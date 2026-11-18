@@ -29,7 +29,7 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
 import { can } from "@/lib/shared/permissions";
-import { planningWeekStart, type PlanningRole } from "@/lib/shared/planning";
+import { LATE_WITHDRAWAL_MS, planningWeekStart, WITHDRAWAL_REASON_MAX, type PlanningRole } from "@/lib/shared/planning";
 import { planAssignments, type PlannedAssignment } from "@/lib/shared/planning-planner";
 import { visibleText } from "@/lib/shared/visible-text";
 import {
@@ -44,12 +44,6 @@ import { loadPlanningData, loadPlanningHistory, type Executor, type LoadedEntry,
 import { entryAssignments } from "./model";
 import { announceWithdrawal } from "./notices";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture, type PlanningUndo } from "./planning-undo";
-
-/** Un désistement à moins de ce délai avant le début est tardif. */
-export const LATE_WITHDRAWAL_MS = 24 * 60 * 60 * 1000;
-
-/** Longueur maximale du motif (caractères). */
-export const WITHDRAWAL_REASON_MAX = 300;
 
 export type WithdrawalInput = { entryKey: string; role: PlanningRole; reason: string | null };
 
@@ -135,7 +129,10 @@ async function findReplacement(
  * refusent (place alors à pourvoir). Arbitre de match confirmé : posé sur le
  * match d'abord (`assignMatchReferee`, qui juge condition d'arbitrage et
  * joueur), la ligne du planning ensuite — la réconciliation (`confirmPendingReferees`)
- * rattraperait une panne entre les deux.
+ * rattraperait une panne entre les deux. `actorId` : celui dont le geste
+ * déclenche la pose (le désisté) ; le match ne s'en sert qu'à taire l'avis
+ * d'un arbitre remplacé par lui-même — aucun ici, le match étant vide
+ * (`expected` nul) — et ne le garde ni ne le publie.
  */
 async function placeReplacement(
   connection: PoolConnection,
@@ -183,16 +180,30 @@ function withdrawnAssignment(user: AuthUser, input: WithdrawalInput, data: Plann
   return { entry, current };
 }
 
-/** Retire l'arbitre désigné du match s'il s'agit encore de `userId` ; un refus défait le geste. */
-async function releaseMatchReferee(matchId: number, userId: number, undo: PlanningUndo, eventIds: readonly number[]): Promise<void> {
+/**
+ * Retire l'arbitre désigné du match s'il s'agit encore de `userId` ; un refus
+ * défait le geste. Rend l'arbitre que le match porte déjà quand c'est **un
+ * autre** (changé depuis la fenêtre « Arbitrage » entre la lecture et ce
+ * retrait) : le rôle est tenu, il n'y a ni remplaçant à chercher ni place à
+ * pourvoir. `null` sinon.
+ */
+async function releaseMatchReferee(matchId: number, userId: number, undo: PlanningUndo, eventIds: readonly number[]): Promise<number | null> {
   const carried = await readMatchReferee(matchId);
-  if (carried !== undefined && carried !== userId) return;
+  if (carried !== undefined && carried !== userId) return carried;
   try {
     await assignMatchReferee(matchId, userId, null, userId);
   } catch (error) {
     await settleFailedDesignation(error, matchId, null, undo, eventIds);
     throw error;
   }
+  return null;
+}
+
+/** Les autres affectés tenus de l'entrée : ni le désisté, ni le remplaçant. */
+function coAssigned(entry: LoadedEntry, data: PlanningData, userId: number, replacementId: number | null): number[] {
+  return entryAssignments(entry, data)
+    .filter((row) => !row.provisional && row.userId !== userId && row.userId !== replacementId)
+    .map((row) => row.userId);
 }
 
 type Outcome = WithdrawalResult & {
@@ -226,14 +237,26 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
       ]);
       return [await writeWithdrawalEvent(connection, entry, user.id, input, confirmed, late)];
     });
-    if (matchId !== null && undo !== undefined) await releaseMatchReferee(matchId, user.id, undo, eventIds);
+    const heldBy = matchId !== null && undo !== undefined ? await releaseMatchReferee(matchId, user.id, undo, eventIds) : null;
+    if (heldBy !== null) {
+      const reread = await loadPlanningData(connection, { now, includeHidden: true });
+      const fresh = reread.entries.find((candidate) => candidate.key === entry.key) ?? entry;
+      return {
+        late,
+        replaced: false,
+        unfilled: false,
+        confirmed,
+        entry: fresh,
+        replacementId: null,
+        // L'arbitre posé par le staff n'apprend pas un désistement d'une place qu'il tient déjà.
+        coAssignedIds: coAssigned(fresh, reread, user.id, heldBy),
+      };
+    }
     const found = await findReplacement(connection, entry.key, input.role, now);
     const fresh = found.entry ?? entry;
     const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, user.id));
     const replacementId = placed && found.pick ? found.pick.userId : null;
-    const coAssignedIds = entryAssignments(fresh, found.data)
-      .filter((row) => !row.provisional && row.userId !== user.id && row.userId !== replacementId)
-      .map((row) => row.userId);
+    const coAssignedIds = coAssigned(fresh, found.data, user.id, replacementId);
     return {
       late,
       replaced: replacementId !== null,
@@ -251,7 +274,9 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
       entry: outcome.entry,
       role: input.role,
       late: outcome.late,
+      withdrawnUserId: user.id,
       replacementId: outcome.replacementId,
+      unfilled: outcome.unfilled,
       coAssignedIds: outcome.coAssignedIds,
     });
   }

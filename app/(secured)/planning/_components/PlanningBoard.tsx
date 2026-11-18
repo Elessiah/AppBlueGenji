@@ -8,10 +8,19 @@ import { BusyButton } from "@/components/ui/busy-button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { NumberInput } from "@/components/ui/number-input";
+import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useToast } from "@/components/ui/toast";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import type { Locale } from "@/lib/shared/locales";
-import { AVAILABILITY_STATUSES, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
+import {
+  AVAILABILITY_STATUSES,
+  LATE_WITHDRAWAL_MS,
+  WITHDRAWAL_FIELD_ERRORS,
+  WITHDRAWAL_REASON_MAX,
+  type AvailabilityStatus,
+  type PlanningRole,
+} from "@/lib/shared/planning";
 import { PLANNING_DURATION_BOUNDS, type PlanningDurationSettings } from "@/lib/shared/planning-durations";
 import type {
   AutoAssignReport,
@@ -91,6 +100,7 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   const [filters, setFilters] = useState<PlanningFilters>(NO_FILTERS);
   const [withdrawing, setWithdrawing] = useState<WithdrawTarget | null>(null);
   const [withdrawReason, setWithdrawReason] = useState("");
+  const reasonErrors = useFieldErrors(WITHDRAWAL_FIELD_ERRORS, WITHDRAWAL_FIELD_IDS);
 
   const fail = useCallback(
     (error: unknown) => showError(t(`errors.${errorKey((error as Error).message, messages.errors)}` as never)),
@@ -158,10 +168,15 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   };
 
   const confirmEntry = useCallback((key: string, slot: string) => setConfirming({ kind: "entry", key, slot }), []);
-  const askWithdraw = useCallback((target: WithdrawTarget) => {
-    setWithdrawReason("");
-    setWithdrawing(target);
-  }, []);
+  const clearReasonError = reasonErrors.clear;
+  const askWithdraw = useCallback(
+    (target: WithdrawTarget) => {
+      setWithdrawReason("");
+      clearReasonError();
+      setWithdrawing(target);
+    },
+    [clearReasonError],
+  );
   const saveAvailability = useCallback(
     (change: Parameters<typeof applyAvailability>[1]) => setView((current) => (current ? applyAvailability(current, change) : current)),
     [],
@@ -372,11 +387,19 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
           onConfirm={() =>
             act(
               `withdraw:${withdrawing.key}:${withdrawing.role}`,
-              () =>
-                call<WithdrawalResponse>(
-                  "/api/planning/withdrawal",
-                  json("POST", { entryKey: withdrawing.key, role: withdrawing.role, reason: withdrawReason.trim() || null }),
-                ),
+              async () => {
+                try {
+                  return await call<WithdrawalResponse>(
+                    "/api/planning/withdrawal",
+                    json("POST", { entryKey: withdrawing.key, role: withdrawing.role, reason: withdrawReason.trim() || null }),
+                  );
+                } catch (error) {
+                  // Un refus qui désigne le motif s'y rattache aussi (la notification part de `act`).
+                  const code = (error as Error).message;
+                  reasonErrors.report(code, t(`errors.${errorKey(code, messages.errors)}` as never));
+                  throw error;
+                }
+              },
               (result) => t(withdrawDoneKey(result)),
             )
           }
@@ -387,13 +410,18 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
           <p>{t("withdraw.body")}</p>
           {withdrawing.late && <p className={styles.lateWarning}>{t("withdraw.late")}</p>}
           <div className="field">
-            <label htmlFor="planning-withdraw-reason">{t("withdraw.reasonLabel")}</label>
+            <label htmlFor={WITHDRAWAL_FIELD_IDS.reason}>{t("withdraw.reasonLabel")}</label>
             <textarea
-              id="planning-withdraw-reason"
+              id={WITHDRAWAL_FIELD_IDS.reason}
               maxLength={WITHDRAWAL_REASON_MAX}
               value={withdrawReason}
-              onChange={(event) => setWithdrawReason(event.target.value)}
+              onChange={(event) => {
+                setWithdrawReason(event.target.value);
+                reasonErrors.clear("reason");
+              }}
+              {...reasonErrors.aria("reason")}
             />
+            <FieldErrorText fieldId={WITHDRAWAL_FIELD_IDS.reason} message={reasonErrors.message("reason")} />
           </div>
         </ConfirmActionDialog>
       )}
@@ -423,11 +451,8 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
 /** Le désistement en attente de l'accord du membre : l'entrée, le rôle, s'il est tardif (moins de 24 h). */
 type WithdrawTarget = { key: string; role: PlanningRole; slot: string; late: boolean };
 
-/** Motif d'un désistement, au plus (la route refuse au-delà). */
-const WITHDRAWAL_REASON_MAX = 300;
-
-/** Un désistement tardif : moins de 24 h avant le début (la route en juge aussi). */
-const LATE_WITHDRAWAL_MS = 24 * 60 * 60 * 1000;
+/** Le champ du motif d'un désistement (refus rattaché, `useFieldErrors`). */
+const WITHDRAWAL_FIELD_IDS = { reason: "planning-withdraw-reason" } as const;
 
 /** Le message de succès d'un désistement, selon son issue. */
 function withdrawDoneKey(result: WithdrawalResponse): "withdraw.doneReplaced" | "withdraw.doneUnfilled" | "withdraw.done" {

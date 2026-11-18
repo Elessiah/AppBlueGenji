@@ -38,13 +38,8 @@ import {
 import { announceWithdrawal } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "@/lib/server/planning/planning-undo";
-import {
-  cleanWithdrawalReason,
-  isLateWithdrawal,
-  LATE_WITHDRAWAL_MS,
-  WITHDRAWAL_REASON_MAX,
-  withdrawFromEntry,
-} from "@/lib/server/planning/withdrawal";
+import { cleanWithdrawalReason, isLateWithdrawal, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
+import { LATE_WITHDRAWAL_MS, WITHDRAWAL_REASON_MAX } from "@/lib/shared/planning";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { authUser } from "../../../helpers/auth-user";
@@ -218,7 +213,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
     expect(result).toEqual({ late: false, replaced: false, unfilled: true });
-    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: true, withdrawnUserId: 4 });
   });
 
   it("withdrawFromEntry_lessThan24hBefore_flaggedLate", async () => {
@@ -268,6 +263,57 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
       [1, 3, null, 3],
       [1, 3, 5, null],
     ]);
+  });
+
+  it("withdrawFromEntry_matchRefereeChangedMeanwhile_noReplacementNorOpenSlot", async () => {
+    // Le staff a posé l'arbitre 7 sur le match entre la lecture et le retrait : la place est tenue.
+    const members = [loadedMember({ userId: 3 }), loadedMember({ userId: 5 }), loadedMember({ userId: 7 })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry({ matchRefereeId: 3 })],
+          assignments: [loadedAssignment({ userId: 3, confirmed: true })],
+          members,
+        }),
+      )
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry({ matchRefereeId: 7 })],
+          members,
+          availability: [available("m:1", 5, "REFEREE")],
+        }),
+      );
+    jest.mocked(readMatchReferee).mockResolvedValue(7);
+
+    const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false });
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: false, coAssignedIds: [] });
+  });
+
+  it("withdrawFromEntry_matchRefereeClearedMeanwhile_noReleaseCallButReplacementSearched", async () => {
+    const members = [loadedMember({ userId: 3 }), loadedMember({ userId: 5 })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(
+        planningData({ entries: [loadedEntry({ matchRefereeId: 3 })], assignments: [loadedAssignment({ userId: 3, confirmed: true })], members }),
+      )
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry()],
+          members,
+          availability: [available("m:1", 5, "REFEREE")],
+          removals: [{ entryKey: "m:1", userId: 3, role: "REFEREE" }],
+        }),
+      );
+    jest.mocked(readMatchReferee).mockResolvedValue(null);
+
+    const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false });
+    expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([[1, 3, 5, null]]);
   });
 
   it("withdrawFromEntry_matchRefusesRelease_rethrowsAfterUndo", async () => {

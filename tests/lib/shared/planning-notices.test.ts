@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   formatPlanningAssignedDm,
   formatPlanningNewEntriesDm,
+  formatPlanningUnfilledDm,
   formatPlanningUnfilledLine,
   formatPlanningWithdrawalDm,
   PLANNING_DM_MAX_LINES,
@@ -130,6 +131,16 @@ describe("formatPlanningWithdrawalDm", () => {
 
     expect(message).toContain("A caster withdrew");
     expect(message).toContain("The slot is open.");
+  });
+});
+
+describe("formatPlanningUnfilledDm", () => {
+  it("formatPlanningUnfilledDm_englishNotLate_noLateFlag", () => {
+    const dm = formatPlanningUnfilledDm(withdrawal(), SITE, "en");
+
+    expect(dm).toContain("no replacement found, the slot is open.");
+    expect(dm).toContain(`${SITE}/en/planning`);
+    expect(dm).not.toContain("late withdrawal");
   });
 });
 

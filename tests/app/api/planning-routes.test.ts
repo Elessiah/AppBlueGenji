@@ -39,7 +39,8 @@ import { setAvailability, setManualAssignment, setSoloCaster } from "@/lib/serve
 import { confirmAssignments, runAutoAssign } from "@/lib/server/planning/auto-assign";
 import { writeDurationSettings } from "@/lib/server/planning/load";
 import { loadPlanningView } from "@/lib/server/planning/view";
-import { WITHDRAWAL_REASON_MAX, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
+import { withdrawFromEntry } from "@/lib/server/planning/withdrawal";
+import { WITHDRAWAL_REASON_MAX } from "@/lib/shared/planning";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { DEFAULT_PLANNING_DURATIONS } from "@/lib/shared/planning-durations";
 import type { PlanningView } from "@/lib/shared/planning-view";

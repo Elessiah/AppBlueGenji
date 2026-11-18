@@ -204,7 +204,7 @@ compte les **rôles**, pas les personnes.
 ## Notifications (`lib/server/planning/notices.ts`, `new-entries.ts`)
 
 Quatre sujets de `PUSH_TOPICS`, chacun push **et** message privé Discord
-(`notifyUsers` / `notifyStaff`) ; couper le sujet coupe aussi le message privé
+(`notifyUsers`) ; couper le sujet coupe aussi le message privé
 (`dmFollowsTopic` : lu dans `bg_push_topic_optouts`, et une lecture en
 échec n'envoie aucun message privé). Rédacteurs : `push-messages.ts`
 (`planning*Push`) et `lib/shared/planning-notices.ts` (messages privés, heure
@@ -217,10 +217,15 @@ de Paris, lien vers `/planning` dans la langue du destinataire).
   depuis 5 min, ou au plus tard 30 min après sa plus ancienne entrée. Chaque
   membre ne reçoit que les entrées où il tient un rôle utile : caster et prod
   toutes, arbitre celles dont il remplit la condition d'arbitrage du jeu ;
-  jamais une entrée où il joue ; un tournoi caché seulement s'il voit les
-  tournois cachés. Au premier passage (table vide) tout est noté déjà
-  annoncé, sans message. Une entrée est notée annoncée **avant** l'envoi :
-  une panne perd un récapitulatif, n'en double jamais un.
+  jamais une entrée où il joue. Une entrée d'un tournoi encore **caché** n'est
+  pas notée : elle l'est quand le tournoi devient visible, et part alors à
+  tous ceux qu'elle concerne. Au tout premier passage (marqueur
+  `planning_entry_notices_bootstrapped` absent de `bg_settings`), tout est noté
+  déjà annoncé, sans message ; le marqueur ne dépend pas du contenu de la
+  table, que la purge de conservation peut vider. Le balayage ne lit que les
+  lignes des entrées ouvertes et celles qui attendent leur annonce, et note les
+  nouvelles en une seule insertion. Une entrée est notée annoncée **avant**
+  l'envoi : une panne perd un récapitulatif, n'en double jamais un.
 - `PLANNING_ASSIGNED` (« Affectations du planning ») : à la **confirmation**
   (calcul confirmé, un message par personne pour toutes ses lignes) ou à une
   affectation **manuelle** ; jamais pour une proposition provisoire, jamais
@@ -230,9 +235,15 @@ de Paris, lien vers `/planning` dans la langue du destinataire).
   de l'entrée quand une attribution **confirmée** est quittée — « un caster
   s'est désisté », remplaçant affecté ou place à pourvoir.
 - `PLANNING_UNFILLED` (« Places à pourvoir », `tournaments`) :
-  aucun remplaçant trouvé — push au staff des tournois, ligne au canal de logs
-  et message privé aux arbitres (`pushRefereeAlert`, comme une alerte
-  d'arbitrage) ; « désistement tardif » s'il l'est.
+  aucun remplaçant trouvé — push **et** message privé au staff des tournois
+  (comptes qui tiennent `tournaments`, donc voient les tournois cachés ; le
+  désisté excepté), dans la langue de chacun, et une ligne sans nom au journal
+  du staff sur Discord (`sendBotLog`, catégorie `referees`) ; « désistement
+  tardif » s'il l'est. Jamais par le rôle arbitre de Discord : son message
+  privé passerait outre le sujet coupé.
+- Arbitre de match changé depuis la fenêtre « Arbitrage » entre la lecture
+  et le retrait : le match porte déjà un autre arbitre, la place est tenue —
+  ni remplaçant cherché, ni place à pourvoir, ni avis à cet arbitre.
 
 Vie privée : aucun pseudo de joueur (« Un match » en tournoi individuel),
 noms d'équipe et de tournoi par `discordInline`, **aucun membre du staff

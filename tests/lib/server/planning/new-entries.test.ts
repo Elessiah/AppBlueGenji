@@ -18,6 +18,7 @@ import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { loadPlanningEntries, loadPlanningMembers } from "@/lib/server/planning/load";
 import {
   announceWave,
+  BOOTSTRAP_SETTING,
   collectWave,
   digestRecipients,
   groupByEntries,
@@ -47,8 +48,12 @@ beforeEach(() => {
 });
 
 /** Les lignes de `bg_planning_entry_notices` que rend la base. */
-function knownNotices(rows: { entry_key: string; seen_at: Date; announced_at: Date | null }[]) {
-  execute.mockImplementation(async (sql: string) => (sql.startsWith("SELECT entry_key") ? [rows] : [{ affectedRows: 1 }]));
+function knownNotices(rows: { entry_key: string; seen_at: Date; announced_at: Date | null }[], bootstrapped = true) {
+  execute.mockImplementation(async (sql: string) => {
+    if (sql.startsWith("SELECT entry_key")) return [rows];
+    if (sql.startsWith("SELECT 1 FROM bg_settings")) return [bootstrapped ? [{ 1: 1 }] : []];
+    return [{ affectedRows: 1 }];
+  });
 }
 
 function statements(): string[] {
@@ -136,14 +141,31 @@ describe("groupByEntries", () => {
 });
 
 describe("collectWave", () => {
-  it("collectWave_emptyTable_marksEverythingAnnouncedWithoutWave", async () => {
+  it("collectWave_firstPassMarkerAbsent_marksEverythingAnnouncedAndSetsMarker", async () => {
+    knownNotices([], false);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave).toEqual([]);
+    expect(statements()).toEqual([
+      "SELECT 1 FROM bg_settings WHERE setting_",
+      "SELECT entry_key, seen_at, announced_at ",
+      "INSERT IGNORE INTO bg_planning_entry_not",
+      "INSERT IGNORE INTO bg_settings (setting_",
+    ]);
+    expect(execute.mock.calls[2][1]).toEqual(["m:1", 10, 1, new Date(NOW), new Date(NOW)]);
+    expect(execute.mock.calls[3][1]).toEqual([BOOTSTRAP_SETTING]);
+  });
+
+  it("collectWave_tableEmptiedByRetentionAfterFirstPass_newWaveStillPending", async () => {
+    // Table vidée par la purge : le marqueur tient, la nouvelle vague n'est pas avalée.
     knownNotices([]);
 
     const wave = await collectWave(fakeConnection(connection), NOW);
 
     expect(wave).toEqual([]);
-    expect(statements()).toEqual(["SELECT entry_key, seen_at, announced_at ", "INSERT IGNORE INTO bg_planning_entry_not"]);
-    expect(execute.mock.calls[1][1]).toEqual(["m:1", 10, 1, new Date(NOW), new Date(NOW)]);
+    expect(execute.mock.calls[2][1]).toEqual(["m:1", 10, 1, new Date(NOW), null]);
+    expect(statements()).not.toContain("INSERT IGNORE INTO bg_settings (setting_");
   });
 
   it("collectWave_freshEntry_notedPendingWithoutWave", async () => {
@@ -152,7 +174,57 @@ describe("collectWave", () => {
     const wave = await collectWave(fakeConnection(connection), NOW);
 
     expect(wave).toEqual([]);
-    expect(execute.mock.calls[1][1]).toEqual(["m:1", 10, 1, new Date(NOW), null]);
+    expect(execute.mock.calls[2][1]).toEqual(["m:1", 10, 1, new Date(NOW), null]);
+  });
+
+  it("collectWave_severalFreshEntries_oneMultiRowInsert", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry(), loadedEntry({ key: "m:2", matchId: 2 })]);
+    knownNotices([]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    const inserts = execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_planning_entry_notices"));
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0][1]).toEqual(["m:1", 10, 1, new Date(NOW), null, "m:2", 10, 2, new Date(NOW), null]);
+  });
+
+  it("collectWave_readsOnlyOpenKeysAndPendingRows", async () => {
+    knownNotices([]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    const [sql, params] = execute.mock.calls[1];
+    expect(sql.replace(/\s+/g, " ")).toContain("WHERE announced_at IS NULL OR entry_key IN (?)");
+    expect(params).toEqual(["m:1"]);
+  });
+
+  it("collectWave_noOpenEntry_readsPendingRowsOnly", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([]);
+    knownNotices([]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    expect(execute.mock.calls[1][0].replace(/\s+/g, " ")).toContain("WHERE announced_at IS NULL");
+    expect(execute.mock.calls[1][0]).not.toContain("entry_key IN");
+  });
+
+  it("collectWave_hiddenTournamentEntry_notNotedUntilVisible", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: true })]);
+    knownNotices([]);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave).toEqual([]);
+    expect(statements()).not.toContain("INSERT IGNORE INTO bg_planning_entry_not");
+  });
+
+  it("collectWave_tournamentBecameVisible_entryNotedThenAnnouncedToAll", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: false })]);
+    knownNotices([]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    expect(execute.mock.calls[2][1]).toEqual(["m:1", 10, 1, new Date(NOW), null]);
   });
 
   it("collectWave_pendingWaveQuiet_markedAnnouncedThenReturned", async () => {
@@ -161,7 +233,11 @@ describe("collectWave", () => {
     const wave = await collectWave(fakeConnection(connection), NOW);
 
     expect(wave.map((entry) => entry.key)).toEqual(["m:1"]);
-    expect(statements()).toEqual(["SELECT entry_key, seen_at, announced_at ", "UPDATE bg_planning_entry_notices SET ann"]);
+    expect(statements()).toEqual([
+      "SELECT 1 FROM bg_settings WHERE setting_",
+      "SELECT entry_key, seen_at, announced_at ",
+      "UPDATE bg_planning_entry_notices SET ann",
+    ]);
   });
 
   it("collectWave_pendingEntryNoLongerOpen_markedButNotReturned", async () => {
@@ -171,7 +247,7 @@ describe("collectWave", () => {
     const wave = await collectWave(fakeConnection(connection), NOW);
 
     expect(wave).toEqual([]);
-    expect(execute.mock.calls[1][1]).toEqual([new Date(NOW), "m:1"]);
+    expect(execute.mock.calls[2][1]).toEqual([new Date(NOW), "m:1"]);
   });
 });
 

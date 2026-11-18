@@ -9,14 +9,20 @@
  * nouvelle entrée), sans jamais attendre plus de {@link NEW_ENTRIES_MAX_WAIT_MS}
  * depuis la plus ancienne. Chaque membre ne reçoit que les entrées où il tient
  * un rôle utile : arbitre seulement s'il remplit la condition d'arbitrage du
- * jeu, jamais une entrée où il joue, un tournoi encore caché seulement s'il
- * voit les tournois cachés. Les membres qui reçoivent la même liste partent en
- * un envoi.
+ * jeu, jamais une entrée où il joue. Les membres qui reçoivent la même liste
+ * partent en un envoi.
  *
- * Au premier passage (table vide : premier déploiement), tout ce qui existe
- * est noté **déjà annoncé** : on n'écrit pas en masse sur un planning qui
- * n'est pas nouveau. Les entrées sont notées annoncées **avant** l'envoi : une
- * panne fait perdre un récapitulatif, jamais en envoyer deux.
+ * Une entrée d'un tournoi encore caché n'est pas notée : elle le sera quand
+ * le tournoi deviendra visible, et partira alors à tous ceux qu'elle concerne
+ * (l'annoncer plus tôt au seul staff qui voit les tournois cachés la ferait
+ * passer pour annoncée aux autres, qui n'en sauraient jamais rien).
+ *
+ * Au tout premier passage (marqueur {@link BOOTSTRAP_SETTING} absent de
+ * `bg_settings` : premier déploiement), tout ce qui existe est noté **déjà
+ * annoncé** : on n'écrit pas en masse sur un planning qui n'est pas nouveau.
+ * Le marqueur, posé une fois, ne dépend pas du contenu de la table, que la
+ * purge de conservation peut vider. Les entrées sont notées annoncées
+ * **avant** l'envoi : une panne fait perdre un récapitulatif, jamais en envoyer deux.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -38,6 +44,8 @@ export const NEW_ENTRIES_MAX_WAIT_MS = 30 * 60 * 1000;
 const SWEEP_TICK_MS = 60 * 1000;
 const FIRST_SWEEP_DELAY_MS = 2 * 60 * 1000;
 const NOTICES_LOCK = "bg_planning_notices";
+/** Marqueur (`bg_settings`) du premier passage, posé une fois pour toutes. */
+export const BOOTSTRAP_SETTING = "planning_entry_notices_bootstrapped";
 
 type NoticeRow = RowDataPacket & { entry_key: string; seen_at: Date | string; announced_at: Date | string | null };
 
@@ -102,25 +110,44 @@ async function eligibleByGame(executor: Executor, members: readonly LoadedMember
 const toMs = (value: Date | string) => new Date(value).getTime();
 const inList = (count: number) => Array.from({ length: count }, () => "?").join(", ");
 
+/** Le premier passage a-t-il déjà eu lieu ({@link BOOTSTRAP_SETTING}) ? */
+async function bootstrapped(connection: PoolConnection): Promise<boolean> {
+  const [rows] = await connection.execute<RowDataPacket[]>("SELECT 1 FROM bg_settings WHERE setting_key = ? LIMIT 1", [BOOTSTRAP_SETTING]);
+  return rows.length > 0;
+}
+
 /**
  * Un passage : note les entrées nouvelles, et rend la vague à annoncer (déjà
  * notée annoncée) — vide si rien n'est prêt. Sous le verrou nommé : deux
- * processus ne l'annoncent jamais deux fois.
+ * processus ne l'annoncent jamais deux fois. Ne lit que les lignes utiles :
+ * celles des entrées ouvertes, et celles qui attendent leur annonce.
  */
 export async function collectWave(connection: PoolConnection, now: number): Promise<LoadedEntry[]> {
-  const entries = (await loadPlanningEntries(connection, { now, includeHidden: true })).filter((entry) => entry.open);
-  const [known] = await connection.execute<NoticeRow[]>(`SELECT entry_key, seen_at, announced_at FROM bg_planning_entry_notices`);
-  const bootstrap = known.length === 0;
+  // Un tournoi caché attend d'être visible (voir l'en-tête).
+  const entries = (await loadPlanningEntries(connection, { now, includeHidden: true })).filter((entry) => entry.open && !entry.hidden);
+  const bootstrap = !(await bootstrapped(connection));
+  const openKeys = entries.map((entry) => entry.key);
+  const [known] = await connection.execute<NoticeRow[]>(
+    openKeys.length === 0
+      ? `SELECT entry_key, seen_at, announced_at FROM bg_planning_entry_notices WHERE announced_at IS NULL`
+      : `SELECT entry_key, seen_at, announced_at FROM bg_planning_entry_notices
+          WHERE announced_at IS NULL OR entry_key IN (${inList(openKeys.length)})`,
+    openKeys,
+  );
   const knownKeys = new Set(known.map((row) => row.entry_key));
   const fresh = entries.filter((entry) => !knownKeys.has(entry.key));
   const stamp = new Date(now);
-  for (const entry of fresh) {
+  if (fresh.length > 0) {
     await connection.execute(
-      `INSERT IGNORE INTO bg_planning_entry_notices (entry_key, tournament_id, match_id, seen_at, announced_at) VALUES (?, ?, ?, ?, ?)`,
-      [entry.key, entry.tournamentId, entry.matchId, stamp, bootstrap ? stamp : null],
+      `INSERT IGNORE INTO bg_planning_entry_notices (entry_key, tournament_id, match_id, seen_at, announced_at)
+       VALUES ${fresh.map(() => "(?, ?, ?, ?, ?)").join(", ")}`,
+      fresh.flatMap((entry) => [entry.key, entry.tournamentId, entry.matchId, stamp, bootstrap ? stamp : null]),
     );
   }
-  if (bootstrap) return [];
+  if (bootstrap) {
+    await connection.execute("INSERT IGNORE INTO bg_settings (setting_key, setting_value) VALUES (?, '1')", [BOOTSTRAP_SETTING]);
+    return [];
+  }
   const open = new Map(entries.map((entry) => [entry.key, entry]));
   const pending = [
     ...known.filter((row) => row.announced_at === null).map((row) => ({ key: row.entry_key, seenAt: toMs(row.seen_at) })),

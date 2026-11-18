@@ -177,14 +177,26 @@ export function formatPlanningWithdrawalDm(notice: PlanningWithdrawalNotice, sit
 }
 
 /**
- * Ligne du staff (canal de logs et message privé du staff des tournois,
- * `PLANNING_UNFILLED`) : une place reste à pourvoir. Aucun nom de staff.
+ * Ligne du journal du staff sur Discord (`PLANNING_UNFILLED`) : une place
+ * reste à pourvoir. Aucun nom de staff. Le journal reste en français.
  */
 export function formatPlanningUnfilledLine(notice: PlanningWithdrawalNotice, siteBase: string): string {
+  return formatPlanningUnfilledDm(notice, siteBase, "fr");
+}
+
+/**
+ * Message privé du staff des tournois (`PLANNING_UNFILLED`), dans la langue
+ * du destinataire : une place reste à pourvoir. Aucun nom de staff.
+ */
+export function formatPlanningUnfilledDm(notice: PlanningWithdrawalNotice, siteBase: string, locale: Locale): string {
+  const role = planningRoleLabel(notice.role, locale);
+  const label = planningEntryLabel(notice, locale);
+  const when = planningNoticeTime(notice.startAt, locale);
+  const url = planningNoticeUrl(siteBase, locale);
+  if (locale === "en") {
+    const late = notice.late ? " (late withdrawal, less than 24 h before)" : "";
+    return `⚠️ Planning — a ${role} withdrew from ${label} (${when}, Paris time)${late}: no replacement found, the slot is open. ${url}`;
+  }
   const late = notice.late ? " (désistement tardif, moins de 24 h avant)" : "";
-  return (
-    `⚠️ Planning — un ${planningRoleLabel(notice.role, "fr")} s'est désisté de ${planningEntryLabel(notice, "fr")} ` +
-    `(${planningNoticeTime(notice.startAt, "fr")}, heure de Paris)${late} : aucun remplaçant trouvé, place à pourvoir. ` +
-    planningNoticeUrl(siteBase, "fr")
-  );
+  return `⚠️ Planning — un ${role} s'est désisté de ${label} (${when}, heure de Paris)${late} : aucun remplaçant trouvé, place à pourvoir. ${url}`;
 }
