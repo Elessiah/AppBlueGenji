@@ -1120,7 +1120,12 @@ function RgpdFr({
           <p>
             Un membre de la modération peut <strong>suspendre un compte</strong> contraire aux
             conditions d&apos;utilisation, pour une durée déterminée ou indéterminée : toutes ses
-            sessions sont fermées et aucune connexion n&apos;est possible tant que la suspension court.
+            sessions sont fermées et aucune connexion n&apos;est possible tant que la suspension court ;
+            s&apos;il arbitre, caste ou produit, il est écarté des propositions, confirmations, désignations,
+            remplacements et avis du planning (nouveaux créneaux, affectations, désistements, places à pourvoir) ; ce
+            qui lui était déjà confirmé ou désigné reste jusqu&apos;à son retrait ; le staff des tournois et les autres
+            membres du planning peuvent seulement en déduire que le planning ne le retient plus, sans voir la suspension
+            ni ses motifs (<Link href="/rgpd/registre#t20">registre, T20</Link>).
           </p>
           <ul>
             <li>
@@ -1168,7 +1173,7 @@ function RgpdFr({
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de l&apos;horaire de vos matchs (posé,
             changé ou retiré) et de ses rappels (24 h avant ; aussi 10 h avant si le tournoi a un check-in), du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, dans un tournoi qui a un check-in, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
-            alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
+            alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage ; un arbitre, caster ou prod, du planning (nouveaux créneaux où il peut tenir un rôle, ses affectations, les désistements d&apos;attributions confirmées sur ses créneaux confirmés) et, staff des tournois, des places à pourvoir. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets. Un
             sujet ajouté depuis votre abonnement (ainsi « Nouveau match ») est actif d&apos;office sur vos appareils
@@ -1541,8 +1546,17 @@ function RgpdFr({
             sur le match lui-même, comme un geste du staff : le journal du staff sur Discord note chaque
             changement d&apos;arbitre du match sans nommer personne et l&apos;arbitre
             retiré par un autre que lui en est prévenu par notification (<Link href="/rgpd/registre#t04">registre, T04</Link> et{" "}
-            <Link href="/rgpd/registre#t05">T05</Link>) ; rien d&apos;autre du planning n&apos;est publié sur
-            Discord. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
+            <Link href="/rgpd/registre#t05">T05</Link>). Les arbitres, casters et prods sont prévenus en
+            message privé Discord et en notification push des nouveaux créneaux où ils peuvent tenir un rôle
+            (un récapitulatif par vague), de leurs affectations confirmées ou posées à la main, et du
+            désistement d&apos;une attribution confirmée sur un créneau où leur propre attribution est
+            confirmée ; le staff des tournois, d&apos;une place restée à pourvoir (ligne sans nom au journal
+            du staff sur Discord ; le rôle paraît aussi « à pourvoir » sur le planning quand plus personne n&apos;y est confirmé, sans le motif). Aucun de ces messages ne nomme un
+            joueur ni un membre du staff ; chacun de ces sujets se coupe dans les réglages de notifications
+            de « Mon profil », ce qui coupe aussi son message privé. Chacun peut se désister d&apos;une
+            attribution jusqu&apos;au début du créneau, avec un motif facultatif lu par le seul staff des
+            tournois ; le site garde le désistement (rôle, date, motif, s&apos;il est tardif — moins de 24 h
+            avant) avec l&apos;historique, et remplace automatiquement la personne. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
             créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
             le rôle caster ; la suppression du compte emporte tout ce qui le concerne (les gestes faits comme
             staff restent, sans le désigner), l&apos;export de vos données le contient, gestes faits comme staff

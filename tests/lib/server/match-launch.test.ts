@@ -119,6 +119,8 @@ type World = {
   alerts?: string[];
   /** Cartes réglées de la manche du match (`bg_tournament_round_maps.slots_json`), aucune par défaut. */
   roundSlots?: string;
+  /** Comptes sous une suspension qui court (`bg_account_suspensions`), aucun par défaut. */
+  suspendedUsers?: number[];
 };
 
 const STAMP = "2026-09-24 20:00:00";
@@ -444,6 +446,9 @@ function executeFor(state: World) {
     if (sql.startsWith("DELETE FROM bg_match_start_notices")) {
       state.writes.push(`${sql} ${JSON.stringify(params)}`);
       return [{ affectedRows: 1 }, []];
+    }
+    if (sql.includes("FROM bg_account_suspensions")) {
+      return [(state.suspendedUsers ?? []).includes(Number(params[0])) ? [{ user_id: Number(params[0]) }] : [], []];
     }
     const userResult = readUserRows(state, sql, params);
     if (userResult) return userResult;
@@ -1766,6 +1771,40 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     state.match = matchState();
     await expect(assignMatchReferee(42, 1, REFEREE)).rejects.toThrow("REFEREE_IDENTITY_REQUIRED");
     expect(state.match?.referee_user_id).toBeNull();
+  });
+
+  it("assignMatchReferee_refuseSuspendedAndSuspended_refusesWithoutWrite", async () => {
+    state.match = matchState();
+    state.suspendedUsers = [REFEREE];
+
+    await expect(assignMatchReferee(42, 1, REFEREE, undefined, { refuseSuspended: true })).rejects.toThrow("REFEREE_UNAVAILABLE");
+
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+  });
+
+  it("assignMatchReferee_refuseSuspendedNotSuspended_designatesAfterLockedAccountRead", async () => {
+    state.match = matchState();
+    state.issued = [];
+
+    await assignMatchReferee(42, 1, REFEREE, undefined, { refuseSuspended: true });
+
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    const suspensionRead = state.issued.findIndex((sql) => sql.includes("FROM bg_account_suspensions"));
+    const accountRead = state.issued.findIndex((sql) => sql.includes("FROM bg_users") && sql.endsWith("LOCK IN SHARE MODE"));
+    expect(state.issued[suspensionRead]).toMatch(/WHERE s\.user_id IN \(\?\) AND .* LOCK IN SHARE MODE$/);
+    expect(accountRead).toBeLessThan(suspensionRead);
+  });
+
+  it("assignMatchReferee_withoutOption_suspensionNotRead", async () => {
+    state.match = matchState();
+    state.suspendedUsers = [REFEREE];
+    state.issued = [];
+
+    await assignMatchReferee(42, 1, REFEREE);
+
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    expect(state.issued.some((sql) => sql.includes("bg_account_suspensions"))).toBe(false);
   });
 
   it("refuse un match introuvable, joué, ou une exemption", async () => {

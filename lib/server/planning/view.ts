@@ -6,15 +6,17 @@
 import type { AuthUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { can } from "@/lib/shared/permissions";
-import { planningRolesOf } from "@/lib/shared/planning";
+import { PLANNING_ROLES, planningRolesOf, type PlanningRole } from "@/lib/shared/planning";
 import type { PlanningAssignmentShown, PlanningAssignmentView, PlanningEntryView, PlanningView } from "@/lib/shared/planning-view";
 import {
   loadPlanningData,
   loadPlanningMembers,
+  coveringSoloCasterIds,
   loadPlanningMembersByIds,
   type Executor,
-  type LoadedAvailability,
+  type LoadedEntry,
   type LoadedMember,
+  type LoadedWithdrawal,
 } from "./load";
 import { entryAssignments, entryCoverage } from "./model";
 
@@ -60,9 +62,24 @@ export function visibleAssignment(row: PlanningAssignmentView, readerId: number,
 /** Motifs qui ne disent rien de ce que la personne a déclaré : lisibles de tous. */
 const SHARED_REASONS: ReadonlySet<PlanningAssignmentView["reason"]> = new Set<PlanningAssignmentView["reason"]>(["MANUAL", "CAST", "MATCH"]);
 
-/** Les disponibilités regroupées par entrée, en un seul passage. */
-function groupAvailability(rows: readonly LoadedAvailability[]): Map<string, LoadedAvailability[]> {
-  const byEntry = new Map<string, LoadedAvailability[]>();
+/**
+ * Rôles « à pourvoir » d'une entrée encore modifiable : un désistement d'une
+ * attribution **confirmée** sur ce rôle, et plus personne qui le tienne
+ * (proposition provisoire non comprise).
+ */
+export function unfilledRoles(
+  entry: Pick<LoadedEntry, "editable">,
+  assignments: readonly PlanningAssignmentView[],
+  withdrawals: readonly LoadedWithdrawal[],
+): PlanningRole[] {
+  if (!entry.editable) return [];
+  const roles = new Set(withdrawals.filter((row) => row.confirmed).map((row) => row.role));
+  return PLANNING_ROLES.filter((role) => roles.has(role) && !assignments.some((row) => row.role === role && !row.provisional));
+}
+
+/** Les lignes regroupées par entrée, en un seul passage. */
+function groupByEntry<T extends { entryKey: string }>(rows: readonly T[]): Map<string, T[]> {
+  const byEntry = new Map<string, T[]>();
   for (const row of rows) {
     const list = byEntry.get(row.entryKey);
     if (list) list.push(row);
@@ -81,8 +98,11 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       ...(canManage ? {} : { availabilityOf: user.id }),
     }),
   );
-  const solo = new Set(data.members.filter((member) => member.soloCaster).map((member) => member.userId));
-  const availabilityByEntry = groupAvailability(data.availability);
+  // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul
+  // (`preparePlanner`) ; les autres lecteurs gardent la couverture d'avant (rien n'y trahit la suspension).
+  const solo = coveringSoloCasterIds(data.members, canManage);
+  const availabilityByEntry = groupByEntry(data.availability);
+  const withdrawalsByEntry = groupByEntry(data.withdrawals);
   const entries: PlanningEntryView[] = data.entries.map((entry) => {
     const assignments = entryAssignments(entry, data);
     const availability = availabilityByEntry.get(entry.key) ?? [];
@@ -111,6 +131,18 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       // Défense en profondeur : sans `tournaments`, la lecture ne rend déjà que les siennes.
       availability: canManage
         ? availability.map(({ userId, role, status, preferred }) => ({ userId, role, status, preferred }))
+        : [],
+      unfilled: unfilledRoles(entry, assignments, withdrawalsByEntry.get(entry.key) ?? []),
+      // Motif et auteur d'un désistement : au staff des tournois seul.
+      withdrawals: canManage
+        ? (withdrawalsByEntry.get(entry.key) ?? []).map(({ userId, role, late, reason, confirmed, createdAt }) => ({
+            userId,
+            role,
+            late,
+            reason,
+            confirmed,
+            createdAt,
+          }))
         : [],
     };
   });

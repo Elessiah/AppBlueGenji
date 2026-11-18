@@ -13,6 +13,7 @@ jest.mock("@/lib/server/planning/load", () => ({
   loadHiddenTournamentIds: jest.fn(),
 }));
 jest.mock("@/lib/server/planning/profiles");
+jest.mock("@/lib/server/planning/notices");
 jest.mock("@/lib/server/planning/players", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/players")>("@/lib/server/planning/players"),
   loadEntryPlayers: jest.fn(),
@@ -26,6 +27,7 @@ import { withNamedLock } from "@/lib/server/named-lock";
 import { PLANNING_STATUSES, setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
 import { MATCH_REFEREE_REFUSAL_CODES } from "@/lib/server/planning/auto-assign";
 import { loadHiddenTournamentIds, loadPlanningData, loadPlanningEntries, loadPlanningMembersByIds } from "@/lib/server/planning/load";
+import { announceAssignments } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { writeSoloCaster } from "@/lib/server/planning/profiles";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -266,6 +268,30 @@ describe("setManualAssignment — pose", () => {
     expect(callsWith("INSERT INTO bg_planning_assignments")).toHaveLength(1);
   });
 
+  it("setManualAssignment_newAssignment_announcedToAssigneeNotActor", async () => {
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [event], members: [loadedMember({ userId: 6, roles: ["PROD"] })] }));
+
+    await setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: true });
+
+    expect(jest.mocked(announceAssignments).mock.calls[0]).toEqual([[{ userId: 6, entry: event, role: "PROD" }], { actorId: 9 }]);
+  });
+
+  it("setManualAssignment_removal_notAnnounced", async () => {
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [event],
+        members: [loadedMember({ userId: 6, roles: ["PROD"] })],
+        assignments: [loadedAssignment({ entryKey: "t:10", userId: 6, role: "PROD", confirmed: true })],
+      }),
+    );
+
+    await setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: false });
+
+    expect(announceAssignments).not.toHaveBeenCalled();
+  });
+
   it("setManualAssignment_roleLostUnderLock_rollsBackWithoutWriting", async () => {
     const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [event], members }));
@@ -319,7 +345,7 @@ describe("setManualAssignment — pose", () => {
 
     await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true });
 
-    expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, 7);
+    expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, 7, { refuseSuspended: true });
     expect(callsWith("role = 'REFEREE' AND user_id <> ?")[0][1]).toEqual(["m:1", 3]);
     expect(callsWith("UPDATE bg_matches")).toEqual([]);
   });
@@ -543,6 +569,26 @@ describe("setManualAssignment — pose", () => {
       "ER_LOCK_DEADLOCK",
     );
     expect(callsWith("INSERT IGNORE")).toHaveLength(1);
+  });
+
+  it("setManualAssignment_matchRefereeUnavailable_neutralRefusalAndUndone", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    routeSql({ rows: [assignmentRow()], matchReferee: 7 });
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("REFEREE_UNAVAILABLE"));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(
+      "PLANNING_ROLE_NOT_HELD",
+    );
+    expect(callsWith("INSERT IGNORE")).toHaveLength(1);
+  });
+
+  it("setManualAssignment_matchReferee_onePlanningReReadOnly", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    routeSql({ matchReferee: 7 });
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true });
+
+    expect(loadPlanningMembersByIds).toHaveBeenCalledTimes(1);
   });
 
   it("setManualAssignment_matchAlreadyHasWanted_noDesignationCall", async () => {

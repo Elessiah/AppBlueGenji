@@ -24,6 +24,7 @@ import {
   type PlanningData,
 } from "./load";
 import { entryAssignments } from "./model";
+import { announceAssignments } from "./notices";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture, undoPlanningBlock } from "./planning-undo";
 import { loadEntryPlayers, playersDuring } from "./players";
 import { writeSoloCaster } from "./profiles";
@@ -42,6 +43,8 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   PLANNING_NOT_ASSIGNED: 409,
   PLANNING_BUSY: 409,
   PLANNING_CONFIRM_PARTIAL: 409,
+  PLANNING_WITHDRAWAL_CLOSED: 409,
+  PLANNING_REASON_TOO_LONG: 400,
   NOT_CASTER: 409,
   // Refus de la désignation d'un arbitre de match (`assignMatchReferee`) : la liste unique.
   ...Object.fromEntries(MATCH_REFEREE_REFUSAL_CODES.map((code) => [code, code === "MATCH_NOT_FOUND" ? 404 : 409])),
@@ -244,11 +247,15 @@ async function assignManually({ connection, actor, data, entry, input, current, 
     return;
   }
   try {
-    await assignMatchReferee(matchId, actor.id, input.userId, entry.matchRefereeId);
+    // Suspension jugée dans la transaction même du match (`refuseSuspended`) : une suspension posée
+    // depuis le contrôle du planning refuse, et le geste se défait comme sur un refus.
+    await assignMatchReferee(matchId, actor.id, input.userId, entry.matchRefereeId, { refuseSuspended: true });
   } catch (error) {
     const took = await settleFailedDesignation(error, matchId, input.userId, undo, eventIds);
     // Issue incertaine : le match a pu garder son arbitre, l'historique ne dit pas qu'il l'a perdu.
     if (took === undefined && carriedEvent !== undefined) await undoPlanningBlock({ keys: [], rows: [] }, [carriedEvent]);
+    // Même texte neutre que le contrôle du planning : la suspension n'est pas dite au staff des tournois.
+    if (error instanceof Error && error.message === "REFEREE_UNAVAILABLE") throw new Error("PLANNING_ROLE_NOT_HELD");
     throw error;
   }
 }
@@ -292,7 +299,7 @@ async function unassignManually({ connection, actor, entry, input, current, matc
 }
 
 export async function setManualAssignment(actor: AuthUser, input: ManualInput, now: number = Date.now()): Promise<void> {
-  await withPlanningLock(async (connection) => {
+  const announce = await withPlanningLock(async (connection) => {
     const { data, entry } = await findEntry(connection, actor, input.entryKey, now);
     if (!entry.editable) throw new Error("PLANNING_ENTRY_CLOSED");
     // L'arbitre d'un match passe par le match lui-même.
@@ -300,5 +307,9 @@ export async function setManualAssignment(actor: AuthUser, input: ManualInput, n
     const current = entryAssignments(entry, data).find((row) => row.userId === input.userId && row.role === input.role);
     const context = { connection, actor, data, entry, input, current, matchId };
     await (input.assigned ? assignManually(context) : unassignManually(context));
+    // Une affectation nouvelle (ou une proposition que ce choix fixe) s'annonce ; une déjà tenue, non.
+    return input.assigned && (current === undefined || current.provisional) ? entry : null;
   });
+  // Après le verrou, sans faire attendre la page ; l'auteur qui se pose lui-même n'est pas prévenu.
+  if (announce !== null) void announceAssignments([{ userId: input.userId, entry: announce, role: input.role }], { actorId: actor.id });
 }

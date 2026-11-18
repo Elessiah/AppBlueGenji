@@ -8,6 +8,8 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { resolveRoles } from "@/lib/server/auth";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
 import { firstStreamUrlSql } from "@/lib/server/tournaments/match-casters";
+import { toIso } from "@/lib/server/serialization";
+import { lockedSuspendedUserIds, userSuspendedSql } from "@/lib/server/suspension-sql";
 import { can, rolesGranting } from "@/lib/shared/permissions";
 import {
   PLANNING_HORIZON_DAYS,
@@ -84,14 +86,37 @@ export type LoadedAssignment = {
   confirmed: boolean;
 };
 
-/** Retrait manuel par le staff (`bg_planning_events`) : le calcul ne replace plus ce membre sur ce rôle de cette entrée. */
+/**
+ * Retrait manuel par le staff, ou désistement du membre (`bg_planning_events`) :
+ * le calcul ne replace plus ce membre sur ce rôle de cette entrée.
+ */
 export type LoadedRemoval = { entryKey: string; userId: number; role: PlanningRole };
+
+/**
+ * Désistement d'un membre (`WITHDRAWN`). `reason` (facultatif) n'est rendu
+ * qu'au staff des tournois (`view.ts`) ; `confirmed` : l'attribution quittée
+ * était confirmée (elle comptait dans la couverture annoncée) — seule celle-là
+ * laisse une place « à pourvoir ».
+ */
+export type LoadedWithdrawal = {
+  entryKey: string;
+  userId: number;
+  role: PlanningRole;
+  reason: string | null;
+  late: boolean;
+  confirmed: boolean;
+  createdAt: string;
+};
 
 /**
  * Un compte du planning. `seesHidden` : il voit les tournois encore cachés
  * (permission `tournaments`, la même que `includeHidden` des lectures).
  */
-export type LoadedMember = { userId: number; pseudo: string; roles: PlanningRole[]; soloCaster: boolean; seesHidden: boolean };
+/**
+ * `suspended` : une suspension le tient à la lecture — plus aucun droit
+ * effectif au planning (`holdingRefusal`) ; jamais rendu à la page.
+ */
+export type LoadedMember = { userId: number; pseudo: string; roles: PlanningRole[]; soloCaster: boolean; seesHidden: boolean; suspended: boolean };
 
 export type PlanningData = {
   entries: LoadedEntry[];
@@ -100,6 +125,7 @@ export type PlanningData = {
   availability: LoadedAvailability[];
   assignments: LoadedAssignment[];
   removals: LoadedRemoval[];
+  withdrawals: LoadedWithdrawal[];
   /** Casters inscrits sur un match (`bg_match_casters`) : `entryKey` → comptes. */
   matchCasters: Map<string, number[]>;
   members: LoadedMember[];
@@ -311,12 +337,29 @@ type MemberRow = RowDataPacket & {
   is_admin: number;
   platform_roles_json: string | null;
   solo_caster: number | null;
+  suspended: number;
 };
+
+/**
+ * Les casters autonomes qui couvrent seuls leur créneau. `skipSuspended` :
+ * un caster autonome suspendu ne compte plus (calcul et staff des tournois,
+ * qui doivent pourvoir sa place) ; les autres lecteurs gardent la couverture
+ * d'avant, rien n'y trahit la suspension.
+ */
+export function coveringSoloCasterIds(
+  members: readonly Pick<LoadedMember, "userId" | "soloCaster" | "suspended">[],
+  skipSuspended: boolean,
+): Set<number> {
+  return new Set(members.filter((member) => member.soloCaster && !(skipSuspended && member.suspended)).map((member) => member.userId));
+}
+
+/** Une suspension qui court tient le compte `u` (sous-requête, lue avec la ligne du compte). */
+const MEMBER_SUSPENDED_SQL = `${userSuspendedSql("u.id")} AS suspended`;
 
 /** Comptes qui tiennent un rôle du planning (droits **réels**, la vue joueur n'y change rien). */
 export async function loadPlanningMembers(executor: Executor): Promise<LoadedMember[]> {
   const [rows] = await executor.execute<MemberRow[]>(
-    `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster
+    `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster, ${MEMBER_SUSPENDED_SQL}
        FROM bg_users u
        LEFT JOIN bg_planning_profiles p ON p.user_id = u.id
       WHERE u.is_deleted = 0 AND ${PLANNING_MEMBER_SQL}
@@ -338,6 +381,7 @@ function toMembers(rows: readonly MemberRow[]): LoadedMember[] {
         roles: planningRolesOf(account),
         soloCaster: Number(row.solo_caster ?? 0) === 1,
         seesHidden: can(account, "tournaments"),
+        suspended: Number(row.suspended) === 1,
       };
     })
     .filter((member) => member.roles.length > 0);
@@ -351,8 +395,13 @@ function toMembers(rows: readonly MemberRow[]): LoadedMember[] {
  * en partage (`LOCK IN SHARE MODE`, compris de MariaDB) — un retrait de rôle
  * concurrent attend que l'écriture qui s'appuie sur cette lecture soit validée ;
  * cette lecture-là, sans jointure, ne lit **pas** le réglage « caster
- * autonome » (`soloCaster` toujours faux) : elle ne sert qu'à juger rôles et
- * visibilité (`lockedHolding`).
+ * autonome » (`soloCaster` toujours faux) : elle ne sert qu'à juger rôles,
+ * suspension et visibilité (`lockedHolding`). La suspension s'y relit à part,
+ * **après** les comptes, par sa propre lecture verrouillante (une sous-requête
+ * d'une lecture verrouillante n'est qu'une lecture d'instantané, qui ne verrait
+ * pas une suspension validée pendant l'attente du verrou) : une suspension
+ * posée pendant le geste (`suspendAccount` tient la ligne du compte jusqu'à sa
+ * validation) est donc lue.
  */
 export async function loadPlanningMembersByIds(
   executor: Executor,
@@ -363,18 +412,21 @@ export async function loadPlanningMembersByIds(
   // Le compte seul est verrouillé (requête sans jointure) ; le réglage autonome se lit à part.
   const [rows] = await executor.execute<MemberRow[]>(
     options.lock
-      ? `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, 0 AS solo_caster
+      ? `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, 0 AS solo_caster, 0 AS suspended
            FROM bg_users u
           WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
           ORDER BY u.id LOCK IN SHARE MODE`
-      : `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster
+      : `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster, ${MEMBER_SUSPENDED_SQL}
            FROM bg_users u
            LEFT JOIN bg_planning_profiles p ON p.user_id = u.id
           WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
           ORDER BY u.id`,
     [...ids],
   );
-  return toMembers(rows);
+  if (!options.lock || rows.length === 0) return toMembers(rows);
+  // Les comptes tenus, la suspension se relit verrouillée (comptes puis suspensions, l'ordre de `suspendAccount`).
+  const held = await lockedSuspendedUserIds(executor, rows.map((row) => Number(row.id)));
+  return toMembers(rows.map((row) => ({ ...row, suspended: held.has(Number(row.id)) ? 1 : 0 })));
 }
 
 /**
@@ -411,7 +463,17 @@ type AssignmentRow = RowDataPacket & {
   confirmed: number;
 };
 
-type RemovalRow = RowDataPacket & { entry_key: string; user_id: number; role: PlanningRole };
+type EventRow = RowDataPacket & {
+  id: number;
+  entry_key: string;
+  user_id: number;
+  role: PlanningRole;
+  kind: "REMOVED" | "WITHDRAWN";
+  reason: string | null;
+  late: number;
+  source: AssignmentSource;
+  created_at: Date | string;
+};
 
 type CasterRow = RowDataPacket & { match_id: number; user_id: number };
 
@@ -453,9 +515,18 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
   const matchIds = entries.flatMap((entry) => (entry.matchId === null ? [] : [entry.matchId]));
   const membersRead = options.members ? Promise.resolve(options.members) : loadPlanningMembers(executor);
   if (entries.length === 0) {
-    return { entries, durations, members: await membersRead, availability: [], assignments: [], removals: [], matchCasters: new Map() };
+    return {
+      entries,
+      durations,
+      members: await membersRead,
+      availability: [],
+      assignments: [],
+      removals: [],
+      withdrawals: [],
+      matchCasters: new Map(),
+    };
   }
-  const [members, [availability], [assignments], [removals], matchCasters] = await Promise.all([
+  const [members, [availability], [assignments], [events], matchCasters] = await Promise.all([
     membersRead,
     executor.execute<AvailabilityRow[]>(
       `SELECT entry_key, user_id, role, status, preferred FROM bg_planning_availability
@@ -467,13 +538,19 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
         WHERE entry_key IN (${inList(keys.length)})`,
       keys,
     ),
-    executor.execute<RemovalRow[]>(
-      `SELECT DISTINCT entry_key, user_id, role FROM bg_planning_events
-        WHERE kind = 'REMOVED' AND source = 'MANUAL' AND entry_key IN (${inList(keys.length)})`,
+    // Retraits du staff et désistements en **une** lecture (même index). Pour
+    // un désistement, `source` dit si l'attribution quittée était confirmée
+    // (`MANUAL`) ou une proposition provisoire (`AUTO`), `withdrawal.ts`.
+    executor.execute<EventRow[]>(
+      `SELECT id, entry_key, user_id, role, kind, source, reason, late, created_at FROM bg_planning_events
+        WHERE ((kind = 'REMOVED' AND source = 'MANUAL') OR kind = 'WITHDRAWN') AND entry_key IN (${inList(keys.length)})`,
       keys,
     ),
     loadMatchCasters(executor, matchIds),
   ]);
+  const withdrawals = events
+    .filter((row) => row.kind === "WITHDRAWN")
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime() || Number(a.id) - Number(b.id));
   return {
     entries,
     durations,
@@ -493,9 +570,38 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
       reason: row.reason,
       confirmed: row.source === "MANUAL" || Number(row.confirmed) === 1,
     })),
-    removals: removals.map((row) => ({ entryKey: row.entry_key, userId: Number(row.user_id), role: row.role })),
+    removals: distinctRemovals(events),
+    withdrawals: withdrawals.map((row) => ({
+      entryKey: row.entry_key,
+      userId: Number(row.user_id),
+      role: row.role,
+      reason: row.reason,
+      late: Number(row.late) === 1,
+      confirmed: row.source === "MANUAL",
+      createdAt: toIso(row.created_at) ?? "",
+    })),
     matchCasters,
   };
+}
+
+/**
+ * Les écartés, une fois par (entrée, membre, rôle) : retraits et désistements
+ * répétés sur la même place ne dupliquent pas la ligne (pendant du
+ * `SELECT DISTINCT` d'avant les désistements).
+ */
+export function distinctRemovals(
+  rows: readonly Pick<EventRow, "entry_key" | "user_id" | "role">[],
+): PlanningData["removals"] {
+  const seen = new Set<string>();
+  const removals: PlanningData["removals"] = [];
+  for (const row of rows) {
+    const userId = Number(row.user_id);
+    const key = `${row.entry_key}|${userId}|${row.role}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    removals.push({ entryKey: row.entry_key, userId, role: row.role });
+  }
+  return removals;
 }
 
 type HistoryRow = RowDataPacket & { user_id: number; jobs: number };

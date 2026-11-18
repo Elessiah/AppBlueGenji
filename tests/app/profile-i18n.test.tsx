@@ -705,9 +705,9 @@ describe("langue du compte (lot 9-3)", () => {
   it("aide Discord des push : renvoie au choix des messages privés de match (FR et EN)", async () => {
     const fr = (await import("@/messages/fr/push.json")).default.panel.discordHint;
     const en = (await import("@/messages/en/push.json")).default.panel.discordHint;
-    expect(fr).toBe("Les messages privés Discord ont leur propre case : « Messages privés Discord de mes matchs et de mes équipes ».");
-    expect(en).toBe("Discord direct messages have their own box: “Discord direct messages about my matches and teams”.");
-    expect(fr).toBe(`Les messages privés Discord ont leur propre case : « ${(await import("@/messages/fr/profile.json")).default.matchDms.label} ».`);
+    expect(fr).toBe("Les messages privés Discord de tes matchs et équipes ont leur propre case : « Messages privés Discord de mes matchs et de mes équipes ».");
+    expect(en).toBe("Discord direct messages about your matches and teams have their own box: “Discord direct messages about my matches and teams”.");
+    expect(fr).toBe(`Les messages privés Discord de tes matchs et équipes ont leur propre case : « ${(await import("@/messages/fr/profile.json")).default.matchDms.label} ».`);
   });
 
   it("pendant l'envoi : focus gardé et champ utilisable (aria-busy seul, ni disabled ni aria-disabled), second choix envoyé à la suite", async () => {

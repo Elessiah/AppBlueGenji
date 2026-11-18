@@ -83,9 +83,15 @@ export async function createPlanningTables(db: Pool): Promise<void> {
   `);
 
   // Historique des attributions : chaque pose et chaque retrait, calculé ou
-  // manuel. Un retrait **manuel** écarte ce membre de ce rôle de cette entrée
-  // pour les calculs suivants (le choix du staff tient) ; l'historique sert
-  // aussi de base aux désistements d'un lot ultérieur (`kind` s'étendra).
+  // manuel, et chaque désistement (`WITHDRAWN`, posé par le membre lui-même :
+  // `reason` facultatif, lu du seul staff des tournois ; `late` si moins de
+  // 24 h avant le début). Un retrait **manuel** ou un désistement écarte ce
+  // membre de ce rôle de cette entrée pour les calculs suivants (le choix du
+  // staff tient, le désisté n'est pas reproposé). Un désistement ne compte
+  // jamais comme charge (`loadPlanningHistory` ne lit que les attributions).
+  // Pour `WITHDRAWN`, `source` dit l'attribution quittée : `MANUAL` si elle
+  // était confirmée (place annoncée, « à pourvoir » faute de remplaçant),
+  // `AUTO` si ce n'était qu'une proposition provisoire.
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_planning_events (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -94,9 +100,11 @@ export async function createPlanningTables(db: Pool): Promise<void> {
       role ENUM('REFEREE', 'CASTER', 'PROD') NOT NULL,
       tournament_id BIGINT NOT NULL,
       match_id BIGINT NULL,
-      kind ENUM('ASSIGNED', 'CONFIRMED', 'REMOVED') NOT NULL,
+      kind ENUM('ASSIGNED', 'CONFIRMED', 'REMOVED', 'WITHDRAWN') NOT NULL,
       source ENUM('AUTO', 'MANUAL') NOT NULL,
       actor_user_id BIGINT NULL,
+      reason VARCHAR(300) NULL,
+      late TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       -- Le calcul lit les retraits manuels (REMOVED, MANUAL) des entrées du lot :
       -- l'index les trouve sans filtrer, ligne à ligne, toute l'histoire d'une entrée.
@@ -112,6 +120,26 @@ export async function createPlanningTables(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_planning_events_tournament FOREIGN KEY (tournament_id)
         REFERENCES bg_tournaments(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_planning_events_match FOREIGN KEY (match_id)
+        REFERENCES bg_matches(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Annonce des nouvelles entrées (`lib/server/planning/new-entries.ts`) :
+  // chaque entrée vue par le balayage, et quand le récapitulatif l'a annoncée.
+  // Aucune donnée de personne ; supprimée avec son tournoi ou son match.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_planning_entry_notices (
+      entry_key VARCHAR(24) NOT NULL PRIMARY KEY,
+      tournament_id BIGINT NOT NULL,
+      match_id BIGINT NULL,
+      seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      announced_at DATETIME NULL,
+      INDEX idx_bg_planning_entry_notices_pending (announced_at),
+      INDEX idx_bg_planning_entry_notices_tournament (tournament_id),
+      INDEX idx_bg_planning_entry_notices_match (match_id),
+      CONSTRAINT fk_bg_planning_entry_notices_tournament FOREIGN KEY (tournament_id)
+        REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_planning_entry_notices_match FOREIGN KEY (match_id)
         REFERENCES bg_matches(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);

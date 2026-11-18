@@ -30,7 +30,7 @@ function mapAssignment(row: AssignmentRow): Planning["assignmentsSet"][number] {
  * (art. 15 et 20, `docs/features/CAST_PLANNING.md`) : ses disponibilités et
  * préférences, les attributions qui le nomment (avec leur motif : préférence,
  * charge, choix du staff…), leur historique (attribué,
- * confirmé, retiré — sans dire quel membre du staff a fait le geste), ses
+ * confirmé, retiré, désistement avec son motif — sans dire quel membre du staff a fait le geste), ses
  * propres gestes comme staff (événements dont il est l'auteur, attributions
  * qu'il a posées — sans l'identifiant de la personne visée, art. 15.4) et son réglage
  * « caster autonome ». Tables tolérées : une base qui en manque n'a rien à exporter.
@@ -55,8 +55,8 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
       `SELECT tournament_id, match_id, role, source, reason, confirmed, created_at
          FROM bg_planning_assignments WHERE user_id = ? ORDER BY created_at, entry_key, role`,
     ),
-    tolerant<EventRow>(
-      `SELECT tournament_id, match_id, role, kind, source, created_at
+    tolerant<EventRow & { reason: string | null; late: number }>(
+      `SELECT tournament_id, match_id, role, kind, source, reason, late, created_at
          FROM bg_planning_events WHERE user_id = ? ORDER BY created_at, id`,
     ),
     tolerant<EventRow>(
@@ -77,7 +77,9 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
       updatedAt: toIso(row.updated_at),
     })),
     assignments: assignments.map((row) => ({ ...mapAssignment(row), reason: row.reason })),
-    history: events.map(mapEvent),
+    history: events.map((row) =>
+      row.kind === "WITHDRAWN" ? { ...mapEvent(row), reason: row.reason, late: Boolean(row.late) } : mapEvent(row),
+    ),
     staffActions: acted.map(mapEvent),
     assignmentsSet: set.map(mapAssignment),
     soloCaster: profiles.length > 0 ? Boolean(profiles[0].solo_caster) : null,

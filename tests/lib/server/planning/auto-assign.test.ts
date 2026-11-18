@@ -18,6 +18,7 @@ jest.mock("@/lib/server/planning/players", () => ({
   loadEntryPlayers: jest.fn(),
 }));
 jest.mock("@/lib/server/tournaments/cast-eligibility");
+jest.mock("@/lib/server/planning/notices");
 
 import type { PoolConnection } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
@@ -25,8 +26,11 @@ import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-loc
 import {
   batchEntries,
   confirmAssignments,
+  confirmPendingReferees,
   entriesToConfirm,
+  CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL,
   excludeFromHidden,
+  excludeSuspended,
   holdingRefusal,
   lockedHolding,
   preparePlanner,
@@ -42,6 +46,7 @@ import {
   type LoadedAssignment,
   type PlanningData,
 } from "@/lib/server/planning/load";
+import { announceAssignments } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -178,6 +183,25 @@ function statements(): string[] {
     .map(([sql]) => sql.replace(/\s+/g, " ").trim().slice(0, 40));
 }
 
+describe("confirmPendingReferees", () => {
+  it("confirmPendingReferees_sql_confirmationsExcludeSuspendedAccounts", async () => {
+    await confirmPendingReferees(fakeConnection(connection));
+
+    const confirming = execute.mock.calls
+      .map(([sql]) => sql)
+      .filter((sql) => sql.includes("'CONFIRMED'") || sql.includes("SET a.confirmed = 1"));
+    expect(confirming).toHaveLength(2);
+    for (const sql of confirming) expect(sql).toContain("NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus WHERE sus.user_id = a.user_id");
+  });
+
+  it("confirmPendingReferees_sql_staleRemovalNotGuardedBySuspension", async () => {
+    await confirmPendingReferees(fakeConnection(connection));
+
+    const removing = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.startsWith("DELETE a"));
+    expect(removing).not.toContain("bg_account_suspensions");
+  });
+});
+
 describe("writeEvent", () => {
   it("writeEvent_noInsertId_throws", async () => {
     routeSql({ noInsertId: true });
@@ -275,6 +299,17 @@ describe("preparePlanner", () => {
     expect(input.entries.map((entry) => entry.refereeSlots)).toEqual([2, 1]);
   });
 
+  it("preparePlanner_suspendedSoloCaster_notCountedSolo", () => {
+    const members = [
+      loadedMember({ userId: 4, roles: ["CASTER"], soloCaster: true }),
+      loadedMember({ userId: 5, roles: ["CASTER"], soloCaster: true, suspended: true }),
+    ];
+
+    const input = preparePlanner(planningData({ entries: [inside], members }), [inside], new Map(), new Set());
+
+    expect([...input.soloCasterIds]).toEqual([4]);
+  });
+
   it("preparePlanner_selfManaged_refereeDecided", () => {
     const managed = loadedEntry({ selfManaged: true });
 
@@ -294,6 +329,25 @@ describe("preparePlanner", () => {
 
   it("preparePlanner_historyWeek_passedToPlanner", () => {
     expect(preparePlanner(planningData({ entries: [inside] }), [inside], new Map(), new Set(), MONDAY).historyWeek).toBe(MONDAY);
+  });
+});
+
+describe("excludeSuspended", () => {
+  it("excludeSuspended_suspendedMember_allRolesOfEveryEntryExcluded", () => {
+    const excluded = new Set<string>();
+    const entries = [loadedEntry({ key: "m:1" }), loadedEntry({ key: "m:2", matchId: 2 })];
+
+    excludeSuspended({ members: [loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })] }, entries, excluded);
+
+    expect([...excluded]).toEqual(["m:1|4|REFEREE", "m:1|4|CASTER", "m:1|4|PROD", "m:2|4|REFEREE", "m:2|4|CASTER", "m:2|4|PROD"]);
+  });
+
+  it("excludeSuspended_activeMember_nothingExcluded", () => {
+    const excluded = new Set<string>();
+
+    excludeSuspended({ members: [loadedMember({ userId: 4, roles: ["CASTER"] })] }, [loadedEntry()], excluded);
+
+    expect(excluded.size).toBe(0);
   });
 });
 
@@ -342,6 +396,10 @@ describe("holdingRefusal", () => {
 
   it("holdingRefusal_roleLost_roleNotHeld", () => {
     expect(holdingRefusal(loadedMember({ roles: ["PROD"] }), loadedEntry(), "CASTER")).toBe("PLANNING_ROLE_NOT_HELD");
+  });
+
+  it("holdingRefusal_suspendedMember_roleNotHeld", () => {
+    expect(holdingRefusal(loadedMember({ roles: ["CASTER"], suspended: true }), loadedEntry(), "CASTER")).toBe("PLANNING_ROLE_NOT_HELD");
   });
 
   it("holdingRefusal_hiddenEntryWithoutSeesHidden_hiddenForMember", () => {
@@ -437,6 +495,21 @@ describe("runAutoAssign", () => {
     ]);
     expect(writeParams()[1]).toEqual(["m:1", 3, "REFEREE", 10, 1, "LOAD", 9]);
     expect(writeParams()[2]).toEqual(["m:1", 3, "REFEREE", 10, 1, 9]);
+  });
+
+  it("runAutoAssign_suspendedAvailableMember_notProposed", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        availability: [available("m:1", 3, "REFEREE")],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"], suspended: true })],
+      }),
+    );
+
+    const report = await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
+
+    expect(report.proposed).toBe(0);
+    expect(statements()).toEqual(["DELETE FROM bg_planning_assignments WHER"]);
   });
 
   it("runAutoAssign_roleLostUnderLock_proposalNotWritten", async () => {
@@ -895,6 +968,18 @@ describe("confirmAssignments", () => {
     expect(writeParams()[1]).toContain("REMOVED");
   });
 
+  it("confirmAssignments_memberSuspendedSinceProposal_refusedUnderLock", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
+    );
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })]);
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 1 });
+    expect(writeParams()[1]).toContain("REMOVED");
+  });
+
   it("confirmAssignments_hiddenEntryCasterWithoutTournaments_refused", async () => {
     const hidden = loadedEntry({ key: "m:1", matchId: 1, hidden: true });
     jest.mocked(loadPlanningData).mockResolvedValue(
@@ -931,7 +1016,7 @@ describe("confirmAssignments", () => {
     expect(report).toEqual({ confirmed: 1, refused: 0 });
   });
 
-  it("confirmAssignments_matchRefereeOnly_notReReadByIds", async () => {
+  it("confirmAssignments_matchRefereeOnly_noPlanningReReadBeforeDesignation", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
       confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
     );
@@ -939,6 +1024,34 @@ describe("confirmAssignments", () => {
     await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
 
     expect(loadPlanningMembersByIds).not.toHaveBeenCalled();
+    expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, null, { refuseSuspended: true });
+  });
+
+  it("confirmAssignments_matchRefereeUnavailable_notConfirmedAndRemoved", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    jest.mocked(assignMatchReferee).mockRejectedValue(new Error("REFEREE_UNAVAILABLE"));
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 1 });
+    expect(writeParams()[1]).toContain("REMOVED");
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("confirmAssignments_matchRefereeConfirmSql_followsDesignationWithoutSuspensionFilter", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+
+    await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    const confirmSql = execute.mock.calls
+      .map(([sql]) => sql)
+      .find((sql) => sql.startsWith("UPDATE bg_planning_assignments SET confirmed = 1") && sql.includes("FROM bg_matches"));
+    expect(confirmSql).toBeDefined();
+    expect(confirmSql).not.toContain("bg_account_suspensions");
   });
 
   it("confirmAssignments_subset_confirmsOnlyNamedProvisional", async () => {
@@ -963,6 +1076,16 @@ describe("confirmAssignments", () => {
     expect(assignMatchReferee).not.toHaveBeenCalled();
   });
 
+  it("confirmAssignments_confirmedRow_announcedOnceWithActor", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
+    );
+
+    await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(jest.mocked(announceAssignments).mock.calls[0]).toEqual([[{ userId: 4, entry: first, role: "CASTER" }], { actorId: 9 }]);
+  });
+
   it("confirmAssignments_alreadyConfirmedByEarlierRun_noEventNotCounted", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
       confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
@@ -973,6 +1096,7 @@ describe("confirmAssignments", () => {
 
     expect(report).toEqual({ confirmed: 0, refused: 0 });
     expect(statements()).toEqual(["UPDATE bg_planning_assignments SET confi"]);
+    expect(announceAssignments).not.toHaveBeenCalled();
   });
 
   it("confirmAssignments_matchReferee_appliedViaAssignMatchReferee", async () => {
@@ -983,7 +1107,7 @@ describe("confirmAssignments", () => {
     const report = await confirmAssignments(9, { until: MONDAY + HOUR_MS }, MONDAY - HOUR_MS);
 
     expect(report).toEqual({ confirmed: 1, refused: 0 });
-    expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, null);
+    expect(assignMatchReferee).toHaveBeenCalledWith(1, 9, 3, null, { refuseSuspended: true });
   });
 
   it("confirmAssignments_matchRefereeDesignatedByGesture_confirmedWithActorBeforeReconcile", async () => {
@@ -1277,6 +1401,37 @@ describe("confirmAssignments", () => {
       ["m:1", 3, 1, 3],
       ["m:1", 3, "REFEREE", 10, 1, "CONFIRMED", "AUTO", 9],
     ]);
+  });
+
+  it("confirmAssignments_outageAfterMatchTook_confirmRejudgesSuspension", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    routeSql({ onMatch: [false, true] });
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("PLANNING_CONFIRM_PARTIAL");
+
+    const confirmSql = execute.mock.calls
+      .map(([sql]) => sql)
+      .find((sql) => sql.startsWith("UPDATE bg_planning_assignments SET confirmed = 1") && sql.includes("FROM bg_matches"));
+    expect(confirmSql).toBe(CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL);
+    expect(confirmSql).toContain("NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus WHERE sus.user_id = bg_planning_assignments.user_id");
+  });
+
+  it("confirmAssignments_outageMatchUncertainSuspended_staysProvisionalNoAnnounce", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    // Le compte suspendu : la confirmation rejugée ne touche aucune ligne.
+    routeSql({ onMatch: [false, true], affected: 0 });
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+    expect(writeParams().some((params) => (params as unknown[]).includes("CONFIRMED"))).toBe(false);
+    expect(announceAssignments).not.toHaveBeenCalled();
   });
 
   it("confirmAssignments_lockOrder_accountsBeforeMatchReconcile", async () => {

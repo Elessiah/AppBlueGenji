@@ -198,5 +198,34 @@
   "refereeObjectionReleased": {
     "title": "Refereeing removed",
     "body": "You no longer referee {count, plural, one {# match} other {# matches}}: the staff upheld your objection to being shown to the parties to your matches."
+  },
+  "planning": {
+    "roles": {
+      "REFEREE": "referee",
+      "CASTER": "caster",
+      "PROD": "prod"
+    },
+    "entryMatch": "{pairing} ({tournament})",
+    "entrySolo": "A match ({tournament})",
+    "entryEvent": "{tournament} (whole event)",
+    "newEntries": {
+      "title": "{count, plural, one {# new match} other {# new matches}} in the planning",
+      "line": "{start} · {entry}"
+    },
+    "assigned": {
+      "title": "{count, plural, one {Assigned in the planning} other {Assigned to # planning entries}}",
+      "titleReplacement": "You replace a withdrawal",
+      "line": "{start} · {role} · {entry}"
+    },
+    "withdrawal": {
+      "title": "Withdrawal on your match",
+      "bodyReplaced": "A {role} withdrew from {entry} ({start}): a replacement has been assigned.",
+      "bodyOpen": "A {role} withdrew from {entry} ({start}): the slot is open."
+    },
+    "unfilled": {
+      "title": "Open slot",
+      "body": "A {role} withdrew from {entry} ({start}): no replacement found.",
+      "bodyLate": "A {role} withdrew from {entry} ({start}), less than 24 hours before: no replacement found."
+    }
   }
 }

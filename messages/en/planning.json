@@ -117,7 +117,7 @@
     "NETWORK_ERROR": "Cannot connect. Check your network and try again.",
     "PLANNING_ENTRY_NOT_FOUND": "This slot no longer exists. The page is reloaded.",
     "PLANNING_ENTRY_CLOSED": "This slot is closed: it has started or has been played.",
-    "PLANNING_ROLE_NOT_HELD": "This account does not hold this role.",
+    "PLANNING_ROLE_NOT_HELD": "This account cannot hold this role here.",
     "PLANNING_HIDDEN_FOR_MEMBER": "This tournament is still hidden: this account cannot see it.",
     "PLANNING_ROLE_CONFLICT": "The same person cannot be caster and prod on one slot.",
     "PLANNING_IS_PLAYER": "This person plays during this slot: they cannot cover it.",
@@ -127,6 +127,8 @@
     "PLANNING_NOT_ASSIGNED": "This person is no longer assigned.",
     "PLANNING_BUSY": "Another schedule action is in progress, try again.",
     "PLANNING_CONFIRM_PARTIAL": "Partial confirmation: some proposals are confirmed, the others stayed provisional after a failure. Run the confirmation again.",
+    "PLANNING_WITHDRAWAL_CLOSED": "This slot has started: you can no longer withdraw from it.",
+    "PLANNING_REASON_TOO_LONG": "Reason too long: 300 characters at most.",
     "NOT_CASTER": "This account does not have the caster role.",
     "MATCH_NOT_FOUND": "This match no longer exists.",
     "MATCH_ALREADY_COMPLETED": "This match has already been played.",
@@ -137,6 +139,7 @@
     "REFEREE_OBJECTION": "A team in the match objects to this referee.",
     "REFEREE_IS_PLAYER": "This referee plays in this match.",
     "REFEREE_CHANGED": "The match referee just changed. The page is reloaded.",
+    "REFEREE_UNAVAILABLE": "This account cannot hold this role on this slot.",
     "CONCURRENT_UPDATE_RETRY": "The schedule just changed, try again.",
     "INVALID_WINDOW": "Invalid period (31 days at most).",
     "INVALID_CONFIRM_SCOPE": "Nothing to confirm in this selection.",
@@ -150,5 +153,25 @@
     "leadBody": "Every provisional proposal on slots starting by then becomes an assignment: referees are set on their matches.",
     "confirm": "Confirm",
     "pending": "Confirming…"
-  }
+  },
+  "withdraw": {
+    "action": "Withdraw",
+    "actionLabel": "Withdraw: {role}, {slot}",
+    "title": "Withdraw from this slot?",
+    "body": "An available replacement is looked for right away. If there is none and your assignment was confirmed, the slot is open and the tournament staff is told.",
+    "late": "Late withdrawal: the slot starts in less than 24 hours.",
+    "reasonLabel": "Reason (optional, read by the tournament staff only)",
+    "confirm": "Withdraw",
+    "pending": "Withdrawing…",
+    "done": "Withdrawal saved.",
+    "doneReplaced": "Withdrawal saved: a replacement has been assigned.",
+    "doneUnfilled": "Withdrawal saved: the slot is open, the staff has been told."
+  },
+  "withdrawals": {
+    "title": "Withdrawals",
+    "late": "Late",
+    "provisional": "Proposal",
+    "hint": "Who withdrew from this slot, and their reason if they gave one. “Late”: less than 24 hours before the start. “Proposal”: they were only proposed by the calculation."
+  },
+  "unfilled": "Open slot"
 }

@@ -125,6 +125,26 @@ export const PUSH_TOPICS = {
     description: "Ton inscription comme caster d'un match est retirée par le staff ou d'office : le motif est donné.",
     audience: "live",
   },
+  PLANNING_NEW_ENTRIES: {
+    label: "Nouveaux créneaux au planning",
+    description: "De nouveaux créneaux (matchs ou tournois entiers) viennent d'être planifiés : tous pour un caster ou un prod, ceux des jeux où tu remplis la condition d'arbitrage pour un arbitre, jamais un créneau où tu joues. Un seul récapitulatif par vague, pour poser tes disponibilités. Coupe aussi le message privé Discord.",
+    audience: "planning",
+  },
+  PLANNING_ASSIGNED: {
+    label: "Affectations du planning",
+    description: "Tu es affecté à un match ou un événement, par le staff ou par une affectation automatique confirmée (jamais pour une simple proposition), ou tu remplaces sur une affectation confirmée un membre qui s'est désisté : date, équipes et rôle. Coupe aussi le message privé Discord.",
+    audience: "planning",
+  },
+  PLANNING_WITHDRAWAL: {
+    label: "Désistements du planning",
+    description: "Un membre affecté et confirmé sur le même créneau que toi (toi aussi confirmé) s'est désisté, sans être nommé : son remplaçant éventuel ou la place à pourvoir. Rien pour une simple proposition. Coupe aussi le message privé Discord.",
+    audience: "planning",
+  },
+  PLANNING_UNFILLED: {
+    label: "Places à pourvoir",
+    description: "Après le désistement d'une affectation confirmée, aucun remplaçant n'a été trouvé : la place est à pourvoir. Coupe aussi le message privé Discord.",
+    audience: "tournaments",
+  },
   STAFF_REPORT: {
     label: "Signalements reçus",
     description: "Un nouveau signalement, ou une contestation, arrive à la modération.",

@@ -201,6 +201,100 @@ compte les **rôles**, pas les personnes.
   la route en dérivent.
 - Un geste à la fois : verrou nommé `bg_planning` (10 s) → `PLANNING_BUSY`.
 
+## Notifications (`lib/server/planning/notices.ts`, `new-entries.ts`)
+
+Quatre sujets de `PUSH_TOPICS`, chacun push **et** message privé Discord
+(`notifyUsers`) ; couper le sujet coupe aussi le message privé
+(`dmFollowsTopic` : lu dans `bg_push_topic_optouts`, et une lecture en
+échec n'envoie aucun message privé). Rédacteurs : `push-messages.ts`
+(`planning*Push`) et `lib/shared/planning-notices.ts` (messages privés, heure
+de Paris, lien vers `/planning` dans la langue du destinataire).
+
+- `PLANNING_NEW_ENTRIES` (« Nouveaux créneaux au planning ») : **un
+  récapitulatif par vague**. Un balayage (chaque minute,
+  `bg_planning_entry_notices`, verrou nommé `bg_planning_notices`) note
+  chaque entrée ouverte qu'il découvre ; la vague part quand elle est calme
+  depuis 5 min, ou au plus tard 30 min après sa plus ancienne entrée. Chaque
+  membre ne reçoit que les entrées où il tient un rôle utile : caster et prod
+  toutes, arbitre celles dont il remplit la condition d'arbitrage du jeu ;
+  jamais une entrée où il joue. Une entrée d'un tournoi encore **caché** n'est
+  pas notée : elle l'est quand le tournoi devient visible, et part alors à
+  tous ceux qu'elle concerne ; notée puis recachée avant sa vague, elle attend
+  de même, sans être notée annoncée (son `seen_at` repart à chaque passage
+  tant qu'elle est cachée : à sa réapparition elle rejoint la vague suivante au
+  lieu de partir seule). Les comptes de la vague se lisent une fois, les
+  membres qui reçoivent la même liste partent en un envoi, par paquets de 4 ;
+  même regroupement pour les affectations confirmées en groupe. Au tout premier passage (marqueur
+  `planning_entry_notices_bootstrapped` absent de `bg_settings`), tout est noté
+  déjà annoncé, sans message ; le marqueur ne dépend pas du contenu de la
+  table, que la purge de conservation peut vider ; `npm run seed`, qui
+  régénère le planning, le retire. Le balayage ne lit que les
+  lignes des entrées ouvertes et celles qui attendent leur annonce, et note les
+  nouvelles en une seule insertion. Une entrée est notée annoncée **avant**
+  l'envoi : une panne perd un récapitulatif, n'en double jamais un.
+- `PLANNING_ASSIGNED` (« Affectations du planning ») : à la **confirmation**
+  (calcul confirmé, un message par personne pour toutes ses lignes) ou à une
+  affectation **manuelle** ; jamais pour une proposition provisoire, jamais
+  à l'auteur du geste ; aussi au remplaçant d'un désistement. Date et heure
+  (Paris), rôle, affiche, lien.
+- `PLANNING_WITHDRAWAL` (« Désistements du planning ») : aux autres affectés
+  **confirmés** de l'entrée quand une attribution **confirmée** est quittée
+  (une proposition provisoire, quittée ou co-affectée, n'en reçoit aucun) — « un caster
+  s'est désisté », remplaçant affecté ou place à pourvoir.
+- `PLANNING_UNFILLED` (« Places à pourvoir », `tournaments`) :
+  aucun remplaçant trouvé — push **et** message privé au staff des tournois
+  (comptes qui tiennent `tournaments`, choisis par la règle de `notifyStaff`
+  — `loadStaffIds` dans `notify.ts` —, donc voient les tournois cachés ; le
+  désisté excepté), dans la langue de chacun, et une ligne sans nom au journal
+  du staff sur Discord (`sendBotLog`, catégorie d'alerte `staff-removal`) ; « désistement
+  tardif » s'il l'est. Jamais par le rôle arbitre de Discord : son message
+  privé passerait outre le sujet coupé.
+- Arbitre de match changé depuis la fenêtre « Arbitrage » entre la lecture
+  et le retrait : le match porte déjà un autre arbitre, la place est tenue —
+  ni remplaçant cherché, ni place à pourvoir, ni avis à cet arbitre.
+
+Aucun avis du planning ne part à un compte **suspendu** (rôle gardé, mais
+sans droit effectif) : `loadNotificationRecipients(…, { excludeSuspended: true })`.
+
+Vie privée : aucun pseudo de joueur (« Un match » en tournoi individuel),
+noms d'équipe et de tournoi par `discordInline`, **aucun membre du staff
+nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
+
+## Désistement (`lib/server/planning/withdrawal.ts`, `POST /api/planning/withdrawal`)
+
+- Un membre (`planning`) quitte **sa** ligne (provisoire ou confirmée) d'une
+  entrée modifiable, **jusqu'au début** de l'entrée (`PLANNING_WITHDRAWAL_CLOSED`
+  ensuite) ; jamais un cast inscrit sur le match (`PLANNING_CAST_MANAGED`, il
+  se retire depuis le match). Le staff retire les lignes des autres par le
+  retrait manuel. Geste derrière `ConfirmActionDialog`, motif facultatif
+  (300 caractères au plus, `PLANNING_REASON_TOO_LONG`) lu par le staff des
+  tournois seul.
+- Moins de 24 h avant le début : **tardif** (`late`), signalé au staff.
+- Historique : évènement `WITHDRAWN` (sans auteur, `reason`, `late` ; `source`
+  `MANUAL` si la ligne quittée était confirmée, `AUTO` si provisoire). Il
+  compte comme désistement, **jamais comme charge** : la ligne est effacée,
+  et l'entrée exclut ensuite le membre pour ce rôle (comme un retrait manuel).
+- **Remplacement automatique** sous le verrou du planning, par les règles du
+  calcul (`pickReplacement` : `preparePlanner` sur la seule entrée, rôle
+  quitté). La ligne remplaçante hérite de l'état de la ligne quittée :
+  confirmée (et le remplaçant prévenu, `PLANNING_ASSIGNED`) si elle l'était,
+  provisoire sinon (sans message). Aucun candidat : la place est **« à
+  pourvoir »** (pastille sur la carte, `unfilled` de la vue) et le staff est
+  prévenu (`PLANNING_UNFILLED`) si la ligne était confirmée.
+- Arbitre **d'un match** confirmé : le retrait passe par
+  `assignMatchReferee` (le match perd son arbitre, ligne anonyme au journal),
+  puis le remplaçant y est posé par la même porte — un refus métier compte
+  comme « aucun remplaçant ».
+- Une panne **après** le désistement écrit (recherche ou pose du remplaçant)
+  ne le défait pas et ne rend pas d'échec : la place est « à pourvoir » et
+  l'annonce part quand même. Arbitre déjà posé sur le match quand la ligne du
+  planning échoue : il tient le rôle (le tableau le lit du match, qui fait
+  foi). Une panne d'`assignMatchReferee` en posant le remplaçant relit le
+  match (`readMatchReferee`) : s'il le porte (validation faite, réponse
+  perdue), sa ligne s'écrit et il est le remplaçant ; sinon la place est « à
+  pourvoir ».
+- Les messages partent après le verrou, sans jamais défaire le geste.
+
 ## Coût (performance)
 
 - Une page = une fenêtre bornée : durées lues une fois (elles voyagent dans
@@ -250,23 +344,28 @@ compte les **rôles**, pas les personnes.
 
 `bg_planning_availability` (réponse par entrée × membre × rôle),
 `bg_planning_assignments` (attributions, source, raison, état),
-`bg_planning_events` (historique : `ASSIGNED`, `CONFIRMED`, `REMOVED` —
-la porte des lots suivants : messages privés, désistement et remplacement),
+`bg_planning_events` (historique : `ASSIGNED`, `CONFIRMED`, `REMOVED`,
+`WITHDRAWN` avec motif et retard),
+`bg_planning_entry_notices` (entrées vues et annoncées par le récapitulatif),
 `bg_planning_profiles` (caster autonome). Clés étrangères en cascade sur
 compte, tournoi, match.
 
 ## Conservation et RGPD
 
-Registre **T20** ; `/rgpd` (FR, EN) ; entrée `2026-11-planning-casts-arbitres`
-de `PRIVACY_CHANGES`. Purge quotidienne (`lib/server/planning/retention.ts`,
+Registre **T20** (et **T12** pour les quatre sujets) ; `/rgpd` (FR, EN : §
+planning et § notifications push) ; entrées `2026-11-planning-casts-arbitres`
+et `2026-11-planning-notifications-desistements` de `PRIVACY_CHANGES` — dates
+et `REGISTER_UPDATED_AT` avancent ensemble. Purge quotidienne (`lib/server/planning/retention.ts`,
 lancée par `instrumentation.ts`) : tout ce qui concerne une entrée
 `PLANNING_RETENTION_DAYS` (90) jours après son début ; le réglage caster
 autonome dès que le compte ne tient plus le rôle `CASTER` (seul à pouvoir le
 porter). Suppression du compte : ses lignes partent, ses gestes de staff restent
 sans le désigner (`account-erasure.ts`). Export des données : `planning`
 (`planning-export.ts`) — disponibilités, attributions (avec leur motif),
-historique (`history` : attribuée, confirmée, retirée, sans l'auteur du geste),
-ses gestes comme staff (`staffActions` : événements dont il est l'auteur ;
+historique (`history` : attribuée, confirmée, retirée, désistement avec son
+motif et son retard, sans l'auteur du geste),
+entrées annoncées (`bg_planning_entry_notices`, sans personne) purgées avec
+l'entrée ; ses gestes comme staff (`staffActions` : événements dont il est l'auteur ;
 `assignmentsSet` : attributions qu'il a posées — sans l'identifiant de la
 personne visée, art. 15.4 ; le match et le rôle restent, et l'arbitre désigné
 d'un match est de toute façon public, T04) et réglage autonome.
@@ -278,7 +377,73 @@ changement d'arbitre du match (retirer une proposition provisoire, ou poser
 l'arbitre que le match a déjà, n'en écrit aucune), push `REFEREE_RELEASED` à
 l'arbitre retiré par un autre que lui : retrait (`STAFF`) ou remplacement par un
 autre arbitre (`REPLACED`, désignation avec `replacedRefereeId`), jugés par
-`refereeReleaseNotice` (T04, T05) ; rien d'autre du planning ne part sur Discord. Le staff des
+`refereeReleaseNotice` (T04, T05). Les notifications du planning (§ Notifications)
+partent en message privé Discord sans nommer de joueur ni de membre du
+staff ; la ligne « place à pourvoir » va au canal de logs, anonyme (T12, T20).
+Le motif d'un désistement n'est lu que du staff des tournois ; la pastille
+« à pourvoir » (`unfilled`) est montrée à tous les membres, sans motif, tant
+que plus personne n'est confirmé dans le rôle quitté (une proposition
+provisoire ne compte pas) ; l'avis au staff part,
+lui, dès qu'une attribution confirmée reste sans remplaçant (`unfilledRoles`).
+Un compte **suspendu** (`LoadedMember.suspended` : sous-requête
+`userSuspendedSql` à la lecture simple ; sous `lockedHolding`, lecture
+verrouillante **à part** de `bg_account_suspensions`, après les comptes — une
+sous-requête d'une lecture verrouillante n'est qu'un instantané) n'est plus ni
+proposé, ni confirmé, ni désigné, ni pris en remplaçant par le planning, ni
+prévenu par ses avis : `excludeSuspended` (tous les rôles) et `holdingRefusal`
+(`PLANNING_ROLE_NOT_HELD`, texte neutre « ne peut pas tenir ce rôle ici »,
+aussi rendu à qui pose une disponibilité pour un rôle qu'il n'a pas). Une désignation d'arbitre de match par le planning (confirmation,
+remplaçant, choix à la main) passe `refuseSuspended` à `assignMatchReferee` :
+la suspension est relue (`refereeSuspended`, un seul compte, verrouillée après
+la ligne du compte, l'ordre de `suspendAccount`) **dans la transaction qui
+écrit le match** — aucune fenêtre entre contrôle et écriture ; refus
+`REFEREE_UNAVAILABLE`, rendu `PLANNING_ROLE_NOT_HELD` au choix à la main. La
+fenêtre « Arbitrage » du match ne passe pas l'option. La réconciliation
+(`confirmPendingReferees`) ne confirme pas la proposition d'un compte suspendu
+que le match porte d'ailleurs ; `CONFIRM_MATCH_REFEREE_SQL`, lui, suit la
+désignation que le geste vient de faire (déjà jugée : une suspension validée
+après elle trouve une affectation posée), sauf désignation incertaine (panne
+d'`assignMatchReferee`, match relu qui porte l'arbitre, peut-être posé par la
+fenêtre « Arbitrage » du match qui ne juge pas la suspension) :
+`CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL` rejuge la suspension (sous-select d'un
+`UPDATE` : lecture verrouillante en InnoDB ; le compte suspendu reste alors en
+proposition, le match le portant jusqu'à son retrait). Une suspension validée
+pendant une série de désignations, après celle d'un arbitre, laisse cette
+désignation confirmée : elle était déjà posée. Ses affectations confirmées restent
+jusqu'à ce que le staff les retire (retirer un arbitre de match le prévient par
+`REFEREE_RELEASED`, avis du match et non du planning, dont le push écarte déjà
+un compte suspendu) ; ses propositions encore provisoires ne sont plus
+confirmées (elles restent provisoires jusqu'à leur retrait : calcul de leur lot,
+refus à la confirmation, ou staff — une proposition d'arbitre que le match
+porte n'est jamais retirée par le planning). Un caster autonome suspendu ne couvre plus seul son
+créneau (`coveringSoloCasterIds`) pour le calcul (`preparePlanner`) et pour le
+staff des tournois ; les autres lecteurs gardent la couverture d'avant, mais
+voient ce que le calcul propose à sa place. Le staff des tournois — et, par ces
+propositions, les autres membres — peuvent donc **déduire** qu'un compte n'est
+plus retenu (plus proposé ni confirmé, désignation à la main refusée par le
+texte neutre `PLANNING_ROLE_NOT_HELD`, créneau autonome plus couvert ; déclaré :
+registre T11 et T20, `/rgpd` §5, `PRIVACY_CHANGES`), sans voir la suspension ni
+ses motifs. Les avis déclarent ces effets en **une phrase générale, la même
+partout** (FR = EN), sans énumérer les mécanismes du calcul : « écarté des
+propositions, confirmations, désignations, remplacements et avis du planning
+(…) ; ce qui lui était déjà confirmé ou désigné reste jusqu'à son retrait ; le
+staff des tournois et les autres membres du planning peuvent seulement en
+déduire que le planning ne le retient plus, sans voir la suspension ni ses
+motifs ». Un changement du calcul n'a pas à la retoucher tant qu'il reste
+dans ce périmètre.
+Coût des verrous : la lecture verrouillante des suspensions de `lockedHolding`
+pose des verrous de clé suivante sur `(user_id, lifted_at)` le temps de la
+transaction du planning (courte, sérialisée par le verrou nommé) : une
+suspension d'un compte voisin attend au plus cette transaction, sans
+interblocage (même ordre que `suspendAccount`). La même lecture
+(`lockedSuspendedUserIds`, `suspension-sql.ts`, seule écriture, aussi lue par
+le contrôle du dernier administrateur) joue dans `assignMatchReferee`
+(`refuseSuspended`) pour **un** compte, dans la transaction du match (ligne du
+match `FOR UPDATE`, compte en partage, puis suspensions) : une suspension
+posée sur un compte voisin de l'index attend aussi cette transaction, courte
+(une désignation) ; même ordre comptes → suspensions que `suspendAccount`,
+qui ne touche jamais les matchs avant sa validation, donc sans interblocage.
+Le drapeau `suspended` n'est jamais rendu à la page. Le staff des
 tournois (`tournaments` : arbitres et administrateurs) lit disponibilités,
 préférences et motifs ; les autres membres lisent le motif d'une proposition du
 calcul comme « Calcul » (`visibleAssignment`). Tests :
@@ -295,7 +460,10 @@ membres, créneau du lecteur surligné (« Mon créneau »), cartes d'entrée (c
 segmenté + étoile de préférence), panneau du staff (calcul de la semaine par
 `ConfirmActionDialog`, confirmation par délai ou par entrée, elle aussi derrière
 `ConfirmActionDialog` (elle pose l'arbitre sur le match), casters autonomes,
-durées). Textes : espace de noms `planning` (FR, EN).
+durées), bouton « Me désister » sur ses propres lignes (sauf cast, jusqu'au
+début ; avertissement « tardif » à moins de 24 h), pastille « À pourvoir »,
+liste des désistements (motif, tardif) pour le staff des tournois. Textes :
+espace de noms `planning` (FR, EN).
 
 ## Tests
 

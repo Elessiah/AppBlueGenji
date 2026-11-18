@@ -13,7 +13,8 @@ import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissio
 import { holdsPlatformRights, sessionPlatformRights } from "@/lib/shared/player-view";
 import { recordConnection } from "@/lib/server/connection-logs";
 import { closeSessionStreams, closeUserStreams } from "@/lib/server/session-streams";
-import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
+import { assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 import { certifyPromptDoor } from "@/lib/shared/discord-certify-prompt";
 import {
@@ -557,10 +558,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
      WHERE s.token_hash = ?
        AND s.expires_at > NOW()
        AND u.is_deleted = 0
-       AND NOT EXISTS (
-         SELECT 1 FROM bg_account_suspensions sus
-         WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")}
-       )
+       AND NOT ${userSuspendedSql("u.id")}
      LIMIT 1`,
     [hashToken(token)],
   );

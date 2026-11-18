@@ -12,6 +12,7 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
 import type { RefereeIneligibility } from "@/lib/shared/match-referee";
@@ -25,6 +26,7 @@ import {
 } from "@/lib/shared/planning-planner";
 import type { AutoAssignReport, ConfirmReport } from "@/lib/shared/planning-view";
 import {
+  coveringSoloCasterIds,
   loadPlanningData,
   loadHiddenTournamentIds,
   loadPlanningHistory,
@@ -35,6 +37,7 @@ import {
   type PlanningData,
 } from "./load";
 import { entryAssignments } from "./model";
+import { announceAssignments } from "./notices";
 import { loadEntryPlayers, playersDuring } from "./players";
 
 /** Verrou nommé de tous les gestes d'écriture du planning (calcul, confirmation, désignation). */
@@ -60,7 +63,8 @@ export type PlanningWindow = { from: number; to: number };
  * chevauche — ne la couvre dans aucun rôle ; un arbitre qui ne remplit pas la
  * condition d'arbitrage du jeu n'arbitre pas ; un membre retiré **à la main**
  * d'un rôle d'une entrée n'y est pas replacé ; un tournoi encore caché n'est
- * proposé qu'à qui le voit (le staff des tournois, qui tient l'arbitrage).
+ * proposé qu'à qui le voit (le staff des tournois, qui tient l'arbitrage) ;
+ * un compte suspendu n'est proposé à rien.
  */
 export async function loadExclusions(
   executor: Executor,
@@ -72,7 +76,18 @@ export async function loadExclusions(
   await excludeIneligibleReferees(executor, data, entries, excluded);
   for (const removal of data.removals) excluded.add(exclusionKey(removal.entryKey, removal.userId, removal.role));
   excludeFromHidden(data, entries, excluded);
+  excludeSuspended(data, entries, excluded);
   return excluded;
+}
+
+/** Un compte suspendu n'a plus de droit effectif : aucun rôle d'aucune entrée du lot (lu avec le compte, `LoadedMember.suspended`). */
+export function excludeSuspended(data: Pick<PlanningData, "members">, entries: readonly LoadedEntry[], excluded: Set<string>): void {
+  for (const member of data.members) {
+    if (!member.suspended) continue;
+    for (const entry of entries) {
+      for (const role of PLANNING_ROLES) excluded.add(exclusionKey(entry.key, member.userId, role));
+    }
+  }
 }
 
 /**
@@ -167,7 +182,7 @@ export function preparePlanner(
     })),
     availability: data.availability,
     members: new Map(data.members.map((member) => [member.userId, member.roles])),
-    soloCasterIds: new Set(data.members.filter((member) => member.soloCaster).map((member) => member.userId)),
+    soloCasterIds: coveringSoloCasterIds(data.members, true),
     locked,
     refereeDecided: new Set(data.entries.filter((entry) => entry.selfManaged).map((entry) => entry.key)),
     history,
@@ -187,7 +202,8 @@ export async function writeEvent(
   role: PlanningRole,
   kind: "ASSIGNED" | "CONFIRMED" | "REMOVED",
   source: "AUTO" | "MANUAL",
-  actorId: number,
+  /** `null` : geste du site lui-même (remplacement après un désistement), sans auteur. */
+  actorId: number | null,
 ): Promise<number> {
   const [result] = await executor.execute(
     `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
@@ -440,7 +456,8 @@ type MatchRefereeRefusal =
   | "MATCH_NOT_FOUND"
   | "MATCH_ALREADY_COMPLETED"
   | "MATCH_NOT_LAUNCHABLE"
-  | "REFEREE_CHANGED";
+  | "REFEREE_CHANGED"
+  | "REFEREE_UNAVAILABLE";
 
 // La liste unique, que la route des gestes reprend (`PLANNING_STATUSES`). Un
 // motif d'inéligibilité ajouté (`RefereeIneligibility`) sans entrée ici ne
@@ -455,6 +472,7 @@ const MATCH_REFEREE_REFUSAL_SET = {
   REFEREE_OBJECTION: true,
   REFEREE_IS_PLAYER: true,
   REFEREE_CHANGED: true,
+  REFEREE_UNAVAILABLE: true,
 } satisfies Record<MatchRefereeRefusal, true>;
 
 export const MATCH_REFEREE_REFUSAL_CODES = Object.keys(MATCH_REFEREE_REFUSAL_SET) as readonly MatchRefereeRefusal[];
@@ -483,24 +501,31 @@ type ConfirmStep = {
    * interrompue) : ce geste ne l'a pas désigné, la réconciliation le confirme sans auteur.
    */
   onMatchBefore?: boolean;
+  /**
+   * Désignation incertaine : une panne a interrompu `assignMatchReferee` et le
+   * match relu porte l'arbitre, posé par ce geste **ou** par un autre (fenêtre
+   * « Arbitrage » du match, qui ne juge pas la suspension) — sa confirmation
+   * rejuge donc la suspension (`CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL`).
+   */
+  uncertain?: boolean;
 };
 
 /**
  * Le membre peut-il encore tenir cette proposition : il a toujours le rôle
- * (ni rôle retiré, ni compte supprimé) et voit l'entrée (un tournoi encore
+ * (ni rôle retiré, ni compte supprimé, ni compte suspendu) et voit l'entrée (un tournoi encore
  * caché ne va qu'à qui voit les tournois cachés, `excludeFromHidden`).
  */
 export function canStillHold(member: LoadedMember | undefined, entry: LoadedEntry, role: PlanningRole): boolean {
   return holdingRefusal(member, entry, role) === null;
 }
 
-/** Le refus de `canStillHold`, par son code : rôle plus tenu (ou compte parti), ou tournoi caché qu'il ne voit pas. */
+/** Le refus de `canStillHold`, par son code : rôle plus tenu (ou compte parti ou suspendu), ou tournoi caché qu'il ne voit pas. */
 export function holdingRefusal(
   member: LoadedMember | undefined,
   entry: Pick<LoadedEntry, "hidden">,
   role: PlanningRole,
 ): "PLANNING_ROLE_NOT_HELD" | "PLANNING_HIDDEN_FOR_MEMBER" | null {
-  if (!member?.roles.includes(role)) return "PLANNING_ROLE_NOT_HELD";
+  if (!member?.roles.includes(role) || member.suspended) return "PLANNING_ROLE_NOT_HELD";
   if (entry.hidden && !member.seesHidden) return "PLANNING_HIDDEN_FOR_MEMBER";
   return null;
 }
@@ -523,10 +548,35 @@ export function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmSt
   return steps;
 }
 
-/** Confirme une proposition d'arbitre de match **seulement** si le match a (encore) cet arbitre. */
+/**
+ * Le compte de la ligne `a` n'est pas suspendu : la réconciliation laisse
+ * provisoire la proposition d'un compte suspendu que le match porte d'ailleurs.
+ */
+const NOT_SUSPENDED_SQL = (alias: string) => "NOT " + userSuspendedSql(alias + ".user_id");
+
+/**
+ * Confirme une proposition d'arbitre de match **seulement** si le match a
+ * (encore) cet arbitre. Sans contrôle de suspension : ce geste vient de
+ * désigner cet arbitre, et la désignation l'a jugée dans la transaction du
+ * match (`refuseSuspended`). Une suspension validée après elle trouve une
+ * désignation déjà posée — elle reste (« ce qui lui était déjà désigné reste
+ * jusqu'à son retrait », T11/T20), la ligne suit le match qui fait foi.
+ */
 const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments SET confirmed = 1
   WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0
     AND EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?)`;
+
+/**
+ * La même, pour une désignation incertaine (`ConfirmStep.uncertain`) : rien ne
+ * dit que ce geste l'a jugée, la suspension se rejuge — un compte suspendu
+ * reste en proposition, comme dans la réconciliation (le match, qui fait foi,
+ * le porte jusqu'à son retrait). Le sous-select est une lecture verrouillante
+ * (InnoDB pose des verrous partagés sur les lignes que lit le sous-select d'un
+ * `UPDATE`) : une suspension validée avant est vue, une suspension en cours
+ * attend cette transaction ; aucune ligne de compte n'est prise ici, donc
+ * aucun ordre de verrous à tenir face à `suspendAccount`.
+ */
+export const CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL = `${CONFIRM_MATCH_REFEREE_SQL} AND ${NOT_SUSPENDED_SQL("bg_planning_assignments")}`;
 
 /** Retire une proposition d'arbitre de match refusée, **sauf** si le match porte cet arbitre (il fait foi). */
 const REFUSE_MATCH_REFEREE_SQL = `DELETE FROM bg_planning_assignments
@@ -537,9 +587,9 @@ const REFUSE_MATCH_REFEREE_SQL = `DELETE FROM bg_planning_assignments
 const STALE_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
   WHERE a.role = 'REFEREE' AND a.confirmed = 1 AND (m.referee_user_id IS NULL OR m.referee_user_id <> a.user_id)`;
 
-/** Une proposition d'arbitre provisoire que le match porte déjà. */
+/** Une proposition d'arbitre provisoire que le match porte déjà (compte non suspendu : elle reste sinon provisoire). */
 const PENDING_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
-  WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id`;
+  WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id AND ${NOT_SUSPENDED_SQL("a")}`;
 
 /**
  * Réconcilie les arbitres de match du planning avec les matchs, en un nombre
@@ -574,7 +624,7 @@ export async function confirmPendingReferees(executor: Executor): Promise<number
      SELECT a.entry_key, a.user_id, 'REFEREE', a.tournament_id, a.match_id, 'CONFIRMED', 'AUTO', NULL ${PENDING_ON_MATCH_SQL}`,
   );
   const [result] = await executor.execute(`UPDATE bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
-     SET a.confirmed = 1 WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id`);
+     SET a.confirmed = 1 WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id AND ${NOT_SUSPENDED_SQL("a")}`);
   return affected(result);
 }
 
@@ -583,7 +633,9 @@ export async function confirmPendingReferees(executor: Executor): Promise<number
  * Rend la panne qui a interrompu la série (`undefined` sinon) : les
  * désignations déjà décidées restent marquées `settled`, pour que le planning
  * les écrive quand même — jamais un match qui a son arbitre et un planning qui
- * le montre encore en proposition.
+ * le montre encore en proposition, sauf un compte suspendu entre-temps dont la
+ * désignation est restée incertaine (`uncertain`) : le planning ne le confirme
+ * pas, le match le porte jusqu'à son retrait.
  */
 async function designateReferees(steps: ConfirmStep[], actorId: number): Promise<unknown> {
   for (const step of steps) {
@@ -601,12 +653,16 @@ async function designateReferees(steps: ConfirmStep[], actorId: number): Promise
           step.onMatchBefore = true;
           return;
         }
-        await assignMatchReferee(matchId, actorId, step.userId, null);
+        // Suspension jugée dans la transaction même du match : posée depuis la lecture, elle refuse.
+        await assignMatchReferee(matchId, actorId, step.userId, null, { refuseSuspended: true });
       });
     } catch (error) {
       if (!isMatchRefereeRefusal(error)) {
         // Une panne après la validation : le match relu dit si ce geste l'a posé (alors écrit à son compte).
-        if (await matchHasReferee(matchId, step.userId)) step.settled = true;
+        if (await matchHasReferee(matchId, step.userId)) {
+          step.settled = true;
+          step.uncertain = true;
+        }
         return error;
       }
       step.refused = true;
@@ -669,7 +725,7 @@ export type HoldingCheck = (userId: number, entry: LoadedEntry, role: PlanningRo
 
 /**
  * Relit, **dans la transaction qui écrit** et verrouillés en partage, les
- * comptes visés (rôles, permission `tournaments`) et l'état caché de leurs
+ * comptes visés (rôles, permission `tournaments`, suspension) et l'état caché de leurs
  * tournois : un rôle retiré ou un tournoi recaché pendant le geste attend sa
  * validation au lieu de passer entre la lecture et l'écriture. Rend le
  * contrôle `holdingRefusal` sur ces données fraîches.
@@ -685,6 +741,19 @@ export async function lockedHolding(
   return (userId, entry, role) => holdingRefusal(byId.get(userId), { hidden: hidden.has(entry.tournamentId) }, role);
 }
 
+/** L'écriture qui confirme une proposition : un arbitre de match seulement si le match l'a encore. */
+function confirmStatement(step: ConfirmStep): [string, (string | number | null)[]] {
+  const { entry } = step;
+  if (!isMatchReferee(step)) {
+    return [
+      "UPDATE bg_planning_assignments SET confirmed = 1 WHERE entry_key = ? AND user_id = ? AND role = ? AND confirmed = 0",
+      [entry.key, step.userId, step.role],
+    ];
+  }
+  const sql = step.uncertain === true ? CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL : CONFIRM_MATCH_REFEREE_SQL;
+  return [sql, [entry.key, step.userId, entry.matchId, step.userId]];
+}
+
 /**
  * Les lignes d'une confirmation, d'un bloc : les propositions refusées par le
  * match, ou que le membre ne peut plus tenir (rôles relus ici, sous le
@@ -692,7 +761,12 @@ export async function lockedHolding(
  * le match l'a encore. Un évènement par ligne vraiment changée : relancer le
  * geste n'écrit rien deux fois.
  */
-async function writeConfirmSteps(connection: PoolConnection, steps: readonly ConfirmStep[], actorId: number): Promise<ConfirmReport> {
+async function writeConfirmSteps(
+  connection: PoolConnection,
+  steps: readonly ConfirmStep[],
+  actorId: number,
+  written: ConfirmStep[] = [],
+): Promise<ConfirmReport> {
   // Comptes et tournois verrouillés d'abord, avant les matchs (même ordre que `runAutoAssign`, sans interblocage).
   await refuseLostRoles(connection, steps);
   let confirmed = 0;
@@ -714,14 +788,11 @@ async function writeConfirmSteps(connection: PoolConnection, steps: readonly Con
       refused += 1;
       continue;
     }
-    const [result] = isMatchReferee(step)
-      ? await connection.execute(CONFIRM_MATCH_REFEREE_SQL, [entry.key, step.userId, entry.matchId, step.userId])
-      : await connection.execute(
-          "UPDATE bg_planning_assignments SET confirmed = 1 WHERE entry_key = ? AND user_id = ? AND role = ? AND confirmed = 0",
-          [entry.key, step.userId, step.role],
-        );
+    const [result] = await connection.execute(...confirmStatement(step));
     if (affected(result) === 0) continue;
     await writeEvent(connection, entry, step.userId, step.role, "CONFIRMED", "AUTO", actorId);
+    // Confirmée par ce geste : la personne sera prévenue (`announceAssignments`), une fois l'écriture validée.
+    written.push(step);
     confirmed += 1;
   }
   // La réconciliation **après** les lignes du geste : un arbitre que ce geste vient de poser sur le
@@ -757,14 +828,38 @@ export async function confirmAssignments(
   const data = await withConnection((connection) => loadPlanningData(connection, { now, includeHidden: true }));
   const all = confirmSteps(data, scope);
   const failure = await designateReferees(all, actorId);
+  // Les attributions que ce geste a confirmées (écriture validée) : annoncées après le verrou,
+  // confirmation partielle comprise. Une proposition provisoire n'est jamais annoncée.
+  const announced: ConfirmStep[] = [];
+  try {
+    return await confirmUnderLock(all, failure, actorId, announced);
+  } finally {
+    if (announced.length > 0) {
+      void announceAssignments(
+        announced.map((step) => ({ userId: step.userId, entry: step.entry, role: step.role })),
+        { actorId },
+      );
+    }
+  }
+}
+
+/** L'écriture d'une confirmation sous le verrou ; `announced` reçoit les lignes confirmées une fois validées. */
+async function confirmUnderLock(
+  all: ConfirmStep[],
+  failure: unknown,
+  actorId: number,
+  announced: ConfirmStep[],
+): Promise<ConfirmReport> {
   return withPlanningLock(async (connection) => {
     // Une panne en route : les désignations que le match a déjà décidées et
     // les autres rôles (casters, prods, qui ne dépendent d'aucun match)
     // s'écrivent quand même, puis la panne d'origine remonte (le geste se relance).
     const steps = failure === undefined ? all : all.filter((step) => step.settled || !isMatchReferee(step));
     let report: ConfirmReport;
+    const written: ConfirmStep[] = [];
     try {
-      report = await transact(connection, () => writeConfirmSteps(connection, steps, actorId));
+      report = await transact(connection, () => writeConfirmSteps(connection, steps, actorId, written));
+      announced.push(...written);
     } catch (error) {
       if (failure === undefined) throw error;
       console.error("[planning] confirmation : écriture du planning en échec après une panne de désignation", failureDiagnostic(error));

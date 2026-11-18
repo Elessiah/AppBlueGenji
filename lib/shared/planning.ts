@@ -57,6 +57,15 @@ export const PLANNING_HORIZON_DAYS = 90;
 /** Arbitres posés par le calcul sur un tournoi entier (évènement aux matchs enchaînés) ; le staff peut en ajouter. */
 export const PLANNING_EVENT_REFEREES = 2;
 
+/** Un désistement à moins de ce délai avant le début est tardif (serveur et page). */
+export const LATE_WITHDRAWAL_MS = 24 * 60 * 60 * 1000;
+
+/** Longueur maximale du motif d'un désistement, en caractères (serveur et page). */
+export const WITHDRAWAL_REASON_MAX = 300;
+
+/** Le refus d'un motif trop long, rattaché au champ du motif (`useFieldErrors`). */
+export const WITHDRAWAL_FIELD_ERRORS = { PLANNING_REASON_TOO_LONG: "reason" } as const;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
 

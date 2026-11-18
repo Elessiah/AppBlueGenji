@@ -1,0 +1,328 @@
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+
+jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/notify");
+jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://bluegenji.test" }));
+jest.mock("@/lib/server/tournaments/cast-eligibility");
+jest.mock("@/lib/server/planning/load", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/planning/load")>("@/lib/server/planning/load"),
+  loadPlanningEntries: jest.fn(),
+  loadPlanningMembers: jest.fn(),
+}));
+jest.mock("@/lib/server/planning/players", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/planning/players")>("@/lib/server/planning/players"),
+  loadEntryPlayers: jest.fn(),
+}));
+
+import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
+import { loadPlanningEntries, loadPlanningMembers } from "@/lib/server/planning/load";
+import {
+  announceWave,
+  BOOTSTRAP_SETTING,
+  collectWave,
+  digestRecipients,
+  groupByEntries,
+  NEW_ENTRIES_MAX_WAIT_MS,
+  NEW_ENTRIES_QUIET_MS,
+  waveReady,
+} from "@/lib/server/planning/new-entries";
+import { loadEntryPlayers } from "@/lib/server/planning/players";
+import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
+import { HOUR_MS, loadedEntry, loadedMember, MONDAY } from "../../../helpers/planning";
+import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
+
+/** Récapitulatif des nouvelles entrées (`CAST_PLANNING.md` § Notifications) : une vague, un message. */
+
+const NOW = MONDAY - 72 * HOUR_MS;
+const connection = connectionMock();
+const { execute } = connection;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  execute.mockResolvedValue([{ affectedRows: 1 }]);
+  jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry()]);
+  jest.mocked(loadEntryPlayers).mockResolvedValue(new Map());
+  jest.mocked(loadEligibleRefereeIds).mockImplementation(async (_executor, ids) => new Set(ids));
+  jest.mocked(loadNotificationRecipients).mockImplementation(async (ids) => ids.map((userId) => ({ userId, discord: null })));
+  jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [], pushed: 0 });
+});
+
+/** Les lignes de `bg_planning_entry_notices` que rend la base. */
+function knownNotices(rows: { entry_key: string; seen_at: Date; announced_at: Date | null }[], bootstrapped = true) {
+  execute.mockImplementation(async (sql: string) => {
+    if (sql.startsWith("SELECT entry_key")) return [rows];
+    if (sql.startsWith("SELECT 1 FROM bg_settings")) return [bootstrapped ? [{ 1: 1 }] : []];
+    return [{ affectedRows: 1 }];
+  });
+}
+
+function statements(): string[] {
+  return execute.mock.calls.map(([sql]) => sql.replace(/\s+/g, " ").trim().slice(0, 40));
+}
+
+describe("waveReady", () => {
+  it("waveReady_newestJustUnderQuiet_notReady", () => {
+    expect(waveReady([NOW - NEW_ENTRIES_QUIET_MS + 1], NOW)).toBe(false);
+  });
+
+  it("waveReady_newestQuietExactly_ready", () => {
+    expect(waveReady([NOW - NEW_ENTRIES_QUIET_MS], NOW)).toBe(true);
+  });
+
+  it("waveReady_burstStillGoingButOldestAtMaxWait_ready", () => {
+    expect(waveReady([NOW - NEW_ENTRIES_MAX_WAIT_MS, NOW], NOW)).toBe(true);
+  });
+
+  it("waveReady_empty_notReady", () => {
+    expect(waveReady([], NOW)).toBe(false);
+  });
+});
+
+describe("digestRecipients", () => {
+  const entry = loadedEntry();
+  const noPlayers = () => new Set<number>();
+
+  it("digestRecipients_casterAndProd_receiveEveryEntry", () => {
+    const members = [loadedMember({ userId: 4, roles: ["CASTER"] }), loadedMember({ userId: 6, roles: ["PROD"] })];
+
+    expect([...digestRecipients([entry], members, new Map(), noPlayers).keys()]).toEqual([4, 6]);
+  });
+
+  it("digestRecipients_refereeEligibleForGame_receivesEntry", () => {
+    const members = [loadedMember({ userId: 3 })];
+
+    expect([...digestRecipients([entry], members, new Map([["OW", new Set([3])]]), noPlayers).keys()]).toEqual([3]);
+  });
+
+  it("digestRecipients_refereeNotEligible_skipped", () => {
+    const members = [loadedMember({ userId: 3 })];
+
+    expect(digestRecipients([entry], members, new Map([["OW", new Set<number>()]]), noPlayers).size).toBe(0);
+  });
+
+  it("digestRecipients_memberPlaysTheEntry_skipped", () => {
+    const members = [loadedMember({ userId: 4, roles: ["CASTER"] })];
+
+    expect(digestRecipients([entry], members, new Map(), () => new Set([4])).size).toBe(0);
+  });
+});
+
+describe("groupByEntries", () => {
+  it("groupByEntries_sameEntriesInAnyOrder_oneGroup", () => {
+    const first = loadedEntry({ key: "m:1" });
+    const second = loadedEntry({ key: "m:2", matchId: 2, startAt: MONDAY + HOUR_MS });
+
+    const groups = groupByEntries(
+      new Map([
+        [4, [first, second]],
+        [6, [second, first]],
+      ]),
+    );
+
+    expect(groups).toEqual([{ userIds: [4, 6], entries: [first, second] }]);
+  });
+
+  it("groupByEntries_differentEntries_separateGroups", () => {
+    const groups = groupByEntries(
+      new Map([
+        [4, [loadedEntry({ key: "m:1" })]],
+        [6, [loadedEntry({ key: "m:2" })]],
+      ]),
+    );
+
+    expect(groups).toHaveLength(2);
+  });
+});
+
+describe("collectWave", () => {
+  it("collectWave_firstPassMarkerAbsent_marksEverythingAnnouncedAndSetsMarker", async () => {
+    knownNotices([], false);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave).toEqual([]);
+    expect(statements()).toEqual([
+      "SELECT 1 FROM bg_settings WHERE setting_",
+      "SELECT entry_key, seen_at, announced_at ",
+      "INSERT IGNORE INTO bg_planning_entry_not",
+      "INSERT IGNORE INTO bg_settings (setting_",
+    ]);
+    expect(execute.mock.calls[2][1]).toEqual(["m:1", 10, 1, new Date(NOW), new Date(NOW)]);
+    expect(execute.mock.calls[3][1]).toEqual([BOOTSTRAP_SETTING]);
+  });
+
+  it("collectWave_tableEmptiedByRetentionAfterFirstPass_newWaveStillPending", async () => {
+    // Table vidée par la purge : le marqueur tient, la nouvelle vague n'est pas avalée.
+    knownNotices([]);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave).toEqual([]);
+    expect(execute.mock.calls[2][1]).toEqual(["m:1", 10, 1, new Date(NOW), null]);
+    expect(statements()).not.toContain("INSERT IGNORE INTO bg_settings (setting_");
+  });
+
+  it("collectWave_freshEntry_notedPendingWithoutWave", async () => {
+    knownNotices([{ entry_key: "m:9", seen_at: new Date(NOW - HOUR_MS), announced_at: new Date(NOW - HOUR_MS) }]);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave).toEqual([]);
+    expect(execute.mock.calls[2][1]).toEqual(["m:1", 10, 1, new Date(NOW), null]);
+  });
+
+  it("collectWave_severalFreshEntries_oneMultiRowInsert", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry(), loadedEntry({ key: "m:2", matchId: 2 })]);
+    knownNotices([]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    const inserts = execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_planning_entry_notices"));
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0][1]).toEqual(["m:1", 10, 1, new Date(NOW), null, "m:2", 10, 2, new Date(NOW), null]);
+  });
+
+  it("collectWave_readsOnlyOpenKeysAndPendingRows", async () => {
+    knownNotices([]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    const [sql, params] = execute.mock.calls[1];
+    expect(sql.replace(/\s+/g, " ")).toContain("WHERE announced_at IS NULL OR entry_key IN (?)");
+    expect(params).toEqual(["m:1"]);
+  });
+
+  it("collectWave_noOpenEntry_readsPendingRowsOnly", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([]);
+    knownNotices([]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    expect(execute.mock.calls[1][0].replace(/\s+/g, " ")).toContain("WHERE announced_at IS NULL");
+    expect(execute.mock.calls[1][0]).not.toContain("entry_key IN");
+  });
+
+  it("collectWave_hiddenTournamentEntry_notNotedUntilVisible", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: true })]);
+    knownNotices([]);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave).toEqual([]);
+    expect(statements()).not.toContain("INSERT IGNORE INTO bg_planning_entry_not");
+  });
+
+  it("collectWave_tournamentBecameVisible_entryNotedThenAnnouncedToAll", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: false })]);
+    knownNotices([]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    expect(execute.mock.calls[2][1]).toEqual(["m:1", 10, 1, new Date(NOW), null]);
+  });
+
+  it("collectWave_pendingWaveQuiet_markedAnnouncedThenReturned", async () => {
+    knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW - NEW_ENTRIES_QUIET_MS), announced_at: null }]);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave.map((entry) => entry.key)).toEqual(["m:1"]);
+    expect(statements()).toEqual([
+      "SELECT 1 FROM bg_settings WHERE setting_",
+      "SELECT entry_key, seen_at, announced_at ",
+      "UPDATE bg_planning_entry_notices SET ann",
+    ]);
+  });
+
+  it("collectWave_pendingEntryRehiddenBeforeWave_staysUnannounced", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: true })]);
+    knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW - NEW_ENTRIES_QUIET_MS), announced_at: null }]);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave).toEqual([]);
+    expect(statements()).not.toContain("UPDATE bg_planning_entry_notices SET ann");
+  });
+
+  it("collectWave_pendingEntryHidden_seenAtRestampedSoItJoinsTheNextWave", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: true })]);
+    knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW - NEW_ENTRIES_MAX_WAIT_MS), announced_at: null }]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    const update = execute.mock.calls.find(([sql]) => sql.includes("SET seen_at = ?"));
+    expect(update?.[1]).toEqual([new Date(NOW), "m:1"]);
+  });
+
+  it("collectWave_noHiddenPending_noRestamp", async () => {
+    knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW), announced_at: null }]);
+
+    await collectWave(fakeConnection(connection), NOW);
+
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET seen_at = ?"))).toBe(false);
+  });
+
+  it("collectWave_rehiddenEntryVisibleAgain_announcedInWave", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: false })]);
+    knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW - NEW_ENTRIES_QUIET_MS), announced_at: null }]);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave.map((entry) => entry.key)).toEqual(["m:1"]);
+  });
+
+  it("collectWave_pendingEntryNoLongerOpen_markedButNotReturned", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ open: false })]);
+    knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW - NEW_ENTRIES_QUIET_MS), announced_at: null }]);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave).toEqual([]);
+    expect(execute.mock.calls[2][1]).toEqual([new Date(NOW), "m:1"]);
+  });
+});
+
+describe("announceWave", () => {
+  it("announceWave_sameEntriesForTwoMembers_oneDigestForBoth", async () => {
+    jest.mocked(loadPlanningMembers).mockResolvedValue([
+      loadedMember({ userId: 4, roles: ["CASTER"] }),
+      loadedMember({ userId: 6, roles: ["PROD"] }),
+    ]);
+
+    await announceWave(fakeConnection(connection), [loadedEntry()]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+    // Un compte suspendu (rôle gardé) n'est pas sollicité pour poser ses disponibilités.
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4, 6], "proven", { excludeSuspended: true }]);
+    expect(jest.mocked(notifyUsers).mock.calls[0][1]).toMatchObject({ topic: "PLANNING_NEW_ENTRIES", dmFollowsTopic: true });
+  });
+
+  it("announceWave_differentListsPerMember_recipientsLoadedOnceAndOneSendPerList", async () => {
+    jest.mocked(loadPlanningMembers).mockResolvedValue([
+      loadedMember({ userId: 4, roles: ["CASTER"] }),
+      loadedMember({ userId: 6, roles: ["REFEREE"] }),
+    ]);
+    jest.mocked(loadEligibleRefereeIds).mockImplementation(async (_executor, _ids, game) => (game === "OW" ? new Set([6]) : new Set<number>()));
+
+    await announceWave(fakeConnection(connection), [loadedEntry({ game: "OW" }), loadedEntry({ key: "m:2", matchId: 2, game: "MR" })]);
+
+    expect(loadNotificationRecipients).toHaveBeenCalledTimes(1);
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+    expect(loadEligibleRefereeIds).toHaveBeenCalledTimes(2);
+  });
+
+  it("announceWave_emptyWave_sendsNothing", async () => {
+    await announceWave(fakeConnection(connection), []);
+
+    expect(loadPlanningMembers).not.toHaveBeenCalled();
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("announceWave_loadFails_neverThrows", async () => {
+    jest.mocked(loadPlanningMembers).mockRejectedValue(new Error("ECONNRESET"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(announceWave(fakeConnection(connection), [loadedEntry()])).resolves.toBeUndefined();
+    error.mockRestore();
+  });
+});

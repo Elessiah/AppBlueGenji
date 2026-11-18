@@ -14,6 +14,10 @@ jest.mock("@/lib/server/planning/auto-assign", () => ({
   confirmAssignments: jest.fn(),
 }));
 jest.mock("@/lib/server/planning/view");
+jest.mock("@/lib/server/planning/withdrawal", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/planning/withdrawal")>("@/lib/server/planning/withdrawal"),
+  withdrawFromEntry: jest.fn(),
+}));
 jest.mock("@/lib/server/planning/load", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/load")>("@/lib/server/planning/load"),
   writeDurationSettings: jest.fn(),
@@ -27,6 +31,7 @@ import { PUT as settingsPut } from "@/app/api/admin/planning/settings/route";
 import { PUT as availabilityPut } from "@/app/api/planning/availability/route";
 import { GET as planningGet } from "@/app/api/planning/route";
 import { PUT as soloPut } from "@/app/api/planning/solo-caster/route";
+import { POST as withdrawalPost } from "@/app/api/planning/withdrawal/route";
 import { PLANNING_BATCH_RULE, PLANNING_READ_BURST_RULE, PLANNING_READ_RULE, PLANNING_WRITE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
@@ -34,6 +39,8 @@ import { setAvailability, setManualAssignment, setSoloCaster } from "@/lib/serve
 import { confirmAssignments, runAutoAssign } from "@/lib/server/planning/auto-assign";
 import { writeDurationSettings } from "@/lib/server/planning/load";
 import { loadPlanningView } from "@/lib/server/planning/view";
+import { withdrawFromEntry } from "@/lib/server/planning/withdrawal";
+import { WITHDRAWAL_REASON_MAX } from "@/lib/shared/planning";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { DEFAULT_PLANNING_DURATIONS } from "@/lib/shared/planning-durations";
 import type { PlanningView } from "@/lib/shared/planning-view";
@@ -74,6 +81,7 @@ const AVAILABILITY: Parameters<typeof setAvailability>[1] = { entryKey: "m:1", r
 const ASSIGNMENT = { entryKey: "m:1", role: "CASTER", userId: 4, assigned: true };
 const WINDOW = { from: "2026-11-23T00:00:00.000Z", to: "2026-11-30T00:00:00.000Z" };
 const CONFIRM = { entryKeys: ["m:1"] };
+const WITHDRAWAL = { entryKey: "m:1", role: "CASTER" };
 
 type Call = () => Promise<Response>;
 
@@ -82,6 +90,7 @@ const ROUTES: Record<string, Call> = {
   "GET /api/planning": () => planningGet(),
   "PUT /api/planning/availability": () => availabilityPut(request("PUT", AVAILABILITY)),
   "PUT /api/planning/solo-caster": () => soloPut(request("PUT", { solo: true })),
+  "POST /api/planning/withdrawal": () => withdrawalPost(request("POST", WITHDRAWAL)),
   "PUT /api/admin/planning/assignment": () => assignmentPut(request("PUT", ASSIGNMENT)),
   "POST /api/admin/planning/auto-assign": () => autoAssignPost(request("POST", WINDOW)),
   "POST /api/admin/planning/confirm": () => confirmPost(request("POST", CONFIRM)),
@@ -98,6 +107,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit();
   jest.mocked(loadPlanningView).mockResolvedValue(VIEW);
+  jest.mocked(withdrawFromEntry).mockResolvedValue({ late: false, replaced: true, unfilled: false });
   jest.mocked(setAvailability).mockResolvedValue(undefined);
   jest.mocked(setSoloCaster).mockResolvedValue(undefined);
   jest.mocked(setManualAssignment).mockResolvedValue(undefined);
@@ -451,5 +461,55 @@ describe("plafonds des routes du planning", () => {
     for (let call = 0; call < PLANNING_READ_RULE.limit + 1; call += 1) await planningGet();
 
     expect((await planningGet()).status).toBe(403);
+  });
+});
+
+describe("POST /api/planning/withdrawal", () => {
+  it("withdrawalPost_caster_withdrawsOwnRowAndReturnsOutcome", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+
+    const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, reason: "  Malade  " }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ late: false, replaced: true, unfilled: false });
+    expect(jest.mocked(withdrawFromEntry).mock.calls[0].slice(0, 2)).toEqual([caster, { entryKey: "m:1", role: "CASTER", reason: "Malade" }]);
+  });
+
+  it("withdrawalPost_invalidEntryKey_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+
+    const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, entryKey: "x:1" }));
+
+    expect(response.status).toBe(400);
+    expect(await errorOf(response)).toBe("INVALID_ENTRY");
+  });
+
+  it("withdrawalPost_invalidRole_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+
+    const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, role: "PLAYER" }));
+
+    expect(response.status).toBe(400);
+    expect(await errorOf(response)).toBe("INVALID_ROLE");
+  });
+
+  it("withdrawalPost_reasonOverMax_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+
+    const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, reason: "a".repeat(WITHDRAWAL_REASON_MAX + 1) }));
+
+    expect(response.status).toBe(400);
+    expect(await errorOf(response)).toBe("PLANNING_REASON_TOO_LONG");
+    expect(withdrawFromEntry).not.toHaveBeenCalled();
+  });
+
+  it("withdrawalPost_entryStarted_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(withdrawFromEntry).mockRejectedValue(new Error("PLANNING_WITHDRAWAL_CLOSED"));
+
+    const response = await withdrawalPost(request("POST", WITHDRAWAL));
+
+    expect(response.status).toBe(409);
+    expect(await errorOf(response)).toBe("PLANNING_WITHDRAWAL_CLOSED");
   });
 });

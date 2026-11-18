@@ -4,9 +4,12 @@ jest.mock("@/lib/server/auth");
 
 import { resolveRoles } from "@/lib/server/auth";
 import {
+  coveringSoloCasterIds,
+  distinctRemovals,
   loadPlanningData,
   loadPlanningEntries,
   loadHiddenTournamentIds,
+  loadPlanningMembers,
   loadPlanningMembersByIds,
   parseEntryKey,
   type LoadedMember,
@@ -186,15 +189,70 @@ describe("loadPlanningMembersByIds", () => {
     jest.mocked(resolveRoles).mockImplementation((_isAdmin, raw) => (raw === '["CASTER"]' ? ["CASTER"] : []));
     connection.execute.mockResolvedValue([
       [
-        { id: 4, pseudo: "Caster", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: 1 },
-        { id: 9, pseudo: "Ancien", is_admin: 0, platform_roles_json: "[]", solo_caster: null },
+        { id: 4, pseudo: "Caster", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: 1, suspended: 0 },
+        { id: 9, pseudo: "Ancien", is_admin: 0, platform_roles_json: "[]", solo_caster: null, suspended: 0 },
       ],
       [],
     ]);
 
     expect(await loadPlanningMembersByIds(executor, [4, 9])).toEqual([
-      { userId: 4, pseudo: "Caster", roles: ["CASTER"], soloCaster: true, seesHidden: false },
+      { userId: 4, pseudo: "Caster", roles: ["CASTER"], soloCaster: true, seesHidden: false, suspended: false },
     ]);
+  });
+
+  it("loadPlanningMembersByIds_suspendedRow_flaggedSuspended", async () => {
+    jest.mocked(resolveRoles).mockReturnValue(["CASTER"]);
+    connection.execute.mockResolvedValue([[{ id: 4, pseudo: "Caster", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: 0, suspended: 1 }], []]);
+
+    const [member] = await loadPlanningMembersByIds(executor, [4]);
+
+    expect(member.suspended).toBe(true);
+  });
+
+  it("loadPlanningMembersByIds_lock_suspensionReadSeparatelyWithShareLock", async () => {
+    jest.mocked(resolveRoles).mockReturnValue(["CASTER"]);
+    connection.execute
+      .mockResolvedValueOnce([[{ id: 4, pseudo: "Caster", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: 0, suspended: 0 }], []])
+      .mockResolvedValueOnce([[], []]);
+
+    await loadPlanningMembersByIds(executor, [4], { lock: true });
+
+    const [accountsSql] = connection.execute.mock.calls[0];
+    const [suspensionSql, params] = connection.execute.mock.calls[1];
+    expect(accountsSql).not.toContain("bg_account_suspensions");
+    expect(suspensionSql).toContain("FROM bg_account_suspensions s");
+    expect(suspensionSql).toContain("s.lifted_at IS NULL");
+    expect(suspensionSql).toContain("LOCK IN SHARE MODE");
+    expect(suspensionSql).not.toContain("JOIN");
+    expect(params).toEqual([4]);
+  });
+
+  it("loadPlanningMembersByIds_lock_suspendedRow_flagsMember", async () => {
+    jest.mocked(resolveRoles).mockReturnValue(["CASTER"]);
+    connection.execute
+      .mockResolvedValueOnce([
+        [
+          { id: 4, pseudo: "Caster", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: 0, suspended: 0 },
+          { id: 5, pseudo: "Autre", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: 0, suspended: 0 },
+        ],
+        [],
+      ])
+      .mockResolvedValueOnce([[{ user_id: 4 }], []]);
+
+    const members = await loadPlanningMembersByIds(executor, [4, 5], { lock: true });
+
+    expect(members.map(({ userId, suspended }) => ({ userId, suspended }))).toEqual([
+      { userId: 4, suspended: true },
+      { userId: 5, suspended: false },
+    ]);
+  });
+
+  it("loadPlanningMembersByIds_lock_noAccount_skipsSuspensionRead", async () => {
+    connection.execute.mockResolvedValue([[], []]);
+
+    await loadPlanningMembersByIds(executor, [4], { lock: true });
+
+    expect(connection.execute).toHaveBeenCalledTimes(1);
   });
 
   it("loadPlanningMembersByIds_lock_shareLockOnAccountsOnly", async () => {
@@ -241,7 +299,92 @@ describe("loadHiddenTournamentIds", () => {
   });
 });
 
+describe("loadPlanningMembers", () => {
+  it("loadPlanningMembers_sql_readsActiveSuspension", async () => {
+    connection.execute.mockResolvedValue([[], []]);
+
+    await loadPlanningMembers(executor);
+
+    const [sql] = connection.execute.mock.calls[0];
+    expect(sql).toContain("FROM bg_account_suspensions sus WHERE sus.user_id = u.id");
+    expect(sql).toContain("AS suspended");
+  });
+
+  it("loadPlanningMembers_activeRow_notSuspended", async () => {
+    jest.mocked(resolveRoles).mockReturnValue(["CASTER"]);
+    connection.execute.mockResolvedValue([[{ id: 3, pseudo: "Caster", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: null, suspended: 0 }], []]);
+
+    const [member] = await loadPlanningMembers(executor);
+
+    expect(member.suspended).toBe(false);
+  });
+});
+
+describe("coveringSoloCasterIds", () => {
+  const members = [
+    loadedMember({ userId: 3, soloCaster: true }),
+    loadedMember({ userId: 4, soloCaster: true, suspended: true }),
+    loadedMember({ userId: 5, soloCaster: false }),
+  ];
+
+  it("coveringSoloCasterIds_skipSuspended_excludesSuspendedSolo", () => {
+    expect([...coveringSoloCasterIds(members, true)]).toEqual([3]);
+  });
+
+  it("coveringSoloCasterIds_keepSuspended_includesSuspendedSolo", () => {
+    expect([...coveringSoloCasterIds(members, false)]).toEqual([3, 4]);
+  });
+});
+
+describe("distinctRemovals", () => {
+  it("distinctRemovals_repeatedRemovalAndWithdrawal_oneRowPerPlace", () => {
+    const rows = [
+      { entry_key: "m:1", user_id: 4, role: "CASTER" as const },
+      { entry_key: "m:1", user_id: 4, role: "CASTER" as const },
+      { entry_key: "m:1", user_id: 4, role: "PROD" as const },
+      { entry_key: "m:2", user_id: 4, role: "CASTER" as const },
+    ];
+
+    expect(distinctRemovals(rows)).toEqual([
+      { entryKey: "m:1", userId: 4, role: "CASTER" },
+      { entryKey: "m:1", userId: 4, role: "PROD" },
+      { entryKey: "m:2", userId: 4, role: "CASTER" },
+    ]);
+  });
+
+  it("distinctRemovals_noRows_empty", () => {
+    expect(distinctRemovals([])).toEqual([]);
+  });
+});
+
 describe("loadPlanningData", () => {
+  it("loadPlanningData_withdrawals_readAndExcludedFromRole", async () => {
+    routeSql({ tournaments: [tournamentRow()] });
+    const plain = connection.execute.getMockImplementation();
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      if (sql.includes("kind = 'WITHDRAWN'")) {
+        return [
+          [
+            { id: 8, entry_key: "t:10", user_id: 5, role: "CASTER", kind: "WITHDRAWN", source: "AUTO", reason: null, late: 0, created_at: new Date("2026-11-20T10:00:00Z") },
+            { id: 9, entry_key: "t:10", user_id: 6, role: "PROD", kind: "REMOVED", source: "MANUAL", reason: null, late: 0, created_at: new Date("2026-11-19T10:00:00Z") },
+            { id: 7, entry_key: "t:10", user_id: 4, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: "Malade", late: 1, created_at: new Date("2026-11-20T10:00:00Z") },
+          ],
+          [],
+        ];
+      }
+      return plain ? plain(sql, params) : [[], []];
+    });
+
+    const data = await loadPlanningData(executor, { now: MONDAY, includeHidden: true, members: [] });
+
+    // Une seule lecture pour retraits et désistements ; les désistements sortent par date puis identifiant.
+    expect(connection.execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_planning_events"))).toHaveLength(1);
+    expect(data.withdrawals.map((row) => row.userId)).toEqual([4, 5]);
+    expect(data.withdrawals[0]).toEqual({ entryKey: "t:10", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, createdAt: "2026-11-20T10:00:00.000Z" });
+    expect(data.removals).toContainEqual({ entryKey: "t:10", userId: 4, role: "CASTER" });
+    expect(data.removals).toContainEqual({ entryKey: "t:10", userId: 6, role: "PROD" });
+  });
+
   it("loadPlanningData_reads_settingsOnce_andCarriesThem", async () => {
     routeSql({ tournaments: [tournamentRow()] });
 

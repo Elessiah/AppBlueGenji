@@ -16,10 +16,12 @@ import {
   loadDisabledTopics,
   purgeStaleSubscriptions,
   pushToUsers,
+  loadStaffCandidates,
   saveDisabledTopics,
   saveSubscription,
   subscribedStaffCandidates,
   usersReachableByPush,
+  usersWithTopicDisabled,
 } from "@/lib/server/push-subscriptions";
 import { sendWebPush, type WebPushConfig } from "@/lib/server/web-push";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
@@ -354,6 +356,22 @@ describe("abonnements", () => {
 });
 
 describe("sujets coupés", () => {
+  it("usersWithTopicDisabled_someOptedOut_returnsThoseIds", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[{ user_id: 4 }]]);
+    pool({ query });
+
+    expect(await usersWithTopicDisabled([4, 5, 4], "PLANNING_ASSIGNED")).toEqual(new Set([4]));
+    expect(query.mock.calls[0][1]).toEqual(["PLANNING_ASSIGNED", 4, 5]);
+  });
+
+  it("usersWithTopicDisabled_noIds_noQuery", async () => {
+    const query = jest.fn<SqlQuery>();
+    pool({ query });
+
+    expect(await usersWithTopicDisabled([], "PLANNING_ASSIGNED")).toEqual(new Set());
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it("ne relit que des sujets connus, dans l'ordre du registre", async () => {
     pool({
       execute: jest.fn<SqlQuery>().mockResolvedValue([[{ topic: "MATCH_REMINDER" }, { topic: "RETIRÉ" }, { topic: "MATCH_START" }]]),
@@ -405,6 +423,30 @@ describe("staff, purge et export", () => {
     expect(query.mock.calls[0][0]).toMatch(/is_deleted = 0/);
     // Un compte suspendu n'a plus aucun droit effectif : il ne reçoit rien du staff.
     expect(query.mock.calls[0][0]).toMatch(/NOT EXISTS \(SELECT 1 FROM bg_account_suspensions sus\s+WHERE sus\.user_id = u\.id AND sus\.lifted_at IS NULL/);
+  });
+
+  it("loadStaffCandidates_allStaff_noSubscriptionClause", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 4, is_admin: 0, platform_roles_json: '["TOURNOIS"]' }]]);
+    pool({ query });
+
+    expect(await loadStaffCandidates({ subscribedOnly: false })).toEqual([{ userId: 4, isAdmin: false, rolesJson: '["TOURNOIS"]' }]);
+    expect(query.mock.calls[0][0]).not.toContain("bg_push_subscriptions");
+    expect(query.mock.calls[0][0]).toContain("bg_account_suspensions");
+  });
+
+  it("loadStaffCandidates_subscribedOnly_filtersOnSubscriptions", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    pool({ query });
+
+    await loadStaffCandidates({ subscribedOnly: true });
+
+    expect(query.mock.calls[0][0]).toContain("EXISTS (SELECT 1 FROM bg_push_subscriptions");
+  });
+
+  it("loadStaffCandidates_databaseFailure_throws", async () => {
+    pool({ query: jest.fn<SqlQuery>().mockRejectedValue(new Error("ECONNRESET")) });
+
+    await expect(loadStaffCandidates({ subscribedOnly: false })).rejects.toThrow("ECONNRESET");
   });
 
   it("oublie les abonnements restés muets au-delà de la durée déclarée", async () => {

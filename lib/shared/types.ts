@@ -1307,8 +1307,22 @@ export type PersonalDataExport = {
     availability: { tournamentId: number; matchId: number | null; role: string; status: string; preferred: boolean; updatedAt: string | null }[];
     /** `reason` : motif de l'attribution (`PREFERENCE`, `LOAD`, `MANUAL`), tel que sa page le lui montre. */
     assignments: { tournamentId: number; matchId: number | null; role: string; source: string; reason: string; confirmed: boolean; createdAt: string | null }[];
-    /** Historique des attributions (attribuée, confirmée, retirée), sans l'auteur du geste. */
-    history: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
+    /**
+     * Historique des attributions (attribuée, confirmée, retirée, désistement),
+     * sans l'auteur du geste ; un désistement porte son motif et son retard.
+     */
+    history: {
+      tournamentId: number;
+      matchId: number | null;
+      role: string;
+      kind: string;
+      source: string;
+      createdAt: string | null;
+      /** Désistement (`WITHDRAWN`) : motif saisi, `null` sinon ou s'il n'en a pas donné. */
+      reason?: string | null;
+      /** Désistement à moins de 24 h du début. */
+      late?: boolean;
+    }[];
     /**
      * Ses gestes comme staff (attribution posée, confirmée, retirée) : la
      * trace qui le nomme comme auteur, sans l'identifiant de la personne visée (art. 15.4).

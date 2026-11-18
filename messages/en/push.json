@@ -68,6 +68,22 @@
       "label": "Cast removed",
       "description": "Your caster registration for a match is removed by the staff or automatically: the reason is given."
     },
+    "PLANNING_NEW_ENTRIES": {
+      "label": "New slots in the planning",
+      "description": "New slots (matches or whole tournaments) were just scheduled: all of them for a caster or a prod, those of the games where you meet the refereeing requirement for a referee, never a slot where you play. One summary per wave, so you can set your availability. Also turns off the Discord direct message."
+    },
+    "PLANNING_ASSIGNED": {
+      "label": "Planning assignments",
+      "description": "You are assigned to a match or an event, by the staff or by a confirmed automatic assignment (never for a mere proposal), or you replace, on a confirmed assignment, a member who withdrew: date, teams and role. Also turns off the Discord direct message."
+    },
+    "PLANNING_WITHDRAWAL": {
+      "label": "Planning withdrawals",
+      "description": "A member assigned and confirmed on the same slot as you (you being confirmed too) withdrew, without being named: their replacement, if any, or the open slot. Nothing for a mere proposal. Also turns off the Discord direct message."
+    },
+    "PLANNING_UNFILLED": {
+      "label": "Open slots",
+      "description": "After the withdrawal from a confirmed assignment, no replacement was found: the slot is open. Also turns off the Discord direct message."
+    },
     "STAFF_REPORT": {
       "label": "Incoming reports",
       "description": "A new report, or an appeal, reaches moderation."
@@ -79,7 +95,7 @@
     "compactLead": "Get notified even when the site is closed.",
     "devices": "{count, plural, one {1 device subscribed} other {{count} devices subscribed}} to your account. The settings below apply to all of them.",
     "legend": "Notify me about",
-    "discordHint": "Discord direct messages have their own box: “Discord direct messages about my matches and teams”.",
+    "discordHint": "Discord direct messages about your matches and teams have their own box: “Discord direct messages about my matches and teams”.",
     "notConfigured": "Push notifications aren't enabled on the site yet.",
     "checking": "Checking this device…",
     "enabledHere": "Enabled on this device",

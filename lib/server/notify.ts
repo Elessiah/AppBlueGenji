@@ -29,6 +29,7 @@ import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { parseRoles } from "@/lib/server/serialization";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import {
@@ -36,7 +37,7 @@ import {
   type DiscordDeliveryReport,
   type DiscordRecipient,
 } from "@/lib/server/bot-integration";
-import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
+import { can, sanitizePlatformRoles, type Permission } from "@/lib/shared/permissions";
 import { renderDm, type LocalizedDm } from "@/lib/shared/dm-language";
 import type { Locale } from "@/lib/shared/locales";
 import { accountLocaleFromRow, readWithLocaleColumn, withRowLocale } from "./users/account-locale";
@@ -45,7 +46,7 @@ import {
   type LocalizedPushContent,
   type PushTopic,
 } from "@/lib/shared/push-notifications";
-import { pushToUsers, subscribedStaffCandidates, type PushOptions } from "./push-subscriptions";
+import { loadStaffCandidates, pushToUsers, subscribedStaffCandidates, usersWithTopicDisabled, type PushOptions, type StaffCandidate } from "./push-subscriptions";
 import { matchDmEnabled } from "./users/match-dm-preference";
 
 /** Une personne à prévenir : son compte, et comment Discord la joint (ou pas). */
@@ -77,6 +78,13 @@ export type UserNotification = {
    * le premier envoi (`match-reminders.ts`).
    */
   discordOnly?: true;
+  /**
+   * Le sujet coupé dans « Mon profil » coupe aussi le message privé Discord
+   * (sujets du planning, `CAST_PLANNING.md` § Notifications) : un compte qui
+   * l'a coupé ne reçoit ni push ni message privé. Lecture impossible des
+   * réglages : aucun message privé (on ne passe pas outre une opposition).
+   */
+  dmFollowsTopic?: true;
 };
 
 export type NotificationReport = {
@@ -106,9 +114,12 @@ export async function notifyUsers(
   recipients: readonly NotificationRecipient[],
   notification: UserNotification,
 ): Promise<NotificationReport> {
-  const reachable = recipients.filter(
+  const withDiscord = recipients.filter(
     (recipient): recipient is NotificationRecipient & { discord: DiscordRecipient } => recipient.discord !== null,
   );
+  const reachable = notification.dmFollowsTopic
+    ? await withoutTopicOptOuts(withDiscord, notification.topic)
+    : withDiscord;
   const userIds = recipients.map((recipient) => recipient.userId);
   const message = notification.discord;
   // Rédigés **avant** tout départ, dans les seules langues des destinataires :
@@ -133,6 +144,20 @@ export async function notifyUsers(
 }
 
 type ReachableRecipient = NotificationRecipient & { discord: DiscordRecipient };
+
+/** Les destinataires Discord qui n'ont pas coupé le sujet ; aucun si les réglages sont illisibles. */
+async function withoutTopicOptOuts(recipients: ReachableRecipient[], topic: PushTopic): Promise<ReachableRecipient[]> {
+  if (recipients.length === 0) return recipients;
+  try {
+    const muted = await usersWithTopicDisabled(
+      recipients.map((recipient) => recipient.userId),
+      topic,
+    );
+    return recipients.filter((recipient) => !muted.has(recipient.userId));
+  } catch {
+    return [];
+  }
+}
 
 /** Les destinataires d'une langue et le message déjà rédigé pour eux. */
 type LocaleGroup = { text: string; group: ReachableRecipient[] };
@@ -247,6 +272,32 @@ export type StaffNotification = {
 };
 
 /**
+ * Les comptes du staff qui détiennent `permission`, hors `excluded` — la
+ * **seule** règle de sélection du staff, partagée par {@link notifyStaff} et
+ * {@link loadStaffIds}.
+ */
+export function staffHolding(
+  candidates: readonly StaffCandidate[],
+  permission: Permission,
+  excluded: ReadonlySet<number>,
+): number[] {
+  return candidates
+    .filter((candidate) => !excluded.has(candidate.userId))
+    .filter((candidate) => can({ isAdmin: candidate.isAdmin, roles: sanitizePlatformRoles(candidate.rolesJson) }, permission))
+    .map((candidate) => candidate.userId);
+}
+
+/**
+ * Le staff qui détient `permission` (abonné ou non à un appareil), hors
+ * `excluded` : les destinataires d'un avis de staff qui part **aussi** en
+ * message privé (`notifyUsers`), par la même sélection que {@link notifyStaff}.
+ * Lève en cas de panne.
+ */
+export async function loadStaffIds(permission: Permission, excluded: readonly number[] = []): Promise<number[]> {
+  return staffHolding(await loadStaffCandidates({ subscribedOnly: false }), permission, new Set(excluded));
+}
+
+/**
  * Prévient un métier : l'envoi Discord de l'appelant, et le push aux comptes
  * qui détiennent la permission du sujet (hors `excludeUserIds`).
  */
@@ -255,13 +306,7 @@ export async function notifyStaff(notification: StaffNotification): Promise<Noti
   const excluded = new Set(notification.excludeUserIds ?? []);
   const staffPush = async (): Promise<number> => {
     if (audience === null) return 0;
-    const candidates = await subscribedStaffCandidates();
-    const userIds = candidates
-      .filter((candidate) => !excluded.has(candidate.userId))
-      .filter((candidate) =>
-        can({ isAdmin: candidate.isAdmin, roles: sanitizePlatformRoles(candidate.rolesJson) }, audience),
-      )
-      .map((candidate) => candidate.userId);
+    const userIds = staffHolding(await subscribedStaffCandidates(), audience, excluded);
     return pushToUsers(userIds, notification.topic, notification.push, notification.pushOptions);
   };
   const [discord, pushed] = await Promise.all([
@@ -318,15 +363,20 @@ export function toNotificationRecipient(row: RecipientRow, reach: DiscordReach):
 export async function loadNotificationRecipients(
   userIds: readonly number[],
   reach: DiscordReach,
-  options: { matchDm?: boolean } = {},
+  options: { matchDm?: boolean; excludeSuspended?: boolean } = {},
 ): Promise<NotificationRecipient[]> {
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return [];
   const db = await getDatabase();
+  // Un compte suspendu n'est plus sollicité pour un rôle qu'il ne peut tenir
+  // (avis du planning) ; les avis qui le concernent lui-même le joignent encore.
+  const active = options.excludeSuspended
+    ? ` AND NOT ${userSuspendedSql("bg_users.id")}`
+    : "";
   const select = (withMatchDm: boolean, withLocale: boolean) =>
     db.query<(RecipientRow & { match_dm_enabled?: number | null })[]>(
       `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at${withMatchDm ? ", match_dm_enabled" : ""}${withLocale ? ", locale" : ""}
-       FROM bg_users WHERE is_deleted = 0 AND id IN (${ids.map(() => "?").join(", ")})`,
+       FROM bg_users WHERE is_deleted = 0 AND id IN (${ids.map(() => "?").join(", ")})${active}`,
       ids,
     );
   // La langue (lue ici pour que `notifyUsers` n'y revienne pas) et le réglage

@@ -35,7 +35,7 @@ import { inBatches } from "@/lib/shared/in-batches";
 import { accountLocaleFromRow } from "@/lib/server/users/account-locale";
 import { sendWebPush, webPushConfig, type WebPushConfig } from "./web-push";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
-import { activeSuspensionSql } from "@/lib/server/suspension-sql";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 
 export function endpointHash(endpoint: string): string {
   return crypto.createHash("sha256").update(endpoint).digest("hex");
@@ -123,6 +123,22 @@ export async function loadDisabledTopics(userId: number): Promise<PushTopic[]> {
   return PUSH_TOPIC_KEYS.filter((topic) => set.has(topic));
 }
 
+/**
+ * Comptes, parmi `userIds`, qui ont coupé `topic`. Sert aux sujets dont le
+ * réglage coupe **aussi** le message privé Discord (`dmFollowsTopic` de
+ * `notifyUsers`, sujets du planning).
+ */
+export async function usersWithTopicDisabled(userIds: readonly number[], topic: PushTopic): Promise<Set<number>> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return new Set();
+  const db = await getDatabase();
+  const [rows] = await db.query<(RowDataPacket & { user_id: number })[]>(
+    `SELECT user_id FROM bg_push_topic_optouts WHERE topic = ? AND user_id IN (${ids.map(() => "?").join(", ")})`,
+    [topic, ...ids],
+  );
+  return new Set(rows.map((row) => Number(row.user_id)));
+}
+
 /** Remplace l'ensemble des sujets coupés du compte. */
 export async function saveDisabledTopics(userId: number, topics: readonly PushTopic[]): Promise<void> {
   const db = await getDatabase();
@@ -190,8 +206,7 @@ function reachableSubscriptionsSql(accounts: number, topic: PushTopic): string {
                          WHERE o.user_id = s.user_id AND o.topic = ?)${
                            restricted
                              ? `
-         AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
-                         WHERE sus.user_id = s.user_id AND ${activeSuspensionSql("sus")})`
+         AND NOT ${userSuspendedSql("s.user_id")}`
                              : ""
                          }`;
 }
@@ -337,32 +352,43 @@ async function recordDeliveries(sent: readonly number[], gone: readonly number[]
   }
 }
 
+export type StaffCandidate = { userId: number; isAdmin: boolean; rolesJson: unknown };
+
 /**
- * Comptes abonnés sur au moins un appareil, parmi ceux qui détiennent une des
- * permissions données — les destinataires d'une notification de staff. Le
+ * Comptes de staff candidats (non supprimés, non suspendus, porteurs d'au
+ * moins un droit de plateforme) — **seule** source de la sélection du staff.
+ * `subscribedOnly` : seulement ceux abonnés sur au moins un appareil. Le
  * filtrage fin par permission se fait en mémoire, par la règle partagée : la
- * réécrire en SQL en ferait une seconde.
+ * réécrire en SQL en ferait une seconde. Lève en cas de panne.
  */
-export async function subscribedStaffCandidates(): Promise<
-  { userId: number; isAdmin: boolean; rolesJson: unknown }[]
-> {
+export async function loadStaffCandidates(options: { subscribedOnly: boolean }): Promise<StaffCandidate[]> {
+  const db = await getDatabase();
+  const [rows] = await db.query<(RowDataPacket & { id: number; is_admin: number; platform_roles_json: unknown })[]>(
+    `SELECT u.id, u.is_admin, u.platform_roles_json FROM bg_users u
+     WHERE u.is_deleted = 0
+       AND (u.is_admin = 1 OR u.platform_roles_json IS NOT NULL)${
+         options.subscribedOnly
+           ? `
+       AND EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id)`
+           : ""
+       }
+       AND NOT ${userSuspendedSql("u.id")}`,
+  );
+  return rows.map((row) => ({
+    userId: Number(row.id),
+    isAdmin: Number(row.is_admin) === 1,
+    rolesJson: row.platform_roles_json,
+  }));
+}
+
+/**
+ * Comptes abonnés sur au moins un appareil, parmi les candidats du staff
+ * ({@link loadStaffCandidates}) — les destinataires d'une notification de
+ * staff. Une panne rend une liste vide.
+ */
+export async function subscribedStaffCandidates(): Promise<StaffCandidate[]> {
   try {
-    const db = await getDatabase();
-    const [rows] = await db.query<
-      (RowDataPacket & { id: number; is_admin: number; platform_roles_json: unknown })[]
-    >(
-      `SELECT u.id, u.is_admin, u.platform_roles_json FROM bg_users u
-       WHERE u.is_deleted = 0
-         AND (u.is_admin = 1 OR u.platform_roles_json IS NOT NULL)
-         AND EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id)
-         AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
-                          WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")})`,
-    );
-    return rows.map((row) => ({
-      userId: Number(row.id),
-      isAdmin: Number(row.is_admin) === 1,
-      rolesJson: row.platform_roles_json,
-    }));
+    return await loadStaffCandidates({ subscribedOnly: true });
   } catch (error) {
     if (!isMissingTableError(error)) console.error("[push] lecture du staff impossible", failureReason(error));
     return [];

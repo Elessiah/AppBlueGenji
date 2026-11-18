@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   applyAvailability,
   candidatesFor,
+  canWithdraw,
   COVERAGE_PILL,
   errorKey,
   filterEntries,
@@ -21,9 +22,11 @@ import {
 import { PLANNING_STATUSES } from "@/lib/server/planning/actions";
 import enPlanning from "@/messages/en/planning.json";
 import frPlanning from "@/messages/fr/planning.json";
+import FR_PUSH from "@/messages/fr/pushMessages.json";
 import { DEFAULT_PLANNING_DURATIONS } from "@/lib/shared/planning-durations";
 import type { PlanningMember, PlanningView } from "@/lib/shared/planning-view";
-import { planningCoverage } from "@/lib/shared/planning";
+import { fieldForError } from "@/lib/shared/field-errors";
+import { planningCoverage, WITHDRAWAL_FIELD_ERRORS } from "@/lib/shared/planning";
 import { entryView, HOUR_MS, MONDAY } from "../helpers/planning";
 
 /** Logique pure de l'écran « Planning » et ses textes de refus (`CAST_PLANNING.md` § Interface). */
@@ -478,5 +481,50 @@ describe("groupByWeek — identité des entrées", () => {
 
     expect(groupByWeek(entries).map((week) => week.weekStart)).toEqual(groupByWeek(entries).map((week) => week.weekStart));
     expect(groupByWeek(entries)).toHaveLength(2);
+  });
+});
+
+describe("désistement — refus rattaché au motif", () => {
+  it("withdrawalFieldErrors_reasonTooLong_flagsReasonField", () => {
+    expect(fieldForError("PLANNING_REASON_TOO_LONG", WITHDRAWAL_FIELD_ERRORS)).toBe("reason");
+  });
+
+  it("withdrawalFieldErrors_otherRefusal_flagsNoField", () => {
+    expect(fieldForError("PLANNING_WITHDRAWAL_CLOSED", WITHDRAWAL_FIELD_ERRORS)).toBeNull();
+  });
+
+  it("withdrawalFieldErrors_mappedCode_hasTextInBothLanguages", () => {
+    for (const code of Object.keys(WITHDRAWAL_FIELD_ERRORS)) {
+      expect(Object.hasOwn(frPlanning.errors, code)).toBe(true);
+      expect(Object.hasOwn(enPlanning.errors, code)).toBe(true);
+    }
+  });
+});
+
+describe("canWithdraw (bouton « Me désister »)", () => {
+  const start = Date.parse("2026-11-20T18:00:00Z");
+
+  it("canWithdraw_editableEntryBeforeStart_true", () => {
+    expect(canWithdraw({ editable: true, startAt: new Date(start).toISOString() }, start - 1)).toBe(true);
+  });
+
+  it("canWithdraw_clockReachesStart_false", () => {
+    expect(canWithdraw({ editable: true, startAt: new Date(start).toISOString() }, start)).toBe(false);
+    expect(canWithdraw({ editable: true, startAt: new Date(start).toISOString() }, start + HOUR_MS)).toBe(false);
+  });
+
+  it("canWithdraw_notEditable_false", () => {
+    expect(canWithdraw({ editable: false, startAt: new Date(start).toISOString() }, start - HOUR_MS)).toBe(false);
+  });
+});
+
+describe("textes du désistement", () => {
+  it("withdrawals_noUnusedItemKey_inBothLanguages", () => {
+    expect(Object.hasOwn(frPlanning.withdrawals, "item")).toBe(false);
+    expect(Object.hasOwn(enPlanning.withdrawals, "item")).toBe(false);
+  });
+
+  it("assignedPushTitle_french_isNotGendered", () => {
+    expect(FR_PUSH.planning.assigned.title).not.toMatch(/Affecté/);
   });
 });

@@ -37,6 +37,12 @@ export async function register(): Promise<void> {
       } catch (error) {
         await logStartupFailure("[planning] Purge de conservation non lancée.", error);
       }
+      try {
+        const { startPlanningNoticesClock } = await import("@/lib/server/planning/new-entries");
+        startPlanningNoticesClock();
+      } catch (error) {
+        await logStartupFailure("[planning] Récapitulatif des nouvelles entrées non lancé.", error);
+      }
     }
   }
 }

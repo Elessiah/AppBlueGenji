@@ -13,7 +13,7 @@ import { MATCH_DM_SETTINGS_PATH } from "@/lib/shared/discord-notifications";
 import { teamJoinRequestPush } from "@/lib/shared/push-messages";
 import { parseRoles } from "@/lib/server/serialization";
 import { siteCanonicalBase, siteUrl } from "@/lib/server/site-url";
-import { activeSuspensionSql } from "@/lib/server/suspension-sql";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import {
   TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS,
   formatTeamJoinRequestNotice,
@@ -72,8 +72,7 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
        FROM bg_team_members tm
        JOIN bg_users u ON u.id = tm.user_id
        WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0 AND u.id <> ?
-         AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
-                         WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")})`,
+         AND NOT ${userSuspendedSql("u.id")}`,
       [teamId, requesterId],
     ),
   );

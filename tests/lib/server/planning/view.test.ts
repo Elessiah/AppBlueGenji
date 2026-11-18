@@ -10,11 +10,11 @@ jest.mock("@/lib/server/planning/load", () => ({
 
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
-import { loadPlanningData, loadPlanningMembers, loadPlanningMembersByIds, type LoadedAvailability } from "@/lib/server/planning/load";
-import { loadPlanningView, PLANNING_MEMBERS_TTL_MS, resetPlanningMembersCache, visibleAssignment } from "@/lib/server/planning/view";
+import { loadPlanningData, loadPlanningMembers, loadPlanningMembersByIds, type LoadedAvailability, type LoadedWithdrawal } from "@/lib/server/planning/load";
+import { loadPlanningView, PLANNING_MEMBERS_TTL_MS, resetPlanningMembersCache, unfilledRoles, visibleAssignment } from "@/lib/server/planning/view";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { authUser } from "../../../helpers/auth-user";
-import { loadedEntry, loadedMember, MONDAY, planningData } from "../../../helpers/planning";
+import { loadedAssignment, loadedEntry, loadedMember, MONDAY, planningData } from "../../../helpers/planning";
 import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 
 /** La page « Planning » : copie brève des comptes, réglage autonome relu, disponibilités regroupées (`CAST_PLANNING.md`). */
@@ -89,6 +89,14 @@ describe("loadPlanningView — comptes", () => {
     const view = await loadPlanningView(caster, MONDAY);
 
     expect(view.members).toEqual([{ userId: 4, pseudo: "Membre", roles: ["CASTER"], soloCaster: false }]);
+  });
+
+  it("loadPlanningView_suspendedMember_flagNotSentToPage", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], seesHidden: false, suspended: true })]);
+
+    const view = await loadPlanningView(staff, MONDAY);
+
+    expect(view.members[0]).not.toHaveProperty("suspended");
   });
 
   it("loadPlanningView_staff_membersCarrySeesHidden", async () => {
@@ -217,5 +225,88 @@ describe("loadPlanningView — raisons", () => {
     const view = await loadPlanningView(caster, MONDAY);
 
     expect(view.entries[0].assignments.map((row) => row.reason)).toEqual(["AUTO"]);
+  });
+});
+
+/** Un désistement tel que le relit `loadPlanningData`. */
+function withdrawalRow(overrides: Partial<LoadedWithdrawal> = {}): LoadedWithdrawal {
+  return { entryKey: "m:1", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, createdAt: "2026-11-20T10:00:00.000Z", ...overrides };
+}
+
+const heldBy = (userId: number, provisional: boolean): PlanningAssignmentView => ({
+  userId,
+  role: "CASTER",
+  source: "AUTO",
+  reason: "LOAD",
+  provisional,
+});
+
+describe("unfilledRoles", () => {
+  it("unfilledRoles_confirmedWithdrawalNoHolder_listsRole", () => {
+    expect(unfilledRoles({ editable: true }, [], [withdrawalRow()])).toEqual(["CASTER"]);
+  });
+
+  it("unfilledRoles_onlyProvisionalHolder_stillOpen", () => {
+    expect(unfilledRoles({ editable: true }, [heldBy(6, true)], [withdrawalRow()])).toEqual(["CASTER"]);
+  });
+
+  it("unfilledRoles_confirmedHolder_notOpen", () => {
+    expect(unfilledRoles({ editable: true }, [heldBy(6, false)], [withdrawalRow()])).toEqual([]);
+  });
+
+  it("unfilledRoles_provisionalWithdrawal_ignored", () => {
+    expect(unfilledRoles({ editable: true }, [], [withdrawalRow({ confirmed: false })])).toEqual([]);
+  });
+
+  it("unfilledRoles_entryClosed_empty", () => {
+    expect(unfilledRoles({ editable: false }, [], [withdrawalRow()])).toEqual([]);
+  });
+});
+
+describe("loadPlanningView — désistements", () => {
+  beforeEach(() => {
+    jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) =>
+      planningData({ entries: [loadedEntry()], members: options.members ?? [], withdrawals: [withdrawalRow()] }),
+    );
+  });
+
+  it("loadPlanningView_staff_seesWithdrawalReasons", async () => {
+    const view = await loadPlanningView(staff, MONDAY - 48 * 60 * 60 * 1000);
+
+    expect(view.entries[0].withdrawals).toEqual([
+      { userId: 4, role: "CASTER", late: true, reason: "Malade", confirmed: true, createdAt: "2026-11-20T10:00:00.000Z" },
+    ]);
+    expect(view.entries[0].unfilled).toEqual(["CASTER"]);
+  });
+
+  it("loadPlanningView_caster_seesOpenSlotButNoWithdrawals", async () => {
+    const view = await loadPlanningView(caster, MONDAY - 48 * 60 * 60 * 1000);
+
+    expect(view.entries[0].withdrawals).toEqual([]);
+    expect(view.entries[0].unfilled).toEqual(["CASTER"]);
+  });
+});
+
+describe("loadPlanningView — caster autonome suspendu", () => {
+  beforeEach(() => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        assignments: [loadedAssignment({ userId: 4, role: "CASTER", confirmed: true })],
+        members: [loadedMember({ userId: 4, roles: ["CASTER"], soloCaster: true, suspended: true })],
+      }),
+    );
+  });
+
+  it("loadPlanningView_suspendedSoloCaster_staffCoverageNotStreamed", async () => {
+    const view = await loadPlanningView(staff, MONDAY);
+
+    expect(view.entries[0].coverage).toMatchObject({ streamed: false, casterNeedsProd: true });
+  });
+
+  it("loadPlanningView_suspendedSoloCaster_memberCoverageUnchanged", async () => {
+    const view = await loadPlanningView(caster, MONDAY);
+
+    expect(view.entries[0].coverage).toMatchObject({ streamed: true, casterNeedsProd: false });
   });
 });
