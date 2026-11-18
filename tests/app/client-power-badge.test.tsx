@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ClientPowerState } from "@/lib/shared/hooks/useClientPower";
-import { MATCH_BACKGROUND_RENDER_DELAY_MS, powerLimitsList, UNKNOWN_PROBE } from "@/lib/shared/client-power";
+import { MATCH_BACKGROUND_RENDER_DELAY_MS, UNKNOWN_PROBE } from "@/lib/shared/client-power";
+import { powerLimitsList } from "@/lib/shared/client-power-text";
 import { shellText } from "@/lib/shared/shell-text";
 import { readSource } from "../helpers/read-source";
 import { ClientPowerBadge } from "@/components/client-power-badge";
@@ -166,5 +167,14 @@ describe("ClientPowerBadge", () => {
         typeof child === "object" && child !== null ? keys(child).map((sub) => `${key}.${sub}`) : [key],
       );
     expect(keys(enShell.clientPower).sort()).toEqual(keys(frShell.clientPower).sort());
+  });
+});
+
+describe("coût de rendu du témoin", () => {
+  it("le libellé et la description du régime sont mémoïsés par régime et langue", () => {
+    const source = readSource("components/client-power-badge.tsx");
+    expect(source).toContain("useMemo(() => powerModeLabel(mode, t), [mode, t])");
+    expect(source).toContain("useMemo(() => powerModeDescription(mode, t), [mode, t])");
+    expect(source).toContain('from "@/lib/shared/client-power-text"');
   });
 });

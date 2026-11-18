@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { shellText } from "@/lib/shared/shell-text";
+import { readSource } from "../../helpers/read-source";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import {
   activeMatchFocusUntil,
@@ -13,11 +14,7 @@ import {
   parseMatchFocusLeases,
   performanceLimits,
   powerModeAttribute,
-  powerModeDescription,
-  powerModeLabel,
   powerPolicy,
-  powerProbeSummary,
-  powerReasonLabel,
   powerReasons,
   pruneMatchFocusLeases,
   QUIET_STREAM_AFTER_MS,
@@ -33,6 +30,12 @@ import {
   type PageAttention,
   type PowerReason,
 } from "@/lib/shared/client-power";
+import {
+  powerModeDescription,
+  powerModeLabel,
+  powerProbeSummary,
+  powerReasonLabel,
+} from "@/lib/shared/client-power-text";
 
 const input = (overrides: Partial<ClientPowerInput> = {}): ClientPowerInput => ({
   attention: "FOCUSED",
@@ -424,5 +427,13 @@ describe("témoin", () => {
     expect(powerProbeSummary(probe, t)).toBe("30 fps · 1 core · 2 GB");
     expect(powerModeLabel("ECO", t)).toBe("Eco mode");
     expect(powerReasonLabel("MATCH", UNKNOWN_PROBE, t)).toBe("You have a match in progress or about to start");
+  });
+});
+
+describe("client-power.ts reste pur", () => {
+  it("n'importe ni les textes de la coque ni le français (client-power-text.ts)", () => {
+    const source = readSource("lib/shared/client-power.ts");
+    expect(source).not.toMatch(/shell-text|shellText/);
+    expect(readSource("lib/shared/client-power-text.ts")).toContain('from "./shell-text"');
   });
 });

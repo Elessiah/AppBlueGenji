@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { powerReasons, resolvePowerMode, showsPowerBadge } from "@/lib/shared/client-power";
 import {
-  powerModeDescription,
   powerLimitsList,
+  powerModeDescription,
   powerModeLabel,
   powerProbeSummary,
   powerReasonLabel,
-  powerReasons,
-  resolvePowerMode,
-  showsPowerBadge,
-} from "@/lib/shared/client-power";
+} from "@/lib/shared/client-power-text";
 import { setIgnorePerformance, useClientPowerState } from "@/lib/shared/hooks/useClientPower";
 import { useShellText } from "@/components/i18n/shell-text";
 import styles from "./client-power-badge.module.css";
@@ -38,6 +36,11 @@ export function ClientPowerBadge() {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Formatés une fois par régime et langue, pas à chaque rendu du témoin
+  // (monté sur toutes les pages) ; le détail, lui, ne se compose que ouvert.
+  const label = useMemo(() => powerModeLabel(mode, t), [mode, t]);
+  const description = useMemo(() => powerModeDescription(mode, t), [mode, t]);
 
   const reasons = powerReasons(input, limits);
   const ignoredLimits = ignorePerformance && limits.length > 0;
@@ -67,9 +70,6 @@ export function ClientPowerBadge() {
   }, [open]);
 
   if (!visible) return null;
-
-  const label = powerModeLabel(mode, t);
-  const description = powerModeDescription(mode, t);
 
   return (
     <div ref={rootRef} className={styles.root} data-mode={mode.toLowerCase()}>

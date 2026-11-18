@@ -1,11 +1,12 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import { Pill, type PillVariant } from "@/components/cyber/Pill";
 import { InfoHint } from "@/components/ui/info-hint";
 import { useSpectatorView } from "@/components/spectator-view";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import { MATCH_BACKGROUND_RENDER_DELAY_MS, QUIET_STREAM_AFTER_MS } from "@/lib/shared/client-power";
-import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
+import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import {
   otherSyncModes,
   resolveSyncMode,
@@ -68,6 +69,22 @@ export const SYNC_MODE_OTHER_KEYS = {
   POLLING: { other: "live.sync.modes.POLLING.other" },
 } as const satisfies ModeKeys<SyncModeOtherKey>;
 
+/** Clé de l'intitulé de chaque mode, en toutes lettres comme les autres. */
+export const SYNC_MODE_LABEL_KEYS = {
+  PRIORITY: "live.sync.modes.PRIORITY.label",
+  STANDARD: "live.sync.modes.STANDARD.label",
+  MATCH: "live.sync.modes.MATCH.label",
+  ECO: "live.sync.modes.ECO.label",
+  SLEEP: "live.sync.modes.SLEEP.label",
+  POLLING: "live.sync.modes.POLLING.label",
+} as const satisfies Record<SyncMode, TournamentPageKey>;
+
+/** Clé de la note « palier conservé » sous un régime de peinture. */
+export const SYNC_MODE_KEPT_KEYS = {
+  PRIORITY: "live.sync.tierKept.PRIORITY",
+  STANDARD: "live.sync.tierKept.STANDARD",
+} as const satisfies Record<RefreshTier, TournamentPageKey>;
+
 /** Clé du texte « mode courant » ; le texte `now` du mode si la variante manquait. */
 export function syncModeNowTextKey(mode: SyncMode, variant: SyncModeTextKey): TournamentPageKey {
   const keys: Partial<Record<SyncModeTextKey, TournamentPageKey>> = SYNC_MODE_NOW_KEYS[mode];
@@ -93,23 +110,22 @@ export type SyncModeState = { mode: SyncMode; input: SyncModeInput };
 
 /**
  * Mode de synchronisation du lecteur, lu à la source : palier du flux, régime
- * de charge (`useClientPower`), état du flux, page avec ou sans compte. Seuls
- * les composants qui l'appellent se redessinent à un alt-tab, jamais la fiche
- * entière.
+ * de charge (`useClientPower`), état du flux, page avec ou sans compte. Seul le
+ * composant qui l'appelle (l'en-tête, une fois pour la pastille et l'aide) se
+ * redessine à un alt-tab, jamais la fiche entière. Le résultat garde son
+ * identité tant que ses entrées ne changent pas : les vues mémoïsées en
+ * dessous ne se redessinent pas à chaque message du flux.
  */
 export function useSyncMode({ isLive, tier, fatal = null, viewerMatch = false }: Readonly<SyncModeProps>): SyncModeState | null {
   const power = useClientPower().mode;
   const spectator = useSpectatorView();
-  const input: SyncModeInput = {
-    tier,
-    power,
-    isLive,
-    fatal: fatal !== null,
-    source: spectator ? "POLL" : "STREAM",
-    viewerMatch,
-  };
-  const mode = resolveSyncMode(input);
-  return mode === null ? null : { mode, input };
+  const failed = fatal !== null;
+  const source = spectator ? "POLL" : "STREAM";
+  return useMemo(() => {
+    const input: SyncModeInput = { tier, power, isLive, fatal: failed, source, viewerMatch };
+    const mode = resolveSyncMode(input);
+    return mode === null ? null : { mode, input };
+  }, [tier, power, isLive, failed, source, viewerMatch]);
 }
 
 /**
@@ -120,16 +136,20 @@ export function useSyncMode({ isLive, tier, fatal = null, viewerMatch = false }:
  * texte porte le sens, la couleur ne fait que l'accompagner.
  */
 export function SyncModeBadge(props: Readonly<SyncModeProps>) {
-  const state = useSyncMode(props);
+  return <SyncModeBadgeView state={useSyncMode(props)} />;
+}
+
+/** La pastille d'un mode déjà résolu (l'en-tête le résout une fois pour elle et l'aide). */
+export const SyncModeBadgeView = memo(function SyncModeBadgeView({ state }: Readonly<{ state: SyncModeState | null }>) {
   const { t } = useTournamentPageText();
   if (state === null) return null;
   const { mode } = state;
   return (
     <Pill variant={SYNC_MODE_VARIANT[mode]} className={styles.badge} data-sync-mode={mode.toLowerCase()}>
-      {t(`live.sync.modes.${mode}.label`)}
+      {t(SYNC_MODE_LABEL_KEYS[mode])}
     </Pill>
   );
-}
+});
 
 /**
  * Explication du mode courant (avec sa cadence, et le palier conservé sous un
@@ -137,7 +157,10 @@ export function SyncModeBadge(props: Readonly<SyncModeProps>) {
  * rencontrer sur cette page. Les durées viennent des constantes qui les
  * décident, jamais écrites dans le texte.
  */
-export function SyncModeExplanation({ state, cadenceMs }: Readonly<{ state: SyncModeState; cadenceMs?: number | null }>) {
+export const SyncModeExplanation = memo(function SyncModeExplanation({
+  state,
+  cadenceMs,
+}: Readonly<{ state: SyncModeState; cadenceMs?: number | null }>) {
   const text = useTournamentPageText();
   const { t } = text;
   const { mode, input } = state;
@@ -156,29 +179,40 @@ export function SyncModeExplanation({ state, cadenceMs }: Readonly<{ state: Sync
         {now}
         {syncModeBatchNote(mode, input.source) && ` ${t("live.sync.matchBatched", values)}`}
         {kept !== null && " "}
-        {kept !== null && t(`live.sync.tierKept.${kept}`)}
+        {kept !== null && t(SYNC_MODE_KEPT_KEYS[kept])}
       </p>
       <p>{t("live.sync.others")}</p>
       <ul>
         {otherSyncModes(mode, input).map((other) => (
           <li key={other}>
-            <strong>{t(`live.sync.modes.${other}.label`)}</strong> —{" "}
+            <strong>{t(SYNC_MODE_LABEL_KEYS[other])}</strong> —{" "}
             {t(syncModeOtherTextKey(other, syncModeOtherKey(other, input.source)), otherValues)}
           </li>
         ))}
       </ul>
     </>
   );
-}
+});
 
 /** Le « i » de la pastille, pour la page avec compte (la page sans compte a le sien, `SpectatorHint`). */
 export function SyncModeHint(props: Readonly<SyncModeProps>) {
-  const state = useSyncMode(props);
+  return <SyncModeHintView state={useSyncMode(props)} cadenceMs={props.cadenceMs} />;
+}
+
+/**
+ * Le « i » d'un mode déjà résolu. Fermée, l'aide reste montée (`InfoHint`) :
+ * mémoïsée, elle ne se recompose qu'au changement de mode, de palier ou de
+ * cadence, pas à chaque message du flux.
+ */
+export const SyncModeHintView = memo(function SyncModeHintView({
+  state,
+  cadenceMs,
+}: Readonly<{ state: SyncModeState | null; cadenceMs?: number | null }>) {
   const { t } = useTournamentPageText();
   if (state === null) return null;
   return (
     <InfoHint id="tournament-sync-hint" subject={t("live.sync.title")}>
-      <SyncModeExplanation state={state} cadenceMs={props.cadenceMs} />
+      <SyncModeExplanation state={state} cadenceMs={cadenceMs} />
     </InfoHint>
   );
-}
+});

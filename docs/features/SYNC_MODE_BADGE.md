@@ -29,7 +29,8 @@ L'en-tête de `/tournois/[id]` (et de `/suivre/tournois/[id]`) porte, à côté 
 
 ## Câblage
 
-- `useSyncMode` (`_components/SyncModeBadge.tsx`) lit `useClientPower()` : seuls la pastille et le « i » se redessinent à un alt-tab, pas la fiche (qui s'abonne par `subscribeClientPower`). Le « i » calcule le mode une fois et le passe à `SyncModeExplanation`.
+- `useSyncMode` (`_components/SyncModeBadge.tsx`) lit `useClientPower()` : seuls la pastille et le « i » se redessinent à un alt-tab, pas la fiche (qui s'abonne par `subscribeClientPower`). L'en-tête résout le mode **une fois** (`useSyncMode`, résultat mémoïsé : même identité tant que palier, régime, flux, source et match ne changent pas) et le passe à la pastille et à l'aide (`SyncModeBadgeView`, `SyncModeHintView`, `SyncModeExplanation`, tous `memo`) : fermée, l'aide reste montée (`InfoHint`) mais ne se recompose qu'au changement de mode, pas à chaque message du flux. Les clés des textes sont des tables écrites en toutes lettres (`SYNC_MODE_LABEL_KEYS`, `SYNC_MODE_KEPT_KEYS`).
+- Palier sous flux calmé : `onMessage(message, quiet)` reçoit le drapeau du flux **à son ouverture** (`live-connection.ts`), jamais celui du moment de l'arrivée — la dernière trame d'un flux calmé qu'on remplace ne dégrade plus le palier du lecteur.
 - Pas de `aria-live` : le mode bascule à chaque changement de focus, ce serait du bruit ; le texte porte le sens.
 - Le « i » (`InfoHint`) explique le mode courant avec sa cadence, puis liste brièvement les autres (demande de l'utilisateur, une phrase chacun). Page sans compte : ajouté au « i » de la pastille Spectateur (un seul « i ») ; la phrase du témoin n'y reste que hors lecture réussie, la cadence n'est pas dite deux fois.
 - Textes : `messages/{fr,en}/tournament.json`, `live.sync.*`.

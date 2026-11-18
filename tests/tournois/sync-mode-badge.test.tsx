@@ -20,7 +20,11 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { FR_TOURNAMENT_PAGE_TEXT, tournamentPageMessages } from "@/lib/shared/tournament-page-text";
 import { readSource } from "../helpers/read-source";
 import {
+  SYNC_MODE_KEPT_KEYS,
+  SYNC_MODE_LABEL_KEYS,
   SYNC_MODE_VARIANT,
+  SyncModeBadgeView,
+  SyncModeHintView,
   SyncModeBadge,
   SyncModeExplanation,
   syncModeNowTextKey,
@@ -208,17 +212,24 @@ describe("câblage de l'en-tête et de la source", () => {
   const live = readSource("app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts");
 
   it("membre : pastille et « i » du mode reçoivent le match du lecteur ; sans compte : la pastille Spectateur", () => {
-    expect(header).toMatch(/<SyncModeHint [^>]*viewerMatch=\{viewerMatch\}/);
-    expect(header).toMatch(/<SyncModeBadge [^>]*viewerMatch=\{viewerMatch\}/);
+    expect(header).toContain("useSyncMode({ isLive, tier, fatal, viewerMatch })");
+    expect(header).toContain("<SyncModeHintView state={sync}");
+    expect(header).toContain("<SyncModeBadgeView state={sync} />");
     expect(header).toMatch(/spectator \? \(\s*<SpectatorHint/);
   });
 
+  it("le mode est résolu une seule fois par l'en-tête, pas par la pastille et l'aide", () => {
+    expect(header.split("useSyncMode(")).toHaveLength(2);
+    expect(header).not.toContain("<SyncModeBadge ");
+    expect(header).not.toContain("<SyncModeHint ");
+  });
   it("pastille Spectateur : la phrase du témoin seulement hors lecture réussie (pas deux fois la cadence)", () => {
     expect(header).toContain("{(sync === null || !props.isLive) && <p>{liveText.title}</p>}");
   });
 
   it("le flux passe par applyStreamMessage (palier gardé sous flux calmé, testé dans live-state.test.ts)", () => {
-    expect(live).toContain("commit(applyStreamMessage(stateRef.current, message, quietStream.isQuiet()));");
+    expect(live).toContain("commit(applyStreamMessage(stateRef.current, message, quiet));");
+    expect(live).not.toContain("quietStream.isQuiet()));");
     expect(live).toContain("viewerMatch: matchFocus,");
   });
 });
@@ -249,5 +260,35 @@ describe("clés des textes du mode", () => {
 
   it("syncModeNowTextKey_missingVariant_fallsBackToNow", () => {
     expect(syncModeNowTextKey("PRIORITY", "nowPoll")).toBe("live.sync.modes.PRIORITY.now");
+  });
+});
+
+describe("coût de rendu", () => {
+  const source = readSource("app/(secured)/tournois/[id]/_components/SyncModeBadge.tsx");
+
+  it("useSyncMode garde l'identité de son résultat tant que ses entrées ne changent pas", () => {
+    expect(source).toMatch(/return useMemo\(\(\) => \{[\s\S]*\[tier, power, isLive, failed, source, viewerMatch\]\)/);
+  });
+
+  it("les vues de la pastille, de l'aide et l'explication sont mémoïsées", () => {
+    for (const view of [SyncModeBadgeView, SyncModeHintView, SyncModeExplanation]) {
+      expect(String((view as unknown as { $$typeof: symbol }).$$typeof)).toBe("Symbol(react.memo)");
+    }
+  });
+
+  it("chaque mode et chaque palier conservé ont leur clé écrite en toutes lettres", () => {
+    for (const mode of SYNC_MODES) {
+      expect(messageAt(frTournament, SYNC_MODE_LABEL_KEYS[mode])).toEqual(expect.any(String));
+      expect(SYNC_MODE_LABEL_KEYS[mode]).toBe(`live.sync.modes.${mode}.label`);
+    }
+    expect(SYNC_MODE_KEPT_KEYS.PRIORITY).toBe("live.sync.tierKept.PRIORITY");
+    expect(SYNC_MODE_KEPT_KEYS.STANDARD).toBe("live.sync.tierKept.STANDARD");
+    expect(source).not.toMatch(/t\(`live\.sync/);
+  });
+
+  it("la pastille d'un mode déjà résolu rend le même texte que la pastille autonome", () => {
+    const html = renderToStaticMarkup(<SyncModeBadgeView state={state("ECO", { power: "ECO" })} />);
+    expect(html).toContain(fr.modes.ECO.label);
+    expect(renderToStaticMarkup(<SyncModeBadgeView state={null} />)).toBe("");
   });
 });

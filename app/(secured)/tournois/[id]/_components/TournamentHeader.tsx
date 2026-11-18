@@ -2,7 +2,7 @@
 
 import { ShareLinkButton } from "@/components/share/ShareLinkButton";
 import { spectatorTournamentPath } from "@/lib/shared/spectator-view";
-import { useState, type MouseEvent } from "react";
+import { memo, useState, type MouseEvent } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
@@ -35,7 +35,7 @@ import {
   type HeaderTone,
 } from "../_lib/header-meta";
 import { LiveIndicator, useLiveIndicatorText, type LiveIndicatorProps } from "./LiveIndicator";
-import { SyncModeBadge, SyncModeExplanation, SyncModeHint, useSyncMode } from "./SyncModeBadge";
+import { SyncModeBadgeView, SyncModeExplanation, SyncModeHintView, useSyncMode, type SyncModeState } from "./SyncModeBadge";
 import { TournamentLiveLink } from "./TournamentLiveLink";
 import s from "./TournamentHeader.module.css";
 
@@ -44,12 +44,14 @@ import s from "./TournamentHeader.module.css";
  * témoin (`useLiveIndicatorText`) n'est calculée que pour la page sans compte,
  * et non à chaque rendu poussé par le flux d'un membre.
  */
-function SpectatorHint(props: Readonly<LiveIndicatorProps>) {
+const SpectatorHint = memo(function SpectatorHint({
+  sync,
+  ...props
+}: Readonly<LiveIndicatorProps & { sync: SyncModeState | null }>) {
   const { t } = useTournamentPageText();
   // Le sens de « Hors ligne » : le `title` du témoin ne s'atteint ni au toucher
   // ni au clavier. Lecture réussie, l'explication du mode dit déjà la cadence.
   const liveText = useLiveIndicatorText(props);
-  const sync = useSyncMode(props);
   return (
     <InfoHint id="tournament-spectator-hint" subject={t("header.spectator")}>
       <p>{t("header.spectatorTitle")}</p>
@@ -57,7 +59,7 @@ function SpectatorHint(props: Readonly<LiveIndicatorProps>) {
       {sync !== null && <SyncModeExplanation state={sync} cadenceMs={props.cadenceMs} />}
     </InfoHint>
   );
-}
+});
 
 /** Ce que `canReturnInSite` a besoin de lire du navigateur, à l'instant. */
 function readSiteBackInput() {
@@ -146,6 +148,8 @@ export function TournamentHeader({
   const text = useTournamentPageText();
   const labels = useTournamentsText();
   const { t } = text;
+  // Résolu une fois, pour la pastille et pour l'aide : une seule lecture du régime de charge.
+  const sync = useSyncMode({ isLive, tier, fatal, viewerMatch });
   // Inscription, signalement et gestes du staff : lot 8b / D4, restés français.
   // Gestes (lot 8b) : inscription, signalement, outils du staff de l'en-tête.
   const actionText = useActionsText();
@@ -196,7 +200,7 @@ export function TournamentHeader({
             <LiveIndicator isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
             {/* Comment la page se tient à jour (prioritaire, match, éco…) : à côté
                 du témoin, qui dit seulement si la connexion tient. */}
-            <SyncModeBadge isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} viewerMatch={viewerMatch} />
+            <SyncModeBadgeView state={sync} />
             {detail.isAdmin && !frozen && (
               <Pill variant="accent" title={t("header.adminTitle")}>{t("header.admin")}</Pill>
             )}
@@ -210,9 +214,9 @@ export function TournamentHeader({
               ligne sur toute la barre, au lieu d'élargir le groupe — qui, en
               s'élargissant, déplaçait le bouton qu'on vient de cliquer. */}
           {spectator ? (
-            <SpectatorHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
+            <SpectatorHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} sync={sync} />
           ) : (
-            <SyncModeHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} viewerMatch={viewerMatch} />
+            <SyncModeHintView state={sync} cadenceMs={cadenceMs} />
           )}
         </div>
 

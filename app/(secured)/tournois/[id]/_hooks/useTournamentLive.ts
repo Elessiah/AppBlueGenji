@@ -426,7 +426,7 @@ export function useTournamentLive(tournamentId: number) {
    * du plateau relu quand il a bougé.
    */
   const onMessage = useCallback(
-    (message: LiveMessage) => {
+    (message: LiveMessage, quiet: boolean) => {
       // Le contexte du lecteur n'arrive qu'à la connexion — sauf l'aperçu du
       // plateau, qui se périme à chaque inscription. On ne le redemande que
       // pour ceux qui en ont un, et seulement quand il a bougé.
@@ -437,7 +437,7 @@ export function useTournamentLive(tournamentId: number) {
         shouldRefreshViewerContext(previous, message.snapshot);
 
       // Palier du dernier flux plein gardé sous un flux calmé (`applyStreamMessage`).
-      commit(applyStreamMessage(stateRef.current, message, quietStream.isQuiet()));
+      commit(applyStreamMessage(stateRef.current, message, quiet));
       // `force` : on vient de commiter cette version, la déduplication par
       // version rejetterait la relecture avant d'en avoir pris l'aperçu.
       // Les pseudos viennent avec la relecture ; si elle échoue (429, réseau),
@@ -445,7 +445,7 @@ export function useTournamentLive(tournamentId: number) {
       if (stalePreview) void load(true, true).then(() => refreshRefereeNames());
       else if (message.type === "snapshot") refreshRefereeNames();
     },
-    [commit, load, refreshRefereeNames, quietStream],
+    [commit, load, refreshRefereeNames],
   );
 
   useEffect(() => {
