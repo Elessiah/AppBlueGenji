@@ -559,9 +559,8 @@ const NOT_SUSPENDED_SQL = (alias: string) => "NOT " + userSuspendedSql(alias + "
  * (encore) cet arbitre. Sans contrôle de suspension : ce geste vient de
  * désigner cet arbitre, et la désignation l'a jugée dans la transaction du
  * match (`refuseSuspended`). Une suspension validée après elle trouve une
- * affectation déjà posée — elle reste, la ligne suit le match qui fait foi
- * (jamais un match qui porte l'arbitre et un planning qui le montre en simple
- * proposition).
+ * désignation déjà posée — elle reste (« ce qui lui était déjà désigné reste
+ * jusqu'à son retrait », T11/T20), la ligne suit le match qui fait foi.
  */
 const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments SET confirmed = 1
   WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0
@@ -570,7 +569,12 @@ const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments SET confirmed 
 /**
  * La même, pour une désignation incertaine (`ConfirmStep.uncertain`) : rien ne
  * dit que ce geste l'a jugée, la suspension se rejuge — un compte suspendu
- * reste en proposition, comme dans la réconciliation.
+ * reste en proposition, comme dans la réconciliation (le match, qui fait foi,
+ * le porte jusqu'à son retrait). Le sous-select est une lecture verrouillante
+ * (InnoDB pose des verrous partagés sur les lignes que lit le sous-select d'un
+ * `UPDATE`) : une suspension validée avant est vue, une suspension en cours
+ * attend cette transaction ; aucune ligne de compte n'est prise ici, donc
+ * aucun ordre de verrous à tenir face à `suspendAccount`.
  */
 export const CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL = `${CONFIRM_MATCH_REFEREE_SQL} AND ${NOT_SUSPENDED_SQL("bg_planning_assignments")}`;
 
@@ -629,7 +633,9 @@ export async function confirmPendingReferees(executor: Executor): Promise<number
  * Rend la panne qui a interrompu la série (`undefined` sinon) : les
  * désignations déjà décidées restent marquées `settled`, pour que le planning
  * les écrive quand même — jamais un match qui a son arbitre et un planning qui
- * le montre encore en proposition.
+ * le montre encore en proposition, sauf un compte suspendu entre-temps dont la
+ * désignation est restée incertaine (`uncertain`) : le planning ne le confirme
+ * pas, le match le porte jusqu'à son retrait.
  */
 async function designateReferees(steps: ConfirmStep[], actorId: number): Promise<unknown> {
   for (const step of steps) {

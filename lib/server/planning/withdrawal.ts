@@ -129,9 +129,9 @@ async function findReplacement(
 /**
  * Pose le remplaçant ; rend `false` si le match ou ses rôles relus le
  * refusent (place alors à pourvoir). Arbitre de match confirmé : posé sur le
- * match d'abord (`assignMatchReferee`, qui juge condition d'arbitrage et
- * joueur), la ligne du planning ensuite — la réconciliation (`confirmPendingReferees`)
- * rattraperait une panne entre les deux. `actorId` : celui dont le geste
+ * joueur), la ligne du planning ensuite. Une panne de la désignation peut
+ * survenir après sa validation : le match relu dit si le remplaçant y est posé
+ * (sa ligne s'écrit alors quand même). `actorId` : celui dont le geste
  * déclenche la pose (le désisté) ; le match ne s'en sert qu'à taire l'avis
  * d'un arbitre remplacé par lui-même — aucun ici, le match étant vide
  * (`expected` nul) — et ne le garde ni ne le publie.
@@ -149,8 +149,12 @@ async function placeReplacement(
       // Suspension jugée dans la transaction même du match : posée depuis le choix, la place reste à pourvoir.
       await assignMatchReferee(entry.matchId as number, actorId, pick.userId, null, { refuseSuspended: true });
     } catch (error) {
-      if (!isMatchRefereeRefusal(error)) console.error("[planning] remplaçant d'arbitre non posé.", failureReason(error));
-      return false;
+      if (isMatchRefereeRefusal(error)) return false;
+      // Panne : posé malgré elle (validation faite, réponse perdue), le remplaçant tient le rôle.
+      if ((await readMatchReferee(entry.matchId as number)) !== pick.userId) {
+        console.error("[planning] remplaçant d'arbitre non posé.", failureReason(error));
+        return false;
+      }
     }
   }
   try {
@@ -158,7 +162,7 @@ async function placeReplacement(
   } catch (error) {
     console.error("[planning] remplaçant non inscrit au planning.", failureReason(error));
     // Arbitre déjà posé sur le match : il tient le rôle (le tableau le lit du
-    // match), la réconciliation écrira sa ligne. Sinon, la place reste à pourvoir.
+    // match, qui fait foi). Sinon, la place reste à pourvoir.
     return matchReferee && confirmed;
   }
 }

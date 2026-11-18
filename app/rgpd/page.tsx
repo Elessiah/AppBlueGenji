@@ -1121,15 +1121,11 @@ function RgpdFr({
             Un membre de la modération peut <strong>suspendre un compte</strong> contraire aux
             conditions d&apos;utilisation, pour une durée déterminée ou indéterminée : toutes ses
             sessions sont fermées et aucune connexion n&apos;est possible tant que la suspension court ;
-            s&apos;il arbitre, caste ou produit, il n&apos;est plus ni proposé, ni confirmé, ni désigné, ni
-            pris en remplaçant par le planning, ni prévenu par ses avis (nouveaux créneaux, affectations,
-            désistements, places à pourvoir) ; ses affectations confirmées restent jusqu&apos;à ce que le staff
-            des tournois les retire, ses propositions encore provisoires ne sont plus confirmées par le
-            planning ; le staff des tournois et, par ce que le calcul y propose, les autres membres du planning
-            peuvent seulement en déduire que le planning ne le retient plus (il n&apos;y est plus proposé ni
-            confirmé, une désignation à la main est refusée, et un créneau qu&apos;il diffusait seul n&apos;est
-            plus compté couvert par le calcul, qui y propose d&apos;autres casters, ni dans la vue du staff des
-            tournois), sans voir la suspension ni ses motifs (<Link href="/rgpd/registre#t20">registre, T20</Link>).
+            s&apos;il arbitre, caste ou produit, il est écarté des propositions, confirmations, désignations,
+            remplacements et avis du planning (nouveaux créneaux, affectations, désistements, places à pourvoir) ; ce
+            qui lui était déjà confirmé ou désigné reste jusqu&apos;à son retrait ; le staff des tournois et les autres
+            membres du planning peuvent seulement en déduire que le planning ne le retient plus, sans voir la suspension
+            ni ses motifs (<Link href="/rgpd/registre#t20">registre, T20</Link>).
           </p>
           <ul>
             <li>

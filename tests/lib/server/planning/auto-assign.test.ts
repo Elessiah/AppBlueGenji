@@ -1431,6 +1431,7 @@ describe("confirmAssignments", () => {
 
     await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
     expect(writeParams().some((params) => (params as unknown[]).includes("CONFIRMED"))).toBe(false);
+    expect(announceAssignments).not.toHaveBeenCalled();
   });
 
   it("confirmAssignments_lockOrder_accountsBeforeMatchReconcile", async () => {

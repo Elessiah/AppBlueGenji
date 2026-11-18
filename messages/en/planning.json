@@ -117,7 +117,7 @@
     "NETWORK_ERROR": "Cannot connect. Check your network and try again.",
     "PLANNING_ENTRY_NOT_FOUND": "This slot no longer exists. The page is reloaded.",
     "PLANNING_ENTRY_CLOSED": "This slot is closed: it has started or has been played.",
-    "PLANNING_ROLE_NOT_HELD": "This account cannot hold this role on this slot.",
+    "PLANNING_ROLE_NOT_HELD": "This account cannot hold this role here.",
     "PLANNING_HIDDEN_FOR_MEMBER": "This tournament is still hidden: this account cannot see it.",
     "PLANNING_ROLE_CONFLICT": "The same person cannot be caster and prod on one slot.",
     "PLANNING_IS_PLAYER": "This person plays during this slot: they cannot cover it.",

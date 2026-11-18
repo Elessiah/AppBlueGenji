@@ -288,8 +288,11 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
 - Une panne **après** le désistement écrit (recherche ou pose du remplaçant)
   ne le défait pas et ne rend pas d'échec : la place est « à pourvoir » et
   l'annonce part quand même. Arbitre déjà posé sur le match quand la ligne du
-  planning échoue : il tient le rôle (le tableau le lit du match), la
-  réconciliation (`confirmPendingReferees`) écrit sa ligne.
+  planning échoue : il tient le rôle (le tableau le lit du match, qui fait
+  foi). Une panne d'`assignMatchReferee` en posant le remplaçant relit le
+  match (`readMatchReferee`) : s'il le porte (validation faite, réponse
+  perdue), sa ligne s'écrit et il est le remplaçant ; sinon la place est « à
+  pourvoir ».
 - Les messages partent après le verrou, sans jamais défaire le geste.
 
 ## Coût (performance)
@@ -388,8 +391,8 @@ verrouillante **à part** de `bg_account_suspensions`, après les comptes — un
 sous-requête d'une lecture verrouillante n'est qu'un instantané) n'est plus ni
 proposé, ni confirmé, ni désigné, ni pris en remplaçant par le planning, ni
 prévenu par ses avis : `excludeSuspended` (tous les rôles) et `holdingRefusal`
-(`PLANNING_ROLE_NOT_HELD`, texte neutre « ne peut pas tenir ce rôle pour
-l'instant »). Une désignation d'arbitre de match par le planning (confirmation,
+(`PLANNING_ROLE_NOT_HELD`, texte neutre « ne peut pas tenir ce rôle ici »,
+aussi rendu à qui pose une disponibilité pour un rôle qu'il n'a pas). Une désignation d'arbitre de match par le planning (confirmation,
 remplaçant, choix à la main) passe `refuseSuspended` à `assignMatchReferee` :
 la suspension est relue (`refereeSuspended`, un seul compte, verrouillée après
 la ligne du compte, l'ordre de `suspendAccount`) **dans la transaction qui
@@ -402,7 +405,11 @@ désignation que le geste vient de faire (déjà jugée : une suspension validé
 après elle trouve une affectation posée), sauf désignation incertaine (panne
 d'`assignMatchReferee`, match relu qui porte l'arbitre, peut-être posé par la
 fenêtre « Arbitrage » du match qui ne juge pas la suspension) :
-`CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL` rejuge la suspension. Ses affectations confirmées restent
+`CONFIRM_UNCERTAIN_MATCH_REFEREE_SQL` rejuge la suspension (sous-select d'un
+`UPDATE` : lecture verrouillante en InnoDB ; le compte suspendu reste alors en
+proposition, le match le portant jusqu'à son retrait). Une suspension validée
+pendant une série de désignations, après celle d'un arbitre, laisse cette
+désignation confirmée : elle était déjà posée. Ses affectations confirmées restent
 jusqu'à ce que le staff les retire (retirer un arbitre de match le prévient par
 `REFEREE_RELEASED`, avis du match et non du planning, dont le push écarte déjà
 un compte suspendu) ; ses propositions encore provisoires ne sont plus
@@ -416,7 +423,14 @@ propositions, les autres membres — peuvent donc **déduire** qu'un compte n'es
 plus retenu (plus proposé ni confirmé, désignation à la main refusée par le
 texte neutre `PLANNING_ROLE_NOT_HELD`, créneau autonome plus couvert ; déclaré :
 registre T11 et T20, `/rgpd` §5, `PRIVACY_CHANGES`), sans voir la suspension ni
-ses motifs.
+ses motifs. Les avis déclarent ces effets en **une phrase générale, la même
+partout** (FR = EN), sans énumérer les mécanismes du calcul : « écarté des
+propositions, confirmations, désignations, remplacements et avis du planning
+(…) ; ce qui lui était déjà confirmé ou désigné reste jusqu'à son retrait ; le
+staff des tournois et les autres membres du planning peuvent seulement en
+déduire que le planning ne le retient plus, sans voir la suspension ni ses
+motifs ». Un changement du calcul n'a pas à la retoucher tant qu'il reste
+dans ce périmètre.
 Coût des verrous : la lecture verrouillante des suspensions de `lockedHolding`
 pose des verrous de clé suivante sur `(user_id, lifted_at)` le temps de la
 transaction du planning (courte, sérialisée par le verrou nommé) : une

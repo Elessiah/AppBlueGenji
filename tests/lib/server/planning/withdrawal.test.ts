@@ -396,6 +396,52 @@ describe("withdrawFromEntry — panne après le désistement", () => {
     });
   }
 
+  /** Arbitre confirmé 3 qui se désiste ; 5 disponible pour le remplacer. */
+  function refereeWithCandidate() {
+    const members = [loadedMember({ userId: 3 }), loadedMember({ userId: 5 })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(
+        planningData({ entries: [loadedEntry({ matchRefereeId: 3 })], assignments: [loadedAssignment({ userId: 3, confirmed: true })], members }),
+      )
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry()],
+          members,
+          availability: [available("m:1", 5, "REFEREE")],
+          removals: [{ entryKey: "m:1", userId: 3, role: "REFEREE" }],
+        }),
+      );
+  }
+
+  it("withdrawFromEntry_replacementDesignationOutageButMatchTookIt_replacedAndRowWritten", async () => {
+    refereeWithCandidate();
+    // Lu vide avant le retrait, puis relu après la panne : la désignation a pris.
+    jest.mocked(readMatchReferee).mockResolvedValueOnce(null).mockResolvedValueOnce(5);
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+
+    const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false });
+    const row = execute.mock.calls.find(([sql]) => sql.includes("INSERT INTO bg_planning_assignments"));
+    expect(row?.[1]).toEqual(expect.arrayContaining(["m:1", 5, "REFEREE", 1]));
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 5, unfilled: false });
+  });
+
+  it("withdrawFromEntry_replacementDesignationOutageMatchEmpty_slotUnfilled", async () => {
+    refereeWithCandidate();
+    jest.mocked(readMatchReferee).mockResolvedValue(null);
+    jest.mocked(assignMatchReferee).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true });
+    expect(execute.mock.calls.some(([sql]) => sql.includes("INSERT INTO bg_planning_assignments"))).toBe(false);
+    expect(error).toHaveBeenCalledWith("[planning] remplaçant d'arbitre non posé.", expect.anything());
+    error.mockRestore();
+  });
+
   it("withdrawFromEntry_replacementSearchFails_withdrawalKeptAndUnfilledAnnounced", async () => {
     casterData({ confirmed: true, candidates: [6] });
     jest.mocked(loadPlanningHistory).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));

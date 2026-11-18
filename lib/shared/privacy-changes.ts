@@ -2245,7 +2245,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // en ligne prévue, comme `REGISTER_UPDATED_AT` — tout avancer ensemble si
     // elle glisse.
     id: "2026-11-planning-notifications-desistements",
-    publishedAt: "2026-11-21",
+    publishedAt: "2026-11-20",
     title: "Planning : notifications et désistements",
     links: [{ href: "/rgpd/registre#t20", label: "Lire la fiche T20 du registre" }],
     summary: "Les arbitres, casters et prods sont désormais prévenus en message privé Discord et en notification push des nouveaux créneaux du planning, de leurs affectations et des désistements qui les concernent ; chacun peut se désister d'une attribution, avec un motif facultatif lu par le seul staff des tournois.",
@@ -2253,7 +2253,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui est envoyé : un récapitulatif des nouveaux créneaux où l'on peut tenir un rôle (un par vague de planification), l'annonce d'une affectation confirmée ou posée à la main (jamais d'une simple proposition), l'annonce du désistement d'une attribution confirmée sur un créneau où l'on est soi-même affecté et confirmé, et, au staff des tournois, une place restée à pourvoir (ligne sans nom au journal du staff sur Discord ; le rôle paraît aussi « à pourvoir » sur le planning quand plus personne n'y est confirmé, sans le motif). Aucun de ces messages ne nomme un joueur ni un membre du staff : « un caster s'est désisté ».",
       "Chacun de ces quatre sujets se coupe dans les réglages de notifications de « Mon profil » ; le couper coupe aussi son message privé Discord (droit d'opposition, art. 21). Discord achemine ces messages privés (États-Unis, registre T20).",
       "Ce qui est gardé du désistement : le rôle et le créneau quittés, la date, le motif facultatif (300 caractères au plus), s'il est tardif (moins de 24 h avant le début) et si l'attribution était confirmée — mêmes durées que le reste du planning, dans l'export de tes données ; le motif n'est lu que par le staff des tournois. Le planning note aussi, sans personne, quels créneaux ont déjà été annoncés.",
-      "Compte suspendu : le planning lit désormais si une suspension court, pour ne plus le proposer, le confirmer, le désigner ni le prendre en remplaçant, ni lui envoyer ses avis ; ses affectations confirmées restent jusqu'à ce que le staff des tournois les retire, ses propositions encore provisoires ne sont plus confirmées par le planning ; le staff des tournois et, par ce que le calcul y propose, les autres membres du planning peuvent seulement en déduire que le planning ne le retient plus (il n'y est plus proposé ni confirmé, une désignation à la main est refusée, et un créneau qu'il diffusait seul n'est plus compté couvert par le calcul, qui y propose d'autres casters, ni dans la vue du staff des tournois), sans voir la suspension ni ses motifs ; rien de plus n'est gardé.",
+      "Compte suspendu : le planning lit désormais si une suspension court, et un compte suspendu est écarté des propositions, confirmations, désignations, remplacements et avis du planning (nouveaux créneaux, affectations, désistements, places à pourvoir) ; ce qui lui était déjà confirmé ou désigné reste jusqu'à son retrait ; le staff des tournois et les autres membres du planning peuvent seulement en déduire que le planning ne le retient plus, sans voir la suspension ni ses motifs ; rien de plus n'est gardé.",
       "Ce qui ne change pas : pour un joueur sans rôle de plateforme, rien de nouveau n'est collecté ni envoyé.",
     ],
   },
