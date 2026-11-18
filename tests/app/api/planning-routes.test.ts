@@ -416,6 +416,31 @@ describe("plafonds des routes du planning", () => {
     expect(runAutoAssign).toHaveBeenCalledTimes(PLANNING_BATCH_RULE.limit);
   });
 
+  it("autoAssignPost_invalidWindowsAtLimit_quotaNotConsumed", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const invalid = { from: WINDOW.to, to: WINDOW.from };
+    for (let call = 0; call < PLANNING_BATCH_RULE.limit; call += 1) {
+      expect(await errorOf(await autoAssignPost(request("POST", invalid)))).toBe("INVALID_WINDOW");
+    }
+
+    expect((await autoAssignPost(request("POST", WINDOW))).status).toBe(200);
+    expect(runAutoAssign).toHaveBeenCalledTimes(1);
+  });
+
+  it("confirmPost_invalidScopesAtLimit_quotaNotConsumed", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    for (let call = 0; call < PLANNING_BATCH_RULE.limit; call += 1) {
+      expect(await errorOf(await confirmPost(request("POST", {})))).toBe("INVALID_CONFIRM_SCOPE");
+    }
+
+    expect((await confirmPost(request("POST", CONFIRM))).status).toBe(200);
+    expect(confirmAssignments).toHaveBeenCalledTimes(1);
+  });
+
+  it("readBurstRule_coversAllAcceptedGestures_limitAtLeastWritePlusBatch", () => {
+    expect(PLANNING_READ_BURST_RULE.limit).toBeGreaterThanOrEqual(PLANNING_WRITE_RULE.limit + PLANNING_BATCH_RULE.limit);
+  });
+
   it("planningReadRule_budget_coversEveryAllowedGestureReload", () => {
     expect(PLANNING_READ_RULE.windowMs).toBe(PLANNING_WRITE_RULE.windowMs);
     expect(PLANNING_READ_RULE.limit).toBeGreaterThan(PLANNING_WRITE_RULE.limit + PLANNING_BATCH_RULE.limit);

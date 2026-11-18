@@ -37,18 +37,23 @@ permission `tournaments`) : le calcul ne le propose qu'à eux
 les retire. Rôles et état caché se relisent **dans la transaction qui écrit**,
 verrouillés en partage (`lockedHolding` : `LOCK IN SHARE MODE` sur le compte
 et le tournoi) — calcul, confirmation et choix du staff : un rôle retiré ou un
-tournoi recaché pendant le geste attend sa validation. L'export des données
+tournoi recaché pendant le geste attend sa validation. Ces lectures passent
+**en premier** dans la transaction, avant la réconciliation des matchs et les
+lignes du planning : même ordre qu'un compte rendu de match (tournoi, puis
+match), sans interblocage. L'export des données
 rend toutes les attributions du titulaire, même sur un tournoi caché (art. 15 :
 ce sont ses données). Rien n'est publié sur Discord.
 
 Plafonds par compte (`api-guard.ts`), posés après le contrôle de permission :
 `PLANNING_READ_RULE` (400 lectures / 5 min, plus que la somme des gestes
-permis) doublé de `PLANNING_READ_BURST_RULE` (120 / min, contre une rafale de
-400 en une minute ; une disponibilité se pose sans relecture, seuls les gestes
-du staff relisent),
+permis) doublé de `PLANNING_READ_BURST_RULE` (200 / min, contre une rafale de
+400 en une minute, mais autant que les gestes permis en cinq minutes : une
+rafale de gestes acceptés garde sa relecture ; une disponibilité se pose sans
+relecture, un geste refusé en `429` ne relit pas),
 `PLANNING_WRITE_RULE` (180 gestes unitaires / 5 min, disponibilité, autonome,
 désignation, réglages), `PLANNING_BATCH_RULE` (20 calculs ou confirmations /
-5 min, chacun tenant le verrou `bg_planning`). Le refus `429`
+5 min, chacun tenant le verrou `bg_planning` ; décompté après la validation de
+la requête : une requête mal formée n'use pas ce quota). Le refus `429`
 (`TOO_MANY_REQUESTS`) a son texte dans `planning.errors`.
 
 ## Entrées
@@ -199,7 +204,12 @@ compte les **rôles**, pas les personnes.
 - Sa disponibilité (`setAvailability`) ne lit que **son** entrée (`only`,
   `parseEntryKey`), ni la fenêtre, ni les comptes.
 - Le calcul écrit ses propositions par instructions groupées (200 lignes) et
-  ne retrace (`ASSIGNED`) que ce qui change d'un lot à l'autre. La
+  ne retrace (`ASSIGNED`) que ce qui change d'un lot à l'autre, d'après les
+  lignes du lot relues verrouillées dans sa transaction (`lockedBatchRows`,
+  `FOR UPDATE`, par paquets de 200) : les retraits (`REMOVED`) s'écrivent par
+  paquets, jamais en liste `NOT IN` ; une ligne tenue (confirmée, y compris
+  par la réconciliation du même geste, ou choix du staff) n'est ni reproposée
+  ni réécrite (une clé en double ne change rien). La
   confirmation désigne les arbitres de match un à un, chacun sous un bref
   passage du verrou `bg_planning` qui relit d'abord la proposition
   (`PROPOSAL_STILL_PENDING_SQL`) : un retrait du staff fait entre-temps n'est
@@ -209,7 +219,9 @@ compte les **rôles**, pas les personnes.
   (`canStillHold`) : rôles relus au geste (`confirmSteps`) puis encore sous le
   verrou final, par leur clé et verrouillés en partage avec l'état caché du
   tournoi (`refuseLostRoles` → `lockedHolding`), les désignations pouvant
-  durer. Un `PLANNING_BUSY` en pleine série est une panne : ce qui est décidé
+  durer. Un refus tiré de la lecture sans verrou y est rejugé : un rôle rendu
+  entre-temps fait confirmer la proposition (un arbitre de match non désigné
+  reste provisoire). Un `PLANNING_BUSY` en pleine série est une panne : ce qui est décidé
   s'écrit, le geste se relance.
 - `bg_planning_events` : index `(entry_key, kind, source)` pour les retraits
   manuels ; les lectures par entrée passent par les clés primaires.

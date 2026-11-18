@@ -2,8 +2,10 @@
  * Calcul automatique du planning, par lot (`docs/features/CAST_PLANNING.md`) :
  * rassemble ce que le calcul pur (`planning-planner.ts`) attend sur une
  * fenêtre de temps, remplace les propositions **provisoires** de la fenêtre,
- * et confirme celles que le staff retient. Sous le verrou nommé du planning :
- * un geste à la fois.
+ * et confirme celles que le staff retient. Les écritures du planning se font
+ * sous son verrou nommé, un geste à la fois ; une confirmation lit le planning
+ * et désigne ses arbitres de match **hors** de ce verrou, qu'elle reprend pour
+ * chaque désignation puis pour l'écriture finale (`confirmAssignments`).
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
@@ -229,7 +231,10 @@ const planKey = (entryKey: string, userId: number, role: PlanningRole) => `${ent
  * deux allers-retours par ligne, sous le verrou) : les lignes, puis un
  * évènement `ASSIGNED` seulement pour celles qui diffèrent de la proposition
  * précédente (même membre, même rôle, même motif : rien de nouveau à
- * retracer). Relancer un lot inchangé n'ajoute donc aucun évènement.
+ * retracer). Relancer un lot inchangé n'ajoute donc aucun évènement. Les
+ * lignes tenues (confirmées, choix du staff) sont déjà écartées
+ * (`lockedBatchRows`) ; une clé en double ne réécrit de toute façon jamais
+ * une ligne existante.
  */
 async function writeProposals(
   executor: Executor,
@@ -248,8 +253,7 @@ async function writeProposals(
       `INSERT INTO bg_planning_assignments
          (entry_key, user_id, role, tournament_id, match_id, source, reason, confirmed, assigned_by_user_id)
        VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, 'AUTO', ?, 0, ?)").join(", ")}
-       ON DUPLICATE KEY UPDATE source = VALUES(source), reason = VALUES(reason), confirmed = VALUES(confirmed),
-                               assigned_by_user_id = VALUES(assigned_by_user_id)`,
+       ON DUPLICATE KEY UPDATE entry_key = entry_key`,
       chunk.flatMap(({ row, entry }) => [entry.key, row.userId, row.role, entry.tournamentId, entry.matchId, row.reason, actorId]),
     );
   }
@@ -265,28 +269,69 @@ async function writeProposals(
   return rows.length;
 }
 
+/** Une ligne d'attribution d'une entrée du lot, relue verrouillée dans la transaction d'écriture. */
+type BatchRow = RowDataPacket & {
+  entry_key: string;
+  user_id: number;
+  role: PlanningRole;
+  tournament_id: number;
+  match_id: number | null;
+  source: string;
+  reason: string | null;
+  confirmed: number;
+};
+
+/**
+ * Les lignes des entrées du lot, relues **dans la transaction d'écriture**,
+ * verrouillées (`FOR UPDATE`, requête sans jointure : compris de MariaDB) :
+ * les propositions provisoires que le lot remplace, et les lignes tenues
+ * (confirmées, choix du staff) que le calcul, fait sur une lecture plus
+ * ancienne, ne doit ni réécrire ni doubler.
+ */
+async function lockedBatchRows(connection: Executor, keys: readonly string[]): Promise<{ provisional: BatchRow[]; held: Set<string> }> {
+  const provisional: BatchRow[] = [];
+  const held = new Set<string>();
+  for (let start = 0; start < keys.length; start += WRITE_CHUNK) {
+    const chunk = keys.slice(start, start + WRITE_CHUNK);
+    const [rows] = await connection.execute<BatchRow[]>(
+      `SELECT entry_key, user_id, role, tournament_id, match_id, source, reason, confirmed
+         FROM bg_planning_assignments
+        WHERE entry_key IN (${chunk.map(() => "?").join(", ")})
+        ORDER BY entry_key, user_id, role FOR UPDATE`,
+      chunk,
+    );
+    for (const row of rows) {
+      if (row.source === "AUTO" && !Number(row.confirmed)) provisional.push(row);
+      else held.add(planKey(row.entry_key, Number(row.user_id), row.role));
+    }
+  }
+  return { provisional, held };
+}
+
 /**
  * Retrace le retrait de chaque proposition provisoire du lot que le nouveau
  * calcul ne repose pas (`REMOVED`, `AUTO`, au compte qui lance le calcul, comme
- * ses poses) : d'une instruction (`INSERT … SELECT`), d'après la même lecture
- * que l'effacement qui suit, dans la même transaction. Une proposition reposée
- * (même membre, même rôle) n'est pas retirée : seul son motif peut changer.
+ * ses poses), d'après la lecture verrouillée qui précède l'effacement, en
+ * instructions groupées (jamais une liste `NOT IN` de milliers de paramètres).
+ * Une proposition reposée (même membre, même rôle) n'est pas retirée : seul
+ * son motif peut changer.
  */
 async function writeDroppedProposals(
   executor: Executor,
-  keys: readonly string[],
+  provisional: readonly BatchRow[],
   kept: readonly PlannedRow[],
   actorId: number,
 ): Promise<void> {
-  const keptClause =
-    kept.length === 0 ? "" : ` AND (entry_key, user_id, role) NOT IN (${kept.map(() => "(?, ?, ?)").join(", ")})`;
-  await executor.execute(
-    `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
-     SELECT entry_key, user_id, role, tournament_id, match_id, 'REMOVED', 'AUTO', ?
-       FROM bg_planning_assignments
-      WHERE source = 'AUTO' AND confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})${keptClause}`,
-    [actorId, ...keys, ...kept.flatMap((row) => [row.entryKey, row.userId, row.role])],
-  );
+  const keptKeys = new Set(kept.map((row) => planKey(row.entryKey, row.userId, row.role)));
+  const dropped = provisional.filter((row) => !keptKeys.has(planKey(row.entry_key, Number(row.user_id), row.role)));
+  for (let start = 0; start < dropped.length; start += WRITE_CHUNK) {
+    const chunk = dropped.slice(start, start + WRITE_CHUNK);
+    await executor.execute(
+      `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, 'REMOVED', 'AUTO', ?)").join(", ")}`,
+      chunk.flatMap((row) => [row.entry_key, row.user_id, row.role, row.tournament_id, row.match_id, actorId]),
+    );
+  }
 }
 
 function affected(result: unknown): number {
@@ -321,15 +366,11 @@ export async function runAutoAssign(
     const planned = planAssignments(preparePlanner(data, batch, history, excluded, planningWeekStart(anchor)));
     const keys = batch.map((entry) => entry.key);
     const byKey = new Map(batch.map((entry) => [entry.key, entry]));
-    // Les propositions provisoires que le lot remplace : de quoi ne retracer que ce qui change.
-    const previous = new Map(
-      data.assignments
-        .filter((row) => row.source === "AUTO" && !row.confirmed && byKey.has(row.entryKey))
-        .map((row) => [planKey(row.entryKey, row.userId, row.role), row.reason]),
-    );
     return transact(connection, async () => {
-      await confirmPendingReferees(connection);
-      // Rôles et tournois cachés relus ici, verrouillés : un retrait concurrent ne laisse aucune proposition.
+      // Comptes et tournois d'abord, verrouillés en partage, **avant** toute
+      // écriture ou lecture verrouillante des matchs et du planning : l'ordre
+      // des verrous suit celui d'un compte rendu de match (tournoi, puis match),
+      // sans interblocage. Un retrait concurrent ne laisse aucune proposition.
       const holds = await lockedHolding(
         connection,
         planned.flatMap((row) => {
@@ -337,11 +378,21 @@ export async function runAutoAssign(
           return entry ? [{ userId: row.userId, entry }] : [];
         }),
       );
+      await confirmPendingReferees(connection);
+      // Les lignes du lot relues verrouillées, après la réconciliation : une
+      // ligne qu'elle vient de confirmer est tenue, jamais remise en proposition.
+      const { provisional, held } = await lockedBatchRows(connection, keys);
       const kept = planned.filter((row) => {
         const entry = byKey.get(row.entryKey);
-        return entry !== undefined && holds(row.userId, entry, row.role) === null;
+        return (
+          entry !== undefined &&
+          !held.has(planKey(row.entryKey, row.userId, row.role)) &&
+          holds(row.userId, entry, row.role) === null
+        );
       });
-      await writeDroppedProposals(connection, keys, kept, actorId);
+      // Les propositions provisoires que le lot remplace : de quoi ne retracer que ce qui change.
+      const previous = new Map(provisional.map((row) => [planKey(row.entry_key, Number(row.user_id), row.role), row.reason ?? ""]));
+      await writeDroppedProposals(connection, provisional, kept, actorId);
       const [cleared] = await connection.execute(
         `DELETE FROM bg_planning_assignments
           WHERE source = 'AUTO' AND confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})`,
@@ -404,7 +455,15 @@ export function isMatchRefereeRefusal(error: unknown): boolean {
  * l'a refusée), `settled` (arbitre de match dont le match a décidé : posé ou
  * refusé).
  */
-type ConfirmStep = { entry: LoadedEntry; userId: number; role: PlanningRole; refused: boolean; settled: boolean };
+type ConfirmStep = {
+  entry: LoadedEntry;
+  userId: number;
+  role: PlanningRole;
+  refused: boolean;
+  settled: boolean;
+  /** Refus venu de la lecture sans verrou (rôle, tournoi caché) : rejugé sous le verrou (`refuseLostRoles`). */
+  byHolding?: boolean;
+};
 
 /**
  * Le membre peut-il encore tenir cette proposition : il a toujours le rôle
@@ -438,7 +497,7 @@ export function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmSt
   for (const entry of entriesToConfirm(data, scope)) {
     for (const row of entryAssignments(entry, data).filter((candidate) => candidate.provisional)) {
       const held = canStillHold(members.get(row.userId), entry, row.role);
-      steps.push({ entry, userId: row.userId, role: row.role, refused: !held, settled: !held });
+      steps.push({ entry, userId: row.userId, role: row.role, refused: !held, settled: !held, byHolding: !held });
     }
   }
   return steps;
@@ -533,14 +592,15 @@ function isMatchReferee(step: ConfirmStep): boolean {
  * entrée « tournoi ») : un rôle retiré pendant les désignations, qui peuvent
  * durer, retire la proposition au lieu de la confirmer. Un arbitre de match,
  * lui, suit le match (`assignMatchReferee` a jugé son rôle, `CONFIRM_MATCH_REFEREE_SQL`).
+ * Un refus tiré de la lecture sans verrou (`byHolding`) est rejugé ici aussi :
+ * un rôle rendu entre-temps ne fait plus retirer la proposition (un arbitre de
+ * match qu'on n'a pas désigné reste alors provisoire).
  */
 async function refuseLostRoles(connection: PoolConnection, steps: readonly ConfirmStep[]): Promise<void> {
-  const pending = steps.filter((step) => !step.refused && !isMatchReferee(step));
+  const pending = steps.filter((step) => step.byHolding === true || (!step.refused && !isMatchReferee(step)));
   if (pending.length === 0) return;
   const holds = await lockedHolding(connection, pending);
-  for (const step of pending) {
-    if (holds(step.userId, step.entry, step.role) !== null) step.refused = true;
-  }
+  for (const step of pending) step.refused = holds(step.userId, step.entry, step.role) !== null;
 }
 
 /** Qui peut tenir quoi, relu dans la transaction d'écriture (`lockedHolding`) : `null` s'il le peut, sinon le refus. */
@@ -572,9 +632,10 @@ export async function lockedHolding(
  * geste n'écrit rien deux fois.
  */
 async function writeConfirmSteps(connection: PoolConnection, steps: readonly ConfirmStep[], actorId: number): Promise<ConfirmReport> {
+  // Comptes et tournois verrouillés d'abord, avant les matchs (même ordre que `runAutoAssign`, sans interblocage).
+  await refuseLostRoles(connection, steps);
   let confirmed = await confirmPendingReferees(connection);
   let refused = 0;
-  await refuseLostRoles(connection, steps);
   for (const step of steps) {
     const { entry } = step;
     if (step.refused) {

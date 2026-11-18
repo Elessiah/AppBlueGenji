@@ -196,6 +196,11 @@ export function errorKey(code: string | null | undefined, known: object): string
   return code && Object.hasOwn(known, code) ? code : "generic";
 }
 
+/** Le geste a-t-il été refusé pour excès (429) ? Rien n'a changé : la page ne se relit pas. */
+export function isThrottled(error: unknown): boolean {
+  return error instanceof Error && error.message === "TOO_MANY_REQUESTS";
+}
+
 /** Fenêtre d'un calcul de semaine : `[lundi, lundi suivant[` (minuit à Paris) en ISO. */
 export function weekWindow(weekStart: number): { from: string; to: string } {
   return { from: new Date(weekStart).toISOString(), to: new Date(planningNextWeekStart(weekStart)).toISOString() };

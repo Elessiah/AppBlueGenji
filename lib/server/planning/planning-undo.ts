@@ -162,8 +162,8 @@ export async function undoPlanningBlock(undo: PlanningUndo, eventIds: readonly n
  * Après l'échec de la désignation du match : remet le planning si elle n'a
  * pas pris ; la garde si elle a pris (le planning dit vrai) ; consigne le
  * doute. Une ligne d'arbitre confirmée que le match ne porte pas, laissée par
- * ce doute, est retirée au prochain calcul, à la prochaine confirmation ou au
- * prochain geste manuel (`confirmPendingReferees`).
+ * ce doute, est retirée au prochain calcul ou à la prochaine confirmation
+ * (`confirmPendingReferees`).
  */
 export async function settleFailedDesignation(
   error: unknown,

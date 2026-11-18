@@ -17,13 +17,13 @@ export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
-  const throttled = enforceRateLimit(PLANNING_BATCH_RULE, user.id);
-  if (throttled) return throttled;
-
   const read = await readJsonObject(req, "INVALID_BODY", SMALL_JSON_BODY_MAX_BYTES);
   if ("refusal" in read) return fail(read.refusal, 400);
   const window = readWindow(read.body);
   if (!window) return fail("INVALID_WINDOW", 400);
+  // Décompté après la validation : une requête mal formée n'use pas le quota des gestes qui tiennent le verrou.
+  const throttled = enforceRateLimit(PLANNING_BATCH_RULE, user.id);
+  if (throttled) return throttled;
 
   try {
     return ok({ report: await runAutoAssign(user.id, window) });

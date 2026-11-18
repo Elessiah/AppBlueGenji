@@ -32,6 +32,7 @@ import {
   groupByWeek,
   hasProvisional,
   heldBy,
+  isThrottled,
   leadUntil,
   mergeView,
   tournamentChoices,
@@ -113,27 +114,30 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   /**
    * Un geste à la fois ; la page se relit après chacun, réussi ou non — sauf
    * si `patch` dit comment le poser à la main sur la page (la disponibilité :
-   * le geste le plus fréquent), le geste réussi ne coûte alors aucune relecture.
+   * le geste le plus fréquent), le geste réussi ne coûte alors aucune relecture,
+   * et sauf un geste refusé pour excès (`TOO_MANY_REQUESTS`) : rien n'a changé,
+   * et relire userait le quota des lectures.
    */
   const act = useCallback(
     async <T,>(gesture: string, task: () => Promise<T>, success: (result: T) => string, patch?: () => void): Promise<boolean> => {
       if (pendingRef.current !== null) return false;
       pendingRef.current = gesture;
       setPending(gesture);
-      let patched = false;
+      let skipReload = false;
       try {
         const result = await task();
         showSuccess(success(result));
         if (patch) {
           patch();
-          patched = true;
+          skipReload = true;
         }
         return true;
       } catch (error) {
+        skipReload = isThrottled(error);
         fail(error);
         return false;
       } finally {
-        if (!patched) await load();
+        if (!skipReload) await load();
         pendingRef.current = null;
         setPending(null);
       }
@@ -171,6 +175,11 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   const tournaments = useMemo(() => tournamentChoices(view?.entries ?? []), [view]);
   // Un tournoi choisi qui n'a plus de créneau (relecture) : le filtre retombe sur « tous ».
   const tournamentId = tournaments.some((choice) => choice.id === filters.tournamentId) ? filters.tournamentId : null;
+  // …et l'oublie : il ne se réappliquerait pas seul quand ce tournoi revient, alors que la liste disait « tous ».
+  const staleTournament = view !== null && filters.tournamentId !== null && tournamentId === null;
+  useEffect(() => {
+    if (staleTournament) setFilters((current) => ({ ...current, tournamentId: null }));
+  }, [staleTournament]);
 
   if (!view || !context) {
     return (

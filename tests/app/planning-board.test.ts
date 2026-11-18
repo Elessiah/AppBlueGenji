@@ -10,6 +10,7 @@ import {
   groupByWeek,
   hasProvisional,
   heldBy,
+  isThrottled,
   leadUntil,
   mergeView,
   needsCover,
@@ -181,6 +182,20 @@ function covered(input: { hasReferee?: boolean; casterIds?: number[]; prodIds?: 
 function assigned(userId: number, provisional = false) {
   return { userId, role: "REFEREE" as const, source: "AUTO" as const, reason: "LOAD" as const, provisional };
 }
+
+describe("isThrottled", () => {
+  it("isThrottled_tooManyRequestsError_returnsTrue", () => {
+    expect(isThrottled(new Error("TOO_MANY_REQUESTS"))).toBe(true);
+  });
+
+  it("isThrottled_otherError_returnsFalse", () => {
+    expect(isThrottled(new Error("PLANNING_BUSY"))).toBe(false);
+  });
+
+  it("isThrottled_nonErrorValue_returnsFalse", () => {
+    expect(isThrottled("TOO_MANY_REQUESTS")).toBe(false);
+  });
+});
 
 describe("groupByDay", () => {
   it("groupByDay_sameDayEntries_oneGroup", () => {

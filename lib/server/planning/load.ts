@@ -349,7 +349,10 @@ function toMembers(rows: readonly MemberRow[]): LoadedMember[] {
  * sont rendus, avec leurs rôles, leur pseudo et leur réglage « caster
  * autonome » du moment. `lock` (dans une transaction) : lecture verrouillée
  * en partage (`LOCK IN SHARE MODE`, compris de MariaDB) — un retrait de rôle
- * concurrent attend que l'écriture qui s'appuie sur cette lecture soit validée.
+ * concurrent attend que l'écriture qui s'appuie sur cette lecture soit validée ;
+ * cette lecture-là, sans jointure, ne lit **pas** le réglage « caster
+ * autonome » (`soloCaster` toujours faux) : elle ne sert qu'à juger rôles et
+ * visibilité (`lockedHolding`).
  */
 export async function loadPlanningMembersByIds(
   executor: Executor,
