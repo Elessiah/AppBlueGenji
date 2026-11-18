@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 /**
  * « Tester mes MP » (`DiscordDmTestButton`) joué sans DOM, comme
@@ -42,8 +42,10 @@ jest.mock("@/components/i18n/profile-text", () => ({
 }));
 
 import { DiscordDmTestButton, dmTestResponseAction } from "@/app/(secured)/profil/_components/DiscordDmTestButton";
+import { DiscordInviteLink } from "@/app/(secured)/profil/_components/DiscordInviteLink";
 import { BusyButton } from "@/components/ui/busy-button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { readSource } from "../helpers/read-source";
 import frProfile from "@/messages/fr/profile.json";
 import enProfile from "@/messages/en/profile.json";
 
@@ -66,7 +68,12 @@ function elements(node: unknown, found: Element[] = []): Element[] {
 type ButtonProps = { onClick: () => void };
 type DialogProps = { onConfirm: () => Promise<boolean>; onClose: () => void; title: string };
 
-function render(props: { verified: boolean; onCertify: () => void; linked?: boolean | null }) {
+function render(props: {
+  verified: boolean;
+  onCertify: () => void;
+  linked?: boolean | null;
+  onNotCertified?: () => void;
+}) {
   cursor = 0;
   refCursor = 0;
   return DiscordDmTestButton({ linked: true, ...props });
@@ -147,6 +154,72 @@ describe("DiscordDmTestButton", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("button_idle_showsRestingLabelAndEmptyStatus", () => {
+    const tree = render({ verified: true, onCertify: jest.fn() });
+    const status = elements(tree).find((e) => e.type === "output");
+
+    expect(translate).toHaveBeenCalledWith("dmTest.button");
+    expect(status?.props.children).toBe("");
+  });
+
+  it("button_inFlight_showsSendingLabelAndAnnouncesIt", async () => {
+    let finish!: (value: Response) => void;
+    fetchMock.mockReturnValue(new Promise<Response>((resolve) => (finish = resolve)));
+    const props = { verified: true, onCertify: jest.fn() };
+
+    button(render(props)).onClick();
+    const tree = render(props);
+    const busyButton = elements(tree).find((e) => e.type === BusyButton)?.props;
+    const status = elements(tree).find((e) => e.type === "output");
+    finish(response(true, { outcome: "SENT" }));
+    await flush();
+
+    expect(busyButton?.busy).toBe(true);
+    expect(busyButton?.children).toBe("dmTest.sending");
+    expect(status?.props.children).toBe("dmTest.sending");
+  });
+
+  it("button_render_isAFragmentWithoutOwnRow", () => {
+    const tree = render({ verified: true, onCertify: jest.fn() }) as { type: unknown };
+
+    expect(tree.type).toBe(Fragment);
+  });
+
+  it("button_hint_linksTheServerInvite", () => {
+    const tree = render({ verified: true, onCertify: jest.fn() });
+
+    expect(elements(tree).some((e) => e.type === DiscordInviteLink)).toBe(true);
+  });
+
+  it("modal_hasOneParagraphAndNoPendingLabelOfItsOwn", () => {
+    const props = { verified: false, onCertify: jest.fn() };
+    button(render(props)).onClick();
+    const dialogElement = elements(render(props)).find((e) => e.type === ConfirmActionDialog);
+
+    expect(dialogElement?.props.pendingLabel).toBe(dialogElement?.props.confirmLabel);
+    expect(elements(dialogElement).filter((e) => e.type === "p")).toHaveLength(1);
+  });
+
+  it("button_serverSaysNotCertified_rereadsDiscordState", async () => {
+    fetchMock.mockResolvedValue(response(false, { error: "DISCORD_NOT_CERTIFIED" }));
+    const onNotCertified = jest.fn();
+
+    button(render({ verified: true, onCertify: jest.fn(), onNotCertified })).onClick();
+    await flush();
+
+    expect(onNotCertified).toHaveBeenCalledTimes(1);
+  });
+
+  it("button_okOutcome_doesNotRereadDiscordState", async () => {
+    fetchMock.mockResolvedValue(response(true, { outcome: "SENT" }));
+    const onNotCertified = jest.fn();
+
+    button(render({ verified: true, onCertify: jest.fn(), onNotCertified })).onClick();
+    await flush();
+
+    expect(onNotCertified).not.toHaveBeenCalled();
+  });
+
   it("button_notVerified_opensModalWithoutFetch", () => {
     const props = { verified: false, onCertify: jest.fn() };
 
@@ -221,9 +294,44 @@ describe("textes « Tester mes MP »", () => {
     expect(enProfile.dmTest.hint).toContain("{max} tries per hour");
   });
 
-  it("texts_tooMany_saysLater", () => {
-    expect(frProfile.dmTest.tooMany).toBe("Trop de tests en peu de temps : réessaie plus tard.");
-    expect(enProfile.dmTest.tooMany).toBe("Too many tests in a short time: try again later.");
+  it("texts_tooMany_saysLimitAndWait", () => {
+    expect(frProfile.dmTest.tooMany).toBe("Trop de tests : {max} par heure au maximum. Réessaie dans une heure.");
+    expect(enProfile.dmTest.tooMany).toBe("Too many tests: {max} per hour at most. Try again in an hour.");
+  });
+
+  it("texts_dmsClosed_givesTheDiscordPath", () => {
+    expect(frProfile.dmTest.dmsClosed).toContain("clic droit sur le serveur BlueGenji");
+    expect(enProfile.dmTest.dmsClosed).toContain("right-click the BlueGenji server");
+  });
+
+  it("texts_notInServer_pointsToTheInviteInTheHint", () => {
+    expect(frProfile.dmTest.notInServer).toContain("l'aide « i »");
+    expect(enProfile.dmTest.notInServer).toContain("“i” help");
+    expect(frProfile.dmTest.hintInviteLink).toBe("rejoindre le serveur");
+    expect(enProfile.dmTest.hintInviteLink).toBe("join the server");
+  });
+
+  it("texts_botUnreachable_doesNotContradictTheError", () => {
+    expect(frProfile.dmTest.botUnreachable).not.toContain("arrive quand même");
+    expect(enProfile.dmTest.botUnreachable).not.toContain("arrives anyway");
+  });
+
+  it("texts_failed_saysTheResultIsUnknown", () => {
+    expect(frProfile.dmTest.failed).toContain("inconnu");
+    expect(enProfile.dmTest.failed).toContain("unknown");
+  });
+
+  it("texts_sending_existsInBothLanguages", () => {
+    expect(frProfile.dmTest.sending).toBe("Envoi…");
+    expect(enProfile.dmTest.sending).toBe("Sending…");
+  });
+
+  it("page_rendersTheButtonInTheDiscordActionsRows", () => {
+    const page = readSource("app/(secured)/profil/page.tsx");
+
+    expect(page).toMatch(/\{dmTestButton\}\s*<\/div>\s*\)\}/);
+    expect(page).toMatch(/\)\s*:\s*null\}\s*\{dmTestButton\}\s*<\/div>/);
+    expect(page).toContain("onNotCertified={() => void loadDiscordState()}");
   });
 
   it("texts_accessibleName_containsVisibleLabel", () => {

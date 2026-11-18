@@ -14,6 +14,7 @@ import {
   DM_TEST_HOURLY_LIMIT,
   type DmTestToast,
 } from "@/lib/shared/discord-dm-test";
+import { DiscordInviteLink } from "./DiscordInviteLink";
 import s from "../profil.module.css";
 
 /** Réponse de `POST /api/profile/discord/dm-test`. */
@@ -40,21 +41,29 @@ export function dmTestResponseAction(
  * **le même geste** que le bouton « Certifier » de la ligne Discord
  * (`openVerifyDialog` de la page), aucune logique de certification ici.
  *
- * Rien n'est rendu tant que l'état Discord n'est pas lu (`linked` nul), ni sans
+ * Rendu en fragment : le bouton et son « i » rejoignent la rangée d'actions Discord
+ * du champ (`actionsRow`, posée par la page). Rien n'est rendu tant que l'état Discord n'est pas lu (`linked` nul), ni sans
  * compte Discord lié (`linked` faux) : il n'y a alors personne à qui écrire.
  */
 export function DiscordDmTestButton({
   linked,
   verified,
   onCertify,
-}: Readonly<{ linked: boolean | null; verified: boolean; onCertify: () => void }>) {
+  onNotCertified,
+}: Readonly<{
+  linked: boolean | null;
+  verified: boolean;
+  onCertify: () => void;
+  /** La route a refusé un tag que l'écran croyait certifié : relire l'état Discord. */
+  onNotCertified?: () => void;
+}>) {
   const { t } = useProfileText();
   const { showError, showSuccess } = useToast();
   const { busy, run, whenIdle } = useBusyGuard();
   const [warnOpen, setWarnOpen] = useState(false);
 
   const show = (toast: DmTestToast) => {
-    const message = t(`dmTest.${toast.key}`);
+    const message = t(`dmTest.${toast.key}`, { max: String(DM_TEST_HOURLY_LIMIT) });
     if (toast.tone === "success") showSuccess(message);
     else showError(message);
   };
@@ -73,8 +82,10 @@ export function DiscordDmTestButton({
       } catch {
         action = { tone: "error", key: "failed" };
       }
-      if (action === "certify") setWarnOpen(true);
-      else show(action);
+      if (action === "certify") {
+        setWarnOpen(true);
+        onNotCertified?.();
+      } else show(action);
     });
 
   const onClick = whenIdle(() => {
@@ -85,46 +96,46 @@ export function DiscordDmTestButton({
   if (linked !== true) return null;
 
   return (
-    <div className={s.actionsRow}>
+    <>
       <BusyButton
         busy={busy}
-        className="btn ghost"
+        className={`btn ghost ${s.dmTestButton}`}
         onClick={onClick}
         aria-label={t("dmTest.buttonLabel")}
         style={{ padding: "7px 14px", fontSize: 12 }}
       >
-        {t("dmTest.button")}
+        {busy ? t("dmTest.sending") : t("dmTest.button")}
       </BusyButton>
+      {/* Annonce d'attente aux lecteurs d'écran : le résultat arrive en notification. */}
+      <output className="sr-only" aria-live="polite">
+        {busy ? t("dmTest.sending") : ""}
+      </output>
       <InfoHint id="profile-dm-test-more" subject={t("dmTest.button")}>
         <p>{t("dmTest.hint", { max: String(DM_TEST_HOURLY_LIMIT) })}</p>
+        <p>
+          {t("dmTest.hintInvite")}{" "}
+          <DiscordInviteLink>{t("dmTest.hintInviteLink")}</DiscordInviteLink>
+        </p>
       </InfoHint>
       {warnOpen ? (
-        // Le bouton vit dans le formulaire du profil : la soumission de la
-        // fenêtre (portée dans <body>) remonterait par l'arbre React jusqu'au
-        // `onSubmit` du profil, qui l'enregistrerait. Elle s'arrête ici.
-        <span onSubmit={(event) => event.stopPropagation()}>
-          <ConfirmActionDialog
-            title={t("dmTest.certifyTitle")}
-            confirmLabel={t("dmTest.certifyConfirm")}
-            pendingLabel={t("dmTest.certifyPending")}
-            tone="primary"
-            closeOnSuccess={false}
-            onClose={() => setWarnOpen(false)}
-            onConfirm={async () => {
-              // Cette fenêtre se ferme et celle de la certification s'ouvre dans le
-              // même rendu : la seconde prend le focus.
-              setWarnOpen(false);
-              onCertify();
-              return true;
-            }}
-          >
-            <p>
-              <strong>{t("dmTest.certifyWarning")}</strong>
-            </p>
-            <p>{t("dmTest.certifyWhy")}</p>
-          </ConfirmActionDialog>
-        </span>
+        <ConfirmActionDialog
+          title={t("dmTest.certifyTitle")}
+          confirmLabel={t("dmTest.certifyConfirm")}
+          pendingLabel={t("dmTest.certifyConfirm")}
+          tone="primary"
+          closeOnSuccess={false}
+          onClose={() => setWarnOpen(false)}
+          onConfirm={async () => {
+            // Cette fenêtre se ferme et celle de la certification s'ouvre dans le
+            // même rendu : la seconde prend le focus.
+            setWarnOpen(false);
+            onCertify();
+            return true;
+          }}
+        >
+          <p>{t("dmTest.certifyWarning")}</p>
+        </ConfirmActionDialog>
       ) : null}
-    </div>
+    </>
   );
 }

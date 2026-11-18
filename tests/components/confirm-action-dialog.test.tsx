@@ -181,6 +181,8 @@ describe("geste en vol : le focus reste sur le bouton pressé", () => {
     expect(source).toMatch(/onChange=\{\(e\) => setTyped\(e\.target\.value\)\}[\s\S]{0,200}readOnly=\{busy\}/);
     // `submit` ignore déjà un geste tant que `busy`.
     expect(source).toContain("if (busy || !armed) return;");
+    // Portée dans <body>, la soumission ne remonte pas jusqu'au formulaire englobant (le profil l'enregistrerait).
+    expect(source).toMatch(/event\.preventDefault\(\);[^]*?event\.stopPropagation\(\);[^]*?if \(busy \|\| !armed\) return;/);
     // Et il ne paraît plus pressable : le survol de `.btn` (globals) l'exclut, sans hausser sa spécificité ; « Annuler » éteint, curseur d'attente.
     const globals = readSource("app/globals.css");
     expect(globals).toContain('.btn:hover:where(:not(:disabled):not([aria-disabled="true"])) {');

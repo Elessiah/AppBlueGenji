@@ -98,7 +98,13 @@ describe("modales du site", () => {
       // Le motif d'avant — `stopPropagation()` sur le panneau pour que son clic
       // n'atteigne pas le voile — ne sert plus à rien, et signale un voile qui
       // ferme encore sur un simple `onClick`.
-      expect(src).not.toContain(".stopPropagation()");
+      // Seule exception : la soumission d'une confirmation, qui ne doit pas remonter par
+      // l'arbre React (portail) jusqu'au formulaire englobant — arrêtée juste après `preventDefault()`.
+      const withoutSubmitIsolation = src.replace(
+        /event\.preventDefault\(\);[^;]*event\.stopPropagation\(\);/,
+        "event.preventDefault();",
+      );
+      expect(withoutSubmitIsolation).not.toContain(".stopPropagation()");
       if (file in NO_BACKDROP_DISMISS) return;
       expect(src).toContain("useBackdropDismiss(");
       expect(src).toContain("{...backdrop}");

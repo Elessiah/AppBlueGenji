@@ -12,27 +12,34 @@ l'apprend en manquant un rappel ou un check-in.
 
 ## Le geste
 
-Sous le champ « Pseudo Discord » (section « Identités de jeu et comptes liés »),
+Sous le champ « Pseudo Discord » (section « Identités de jeu et comptes liés »), **dans
+la même rangée** que les gestes Discord du champ (« Retirer mon tag » ou « Certifier »),
 le bouton **« Tester mes MP »** (EN « Test my DMs », `BusyButton` + `useBusyGuard`,
-libellé accessible « Tester mes MP (messages privés Discord) », aide derrière un « i »).
-Absent tant que l'état Discord n'est pas lu.
+libellé accessible « Tester mes MP (messages privés Discord) »). Le composant rend un
+fragment : la page pose la rangée. Pendant l'envoi le libellé devient « Envoi… » (largeur
+réservée `.dmTestButton`, le « i » voisin ne bouge pas) et une région `role="status"`
+`sr-only` l'annonce. L'aide derrière le « i » dit le plafond et porte le lien
+d'invitation du serveur (`DiscordInviteLink`), que la notification « absent du serveur »
+désigne. Absent tant que l'état Discord n'est pas lu.
 
 - **Tag certifié** : `POST /api/profile/discord/dm-test`, puis une notification :
   remis (`SENT`, succès), messages privés fermés (`DMS_CLOSED`), absent du serveur
   BlueGenji (`NOT_IN_SERVER`), aucun Discord lié (`DISCORD_NOT_LINKED`), bot
   injoignable (`BOT_INTERNAL_UNREACHABLE`, 503), trop d'essais (`TOO_MANY_REQUESTS`,
-  429, « réessaie plus tard » : la fenêtre fixe ne rouvre pas forcément dans l'heure),
-  autre échec (`DISCORD_DM_TEST_FAILED`). Sans Discord lié (`linked` faux), le bouton
+  429, plafond annoncé et « réessaie dans une heure »), autre échec ou réponse illisible
+  côté navigateur (`failed` : le résultat est inconnu, le message a pu partir — le texte
+  invite à regarder ses messages privés avant de relancer) (`DISCORD_DM_TEST_FAILED`). Sans Discord lié (`linked` faux), le bouton
   n'est pas rendu ; l'astuce lit le plafond dans `DM_TEST_HOURLY_LIMIT`.
 - **Tag non certifié** (ou `DISCORD_NOT_CERTIFIED` rendu par la route, état changé
-  sous l'écran) : rien ne part ; une modale (`ConfirmActionDialog`, ton `primary`)
-  dit que sans certification le bot n'envoie aucun message de match, et pourquoi
-  certifier, avec **« Certifier mon tag »** et « Annuler ». « Certifier mon tag »
-  appelle **le même geste** que le bouton « Certifier » de la ligne Discord des comptes
-  liés et le bouton « Certifier » du champ : `openVerifyDialog` de la page (`DiscordVerificationDialog`), aucune logique de
-  certification nouvelle. La modale est enveloppée d'un `onSubmit` arrêté : portée
-  dans `<body>`, sa soumission remonterait sinon par l'arbre React jusqu'au
-  formulaire du profil.
+  sous l'écran : la page relit alors l'état Discord, `onNotCertified`) : rien ne part ;
+  une modale (`ConfirmActionDialog`, ton `primary`, un seul paragraphe) dit que sans
+  certification le bot n'envoie aucun message de match, avec **« Certifier mon tag »** et
+  « Annuler ». « Certifier mon tag » appelle **le même geste** que le bouton « Certifier »
+  de la ligne Discord des comptes liés et le bouton « Certifier » du champ :
+  `openVerifyDialog` de la page (`DiscordVerificationDialog`), aucune logique de
+  certification nouvelle. `ConfirmActionDialog` arrête lui-même la propagation de sa
+  soumission : portée dans `<body>`, elle remonterait sinon par l'arbre React jusqu'au
+  formulaire du profil et l'enregistrerait.
 
 ## Côté serveur
 
