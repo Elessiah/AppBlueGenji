@@ -1081,7 +1081,7 @@ export function RgpdEn({
             closed, not on the BlueGenji server, bot unreachable) is shown to you only and is not recorded; a try that
             does not succeed is counted in the staff log on Discord without naming anyone. At most{" "}
             {DM_TEST_HOURLY_LIMIT} tries per hour: your account number is kept in memory only, sixty-one minutes at
-            most, for that cap. Basis: <strong>performance of the service</strong> you request (
+            most after your last try, for that cap. Basis: <strong>performance of the service</strong> you request (
             <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>
           <p id="arbitre-designe">

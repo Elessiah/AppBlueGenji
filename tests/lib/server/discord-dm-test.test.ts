@@ -1,11 +1,18 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration", () => ({ pushDiscordDirectMessages: jest.fn() }));
 
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
-import { DmTestError, sendDiscordDmTest } from "@/lib/server/discord-dm-test";
+import {
+  DM_TEST_MAX_TRACKED_ACCOUNTS,
+  DmTestError,
+  reserveDmTestTry,
+  resetDmTestTries,
+  sendDiscordDmTest,
+  trackedDmTestAccounts,
+} from "@/lib/server/discord-dm-test";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 
 /** « Tester mes MP » : un seul message, au Discord rattaché et certifié du compte. */
@@ -175,5 +182,104 @@ describe("sendDiscordDmTest abort during the bot call", () => {
     await new Promise((resolve) => setImmediate(resolve));
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
     await expect(sendDiscordDmTest(7)).resolves.toBe("SENT");
+  });
+});
+
+describe("reserveDmTestTry", () => {
+  const T0 = Date.parse("2026-11-18T10:00:00Z");
+  const MIN = 60_000;
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: T0 });
+    resetDmTestTries();
+  });
+  afterEach(() => {
+    resetDmTestTries();
+    jest.useRealTimers();
+  });
+
+  it("reserveDmTestTry_underLimit_acceptsAndTracksAccount", () => {
+    const reservation = reserveDmTestTry(7, T0);
+
+    expect(reservation.refused).toBeNull();
+    expect(trackedDmTestAccounts()).toBe(1);
+  });
+
+  it("reserveDmTestTry_fourthWithinHour_refusesWithRetryUntilOldestExpires", () => {
+    reserveDmTestTry(7, T0);
+    reserveDmTestTry(7, T0 + 10 * MIN);
+    reserveDmTestTry(7, T0 + 20 * MIN);
+
+    const reservation = reserveDmTestTry(7, T0 + 30 * MIN);
+
+    expect(reservation).toEqual({ refused: "TOO_MANY", retryAfterMs: 30 * MIN });
+  });
+
+  it("reserveDmTestTry_oldestOlderThanHour_acceptsAgain", () => {
+    reserveDmTestTry(7, T0);
+    reserveDmTestTry(7, T0 + 55 * MIN);
+    reserveDmTestTry(7, T0 + 110 * MIN);
+
+    const reservation = reserveDmTestTry(7, T0 + 160 * MIN);
+
+    expect(reservation.refused).toBeNull();
+  });
+
+  it("reserveDmTestTry_refundOverlappingConcurrent_removesOwnTryOnly", () => {
+    const first = reserveDmTestTry(7, T0);
+    reserveDmTestTry(7, T0 + 5);
+    if (first.refused !== null) throw new Error("expected a reservation");
+
+    first.refund();
+
+    expect(reserveDmTestTry(7, T0 + 10).refused).toBeNull();
+    expect(reserveDmTestTry(7, T0 + 15).refused).toBeNull();
+    expect(reserveDmTestTry(7, T0 + 20).refused).toBe("TOO_MANY");
+  });
+
+  it("reserveDmTestTry_refundTwice_removesOnce", () => {
+    reserveDmTestTry(7, T0);
+    reserveDmTestTry(7, T0 + 1);
+    const third = reserveDmTestTry(7, T0 + 2);
+    if (third.refused !== null) throw new Error("expected a reservation");
+
+    third.refund();
+    third.refund();
+
+    expect(reserveDmTestTry(7, T0 + 3).refused).toBeNull();
+    expect(reserveDmTestTry(7, T0 + 4).refused).toBe("TOO_MANY");
+  });
+
+  it("reserveDmTestTry_refundOnlyTry_dropsAccount", () => {
+    const only = reserveDmTestTry(7, T0);
+    if (only.refused !== null) throw new Error("expected a reservation");
+
+    only.refund();
+
+    expect(trackedDmTestAccounts()).toBe(0);
+  });
+
+  it("reserveDmTestTry_expiryTimer_dropsAccountAfterHourWithoutRequest", () => {
+    reserveDmTestTry(7);
+
+    jest.advanceTimersByTime(60 * MIN + 1);
+
+    expect(trackedDmTestAccounts()).toBe(0);
+  });
+
+  it("reserveDmTestTry_mapFullOfLiveAccounts_returnsBusyForNewcomer", () => {
+    for (let id = 1; id <= DM_TEST_MAX_TRACKED_ACCOUNTS; id += 1) reserveDmTestTry(id, T0);
+
+    expect(reserveDmTestTry(999_999, T0 + 1)).toEqual({ refused: "BUSY" });
+    expect(reserveDmTestTry(1, T0 + 1).refused).toBeNull();
+  });
+
+  it("reserveDmTestTry_mapFullOfExpiredAccounts_prunesAndAccepts", () => {
+    for (let id = 1; id <= DM_TEST_MAX_TRACKED_ACCOUNTS; id += 1) reserveDmTestTry(id, T0);
+
+    const reservation = reserveDmTestTry(999_999, T0 + 61 * MIN);
+
+    expect(reservation.refused).toBeNull();
+    expect(trackedDmTestAccounts()).toBe(1);
   });
 });

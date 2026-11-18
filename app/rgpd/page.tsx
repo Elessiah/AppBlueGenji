@@ -1281,7 +1281,7 @@ function RgpdFr({
             messages privés fermés, absent du serveur BlueGenji, bot injoignable) ne s&apos;affiche qu&apos;à vous et
             n&apos;est pas enregistré ; un essai qui n&apos;aboutit pas est compté au journal du staff sur Discord sans
             nommer personne. Au plus {DM_TEST_HOURLY_LIMIT} essais par heure : le numéro de votre compte est gardé en
-            mémoire seulement, soixante et une minutes au plus, pour ce plafond. Base : l&apos;
+            mémoire seulement, soixante et une minutes au plus après votre dernier essai, pour ce plafond. Base : l&apos;
             <strong>exécution du service</strong> que vous demandez (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>
           <p id="arbitre-designe">

@@ -70,22 +70,33 @@ désigne. Absent tant que l'état Discord n'est pas lu.
   tous comptes confondus — au-delà `DISCORD_DM_TEST_BUSY` (503, places rendues, toast
   « trop de tests en cours sur le site »). Joueur parti avant l'appel : rien n'est
   demandé au bot. Le bouton abandonne sa requête au démontage.
-- Coupe-circuit : le test l'ignore (`honourCircuit: false`) et, réussi, **ne le referme
-  pas** (seuls ses échecs comptent) — un clic ne rouvre pas les flux d'arrière-plan
-  vers un bot en panne partielle. Vaut aussi pour les alertes arbitres et dirigeants.
-- Plafonds, en mémoire, réservés en une instruction (`reserveRateLimit`) avant tout
+- Coupe-circuit : le test l'ignore (`honourCircuit: false`) et, réussi, **ne le rouvre
+  pas** s'il est ouvert — un clic ne relance pas les flux d'arrière-plan vers un bot en
+  panne partielle ; coupe-circuit fermé, son succès remet la série d'échecs à zéro comme
+  tout autre (`recordBypassSuccess`). Vaut aussi pour les alertes arbitres et dirigeants.
+- Plafonds, en mémoire du processus, contrôlés et décomptés en une instruction avant tout
   `await` :
-  - `DISCORD_DM_TEST_RULE`, **3 essais par heure et par compte**, fenêtre **glissante**
-    (`slide` : chaque essai repousse la fin d'une heure ; aucune heure glissante n'en
-    porte plus de 3, pas de double rafale à la remise à zéro), seau plein : `refuse` ;
-  - `DISCORD_DM_TEST_GLOBAL_RULE`, 120 par heure tous comptes confondus (chaque test
-    non remis écrit une ligne au journal du staff) — au-delà `DISCORD_DM_TEST_BUSY` ;
+  - par compte, **3 essais par heure** (`reserveDmTestTry`), **vraie fenêtre glissante** :
+    l'heure de chaque essai décompté est gardée et un essai n'est accepté que si moins de 3
+    datent de la dernière heure — aucune heure glissante n'en porte plus de 3 ; refus 429
+    `TOO_MANY_REQUESTS` avec `Retry-After` (sortie du plus ancien essai). Un essai rendu est
+    retiré, une fois au plus, sans rien repousser. Le compte est effacé une heure après son
+    dernier essai décompté (minuteur détaché, sans attendre de requête). Au-delà de
+    `DM_TEST_MAX_TRACKED_ACCOUNTS` comptes suivis : `DISCORD_DM_TEST_BUSY` ;
+  - `DISCORD_DM_TEST_GLOBAL_RULE`, seau à jetons tous comptes confondus (30 d'un coup, puis
+    un toutes les 30 s) : chaque test non remis écrit une ligne au journal du staff ; un test
+    remis (`SENT`) rend son jeton — vide : `DISCORD_DM_TEST_BUSY` (place du compte rendue) ;
   - `DISCORD_DM_TEST_ATTEMPT_RULE`, 30 appels par heure et par compte, refus compris,
-    jamais rendu : borne la boucle de refus rendus.
+    jamais rendu : borne la boucle de refus rendus (seau plein : remis à zéro).
   Une erreur `DmTestError` dit si rien n'est parti (`nothingSent`) : non lié, non
   certifié, compte absent, lecture du compte en échec, occupé, joueur parti avant
   l'appel → places rendues ; bot injoignable, bilan illisible, joueur parti pendant
   l'appel → gardées (on ne martèle pas un bot tombé).
+- **Redémarrage** : ces plafonds vivent en mémoire ; un redémarrage du site (déploiement,
+  `pm2 restart`) les remet à zéro — un compte peut alors refaire jusqu'à 3 essais. Accepté :
+  c'est un garde-fou contre la rafale, pas une promesse faite au joueur, et rien n'est
+  écrit en base. Le numéro du compte n'est gardé que 61 minutes au plus après son dernier
+  essai (registre T04, `/rgpd#test-messages-prives`).
 - Provenance vérifiée par la route elle-même en première instruction
   (`rejectCrossSiteRequest` avec `requireJson`, en plus du middleware : 403
   `CROSS_SITE_REQUEST`, 415 sans corps JSON — ferme le formulaire forgé d'un navigateur
@@ -98,7 +109,7 @@ désigne. Absent tant que l'état Discord n'est pas lu.
 Registre **T04** (sous-finalité, conservation, sécurité ; `REGISTER_UPDATED_AT`),
 `/rgpd#test-messages-prives` (FR et EN), entrée `2026-11-test-messages-prives` de
 `PRIVACY_CHANGES` (FR et EN). Rien n'est écrit en base ; le numéro de compte du
-plafond vit en mémoire, 61 minutes au plus.
+plafond vit en mémoire, 61 minutes au plus après le dernier essai.
 
 ## Tests
 

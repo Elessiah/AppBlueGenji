@@ -25,6 +25,7 @@ describe("bot-integration", () => {
   afterEach(() => {
     process.env = { ...originalEnv };
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it("uses localhost fallback URL when BOT_INTERNAL_URL is missing", async () => {
@@ -437,6 +438,25 @@ describe("bot-integration", () => {
 
       expect(report).toBeNull();
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("pushDiscordDirectMessages_bypassSuccessWhileClosed_resetsFailureStreak", async () => {
+      // Au-delà du délai d'un coupe-circuit ouvert par un test précédent : fermé.
+      jest.useFakeTimers({ now: Date.now() + 120_000, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+      const failing = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 500 }));
+      await pushSiteVisitStats({} as SiteVisitStats);
+      await pushSiteVisitStats({} as SiteVisitStats);
+      failing.mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+      await pushRefereeAlert("Signalement", "issue-report");
+      failing.mockResolvedValue(new Response(null, { status: 500 }));
+      await pushSiteVisitStats({} as SiteVisitStats);
+      failing.mockResolvedValue(Response.json({ sent: 1, unresolved: [], failed: [] }));
+      failing.mockClear();
+
+      const report = await pushDiscordDirectMessages("Rappel", recipients, "match-reminder");
+
+      expect(report).toEqual({ sent: 1, unresolved: [], failed: [] });
+      expect(failing).toHaveBeenCalled();
     });
 
     it("tente quand même l'alerte arbitres : un signalement est une action de joueur", async () => {

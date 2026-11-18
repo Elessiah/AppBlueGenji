@@ -69,6 +69,17 @@ function recordSuccess(): void {
   circuitOpenUntil = 0;
 }
 
+/**
+ * Succès d'un appel qui passe outre le coupe-circuit (geste d'un joueur,
+ * alerte arbitres ou dirigeants) : coupe-circuit fermé, il remet la série
+ * d'échecs à zéro comme tout succès ; ouvert, il ne le referme pas — un clic
+ * répété ne rouvrirait sinon les flux d'arrière-plan vers un bot en panne
+ * partielle.
+ */
+function recordBypassSuccess(): void {
+  if (Date.now() >= circuitOpenUntil) consecutiveFailures = 0;
+}
+
 function getInternalHeaders(): HeadersInit {
   const token = process.env.BOT_INTERNAL_TOKEN;
   return token ? { "x-internal-token": token } : {};
@@ -535,10 +546,8 @@ async function postDiscordNotification(
       return null;
     }
 
-    // Un appel qui passe outre le coupe-circuit (geste d'un joueur) ne le
-    // referme pas : un clic répété ne rouvrirait sinon les flux d'arrière-plan
-    // vers un bot en panne partielle. Il ne compte que ses échecs.
     if (options.honourCircuit) recordSuccess();
+    else recordBypassSuccess();
     return { ...emptyDelivery(), ...((await response.json()) as Partial<DiscordDeliveryReport>) };
   } catch {
     recordFailure();

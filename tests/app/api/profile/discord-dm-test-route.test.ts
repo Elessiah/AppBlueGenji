@@ -8,7 +8,13 @@ jest.mock("@/lib/server/discord-dm-test", () => ({
 
 import { POST } from "@/app/api/profile/discord/dm-test/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { DmTestError, sendDiscordDmTest } from "@/lib/server/discord-dm-test";
+import {
+  DM_TEST_MAX_TRACKED_ACCOUNTS,
+  DmTestError,
+  reserveDmTestTry,
+  resetDmTestTries,
+  sendDiscordDmTest,
+} from "@/lib/server/discord-dm-test";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -25,6 +31,7 @@ const sameSite = () =>
 beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit();
+  resetDmTestTries();
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
   jest.mocked(sendDiscordDmTest).mockResolvedValue("SENT");
 });
@@ -145,20 +152,54 @@ describe("POST /api/profile/discord/dm-test", () => {
     expect(sendDiscordDmTest).not.toHaveBeenCalled();
   });
 
-  it("post_slidingWindow_refusesFourthJustAfterTheFirstHour", async () => {
+  it("post_slidingWindow_refusesFourthUntilTheOldestTryIsAnHourOld", async () => {
     jest.useFakeTimers({ now: new Date("2026-11-18T10:00:00Z") });
     try {
       await POST(sameSite());
       jest.setSystemTime(new Date("2026-11-18T10:30:00Z"));
       await POST(sameSite());
-      jest.setSystemTime(new Date("2026-11-18T10:59:00Z"));
+      jest.setSystemTime(new Date("2026-11-18T10:59:30Z"));
       await POST(sameSite());
-      jest.setSystemTime(new Date("2026-11-18T11:01:00Z"));
+      const refused = await POST(sameSite());
+      jest.setSystemTime(new Date("2026-11-18T11:00:01Z"));
 
-      const response = await POST(sameSite());
+      const accepted = await POST(sameSite());
 
-      expect(response.status).toBe(429);
-      expect(sendDiscordDmTest).toHaveBeenCalledTimes(3);
+      expect(refused.status).toBe(429);
+      expect(accepted.status).toBe(200);
+      expect(sendDiscordDmTest).toHaveBeenCalledTimes(4);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("post_overLimit_returns429WithRetryAfter", async () => {
+    await POST(sameSite());
+    await POST(sameSite());
+    await POST(sameSite());
+
+    const response = await POST(sameSite());
+
+    expect(response.status).toBe(429);
+    expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(3500);
+  });
+
+  it("post_refusedTriesDoNotExtendTheWindow", async () => {
+    jest.useFakeTimers({ now: new Date("2026-11-18T10:00:00Z") });
+    try {
+      await POST(sameSite());
+      await POST(sameSite());
+      jest.setSystemTime(new Date("2026-11-18T10:50:00Z"));
+      jest.mocked(sendDiscordDmTest).mockRejectedValue(new DmTestError("DISCORD_NOT_LINKED", true));
+      await POST(sameSite());
+      await POST(sameSite());
+      jest.mocked(sendDiscordDmTest).mockResolvedValue("SENT");
+      jest.setSystemTime(new Date("2026-11-18T11:00:01Z"));
+
+      const statuses = [];
+      for (let i = 0; i < 3; i += 1) statuses.push((await POST(sameSite())).status);
+
+      expect(statuses).toEqual([200, 200, 200]);
     } finally {
       jest.useRealTimers();
     }
@@ -175,11 +216,10 @@ describe("POST /api/profile/discord/dm-test", () => {
     expect(sendDiscordDmTest).toHaveBeenCalledTimes(30);
   });
 
-  it("post_globalCapReached_returns503BusyAndRefundsAccountSlot", async () => {
-    for (let id = 1000; id < 1040; id += 1) {
+  it("post_globalBucketEmpty_returns503BusyAndRefundsAccountSlot", async () => {
+    jest.mocked(sendDiscordDmTest).mockResolvedValue("DMS_CLOSED");
+    for (let id = 1000; id < 1030; id += 1) {
       jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id }));
-      await POST(sameSite());
-      await POST(sameSite());
       await POST(sameSite());
     }
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
@@ -188,20 +228,41 @@ describe("POST /api/profile/discord/dm-test", () => {
 
     expect(refused.status).toBe(503);
     expect(await refused.json()).toEqual({ error: "DISCORD_DM_TEST_BUSY" });
-    expect(sendDiscordDmTest).toHaveBeenCalledTimes(120);
+    expect(sendDiscordDmTest).toHaveBeenCalledTimes(30);
     resetRateLimit("discord-dm-test-global");
     const statuses = [];
     for (let i = 0; i < 3; i += 1) statuses.push((await POST(sameSite())).status);
     expect(statuses).toEqual([200, 200, 200]);
   });
 
+  it("post_trackedAccountsFull_returns503BusyNotTooMany", async () => {
+    for (let id = 100_000; id < 100_000 + DM_TEST_MAX_TRACKED_ACCOUNTS; id += 1) reserveDmTestTry(id);
+
+    const response = await POST(sameSite());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "DISCORD_DM_TEST_BUSY" });
+    expect(sendDiscordDmTest).not.toHaveBeenCalled();
+  });
+
+  it("post_sentOutcome_refundsGlobalToken", async () => {
+    const statuses = [];
+    for (let id = 1000; id < 1040; id += 1) {
+      jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id }));
+      statuses.push((await POST(sameSite())).status);
+    }
+
+    expect(statuses.every((status) => status === 200)).toBe(true);
+    expect(sendDiscordDmTest).toHaveBeenCalledTimes(40);
+  });
+
   it("post_nothingSentError_refundsGlobalSlot", async () => {
     jest.mocked(sendDiscordDmTest).mockRejectedValue(new DmTestError("DISCORD_NOT_LINKED", true));
-    for (let id = 1000; id < 1121; id += 1) {
+    for (let id = 1000; id < 1031; id += 1) {
       jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id }));
       await POST(sameSite());
     }
-    jest.mocked(sendDiscordDmTest).mockResolvedValue("SENT");
+    jest.mocked(sendDiscordDmTest).mockResolvedValue("DMS_CLOSED");
 
     const response = await POST(sameSite());
 

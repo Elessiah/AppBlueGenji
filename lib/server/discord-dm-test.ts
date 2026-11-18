@@ -12,7 +12,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
-import type { RateLimitRule } from "@/lib/server/rate-limit";
+import type { RateLimitRule, TokenBucketRule } from "@/lib/server/rate-limit";
 import { accountLocaleFromRow, readWithLocaleColumn } from "@/lib/server/users/account-locale";
 import { renderDm } from "@/lib/shared/dm-language";
 import {
@@ -28,49 +28,127 @@ import {
   type DmTestOutcome,
 } from "@/lib/shared/discord-dm-test";
 
+/** Durée de la fenêtre glissante du plafond par compte. */
+export const DM_TEST_WINDOW_MS = 60 * 60_000;
+
 /**
- * Plafond **par compte du site**, en mémoire : contrôle et décompte en une
- * instruction (`reserveRateLimit`), aucun `await` entre les deux. Fenêtre
- * **glissante** (`slide`) : chaque essai décompté repousse la fin de la fenêtre
- * d'une heure, si bien qu'aucune heure glissante ne porte plus de
- * {@link DM_TEST_HOURLY_LIMIT} essais (une fenêtre fixe en laissait passer le
- * double de part et d'autre de sa remise à zéro). Seau plein : `refuse` — le
- * saturer ne rend à personne ses essais. La clé vit une heure après le dernier
- * essai, plus un balayage (61 minutes au plus, registre T04).
+ * Comptes suivis à la fois par le plafond par compte. Une entrée n'existe que
+ * pour un compte dont un essai **décompté** (non rendu) date de moins d'une
+ * heure : seul un compte réel, lié et certifié, en crée une. Atteint : refus
+ * `DISCORD_DM_TEST_BUSY` (jamais un « trop d'essais » faux pour un nouveau venu).
  */
-export const DISCORD_DM_TEST_RULE: RateLimitRule = {
-  name: "discord-dm-test",
-  limit: DM_TEST_HOURLY_LIMIT,
-  windowMs: 60 * 60_000,
-  slide: true,
-  overflow: "refuse",
-};
+export const DM_TEST_MAX_TRACKED_ACCOUNTS = 10_000;
+
+/** Heures des essais décomptés de chaque compte, de la plus ancienne à la plus récente. */
+const accountTries = new Map<number, number[]>();
+/** Minuteurs d'expiration des essais : ils effacent le compte sans attendre de requête. */
+const expiryTimers = new Set<ReturnType<typeof setTimeout>>();
+
+/** Retire les essais sortis de la fenêtre ; efface le compte quand il n'en reste aucun. */
+function pruneAccountTries(userId: number, now: number): number[] {
+  const tries = accountTries.get(userId);
+  if (!tries) return [];
+  const live = tries.filter((at) => now - at < DM_TEST_WINDOW_MS);
+  if (live.length === 0) accountTries.delete(userId);
+  else accountTries.set(userId, live);
+  return live;
+}
+
+function armTryExpiry(userId: number): void {
+  const timer = setTimeout(() => {
+    expiryTimers.delete(timer);
+    pruneAccountTries(userId, Date.now());
+  }, DM_TEST_WINDOW_MS + 1);
+  timer.unref?.();
+  expiryTimers.add(timer);
+}
+
+/** Réservation d'un essai : refusée (`retryAfterMs` ou occupé), ou prise avec de quoi la rendre. */
+export type DmTestReservation =
+  | { refused: "TOO_MANY"; retryAfterMs: number }
+  | { refused: "BUSY" }
+  | { refused: null; refund: () => void };
+
+/**
+ * Plafond **par compte du site**, en mémoire, en **vraie fenêtre glissante** :
+ * l'heure de chaque essai décompté est gardée, et un essai n'est accepté que si
+ * moins de {@link DM_TEST_HOURLY_LIMIT} datent de la dernière heure — aucune
+ * heure glissante n'en porte davantage, sans double rafale à une remise à zéro,
+ * et un essai ancien sort de lui-même du compte. Contrôle et décompte en une
+ * instruction, aucun `await` entre les deux. `refund` retire **son** essai,
+ * une fois au plus, sans rien repousser : un refus rendu ne prolonge ni le
+ * plafond ni la durée de garde. Le compte est effacé une heure après son
+ * dernier essai décompté (registre T04 : 61 minutes au plus). En mémoire du
+ * processus : un redémarrage du site (déploiement) remet tout à zéro.
+ */
+export function reserveDmTestTry(userId: number, now: number = Date.now()): DmTestReservation {
+  const tries = pruneAccountTries(userId, now);
+  if (tries.length >= DM_TEST_HOURLY_LIMIT) {
+    return { refused: "TOO_MANY", retryAfterMs: Math.max(1, (tries[0] ?? now) + DM_TEST_WINDOW_MS - now) };
+  }
+  if (tries.length === 0 && accountTries.size >= DM_TEST_MAX_TRACKED_ACCOUNTS) {
+    for (const trackedId of [...accountTries.keys()]) pruneAccountTries(trackedId, now);
+    if (accountTries.size >= DM_TEST_MAX_TRACKED_ACCOUNTS) return { refused: "BUSY" };
+  }
+  accountTries.set(userId, [...tries, now]);
+  armTryExpiry(userId);
+  let refunded = false;
+  return {
+    refused: null,
+    refund: () => {
+      if (refunded) return;
+      refunded = true;
+      const current = accountTries.get(userId);
+      const index = current?.indexOf(now) ?? -1;
+      if (!current || index < 0) return;
+      current.splice(index, 1);
+      if (current.length === 0) accountTries.delete(userId);
+    },
+  };
+}
+
+/** Comptes suivis par le plafond par compte. Réservé aux tests. */
+export function trackedDmTestAccounts(): number {
+  return accountTries.size;
+}
+
+/** Vide le plafond par compte et ses minuteurs. Réservé aux tests. */
+export function resetDmTestTries(): void {
+  accountTries.clear();
+  for (const timer of expiryTimers) clearTimeout(timer);
+  expiryTimers.clear();
+}
 
 /**
  * Tous les appels de la route, refus compris, par compte : un refus où rien
  * n'est parti (non lié, non certifié, occupé) rend sa place au plafond
  * ci-dessus ; celui-ci borne la boucle de ces refus (chacun lit la session et
- * le compte). Jamais rendu.
+ * le compte). Jamais rendu. Seau plein : remis à zéro (défaut) — il ne borne
+ * que des lectures, le plafond des messages est l'autre ; un refus ici ne
+ * dirait pas à un nouveau venu qu'il a épuisé ses essais.
  */
 export const DISCORD_DM_TEST_ATTEMPT_RULE: RateLimitRule = {
   name: "discord-dm-test-attempt",
   limit: 30,
   windowMs: 60 * 60_000,
-  overflow: "refuse",
 };
 
 /** Clé unique du plafond global. */
 export const DM_TEST_GLOBAL_KEY = "all";
 
 /**
- * Plafond **tous comptes confondus** : chaque test non remis fait écrire au bot
- * une ligne au journal du staff ; une flotte de comptes ne peut pas en faire
- * une rafale. Au-delà : `DISCORD_DM_TEST_BUSY` (place du compte rendue).
+ * Plafond **tous comptes confondus**, en seau à jetons : chaque test **non
+ * remis** fait écrire au bot une ligne au journal du staff ; une flotte de
+ * comptes ne peut pas en faire une rafale (30 d'un coup, puis un toutes les
+ * 30 s). Un test remis (`SENT`, aucune ligne) rend son jeton, comme un test
+ * où rien n'est parti : des joueurs qui testent normalement ne l'épuisent
+ * pas. Vide : `DISCORD_DM_TEST_BUSY` (place du compte rendue), pour 30 s au
+ * plus par jeton.
  */
-export const DISCORD_DM_TEST_GLOBAL_RULE: RateLimitRule = {
+export const DISCORD_DM_TEST_GLOBAL_RULE: TokenBucketRule = {
   name: "discord-dm-test-global",
-  limit: 120,
-  windowMs: 60 * 60_000,
+  capacity: 30,
+  refillMs: 30_000,
 };
 
 /**
