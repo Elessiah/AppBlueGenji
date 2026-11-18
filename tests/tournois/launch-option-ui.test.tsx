@@ -677,6 +677,30 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
     expect(html).toContain("Héberge la partie — crée le salon");
   });
 
+  it("RefereeCard_refereeDesignated_badgeUsesControllerNotHouse", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ userId: 77, pseudo: "Juge", ready: false, contactsShown: true, isViewer: false }}
+        selfManaged={false}
+        phase="LOBBY"
+        onCopy={noop}
+      />,
+    );
+
+    expect(html).toContain("🎮");
+    expect(html).not.toContain("🏠");
+  });
+
+  it("messages_refereeCreatesKeys_equalTheHostKeysInFrAndEn", () => {
+    for (const lang of ["fr", "en"]) {
+      const read = (file: string) => JSON.parse(readFileSync(join(process.cwd(), "messages", lang, file), "utf8"));
+      const modal = read("launchModal.json");
+      const page = read("matchPage.json");
+      expect(modal.refereeCreates).toBe(modal.host);
+      expect(page.facts.refereeCreates).toBe(page.facts.hostDetail);
+    }
+  });
+
   it("RefereeCard_selfManagedNoReferee_noHostsGameBadge", () => {
     const html = renderToStaticMarkup(<RefereeCard referee={null} selfManaged phase="LOBBY" onCopy={noop} />);
 

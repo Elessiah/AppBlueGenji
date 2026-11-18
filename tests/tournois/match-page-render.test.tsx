@@ -111,6 +111,7 @@ function launch(overrides: Partial<MatchLaunchInfo> = {}): MatchLaunchInfo {
     team2: side(BRAVO, "Bravo"),
     casters: [],
     referee: null,
+    refereeAssigned: overrides.referee != null,
     selfManaged: false,
     viewer: { role: "TEAM1", canDeclareReady: true, isReferee: false, isCaster: false, earlyContacts: true, ready: false },
     ...overrides,
@@ -397,7 +398,7 @@ describe("page d'un match — cartes du round et bans", () => {
 
   it("keyFacts_refereedMatch_hostPlaysLeftAndRefereeCreatesGame", () => {
     const facts = visible(render(match({ refereeAssigned: true }), "public"));
-    expect(facts).toContain("Hôte B Bravo Joue à gauche");
+    expect(facts).toContain("Hôte B Bravo Côté gauche en jeu");
     expect(facts).toContain("Arbitre Arbitre désigné Un arbitre suit ce match. Crée la partie");
     expect(facts).not.toContain("Bravo Crée la partie");
   });
@@ -405,7 +406,7 @@ describe("page d'un match — cartes du round et bans", () => {
   it("keyFacts_selfManaged_hostKeepsCreatesGame", () => {
     const facts = visible(render(match({ selfManaged: true }), "public"));
     expect(facts).toContain("Hôte B Bravo Crée la partie");
-    expect(facts).not.toContain("Joue à gauche");
+    expect(facts).not.toContain("Côté gauche en jeu");
     expect(facts).not.toContain("Arbitre désigné Crée la partie");
   });
 
@@ -414,7 +415,7 @@ describe("page d'un match — cartes du round et bans", () => {
     const facts = visible(render(match({ refereeAssigned: false, selfManaged: false }), "public"));
 
     expect(facts).toContain("Hôte B Bravo Crée la partie");
-    expect(facts).not.toContain("Joue à gauche");
+    expect(facts).not.toContain("Côté gauche en jeu");
   });
 
   it("keyFacts_refereedOpponentsPending_hostPendingWithoutDetail", () => {
@@ -422,18 +423,18 @@ describe("page d'un match — cartes du round et bans", () => {
 
     const facts = visible(html.slice(html.indexOf('data-fact="host"')));
     expect(facts).toContain("Hôte Adversaires à venir");
-    expect(facts).not.toContain("Joue à gauche");
+    expect(facts).not.toContain("Côté gauche en jeu");
   });
 
   it("keyFacts_completedRefereed_noRefereeFactNorCreatesGameClaim", () => {
     const facts = visible(render(match({ status: "COMPLETED", refereeAssigned: true }), "public"));
-    expect(facts).toContain("Hôte B Bravo Joue à gauche");
+    expect(facts).toContain("Hôte B Bravo Côté gauche en jeu");
     expect(facts).not.toContain("Crée la partie");
   });
 
   it("keyFacts_refereedMatchEnglish_playsOnLeftAndCreatesGame", () => {
     const facts = visible(render(match({ refereeAssigned: true }), "public", false, "en"));
-    expect(facts).toContain("Plays on the left");
+    expect(facts).toContain("Left side in the game");
     expect(facts).toContain("Creates the game");
   });
 

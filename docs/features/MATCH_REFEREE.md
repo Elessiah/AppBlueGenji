@@ -195,8 +195,8 @@ match l'explique derrière un `InfoHint` (`roundMaps.page.refereeHostBan`, FR/EN
 Sur la page du match, la modale de lancement, la fenêtre « Contacts » et la
 fiche de connexion, « crée la partie » va donc à l'**arbitre** (fait « Arbitre »,
 `facts.refereeCreates` ; fiche de l'arbitre : `launchModal.refereeCreates`) ;
-l'équipe hôte, qui reste à gauche (règlement §14), lit « Joue à gauche »
-(`facts.hostRefereedDetail`) ou « côté gauche en jeu » sur sa fiche
+l'équipe hôte, qui reste à gauche (règlement §14), lit « Côté gauche en jeu »
+(`facts.hostRefereedDetail`) et « Équipe hôte — côté gauche en jeu » sur sa fiche
 (`launchModal.hostRefereed` : la modale garde l'ordre équipe 1 / équipe 2, la
 fiche de l'hôte peut être à droite). La page du match tire « arbitré » de
 l'instantané (`refereeAssigned`) pour les faits clés **et** la fiche de

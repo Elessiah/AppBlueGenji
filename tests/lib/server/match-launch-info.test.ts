@@ -1239,6 +1239,33 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
     expect(info.referee).not.toHaveProperty("battletagVerified");
   });
 
+  it("listViewerMatchLaunches_eligibleReferee_refereeAssignedTrue", async () => {
+    state.candidates = [candidate({ referee_user_id: REFEREE, self_managed: 0 })];
+    state.users = [refereeUser()];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+
+    expect(info.refereeAssigned).toBe(true);
+  });
+
+  it("listViewerMatchLaunches_noReferee_refereeAssignedFalse", async () => {
+    state.candidates = [candidate({ referee_user_id: null, self_managed: 1 })];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+
+    expect(info.refereeAssigned).toBe(false);
+  });
+
+  it("listViewerMatchLaunches_refereeUserMissing_cardNullAndNotAssigned", async () => {
+    state.candidates = [candidate({ referee_user_id: REFEREE, self_managed: 0 })];
+    state.users = [];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+
+    expect(info.referee).toBeNull();
+    expect(info.refereeAssigned).toBe(false);
+  });
+
   it("listViewerMatchLaunches_overwatchRefereeWithoutBattlenet_isNotPresented", async () => {
     state.candidates = [candidate({ tournament_game: "OW", referee_user_id: REFEREE, self_managed: 0 })];
     state.users = [refereeUser({ blizzard_sub: null, overwatch_battletag: null })];

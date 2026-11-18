@@ -497,7 +497,7 @@ export function RefereeCard({
       </div>
       {/* L'arbitre désigné crée la partie (MATCH_REFEREE.md § Hôte et premier ban). */}
       <p className={styles.hostBadge}>
-        <span aria-hidden="true">🏠</span> {t("refereeCreates")}
+        <span aria-hidden="true">🎮</span> {t("refereeCreates")}
       </p>
       {/* Contacts pas encore ouverts : la note dit quand, comme sur la fiche d'un caster. */}
       {casterCardPending(referee) && <p className={styles.note}>{laterText ?? t("casterContactsAtLaunch")}</p>}

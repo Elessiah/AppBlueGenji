@@ -64,7 +64,7 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    diffusion (`pill-live` seulement à l'antenne, « Cast annoncé » sinon), date
    manquante (staff), rediffusion et proposition de score en attente.
 2. **Faits clés** (`KeyFacts`, `components/cyber/` — la grille des pages de
-   règles `/regles/[slug]`, une seule définition) : « Hôte » (crée la partie ; sur un match arbitré, « Joue à gauche » : c'est l'arbitre désigné qui la crée, détail « Crée la partie » sous « Arbitre »),
+   règles `/regles/[slug]`, une seule définition) : « Hôte » (crée la partie ; sur un match arbitré, « Côté gauche en jeu » : c'est l'arbitre désigné qui la crée, détail « Crée la partie » sous « Arbitre »),
    « Premier ban » (« Adversaires à venir » tant qu'une case attend ; tus quand
    les deux adversaires sont connus sans hôte désigné), « Arbitre » (pseudo pour un lecteur connecté qui le reçoit
    déjà, `refereeNameOf` ; « Arbitre désigné » sinon) ou « Arbitrage :
