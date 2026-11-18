@@ -4,6 +4,7 @@ jest.mock("@/lib/server/auth");
 
 import { resolveRoles } from "@/lib/server/auth";
 import {
+  distinctRemovals,
   loadPlanningData,
   loadPlanningEntries,
   loadHiddenTournamentIds,
@@ -238,6 +239,27 @@ describe("loadHiddenTournamentIds", () => {
     const [sql, params] = connection.execute.mock.calls[0];
     expect(sql).toContain("LOCK IN SHARE MODE");
     expect(params).toEqual([10, 11]);
+  });
+});
+
+describe("distinctRemovals", () => {
+  it("distinctRemovals_repeatedRemovalAndWithdrawal_oneRowPerPlace", () => {
+    const rows = [
+      { entry_key: "m:1", user_id: 4, role: "CASTER" as const },
+      { entry_key: "m:1", user_id: 4, role: "CASTER" as const },
+      { entry_key: "m:1", user_id: 4, role: "PROD" as const },
+      { entry_key: "m:2", user_id: 4, role: "CASTER" as const },
+    ];
+
+    expect(distinctRemovals(rows)).toEqual([
+      { entryKey: "m:1", userId: 4, role: "CASTER" },
+      { entryKey: "m:1", userId: 4, role: "PROD" },
+      { entryKey: "m:2", userId: 4, role: "CASTER" },
+    ]);
+  });
+
+  it("distinctRemovals_noRows_empty", () => {
+    expect(distinctRemovals([])).toEqual([]);
   });
 });
 

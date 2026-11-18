@@ -6,13 +6,15 @@ jest.mock("@/lib/server/push-subscriptions");
 
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
-import { pushToUsers, subscribedStaffCandidates, usersWithTopicDisabled } from "@/lib/server/push-subscriptions";
+import { loadStaffCandidates, pushToUsers, subscribedStaffCandidates, usersWithTopicDisabled } from "@/lib/server/push-subscriptions";
 import {
   loadEntrantManagerIds,
   loadEntrantMatchLeaderIds,
   loadEntrantPlayerIds,
   loadNotificationRecipients,
+  loadStaffIds,
   notifyStaff,
+  staffHolding,
   notifyUsers,
   toNotificationRecipient,
 } from "@/lib/server/notify";
@@ -383,6 +385,36 @@ describe("notifyStaff", () => {
   });
 });
 
+describe("staffHolding / loadStaffIds", () => {
+  const CANDIDATES = [
+    { userId: 1, isAdmin: true, rolesJson: null },
+    { userId: 2, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]) },
+    { userId: 3, isAdmin: false, rolesJson: JSON.stringify(["CASTER"]) },
+    { userId: 4, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]) },
+  ];
+
+  it("staffHolding_tournamentsPermission_keepsHoldersOnly", () => {
+    expect(staffHolding(CANDIDATES, "tournaments", new Set())).toEqual([1, 2, 4]);
+  });
+
+  it("staffHolding_excludedAccounts_leftOut", () => {
+    expect(staffHolding(CANDIDATES, "tournaments", new Set([2, 4]))).toEqual([1]);
+  });
+
+  it("loadStaffIds_readsEveryCandidateNotOnlySubscribed", async () => {
+    jest.mocked(loadStaffCandidates).mockResolvedValue(CANDIDATES);
+
+    await expect(loadStaffIds("tournaments", [4])).resolves.toEqual([1, 2]);
+    expect(loadStaffCandidates).toHaveBeenCalledWith({ subscribedOnly: false });
+  });
+
+  it("loadStaffIds_readFails_rejects", async () => {
+    jest.mocked(loadStaffCandidates).mockRejectedValue(new Error("ECONNRESET"));
+
+    await expect(loadStaffIds("tournaments")).rejects.toThrow("ECONNRESET");
+  });
+});
+
 describe("destinataires", () => {
   const row = recipientRow({ id: 5, pseudo: "Nova", discord_pseudo: "nova" });
 
@@ -424,6 +456,24 @@ describe("destinataires", () => {
 
     expect(query.mock.calls[0][0]).toMatch(/is_deleted = 0/);
     expect(query.mock.calls[0][1]).toEqual([5, 6]);
+  });
+
+  it("loadNotificationRecipients_excludeSuspended_filtersActiveSuspensionsInSql", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[row]]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    await loadNotificationRecipients([5], "proven", { excludeSuspended: true });
+
+    expect(String(query.mock.calls[0][0])).toContain("NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus");
+  });
+
+  it("loadNotificationRecipients_default_keepsSuspendedAccounts", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[row]]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    await loadNotificationRecipients([5], "proven");
+
+    expect(String(query.mock.calls[0][0])).not.toContain("bg_account_suspensions");
   });
 
   it("réunit membres actuels et joueur d'une entrée solo, par engagée", async () => {

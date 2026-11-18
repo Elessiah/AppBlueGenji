@@ -539,7 +539,7 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
       reason: row.reason,
       confirmed: row.source === "MANUAL" || Number(row.confirmed) === 1,
     })),
-    removals: events.map((row) => ({ entryKey: row.entry_key, userId: Number(row.user_id), role: row.role })),
+    removals: distinctRemovals(events),
     withdrawals: withdrawals.map((row) => ({
       entryKey: row.entry_key,
       userId: Number(row.user_id),
@@ -551,6 +551,26 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
     })),
     matchCasters,
   };
+}
+
+/**
+ * Les écartés, une fois par (entrée, membre, rôle) : retraits et désistements
+ * répétés sur la même place ne dupliquent pas la ligne (pendant du
+ * `SELECT DISTINCT` d'avant les désistements).
+ */
+export function distinctRemovals(
+  rows: readonly Pick<EventRow, "entry_key" | "user_id" | "role">[],
+): PlanningData["removals"] {
+  const seen = new Set<string>();
+  const removals: PlanningData["removals"] = [];
+  for (const row of rows) {
+    const userId = Number(row.user_id);
+    const key = `${row.entry_key}|${userId}|${row.role}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    removals.push({ entryKey: row.entry_key, userId, role: row.role });
+  }
+  return removals;
 }
 
 type HistoryRow = RowDataPacket & { user_id: number; jobs: number };

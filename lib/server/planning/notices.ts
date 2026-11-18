@@ -11,10 +11,8 @@
  */
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { failureReason } from "@/lib/server/failure-reason";
-import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
-import { loadStaffCandidates } from "@/lib/server/push-subscriptions";
+import { loadNotificationRecipients, loadStaffIds, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
-import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import type { PlanningRole } from "@/lib/shared/planning";
 import {
   formatPlanningAssignedDm,
@@ -67,7 +65,7 @@ export async function announceAssignments(
       byUser.set(item.userId, list);
     }
     if (byUser.size === 0) return;
-    const recipients = await loadNotificationRecipients([...byUser.keys()], "proven");
+    const recipients = await loadNotificationRecipients([...byUser.keys()], "proven", { excludeSuspended: true });
     const base = siteCanonicalBase();
     const replacement = options.replacement === true;
     // Les personnes qui reçoivent la même liste partent en un envoi (une
@@ -136,7 +134,7 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
   try {
     const others = [...new Set(input.coAssignedIds)].filter((id) => id !== input.replacementId && id !== input.withdrawnUserId);
     if (others.length > 0) {
-      const recipients = await loadNotificationRecipients(others, "proven");
+      const recipients = await loadNotificationRecipients(others, "proven", { excludeSuspended: true });
       const base = siteCanonicalBase();
       await notifyUsers(recipients, {
         topic: "PLANNING_WITHDRAWAL",
@@ -156,21 +154,9 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
 }
 
 /**
- * Le staff des tournois (permission `tournaments`, la même qui lit les
- * tournois cachés) : candidats du staff ({@link loadStaffCandidates}, la
- * sélection partagée avec `notifyStaff`), hors `excluded`.
- */
-export async function loadTournamentStaffIds(excluded: readonly number[] = []): Promise<number[]> {
-  const skip = new Set(excluded);
-  return (await loadStaffCandidates({ subscribedOnly: false }))
-    .filter((row) => !skip.has(row.userId))
-    .filter((row) => can({ isAdmin: row.isAdmin, roles: sanitizePlatformRoles(row.rolesJson) }, "tournaments"))
-    .map((row) => row.userId);
-}
-
-/**
  * Place à pourvoir : une ligne sans nom au journal du staff sur Discord, et
- * le staff des tournois prévenu (push **et** message privé, dans sa langue).
+ * le staff des tournois prévenu (push **et** message privé, dans sa langue),
+ * choisi par la règle de `notifyStaff` (`loadStaffIds`).
  * Ce staff voit les tournois cachés : rien n'atteint qui ne peut pas voir
  * l'entrée. Couper le sujet coupe aussi le message privé (`dmFollowsTopic`).
  * Celui qui s'est désisté n'est pas prévenu de son propre geste.
@@ -178,8 +164,8 @@ export async function loadTournamentStaffIds(excluded: readonly number[] = []): 
 async function announceUnfilled(notice: PlanningWithdrawalNotice, withdrawnUserId: number): Promise<void> {
   try {
     const base = siteCanonicalBase();
-    sendBotLog(formatPlanningUnfilledLine(notice, base), { tournamentId: notice.tournamentId, category: "referees" });
-    const recipients = await loadNotificationRecipients(await loadTournamentStaffIds([withdrawnUserId]), "proven");
+    sendBotLog(formatPlanningUnfilledLine(notice, base), { tournamentId: notice.tournamentId, category: "staff-removal" });
+    const recipients = await loadNotificationRecipients(await loadStaffIds("tournaments", [withdrawnUserId]), "proven", { excludeSuspended: true });
     if (recipients.length === 0) return;
     await notifyUsers(recipients, {
       topic: "PLANNING_UNFILLED",

@@ -353,7 +353,7 @@ async function recordDeliveries(sent: readonly number[], gone: readonly number[]
   }
 }
 
-type StaffCandidate = { userId: number; isAdmin: boolean; rolesJson: unknown };
+export type StaffCandidate = { userId: number; isAdmin: boolean; rolesJson: unknown };
 
 /**
  * Comptes de staff candidats (non supprimés, non suspendus, porteurs d'au

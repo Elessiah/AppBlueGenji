@@ -82,7 +82,7 @@
     },
     "PLANNING_UNFILLED": {
       "label": "Open slots",
-      "description": "After a withdrawal, no replacement was found: the slot is open on the planning."
+      "description": "After a withdrawal, no replacement was found: the slot is open on the planning. Also turns off the Discord direct message."
     },
     "STAFF_REPORT": {
       "label": "Incoming reports",

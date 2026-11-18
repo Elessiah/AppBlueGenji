@@ -82,7 +82,7 @@
     },
     "PLANNING_UNFILLED": {
       "label": "Places à pourvoir",
-      "description": "Après un désistement, aucun remplaçant n'a été trouvé : la place est à pourvoir sur le planning."
+      "description": "Après un désistement, aucun remplaçant n'a été trouvé : la place est à pourvoir sur le planning. Coupe aussi le message privé Discord."
     },
     "STAFF_REPORT": {
       "label": "Signalements reçus",

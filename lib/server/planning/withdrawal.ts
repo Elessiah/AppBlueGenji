@@ -152,8 +152,26 @@ async function placeReplacement(
       return false;
     }
   }
+  try {
+    return await placeReplacementRow(connection, entry, pick, confirmed, matchReferee && confirmed);
+  } catch (error) {
+    console.error("[planning] remplaçant non inscrit au planning.", failureReason(error));
+    // Arbitre déjà posé sur le match : il tient le rôle (le tableau le lit du
+    // match), la réconciliation écrira sa ligne. Sinon, la place reste à pourvoir.
+    return matchReferee && confirmed;
+  }
+}
+
+/** La ligne du remplaçant au planning, et ses évènements (une transaction). */
+function placeReplacementRow(
+  connection: PoolConnection,
+  entry: LoadedEntry,
+  pick: PlannedAssignment,
+  confirmed: boolean,
+  onMatch: boolean,
+): Promise<boolean> {
   return transact(connection, async () => {
-    if (!(matchReferee && confirmed)) {
+    if (!onMatch) {
       const holds = await lockedHolding(connection, [{ userId: pick.userId, entry }]);
       if (holds(pick.userId, entry, pick.role) !== null) return false;
     }
@@ -208,6 +226,29 @@ function coAssigned(entry: LoadedEntry, data: PlanningData, userId: number, repl
     .map((row) => row.userId);
 }
 
+/**
+ * Cherche et pose le remplaçant, une fois le désistement acquis. Une panne
+ * ici ne défait pas le désistement déjà écrit : la place reste à pourvoir et
+ * l'annonce part quand même (co-affectés, staff), au lieu d'un échec rendu
+ * pour un geste fait.
+ */
+async function replaceWithdrawn(
+  connection: PoolConnection,
+  gesture: { entry: LoadedEntry; data: PlanningData; role: PlanningRole; now: number; confirmed: boolean; userId: number },
+): Promise<{ fresh: LoadedEntry; replacementId: number | null; coAssignedIds: number[] }> {
+  const { entry, data, role, now, confirmed, userId } = gesture;
+  try {
+    const found = await findReplacement(connection, entry.key, role, now, data.members);
+    const fresh = found.entry ?? entry;
+    const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, userId));
+    const replacementId = placed && found.pick ? found.pick.userId : null;
+    return { fresh, replacementId, coAssignedIds: coAssigned(fresh, found.data, userId, replacementId) };
+  } catch (error) {
+    console.error("[planning] remplaçant introuvable après un désistement.", failureReason(error));
+    return { fresh: entry, replacementId: null, coAssignedIds: coAssigned(entry, data, userId, null) };
+  }
+}
+
 type Outcome = WithdrawalResult & {
   confirmed: boolean;
   entry: LoadedEntry;
@@ -253,11 +294,7 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
         coAssignedIds: coAssigned(entry, data, user.id, heldBy),
       };
     }
-    const found = await findReplacement(connection, entry.key, input.role, now, data.members);
-    const fresh = found.entry ?? entry;
-    const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, user.id));
-    const replacementId = placed && found.pick ? found.pick.userId : null;
-    const coAssignedIds = coAssigned(fresh, found.data, user.id, replacementId);
+    const { fresh, replacementId, coAssignedIds } = await replaceWithdrawn(connection, { entry, data, role: input.role, now, confirmed, userId: user.id });
     return {
       late,
       replaced: replacementId !== null,

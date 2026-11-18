@@ -2,33 +2,21 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/notify");
 jest.mock("@/lib/server/bot-integration");
-jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://bluegenji.test" }));
 
 import { sendBotLog } from "@/lib/server/bot-integration";
-import { getDatabase } from "@/lib/server/database";
-import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
-import { announceAssignments, announceWithdrawal, loadTournamentStaffIds, noticeEntry } from "@/lib/server/planning/notices";
+import { loadNotificationRecipients, loadStaffIds, notifyUsers } from "@/lib/server/notify";
+import { announceAssignments, announceWithdrawal, noticeEntry } from "@/lib/server/planning/notices";
 import { loadedEntry } from "../../../helpers/planning";
-import { fakePool, type SqlQuery } from "../../../helpers/sql-double";
 
 /** Annonces du planning (`CAST_PLANNING.md` § Notifications) : à qui, sur quel sujet, sans nommer personne. */
 
-const query = jest.fn<SqlQuery>();
-/** Comptes du staff que rend la base : 1 admin, 2 arbitre (`tournaments`), 3 caster seul, 4 l'arbitre qui se désiste. */
-const STAFF_ROWS = [
-  { id: 1, is_admin: 1, platform_roles_json: null },
-  { id: 2, is_admin: 0, platform_roles_json: '["ARBITRE"]' },
-  { id: 3, is_admin: 0, platform_roles_json: '["CASTER"]' },
-  { id: 4, is_admin: 0, platform_roles_json: '["ARBITRE"]' },
-];
-
 beforeEach(() => {
   jest.clearAllMocks();
-  query.mockResolvedValue([STAFF_ROWS]);
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
   jest.mocked(loadNotificationRecipients).mockImplementation(async (ids) => ids.map((userId) => ({ userId, discord: null })));
   jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [], pushed: 0 });
+  // Le staff des tournois (1 admin, 2 arbitre), sans celui qui se désiste (4).
+  jest.mocked(loadStaffIds).mockResolvedValue([1, 2]);
 });
 
 const withdrawal = (overrides: Partial<Parameters<typeof announceWithdrawal>[0]> = {}) => ({
@@ -66,7 +54,7 @@ describe("announceAssignments", () => {
       { actorId: 9 },
     );
 
-    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4], "proven"]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4], "proven", { excludeSuspended: true }]);
     expect(notifyUsers).toHaveBeenCalledTimes(1);
     expect(jest.mocked(notifyUsers).mock.calls[0][1]).toMatchObject({ topic: "PLANNING_ASSIGNED", dmFollowsTopic: true });
   });
@@ -140,7 +128,7 @@ describe("announceWithdrawal", () => {
     const [line, scope] = jest.mocked(sendBotLog).mock.calls[0];
     expect(line).toContain("un caster s'est désisté de Alpha contre Bravo — Coupe");
     expect(line).toContain("désistement tardif");
-    expect(scope).toEqual({ tournamentId: 10, category: "referees" });
+    expect(scope).toEqual({ tournamentId: 10, category: "staff-removal" });
   });
 
   it("announceWithdrawal_slotHeldByMatchReferee_noOpenSlotAlert", async () => {
@@ -157,7 +145,7 @@ describe("announceWithdrawal", () => {
   });
 
   it("announceWithdrawal_unfilledNoOtherStaff_logSentWithoutNotification", async () => {
-    query.mockResolvedValue([[{ id: 4, is_admin: 0, platform_roles_json: '["ARBITRE"]' }]]);
+    jest.mocked(loadStaffIds).mockResolvedValue([]);
 
     await announceWithdrawal(withdrawal());
 
@@ -166,7 +154,7 @@ describe("announceWithdrawal", () => {
   });
 
   it("announceWithdrawal_staffReadFails_neverThrows", async () => {
-    query.mockRejectedValue(new Error("ECONNRESET"));
+    jest.mocked(loadStaffIds).mockRejectedValue(new Error("ECONNRESET"));
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     await expect(announceWithdrawal(withdrawal())).resolves.toBeUndefined();
@@ -175,20 +163,22 @@ describe("announceWithdrawal", () => {
   });
 });
 
-describe("loadTournamentStaffIds", () => {
-  it("loadTournamentStaffIds_keepsTournamentsPermissionOnly", async () => {
-    await expect(loadTournamentStaffIds()).resolves.toEqual([1, 2, 4]);
+describe("announceWithdrawal — destinataires", () => {
+  it("announceWithdrawal_unfilled_staffChosenByNotifyStaffRuleWithoutWithdrawer", async () => {
+    await announceWithdrawal(withdrawal());
+
+    expect(loadStaffIds).toHaveBeenCalledWith("tournaments", [4]);
   });
 
-  it("loadTournamentStaffIds_excludedAccounts_left", async () => {
-    await expect(loadTournamentStaffIds([2, 4])).resolves.toEqual([1]);
+  it("announceWithdrawal_coAssigned_suspendedAccountsLeftOut", async () => {
+    await announceWithdrawal(withdrawal({ unfilled: false, coAssignedIds: [3] }));
+
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[3], "proven", { excludeSuspended: true }]);
   });
 
-  it("loadTournamentStaffIds_skipsDeletedAndSuspendedInSql", async () => {
-    await loadTournamentStaffIds();
+  it("announceWithdrawal_unfilled_suspendedStaffLeftOut", async () => {
+    await announceWithdrawal(withdrawal());
 
-    const sql = String(query.mock.calls[0][0]);
-    expect(sql).toContain("u.is_deleted = 0");
-    expect(sql).toContain("bg_account_suspensions");
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[1, 2], "proven", { excludeSuspended: true }]);
   });
 });

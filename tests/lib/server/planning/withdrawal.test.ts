@@ -320,3 +320,63 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     expect(announceWithdrawal).not.toHaveBeenCalled();
   });
 });
+
+describe("withdrawFromEntry — panne après le désistement", () => {
+  /** Le planning refuse la ligne du remplaçant (verrou perdu, interblocage…). */
+  function assignmentInsertFails() {
+    execute.mockImplementation(async (sql: string) => {
+      if (sql.includes("INSERT INTO bg_planning_assignments")) throw new Error("ER_LOCK_DEADLOCK");
+      return sql.includes("INSERT INTO bg_planning_events") ? [{ affectedRows: 1, insertId: 41 }] : [{ affectedRows: 1 }];
+    });
+  }
+
+  it("withdrawFromEntry_replacementSearchFails_withdrawalKeptAndUnfilledAnnounced", async () => {
+    casterData({ confirmed: true, candidates: [6] });
+    jest.mocked(loadPlanningHistory).mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: true, withdrawnUserId: 4 });
+    error.mockRestore();
+  });
+
+  it("withdrawFromEntry_replacementRowFails_slotUnfilledAndAnnounced", async () => {
+    casterData({ confirmed: true, candidates: [6] });
+    assignmentInsertFails();
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: true });
+    error.mockRestore();
+  });
+
+  it("withdrawFromEntry_refereeRowFailsAfterMatchSet_replacementKeptAndAnnounced", async () => {
+    const members = [loadedMember({ userId: 3 }), loadedMember({ userId: 5 })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(
+        planningData({ entries: [loadedEntry({ matchRefereeId: 3 })], assignments: [loadedAssignment({ userId: 3, confirmed: true })], members }),
+      )
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry()],
+          members,
+          availability: [available("m:1", 5, "REFEREE")],
+          removals: [{ entryKey: "m:1", userId: 3, role: "REFEREE" }],
+        }),
+      );
+    assignmentInsertFails();
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
+
+    // Le match porte déjà l'arbitre 5 : il tient le rôle, la réconciliation écrira sa ligne.
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 5, unfilled: false });
+    error.mockRestore();
+  });
+});

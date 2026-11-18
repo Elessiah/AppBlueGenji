@@ -193,7 +193,7 @@ export async function announceWave(executor: Executor, wave: readonly LoadedEntr
     const groups = groupByEntries(byMember);
     // Les comptes se lisent **une** fois pour toute la vague, non une fois par liste.
     const recipientsById = new Map(
-      (await loadNotificationRecipients(groups.flatMap((group) => group.userIds), "proven")).map((recipient) => [recipient.userId, recipient]),
+      (await loadNotificationRecipients(groups.flatMap((group) => group.userIds), "proven", { excludeSuspended: true })).map((recipient) => [recipient.userId, recipient]),
     );
     const send = async (group: (typeof groups)[number]) => {
       const list: PlanningNoticeEntry[] = group.entries.map(noticeEntry);

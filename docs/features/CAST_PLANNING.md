@@ -242,14 +242,18 @@ de Paris, lien vers `/planning` dans la langue du destinataire).
   s'est désisté », remplaçant affecté ou place à pourvoir.
 - `PLANNING_UNFILLED` (« Places à pourvoir », `tournaments`) :
   aucun remplaçant trouvé — push **et** message privé au staff des tournois
-  (comptes qui tiennent `tournaments`, donc voient les tournois cachés ; le
+  (comptes qui tiennent `tournaments`, choisis par la règle de `notifyStaff`
+  — `loadStaffIds` dans `notify.ts` —, donc voient les tournois cachés ; le
   désisté excepté), dans la langue de chacun, et une ligne sans nom au journal
-  du staff sur Discord (`sendBotLog`, catégorie `referees`) ; « désistement
+  du staff sur Discord (`sendBotLog`, catégorie d'alerte `staff-removal`) ; « désistement
   tardif » s'il l'est. Jamais par le rôle arbitre de Discord : son message
   privé passerait outre le sujet coupé.
 - Arbitre de match changé depuis la fenêtre « Arbitrage » entre la lecture
   et le retrait : le match porte déjà un autre arbitre, la place est tenue —
   ni remplaçant cherché, ni place à pourvoir, ni avis à cet arbitre.
+
+Aucun avis du planning ne part à un compte **suspendu** (rôle gardé, mais
+sans droit effectif) : `loadNotificationRecipients(…, { excludeSuspended: true })`.
 
 Vie privée : aucun pseudo de joueur (« Un match » en tournoi individuel),
 noms d'équipe et de tournoi par `discordInline`, **aucun membre du staff
@@ -280,6 +284,11 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   `assignMatchReferee` (le match perd son arbitre, ligne anonyme au journal),
   puis le remplaçant y est posé par la même porte — un refus métier compte
   comme « aucun remplaçant ».
+- Une panne **après** le désistement écrit (recherche ou pose du remplaçant)
+  ne le défait pas et ne rend pas d'échec : la place est « à pourvoir » et
+  l'annonce part quand même. Arbitre déjà posé sur le match quand la ligne du
+  planning échoue : il tient le rôle (le tableau le lit du match), la
+  réconciliation (`confirmPendingReferees`) écrit sa ligne.
 - Les messages partent après le verrou, sans jamais défaire le geste.
 
 ## Coût (performance)

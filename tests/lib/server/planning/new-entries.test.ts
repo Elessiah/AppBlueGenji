@@ -292,7 +292,8 @@ describe("announceWave", () => {
     await announceWave(fakeConnection(connection), [loadedEntry()]);
 
     expect(notifyUsers).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4, 6], "proven"]);
+    // Un compte suspendu (rôle gardé) n'est pas sollicité pour poser ses disponibilités.
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4, 6], "proven", { excludeSuspended: true }]);
     expect(jest.mocked(notifyUsers).mock.calls[0][1]).toMatchObject({ topic: "PLANNING_NEW_ENTRIES", dmFollowsTopic: true });
   });
 
