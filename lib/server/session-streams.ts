@@ -193,6 +193,18 @@ export function closeSessionStreams(tokenHash: string): number {
   return closeMatching((entry) => entry.tokenHash === tokenHash);
 }
 
+/**
+ * Fait reconnecter les flux d'**une** session, sans la révoquer (`RECONNECT`) :
+ * son contexte de lecteur a changé (vue joueur, `ADMIN_PLAYER_VIEW.md`) et la
+ * route doit le relire. L'empreinte vide est celle du contournement de
+ * développement : le compte la désigne alors, seul.
+ *
+ * @returns le nombre de flux fermés.
+ */
+export function reconnectSessionStreams(userId: number, tokenHash: string): number {
+  return closeMatching((entry) => entry.userId === userId && entry.tokenHash === tokenHash, "RECONNECT");
+}
+
 /** Oublie tous les flux inscrits (sans les fermer) et les révocations récentes. Réservé aux tests. */
 export function resetSessionStreams(): void {
   registry().clear();

@@ -10,6 +10,7 @@ import { localAvatarUrl } from "@/lib/shared/avatar";
 import { TERMS_POSTPONED_COOKIE } from "@/lib/shared/global-modals";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
+import { holdsPlatformRights, sessionPlatformRights } from "@/lib/shared/player-view";
 import { recordConnection } from "@/lib/server/connection-logs";
 import { closeSessionStreams, closeUserStreams } from "@/lib/server/session-streams";
 import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
@@ -38,9 +39,30 @@ export type AuthUser = {
   discordId: string | null;
   googleSub: string | null;
   isAdult: boolean | null;
+  /**
+   * Administrateur **pour cette session** : toujours `false` en vue joueur
+   * (`playerView`), quel que soit `bg_users.is_admin`.
+   */
   isAdmin: boolean;
-  /** Rôles de permission cumulables (inclut `ADMIN` si `isAdmin`). */
+  /**
+   * Rôles de permission cumulables (inclut `ADMIN` si `isAdmin`) **pour cette
+   * session** : vides en vue joueur — `can()`, `canAny()`, `isStaffMember()`
+   * n'y voient alors aucun droit, sans que la moindre route ait à y penser.
+   */
   roles: PlatformRole[];
+  /**
+   * La session est en « vue joueur » (`bg_user_sessions.player_view_until`
+   * dans le futur, `docs/features/ADMIN_PLAYER_VIEW.md`) : ses droits de
+   * plateforme sont suspendus jusqu'au retour ou à l'échéance.
+   */
+  playerView: boolean;
+  /**
+   * Le compte porte **réellement** des droits de plateforme (colonne
+   * `is_admin` ou rôle cumulable), vue joueur ou non : seule condition de la
+   * bascule, dans les deux sens — sans quoi le retour serait impossible.
+   * Ce n'est pas un droit : aucun `can()` ne le lit.
+   */
+  playerViewAvailable: boolean;
   /** « Ne plus afficher » posé sur la modale d'arrivée du recrutement (`bg_users.recruitment_modal_off`). */
   recruitmentModalOff: boolean;
   /** Modale réaffichée depuis « Mon profil » : aucun cookie n'est plus reporté sur le compte. */
@@ -66,6 +88,7 @@ type UserRow = RowDataPacket & {
   platform_roles_json: string | null;
   recruitment_modal_off?: number | null;
   certify_prompt_due?: number | null;
+  player_view?: number | string | null;
 };
 
 /**
@@ -100,6 +123,12 @@ function baseCookieOptions() {
 }
 
 function fromRow(row: UserRow): AuthUser {
+  const real = { isAdmin: Boolean(row.is_admin), roles: resolveRoles(Boolean(row.is_admin), row.platform_roles_json) };
+  const playerViewAvailable = holdsPlatformRights(real);
+  // Le point unique où la vue joueur s'applique : un compte sans droit réel
+  // n'a rien à suspendre (une ligne restée posée ne change rien pour lui).
+  const playerView = playerViewAvailable && Number(row.player_view ?? 0) === 1;
+  const rights = sessionPlatformRights(real, playerView);
   return {
     id: Number(row.id),
     pseudo: row.pseudo,
@@ -112,8 +141,10 @@ function fromRow(row: UserRow): AuthUser {
     discordId: row.discord_id,
     googleSub: row.google_sub,
     isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
-    isAdmin: Boolean(row.is_admin),
-    roles: resolveRoles(Boolean(row.is_admin), row.platform_roles_json),
+    isAdmin: rights.isAdmin,
+    roles: rights.roles,
+    playerView,
+    playerViewAvailable,
     recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
     recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
     certifyPromptDue: Number(row.certify_prompt_due ?? 0) === 1,
@@ -387,14 +418,24 @@ async function ensureFreshTestUser(): Promise<number> {
  * **Un repli par colonne** : la plus récente (`certify_prompt_due`, sur la
  * table des sessions) tombe seule d'abord, sans emporter
  * `recruitment_modal_off` — un « Ne plus afficher » posé ne doit pas se perdre
- * parce qu'un autre `ALTER` a échoué.
+ * parce qu'un autre `ALTER` a échoué. `player_view_until`, plus récente
+ * encore, tombe avant elles : sans la colonne, aucune session n'est en vue
+ * joueur, les droits restent entiers.
  */
 async function selectUserRows(
-  sql: (withModalOff: boolean, withCertifyPrompt: boolean) => string,
+  sql: (withModalOff: boolean, withCertifyPrompt: boolean, withPlayerView: boolean) => string,
   params: (string | number)[],
 ): Promise<UserRow[]> {
   const db = await getDatabase();
-  const all = [...new Set([sql(true, true), sql(true, false), sql(false, true), sql(false, false)])];
+  // Ordre : la colonne la plus récente tombe la première (`player_view_until`,
+  // puis `certify_prompt_due`, puis `recruitment_modal_off`).
+  const variants: string[] = [];
+  for (const modalOff of [true, false]) {
+    for (const certifyPrompt of [true, false]) {
+      for (const playerView of [true, false]) variants.push(sql(modalOff, certifyPrompt, playerView));
+    }
+  }
+  const all = [...new Set(variants)];
   // Une lecture déjà tombée sur une colonne absente n'est plus retentée : le
   // schéma ne se rejoue qu'au redémarrage, qui vide aussi cette mémoire.
   const attempts = all.filter((text, index) => index === all.length - 1 || !UNKNOWN_COLUMN_SQL.has(text));
@@ -418,6 +459,22 @@ export function resetUnknownColumnMemoForTests(): void {
   UNKNOWN_COLUMN_SQL.clear();
 }
 
+/**
+ * Clé de la ligne de session qui porte la vue joueur du contournement de
+ * développement (`DEV_AUTH_BYPASS.md`) : il n'a pas de session, la vue joueur
+ * en a besoin d'une. Jamais une empreinte : `hashToken` ne rend que de
+ * l'hexadécimal, si bien qu'aucun cookie ne peut désigner cette ligne.
+ */
+export function devBypassSessionKey(userId: number): string {
+  return `${DEV_BYPASS_SESSION_PREFIX}${userId}`;
+}
+
+const DEV_BYPASS_SESSION_PREFIX = "dev-auth-bypass:";
+
+const DEV_BYPASS_PLAYER_VIEW_SQL = `(SELECT COUNT(*) FROM bg_user_sessions dv
+       WHERE dv.user_id = bg_users.id AND dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', bg_users.id)
+         AND dv.player_view_until > NOW()) AS player_view`;
+
 async function getDevBypassUser(): Promise<AuthUser | null> {
   // Liste blanche stricte : le bypass n'est actif QUE lorsqu'on est explicitement
   // en développement (`next dev` → NODE_ENV="development"). Toute autre valeur
@@ -437,7 +494,7 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
   }
 
   const rows = await selectUserRows(
-    (modalOff) => `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json${modalOff ? ", recruitment_modal_off" : ""}
+    (modalOff, _certifyPrompt, playerView) => `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json${modalOff ? ", recruitment_modal_off" : ""}${playerView ? ", " + DEV_BYPASS_PLAYER_VIEW_SQL : ""}
      FROM bg_users
      WHERE id = ?
        AND is_deleted = 0
@@ -465,7 +522,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
   if (!token) return null;
 
   const rows = await selectUserRows(
-    (modalOff, certifyPrompt) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}
+    (modalOff, certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}${playerView ? ", s.player_view_until > NOW() AS player_view" : ""}
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?
@@ -485,6 +542,20 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
 
   return fromRow(rows[0]);
 });
+
+/**
+ * La ligne de session qui porte la vue joueur de la requête en cours :
+ * l'empreinte du cookie, ou la clé du contournement de développement quand
+ * c'est lui qui a résolu `user` (`devBypass`). `null` sans session.
+ */
+export async function playerViewSessionKey(
+  user: AuthUser,
+): Promise<{ tokenHash: string; devBypass: boolean } | null> {
+  const bypass = await getDevBypassUser();
+  if (bypass && bypass.id === user.id) return { tokenHash: devBypassSessionKey(user.id), devBypass: true };
+  const tokenHash = await currentTokenHash();
+  return tokenHash ? { tokenHash, devBypass: false } : null;
+}
 
 async function pseudoExists(candidate: string): Promise<boolean> {
   const db = await getDatabase();

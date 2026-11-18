@@ -82,7 +82,13 @@ import { publishMatchUpdatedEvent } from "./notifications";
 export const LAUNCH_LOOKAHEAD_MINUTES = 60;
 
 /** Le lecteur tel que ce module le lit. */
-export type LaunchViewer = { id: number; isAdmin?: boolean; roles?: readonly PlatformRole[] };
+export type LaunchViewer = {
+  id: number;
+  isAdmin?: boolean;
+  roles?: readonly PlatformRole[];
+  /** Vue joueur de la session (`ADMIN_PLAYER_VIEW.md`) : ni cast ni arbitrage désigné. */
+  playerView?: boolean;
+};
 
 type CandidateBaseRow = LaunchMatchBaseRow & {
   tournament_name: string;
@@ -332,6 +338,7 @@ function viewerRole(
   teams: ViewerTeams,
   casters: readonly MatchCasterLink[],
   referee: boolean,
+  playerView = false,
 ): { role: MatchLaunchViewerRole; canDeclareReady: boolean } | null {
   // Ordre de `resolveMatchParty` : joueur, caster, arbitre désigné.
   // Le rôle de joueur prime, comme dans `resolveMatchParty`.
@@ -344,6 +351,10 @@ function viewerRole(
       return { role, canDeclareReady: membership.solo || canDeclareTeamReady(membership.roles) };
     }
   }
+  // Vue joueur (`ADMIN_PLAYER_VIEW.md`) : la session ne tient ni cast ni
+  // arbitrage, comme un joueur qui n'en aurait jamais pris — seul son rôle de
+  // joueur du match lui reste.
+  if (playerView) return null;
   // `casters` : ceux que la lecture garde (un caster inéligible n'en est plus).
   if (casters.some((caster) => caster.userId === userId)) {
     return { role: "CASTER", canDeclareReady: true };
@@ -1077,7 +1088,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase, early, exposes } of visible) {
       const casters = kept.get(Number(row.id)) ?? [];
-      const party = viewerRole(row, viewer.id, teams, casters, referee);
+      const party = viewerRole(row, viewer.id, teams, casters, referee, viewer.playerView === true);
       if (!party) continue;
       // À un arbitre qui caste, la modale de lancement renvoie aussi à « Contacts ».
       result.push(

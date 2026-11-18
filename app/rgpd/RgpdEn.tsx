@@ -312,7 +312,7 @@ export function RgpdEn({
           from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
           the #live announcements of a solo tournament, which keep your username in the Discord channel until they
           are deleted on request, and to the moderation alert for such an announcement blocked or flagged by AutoMod, which keeps your username — the staff is told of your request without you being named, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found (<a href="#retransmission">“Match streaming”</a>);
-          for a staff member, their refereeing actions and the platform roles they granted or removed remain named in the server logs, according to their
+          for a staff member, their refereeing actions, the platform roles they granted or removed and their switches to player view remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
           {WEB_ACCESS_LOG_FIELDS_EN}), for its security (<LocaleLink href="/rgpd/registre#t17">register, T17</LocaleLink>

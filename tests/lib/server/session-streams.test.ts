@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   closeSessionStreams,
   closeUserStreams,
+  reconnectSessionStreams,
   reconnectUserStreams,
   registerSessionStream,
   registeredStreamCount,
@@ -231,5 +232,40 @@ describe("reconnectUserStreams (EF-04)", () => {
 
     expect(reconnectUserStreams([])).toBe(0);
     expect(close).not.toHaveBeenCalled();
+  });
+});
+
+describe("reconnectSessionStreams (ADMIN_PLAYER_VIEW.md)", () => {
+  it("reconnectSessionStreams_oneSession_closesOnlyThatSessionStreams", () => {
+    const here = jest.fn();
+    const otherDevice = jest.fn();
+    const otherUser = jest.fn();
+    register(1, "ici", here);
+    register(1, "ailleurs", otherDevice);
+    register(2, "ici", otherUser);
+
+    expect(reconnectSessionStreams(1, "ici")).toBe(1);
+    expect(here).toHaveBeenCalledTimes(1);
+    expect(otherDevice).not.toHaveBeenCalled();
+    expect(otherUser).not.toHaveBeenCalled();
+  });
+
+  it("reconnectSessionStreams_switch_isNotARevocation", () => {
+    register(1, "ici");
+    const mark = revocationMark();
+
+    reconnectSessionStreams(1, "ici");
+
+    expect(revokedSince(1, "ici", mark)).toBe(false);
+  });
+
+  it("reconnectSessionStreams_devBypass_closesTheCookielessStreams", () => {
+    const dev = jest.fn();
+    const real = jest.fn();
+    register(1, "", dev);
+    register(1, "vraie", real);
+
+    expect(reconnectSessionStreams(1, "")).toBe(1);
+    expect(real).not.toHaveBeenCalled();
   });
 });

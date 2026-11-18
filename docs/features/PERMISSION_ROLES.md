@@ -84,6 +84,15 @@ s'additionnent.
   retirés et enregistrés (`rolesChangeAuditLine`, écart aux rôles lus sous le
   verrou). Un refus ou un enregistrement sans écart ne laisse aucune trace.
 
+## Vue joueur
+
+Un compte qui porte un rôle de plateforme peut, pour **une** session, les
+suspendre tous (« Passer en vue joueur », menu du compte) : `getCurrentUser()`
+rend alors `isAdmin: false` et `roles: []`, si bien que `can()`, `canAny()` et
+`isStaffMember()` n'y voient plus rien — le seul geste qui reste est le retour,
+ouvert par `playerViewAvailable` (les droits **réels**). Les rôles d'équipe ne
+sont pas touchés. Voir `ADMIN_PLAYER_VIEW.md`.
+
 ## Un administrateur règle ses propres rôles
 
 `POST /api/admin/users/[id]/roles` avec `id` = l'appelant :

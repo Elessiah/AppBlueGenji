@@ -25,6 +25,9 @@ export function authUser(overrides: Partial<AuthUser> = {}): AuthUser {
     recruitmentModalOff: false,
     recruitmentModalBackOn: false,
     certifyPromptDue: false,
+    playerView: false,
+    // Le compte porte réellement des droits dès qu'il a un rôle de plateforme.
+    playerViewAvailable: isAdmin || (overrides.roles ?? []).length > 0,
     ...overrides,
   };
 }

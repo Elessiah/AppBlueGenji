@@ -96,7 +96,10 @@ export async function PublicHeader() {
               {/* Profil, équipe et déconnexion : le même menu que dans
                   l'espace connecté. Son nom accessible commence par le pseudo
                   affiché (WCAG 2.5.3). */}
-              <AccountMenu pseudo={user.pseudo} avatarUrl={user.avatarUrl} activeTeam={activeTeam} devDocs={can(user, "dev")} />
+              <AccountMenu pseudo={user.pseudo} avatarUrl={user.avatarUrl} activeTeam={activeTeam}
+                devDocs={can(user, "dev")}
+                playerViewEntry={user.playerViewAvailable && !user.playerView}
+              />
             </>
           ) : (
             <CyberButton variant="primary" asChild>

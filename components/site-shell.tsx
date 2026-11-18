@@ -37,6 +37,7 @@ export async function SiteShell({
         openReports={openReports}
         languageSwitcherLabel={await languageSwitcherLabel()}
         devDocs={can(user, "dev")}
+        playerViewEntry={user.playerViewAvailable && !user.playerView}
       />
       <main className={mainClassName} style={mainStyle}>{children}</main>
       <SiteFooterBar authenticated />

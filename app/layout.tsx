@@ -17,6 +17,7 @@ import { FloatingScrollWatcher } from "@/components/floating-scroll-watcher";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
 import { SkipLink } from "@/components/accessibility/SkipLink";
+import { PlayerViewBanner } from "@/components/player-view";
 import { MatchLaunchCenterLazy } from "@/components/match-launch/MatchLaunchCenterLazy";
 import { EnglishLinkPreload } from "@/components/i18n/english-link-preload";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
@@ -332,6 +333,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           {/* Deuxième arrêt : le lien d'évitement, qui mène au contenu sans
               traverser la bannière de recrutement ni la navigation. */}
           <SkipLink />
+          {/* Vue joueur du staff (`ADMIN_PLAYER_VIEW.md`) : sur toutes les
+              pages, tant qu'elle dure, avec le retour en un clic. */}
+          {user?.playerView && <PlayerViewBanner />}
           <VisitTracker />
           <AudienceBeacon />
           <ServiceWorkerRegistration />

@@ -131,7 +131,7 @@ describe("POST /api/matches/[matchId]/ready", () => {
     const res = await readyPost(jsonRequest("POST", { ready: true }), params("42"));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ launched: true });
-    expect(setMatchReady).toHaveBeenCalledWith(42, 2, true);
+    expect(setMatchReady).toHaveBeenCalledWith(42, 2, true, { playerView: false });
   });
 
   it.each<[string, number]>([
@@ -631,5 +631,36 @@ describe("launchFailure", () => {
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: "MAP_PICK_FAILED" });
     log.mockRestore();
+  });
+});
+
+describe("vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+  const inPlayerView = authUser({ id: 6, roles: [], playerView: true, playerViewAvailable: true });
+
+  it("readyPost_playerView_passesTheFlagToTheService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(inPlayerView);
+    jest.mocked(setMatchReady).mockResolvedValue({ launched: false });
+
+    await readyPost(jsonRequest("POST", { ready: true }), params("42"));
+
+    expect(setMatchReady).toHaveBeenCalledWith(42, 6, true, { playerView: true });
+  });
+
+  it("casterPost_playerView_returns403WithoutCallingService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(inPlayerView);
+
+    const res = await casterPost(jsonRequest("POST", { liveUrl: "https://twitch.tv/voix" }), params("42"));
+
+    expect(res.status).toBe(403);
+    expect(claimMatchCast).not.toHaveBeenCalled();
+  });
+
+  it("casterDelete_playerView_returns403WithoutReleasing", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(inPlayerView);
+
+    const res = await casterDelete(jsonRequest("DELETE"), params("42"));
+
+    expect(res.status).toBe(403);
+    expect(releaseMatchCast).not.toHaveBeenCalled();
   });
 });

@@ -3270,3 +3270,18 @@ describe("jeu du tournoi lu sous le verrou du match (revue sécurité #545)", ()
     expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP]);
   });
 });
+
+describe("setMatchReady — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+  it("setMatchReady_casterInPlayerView_refusesNotMatchParty", async () => {
+    state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
+    state.users[CASTER] = ELIGIBLE_CASTER;
+
+    await expect(setMatchReady(42, CASTER, true, { playerView: true })).rejects.toThrow("NOT_MATCH_PARTY");
+    expect(casterReadyOf(state)).toBeNull();
+  });
+
+  it("setMatchReady_captainInPlayerView_keepsTeamReady", async () => {
+    await expect(setMatchReady(42, 1, true, { playerView: true })).resolves.toEqual({ launched: false });
+    expect(state.match?.team1_ready_at).toBe(STAMP);
+  });
+});

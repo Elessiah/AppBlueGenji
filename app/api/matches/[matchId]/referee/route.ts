@@ -43,6 +43,8 @@ export async function POST(_req: Request, context: { params: Promise<{ matchId: 
 export async function DELETE(_req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
+  // Vue joueur (`ADMIN_PLAYER_VIEW.md`) : aucun geste d'arbitrage sur cette session.
+  if (user.playerView) return fail("FORBIDDEN", 403);
 
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);

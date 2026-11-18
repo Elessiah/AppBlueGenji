@@ -843,3 +843,22 @@ describe("GET /api/tournaments/[id]/stream — invitation à certifier poussée 
     expect(() => lateCallback()(PROMPT)).not.toThrow();
   });
 });
+
+describe("GET /api/tournaments/[id]/stream — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+  it("GET_adminInPlayerView_getsStandardTierAndNoStaffRight", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: [], playerView: true, playerViewAvailable: true }),
+    );
+
+    const message = await firstMessage(await GET(new Request("http://t/"), params("5")));
+
+    expect(message.tier).toBe("STANDARD");
+    expect(rightsPassedToViewerContext()).toEqual({
+      canManage: false,
+      canPreview: false,
+      canManageLive: false,
+      canDelete: false,
+      canCancelForfeit: false,
+    });
+  });
+});

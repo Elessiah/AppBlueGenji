@@ -161,3 +161,24 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(await res.json()).toEqual({ error: "TOURNAMENT_NOT_FOUND" });
   });
 });
+
+describe("GET /api/tournaments/[id] — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(service.getTournamentDetail).mockResolvedValue(tournamentDetail());
+  });
+
+  it("GET_adminInPlayerView_getsNoStaffRight", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: [], playerView: true, playerViewAvailable: true }),
+    );
+
+    await get("7");
+
+    expect(detailCall()).toEqual([
+      7,
+      1,
+      { canManage: false, canPreview: false, canManageLive: false, canDelete: false, canCancelForfeit: false },
+    ]);
+  });
+});

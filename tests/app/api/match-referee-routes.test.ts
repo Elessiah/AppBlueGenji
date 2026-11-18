@@ -257,3 +257,14 @@ describe("PUT autogestion et première carte", () => {
     await expect(res.json()).resolves.toEqual({ error: "MATCH_NOT_LAUNCHABLE" });
   });
 });
+
+describe("vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+  it("refereeDelete_playerView_returns403WithoutReleasing", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3, roles: [], playerView: true, playerViewAvailable: true }));
+
+    const res = await refereeDelete(jsonRequest("DELETE"), params("42"));
+
+    expect(res.status).toBe(403);
+    expect(releaseMatchReferee).not.toHaveBeenCalled();
+  });
+});

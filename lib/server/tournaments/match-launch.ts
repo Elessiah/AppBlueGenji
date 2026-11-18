@@ -738,6 +738,7 @@ export async function setMatchReady(
   matchId: number,
   userId: number,
   ready: boolean,
+  options: { playerView?: boolean } = {},
 ): Promise<{ launched: boolean }> {
   const { tournamentId, launched, quiet } = await inTransaction(async (connection) => {
     const row = await lockLaunchMatch(connection, matchId);
@@ -752,6 +753,7 @@ export async function setMatchReady(
     const lobbyWasOpen = row.lobby_opened_at !== null;
     const party = await resolvePartyOrRefusal(connection, row, userId);
     if (typeof party === "string") throw new Error(party);
+    assertPlayerViewParty(party.role, options.playerView === true);
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
 
     if (party.role === "CASTER") {
@@ -779,6 +781,14 @@ export async function setMatchReady(
   });
   if (!quiet) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   return { launched };
+}
+
+/**
+ * Vue joueur (`ADMIN_PLAYER_VIEW.md`) : le « Prêt » d'un cast ou d'un
+ * arbitrage n'est pas un geste de joueur — seule une équipe du match le donne.
+ */
+function assertPlayerViewParty(role: string, playerView: boolean): void {
+  if (playerView && role !== "TEAM1" && role !== "TEAM2") throw new Error("NOT_MATCH_PARTY");
 }
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { BookOpen, LogOut, Shield, UserRound } from "lucide-react";
+import { BookOpen, Eye, LogOut, Shield, UserRound } from "lucide-react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { entrantHref } from "@/lib/shared/participants";
 import { DEVDOC_PATH } from "@/lib/shared/dev-docs";
@@ -9,6 +9,7 @@ import { UserAvatar } from "./user-avatar";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";
 import { useLogout } from "./use-logout";
+import { usePlayerViewToggle } from "./player-view";
 import s from "./account-menu.module.css";
 
 export type AccountMenuTeam = { teamId: number; teamName: string };
@@ -19,6 +20,12 @@ type AccountMenuProps = {
   activeTeam?: AccountMenuTeam | null;
   /** Lien vers la documentation développeur (permission `dev`, `DEVDOC.md`). */
   devDocs?: boolean;
+  /**
+   * Entrée « Passer en vue joueur » (`ADMIN_PLAYER_VIEW.md`) : le compte porte
+   * des droits de plateforme et la session ne les a pas encore suspendus. Le
+   * retour, lui, passe par la bannière de la vue joueur.
+   */
+  playerViewEntry?: boolean;
 };
 
 /**
@@ -34,7 +41,13 @@ type AccountMenuProps = {
  * en dehors, sur un lien, avec Échap (le focus revient au bouton) et quand la
  * tabulation en sort — mêmes règles que le menu de la vitrine.
  */
-export function AccountMenu({ pseudo, avatarUrl, activeTeam = null, devDocs = false }: Readonly<AccountMenuProps>) {
+export function AccountMenu({
+  pseudo,
+  avatarUrl,
+  activeTeam = null,
+  devDocs = false,
+  playerViewEntry = false,
+}: Readonly<AccountMenuProps>) {
   const { t } = useShellText();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -62,6 +75,7 @@ export function AccountMenu({ pseudo, avatarUrl, activeTeam = null, devDocs = fa
   const { leaving, logout: onLogout } = useLogout(() => setOpen(false));
 
   const close = () => setOpen(false);
+  const { pending: switching, toggle } = usePlayerViewToggle(close);
 
   return (
     <div
@@ -93,6 +107,7 @@ export function AccountMenu({ pseudo, avatarUrl, activeTeam = null, devDocs = fa
           id={panelId}
           activeTeam={activeTeam}
           devDocs={devDocs}
+          playerView={playerViewEntry ? { pending: switching, enter: () => toggle(true) } : null}
           leaving={leaving}
           onNavigate={close}
           onLogout={onLogout}
@@ -107,6 +122,7 @@ export function AccountMenuPanel({
   id,
   activeTeam,
   devDocs = false,
+  playerView = null,
   leaving,
   onNavigate,
   onLogout,
@@ -114,6 +130,8 @@ export function AccountMenuPanel({
   id: string;
   activeTeam: AccountMenuTeam | null;
   devDocs?: boolean;
+  /** « Passer en vue joueur », quand le compte peut suspendre ses droits ({@link AccountMenuProps.playerViewEntry}). */
+  playerView?: { pending: boolean; enter: () => void } | null;
   leaving: boolean;
   onNavigate: () => void;
   onLogout: () => void;
@@ -151,6 +169,20 @@ export function AccountMenuPanel({
           <BookOpen className={s.itemIcon} size={16} aria-hidden="true" />
           <span className={s.itemText}>{t("account.devDocs")}</span>
         </LocaleLink>
+      )}
+      {playerView && (
+        <button
+          type="button"
+          className={s.item}
+          onClick={() => !playerView.pending && playerView.enter()}
+          aria-disabled={playerView.pending || undefined}
+          aria-busy={playerView.pending || undefined}
+        >
+          <Eye className={s.itemIcon} size={16} aria-hidden="true" />
+          <span className={s.itemText}>
+            {playerView.pending ? t("account.playerViewPending") : t("account.playerView")}
+          </span>
+        </button>
       )}
       <button type="button" className={`${s.item} ${s.logout}`} onClick={() => !leaving && onLogout()}
         aria-disabled={leaving || undefined}

@@ -421,7 +421,7 @@ function RgpdFr({
           <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
           individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
           demande, et de l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod, qui garde votre pseudo — le staff est averti de votre demande sans que vous soyez nommé, et les modérateurs suppriment à la main les alertes qu&apos;ils parviennent à identifier, sans garantie de toutes les retrouver (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
-          d&apos;arbitrage et les rôles de plateforme qu&apos;il a attribués ou retirés restent nommés dans les journaux du serveur, selon leur rotation
+          d&apos;arbitrage, les rôles de plateforme qu&apos;il a attribués ou retirés et ses passages en vue joueur restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
           chaque requête ({WEB_ACCESS_LOG_FIELDS}), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
