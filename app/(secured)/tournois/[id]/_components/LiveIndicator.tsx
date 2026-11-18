@@ -25,7 +25,7 @@ export type LiveIndicatorProps = {
   fatal?: LiveFailure | null;
 };
 
-function cadenceLabel(text: TournamentPageText, cadenceMs: number): string {
+export function cadenceLabel(text: TournamentPageText, cadenceMs: number): string {
   const seconds = Math.round(cadenceMs / 1000);
   if (seconds <= 1) return text.t("live.cadenceSecond");
   if (seconds < 60) return text.t("live.cadenceSeconds", { seconds: String(seconds) });

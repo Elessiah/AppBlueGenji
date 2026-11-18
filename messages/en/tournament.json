@@ -117,6 +117,42 @@
       "MATCH_READY": "Your match is ready",
       "TOURNAMENT_STARTED": "Tournament starting",
       "ROUND_STARTED": "New round"
+    },
+    "sync": {
+      "title": "Sync mode",
+      "others": "The other modes:",
+      "modes": {
+        "PRIORITY": {
+          "label": "Priority mode",
+          "now": "You are among those the server serves first (organisers, casters, registered teams): changes reach you {cadence}.",
+          "other": "Organisers, casters and registered teams receive changes within the second."
+        },
+        "STANDARD": {
+          "label": "Standard mode",
+          "now": "You follow this tournament as a spectator: changes reach you {cadence}, with no need to reload the page.",
+          "other": "Spectators receive changes in wider windows, with no need to reload the page."
+        },
+        "MATCH": {
+          "label": "Match mode",
+          "now": "You have a match in progress: changes reach you {cadence}, animations are frozen to spare your machine, and your match shows at once even when the page is not focused.",
+          "other": "During your match, animations are frozen; without focus, the display of other matches is batched every 5 seconds."
+        },
+        "ECO": {
+          "label": "Eco mode",
+          "now": "The page runs without animations (it is not focused, your machine is struggling, or reduced motion is requested): changes arrive {cadence} and show at once.",
+          "other": "Unfocused page, struggling machine or reduced motion: animations frozen, data still shown at once."
+        },
+        "SLEEP": {
+          "label": "Sleep mode",
+          "now": "The tab is hidden: changes are received but shown when you come back. After a minute, outside a match, the page drops to the spectator pace to relieve the server.",
+          "other": "Hidden tab: the display waits for your return, and after a minute (outside a match) the stream drops to the spectator pace."
+        },
+        "POLLING": {
+          "label": "Re-read mode",
+          "now": "The live stream is not established: the page re-reads the tournament by itself {cadence}, until the connection returns.",
+          "other": "Live stream cut: the page re-reads the tournament by itself, more slowly."
+        }
+      }
     }
   },
   "loading": "Loading the tournament…",

@@ -117,6 +117,42 @@
       "MATCH_READY": "Ton match est prêt",
       "TOURNAMENT_STARTED": "Le tournoi commence",
       "ROUND_STARTED": "Nouvelle manche"
+    },
+    "sync": {
+      "title": "Mode de synchronisation",
+      "others": "Les autres modes :",
+      "modes": {
+        "PRIORITY": {
+          "label": "Mode prioritaire",
+          "now": "Tu fais partie de ceux que le serveur sert en premier (organisation, cast, équipes engagées) : les changements t'arrivent {cadence}.",
+          "other": "Organisation, cast et équipes engagées reçoivent les changements à la seconde."
+        },
+        "STANDARD": {
+          "label": "Mode standard",
+          "now": "Tu suis ce tournoi en spectateur : les changements t'arrivent {cadence}, sans recharger la page.",
+          "other": "Les spectateurs reçoivent les changements par fenêtres plus larges, sans recharger la page."
+        },
+        "MATCH": {
+          "label": "Mode match",
+          "now": "Tu as un match en cours : les changements t'arrivent {cadence}, les animations sont figées pour ménager ta machine, et ton match s'affiche aussitôt même si la page n'a pas le focus.",
+          "other": "Pendant ton match, animations figées ; sans focus, l'affichage des autres matchs est regroupé toutes les 5 secondes."
+        },
+        "ECO": {
+          "label": "Mode éco",
+          "now": "La page est sans animation (elle n'a pas le focus, ta machine est à la peine, ou le mouvement réduit est demandé) : les changements arrivent {cadence} et s'affichent aussitôt.",
+          "other": "Page sans focus, machine à la peine ou mouvement réduit : animations figées, données toujours affichées aussitôt."
+        },
+        "SLEEP": {
+          "label": "Mode veille",
+          "now": "L'onglet est caché : les changements sont reçus mais affichés à ton retour. Au bout d'une minute, hors match, la page passe au rythme des spectateurs pour soulager le serveur.",
+          "other": "Onglet caché : l'affichage attend ton retour, et après une minute (hors match) le flux passe au rythme des spectateurs."
+        },
+        "POLLING": {
+          "label": "Mode relecture",
+          "now": "Le flux temps réel n'est pas établi : la page relit le tournoi d'elle-même {cadence}, en attendant le retour de la connexion.",
+          "other": "Flux temps réel coupé : la page relit le tournoi d'elle-même, plus lentement."
+        }
+      }
     }
   },
   "loading": "Chargement du tournoi…",

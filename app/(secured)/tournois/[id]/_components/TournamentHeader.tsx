@@ -35,6 +35,7 @@ import {
   type HeaderTone,
 } from "../_lib/header-meta";
 import { LiveIndicator, useLiveIndicatorText, type LiveIndicatorProps } from "./LiveIndicator";
+import { SyncModeBadge, SyncModeExplanation, SyncModeHint } from "./SyncModeBadge";
 import { TournamentLiveLink } from "./TournamentLiveLink";
 import s from "./TournamentHeader.module.css";
 
@@ -52,6 +53,7 @@ function SpectatorHint(props: Readonly<LiveIndicatorProps>) {
     <InfoHint id="tournament-spectator-hint" subject={t("header.spectator")}>
       <p>{t("header.spectatorTitle")}</p>
       <p>{liveText.title}</p>
+      <SyncModeExplanation {...props} />
     </InfoHint>
   );
 }
@@ -188,6 +190,9 @@ export function TournamentHeader({
             {/* Dit que la page se tient à jour seule : sans ce repère, on
                 recharge par précaution même quand tout arrive tout seul. */}
             <LiveIndicator isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
+            {/* Comment la page se tient à jour (prioritaire, match, éco…) : à côté
+                du témoin, qui dit seulement si la connexion tient. */}
+            <SyncModeBadge isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
             {detail.isAdmin && !frozen && (
               <Pill variant="accent" title={t("header.adminTitle")}>{t("header.admin")}</Pill>
             )}
@@ -200,7 +205,11 @@ export function TournamentHeader({
               même, hors du groupe `.viewer` : ouverte, l'explication passe à la
               ligne sur toute la barre, au lieu d'élargir le groupe — qui, en
               s'élargissant, déplaçait le bouton qu'on vient de cliquer. */}
-          {spectator && <SpectatorHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />}
+          {spectator ? (
+            <SpectatorHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
+          ) : (
+            <SyncModeHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />
+          )}
         </div>
 
         {/* Illustration : un bandeau entre les outils du lecteur et l'identité,
