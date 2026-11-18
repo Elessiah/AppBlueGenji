@@ -213,7 +213,7 @@
       "line": "{start} · {entry}"
     },
     "assigned": {
-      "title": "{count, plural, one {Affecté au planning} other {Affecté à # entrées du planning}}",
+      "title": "{count, plural, one {Nouvelle affectation au planning} other {# nouvelles affectations au planning}}",
       "titleReplacement": "Tu remplaces un désistement",
       "line": "{start} · {role} · {entry}"
     },

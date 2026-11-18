@@ -387,7 +387,9 @@
 }
 
 .linkButton {
-  padding: 4px 6px;
+  min-height: 28px;
+  margin-inline: 4px;
+  padding: 4px 8px;
   border: 0;
   background: transparent;
   color: var(--blue-300);
@@ -472,6 +474,10 @@
 }
 
 .lateWarning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   color: var(--amber);
   font-weight: 600;
 }

@@ -210,3 +210,8 @@ export function weekWindow(weekStart: number): { from: string; to: string } {
 export function leadUntil(now: number, hours: number): string {
   return new Date(now + hours * 60 * 60 * 1000).toISOString();
 }
+
+/** On se désiste jusqu'au début de l'entrée (`now` : l'horloge d'affichage), tant qu'elle reste modifiable. */
+export function canWithdraw(entry: Pick<PlanningEntryView, "editable" | "startAt">, now: number): boolean {
+  return entry.editable && Date.parse(entry.startAt) > now;
+}

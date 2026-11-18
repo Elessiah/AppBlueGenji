@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   applyAvailability,
   candidatesFor,
+  canWithdraw,
   COVERAGE_PILL,
   errorKey,
   filterEntries,
@@ -21,6 +22,7 @@ import {
 import { PLANNING_STATUSES } from "@/lib/server/planning/actions";
 import enPlanning from "@/messages/en/planning.json";
 import frPlanning from "@/messages/fr/planning.json";
+import FR_PUSH from "@/messages/fr/pushMessages.json";
 import { DEFAULT_PLANNING_DURATIONS } from "@/lib/shared/planning-durations";
 import type { PlanningMember, PlanningView } from "@/lib/shared/planning-view";
 import { fieldForError } from "@/lib/shared/field-errors";
@@ -496,5 +498,33 @@ describe("désistement — refus rattaché au motif", () => {
       expect(Object.hasOwn(frPlanning.errors, code)).toBe(true);
       expect(Object.hasOwn(enPlanning.errors, code)).toBe(true);
     }
+  });
+});
+
+describe("canWithdraw (bouton « Me désister »)", () => {
+  const start = Date.parse("2026-11-20T18:00:00Z");
+
+  it("canWithdraw_editableEntryBeforeStart_true", () => {
+    expect(canWithdraw({ editable: true, startAt: new Date(start).toISOString() }, start - 1)).toBe(true);
+  });
+
+  it("canWithdraw_clockReachesStart_false", () => {
+    expect(canWithdraw({ editable: true, startAt: new Date(start).toISOString() }, start)).toBe(false);
+    expect(canWithdraw({ editable: true, startAt: new Date(start).toISOString() }, start + HOUR_MS)).toBe(false);
+  });
+
+  it("canWithdraw_notEditable_false", () => {
+    expect(canWithdraw({ editable: false, startAt: new Date(start).toISOString() }, start - HOUR_MS)).toBe(false);
+  });
+});
+
+describe("textes du désistement", () => {
+  it("withdrawals_noUnusedItemKey_inBothLanguages", () => {
+    expect(Object.hasOwn(frPlanning.withdrawals, "item")).toBe(false);
+    expect(Object.hasOwn(enPlanning.withdrawals, "item")).toBe(false);
+  });
+
+  it("assignedPushTitle_french_isNotGendered", () => {
+    expect(FR_PUSH.planning.assigned.title).not.toMatch(/Affecté/);
   });
 });

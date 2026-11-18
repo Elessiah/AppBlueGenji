@@ -170,7 +170,6 @@
     "title": "Withdrawals",
     "late": "Late",
     "provisional": "Proposal",
-    "item": "{name} · {role}",
     "hint": "Who withdrew from this slot, and their reason if they gave one. “Late”: less than 24 hours before the start. “Proposal”: they were only proposed by the calculation."
   },
   "unfilled": "Open slot"

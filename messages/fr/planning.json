@@ -170,7 +170,6 @@
     "title": "Désistements",
     "late": "Tardif",
     "provisional": "Proposition",
-    "item": "{name} · {role}",
     "hint": "Qui s'est désisté de ce créneau, et son motif s'il en a donné un. « Tardif » : moins de 24 h avant le début. « Proposition » : il n'était que proposé par le calcul."
   },
   "unfilled": "À pourvoir"

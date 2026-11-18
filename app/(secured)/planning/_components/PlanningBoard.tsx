@@ -10,6 +10,7 @@ import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { NumberInput } from "@/components/ui/number-input";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useToast } from "@/components/ui/toast";
+import { useClock } from "@/lib/shared/hooks/useClock";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import type { Locale } from "@/lib/shared/locales";
@@ -36,6 +37,7 @@ import {
   NO_FILTERS,
   applyAvailability,
   candidatesFor,
+  canWithdraw,
   errorKey,
   filterEntries,
   filtersActive,
@@ -408,7 +410,11 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
             {withdrawing.slot} · {t(`roles.${withdrawing.role}`)}
           </p>
           <p>{t("withdraw.body")}</p>
-          {withdrawing.late && <p className={styles.lateWarning}>{t("withdraw.late")}</p>}
+          {withdrawing.late && (
+            <p className={styles.lateWarning}>
+              <Pill variant="warning">{t("withdrawals.late")}</Pill> {t("withdraw.late")}
+            </p>
+          )}
           <div className="field">
             <label htmlFor={WITHDRAWAL_FIELD_IDS.reason}>{t("withdraw.reasonLabel")}</label>
             <textarea
@@ -421,6 +427,9 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
               }}
               {...reasonErrors.aria("reason")}
             />
+            <span className={styles.muted} aria-hidden="true">
+              {withdrawReason.length}/{WITHDRAWAL_REASON_MAX}
+            </span>
             <FieldErrorText fieldId={WITHDRAWAL_FIELD_IDS.reason} message={reasonErrors.message("reason")} />
           </div>
         </ConfirmActionDialog>
@@ -460,9 +469,42 @@ function withdrawDoneKey(result: WithdrawalResponse): "withdraw.doneReplaced" | 
   return result.unfilled ? "withdraw.doneUnfilled" : "withdraw.done";
 }
 
-/** On se désiste jusqu'au début de l'entrée, tant qu'elle reste modifiable. */
-function canWithdraw(entry: PlanningEntryView): boolean {
-  return entry.editable && Date.parse(entry.startAt) > Date.now();
+/** Relue chaque minute : le bouton disparaît quand l'entrée commence, sans attendre une relecture de la page. */
+const WITHDRAW_CLOCK_MS = 60_000;
+
+function WithdrawButton({
+  entry,
+  role,
+  slot,
+  roleName,
+  pending,
+  onWithdraw,
+  text,
+}: Readonly<{
+  entry: PlanningEntryView;
+  role: PlanningRole;
+  slot: string;
+  roleName: string;
+  pending: boolean;
+  onWithdraw: (target: WithdrawTarget) => void;
+  text: Text;
+}>) {
+  const { t } = text;
+  const now = useClock(WITHDRAW_CLOCK_MS);
+  if (now === null || !canWithdraw(entry, now)) return null;
+  return (
+    <button
+      type="button"
+      className={styles.linkButton}
+      aria-label={t("withdraw.actionLabel", { role: roleName, slot })}
+      aria-disabled={pending || undefined}
+      onClick={() =>
+        !pending && onWithdraw({ key: entry.key, role, slot, late: Date.parse(entry.startAt) - Date.now() < LATE_WITHDRAWAL_MS })
+      }
+    >
+      {t("withdraw.action")}
+    </button>
+  );
 }
 
 /** Le geste de confirmation en attente de l'accord du staff : une entrée, ou ce qui commence dans `hours` heures. */
@@ -637,19 +679,8 @@ function RoleRow({
                 {t(`assignment.reason.${row.reason}`)}
                 {row.provisional ? ` · ${t("assignment.provisional")}` : ""}
               </span>
-              {row.userId === view.me && row.source !== "CAST" && canWithdraw(entry) && (
-                <button
-                  type="button"
-                  className={styles.linkButton}
-                  aria-label={t("withdraw.actionLabel", { role: roleName, slot })}
-                  aria-disabled={pending !== null || undefined}
-                  onClick={() =>
-                    pending === null &&
-                    onWithdraw({ key: entry.key, role, slot, late: Date.parse(entry.startAt) - Date.now() < LATE_WITHDRAWAL_MS })
-                  }
-                >
-                  {t("withdraw.action")}
-                </button>
+              {row.userId === view.me && row.source !== "CAST" && (
+                <WithdrawButton entry={entry} role={role} slot={slot} roleName={roleName} pending={pending !== null} onWithdraw={onWithdraw} text={text} />
               )}
               {manage && row.source !== "CAST" && (
                 <button
@@ -700,7 +731,7 @@ function RoleRow({
 /** Les désistements d'une entrée, au staff des tournois seul (la route ne les rend qu'à lui). */
 function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView; text: Text; names: ReadonlyMap<number, string> }>) {
   const { t } = text;
-  const hintId = `planning-withdrawals-${entry.key.replace(":", "-")}`;
+  const hintId = `planning-withdrawals-${entry.key.replaceAll(/[^A-Za-z0-9_-]/g, "-")}`;
   return (
     <div className={styles.withdrawals}>
       <InfoHintRow>
