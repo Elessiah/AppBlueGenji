@@ -194,9 +194,15 @@ la règle de ban du tournoi (`refereeHostedFirstBanTeamId`,
 match l'explique derrière un `InfoHint` (`roundMaps.page.refereeHostBan`, FR/EN).
 Sur la page du match, la modale de lancement, la fenêtre « Contacts » et la
 fiche de connexion, « crée la partie » va donc à l'**arbitre** (fait « Arbitre »,
-`facts.refereeCreates`) ; l'équipe hôte, qui reste à gauche (règlement §14),
-lit « Joue à gauche » (`facts.hostRefereedDetail`, `launchModal.hostRefereed`).
-Un match en autogestion ou sans décision garde « Crée la partie » sous l'hôte.
+`facts.refereeCreates` ; fiche de l'arbitre : `launchModal.refereeCreates`) ;
+l'équipe hôte, qui reste à gauche (règlement §14), lit « Joue à gauche »
+(`facts.hostRefereedDetail`) ou « côté gauche en jeu » sur sa fiche
+(`launchModal.hostRefereed` : la modale garde l'ordre équipe 1 / équipe 2, la
+fiche de l'hôte peut être à droite). La page du match tire « arbitré » de
+l'instantané (`refereeAssigned`) pour les faits clés **et** la fiche de
+connexion. Un match en autogestion ou sans décision garde « Crée la partie »
+sous l'hôte — y compris un match dont l'arbitre est retiré, même lancé
+(opposition retenue) : sans arbitre, l'hôte reprend la main.
 Un match arbitré **déjà joué** (`COMPLETED`) n'affirme aucun premier ban
 (`firstBanTeamId` nul) : l'ordre réellement suivi n'est pas gardé, et la
 règle a changé avec l'arbitre hôte.

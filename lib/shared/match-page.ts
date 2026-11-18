@@ -73,7 +73,7 @@ export type MatchPageSide = {
   teamId: number | null;
   name: string | null;
   placeholder: string | null;
-  /** Crée la partie (côté gauche). */
+  /** Hôte, côté gauche : crée la partie, sauf sur un match arbitré (l'arbitre désigné). */
   host: boolean;
   /** Bannit la première (l'équipe qui n'héberge pas). */
   firstBan: boolean;

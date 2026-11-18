@@ -73,7 +73,8 @@ même chose.
    couple est acquis quand deux équipes, **présentes quoi qu'il arrive**, ne
    peuvent occuper **que** ses deux places. Si l'une ou l'autre peut encore
    prendre la meilleure des deux, le couple est annoncé « côtés à confirmer » :
-   l'affiche est sûre, pas qui part à gauche (et accueille la partie).
+   l'affiche est sûre, pas qui part à gauche (l'hôte, qui crée la partie
+   sauf sur un match arbitré : l'arbitre désigné la crée).
 7. **Exemption** (effectif impair) — annoncée quand l'effectif est acquis et
    que la dernière place l'est aussi.
 

@@ -168,7 +168,7 @@ function ContactRow({
 export function SideCard({
   side,
   isHost,
-  refereed = false,
+  refereed,
   phase,
   onCopy,
   linkNames = false,
@@ -177,8 +177,12 @@ export function SideCard({
 }: Readonly<{
   side: LaunchSide;
   isHost: boolean;
-  /** Un arbitre désigné crée la partie : l'hôte joue seulement à gauche. */
-  refereed?: boolean;
+  /**
+   * Un arbitre désigné crée la partie : l'hôte joue seulement à gauche (côté
+   * en jeu, pas place de la fiche). Requis : un appel qui l'oublierait ferait
+   * dire « crée le salon » à l'hôte d'un match arbitré.
+   */
+  refereed: boolean;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   /**
@@ -491,6 +495,10 @@ export function RefereeCard({
         </span>
         <ReadyChip ready={referee.ready} phase={phase} />
       </div>
+      {/* L'arbitre désigné crée la partie (MATCH_REFEREE.md § Hôte et premier ban). */}
+      <p className={styles.hostBadge}>
+        <span aria-hidden="true">🏠</span> {t("refereeCreates")}
+      </p>
       {/* Contacts pas encore ouverts : la note dit quand, comme sur la fiche d'un caster. */}
       {casterCardPending(referee) && <p className={styles.note}>{laterText ?? t("casterContactsAtLaunch")}</p>}
       {/* Contacts ouverts mais vides (`discordTag` vaut `null`, non `undefined` : le serveur

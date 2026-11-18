@@ -8,7 +8,8 @@ qu'il devient jouable s'il n'a pas d'horaire — il entre en **lancement** :
 - une **modale** s'ouvre d'elle-même, sur **n'importe quelle page du site**,
   pour les joueurs des deux engagées et le caster inscrit ;
 - elle présente la rencontre (« Équipe 1 VS Équipe 2 », nom du tournoi),
-  **met en avant l'équipe qui héberge la partie**, et donne les contacts d'un ou
+  **met en avant l'équipe hôte** (« crée le salon » ; sur un match arbitré,
+  « côté gauche en jeu », la fiche de l'arbitre disant qu'il crée la partie), et donne les contacts d'un ou
   deux joueurs par équipe et ceux du caster ;
 - chaque partie — les deux équipes, et le caster s'il y en a un — clique
   **« Prêt »** (avec confirmation ; un second clic l'annule) ;

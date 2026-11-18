@@ -787,8 +787,17 @@ function connectionLaunchOf(launch: MatchLaunchInfo | null): MatchLaunchInfo | n
 
 function ConnectionSection({
   launch: read,
+  refereed,
   onCopy,
-}: Readonly<{ launch: MatchLaunchInfo | null; onCopy: (value: string, label: string) => Promise<void> }>) {
+}: Readonly<{
+  launch: MatchLaunchInfo | null;
+  /**
+   * Match arbitré selon l'instantané (`refereeAssigned`), la source des faits
+   * clés : la fiche de l'hôte et le fait « Hôte » disent la même chose.
+   */
+  refereed: boolean;
+  onCopy: (value: string, label: string) => Promise<void>;
+}>) {
   const page = useMatchPageText();
   const launchText = useLaunchText();
   const titleId = useId();
@@ -807,7 +816,7 @@ function ConnectionSection({
             key={side.teamId}
             side={side}
             isHost={launch.hostTeamId === side.teamId}
-            refereed={launch.referee !== null}
+            refereed={refereed}
             phase={launch.phase}
             onCopy={onCopy}
             linkNames
@@ -1323,7 +1332,7 @@ function MatchPageContent({
         {rightColumn && (
           <div className={styles.column}>
             {voice && <VoiceSection voice={voice} sides={sides} match={match} clearer={voiceClearer} />}
-            <ConnectionSection launch={shownLaunch} onCopy={onCopy} />
+            <ConnectionSection launch={shownLaunch} refereed={match.refereeAssigned} onCopy={onCopy} />
             <OfficiatingSection
               match={match}
               staff={canSchedule}
