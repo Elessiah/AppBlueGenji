@@ -128,7 +128,27 @@ describe("exportOwnPlanning", () => {
 
     await exportOwnPlanning(4);
 
-    for (const [sql] of execute.mock.calls) expect(sql).not.toMatch(/SELECT[^]*entry_key[^]*FROM/);
+    for (const [sql] of execute.mock.calls) expect(sql.split("FROM")[0]).not.toContain("entry_key");
+  });
+
+  it("exportOwnPlanning_staffRowsWithStrayIdentifiers_neverCarryThem", async () => {
+    routeSql({
+      acted: [
+        { tournament_id: 10, match_id: 1, role: "REFEREE", kind: "REMOVED", source: "MANUAL", created_at: new Date("2026-11-20T18:00:00.000Z"), user_id: 7, actor_user_id: 4 },
+      ],
+      set: [
+        { tournament_id: 10, match_id: 1, role: "CASTER", source: "MANUAL", confirmed: 0, created_at: new Date("2026-11-20T18:00:00.000Z"), user_id: 7, assigned_by_user_id: 4 },
+      ],
+    });
+
+    const data = await exportOwnPlanning(4);
+
+    expect(data.staffActions).toEqual([
+      { tournamentId: 10, matchId: 1, role: "REFEREE", kind: "REMOVED", source: "MANUAL", createdAt: "2026-11-20T18:00:00.000Z" },
+    ]);
+    expect(data.assignmentsSet).toEqual([
+      { tournamentId: 10, matchId: 1, role: "CASTER", source: "MANUAL", confirmed: false, createdAt: "2026-11-20T18:00:00.000Z" },
+    ]);
   });
 
   it("exportOwnPlanning_otherFailure_propagates", async () => {

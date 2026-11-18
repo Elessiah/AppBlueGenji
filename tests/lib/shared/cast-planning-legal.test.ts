@@ -46,6 +46,16 @@ describe("planning — historique des changements", () => {
     expect(enEntry()).toContain("Nothing else from the schedule is published on Discord.");
   });
 
+  it("planningEntry_refereeRemoval_declaredWithDiscordLineInBothLanguages", () => {
+    expect(frEntry()).toContain("Confirmer, désigner ou retirer un arbitre de match par le planning agit sur le match lui-même");
+    expect(enEntry()).toContain("Confirming, assigning or removing a match referee through the schedule acts on the match itself");
+  });
+
+  it("planningEntry_push_onlyForRefereeRemovedBySomeoneElse", () => {
+    expect(frEntry()).toContain("l'arbitre retiré par un autre que lui en est prévenu par notification");
+    expect(enEntry()).toContain("a referee removed by someone else is notified by push");
+  });
+
   it("planningEntry_neverClaimsNothingIsPublishedOnDiscord", () => {
     expect(frEntry()).not.toContain("Rien n'en est publié sur Discord");
     expect(enEntry()).not.toContain("Nothing about it is published on Discord");
@@ -91,8 +101,8 @@ describe("planning — registre T20", () => {
   });
 
   it("t20_retention_exportListsStaffActions", () => {
-    expect(t20(PROCESSING_ACTIVITIES).retention.join(" ")).toContain("les gestes qu'il a faits comme staff (sans la personne visée)");
-    expect(t20(PROCESSING_ACTIVITIES_EN).retention.join(" ")).toContain("the actions it took as staff (without the person concerned)");
+    expect(t20(PROCESSING_ACTIVITIES).retention.join(" ")).toContain("les gestes qu'il a faits comme staff (sans l'identifiant de la personne visée)");
+    expect(t20(PROCESSING_ACTIVITIES_EN).retention.join(" ")).toContain("the actions it took as staff (without the identifier of the person concerned)");
   });
 
   it("t20_recipients_reasonMaskedAndStaffNamed", () => {
@@ -102,6 +112,31 @@ describe("planning — registre T20", () => {
     expect(fr).toContain("Staff des tournois (arbitres et administrateurs)");
     expect(en).toContain("only appears there as “Calculation”");
     expect(en).toContain("Tournament staff (referees and administrators)");
+  });
+
+  it("t20_recipients_removalAndPushRestriction_inBothLanguages", () => {
+    const fr = t20(PROCESSING_ACTIVITIES).recipients.join(" ");
+    const en = t20(PROCESSING_ACTIVITIES_EN).recipients.join(" ");
+    expect(fr).toContain("Confirmer, désigner ou retirer un arbitre de match par le planning");
+    expect(fr).toContain("une notification push à l'arbitre retiré par un autre que lui");
+    expect(en).toContain("Confirming, assigning or removing a match referee through the schedule");
+    expect(en).toContain("a push notification to a referee removed by someone else");
+  });
+
+  it("t20_dataCategories_reasonListsEveryStoredValue", () => {
+    expect(t20(PROCESSING_ACTIVITIES).dataCategories.join(" ")).toContain(
+      "motif (préférence, charge, choix du staff, inscription de cast, arbitre désigné du match)",
+    );
+    expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain(
+      "reason (preference, load, staff choice, cast signup, match's assigned referee)",
+    );
+  });
+
+  it("legalTexts_enPlanning_neverSayProducers", () => {
+    const t20En = t20(PROCESSING_ACTIVITIES_EN);
+    expect(JSON.stringify(t20En)).not.toContain("producer");
+    expect(enEntry()).not.toContain("producer");
+    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).not.toContain("producer");
   });
 
   it("t20_recipients_refereeDesignationLoggedWithoutName", () => {
@@ -118,6 +153,8 @@ describe("planning — /rgpd", () => {
     expect(fr).toContain("que comme « Calcul »");
     expect(fr).toContain("quand le compte ne tient plus le rôle caster");
     expect(fr).toContain("gestes faits comme staff compris");
+    expect(fr).toContain("retirer un arbitre de match par le planning");
+    expect(fr).toContain("retiré par un autre que lui en est prévenu");
     expect(fr).not.toContain("rien n&apos;en est publié sur Discord");
   });
 
@@ -128,6 +165,8 @@ describe("planning — /rgpd", () => {
     expect(en).toContain("as “Calculation”");
     expect(en).toContain("when the account no longer holds the caster role");
     expect(en).toContain("actions taken as staff included");
+    expect(en).toContain("removing a match referee through the schedule");
+    expect(en).toContain("a referee removed by someone else is notified by push");
     expect(en).not.toContain("nothing about it is published on Discord");
   });
 

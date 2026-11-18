@@ -229,13 +229,14 @@ sans le désigner (`account-erasure.ts`). Export des données : `planning`
 (`planning-export.ts`) — disponibilités, attributions (avec leur motif),
 historique (`history` : attribuée, confirmée, retirée, sans l'auteur du geste),
 ses gestes comme staff (`staffActions` : événements dont il est l'auteur ;
-`assignmentsSet` : attributions qu'il a posées — sans la personne visée,
-art. 15.4) et réglage autonome.
+`assignmentsSet` : attributions qu'il a posées — sans l'identifiant de la
+personne visée, art. 15.4 ; le match et le rôle restent, et l'arbitre désigné
+d'un match est de toute façon public, T04) et réglage autonome.
 
-Ce que disent les textes, et qui doit rester vrai : un arbitre de **match**
-confirmé ou désigné par le planning passe par `assignMatchReferee` — ligne
+Ce que disent les textes, et qui doit rester vrai : confirmer, désigner ou retirer
+un arbitre de **match** par le planning passe par `assignMatchReferee` — ligne
 anonyme au journal du staff sur Discord, push `REFEREE_RELEASED` à l'arbitre
-retiré (T04, T05) ; rien d'autre du planning ne part sur Discord. Le staff des
+retiré par un autre que lui (`refereeReleaseNotice`, T04, T05) ; rien d'autre du planning ne part sur Discord. Le staff des
 tournois (`tournaments` : arbitres et administrateurs) lit disponibilités,
 préférences et motifs ; les autres membres lisent le motif d'une proposition du
 calcul comme « Calcul » (`visibleAssignment`). Tests :

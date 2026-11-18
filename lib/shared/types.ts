@@ -1311,10 +1311,10 @@ export type PersonalDataExport = {
     history: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
     /**
      * Ses gestes comme staff (attribution posée, confirmée, retirée) : la
-     * trace qui le nomme comme auteur, sans la personne visée (art. 15.4).
+     * trace qui le nomme comme auteur, sans l'identifiant de la personne visée (art. 15.4).
      */
     staffActions: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
-    /** Attributions en cours qu'il a posées comme staff, sans la personne visée. */
+    /** Attributions en cours qu'il a posées comme staff, sans l'identifiant de la personne visée. */
     assignmentsSet: { tournamentId: number; matchId: number | null; role: string; source: string; confirmed: boolean; createdAt: string | null }[];
     soloCaster: boolean | null;
   };
