@@ -9,13 +9,11 @@
  * celui qui se désiste, son remplaçant ou l'auteur d'un geste restent
  * anonymes (`lib/shared/planning-notices.ts`).
  */
-import type { RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
-import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
+import { loadStaffCandidates } from "@/lib/server/push-subscriptions";
 import { siteCanonicalBase } from "@/lib/server/site-url";
-import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import type { PlanningRole } from "@/lib/shared/planning";
 import {
@@ -139,26 +137,17 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
   if (input.unfilled) await announceUnfilled(notice, input.withdrawnUserId);
 }
 
-type StaffRow = RowDataPacket & { id: number; is_admin: number; platform_roles_json: unknown };
-
 /**
  * Le staff des tournois (permission `tournaments`, la même qui lit les
- * tournois cachés) : comptes non supprimés, non suspendus, hors `excluded`.
+ * tournois cachés) : candidats du staff ({@link loadStaffCandidates}, la
+ * sélection partagée avec `notifyStaff`), hors `excluded`.
  */
 export async function loadTournamentStaffIds(excluded: readonly number[] = []): Promise<number[]> {
-  const db = await getDatabase();
-  const [rows] = await db.query<StaffRow[]>(
-    `SELECT u.id, u.is_admin, u.platform_roles_json FROM bg_users u
-      WHERE u.is_deleted = 0
-        AND (u.is_admin = 1 OR u.platform_roles_json IS NOT NULL)
-        AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
-                         WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")})`,
-  );
   const skip = new Set(excluded);
-  return rows
-    .filter((row) => !skip.has(Number(row.id)))
-    .filter((row) => can({ isAdmin: Number(row.is_admin) === 1, roles: sanitizePlatformRoles(row.platform_roles_json) }, "tournaments"))
-    .map((row) => Number(row.id));
+  return (await loadStaffCandidates({ subscribedOnly: false }))
+    .filter((row) => !skip.has(row.userId))
+    .filter((row) => can({ isAdmin: row.isAdmin, roles: sanitizePlatformRoles(row.rolesJson) }, "tournaments"))
+    .map((row) => row.userId);
 }
 
 /**

@@ -105,12 +105,6 @@ describe("digestRecipients", () => {
 
     expect(digestRecipients([entry], members, new Map(), () => new Set([4])).size).toBe(0);
   });
-
-  it("digestRecipients_hiddenTournamentMemberCannotSeeIt_skipped", () => {
-    const members = [loadedMember({ userId: 4, roles: ["CASTER"], seesHidden: false })];
-
-    expect(digestRecipients([loadedEntry({ hidden: true })], members, new Map(), noPlayers).size).toBe(0);
-  });
 });
 
 describe("groupByEntries", () => {
@@ -238,6 +232,25 @@ describe("collectWave", () => {
       "SELECT entry_key, seen_at, announced_at ",
       "UPDATE bg_planning_entry_notices SET ann",
     ]);
+  });
+
+  it("collectWave_pendingEntryRehiddenBeforeWave_staysUnannounced", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: true })]);
+    knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW - NEW_ENTRIES_QUIET_MS), announced_at: null }]);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave).toEqual([]);
+    expect(statements()).not.toContain("UPDATE bg_planning_entry_notices SET ann");
+  });
+
+  it("collectWave_rehiddenEntryVisibleAgain_announcedInWave", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ hidden: false })]);
+    knownNotices([{ entry_key: "m:1", seen_at: new Date(NOW - NEW_ENTRIES_QUIET_MS), announced_at: null }]);
+
+    const wave = await collectWave(fakeConnection(connection), NOW);
+
+    expect(wave.map((entry) => entry.key)).toEqual(["m:1"]);
   });
 
   it("collectWave_pendingEntryNoLongerOpen_markedButNotReturned", async () => {

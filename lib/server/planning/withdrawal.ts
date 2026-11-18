@@ -239,17 +239,16 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
     });
     const heldBy = matchId !== null && undo !== undefined ? await releaseMatchReferee(matchId, user.id, undo, eventIds) : null;
     if (heldBy !== null) {
-      const reread = await loadPlanningData(connection, { now, includeHidden: true });
-      const fresh = reread.entries.find((candidate) => candidate.key === entry.key) ?? entry;
+      // Les co-affectés se lisent dans `data` (lu sous le même verrou) : seule la ligne du désisté a changé.
       return {
         late,
         replaced: false,
         unfilled: false,
         confirmed,
-        entry: fresh,
+        entry,
         replacementId: null,
         // L'arbitre posé par le staff n'apprend pas un désistement d'une place qu'il tient déjà.
-        coAssignedIds: coAssigned(fresh, reread, user.id, heldBy),
+        coAssignedIds: coAssigned(entry, data, user.id, heldBy),
       };
     }
     const found = await findReplacement(connection, entry.key, input.role, now);

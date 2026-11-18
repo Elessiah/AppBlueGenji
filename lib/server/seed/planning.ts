@@ -1,5 +1,6 @@
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { planningEntryKey, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
+import { BOOTSTRAP_SETTING } from "@/lib/server/planning/new-entries";
 import { SEED_TOURNAMENT_PREFIX } from "./cases";
 
 /**
@@ -63,6 +64,10 @@ async function writeAnswers(db: Pool, entry: Entry, answers: Answer[], ids: Map<
 
 export async function applyPlanningCases(db: Pool, ids: Map<string, number>): Promise<void> {
   console.log("🗓️ Planning des casts et arbitres...");
+  // Le seed vient de vider le planning (cascade des tournois Test_) : sans
+  // marqueur, le balayage suivant note tout le planning régénéré déjà annoncé
+  // au lieu d'en écrire un récapitulatif géant (`new-entries.ts`).
+  await db.execute("DELETE FROM bg_settings WHERE setting_key = ?", [BOOTSTRAP_SETTING]);
   const scheduledId = await tournamentId(db, `${SEED_TOURNAMENT_PREFIX}Planning Casts (sur deux semaines)`);
   const eventId = await tournamentId(db, `${SEED_TOURNAMENT_PREFIX}Planning Soirée (sans planification)`);
   if (scheduledId === null || eventId === null) {

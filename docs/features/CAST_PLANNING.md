@@ -219,10 +219,12 @@ de Paris, lien vers `/planning` dans la langue du destinataire).
   toutes, arbitre celles dont il remplit la condition d'arbitrage du jeu ;
   jamais une entrée où il joue. Une entrée d'un tournoi encore **caché** n'est
   pas notée : elle l'est quand le tournoi devient visible, et part alors à
-  tous ceux qu'elle concerne. Au tout premier passage (marqueur
+  tous ceux qu'elle concerne ; notée puis recachée avant sa vague, elle attend
+  de même, sans être notée annoncée. Au tout premier passage (marqueur
   `planning_entry_notices_bootstrapped` absent de `bg_settings`), tout est noté
   déjà annoncé, sans message ; le marqueur ne dépend pas du contenu de la
-  table, que la purge de conservation peut vider. Le balayage ne lit que les
+  table, que la purge de conservation peut vider ; `npm run seed`, qui
+  régénère le planning, le retire. Le balayage ne lit que les
   lignes des entrées ouvertes et celles qui attendent leur annonce, et note les
   nouvelles en une seule insertion. Une entrée est notée annoncée **avant**
   l'envoi : une panne perd un récapitulatif, n'en double jamais un.

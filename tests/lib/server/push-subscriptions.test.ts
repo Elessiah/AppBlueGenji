@@ -16,6 +16,7 @@ import {
   loadDisabledTopics,
   purgeStaleSubscriptions,
   pushToUsers,
+  loadStaffCandidates,
   saveDisabledTopics,
   saveSubscription,
   subscribedStaffCandidates,
@@ -422,6 +423,30 @@ describe("staff, purge et export", () => {
     expect(query.mock.calls[0][0]).toMatch(/is_deleted = 0/);
     // Un compte suspendu n'a plus aucun droit effectif : il ne reçoit rien du staff.
     expect(query.mock.calls[0][0]).toMatch(/NOT EXISTS \(SELECT 1 FROM bg_account_suspensions sus\s+WHERE sus\.user_id = u\.id AND sus\.lifted_at IS NULL/);
+  });
+
+  it("loadStaffCandidates_allStaff_noSubscriptionClause", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 4, is_admin: 0, platform_roles_json: '["TOURNOIS"]' }]]);
+    pool({ query });
+
+    expect(await loadStaffCandidates({ subscribedOnly: false })).toEqual([{ userId: 4, isAdmin: false, rolesJson: '["TOURNOIS"]' }]);
+    expect(query.mock.calls[0][0]).not.toContain("bg_push_subscriptions");
+    expect(query.mock.calls[0][0]).toContain("bg_account_suspensions");
+  });
+
+  it("loadStaffCandidates_subscribedOnly_filtersOnSubscriptions", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    pool({ query });
+
+    await loadStaffCandidates({ subscribedOnly: true });
+
+    expect(query.mock.calls[0][0]).toContain("EXISTS (SELECT 1 FROM bg_push_subscriptions");
+  });
+
+  it("loadStaffCandidates_databaseFailure_throws", async () => {
+    pool({ query: jest.fn<SqlQuery>().mockRejectedValue(new Error("ECONNRESET")) });
+
+    await expect(loadStaffCandidates({ subscribedOnly: false })).rejects.toThrow("ECONNRESET");
   });
 
   it("oublie les abonnements restés muets au-delà de la durée déclarée", async () => {

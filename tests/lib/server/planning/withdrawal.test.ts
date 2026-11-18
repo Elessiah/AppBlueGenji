@@ -267,30 +267,23 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
   it("withdrawFromEntry_matchRefereeChangedMeanwhile_noReplacementNorOpenSlot", async () => {
     // Le staff a posé l'arbitre 7 sur le match entre la lecture et le retrait : la place est tenue.
-    const members = [loadedMember({ userId: 3 }), loadedMember({ userId: 5 }), loadedMember({ userId: 7 })];
-    jest
-      .mocked(loadPlanningData)
-      .mockResolvedValueOnce(
-        planningData({
-          entries: [loadedEntry({ matchRefereeId: 3 })],
-          assignments: [loadedAssignment({ userId: 3, confirmed: true })],
-          members,
-        }),
-      )
-      .mockResolvedValueOnce(
-        planningData({
-          entries: [loadedEntry({ matchRefereeId: 7 })],
-          members,
-          availability: [available("m:1", 5, "REFEREE")],
-        }),
-      );
+    // Les co-affectés se lisent dans la lecture déjà faite, sans recharger tout le planning.
+    const members = [loadedMember({ userId: 3 }), loadedMember({ userId: 5, roles: ["CASTER"] }), loadedMember({ userId: 7 })];
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(
+      planningData({
+        entries: [loadedEntry({ matchRefereeId: 3 })],
+        assignments: [loadedAssignment({ userId: 3, confirmed: true }), loadedAssignment({ userId: 5, role: "CASTER", confirmed: true })],
+        members,
+      }),
+    );
     jest.mocked(readMatchReferee).mockResolvedValue(7);
 
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
     expect(result).toEqual({ late: false, replaced: false, unfilled: false });
     expect(assignMatchReferee).not.toHaveBeenCalled();
-    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: false, coAssignedIds: [] });
+    expect(loadPlanningData).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: false, coAssignedIds: [5] });
   });
 
   it("withdrawFromEntry_matchRefereeClearedMeanwhile_noReleaseCallButReplacementSearched", async () => {

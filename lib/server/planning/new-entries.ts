@@ -15,7 +15,9 @@
  * Une entrée d'un tournoi encore caché n'est pas notée : elle le sera quand
  * le tournoi deviendra visible, et partira alors à tous ceux qu'elle concerne
  * (l'annoncer plus tôt au seul staff qui voit les tournois cachés la ferait
- * passer pour annoncée aux autres, qui n'en sauraient jamais rien).
+ * passer pour annoncée aux autres, qui n'en sauraient jamais rien). Une entrée
+ * notée puis recachée avant sa vague attend de même, sans être notée annoncée.
+ * Le seed, qui régénère le planning, retire le marqueur du premier passage.
  *
  * Au tout premier passage (marqueur {@link BOOTSTRAP_SETTING} absent de
  * `bg_settings` : premier déploiement), tout ce qui existe est noté **déjà
@@ -72,7 +74,6 @@ export function digestRecipients(
   for (const entry of entries) {
     const players = playersOf(entry);
     for (const member of members) {
-      if (entry.hidden && !member.seesHidden) continue;
       if (players.has(member.userId)) continue;
       const referee = member.roles.includes("REFEREE") && (eligibleReferees.get(entry.game)?.has(member.userId) ?? false);
       const streams = member.roles.includes("CASTER") || member.roles.includes("PROD");
@@ -124,7 +125,10 @@ async function bootstrapped(connection: PoolConnection): Promise<boolean> {
  */
 export async function collectWave(connection: PoolConnection, now: number): Promise<LoadedEntry[]> {
   // Un tournoi caché attend d'être visible (voir l'en-tête).
-  const entries = (await loadPlanningEntries(connection, { now, includeHidden: true })).filter((entry) => entry.open && !entry.hidden);
+  const opened = (await loadPlanningEntries(connection, { now, includeHidden: true })).filter((entry) => entry.open);
+  const entries = opened.filter((entry) => !entry.hidden);
+  // Notée pendant qu'elle était visible, puis recachée : elle attend, non annoncée.
+  const waiting = new Set(opened.filter((entry) => entry.hidden).map((entry) => entry.key));
   const bootstrap = !(await bootstrapped(connection));
   const openKeys = entries.map((entry) => entry.key);
   const [known] = await connection.execute<NoticeRow[]>(
@@ -150,7 +154,7 @@ export async function collectWave(connection: PoolConnection, now: number): Prom
   }
   const open = new Map(entries.map((entry) => [entry.key, entry]));
   const pending = [
-    ...known.filter((row) => row.announced_at === null).map((row) => ({ key: row.entry_key, seenAt: toMs(row.seen_at) })),
+    ...known.filter((row) => row.announced_at === null && !waiting.has(row.entry_key)).map((row) => ({ key: row.entry_key, seenAt: toMs(row.seen_at) })),
     ...fresh.map((entry) => ({ key: entry.key, seenAt: now })),
   ];
   if (pending.length === 0 || !waveReady(pending.map((row) => row.seenAt), now)) return [];
