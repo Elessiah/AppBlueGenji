@@ -761,7 +761,14 @@ async function assertMapPicker(
   const selfManaged = Number(row.self_managed) === 1;
   const party =
     viewer.staff || selfManaged
-      ? await resolveMatchParty(connection, { team1_id: row.team1_id, team2_id: row.team2_id, casters: [], tournament_game: null }, viewer.userId)
+      ? // Seul le rôle de joueur compte ici (ni caster ni arbitre passés) : la
+        // réponse est celle d'une session en vue joueur, quelle qu'elle soit.
+        await resolveMatchParty(
+          connection,
+          { team1_id: row.team1_id, team2_id: row.team2_id, casters: [], tournament_game: null },
+          viewer.userId,
+          { playerView: true },
+        )
       : null;
   const plays = party?.role === "TEAM1" || party?.role === "TEAM2";
   if (viewer.staff && !plays) return false;

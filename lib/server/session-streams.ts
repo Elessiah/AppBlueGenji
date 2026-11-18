@@ -43,6 +43,12 @@ type Entry = {
 type Revocation = {
   mark: number;
   at: number;
+  /**
+   * `RECONNECT` : seul le contexte du lecteur a changé (vue joueur) — un flux
+   * qui s'ouvrait se reconnecte sitôt ouvert (`reconnectRequestedSince`), sans
+   * refus. Absent : une vraie révocation.
+   */
+  reconnect?: true;
   userId?: number;
   tokenHash?: string;
   keepTokenHash?: string;
@@ -92,7 +98,7 @@ export function revocationMark(): number {
 export function revokedSince(userId: number, tokenHash: string, mark: number): boolean {
   prune(Date.now());
   return revocations().recent.some((entry) => {
-    if (entry.mark <= mark) return false;
+    if (entry.mark <= mark || entry.reconnect) return false;
     if (entry.tokenHash !== undefined) return entry.tokenHash === tokenHash;
     return (
       entry.userId === userId &&
@@ -196,13 +202,38 @@ export function closeSessionStreams(tokenHash: string): number {
 /**
  * Fait reconnecter les flux d'**une** session, sans la révoquer (`RECONNECT`) :
  * son contexte de lecteur a changé (vue joueur, `ADMIN_PLAYER_VIEW.md`) et la
- * route doit le relire. L'empreinte vide est celle du contournement de
- * développement : le compte la désigne alors, seul.
+ * route doit le relire. `tokenHash` `null` : tous les flux du compte — le
+ * contournement de développement, dont les flux portent l'empreinte d'un
+ * éventuel cookie resté posé, ou aucune.
+ *
+ * Le changement est noté comme une révocation (même repère), mais lu par
+ * `reconnectRequestedSince` seulement : un flux qui lisait la session pendant
+ * la bascule se reconnecte sitôt ouvert, au lieu de garder l'ancien contexte.
  *
  * @returns le nombre de flux fermés.
  */
-export function reconnectSessionStreams(userId: number, tokenHash: string): number {
-  return closeMatching((entry) => entry.userId === userId && entry.tokenHash === tokenHash, "RECONNECT");
+export function reconnectSessionStreams(userId: number, tokenHash: string | null): number {
+  noteRevocation(tokenHash === null ? { userId, reconnect: true } : { userId, tokenHash, reconnect: true });
+  return closeMatching(
+    (entry) => entry.userId === userId && (tokenHash === null || entry.tokenHash === tokenHash),
+    "RECONNECT",
+  );
+}
+
+/**
+ * Un changement de contexte postérieur au repère (`reconnectSessionStreams`)
+ * vise-t-il ce flux ? Le flux qui l'a manqué pendant son ouverture doit alors
+ * se reconnecter pour relire la session.
+ */
+export function reconnectRequestedSince(userId: number, tokenHash: string, mark: number): boolean {
+  prune(Date.now());
+  return revocations().recent.some(
+    (entry) =>
+      entry.mark > mark &&
+      entry.reconnect === true &&
+      entry.userId === userId &&
+      (entry.tokenHash === undefined || entry.tokenHash === tokenHash),
+  );
 }
 
 /** Oublie tous les flux inscrits (sans les fermer) et les révocations récentes. Réservé aux tests. */

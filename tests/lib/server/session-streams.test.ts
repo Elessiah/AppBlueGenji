@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   closeSessionStreams,
   closeUserStreams,
+  reconnectRequestedSince,
   reconnectSessionStreams,
   reconnectUserStreams,
   registerSessionStream,
@@ -259,13 +260,51 @@ describe("reconnectSessionStreams (ADMIN_PLAYER_VIEW.md)", () => {
     expect(revokedSince(1, "ici", mark)).toBe(false);
   });
 
-  it("reconnectSessionStreams_devBypass_closesTheCookielessStreams", () => {
-    const dev = jest.fn();
-    const real = jest.fn();
-    register(1, "", dev);
-    register(1, "vraie", real);
+  it("reconnectSessionStreams_nullHash_closesEveryStreamOfTheAccount", () => {
+    const cookieless = jest.fn();
+    const staleCookie = jest.fn();
+    const otherUser = jest.fn();
+    register(1, "", cookieless);
+    register(1, "vraie", staleCookie);
+    register(2, "", otherUser);
 
-    expect(reconnectSessionStreams(1, "")).toBe(1);
-    expect(real).not.toHaveBeenCalled();
+    expect(reconnectSessionStreams(1, null)).toBe(2);
+    expect(otherUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("reconnectRequestedSince (ADMIN_PLAYER_VIEW.md)", () => {
+  it("reconnectRequestedSince_switchAfterMark_isTrueForThatSessionOnly", () => {
+    const mark = revocationMark();
+
+    reconnectSessionStreams(1, "ici");
+
+    expect(reconnectRequestedSince(1, "ici", mark)).toBe(true);
+    expect(reconnectRequestedSince(1, "ailleurs", mark)).toBe(false);
+    expect(reconnectRequestedSince(2, "ici", mark)).toBe(false);
+  });
+
+  it("reconnectRequestedSince_switchBeforeMark_isFalse", () => {
+    reconnectSessionStreams(1, "ici");
+    const mark = revocationMark();
+
+    expect(reconnectRequestedSince(1, "ici", mark)).toBe(false);
+  });
+
+  it("reconnectRequestedSince_nullHashSwitch_matchesAnySessionOfTheAccount", () => {
+    const mark = revocationMark();
+
+    reconnectSessionStreams(1, null);
+
+    expect(reconnectRequestedSince(1, "", mark)).toBe(true);
+    expect(reconnectRequestedSince(1, "cookie", mark)).toBe(true);
+  });
+
+  it("reconnectRequestedSince_revocation_isNotAReconnect", () => {
+    const mark = revocationMark();
+
+    closeUserStreams(1);
+
+    expect(reconnectRequestedSince(1, "ici", mark)).toBe(false);
   });
 });

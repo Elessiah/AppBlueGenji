@@ -48,8 +48,11 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
 - **Ses casts et arbitrages désignés restent en base**, mais la session ne les
   tient plus : la modale de lancement et « Contacts » ne lui présentent que
   ses matchs de joueur (`viewerRole`), le « Prêt » d'un caster ou d'un arbitre
-  est refusé (`setMatchReady`, `NOT_MATCH_PARTY`), et les routes de cast et le
-  retrait d'arbitrage répondent `403 FORBIDDEN`. Revenir en vue admin les lui
+  est refusé (`NOT_MATCH_PARTY`), et les routes de cast et le retrait
+  d'arbitrage répondent `403 FORBIDDEN`. La résolution de la partie du match
+  (`resolveMatchParty`, qui lit l'éligibilité en base) prend **obligatoirement**
+  l'état de la session (`PartySession`) : un nouvel appelant qui l'oublie ne
+  compile pas, et en vue joueur seul le rôle d'équipe en sort. Revenir en vue admin les lui
   rend tels quels.
 - Les notifications push staff suivent le **compte** (abonnement de
   l'appareil), pas la session : elles continuent d'arriver.
@@ -62,9 +65,21 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
   réel ; `400 INVALID_PLAYER_VIEW` pour un corps sans booléen ;
   `500 PLAYER_VIEW_FAILED` sur une panne. Réponse `{ playerView, until }`.
 - `setPlayerView` (`lib/server/player-view.ts`) écrit l'échéance (ou `NULL`)
-  sur la ligne de **cette** session, puis fait reconnecter ses flux SSE
+  sur la ligne de **cette** session, **seulement si l'état change** (écriture
+  conditionnée en une instruction) : redemander la vue joueur ne repousse pas
+  l'échéance, quitter une vue joueur absente n'écrit ni ne journalise rien.
+  `until` est relu en base (`toIso`), jamais recalculé sur l'horloge du
+  serveur d'application.
+- Un changement fait reconnecter les flux SSE de la session
   (`reconnectSessionStreams`, motif `RECONNECT` : la route relit le contexte
-  du lecteur, sans refus).
+  du lecteur, sans refus). Il laisse aussi une trace datée par le repère des
+  révocations : un flux qui lisait la session pendant la bascule la retrouve
+  (`reconnectRequestedSince`) et se reconnecte sitôt ouvert, au lieu de garder
+  le contexte staff.
+- Contournement de développement : la ligne `dev-auth-bypass:<id>` est
+  reconnue sur l'objet même rendu par `getCurrentUser` (aucune relecture), ses
+  bascules reconnectent tous les flux du compte, et elle n'est ni comptée ni
+  fermée par « déconnecter mes autres appareils ».
 - **Journal** : une ligne pm2 seulement (`auditStaffAction`, auteur nommé) —
   rien sur Discord, où la bascule ne dirait rien d'utile au staff.
 - Côté client : `usePlayerViewToggle` (`components/player-view.tsx`) — un
@@ -77,7 +92,8 @@ aucune session n'est alors en vue joueur, les droits restent entiers.
   joueur », rendu quand le compte peut basculer et ne l'a pas fait.
 - Bannière `PlayerViewBanner`, rendue par la mise en page racine quand
   `user.playerView` : « Vue joueur active », un « i » (`InfoHint`) qui dit
-  l'appareil seul et l'échéance, et « Revenir en vue admin ». Bleu glacier,
+  l'appareil seul, l'échéance (`PLAYER_VIEW_MAX_HOURS`, passé en paramètre du
+  texte) et que les notifications push staff continuent d'arriver, et « Revenir en vue admin ». Bleu glacier,
   jamais l'ambre (un état choisi, pas un avertissement).
 - Textes : `shell.account.playerView*` et `shell.playerView.*`, FR et EN.
 
@@ -95,6 +111,7 @@ lui-même le geste (décision à confirmer à la revue juridique).
 `tests/lib/shared/player-view.test.ts`, `tests/lib/server/auth-player-view.test.ts`,
 `tests/lib/server/player-view.test.ts`, `tests/app/api/auth/player-view/route.test.ts`,
 `tests/app/player-view.test.tsx` (bannière, menu, textes FR = EN, schéma aux
-deux endroits), et des cas « vue joueur » dans `session-streams`, `match-launch`,
+deux endroits), `tests/app/player-view-toggle.test.tsx` (le geste : toast,
+relecture après réussite seulement, un seul envoi par double clic), et des cas « vue joueur » dans `session-streams`, `match-launch`,
 `match-launch-routes`, `match-referee-routes`, `users-roles`, `detail-preview`
 et `stream` (aucun droit staff par le flux comme par la lecture REST).

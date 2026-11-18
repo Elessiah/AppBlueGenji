@@ -3280,6 +3280,23 @@ describe("setMatchReady — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
     expect(casterReadyOf(state)).toBeNull();
   });
 
+  it("setMatchReady_designatedRefereeInPlayerView_refusesNotMatchParty", async () => {
+    const referee = 950;
+    state.match = matchState({ referee_user_id: referee, team1_ready_at: STAMP });
+    state.users[referee] = {
+      discord_verified_at: STAMP,
+      discord_pseudo: "arbitre",
+      blizzard_sub: "sub",
+      overwatch_battletag: "Arbitre#1",
+      is_deleted: 0,
+      is_admin: 0,
+      platform_roles_json: JSON.stringify(["ARBITRE"]),
+    };
+
+    await expect(setMatchReady(42, referee, true, { playerView: true })).rejects.toThrow("NOT_MATCH_PARTY");
+    expect(state.match?.referee_ready_at ?? null).toBeNull();
+  });
+
   it("setMatchReady_captainInPlayerView_keepsTeamReady", async () => {
     await expect(setMatchReady(42, 1, true, { playerView: true })).resolves.toEqual({ launched: false });
     expect(state.match?.team1_ready_at).toBe(STAMP);

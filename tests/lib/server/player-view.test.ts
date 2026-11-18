@@ -21,42 +21,85 @@ import { authUser } from "../../helpers/auth-user";
 
 const admin = authUser({ id: 7, pseudo: "Chef", isAdmin: true });
 const HASH = "a".repeat(64);
+const DEADLINE = new Date("2026-11-18T22:00:00.000Z");
 
 function header(affectedRows: number): ResultSetHeader {
   return { affectedRows } as ResultSetHeader;
 }
 
+/** Ligne relue après l'écriture ; `null` : aucune ligne de session. */
+type ReadBack = { player_view_until: Date | null; active: number | null } | null;
+
 let execute: jest.Mock<SqlQuery>;
+
+/** Double SQL : les écritures rendent `written` lignes touchées, la relecture rend `readBack`. */
+function database(written: number, readBack: ReadBack) {
+  execute = jest.fn<SqlQuery>().mockImplementation(async (sql) =>
+    String(sql).trimStart().startsWith("SELECT")
+      ? [readBack === null ? [] : [readBack], []]
+      : [header(written), []],
+  );
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+}
+
+const sqlCalls = () => execute.mock.calls.map(([sql]) => String(sql));
 
 beforeEach(() => {
   jest.clearAllMocks();
-  execute = jest.fn<SqlQuery>().mockResolvedValue([header(1), []]);
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  database(1, { player_view_until: DEADLINE, active: 1 });
   jest.mocked(playerViewSessionKey).mockResolvedValue({ tokenHash: HASH, devBypass: false });
 });
 
 describe("setPlayerView — session à cookie", () => {
-  it("setPlayerView_activate_setsDeadlineOnThisSessionOnly", async () => {
-    const result = await setPlayerView(admin, true);
+  it("setPlayerView_activate_setsDeadlineOnThisSessionOnlyWhenNotActive", async () => {
+    await setPlayerView(admin, true);
 
     const [sql, params] = execute.mock.calls[0];
     expect(sql).toContain("SET player_view_until = DATE_ADD(NOW(), INTERVAL ? HOUR)");
     expect(sql).toContain("WHERE token_hash = ? AND user_id = ? AND expires_at > NOW()");
+    expect(sql).toContain("(player_view_until IS NULL OR player_view_until <= NOW())");
     expect(params).toEqual([12, HASH, 7]);
-    expect(result.until).toEqual(expect.any(String));
   });
 
-  it("setPlayerView_deactivate_clearsDeadline", async () => {
+  it("setPlayerView_activate_returnsDeadlineReadFromDb", async () => {
+    const result = await setPlayerView(admin, true);
+
+    expect(result.until).toBe("2026-11-18T22:00:00.000Z");
+  });
+
+  it("setPlayerView_alreadyActive_keepsStoredDeadlineWithoutAuditOrReconnect", async () => {
+    database(0, { player_view_until: DEADLINE, active: 1 });
+
+    const result = await setPlayerView(admin, true);
+
+    expect(result.until).toBe("2026-11-18T22:00:00.000Z");
+    expect(auditStaffAction).not.toHaveBeenCalled();
+    expect(reconnectSessionStreams).not.toHaveBeenCalled();
+  });
+
+  it("setPlayerView_deactivate_clearsOnlyALiveDeadline", async () => {
+    database(1, { player_view_until: null, active: null });
+
     const result = await setPlayerView(admin, false);
 
     const [sql, params] = execute.mock.calls[0];
     expect(sql).toContain("SET player_view_until = NULL");
+    expect(sql).toContain("AND player_view_until > NOW()");
     expect(params).toEqual([HASH, 7]);
     expect(result.until).toBeNull();
   });
 
-  it("setPlayerView_noLiveSessionRow_throwsNoSession", async () => {
-    execute.mockResolvedValue([header(0), []]);
+  it("setPlayerView_deactivateWhenInactive_writesNoAudit", async () => {
+    database(0, { player_view_until: null, active: null });
+
+    await setPlayerView(admin, false);
+
+    expect(auditStaffAction).not.toHaveBeenCalled();
+    expect(reconnectSessionStreams).not.toHaveBeenCalled();
+  });
+
+  it("setPlayerView_sessionVanished_throwsNoSession", async () => {
+    database(0, null);
 
     await expect(setPlayerView(admin, true)).rejects.toThrow(PLAYER_VIEW_NO_SESSION);
     expect(reconnectSessionStreams).not.toHaveBeenCalled();
@@ -83,6 +126,8 @@ describe("setPlayerView — session à cookie", () => {
   });
 
   it("setPlayerView_deactivate_auditsTheReturn", async () => {
+    database(1, { player_view_until: null, active: null });
+
     await setPlayerView(admin, false);
 
     expect(auditStaffAction).toHaveBeenCalledWith(PLAYER_VIEW_OFF_AUDIT, { id: 7, pseudo: "Chef" });
@@ -94,26 +139,39 @@ describe("setPlayerView — contournement de développement", () => {
     jest.mocked(playerViewSessionKey).mockResolvedValue({ tokenHash: "dev-auth-bypass:7", devBypass: true });
   });
 
-  it("setPlayerView_devBypassActivate_upsertsDedicatedRow", async () => {
+  it("setPlayerView_devBypassActivate_removesStaleRowThenInsertsWithoutExtending", async () => {
     await setPlayerView(admin, true);
 
-    const [sql, params] = execute.mock.calls[0];
-    expect(sql).toContain("INSERT INTO bg_user_sessions");
-    expect(sql).toContain("ON DUPLICATE KEY UPDATE");
-    expect(params).toEqual(["dev-auth-bypass:7", 7, 12, 12]);
+    const [stale, insert] = sqlCalls();
+    expect(stale).toContain("DELETE FROM bg_user_sessions");
+    expect(stale).toContain("(player_view_until IS NULL OR player_view_until <= NOW())");
+    expect(insert).toContain("INSERT IGNORE INTO bg_user_sessions");
+    expect(execute.mock.calls[1][1]).toEqual(["dev-auth-bypass:7", 7, 12, 12]);
   });
 
-  it("setPlayerView_devBypassDeactivate_deletesDedicatedRow", async () => {
-    await setPlayerView(admin, false);
+  it("setPlayerView_devBypassAlreadyActive_writesNoAudit", async () => {
+    database(0, { player_view_until: DEADLINE, active: 1 });
+
+    const result = await setPlayerView(admin, true);
+
+    expect(result.until).toBe("2026-11-18T22:00:00.000Z");
+    expect(auditStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("setPlayerView_devBypassDeactivate_deletesOnlyTheLiveRow", async () => {
+    database(1, null);
+
+    const result = await setPlayerView(admin, false);
 
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toContain("DELETE FROM bg_user_sessions WHERE token_hash = ? AND user_id = ?");
+    expect(sql).toContain("DELETE FROM bg_user_sessions WHERE token_hash = ? AND user_id = ? AND player_view_until > NOW()");
     expect(params).toEqual(["dev-auth-bypass:7", 7]);
+    expect(result.until).toBeNull();
   });
 
-  it("setPlayerView_devBypass_reconnectsTheCookielessStreams", async () => {
+  it("setPlayerView_devBypass_reconnectsEveryStreamOfTheAccount", async () => {
     await setPlayerView(admin, true);
 
-    expect(reconnectSessionStreams).toHaveBeenCalledWith(7, "");
+    expect(reconnectSessionStreams).toHaveBeenCalledWith(7, null);
   });
 });

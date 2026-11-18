@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import {
+  countOtherSessions,
   devBypassSessionKey,
   getCurrentUser,
+  revokeOtherSessions,
   playerViewSessionKey,
   resetUnknownColumnMemoForTests,
 } from "@/lib/server/auth";
@@ -198,14 +200,48 @@ describe("playerViewSessionKey", () => {
     expect(await playerViewSessionKey(authUser({ id: 3 }))).toBeNull();
   });
 
-  it("playerViewSessionKey_devBypassUser_returnsDedicatedKey", async () => {
+  it("playerViewSessionKey_devBypassUserObject_returnsBypassKeyWithoutDb", async () => {
     devBypass("3");
     await withCookie(null);
-    await withExecute(jest.fn<SqlQuery>().mockResolvedValue([[baseRow], []]));
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[baseRow], []]);
+    await withExecute(execute);
+    const user = await getCurrentUser();
+    execute.mockClear();
 
-    expect(await playerViewSessionKey(authUser({ id: 3 }))).toEqual({
-      tokenHash: "dev-auth-bypass:3",
-      devBypass: true,
-    });
+    const key = await playerViewSessionKey(user!);
+
+    expect(key).toEqual({ tokenHash: "dev-auth-bypass:3", devBypass: true });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("playerViewSessionKey_lookalikeUserNotFromBypass_usesCookie", async () => {
+    devBypass("3");
+
+    const key = await playerViewSessionKey(authUser({ id: 3 }));
+
+    expect(key).toEqual({ tokenHash: expect.stringMatching(/^[0-9a-f]{64}$/), devBypass: false });
+  });
+});
+
+describe("autres appareils — ligne du contournement écartée", () => {
+  it("countOtherSessions_devBypassRow_isNotCounted", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 0 }], []]);
+    await withExecute(execute);
+
+    await countOtherSessions(3);
+
+    expect(execute.mock.calls[0][0]).toContain("token_hash NOT LIKE 'dev-auth-bypass:%'");
+  });
+
+  it("revokeOtherSessions_devBypassRow_isKept", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }, undefined]);
+    await withExecute(execute);
+
+    await revokeOtherSessions(3);
+
+    expect(execute.mock.calls.map(([sql]) => sql)).toEqual([
+      expect.stringContaining("token_hash NOT LIKE 'dev-auth-bypass:%'"),
+      expect.stringContaining("token_hash NOT LIKE 'dev-auth-bypass:%'"),
+    ]);
   });
 });

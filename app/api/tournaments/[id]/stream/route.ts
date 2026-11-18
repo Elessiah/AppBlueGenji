@@ -16,6 +16,7 @@ import { fail } from "@/lib/server/http";
 import {
   registerSessionStream,
   revocationMark,
+  reconnectRequestedSince,
   revokedSince,
 } from "@/lib/server/session-streams";
 import { enforceRateLimit, STREAM_OPEN_RULE } from "@/lib/server/api-guard";
@@ -140,6 +141,10 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   if (revokedSince(user.id, tokenHash, mark)) {
     return refuse(fail("UNAUTHORIZED", 401));
   }
+  // Vue joueur basculée pendant la lecture de la session : le contexte lu est
+  // périmé, le flux se reconnecte sitôt ouvert (`reconnectSessionStreams`).
+  // Rien n'a pu le demander depuis l'inscription (aucune attente depuis).
+  reconnectRequested = reconnectRequestedSince(user.id, tokenHash, mark);
 
   // Toute sortie imprévue (base indisponible pendant les lectures) désinscrit
   // le flux : le registre est global, et une reconnexion en boucle pendant une

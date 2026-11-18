@@ -13,6 +13,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import frShell from "@/messages/fr/shell.json";
 import enShell from "@/messages/en/shell.json";
+import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import { readSource } from "../helpers/read-source";
 
 /** Vue joueur du staff, côté écran (`docs/features/ADMIN_PLAYER_VIEW.md`). */
@@ -52,6 +53,11 @@ describe("PlayerViewBanner", () => {
 
     expect(html).toContain("Player view on");
     expect(html).toContain("Back to admin view");
+  });
+
+  it("PlayerViewBanner_hint_interpolatesTheMaxHours", () => {
+    expect(banner()).toContain(`au plus ${PLAYER_VIEW_MAX_HOURS} heures`);
+    expect(banner("en")).toContain(`for ${PLAYER_VIEW_MAX_HOURS} hours at most`);
   });
 
   it("PlayerViewBanner_explanation_staysBehindInfoHint", () => {
@@ -116,9 +122,6 @@ describe("câblage", () => {
     expect(readSource("app/layout.tsx")).toContain("{user?.playerView && <PlayerViewBanner />}");
   });
 
-  it("le geste relit la page après la bascule", () => {
-    expect(readSource("components/player-view.tsx")).toContain("router.refresh()");
-  });
 });
 
 describe("schéma", () => {

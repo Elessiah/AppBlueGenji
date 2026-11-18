@@ -49,7 +49,7 @@
     "back": "Back to admin view",
     "backPending": "Returning to admin view…",
     "backFailed": "Couldn't return to admin view. Try again in a moment.",
-    "hint": "On this device only, the site treats you as a player: your staff rights are suspended until you switch back, for 12 hours at most."
+    "hint": "On this device only, the site treats you as a player: your staff rights are suspended until you switch back, for {hours} hours at most. Staff push notifications follow the account and keep arriving."
   },
   "footer": {
     "brandName": "BlueGenji",

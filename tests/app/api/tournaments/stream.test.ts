@@ -21,6 +21,7 @@ import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
 import {
   closeSessionStreams,
   closeUserStreams,
+  reconnectSessionStreams,
   reconnectUserStreams,
   registeredStreamCount,
   resetSessionStreams,
@@ -400,6 +401,22 @@ describe("GET /api/tournaments/[id]/stream — révocation de la session", () =>
     expect(await drainsToEnd(response)).toBe(true);
     expect(registeredStreamCount()).toBe(0);
     expect(tournamentAudience(5)).toBe(0);
+  });
+
+  it("GET_playerViewSwitchDuringSessionRead_opensThenEndsWithoutRefusal (ADMIN_PLAYER_VIEW.md)", async () => {
+    // Bascule commitée pendant la lecture de la session : aucun flux encore
+    // inscrit — seule la trace de la reconnexion le rattrape, sans 401.
+    jest.mocked(currentTokenHash).mockResolvedValue("empreinte-A");
+    jest.mocked(getCurrentUser).mockImplementation(async () => {
+      reconnectSessionStreams(1, "empreinte-A");
+      return authUser({ id: 1, isAdmin: true, roles: ["ADMIN"] });
+    });
+
+    const response = await GET(new Request("http://t/"), params("5"));
+
+    expect(response.status).toBe(200);
+    expect(await drainsToEnd(response)).toBe(true);
+    expect(registeredStreamCount()).toBe(0);
   });
 
   it("GET_reconnectOfOpenStream_endsIt (EF-23)", async () => {

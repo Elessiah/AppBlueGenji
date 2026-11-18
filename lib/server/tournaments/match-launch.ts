@@ -538,16 +538,25 @@ type PartyMatch = {
 };
 
 /**
+ * Ce que la **session** permet au lecteur, au-delà de son compte : en vue
+ * joueur (`ADMIN_PLAYER_VIEW.md`), ni cast ni arbitrage désigné — l'éligibilité
+ * se lit en base (`is_admin`, rôles), que la vue joueur ne change pas. Requis :
+ * un appelant qui l'oublie ne compile pas, aucun chemin ne la contourne.
+ */
+export type PartySession = { playerView: boolean };
+
+/**
  * Le lecteur est-il partie de ce match — joueur d'une des deux engagées
  * (appartenance **en cours**, ou entrée solo), un de ses casters, ou son
- * arbitre désigné ?
+ * arbitre désigné ? En vue joueur, seul le rôle de joueur compte.
  */
 export async function resolveMatchParty(
   connection: PoolConnection,
   match: PartyMatch,
   userId: number,
+  session: PartySession,
 ): Promise<MatchParty | null> {
-  const party = await resolvePartyOrRefusal(connection, match, userId);
+  const party = await resolvePartyOrRefusal(connection, match, userId, session);
   return typeof party === "string" ? null : party;
 }
 
@@ -560,11 +569,14 @@ async function resolvePartyOrRefusal(
   connection: PoolConnection,
   match: PartyMatch,
   userId: number,
+  session: PartySession,
 ): Promise<MatchParty | string> {
   // Le rôle de joueur prime : qui joue le match ne le caste pas, même si une
   // inscription faite avant que son équipe n'arrive est encore en base.
   const team = await resolveTeamParty(connection, match, userId);
   if (team) return team;
+  // Vue joueur : casts et arbitrages restent en base, la session ne les tient pas.
+  if (session.playerView) return "NOT_MATCH_PARTY";
   let refusal = "NOT_MATCH_PARTY";
   if (match.casters.some((caster) => caster.userId === userId)) {
     // Une inscription ne vaut que tant que son titulaire remplit la condition
@@ -751,9 +763,8 @@ export async function setMatchReady(
     await adoptCurrentPairing(connection, row);
     // Lu après l'adoption, qui peut défaire l'ouverture d'un autre appariement.
     const lobbyWasOpen = row.lobby_opened_at !== null;
-    const party = await resolvePartyOrRefusal(connection, row, userId);
+    const party = await resolvePartyOrRefusal(connection, row, userId, { playerView: options.playerView === true });
     if (typeof party === "string") throw new Error(party);
-    assertPlayerViewParty(party.role, options.playerView === true);
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
 
     if (party.role === "CASTER") {
@@ -781,14 +792,6 @@ export async function setMatchReady(
   });
   if (!quiet) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   return { launched };
-}
-
-/**
- * Vue joueur (`ADMIN_PLAYER_VIEW.md`) : le « Prêt » d'un cast ou d'un
- * arbitrage n'est pas un geste de joueur — seule une équipe du match le donne.
- */
-function assertPlayerViewParty(role: string, playerView: boolean): void {
-  if (playerView && role !== "TEAM1" && role !== "TEAM2") throw new Error("NOT_MATCH_PARTY");
 }
 
 /**

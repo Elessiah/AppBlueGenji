@@ -6,6 +6,7 @@ import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
+import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import s from "./player-view.module.css";
 
 /**
@@ -70,7 +71,7 @@ export function PlayerViewBanner() {
         <Eye className={s.icon} size={16} aria-hidden="true" />
         <span>{t("playerView.active")}</span>
         <InfoHint id="player-view-hint" subject={t("playerView.label")}>
-          {t("playerView.hint")}
+          {t("playerView.hint", { hours: PLAYER_VIEW_MAX_HOURS })}
         </InfoHint>
       </div>
       <button

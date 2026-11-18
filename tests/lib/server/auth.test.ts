@@ -661,7 +661,7 @@ describe("auth", () => {
       expect(await revokeOtherSessions(7)).toBe(2);
       // Les expirées d'abord, hors du compte rendu.
       expect(execute.mock.calls[0][0]).toMatch(/expires_at <= NOW\(\)/);
-      expect(execute.mock.calls[1][0]).toMatch(/DELETE FROM bg_user_sessions WHERE user_id = \? AND token_hash <> \?$/);
+      expect(execute.mock.calls[1][0]).toMatch(/DELETE FROM bg_user_sessions WHERE user_id = \? AND token_hash <> \? AND token_hash NOT LIKE 'dev-auth-bypass:%'$/);
       for (const call of execute.mock.calls) expect(call[1]).toEqual([7, hashOf("courant")]);
     });
 

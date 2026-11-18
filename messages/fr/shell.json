@@ -49,7 +49,7 @@
     "back": "Revenir en vue admin",
     "backPending": "Retour en vue admin…",
     "backFailed": "Impossible de revenir en vue admin. Réessaie dans un instant.",
-    "hint": "Sur cet appareil seulement, le site te traite comme un joueur : tes droits de staff sont suspendus jusqu'à ton retour, au plus 12 heures."
+    "hint": "Sur cet appareil seulement, le site te traite comme un joueur : tes droits de staff sont suspendus jusqu'à ton retour, au plus {hours} heures. Les notifications push du staff, liées au compte, continuent d'arriver."
   },
   "footer": {
     "brandName": "BlueGenji",
