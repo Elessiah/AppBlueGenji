@@ -127,6 +127,8 @@
     "PLANNING_NOT_ASSIGNED": "This person is no longer assigned.",
     "PLANNING_BUSY": "Another schedule action is in progress, try again.",
     "PLANNING_CONFIRM_PARTIAL": "Partial confirmation: some proposals are confirmed, the others stayed provisional after a failure. Run the confirmation again.",
+    "PLANNING_WITHDRAWAL_CLOSED": "This slot has started: you can no longer withdraw from it.",
+    "PLANNING_REASON_TOO_LONG": "Reason too long: 300 characters at most.",
     "NOT_CASTER": "This account does not have the caster role.",
     "MATCH_NOT_FOUND": "This match no longer exists.",
     "MATCH_ALREADY_COMPLETED": "This match has already been played.",
@@ -150,5 +152,26 @@
     "leadBody": "Every provisional proposal on slots starting by then becomes an assignment: referees are set on their matches.",
     "confirm": "Confirm",
     "pending": "Confirming…"
-  }
+  },
+  "withdraw": {
+    "action": "Withdraw",
+    "actionLabel": "Withdraw: {role}, {slot}",
+    "title": "Withdraw from this slot?",
+    "body": "An available replacement is looked for right away. If there is none, the slot is open and the tournament staff is told.",
+    "late": "Late withdrawal: the slot starts in less than 24 hours.",
+    "reasonLabel": "Reason (optional, read by the tournament staff only)",
+    "confirm": "Withdraw",
+    "pending": "Withdrawing…",
+    "done": "Withdrawal saved.",
+    "doneReplaced": "Withdrawal saved: a replacement has been assigned.",
+    "doneUnfilled": "Withdrawal saved: the slot is open, the staff has been told."
+  },
+  "withdrawals": {
+    "title": "Withdrawals",
+    "late": "Late",
+    "provisional": "Proposal",
+    "item": "{name} · {role}",
+    "hint": "Who withdrew from this slot, and their reason if they gave one. “Late”: less than 24 hours before the start. “Proposal”: they were only proposed by the calculation."
+  },
+  "unfilled": "Open slot"
 }

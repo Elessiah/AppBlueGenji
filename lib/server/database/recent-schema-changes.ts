@@ -644,6 +644,16 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_logo_quarantines ADD COLUMN image_phash BIGINT UNSIGNED NULL AFTER image_sha256`,
     // « Vue joueur » du staff, par session (`docs/features/ADMIN_PLAYER_VIEW.md`).
     `ALTER TABLE bg_user_sessions ADD COLUMN player_view_until DATETIME NULL`,
+    // Désistements du planning (`docs/features/CAST_PLANNING.md` § Désistement).
+    {
+      when: columnTypeContains("bg_planning_events", "kind", "NOT LIKE '%''WITHDRAWN''%'"),
+      steps: [
+        `ALTER TABLE bg_planning_events MODIFY COLUMN kind
+           ENUM('ASSIGNED', 'CONFIRMED', 'REMOVED', 'WITHDRAWN') NOT NULL`,
+      ],
+    },
+    `ALTER TABLE bg_planning_events ADD COLUMN reason VARCHAR(300) NULL AFTER actor_user_id`,
+    `ALTER TABLE bg_planning_events ADD COLUMN late TINYINT(1) NOT NULL DEFAULT 0 AFTER reason`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

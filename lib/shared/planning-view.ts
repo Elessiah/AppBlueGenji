@@ -45,6 +45,20 @@ export type PlanningAvailabilityView = {
   preferred: boolean;
 };
 
+/**
+ * Un désistement (`CAST_PLANNING.md` § Désistement), montré au seul staff des
+ * tournois : qui, quel rôle, s'il était tardif (moins de 24 h avant), son
+ * motif facultatif, et si l'attribution quittée était confirmée.
+ */
+export type PlanningWithdrawalView = {
+  userId: number;
+  role: PlanningRole;
+  late: boolean;
+  reason: string | null;
+  confirmed: boolean;
+  createdAt: string;
+};
+
 export type PlanningEntryView = {
   key: string;
   kind: PlanningEntryKind;
@@ -74,6 +88,13 @@ export type PlanningEntryView = {
   mine: PlanningAvailabilityView[];
   /** Disponibilités de tous (staff des tournois seul ; vide sinon). */
   availability: PlanningAvailabilityView[];
+  /**
+   * Rôles « à pourvoir » : une attribution confirmée en a été quittée par un
+   * désistement, et personne ne la tient plus (entrée encore modifiable).
+   */
+  unfilled: PlanningRole[];
+  /** Désistements de l'entrée (staff des tournois seul ; vide sinon). */
+  withdrawals: PlanningWithdrawalView[];
 };
 
 export type PlanningMember = {
@@ -95,6 +116,9 @@ export type PlanningView = {
   /** Durées estimées qui servent aux chevauchements. */
   durations: PlanningDurationSettings;
 };
+
+/** Issue d'un désistement (`POST /api/planning/withdrawal`). */
+export type WithdrawalResponse = { late: boolean; replaced: boolean; unfilled: boolean };
 
 /** Bilan d'un calcul automatique : ce qui est posé, et ce que le match a refusé. */
 export type AutoAssignReport = {

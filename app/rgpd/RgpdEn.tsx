@@ -1314,8 +1314,16 @@ export function RgpdEn({
             administrators). Through the schedule, confirming or assigning a match&apos;s referee, or removing
             its assigned referee, acts on the match itself, like the staff does: the staff log on Discord
             notes each change of the match&apos;s referee without naming anyone and a referee removed by someone else is notified by push (<LocaleLink href="/rgpd/registre#t04">register,
-            T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>); nothing else from the
-            schedule is published on Discord. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
+            T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>). Referees, casters
+            and prods are notified by Discord direct message and push notification of new slots where they
+            can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of a
+            withdrawal on a slot they are assigned to; the tournament staff, of a slot left open (a line
+            naming no one in the staff log on Discord). None of these messages names a player or a staff
+            member; each of these topics can be turned off in the notification settings of “My profile”,
+            which also turns off its direct message. Everyone can withdraw from an assignment until the slot
+            starts, with an optional reason read by the tournament staff only; the site keeps the withdrawal
+            (role, date, reason, whether it is late — less than 24 h before) with the history, and replaces
+            the person automatically. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
             of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds the
             caster role; deleting the account removes everything about it (the actions it took as staff
             remain, without naming it), and the export of your data contains it, actions taken as staff

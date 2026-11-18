@@ -127,6 +127,8 @@
     "PLANNING_NOT_ASSIGNED": "Cette personne n'est déjà plus attribuée.",
     "PLANNING_BUSY": "Un autre geste du planning est en cours, réessaie.",
     "PLANNING_CONFIRM_PARTIAL": "Confirmation partielle : une partie des propositions est confirmée, les autres sont restées provisoires après une panne. Relance la confirmation.",
+    "PLANNING_WITHDRAWAL_CLOSED": "Ce créneau a commencé : il n'est plus possible de s'en désister.",
+    "PLANNING_REASON_TOO_LONG": "Motif trop long : 300 caractères au plus.",
     "NOT_CASTER": "Ce compte n'a pas le rôle caster.",
     "MATCH_NOT_FOUND": "Ce match n'existe plus.",
     "MATCH_ALREADY_COMPLETED": "Ce match est déjà joué.",
@@ -150,5 +152,26 @@
     "leadBody": "Toutes les propositions provisoires des créneaux qui commencent d'ici là deviennent des désignations : les arbitres sont posés sur leurs matchs.",
     "confirm": "Confirmer",
     "pending": "Confirmation…"
-  }
+  },
+  "withdraw": {
+    "action": "Me désister",
+    "actionLabel": "Me désister : {role}, {slot}",
+    "title": "Te désister de ce créneau ?",
+    "body": "Un remplaçant disponible est cherché aussitôt. S'il n'y en a pas, la place est « à pourvoir » et le staff des tournois est prévenu.",
+    "late": "Désistement tardif : le créneau commence dans moins de 24 h.",
+    "reasonLabel": "Motif (facultatif, lu du seul staff des tournois)",
+    "confirm": "Me désister",
+    "pending": "Désistement…",
+    "done": "Désistement enregistré.",
+    "doneReplaced": "Désistement enregistré : un remplaçant a été affecté.",
+    "doneUnfilled": "Désistement enregistré : la place est à pourvoir, le staff est prévenu."
+  },
+  "withdrawals": {
+    "title": "Désistements",
+    "late": "Tardif",
+    "provisional": "Proposition",
+    "item": "{name} · {role}",
+    "hint": "Qui s'est désisté de ce créneau, et son motif s'il en a donné un. « Tardif » : moins de 24 h avant le début. « Proposition » : il n'était que proposé par le calcul."
+  },
+  "unfilled": "À pourvoir"
 }

@@ -8,6 +8,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { resolveRoles } from "@/lib/server/auth";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
 import { firstStreamUrlSql } from "@/lib/server/tournaments/match-casters";
+import { toIso } from "@/lib/server/serialization";
 import { can, rolesGranting } from "@/lib/shared/permissions";
 import {
   PLANNING_HORIZON_DAYS,
@@ -84,8 +85,27 @@ export type LoadedAssignment = {
   confirmed: boolean;
 };
 
-/** Retrait manuel par le staff (`bg_planning_events`) : le calcul ne replace plus ce membre sur ce rôle de cette entrée. */
+/**
+ * Retrait manuel par le staff, ou désistement du membre (`bg_planning_events`) :
+ * le calcul ne replace plus ce membre sur ce rôle de cette entrée.
+ */
 export type LoadedRemoval = { entryKey: string; userId: number; role: PlanningRole };
+
+/**
+ * Désistement d'un membre (`WITHDRAWN`). `reason` (facultatif) n'est rendu
+ * qu'au staff des tournois (`view.ts`) ; `confirmed` : l'attribution quittée
+ * était confirmée (elle comptait dans la couverture annoncée) — seule celle-là
+ * laisse une place « à pourvoir ».
+ */
+export type LoadedWithdrawal = {
+  entryKey: string;
+  userId: number;
+  role: PlanningRole;
+  reason: string | null;
+  late: boolean;
+  confirmed: boolean;
+  createdAt: string;
+};
 
 /**
  * Un compte du planning. `seesHidden` : il voit les tournois encore cachés
@@ -100,6 +120,7 @@ export type PlanningData = {
   availability: LoadedAvailability[];
   assignments: LoadedAssignment[];
   removals: LoadedRemoval[];
+  withdrawals: LoadedWithdrawal[];
   /** Casters inscrits sur un match (`bg_match_casters`) : `entryKey` → comptes. */
   matchCasters: Map<string, number[]>;
   members: LoadedMember[];
@@ -412,6 +433,7 @@ type AssignmentRow = RowDataPacket & {
 };
 
 type RemovalRow = RowDataPacket & { entry_key: string; user_id: number; role: PlanningRole };
+type WithdrawalRow = RemovalRow & { reason: string | null; late: number; source: AssignmentSource; created_at: Date | string };
 
 type CasterRow = RowDataPacket & { match_id: number; user_id: number };
 
@@ -453,9 +475,18 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
   const matchIds = entries.flatMap((entry) => (entry.matchId === null ? [] : [entry.matchId]));
   const membersRead = options.members ? Promise.resolve(options.members) : loadPlanningMembers(executor);
   if (entries.length === 0) {
-    return { entries, durations, members: await membersRead, availability: [], assignments: [], removals: [], matchCasters: new Map() };
+    return {
+      entries,
+      durations,
+      members: await membersRead,
+      availability: [],
+      assignments: [],
+      removals: [],
+      withdrawals: [],
+      matchCasters: new Map(),
+    };
   }
-  const [members, [availability], [assignments], [removals], matchCasters] = await Promise.all([
+  const [members, [availability], [assignments], [removals], [withdrawals], matchCasters] = await Promise.all([
     membersRead,
     executor.execute<AvailabilityRow[]>(
       `SELECT entry_key, user_id, role, status, preferred FROM bg_planning_availability
@@ -470,6 +501,14 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
     executor.execute<RemovalRow[]>(
       `SELECT DISTINCT entry_key, user_id, role FROM bg_planning_events
         WHERE kind = 'REMOVED' AND source = 'MANUAL' AND entry_key IN (${inList(keys.length)})`,
+      keys,
+    ),
+    // Désistements : `source` dit si l'attribution quittée était confirmée
+    // (`MANUAL`) ou une proposition provisoire (`AUTO`), `withdrawal.ts`.
+    executor.execute<WithdrawalRow[]>(
+      `SELECT entry_key, user_id, role, source, reason, late, created_at FROM bg_planning_events
+        WHERE kind = 'WITHDRAWN' AND entry_key IN (${inList(keys.length)})
+        ORDER BY created_at, id`,
       keys,
     ),
     loadMatchCasters(executor, matchIds),
@@ -493,7 +532,16 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
       reason: row.reason,
       confirmed: row.source === "MANUAL" || Number(row.confirmed) === 1,
     })),
-    removals: removals.map((row) => ({ entryKey: row.entry_key, userId: Number(row.user_id), role: row.role })),
+    removals: [...removals, ...withdrawals].map((row) => ({ entryKey: row.entry_key, userId: Number(row.user_id), role: row.role })),
+    withdrawals: withdrawals.map((row) => ({
+      entryKey: row.entry_key,
+      userId: Number(row.user_id),
+      role: row.role,
+      reason: row.reason,
+      late: Number(row.late) === 1,
+      confirmed: row.source === "MANUAL",
+      createdAt: toIso(row.created_at) ?? "",
+    })),
     matchCasters,
   };
 }

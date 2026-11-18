@@ -2236,6 +2236,26 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : pour un joueur sans rôle de plateforme, rien de nouveau n'est collecté.",
     ],
   },
+  {
+    // CAST-PLANNING-NOTIFY — notifications et désistements du planning
+    // (`docs/features/CAST_PLANNING.md` § Notifications, § Désistement) :
+    // messages privés Discord et push aux arbitres, casters et prods, motif et
+    // retard d'un désistement. Registre T20 et T12, /rgpd (FR et EN). Pour tous
+    // les comptes, comme l'entrée du planning. Datée du lendemain de la mise
+    // en ligne prévue, comme `REGISTER_UPDATED_AT` — tout avancer ensemble si
+    // elle glisse.
+    id: "2026-11-planning-notifications-desistements",
+    publishedAt: "2026-11-21",
+    title: "Planning : notifications et désistements",
+    links: [{ href: "/rgpd/registre#t20", label: "Lire la fiche T20 du registre" }],
+    summary: "Les arbitres, casters et prods sont désormais prévenus en message privé Discord et en notification push des nouveaux créneaux du planning, de leurs affectations et des désistements qui les concernent ; chacun peut se désister d'une attribution, avec un motif facultatif lu par le seul staff des tournois.",
+    details: [
+      "Ce qui est envoyé : un récapitulatif des nouveaux créneaux où l'on peut tenir un rôle (un par vague de planification), l'annonce d'une affectation confirmée ou posée à la main (jamais d'une simple proposition), l'annonce d'un désistement sur un créneau où l'on est affecté, et, au staff des tournois, une place restée à pourvoir (ligne sans nom au journal du staff sur Discord). Aucun de ces messages ne nomme un joueur ni un membre du staff : « un caster s'est désisté ».",
+      "Chacun de ces quatre sujets se coupe dans les réglages de notifications de « Mon profil » ; le couper coupe aussi son message privé Discord (droit d'opposition, art. 21). Discord achemine ces messages privés (États-Unis, registre T20).",
+      "Ce qui est gardé du désistement : le rôle et le créneau quittés, la date, le motif facultatif (300 caractères au plus), s'il est tardif (moins de 24 h avant le début) et si l'attribution était confirmée — mêmes durées que le reste du planning, dans l'export de tes données ; le motif n'est lu que par le staff des tournois. Le planning note aussi, sans personne, quels créneaux ont déjà été annoncés.",
+      "Ce qui ne change pas : pour un joueur sans rôle de plateforme, rien de nouveau n'est collecté ni envoyé.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

@@ -1541,8 +1541,16 @@ function RgpdFr({
             sur le match lui-même, comme un geste du staff : le journal du staff sur Discord note chaque
             changement d&apos;arbitre du match sans nommer personne et l&apos;arbitre
             retiré par un autre que lui en est prévenu par notification (<Link href="/rgpd/registre#t04">registre, T04</Link> et{" "}
-            <Link href="/rgpd/registre#t05">T05</Link>) ; rien d&apos;autre du planning n&apos;est publié sur
-            Discord. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
+            <Link href="/rgpd/registre#t05">T05</Link>). Les arbitres, casters et prods sont prévenus en
+            message privé Discord et en notification push des nouveaux créneaux où ils peuvent tenir un rôle
+            (un récapitulatif par vague), de leurs affectations confirmées ou posées à la main, et d&apos;un
+            désistement sur un créneau où ils sont affectés ; le staff des tournois, d&apos;une place restée à
+            pourvoir (ligne sans nom au journal du staff sur Discord). Aucun de ces messages ne nomme un
+            joueur ni un membre du staff ; chacun de ces sujets se coupe dans les réglages de notifications
+            de « Mon profil », ce qui coupe aussi son message privé. Chacun peut se désister d&apos;une
+            attribution jusqu&apos;au début du créneau, avec un motif facultatif lu par le seul staff des
+            tournois ; le site garde le désistement (rôle, date, motif, s&apos;il est tardif — moins de 24 h
+            avant) avec l&apos;historique, et remplace automatiquement la personne. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
             créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
             le rôle caster ; la suppression du compte emporte tout ce qui le concerne (les gestes faits comme
             staff restent, sans le désigner), l&apos;export de vos données le contient, gestes faits comme staff

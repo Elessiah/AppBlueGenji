@@ -30,6 +30,20 @@ function routeSql(
 }
 
 describe("exportOwnPlanning", () => {
+  it("exportOwnPlanning_withdrawal_carriesReasonAndLateness", async () => {
+    routeSql({
+      events: [
+        { tournament_id: 10, match_id: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: "Malade", late: 1, created_at: new Date("2026-11-20T18:00:00.000Z") },
+      ],
+    });
+
+    const data = await exportOwnPlanning(4);
+
+    expect(data.history).toEqual([
+      { tournamentId: 10, matchId: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", createdAt: "2026-11-20T18:00:00.000Z", reason: "Malade", late: true },
+    ]);
+  });
+
   it("exportOwnPlanning_events_historyOfTheHolderWithoutActor", async () => {
     routeSql({
       events: [

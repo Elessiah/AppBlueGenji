@@ -68,6 +68,22 @@
       "label": "Cast removed",
       "description": "Your caster registration for a match is removed by the staff or automatically: the reason is given."
     },
+    "PLANNING_NEW_ENTRIES": {
+      "label": "New matches in the planning",
+      "description": "Matches were just scheduled in a game where you hold a role (referee, caster, prod): one summary per wave, so you can set your availability. Also turns off the Discord direct message."
+    },
+    "PLANNING_ASSIGNED": {
+      "label": "Planning assignments",
+      "description": "You are assigned to a match or an event, by the staff or by a confirmed automatic assignment (never for a mere proposal), or you replace a member who withdrew: date, teams and role. Also turns off the Discord direct message."
+    },
+    "PLANNING_WITHDRAWAL": {
+      "label": "Planning withdrawals",
+      "description": "A staff member assigned to the same match as you withdrew (without naming them): their replacement, if any, or the open slot. Also turns off the Discord direct message."
+    },
+    "PLANNING_UNFILLED": {
+      "label": "Open slots",
+      "description": "After a withdrawal, no replacement was found: the slot is open on the planning."
+    },
     "STAFF_REPORT": {
       "label": "Incoming reports",
       "description": "A new report, or an appeal, reaches moderation."

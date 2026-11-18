@@ -1,0 +1,251 @@
+/**
+ * Désistement d'un membre affecté, et son remplacement automatique
+ * (`docs/features/CAST_PLANNING.md` § Désistement).
+ *
+ * - **Qui** : le membre lui-même, sur sa **propre** attribution (la route
+ *   passe le compte de la session). Le staff, lui, retire quelqu'un par la
+ *   désignation à la main (`setManualAssignment`), qui l'écarte aussi.
+ * - **Jusqu'à quand** : jusqu'au début de l'entrée ; à moins de 24 h, le
+ *   désistement est dit **tardif** (`late`). Un caster inscrit sur le match
+ *   (`bg_match_casters`) se retire depuis le match (`PLANNING_CAST_MANAGED`).
+ * - **Trace** : un évènement `WITHDRAWN` (motif facultatif, lu du seul staff
+ *   des tournois ; `source` dit si l'attribution quittée était confirmée). Il
+ *   écarte ce membre de ce rôle de cette entrée pour les calculs suivants, et
+ *   ne compte jamais comme charge (l'attribution est partie).
+ * - **Arbitre d'un match** : retiré du match par `assignMatchReferee`, comme
+ *   un retrait à la main (`unassignManually`) — match et planning ne se
+ *   contredisent jamais ; un refus du match défait le désistement.
+ * - **Remplacement** : le calcul du lot 1 (`planAssignments`) rouvre la seule
+ *   entrée, tout le reste verrouillé, et prend son premier choix pour le rôle
+ *   (disponible, sans chevauchement, ni joueur, ni retiré, préférences
+ *   d'abord, puis la charge). Attribution quittée **confirmée** : le
+ *   remplaçant naît confirmé (posé sur le match pour un arbitre) et il est
+ *   prévenu ; **provisoire** : il reste une proposition, sans message. Personne :
+ *   la place est « à pourvoir » et le staff des tournois est prévenu.
+ */
+import type { PoolConnection } from "mysql2/promise";
+import type { AuthUser } from "@/lib/server/auth";
+import { failureReason } from "@/lib/server/failure-reason";
+import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
+import { transact } from "@/lib/server/tournaments/transaction";
+import { can } from "@/lib/shared/permissions";
+import { planningWeekStart, type PlanningRole } from "@/lib/shared/planning";
+import { planAssignments, type PlannedAssignment } from "@/lib/shared/planning-planner";
+import { visibleText } from "@/lib/shared/visible-text";
+import {
+  isMatchRefereeRefusal,
+  loadExclusions,
+  lockedHolding,
+  preparePlanner,
+  withPlanningLock,
+  writeEvent,
+} from "./auto-assign";
+import { loadPlanningData, loadPlanningHistory, type Executor, type LoadedEntry, type PlanningData } from "./load";
+import { entryAssignments } from "./model";
+import { announceWithdrawal } from "./notices";
+import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "./planning-undo";
+
+/** Un désistement à moins de ce délai avant le début est tardif. */
+export const LATE_WITHDRAWAL_MS = 24 * 60 * 60 * 1000;
+
+/** Longueur maximale du motif (caractères). */
+export const WITHDRAWAL_REASON_MAX = 300;
+
+export type WithdrawalInput = { entryKey: string; role: PlanningRole; reason: string | null };
+
+/** Issue d'un désistement, rendue à la page. */
+export type WithdrawalResult = {
+  late: boolean;
+  /** Un remplaçant a été affecté. */
+  replaced: boolean;
+  /** Attribution confirmée quittée sans remplaçant : place « à pourvoir ». */
+  unfilled: boolean;
+};
+
+/** Motif nettoyé (`visibleText`), `null` s'il est vide ; `undefined` s'il dépasse la borne. */
+export function cleanWithdrawalReason(value: unknown): string | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return undefined;
+  const text = visibleText(value).trim();
+  if (text.length === 0) return null;
+  return Array.from(text).length > WITHDRAWAL_REASON_MAX ? undefined : text;
+}
+
+/** Désistement tardif : l'entrée commence dans moins de 24 h. */
+export function isLateWithdrawal(startAt: number, now: number): boolean {
+  return startAt - now < LATE_WITHDRAWAL_MS;
+}
+
+/** L'évènement du désistement ; rend son identifiant (qu'une désignation refusée efface). */
+async function writeWithdrawalEvent(
+  executor: Executor,
+  entry: LoadedEntry,
+  userId: number,
+  input: WithdrawalInput,
+  confirmed: boolean,
+  late: boolean,
+): Promise<number> {
+  const [result] = await executor.execute(
+    `INSERT INTO bg_planning_events
+       (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id, reason, late)
+     VALUES (?, ?, ?, ?, ?, 'WITHDRAWN', ?, NULL, ?, ?)`,
+    [entry.key, userId, input.role, entry.tournamentId, entry.matchId, confirmed ? "MANUAL" : "AUTO", input.reason, late ? 1 : 0],
+  );
+  const id = Number((result as { insertId?: number } | undefined)?.insertId ?? 0);
+  if (!Number.isInteger(id) || id <= 0) throw new Error("PLANNING_EVENT_ID_MISSING");
+  return id;
+}
+
+/**
+ * Le remplaçant : le calcul rouvre la seule entrée (toutes les autres
+ * attributions verrouillées, provisoires comprises) et rend son premier choix
+ * pour ce rôle. Relu après le désistement : le désisté est écarté
+ * (`removals`), l'arbitre du match retiré.
+ */
+export function pickReplacement(
+  data: PlanningData,
+  entry: LoadedEntry,
+  role: PlanningRole,
+  history: ReadonlyMap<number, number>,
+  excluded: ReadonlySet<string>,
+  historyWeek: number,
+): PlannedAssignment | null {
+  const base = preparePlanner(data, [], history, excluded, historyWeek);
+  const input = { ...base, entries: base.entries.map((item) => (item.key === entry.key ? { ...item, open: true } : item)) };
+  return planAssignments(input).find((row) => row.entryKey === entry.key && row.role === role) ?? null;
+}
+
+async function findReplacement(
+  connection: PoolConnection,
+  entryKey: string,
+  role: PlanningRole,
+  now: number,
+): Promise<{ data: PlanningData; entry: LoadedEntry | undefined; pick: PlannedAssignment | null }> {
+  const data = await loadPlanningData(connection, { now, includeHidden: true });
+  const entry = data.entries.find((candidate) => candidate.key === entryKey);
+  if (!entry?.open || !entry.editable) return { data, entry, pick: null };
+  const anchor = Math.max(now, entry.startAt);
+  const history = await loadPlanningHistory(connection, anchor);
+  const excluded = await loadExclusions(connection, data, [entry]);
+  return { data, entry, pick: pickReplacement(data, entry, role, history, excluded, planningWeekStart(anchor)) };
+}
+
+/**
+ * Pose le remplaçant ; rend `false` si le match ou ses rôles relus le
+ * refusent (place alors à pourvoir). Arbitre de match confirmé : posé sur le
+ * match d'abord (`assignMatchReferee`, qui juge condition d'arbitrage et
+ * joueur), la ligne du planning ensuite — la réconciliation (`confirmPendingReferees`)
+ * rattraperait une panne entre les deux.
+ */
+async function placeReplacement(
+  connection: PoolConnection,
+  entry: LoadedEntry,
+  pick: PlannedAssignment,
+  confirmed: boolean,
+  actorId: number,
+): Promise<boolean> {
+  const matchReferee = entry.kind === "MATCH" && pick.role === "REFEREE" && entry.matchId !== null;
+  if (matchReferee && confirmed) {
+    try {
+      await assignMatchReferee(entry.matchId as number, actorId, pick.userId, null);
+    } catch (error) {
+      if (!isMatchRefereeRefusal(error)) console.error("[planning] remplaçant d'arbitre non posé.", failureReason(error));
+      return false;
+    }
+  }
+  return transact(connection, async () => {
+    if (!(matchReferee && confirmed)) {
+      const holds = await lockedHolding(connection, [{ userId: pick.userId, entry }]);
+      if (holds(pick.userId, entry, pick.role) !== null) return false;
+    }
+    await connection.execute(
+      `INSERT INTO bg_planning_assignments
+         (entry_key, user_id, role, tournament_id, match_id, source, reason, confirmed, assigned_by_user_id)
+       VALUES (?, ?, ?, ?, ?, 'AUTO', ?, ?, NULL)
+       ON DUPLICATE KEY UPDATE source = VALUES(source), reason = VALUES(reason), confirmed = VALUES(confirmed),
+                               assigned_by_user_id = NULL`,
+      [entry.key, pick.userId, pick.role, entry.tournamentId, entry.matchId, pick.reason, confirmed ? 1 : 0],
+    );
+    await writeEvent(connection, entry, pick.userId, pick.role, "ASSIGNED", "AUTO", null);
+    if (confirmed) await writeEvent(connection, entry, pick.userId, pick.role, "CONFIRMED", "AUTO", null);
+    return true;
+  });
+}
+
+type Outcome = WithdrawalResult & {
+  confirmed: boolean;
+  entry: LoadedEntry;
+  replacementId: number | null;
+  coAssignedIds: number[];
+};
+
+/**
+ * Le membre `user` se désiste de son attribution `input.role` sur
+ * `input.entryKey`. Erreurs par code : `PLANNING_ENTRY_NOT_FOUND`,
+ * `PLANNING_WITHDRAWAL_CLOSED` (entrée commencée ou close),
+ * `PLANNING_NOT_ASSIGNED`, `PLANNING_CAST_MANAGED`, refus du match.
+ */
+export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, now: number = Date.now()): Promise<WithdrawalResult> {
+  const outcome = await withPlanningLock(async (connection): Promise<Outcome> => {
+    const data = await loadPlanningData(connection, { now, includeHidden: can(user, "tournaments") });
+    const entry = data.entries.find((candidate) => candidate.key === input.entryKey);
+    if (!entry) throw new Error("PLANNING_ENTRY_NOT_FOUND");
+    if (!entry.editable || entry.startAt <= now) throw new Error("PLANNING_WITHDRAWAL_CLOSED");
+    const current = entryAssignments(entry, data).find((row) => row.userId === user.id && row.role === input.role);
+    if (!current) throw new Error("PLANNING_NOT_ASSIGNED");
+    if (current.source === "CAST") throw new Error("PLANNING_CAST_MANAGED");
+    const confirmed = !current.provisional;
+    const late = isLateWithdrawal(entry.startAt, now);
+    // L'arbitre d'un match passe par le match ; une proposition provisoire n'y est pas encore.
+    const matchId = entry.kind === "MATCH" && input.role === "REFEREE" && confirmed ? entry.matchId : null;
+    const undo =
+      matchId === null ? undefined : await snapshotGesture(connection, [entry.key], { entryKey: entry.key, userId: user.id, role: input.role });
+    const eventIds = await transact(connection, async () => {
+      await connection.execute("DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ?", [
+        entry.key,
+        user.id,
+        input.role,
+      ]);
+      return [await writeWithdrawalEvent(connection, entry, user.id, input, confirmed, late)];
+    });
+    if (matchId !== null && undo !== undefined) {
+      const carried = await readMatchReferee(matchId);
+      if (carried === undefined || carried === user.id) {
+        try {
+          await assignMatchReferee(matchId, user.id, null, user.id);
+        } catch (error) {
+          await settleFailedDesignation(error, matchId, null, undo, eventIds);
+          throw error;
+        }
+      }
+    }
+    const found = await findReplacement(connection, entry.key, input.role, now);
+    const fresh = found.entry ?? entry;
+    const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, user.id));
+    const replacementId = placed && found.pick ? found.pick.userId : null;
+    const coAssignedIds = entryAssignments(fresh, found.data)
+      .filter((row) => !row.provisional && row.userId !== user.id && row.userId !== replacementId)
+      .map((row) => row.userId);
+    return {
+      late,
+      replaced: replacementId !== null,
+      unfilled: confirmed && replacementId === null,
+      confirmed,
+      entry: fresh,
+      replacementId,
+      coAssignedIds,
+    };
+  });
+  // Une simple proposition quittée n'avait été annoncée à personne : rien à dire.
+  // Les envois partent après le verrou, sans faire attendre la page (ils ne lèvent jamais).
+  if (outcome.confirmed) {
+    void announceWithdrawal({
+      entry: outcome.entry,
+      role: input.role,
+      late: outcome.late,
+      replacementId: outcome.replacementId,
+      coAssignedIds: outcome.coAssignedIds,
+    });
+  }
+  return { late: outcome.late, replaced: outcome.replaced, unfilled: outcome.unfilled };
+}

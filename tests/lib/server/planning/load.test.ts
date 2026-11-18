@@ -242,6 +242,24 @@ describe("loadHiddenTournamentIds", () => {
 });
 
 describe("loadPlanningData", () => {
+  it("loadPlanningData_withdrawals_readAndExcludedFromRole", async () => {
+    routeSql({ tournaments: [tournamentRow()] });
+    const plain = connection.execute.getMockImplementation();
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      if (sql.includes("kind = 'WITHDRAWN'")) {
+        return [[{ entry_key: "t:10", user_id: 4, role: "CASTER", source: "MANUAL", reason: "Malade", late: 1, created_at: new Date("2026-11-20T10:00:00Z") }], []];
+      }
+      return plain ? plain(sql, params) : [[], []];
+    });
+
+    const data = await loadPlanningData(executor, { now: MONDAY, includeHidden: true, members: [] });
+
+    expect(data.withdrawals).toEqual([
+      { entryKey: "t:10", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, createdAt: "2026-11-20T10:00:00.000Z" },
+    ]);
+    expect(data.removals).toContainEqual({ entryKey: "t:10", userId: 4, role: "CASTER" });
+  });
+
   it("loadPlanningData_reads_settingsOnce_andCarriesThem", async () => {
     routeSql({ tournaments: [tournamentRow()] });
 

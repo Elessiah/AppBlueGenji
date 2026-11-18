@@ -5,7 +5,7 @@ Le registre décrit les traitements de données personnelles du site et du bot D
 Il décrit aussi le portail de support (Spiceworks), la retransmission des matchs et les journaux techniques du serveur web. La gestion des adhésions à l'association ne relève pas du site : l'association la tient hors du site, et ce registre ne la décrit pas — pour toute question à son sujet, utilisez les moyens de contact de la politique de confidentialité.
 Télécharger le registre (tableur CSV)← Politique de confidentialité
 RESPONSABLE
-ActeursMIS À JOUR LE 20/11/2026
+ActeursMIS À JOUR LE 21/11/2026
 Responsable du traitement
 Bluegenji Esport — Association loi 1901, 4 impasse des Cyprès, 51210 Janvilliers, France
 Contact
@@ -525,6 +525,7 @@ Invitation d'une équipe, reprise d'une équipe fantôme proposée par le staff,
 Alertes d'arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l'adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d'arbitrage et alertes de modération pour le staff qui détient ces rôles
 Retrait de son inscription de caster sur un match (par le staff ou d'office), avec le motif, pour le caster qui détient encore la permission de diffusion
 Retrait de son arbitrage d'un match (par le staff, match confié à un autre arbitre ou passé en autogestion, ou d'office), avec le motif, pour l'arbitre désigné qui détient encore la permission d'arbitrage
+Planning des casts et arbitres (T20), pour les arbitres, casters et prods : nouveaux créneaux, affectations, désistements ; pour le staff des tournois : places à pourvoir — couper l'un de ces sujets coupe aussi son message privé Discord
 Base légale
 Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet ; un sujet ajouté depuis l'abonnement, comme « Nouveau match », est actif d'office sur un appareil déjà abonné, ce que la politique de données annonce, et se coupe de même)
 Personnes concernées
@@ -806,13 +807,18 @@ Sous-finalités
 Recueillir, créneau par créneau (match planifié, ou tournoi entier), la disponibilité de chaque arbitre, caster et prod pour chaque rôle qu'il tient, et sa préférence
 Proposer les attributions par un calcul qui suit les disponibilités et les préférences et répartit la charge (semaine en cours et 8 semaines précédentes) ; propositions provisoires jusqu'à leur confirmation par le staff des tournois, qui peut aussi désigner ou retirer quelqu'un à la main
 Retenir si un caster diffuse seul (caster autonome), réglage posé par le caster ou par le staff des tournois
+Permettre à chacun de se désister d'une attribution jusqu'au début du créneau, avec un motif facultatif, et le remplacer automatiquement par le même calcul ; sans remplaçant, la place est signalée « à pourvoir » au staff des tournois
+Prévenir les arbitres, casters et prods, en message privé Discord et en notification push, des nouveaux créneaux où ils peuvent tenir un rôle (un récapitulatif par vague de planification), de leurs affectations confirmées ou posées à la main, et d'un désistement sur un créneau où ils sont affectés ; prévenir le staff des tournois d'une place à pourvoir — sans jamais nommer un joueur ni un membre du staff
 Base légale
-Intérêt légitime de l'association (RGPD, art. 6.1.f : organiser les bénévoles qui arbitrent et diffusent ses tournois), avec droit d'opposition ; les données viennent des bénévoles eux-mêmes ou du staff qui les organise
+Intérêt légitime de l'association (RGPD, art. 6.1.f : organiser les bénévoles qui arbitrent et diffusent ses tournois), avec droit d'opposition ; les données viennent des bénévoles eux-mêmes ou du staff qui les organise ; pour les messages privés Discord du planning, même intérêt légitime, l'opposition (art. 21) honorée sujet par sujet par les réglages de notifications de « Mon profil », qui coupent ensemble la notification push (consentement, T12) et le message privé
 Personnes concernées
 Arbitres, casters et prods du site (rôles de plateforme), administrateurs compris
 Données
 Pour chaque créneau et chaque rôle : disponibilité (disponible, absent, à voir), préférence, date de la dernière réponse
 Attributions : qui tient quel rôle sur quel créneau, provenance (calcul ou choix du staff), motif (préférence, charge, choix du staff ; l'inscription de cast ou l'arbitre désigné du match, montrés comme motif, se lisent sur l'inscription et sur le match, T04, sans être gardés ici), état (provisoire ou confirmée), compte du staff qui l'a posée, et leur historique (pose, confirmation, retrait — arbitre changé ou retiré depuis le match compris —, avec la date et le compte qui a agi par le planning, sans compte quand le site aligne le planning sur le match)
+Désistements : rôle et créneau quittés, date, motif facultatif (300 caractères au plus), s'il est tardif (moins de 24 h avant le début) et si l'attribution quittée était confirmée
+Créneaux déjà annoncés par le récapitulatif des nouveaux créneaux (date de découverte et d'annonce, sans personne)
+Pour les messages privés : identifiant Discord rattaché ou tag Discord certifié (T01), langue du compte, sujets de notification coupés (T12)
 Réglage « caster autonome »
 Données sensibles
 Aucune
@@ -822,13 +828,16 @@ Réglage « caster autonome » : tant que le compte tient le rôle caster ; effa
 Suppression du compte : tout ce qui le concerne dans le planning part avec lui ; les gestes qu'il a faits comme staff restent, sans le désigner. L'export de ses données (art. 15 et 20) contient ses disponibilités, préférences, attributions avec leur motif, leur historique, son réglage « caster autonome » et les gestes qu'il a faits comme staff (sans l'identifiant de la personne visée)
 Destinataires
 Arbitres, casters, prods et administrateurs connectés du site (page « Planning ») : les attributions de chaque créneau — le motif d'une proposition du calcul (préférence, charge) n'y paraît que comme « Calcul », hors le staff des tournois et la personne concernée — et le réglage « caster autonome » de chacun ; chacun voit ses propres disponibilités et préférences
-Staff des tournois (arbitres et administrateurs) : les disponibilités et préférences de tous, et le motif de chaque attribution, pour attribuer
-Par le planning, confirmer ou désigner l'arbitre d'un match, ou retirer son arbitre désigné, agit sur le match lui-même, comme un geste du staff (T04, T05) : une ligne sans nom au journal du staff sur Discord à chaque changement d'arbitre du match, une notification push à l'arbitre retiré par un autre que lui ; rien d'autre du planning n'est publié sur Discord
+Staff des tournois (arbitres et administrateurs) : les disponibilités et préférences de tous, le motif de chaque attribution, et les désistements (motif, retard), pour attribuer
+Par le planning, confirmer ou désigner l'arbitre d'un match, ou retirer son arbitre désigné, agit sur le match lui-même, comme un geste du staff (T04, T05) : une ligne sans nom au journal du staff sur Discord à chaque changement d'arbitre du match, une notification push à l'arbitre retiré par un autre que lui. Les notifications du planning partent en message privé Discord à leur destinataire, et une place à pourvoir en une ligne sans nom au journal du staff sur Discord ; aucune ne nomme un joueur ni un membre du staff
+Discord, qui achemine les messages privés du planning ; le service de push du navigateur du destinataire, qui achemine la notification push chiffrée des mêmes avis (T12)
 Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)
 Transferts hors UE
-Aucun
+États-Unis : Discord (acheminement des messages privés du planning) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
+États-Unis : service de push du navigateur du destinataire, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — Google, Mozilla, Apple et Microsoft, certifiés EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
 Sécurité
 Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)
 Chiffrement des échanges (HTTPS)
 Droits d'administration par rôle, limités à ce que chaque mission exige
+Motif d'un désistement lu du seul staff des tournois
 Page et routes réservées aux comptes qui tiennent un rôle du planning ; la vue joueur n'y donne aucun accès

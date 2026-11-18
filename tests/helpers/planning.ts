@@ -81,6 +81,7 @@ export function planningData(overrides: Partial<PlanningData> = {}): PlanningDat
     availability: [],
     assignments: [],
     removals: [],
+    withdrawals: [],
     matchCasters: new Map(),
     members: [],
     ...overrides,
@@ -109,6 +110,8 @@ export function entryView(overrides: Partial<PlanningEntryView> = {}): PlanningE
     coverage: planningCoverage({ hasReferee: false, casterIds: [], prodIds: [], soloCasterIds: new Set() }),
     mine: [],
     availability: [],
+    unfilled: [],
+    withdrawals: [],
     ...overrides,
   };
 }

@@ -20,6 +20,7 @@ import {
   saveSubscription,
   subscribedStaffCandidates,
   usersReachableByPush,
+  usersWithTopicDisabled,
 } from "@/lib/server/push-subscriptions";
 import { sendWebPush, type WebPushConfig } from "@/lib/server/web-push";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
@@ -354,6 +355,22 @@ describe("abonnements", () => {
 });
 
 describe("sujets coupés", () => {
+  it("usersWithTopicDisabled_someOptedOut_returnsThoseIds", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[{ user_id: 4 }]]);
+    pool({ query });
+
+    expect(await usersWithTopicDisabled([4, 5, 4], "PLANNING_ASSIGNED")).toEqual(new Set([4]));
+    expect(query.mock.calls[0][1]).toEqual(["PLANNING_ASSIGNED", 4, 5]);
+  });
+
+  it("usersWithTopicDisabled_noIds_noQuery", async () => {
+    const query = jest.fn<SqlQuery>();
+    pool({ query });
+
+    expect(await usersWithTopicDisabled([], "PLANNING_ASSIGNED")).toEqual(new Set());
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it("ne relit que des sujets connus, dans l'ordre du registre", async () => {
     pool({
       execute: jest.fn<SqlQuery>().mockResolvedValue([[{ topic: "MATCH_REMINDER" }, { topic: "RETIRÉ" }, { topic: "MATCH_START" }]]),

@@ -61,6 +61,7 @@ const DATABASE_SOURCES = [
   "lib/server/database/schema/notifications.ts",
   "lib/server/database/schema/showcase.ts",
   "lib/server/database/schema/compliance.ts",
+  "lib/server/database/schema/planning.ts",
   "lib/server/database/recent-schema-changes.ts",
   "lib/server/database/data-migrations.ts",
   "lib/server/database/catch-ups.ts",

@@ -6,7 +6,7 @@ jest.mock("@/lib/server/push-subscriptions");
 
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
-import { pushToUsers, subscribedStaffCandidates } from "@/lib/server/push-subscriptions";
+import { pushToUsers, subscribedStaffCandidates, usersWithTopicDisabled } from "@/lib/server/push-subscriptions";
 import {
   loadEntrantManagerIds,
   loadEntrantMatchLeaderIds,
@@ -493,5 +493,50 @@ describe("loadEntrantManagerIds", () => {
     expect(byTeam.has(3)).toBe(false);
     expect(query.mock.calls[0][1]).toEqual([1, 2, 3, 1, 2, 3]);
     expect((await loadEntrantManagerIds([])).size).toBe(0);
+  });
+});
+
+describe("notifyUsers — dmFollowsTopic (sujets du planning)", () => {
+  const a = { discordId: "1", handle: null, label: "A" };
+  const b = { discordId: "2", handle: null, label: "B" };
+
+  it("notifyUsers_dmFollowsTopicOptedOut_skipsThatDmOnly", async () => {
+    accountLocales([
+      { id: 1, locale: "fr" },
+      { id: 2, locale: "fr" },
+    ]);
+    jest.mocked(usersWithTopicDisabled).mockResolvedValue(new Set([2]));
+
+    await notifyUsers(
+      [
+        { userId: 1, discord: a },
+        { userId: 2, discord: b },
+      ],
+      { topic: "PLANNING_ASSIGNED", push: PUSH, discord: { message: DM, context: "planning-assigned" }, dmFollowsTopic: true },
+    );
+
+    expect(usersWithTopicDisabled).toHaveBeenCalledWith([1, 2], "PLANNING_ASSIGNED");
+    expect(pushDiscordDirectMessages).toHaveBeenCalledWith("m-fr", [a], "planning-assigned");
+    expect(jest.mocked(pushToUsers).mock.calls[0][0]).toEqual([1, 2]);
+  });
+
+  it("notifyUsers_optOutReadFails_sendsNoDm", async () => {
+    jest.mocked(usersWithTopicDisabled).mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
+
+    await notifyUsers([{ userId: 1, discord: a }], {
+      topic: "PLANNING_WITHDRAWAL",
+      push: PUSH,
+      discord: { message: DM, context: "planning-withdrawal" },
+      dmFollowsTopic: true,
+    });
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyUsers_withoutDmFollowsTopic_neverReadsOptOuts", async () => {
+    await notifyUsers([{ userId: 1, discord: a }], { topic: "TEAM_JOIN_REQUEST", push: PUSH, discord: { message: DM, context: "ctx" } });
+
+    expect(usersWithTopicDisabled).not.toHaveBeenCalled();
   });
 });

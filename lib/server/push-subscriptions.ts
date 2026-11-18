@@ -123,6 +123,22 @@ export async function loadDisabledTopics(userId: number): Promise<PushTopic[]> {
   return PUSH_TOPIC_KEYS.filter((topic) => set.has(topic));
 }
 
+/**
+ * Comptes, parmi `userIds`, qui ont coupé `topic`. Sert aux sujets dont le
+ * réglage coupe **aussi** le message privé Discord (`dmFollowsTopic` de
+ * `notifyUsers`, sujets du planning).
+ */
+export async function usersWithTopicDisabled(userIds: readonly number[], topic: PushTopic): Promise<Set<number>> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return new Set();
+  const db = await getDatabase();
+  const [rows] = await db.query<(RowDataPacket & { user_id: number })[]>(
+    `SELECT user_id FROM bg_push_topic_optouts WHERE topic = ? AND user_id IN (${ids.map(() => "?").join(", ")})`,
+    [topic, ...ids],
+  );
+  return new Set(rows.map((row) => Number(row.user_id)));
+}
+
 /** Remplace l'ensemble des sujets coupés du compte. */
 export async function saveDisabledTopics(userId: number, topics: readonly PushTopic[]): Promise<void> {
   const db = await getDatabase();

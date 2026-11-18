@@ -91,7 +91,7 @@ import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { PLANNING_HISTORY_WEEKS, PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-20";
+export const REGISTER_UPDATED_AT = "2026-11-21";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -1291,6 +1291,8 @@ const ACTIVITIES = registerActivities({
         "Removal of their caster registration for a match (by the staff or automatically), with the reason, for the caster who still holds the streaming permission"),
       frEn("Retrait de son arbitrage d'un match (par le staff, match confié à un autre arbitre ou passé en autogestion, ou d'office), avec le motif, pour l'arbitre désigné qui détient encore la permission d'arbitrage",
         "Removal of their refereeing of a match (by the staff, match assigned to another referee or switched to self-management, or automatically), with the reason, for the assigned referee who still holds the refereeing permission"),
+      frEn("Planning des casts et arbitres (T20), pour les arbitres, casters et prods : nouveaux créneaux, affectations, désistements ; pour le staff des tournois : places à pourvoir — couper l'un de ces sujets coupe aussi son message privé Discord",
+        "Cast and referee schedule (T20), for referees, casters and prods: new slots, assignments, withdrawals; for the tournament staff: open slots \u2014 turning off one of these topics also turns off its Discord direct message"),
     ],
     legalBasis: frEn("Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet ; un sujet ajouté depuis l'abonnement, comme « Nouveau match », est actif d'office sur un appareil déjà abonné, ce que la politique de données annonce, et se coupe de même)",
       "Consent (activation on each device, withdrawable at any time, topic by topic; a topic added since the subscription, such as “New match”, is on by default on a device already subscribed, which the data policy announces, and is turned off the same way)"),
@@ -1750,9 +1752,13 @@ const ACTIVITIES = registerActivities({
         `Proposing assignments through a calculation that follows availability and preferences and balances the load (current week and the ${PLANNING_HISTORY_WEEKS} previous weeks); proposals stay provisional until confirmed by the tournament staff, who can also assign or remove someone by hand`),
       frEn("Retenir si un caster diffuse seul (caster autonome), réglage posé par le caster ou par le staff des tournois",
         "Recording whether a caster streams alone (solo caster), a setting made by the caster or by the tournament staff"),
+      frEn("Permettre à chacun de se désister d'une attribution jusqu'au début du créneau, avec un motif facultatif, et le remplacer automatiquement par le même calcul ; sans remplaçant, la place est signalée « à pourvoir » au staff des tournois",
+        "Letting everyone withdraw from an assignment until the slot starts, with an optional reason, and replacing them automatically through the same calculation; without a replacement, the slot is flagged \u201copen\u201d to the tournament staff"),
+      frEn("Prévenir les arbitres, casters et prods, en message privé Discord et en notification push, des nouveaux créneaux où ils peuvent tenir un rôle (un récapitulatif par vague de planification), de leurs affectations confirmées ou posées à la main, et d'un désistement sur un créneau où ils sont affectés ; prévenir le staff des tournois d'une place à pourvoir — sans jamais nommer un joueur ni un membre du staff",
+        "Notifying referees, casters and prods, by Discord direct message and push notification, of new slots where they can hold a role (one summary per planning wave), of their assignments confirmed or set by hand, and of a withdrawal on a slot they are assigned to; notifying the tournament staff of an open slot \u2014 never naming a player or a staff member"),
     ],
-    legalBasis: frEn("Intérêt légitime de l'association (RGPD, art. 6.1.f : organiser les bénévoles qui arbitrent et diffusent ses tournois), avec droit d'opposition ; les données viennent des bénévoles eux-mêmes ou du staff qui les organise",
-      "Legitimate interest of the association (GDPR, art. 6.1.f: organising the volunteers who referee and stream its tournaments), with a right to object; the data come from the volunteers themselves or from the staff who organises them"),
+    legalBasis: frEn("Intérêt légitime de l'association (RGPD, art. 6.1.f : organiser les bénévoles qui arbitrent et diffusent ses tournois), avec droit d'opposition ; les données viennent des bénévoles eux-mêmes ou du staff qui les organise ; pour les messages privés Discord du planning, même intérêt légitime, l'opposition (art. 21) honorée sujet par sujet par les réglages de notifications de « Mon profil », qui coupent ensemble la notification push (consentement, T12) et le message privé",
+      "Legitimate interest of the association (GDPR, art. 6.1.f: organising the volunteers who referee and stream its tournaments), with a right to object; the data come from the volunteers themselves or from the staff who organises them; for the schedule's Discord direct messages, the same legitimate interest, the objection (art. 21) honoured topic by topic by the notification settings of \u201cMy profile\u201d, which turn off the push notification (consent, T12) and the direct message together"),
     dataSubjects: [
       frEn("Arbitres, casters et prods du site (rôles de plateforme), administrateurs compris", "Referees, casters and prods of the site (platform roles), administrators included"),
     ],
@@ -1761,6 +1767,12 @@ const ACTIVITIES = registerActivities({
         "For each slot and each role: availability (available, away, maybe), preference, date of the last answer"),
       frEn("Attributions : qui tient quel rôle sur quel créneau, provenance (calcul ou choix du staff), motif (préférence, charge, choix du staff ; l'inscription de cast ou l'arbitre désigné du match, montrés comme motif, se lisent sur l'inscription et sur le match, T04, sans être gardés ici), état (provisoire ou confirmée), compte du staff qui l'a posée, et leur historique (pose, confirmation, retrait — arbitre changé ou retiré depuis le match compris —, avec la date et le compte qui a agi par le planning, sans compte quand le site aligne le planning sur le match)",
         "Assignments: who holds which role on which slot, origin (calculation or staff choice), reason (preference, load, staff choice; the cast signup or the match's assigned referee, shown as a reason, are read from the signup and from the match, T04, without being kept here), state (provisional or confirmed), the staff account that set it, and their history (set, confirmed, removed — a referee changed or removed from the match included —, with the date and the account that acted through the schedule, none when the site aligns the schedule with the match)"),
+      frEn("Désistements : rôle et créneau quittés, date, motif facultatif (300 caractères au plus), s'il est tardif (moins de 24 h avant le début) et si l'attribution quittée était confirmée",
+        "Withdrawals: role and slot left, date, optional reason (300 characters at most), whether it is late (less than 24 h before the start) and whether the assignment left was confirmed"),
+      frEn("Créneaux déjà annoncés par le récapitulatif des nouveaux créneaux (date de découverte et d'annonce, sans personne)",
+        "Slots already announced by the new-slot summary (date found and date announced, no person)"),
+      frEn("Pour les messages privés : identifiant Discord rattaché ou tag Discord certifié (T01), langue du compte, sujets de notification coupés (T12)",
+        "For direct messages: linked Discord identifier or certified Discord tag (T01), account language, notification topics turned off (T12)"),
       frEn("Réglage « caster autonome »", "\u201cSolo caster\u201d setting"),
     ],
     sensitiveData: frEn("Aucune", "None"),
@@ -1775,18 +1787,24 @@ const ACTIVITIES = registerActivities({
     recipients: [
       frEn("Arbitres, casters, prods et administrateurs connectés du site (page « Planning ») : les attributions de chaque créneau — le motif d'une proposition du calcul (préférence, charge) n'y paraît que comme « Calcul », hors le staff des tournois et la personne concernée — et le réglage « caster autonome » de chacun ; chacun voit ses propres disponibilités et préférences",
         "Logged-in referees, casters, prods and administrators of the site (\u201cSchedule\u201d page): each slot's assignments \u2014 the reason for a calculated proposal (preference, load) only appears there as \u201cCalculation\u201d, except to the tournament staff and the person concerned \u2014 and everyone's \u201csolo caster\u201d setting; each person sees their own availability and preferences"),
-      frEn("Staff des tournois (arbitres et administrateurs) : les disponibilités et préférences de tous, et le motif de chaque attribution, pour attribuer",
-        "Tournament staff (referees and administrators): everyone's availability and preferences, and the reason for each assignment, to assign"),
-      frEn("Par le planning, confirmer ou désigner l'arbitre d'un match, ou retirer son arbitre désigné, agit sur le match lui-même, comme un geste du staff (T04, T05) : une ligne sans nom au journal du staff sur Discord à chaque changement d'arbitre du match, une notification push à l'arbitre retiré par un autre que lui ; rien d'autre du planning n'est publié sur Discord",
-        "Through the schedule, confirming or assigning a match's referee, or removing its assigned referee, acts on the match itself, like the staff does (T04, T05): a line naming no one in the staff log on Discord for each change of the match's referee, a push notification to a referee removed by someone else; nothing else from the schedule is published on Discord"),
+      frEn("Staff des tournois (arbitres et administrateurs) : les disponibilités et préférences de tous, le motif de chaque attribution, et les désistements (motif, retard), pour attribuer",
+        "Tournament staff (referees and administrators): everyone's availability and preferences, the reason for each assignment, and the withdrawals (reason, lateness), to assign"),
+      frEn("Par le planning, confirmer ou désigner l'arbitre d'un match, ou retirer son arbitre désigné, agit sur le match lui-même, comme un geste du staff (T04, T05) : une ligne sans nom au journal du staff sur Discord à chaque changement d'arbitre du match, une notification push à l'arbitre retiré par un autre que lui. Les notifications du planning partent en message privé Discord à leur destinataire, et une place à pourvoir en une ligne sans nom au journal du staff sur Discord ; aucune ne nomme un joueur ni un membre du staff",
+        "Through the schedule, confirming or assigning a match's referee, or removing its assigned referee, acts on the match itself, like the staff does (T04, T05): a line naming no one in the staff log on Discord for each change of the match's referee, a push notification to a referee removed by someone else. The schedule's notifications are sent by Discord direct message to their recipient, and an open slot as a line naming no one in the staff log on Discord; none names a player or a staff member"),
+      frEn("Discord, qui achemine les messages privés du planning ; le service de push du navigateur du destinataire, qui achemine la notification push chiffrée des mêmes avis (T12)",
+        "Discord, which delivers the schedule's direct messages; the push service of the recipient's browser, which delivers the encrypted push notification of the same notices (T12)"),
       frEn("Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)",
         "The association's technical manager, who is also the site's host (database)"),
     ],
     transfers: [
-      frEn("Aucun", "None"),
+      frEn(`États-Unis : Discord (acheminement des messages privés du planning) — ${transferBasis(["DISCORD"])}`,
+        `United States: Discord (delivery of the schedule's direct messages) — ${transferBasisEn(["DISCORD"])}`),
+      frEn(`États-Unis : service de push du navigateur du destinataire, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — ${transferBasis(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
+        `United States: push service of the recipient's browser, which only receives end-to-end encrypted messages (RFC 8291) — ${transferBasisEn(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`),
     ],
     security: [
       ...COMMON_SECURITY,
+      frEn("Motif d'un désistement lu du seul staff des tournois", "A withdrawal's reason read by the tournament staff only"),
       frEn("Page et routes réservées aux comptes qui tiennent un rôle du planning ; la vue joueur n'y donne aucun accès",
         "Page and routes reserved for accounts holding a schedule role; player view gives no access to them"),
     ],

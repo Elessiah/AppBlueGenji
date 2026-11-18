@@ -19,6 +19,7 @@ import type {
   PlanningEntrant,
   PlanningEntryView,
   PlanningView,
+  WithdrawalResponse,
 } from "@/lib/shared/planning-view";
 import { scopedText } from "@/lib/shared/scoped-text";
 import {
@@ -88,6 +89,8 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   const [runWeek, setRunWeek] = useState<number | null>(null);
   const [confirming, setConfirming] = useState<ConfirmTarget | null>(null);
   const [filters, setFilters] = useState<PlanningFilters>(NO_FILTERS);
+  const [withdrawing, setWithdrawing] = useState<WithdrawTarget | null>(null);
+  const [withdrawReason, setWithdrawReason] = useState("");
 
   const fail = useCallback(
     (error: unknown) => showError(t(`errors.${errorKey((error as Error).message, messages.errors)}` as never)),
@@ -155,6 +158,10 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
   };
 
   const confirmEntry = useCallback((key: string, slot: string) => setConfirming({ kind: "entry", key, slot }), []);
+  const askWithdraw = useCallback((target: WithdrawTarget) => {
+    setWithdrawReason("");
+    setWithdrawing(target);
+  }, []);
   const saveAvailability = useCallback(
     (change: Parameters<typeof applyAvailability>[1]) => setView((current) => (current ? applyAvailability(current, change) : current)),
     [],
@@ -323,6 +330,7 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
                         act={act}
                         onConfirm={confirmEntry}
                         onAvailability={saveAvailability}
+                        onWithdraw={askWithdraw}
                       />
                     );
                   })}
@@ -354,6 +362,42 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
         </ConfirmActionDialog>
       )}
 
+      {withdrawing !== null && (
+        <ConfirmActionDialog
+          title={t("withdraw.title")}
+          confirmLabel={t("withdraw.confirm")}
+          pendingLabel={t("withdraw.pending")}
+          focusContent
+          onClose={() => setWithdrawing(null)}
+          onConfirm={() =>
+            act(
+              `withdraw:${withdrawing.key}:${withdrawing.role}`,
+              () =>
+                call<WithdrawalResponse>(
+                  "/api/planning/withdrawal",
+                  json("POST", { entryKey: withdrawing.key, role: withdrawing.role, reason: withdrawReason.trim() || null }),
+                ),
+              (result) => t(withdrawDoneKey(result)),
+            )
+          }
+        >
+          <p>
+            {withdrawing.slot} · {t(`roles.${withdrawing.role}`)}
+          </p>
+          <p>{t("withdraw.body")}</p>
+          {withdrawing.late && <p className={styles.lateWarning}>{t("withdraw.late")}</p>}
+          <div className="field">
+            <label htmlFor="planning-withdraw-reason">{t("withdraw.reasonLabel")}</label>
+            <textarea
+              id="planning-withdraw-reason"
+              maxLength={WITHDRAWAL_REASON_MAX}
+              value={withdrawReason}
+              onChange={(event) => setWithdrawReason(event.target.value)}
+            />
+          </div>
+        </ConfirmActionDialog>
+      )}
+
       {runWeek !== null && (
         <ConfirmActionDialog
           title={t("staff.runTitle", { date: format.day.format(runWeek) })}
@@ -374,6 +418,26 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
       )}
     </div>
   );
+}
+
+/** Le désistement en attente de l'accord du membre : l'entrée, le rôle, s'il est tardif (moins de 24 h). */
+type WithdrawTarget = { key: string; role: PlanningRole; slot: string; late: boolean };
+
+/** Motif d'un désistement, au plus (la route refuse au-delà). */
+const WITHDRAWAL_REASON_MAX = 300;
+
+/** Un désistement tardif : moins de 24 h avant le début (la route en juge aussi). */
+const LATE_WITHDRAWAL_MS = 24 * 60 * 60 * 1000;
+
+/** Le message de succès d'un désistement, selon son issue. */
+function withdrawDoneKey(result: WithdrawalResponse): "withdraw.doneReplaced" | "withdraw.doneUnfilled" | "withdraw.done" {
+  if (result.replaced) return "withdraw.doneReplaced";
+  return result.unfilled ? "withdraw.doneUnfilled" : "withdraw.done";
+}
+
+/** On se désiste jusqu'au début de l'entrée, tant qu'elle reste modifiable. */
+function canWithdraw(entry: PlanningEntryView): boolean {
+  return entry.editable && Date.parse(entry.startAt) > Date.now();
 }
 
 /** Le geste de confirmation en attente de l'accord du staff : une entrée, ou ce qui commence dans `hours` heures. */
@@ -413,6 +477,7 @@ const EntryCard = memo(function EntryCard({
   act,
   onConfirm,
   onAvailability,
+  onWithdraw,
 }: Readonly<{
   entry: PlanningEntryView;
   view: Reader;
@@ -424,6 +489,7 @@ const EntryCard = memo(function EntryCard({
   act: Act;
   onConfirm: (key: string, slot: string) => void;
   onAvailability: (change: Parameters<typeof applyAvailability>[1]) => void;
+  onWithdraw: (target: WithdrawTarget) => void;
 }>) {
   const { t } = text;
   const coverage = entry.coverage;
@@ -462,9 +528,22 @@ const EntryCard = memo(function EntryCard({
 
       <dl className={styles.roles}>
         {(["REFEREE", "CASTER", "PROD"] as const).map((role) => (
-          <RoleRow key={role} role={role} entry={entry} view={view} text={text} names={names} pending={pending} act={act} />
+          <RoleRow
+            key={role}
+            role={role}
+            entry={entry}
+            view={view}
+            text={text}
+            names={names}
+            slot={label}
+            pending={pending}
+            act={act}
+            onWithdraw={onWithdraw}
+          />
         ))}
       </dl>
+
+      {entry.withdrawals.length > 0 && <Withdrawals entry={entry} text={text} names={names} />}
 
       {view.myRoles.length > 0 && (
         <MyAvailability entry={entry} view={view} text={text} pending={pending} act={act} onSaved={onAvailability} />
@@ -491,16 +570,20 @@ function RoleRow({
   view,
   text,
   names,
+  slot,
   pending,
   act,
+  onWithdraw,
 }: Readonly<{
   role: PlanningRole;
   entry: PlanningEntryView;
   view: Reader;
   text: Text;
   names: ReadonlyMap<number, string>;
+  slot: string;
   pending: string | null;
   act: Act;
+  onWithdraw: (target: WithdrawTarget) => void;
 }>) {
   const { t } = text;
   const rows = entry.assignments.filter((row) => row.role === role);
@@ -518,6 +601,7 @@ function RoleRow({
     <div className={styles.roleRow}>
       <dt className={styles.roleName}>{roleName}</dt>
       <dd className={styles.roleWho}>
+        {entry.unfilled.includes(role) && <Pill variant="warning">{t("unfilled")}</Pill>}
         {rows.length === 0 && <span className={styles.muted}>{t("assignment.nobody")}</span>}
         {rows.map((row) => {
           const name = names.get(row.userId) ?? `#${row.userId}`;
@@ -528,6 +612,20 @@ function RoleRow({
                 {t(`assignment.reason.${row.reason}`)}
                 {row.provisional ? ` · ${t("assignment.provisional")}` : ""}
               </span>
+              {row.userId === view.me && row.source !== "CAST" && canWithdraw(entry) && (
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  aria-label={t("withdraw.actionLabel", { role: roleName, slot })}
+                  aria-disabled={pending !== null || undefined}
+                  onClick={() =>
+                    pending === null &&
+                    onWithdraw({ key: entry.key, role, slot, late: Date.parse(entry.startAt) - Date.now() < LATE_WITHDRAWAL_MS })
+                  }
+                >
+                  {t("withdraw.action")}
+                </button>
+              )}
               {manage && row.source !== "CAST" && (
                 <button
                   type="button"
@@ -570,6 +668,37 @@ function RoleRow({
           </>
         )}
       </dd>
+    </div>
+  );
+}
+
+/** Les désistements d'une entrée, au staff des tournois seul (la route ne les rend qu'à lui). */
+function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView; text: Text; names: ReadonlyMap<number, string> }>) {
+  const { t } = text;
+  const hintId = `planning-withdrawals-${entry.key.replace(":", "-")}`;
+  return (
+    <div className={styles.withdrawals}>
+      <InfoHintRow>
+        <span className={styles.withdrawalsTitle}>{t("withdrawals.title")}</span>
+        <InfoHint id={hintId} subject={t("withdrawals.title")}>
+          {t("withdrawals.hint")}
+        </InfoHint>
+      </InfoHintRow>
+      <ul className={styles.withdrawalList}>
+        {entry.withdrawals.map((row) => {
+          const name = names.get(row.userId) ?? `#${row.userId}`;
+          return (
+            <li key={`${row.userId}:${row.role}:${row.createdAt}`} className={styles.withdrawal}>
+              <span>
+                <PlayerLink userId={row.userId}>{name}</PlayerLink> · {t(`roles.${row.role}`)}
+              </span>
+              {row.late && <Pill variant="warning">{t("withdrawals.late")}</Pill>}
+              {!row.confirmed && <span className="cy-tag cy-tag-accent">{t("withdrawals.provisional")}</span>}
+              {row.reason && <q className={styles.withdrawalReason}>{row.reason}</q>}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

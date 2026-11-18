@@ -49,6 +49,13 @@ import { castReleasedHref, castReleaseReasonKey, type CastReleasedMatch } from "
 import { lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "./lobby-brief";
 import { visibleText, withoutInvisibles } from "./visible-text";
 import { teamInviteNoticePath, type TeamInviteNoticeKind } from "./team-invite-notice";
+import { PLANNING_PATH } from "./planning";
+import {
+  planningNoticeTime,
+  type PlanningNoticeAssignment,
+  type PlanningNoticeEntry,
+  type PlanningWithdrawalNotice,
+} from "./planning-notices";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
 
@@ -1144,6 +1151,111 @@ export function staffReportSaturatedPush(locale: Locale = DEFAULT_LOCALE): PushC
     body: text.t("staffReport.bodySaturated"),
     url: `/admin/signalements`,
     tag: "staff-report-saturated",
+  };
+}
+
+/** Une entrée du planning en une ligne de push, sans pseudo (« Un match » en individuel). */
+function planningEntryText(entry: PlanningNoticeEntry, text: PushText): string {
+  const tournament = shown(entry.tournamentName);
+  if (entry.kind === "TOURNAMENT") return text.t("planning.entryEvent", { tournament });
+  if (entry.solo) return text.t("planning.entrySolo", { tournament });
+  const tbd = text.t("matchScheduled.tbd");
+  const pairingText = text.t("pairing", { team: shownOr(entry.team1Name, tbd), opponent: shownOr(entry.team2Name, tbd) });
+  return text.t("planning.entryMatch", { pairing: pairingText, tournament }).replace(/\s+/g, " ");
+}
+
+/** Lignes d'une liste du planning, bornées comme le programme d'arbitrage (`fitDigestBody`). */
+function planningLines(lines: readonly string[]): DigestLine[] {
+  return lines.slice(0, REFEREE_DIGEST_PUSH_LINES).map((line) => ({ text: line.replace(/\s+/g, " "), count: 1 }));
+}
+
+/**
+ * Nouvelles entrées au planning (`PLANNING_NEW_ENTRIES`) : un récapitulatif
+ * par vague, une ligne par entrée (heure de Paris, affiche), pour poser ses
+ * disponibilités. L'étiquette porte l'empreinte des entrées citées.
+ */
+export function planningNewEntriesPush(entries: readonly PlanningNoticeEntry[], locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const lines = entries.map((entry) =>
+    text.t("planning.newEntries.line", { start: planningNoticeTime(entry.startAt, locale), entry: planningEntryText(entry, text) }),
+  );
+  return {
+    title: text.t("planning.newEntries.title", { count: entries.length }),
+    body: fitDigestBody(planningLines(lines), entries.length, text),
+    multiline: true,
+    url: localeHref(PLANNING_PATH, locale),
+    tag: `planning-new-${idsFingerprint(entries.map((entry) => entryKeyNumber(entry.key)))}`,
+  };
+}
+
+/** Clé d'entrée (`m:12`, `t:3`) en nombre stable pour l'empreinte : `t:` décalé pour ne pas croiser `m:`. */
+function entryKeyNumber(key: string): number {
+  const id = Number(key.slice(2));
+  return key.startsWith("t:") ? -id : id;
+}
+
+/**
+ * Affectation au planning (`PLANNING_ASSIGNED`) : confirmée, manuelle, ou
+ * remplacement d'un désistement. Une ligne par affectation (heure, rôle,
+ * affiche) ; aucun autre membre du staff n'est nommé.
+ */
+export function planningAssignedPush(
+  assignments: readonly PlanningNoticeAssignment[],
+  locale: Locale = DEFAULT_LOCALE,
+  replacement = false,
+): PushContent {
+  const text = TEXT[locale];
+  const lines = assignments.map((item) =>
+    text.t("planning.assigned.line", {
+      start: planningNoticeTime(item.startAt, locale),
+      role: text.t(`planning.roles.${item.role}`),
+      entry: planningEntryText(item, text),
+    }),
+  );
+  return {
+    title: replacement
+      ? text.t("planning.assigned.titleReplacement")
+      : text.t("planning.assigned.title", { count: assignments.length }),
+    body: fitDigestBody(planningLines(lines), assignments.length, text),
+    multiline: true,
+    url: localeHref(PLANNING_PATH, locale),
+    tag: `planning-assigned-${idsFingerprint(assignments.map((item) => entryKeyNumber(item.key)))}`,
+  };
+}
+
+/**
+ * Désistement sur une entrée où le destinataire est affecté
+ * (`PLANNING_WITHDRAWAL`) : « un caster », jamais son pseudo ; remplaçant
+ * affecté, ou place à pourvoir.
+ */
+export function planningWithdrawalPush(notice: PlanningWithdrawalNotice, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const values = {
+    role: text.t(`planning.roles.${notice.role}`),
+    entry: planningEntryText(notice, text),
+    start: planningNoticeTime(notice.startAt, locale),
+  };
+  return {
+    title: text.t("planning.withdrawal.title"),
+    body: text.t(notice.replaced ? "planning.withdrawal.bodyReplaced" : "planning.withdrawal.bodyOpen", values),
+    url: localeHref(PLANNING_PATH, locale),
+    tag: `planning-withdrawal-${notice.key}-${notice.role}`,
+  };
+}
+
+/** Place à pourvoir après un désistement sans remplaçant (`PLANNING_UNFILLED`, staff des tournois). */
+export function planningUnfilledPush(notice: PlanningWithdrawalNotice, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const values = {
+    role: text.t(`planning.roles.${notice.role}`),
+    entry: planningEntryText(notice, text),
+    start: planningNoticeTime(notice.startAt, locale),
+  };
+  return {
+    title: text.t("planning.unfilled.title"),
+    body: text.t(notice.late ? "planning.unfilled.bodyLate" : "planning.unfilled.body", values),
+    url: localeHref(PLANNING_PATH, locale),
+    tag: `planning-unfilled-${notice.key}-${notice.role}`,
   };
 }
 

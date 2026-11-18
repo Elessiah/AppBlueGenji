@@ -18,6 +18,7 @@ jest.mock("@/lib/server/planning/players", () => ({
   loadEntryPlayers: jest.fn(),
 }));
 jest.mock("@/lib/server/tournaments/cast-eligibility");
+jest.mock("@/lib/server/planning/notices");
 
 import type { PoolConnection } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
@@ -42,6 +43,7 @@ import {
   type LoadedAssignment,
   type PlanningData,
 } from "@/lib/server/planning/load";
+import { announceAssignments } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -963,6 +965,16 @@ describe("confirmAssignments", () => {
     expect(assignMatchReferee).not.toHaveBeenCalled();
   });
 
+  it("confirmAssignments_confirmedRow_announcedOnceWithActor", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
+    );
+
+    await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(jest.mocked(announceAssignments).mock.calls[0]).toEqual([[{ userId: 4, entry: first, role: "CASTER" }], { actorId: 9 }]);
+  });
+
   it("confirmAssignments_alreadyConfirmedByEarlierRun_noEventNotCounted", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
       confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
@@ -973,6 +985,7 @@ describe("confirmAssignments", () => {
 
     expect(report).toEqual({ confirmed: 0, refused: 0 });
     expect(statements()).toEqual(["UPDATE bg_planning_assignments SET confi"]);
+    expect(announceAssignments).not.toHaveBeenCalled();
   });
 
   it("confirmAssignments_matchReferee_appliedViaAssignMatchReferee", async () => {

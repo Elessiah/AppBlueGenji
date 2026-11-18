@@ -45,7 +45,7 @@ import {
   type LocalizedPushContent,
   type PushTopic,
 } from "@/lib/shared/push-notifications";
-import { pushToUsers, subscribedStaffCandidates, type PushOptions } from "./push-subscriptions";
+import { pushToUsers, subscribedStaffCandidates, usersWithTopicDisabled, type PushOptions } from "./push-subscriptions";
 import { matchDmEnabled } from "./users/match-dm-preference";
 
 /** Une personne à prévenir : son compte, et comment Discord la joint (ou pas). */
@@ -77,6 +77,13 @@ export type UserNotification = {
    * le premier envoi (`match-reminders.ts`).
    */
   discordOnly?: true;
+  /**
+   * Le sujet coupé dans « Mon profil » coupe aussi le message privé Discord
+   * (sujets du planning, `CAST_PLANNING.md` § Notifications) : un compte qui
+   * l'a coupé ne reçoit ni push ni message privé. Lecture impossible des
+   * réglages : aucun message privé (on ne passe pas outre une opposition).
+   */
+  dmFollowsTopic?: true;
 };
 
 export type NotificationReport = {
@@ -106,9 +113,12 @@ export async function notifyUsers(
   recipients: readonly NotificationRecipient[],
   notification: UserNotification,
 ): Promise<NotificationReport> {
-  const reachable = recipients.filter(
+  const withDiscord = recipients.filter(
     (recipient): recipient is NotificationRecipient & { discord: DiscordRecipient } => recipient.discord !== null,
   );
+  const reachable = notification.dmFollowsTopic
+    ? await withoutTopicOptOuts(withDiscord, notification.topic)
+    : withDiscord;
   const userIds = recipients.map((recipient) => recipient.userId);
   const message = notification.discord;
   // Rédigés **avant** tout départ, dans les seules langues des destinataires :
@@ -133,6 +143,20 @@ export async function notifyUsers(
 }
 
 type ReachableRecipient = NotificationRecipient & { discord: DiscordRecipient };
+
+/** Les destinataires Discord qui n'ont pas coupé le sujet ; aucun si les réglages sont illisibles. */
+async function withoutTopicOptOuts(recipients: ReachableRecipient[], topic: PushTopic): Promise<ReachableRecipient[]> {
+  if (recipients.length === 0) return recipients;
+  try {
+    const muted = await usersWithTopicDisabled(
+      recipients.map((recipient) => recipient.userId),
+      topic,
+    );
+    return recipients.filter((recipient) => !muted.has(recipient.userId));
+  } catch {
+    return [];
+  }
+}
 
 /** Les destinataires d'une langue et le message déjà rédigé pour eux. */
 type LocaleGroup = { text: string; group: ReachableRecipient[] };

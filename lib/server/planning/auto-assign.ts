@@ -35,6 +35,7 @@ import {
   type PlanningData,
 } from "./load";
 import { entryAssignments } from "./model";
+import { announceAssignments } from "./notices";
 import { loadEntryPlayers, playersDuring } from "./players";
 
 /** Verrou nommé de tous les gestes d'écriture du planning (calcul, confirmation, désignation). */
@@ -187,7 +188,8 @@ export async function writeEvent(
   role: PlanningRole,
   kind: "ASSIGNED" | "CONFIRMED" | "REMOVED",
   source: "AUTO" | "MANUAL",
-  actorId: number,
+  /** `null` : geste du site lui-même (remplacement après un désistement), sans auteur. */
+  actorId: number | null,
 ): Promise<number> {
   const [result] = await executor.execute(
     `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
@@ -692,7 +694,12 @@ export async function lockedHolding(
  * le match l'a encore. Un évènement par ligne vraiment changée : relancer le
  * geste n'écrit rien deux fois.
  */
-async function writeConfirmSteps(connection: PoolConnection, steps: readonly ConfirmStep[], actorId: number): Promise<ConfirmReport> {
+async function writeConfirmSteps(
+  connection: PoolConnection,
+  steps: readonly ConfirmStep[],
+  actorId: number,
+  written: ConfirmStep[] = [],
+): Promise<ConfirmReport> {
   // Comptes et tournois verrouillés d'abord, avant les matchs (même ordre que `runAutoAssign`, sans interblocage).
   await refuseLostRoles(connection, steps);
   let confirmed = 0;
@@ -722,6 +729,8 @@ async function writeConfirmSteps(connection: PoolConnection, steps: readonly Con
         );
     if (affected(result) === 0) continue;
     await writeEvent(connection, entry, step.userId, step.role, "CONFIRMED", "AUTO", actorId);
+    // Confirmée par ce geste : la personne sera prévenue (`announceAssignments`), une fois l'écriture validée.
+    written.push(step);
     confirmed += 1;
   }
   // La réconciliation **après** les lignes du geste : un arbitre que ce geste vient de poser sur le
@@ -757,14 +766,38 @@ export async function confirmAssignments(
   const data = await withConnection((connection) => loadPlanningData(connection, { now, includeHidden: true }));
   const all = confirmSteps(data, scope);
   const failure = await designateReferees(all, actorId);
+  // Les attributions que ce geste a confirmées (écriture validée) : annoncées après le verrou,
+  // confirmation partielle comprise. Une proposition provisoire n'est jamais annoncée.
+  const announced: ConfirmStep[] = [];
+  try {
+    return await confirmUnderLock(all, failure, actorId, announced);
+  } finally {
+    if (announced.length > 0) {
+      void announceAssignments(
+        announced.map((step) => ({ userId: step.userId, entry: step.entry, role: step.role })),
+        { actorId },
+      );
+    }
+  }
+}
+
+/** L'écriture d'une confirmation sous le verrou ; `announced` reçoit les lignes confirmées une fois validées. */
+async function confirmUnderLock(
+  all: ConfirmStep[],
+  failure: unknown,
+  actorId: number,
+  announced: ConfirmStep[],
+): Promise<ConfirmReport> {
   return withPlanningLock(async (connection) => {
     // Une panne en route : les désignations que le match a déjà décidées et
     // les autres rôles (casters, prods, qui ne dépendent d'aucun match)
     // s'écrivent quand même, puis la panne d'origine remonte (le geste se relance).
     const steps = failure === undefined ? all : all.filter((step) => step.settled || !isMatchReferee(step));
     let report: ConfirmReport;
+    const written: ConfirmStep[] = [];
     try {
-      report = await transact(connection, () => writeConfirmSteps(connection, steps, actorId));
+      report = await transact(connection, () => writeConfirmSteps(connection, steps, actorId, written));
+      announced.push(...written);
     } catch (error) {
       if (failure === undefined) throw error;
       console.error("[planning] confirmation : écriture du planning en échec après une panne de désignation", failureDiagnostic(error));

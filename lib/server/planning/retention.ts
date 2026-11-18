@@ -21,7 +21,12 @@ const PURGE_TICK_MS = DAY_MS;
 /** Premier passage peu après le démarrage, hors du chemin de la première requête. */
 const FIRST_PURGE_DELAY_MS = 5 * 60 * 1000;
 
-const ENTRY_TABLES = ["bg_planning_availability", "bg_planning_assignments", "bg_planning_events"] as const;
+const ENTRY_TABLES = [
+  "bg_planning_availability",
+  "bg_planning_assignments",
+  "bg_planning_events",
+  "bg_planning_entry_notices",
+] as const;
 
 /** Efface ce que le planning garde au-delà de sa durée de conservation ; rend le nombre de lignes effacées. */
 export async function purgeExpiredPlanning(executor: Executor, now: number = Date.now()): Promise<number> {

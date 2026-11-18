@@ -201,6 +201,70 @@ compte les **rôles**, pas les personnes.
   la route en dérivent.
 - Un geste à la fois : verrou nommé `bg_planning` (10 s) → `PLANNING_BUSY`.
 
+## Notifications (`lib/server/planning/notices.ts`, `new-entries.ts`)
+
+Quatre sujets de `PUSH_TOPICS`, chacun push **et** message privé Discord
+(`notifyUsers` / `notifyStaff`) ; couper le sujet coupe aussi le message privé
+(`dmFollowsTopic` : lu dans `bg_push_topic_optouts`, et une lecture en
+échec n'envoie aucun message privé). Rédacteurs : `push-messages.ts`
+(`planning*Push`) et `lib/shared/planning-notices.ts` (messages privés, heure
+de Paris, lien vers `/planning` dans la langue du destinataire).
+
+- `PLANNING_NEW_ENTRIES` (« Nouveaux matchs au planning ») : **un
+  récapitulatif par vague**. Un balayage (chaque minute,
+  `bg_planning_entry_notices`, verrou nommé `bg_planning_notices`) note
+  chaque entrée ouverte qu'il découvre ; la vague part quand elle est calme
+  depuis 5 min, ou au plus tard 30 min après sa plus ancienne entrée. Chaque
+  membre ne reçoit que les entrées où il tient un rôle utile : caster et prod
+  toutes, arbitre celles dont il remplit la condition d'arbitrage du jeu ;
+  jamais une entrée où il joue ; un tournoi caché seulement s'il voit les
+  tournois cachés. Au premier passage (table vide) tout est noté déjà
+  annoncé, sans message. Une entrée est notée annoncée **avant** l'envoi :
+  une panne perd un récapitulatif, n'en double jamais un.
+- `PLANNING_ASSIGNED` (« Affectations du planning ») : à la **confirmation**
+  (calcul confirmé, un message par personne pour toutes ses lignes) ou à une
+  affectation **manuelle** ; jamais pour une proposition provisoire, jamais
+  à l'auteur du geste ; aussi au remplaçant d'un désistement. Date et heure
+  (Paris), rôle, affiche, lien.
+- `PLANNING_WITHDRAWAL` (« Désistements du planning ») : aux autres affectés
+  de l'entrée quand une attribution **confirmée** est quittée — « un caster
+  s'est désisté », remplaçant affecté ou place à pourvoir.
+- `PLANNING_UNFILLED` (« Places à pourvoir », `tournaments`) :
+  aucun remplaçant trouvé — push au staff des tournois, ligne au canal de logs
+  et message privé aux arbitres (`pushRefereeAlert`, comme une alerte
+  d'arbitrage) ; « désistement tardif » s'il l'est.
+
+Vie privée : aucun pseudo de joueur (« Un match » en tournoi individuel),
+noms d'équipe et de tournoi par `discordInline`, **aucun membre du staff
+nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
+
+## Désistement (`lib/server/planning/withdrawal.ts`, `POST /api/planning/withdrawal`)
+
+- Un membre (`planning`) quitte **sa** ligne (provisoire ou confirmée) d'une
+  entrée modifiable, **jusqu'au début** de l'entrée (`PLANNING_WITHDRAWAL_CLOSED`
+  ensuite) ; jamais un cast inscrit sur le match (`PLANNING_CAST_MANAGED`, il
+  se retire depuis le match). Le staff retire les lignes des autres par le
+  retrait manuel. Geste derrière `ConfirmActionDialog`, motif facultatif
+  (300 caractères au plus, `PLANNING_REASON_TOO_LONG`) lu par le staff des
+  tournois seul.
+- Moins de 24 h avant le début : **tardif** (`late`), signalé au staff.
+- Historique : évènement `WITHDRAWN` (sans auteur, `reason`, `late` ; `source`
+  `MANUAL` si la ligne quittée était confirmée, `AUTO` si provisoire). Il
+  compte comme désistement, **jamais comme charge** : la ligne est effacée,
+  et l'entrée exclut ensuite le membre pour ce rôle (comme un retrait manuel).
+- **Remplacement automatique** sous le verrou du planning, par les règles du
+  calcul (`pickReplacement` : `preparePlanner` sur la seule entrée, rôle
+  quitté). La ligne remplaçante hérite de l'état de la ligne quittée :
+  confirmée (et le remplaçant prévenu, `PLANNING_ASSIGNED`) si elle l'était,
+  provisoire sinon (sans message). Aucun candidat : la place est **« à
+  pourvoir »** (pastille sur la carte, `unfilled` de la vue) et le staff est
+  prévenu (`PLANNING_UNFILLED`) si la ligne était confirmée.
+- Arbitre **d'un match** confirmé : le retrait passe par
+  `assignMatchReferee` (le match perd son arbitre, ligne anonyme au journal),
+  puis le remplaçant y est posé par la même porte — un refus métier compte
+  comme « aucun remplaçant ».
+- Les messages partent après le verrou, sans jamais défaire le geste.
+
 ## Coût (performance)
 
 - Une page = une fenêtre bornée : durées lues une fois (elles voyagent dans
@@ -250,8 +314,9 @@ compte les **rôles**, pas les personnes.
 
 `bg_planning_availability` (réponse par entrée × membre × rôle),
 `bg_planning_assignments` (attributions, source, raison, état),
-`bg_planning_events` (historique : `ASSIGNED`, `CONFIRMED`, `REMOVED` —
-la porte des lots suivants : messages privés, désistement et remplacement),
+`bg_planning_events` (historique : `ASSIGNED`, `CONFIRMED`, `REMOVED`,
+`WITHDRAWN` avec motif et retard),
+`bg_planning_entry_notices` (entrées vues et annoncées par le récapitulatif),
 `bg_planning_profiles` (caster autonome). Clés étrangères en cascade sur
 compte, tournoi, match.
 
@@ -265,8 +330,10 @@ autonome dès que le compte ne tient plus le rôle `CASTER` (seul à pouvoir le
 porter). Suppression du compte : ses lignes partent, ses gestes de staff restent
 sans le désigner (`account-erasure.ts`). Export des données : `planning`
 (`planning-export.ts`) — disponibilités, attributions (avec leur motif),
-historique (`history` : attribuée, confirmée, retirée, sans l'auteur du geste),
-ses gestes comme staff (`staffActions` : événements dont il est l'auteur ;
+historique (`history` : attribuée, confirmée, retirée, désistement avec son
+motif et son retard, sans l'auteur du geste),
+entrées annoncées (`bg_planning_entry_notices`, sans personne) purgées avec
+l'entrée ; ses gestes comme staff (`staffActions` : événements dont il est l'auteur ;
 `assignmentsSet` : attributions qu'il a posées — sans l'identifiant de la
 personne visée, art. 15.4 ; le match et le rôle restent, et l'arbitre désigné
 d'un match est de toute façon public, T04) et réglage autonome.
@@ -278,7 +345,10 @@ changement d'arbitre du match (retirer une proposition provisoire, ou poser
 l'arbitre que le match a déjà, n'en écrit aucune), push `REFEREE_RELEASED` à
 l'arbitre retiré par un autre que lui : retrait (`STAFF`) ou remplacement par un
 autre arbitre (`REPLACED`, désignation avec `replacedRefereeId`), jugés par
-`refereeReleaseNotice` (T04, T05) ; rien d'autre du planning ne part sur Discord. Le staff des
+`refereeReleaseNotice` (T04, T05). Les notifications du planning (§ Notifications)
+partent en message privé Discord sans nommer de joueur ni de membre du
+staff ; la ligne « place à pourvoir » va au canal de logs, anonyme (T12, T20).
+Le motif d'un désistement n'est lu que du staff des tournois. Le staff des
 tournois (`tournaments` : arbitres et administrateurs) lit disponibilités,
 préférences et motifs ; les autres membres lisent le motif d'une proposition du
 calcul comme « Calcul » (`visibleAssignment`). Tests :
@@ -295,7 +365,10 @@ membres, créneau du lecteur surligné (« Mon créneau »), cartes d'entrée (c
 segmenté + étoile de préférence), panneau du staff (calcul de la semaine par
 `ConfirmActionDialog`, confirmation par délai ou par entrée, elle aussi derrière
 `ConfirmActionDialog` (elle pose l'arbitre sur le match), casters autonomes,
-durées). Textes : espace de noms `planning` (FR, EN).
+durées), bouton « Me désister » sur ses propres lignes (sauf cast, jusqu'au
+début ; avertissement « tardif » à moins de 24 h), pastille « À pourvoir »,
+liste des désistements (motif, tardif) pour le staff des tournois. Textes :
+espace de noms `planning` (FR, EN).
 
 ## Tests
 

@@ -198,5 +198,34 @@
   "refereeObjectionReleased": {
     "title": "Arbitrage retiré",
     "body": "Tu n'arbitres plus {count, plural, one {# match} other {# matchs}} : le staff a retenu ton opposition à être présenté aux parties de tes matchs."
+  },
+  "planning": {
+    "roles": {
+      "REFEREE": "arbitre",
+      "CASTER": "caster",
+      "PROD": "prod"
+    },
+    "entryMatch": "{pairing} ({tournament})",
+    "entrySolo": "Un match ({tournament})",
+    "entryEvent": "{tournament} (tout l'événement)",
+    "newEntries": {
+      "title": "{count, plural, one {# nouveau match} other {# nouveaux matchs}} au planning",
+      "line": "{start} · {entry}"
+    },
+    "assigned": {
+      "title": "{count, plural, one {Affecté au planning} other {Affecté à # entrées du planning}}",
+      "titleReplacement": "Tu remplaces un désistement",
+      "line": "{start} · {role} · {entry}"
+    },
+    "withdrawal": {
+      "title": "Désistement sur ton match",
+      "bodyReplaced": "Un {role} s'est désisté de {entry} ({start}) : un remplaçant a été affecté.",
+      "bodyOpen": "Un {role} s'est désisté de {entry} ({start}) : la place est à pourvoir."
+    },
+    "unfilled": {
+      "title": "Place à pourvoir",
+      "body": "Un {role} s'est désisté de {entry} ({start}) : aucun remplaçant trouvé.",
+      "bodyLate": "Un {role} s'est désisté de {entry} ({start}), moins de 24 h avant : aucun remplaçant trouvé."
+    }
   }
 }
