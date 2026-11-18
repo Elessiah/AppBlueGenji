@@ -11,7 +11,6 @@ jest.mock("@/lib/server/planning/load", () => ({
   loadPlanningHistory: jest.fn(),
   loadPlanningMembersByIds: jest.fn(),
   loadHiddenTournamentIds: jest.fn(),
-  loadSuspendedUserIds: jest.fn(),
 }));
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/planning/players", () => ({
@@ -29,6 +28,7 @@ import {
   confirmAssignments,
   entriesToConfirm,
   excludeFromHidden,
+  excludeSuspended,
   holdingRefusal,
   lockedHolding,
   preparePlanner,
@@ -38,7 +38,6 @@ import {
 } from "@/lib/server/planning/auto-assign";
 import {
   loadHiddenTournamentIds,
-  loadSuspendedUserIds,
   loadPlanningData,
   loadPlanningHistory,
   loadPlanningMembersByIds,
@@ -171,7 +170,6 @@ beforeEach(() => {
     ids.map((userId) => loadedMember({ userId, roles: ["REFEREE", "CASTER", "PROD"], seesHidden: true })),
   );
   jest.mocked(loadHiddenTournamentIds).mockResolvedValue(new Set());
-  jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set());
 });
 
 /** Requêtes jouées, réduites à leur début (le verbe et la table). */
@@ -302,6 +300,25 @@ describe("preparePlanner", () => {
   });
 });
 
+describe("excludeSuspended", () => {
+  it("excludeSuspended_suspendedMember_allRolesOfEveryEntryExcluded", () => {
+    const excluded = new Set<string>();
+    const entries = [loadedEntry({ key: "m:1" }), loadedEntry({ key: "m:2", matchId: 2 })];
+
+    excludeSuspended({ members: [loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })] }, entries, excluded);
+
+    expect([...excluded]).toEqual(["m:1|4|REFEREE", "m:1|4|CASTER", "m:1|4|PROD", "m:2|4|REFEREE", "m:2|4|CASTER", "m:2|4|PROD"]);
+  });
+
+  it("excludeSuspended_activeMember_nothingExcluded", () => {
+    const excluded = new Set<string>();
+
+    excludeSuspended({ members: [loadedMember({ userId: 4, roles: ["CASTER"] })] }, [loadedEntry()], excluded);
+
+    expect(excluded.size).toBe(0);
+  });
+});
+
 describe("excludeFromHidden", () => {
   const hidden = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null, hidden: true });
 
@@ -347,6 +364,10 @@ describe("holdingRefusal", () => {
 
   it("holdingRefusal_roleLost_roleNotHeld", () => {
     expect(holdingRefusal(loadedMember({ roles: ["PROD"] }), loadedEntry(), "CASTER")).toBe("PLANNING_ROLE_NOT_HELD");
+  });
+
+  it("holdingRefusal_suspendedMember_roleNotHeld", () => {
+    expect(holdingRefusal(loadedMember({ roles: ["CASTER"], suspended: true }), loadedEntry(), "CASTER")).toBe("PLANNING_ROLE_NOT_HELD");
   });
 
   it("holdingRefusal_hiddenEntryWithoutSeesHidden_hiddenForMember", () => {
@@ -449,10 +470,9 @@ describe("runAutoAssign", () => {
       planningData({
         entries: [loadedEntry()],
         availability: [available("m:1", 3, "REFEREE")],
-        members: [loadedMember({ userId: 3, roles: ["REFEREE"] })],
+        members: [loadedMember({ userId: 3, roles: ["REFEREE"], suspended: true })],
       }),
     );
-    jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set([3]));
 
     const report = await runAutoAssign(9, { from: MONDAY, to: MONDAY + 24 * HOUR_MS }, MONDAY - HOUR_MS);
 
@@ -913,6 +933,18 @@ describe("confirmAssignments", () => {
     expect(report).toEqual({ confirmed: 0, refused: 1 });
     expect(jest.mocked(loadPlanningMembersByIds).mock.calls[0][1]).toEqual([4]);
     expect(statements()).toEqual(["DELETE FROM bg_planning_assignments WHER", "INSERT INTO bg_planning_events (entry_ke"]);
+    expect(writeParams()[1]).toContain("REMOVED");
+  });
+
+  it("confirmAssignments_memberSuspendedSinceProposal_refusedUnderLock", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
+    );
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })]);
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 1 });
     expect(writeParams()[1]).toContain("REMOVED");
   });
 

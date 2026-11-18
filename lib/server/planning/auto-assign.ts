@@ -29,7 +29,6 @@ import {
   loadHiddenTournamentIds,
   loadPlanningHistory,
   loadPlanningMembersByIds,
-  loadSuspendedUserIds,
   type Executor,
   type LoadedEntry,
   type LoadedMember,
@@ -75,23 +74,16 @@ export async function loadExclusions(
   await excludeIneligibleReferees(executor, data, entries, excluded);
   for (const removal of data.removals) excluded.add(exclusionKey(removal.entryKey, removal.userId, removal.role));
   excludeFromHidden(data, entries, excluded);
-  await excludeSuspended(executor, data, entries, excluded);
+  excludeSuspended(data, entries, excluded);
   return excluded;
 }
 
-/** Un compte suspendu n'a plus de droit effectif : aucun rôle d'aucune entrée du lot. */
-async function excludeSuspended(
-  executor: Executor,
-  data: Pick<PlanningData, "members">,
-  entries: readonly LoadedEntry[],
-  excluded: Set<string>,
-): Promise<void> {
-  if (entries.length === 0) return;
-  const suspended = await loadSuspendedUserIds(executor, data.members.map((member) => member.userId));
+/** Un compte suspendu n'a plus de droit effectif : aucun rôle d'aucune entrée du lot (lu avec le compte, `LoadedMember.suspended`). */
+export function excludeSuspended(data: Pick<PlanningData, "members">, entries: readonly LoadedEntry[], excluded: Set<string>): void {
   for (const member of data.members) {
-    if (!suspended.has(member.userId)) continue;
+    if (!member.suspended) continue;
     for (const entry of entries) {
-      for (const role of member.roles) excluded.add(exclusionKey(entry.key, member.userId, role));
+      for (const role of PLANNING_ROLES) excluded.add(exclusionKey(entry.key, member.userId, role));
     }
   }
 }
@@ -509,20 +501,20 @@ type ConfirmStep = {
 
 /**
  * Le membre peut-il encore tenir cette proposition : il a toujours le rôle
- * (ni rôle retiré, ni compte supprimé) et voit l'entrée (un tournoi encore
+ * (ni rôle retiré, ni compte supprimé, ni compte suspendu) et voit l'entrée (un tournoi encore
  * caché ne va qu'à qui voit les tournois cachés, `excludeFromHidden`).
  */
 export function canStillHold(member: LoadedMember | undefined, entry: LoadedEntry, role: PlanningRole): boolean {
   return holdingRefusal(member, entry, role) === null;
 }
 
-/** Le refus de `canStillHold`, par son code : rôle plus tenu (ou compte parti), ou tournoi caché qu'il ne voit pas. */
+/** Le refus de `canStillHold`, par son code : rôle plus tenu (ou compte parti ou suspendu), ou tournoi caché qu'il ne voit pas. */
 export function holdingRefusal(
   member: LoadedMember | undefined,
   entry: Pick<LoadedEntry, "hidden">,
   role: PlanningRole,
 ): "PLANNING_ROLE_NOT_HELD" | "PLANNING_HIDDEN_FOR_MEMBER" | null {
-  if (!member?.roles.includes(role)) return "PLANNING_ROLE_NOT_HELD";
+  if (!member?.roles.includes(role) || member.suspended) return "PLANNING_ROLE_NOT_HELD";
   if (entry.hidden && !member.seesHidden) return "PLANNING_HIDDEN_FOR_MEMBER";
   return null;
 }
@@ -691,7 +683,7 @@ export type HoldingCheck = (userId: number, entry: LoadedEntry, role: PlanningRo
 
 /**
  * Relit, **dans la transaction qui écrit** et verrouillés en partage, les
- * comptes visés (rôles, permission `tournaments`) et l'état caché de leurs
+ * comptes visés (rôles, permission `tournaments`, suspension) et l'état caché de leurs
  * tournois : un rôle retiré ou un tournoi recaché pendant le geste attend sa
  * validation au lieu de passer entre la lecture et l'écriture. Rend le
  * contrôle `holdingRefusal` sur ces données fraîches.

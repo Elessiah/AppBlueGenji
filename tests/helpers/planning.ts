@@ -71,7 +71,7 @@ export function loadedAssignment(overrides: Partial<LoadedAssignment> = {}): Loa
 /** `seesHidden` suit par défaut le rôle d'arbitre (tous deux viennent de `tournaments`). */
 export function loadedMember(overrides: Partial<LoadedMember> = {}): LoadedMember {
   const roles = overrides.roles ?? ["REFEREE"];
-  return { userId: 1, pseudo: "Membre", roles, soloCaster: false, seesHidden: roles.includes("REFEREE"), ...overrides };
+  return { userId: 1, pseudo: "Membre", roles, soloCaster: false, seesHidden: roles.includes("REFEREE"), suspended: false, ...overrides };
 }
 
 export function planningData(overrides: Partial<PlanningData> = {}): PlanningData {

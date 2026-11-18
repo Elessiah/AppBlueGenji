@@ -11,7 +11,6 @@ jest.mock("@/lib/server/planning/load", () => ({
   loadPlanningHistory: jest.fn(),
   loadPlanningMembersByIds: jest.fn(),
   loadHiddenTournamentIds: jest.fn(),
-  loadSuspendedUserIds: jest.fn(),
 }));
 jest.mock("@/lib/server/planning/players", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/players")>("@/lib/server/planning/players"),
@@ -32,7 +31,6 @@ import { getDatabase } from "@/lib/server/database";
 import { withNamedLock } from "@/lib/server/named-lock";
 import {
   loadHiddenTournamentIds,
-  loadSuspendedUserIds,
   loadPlanningData,
   loadPlanningHistory,
   loadPlanningMembersByIds,
@@ -76,7 +74,6 @@ beforeEach(() => {
     ids.map((userId) => loadedMember({ userId, roles: ["REFEREE", "CASTER", "PROD"], seesHidden: true })),
   );
   jest.mocked(loadHiddenTournamentIds).mockResolvedValue(new Set());
-  jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set());
   jest.mocked(assignMatchReferee).mockResolvedValue(undefined);
   jest.mocked(snapshotGesture).mockResolvedValue({ keys: [], rows: [] });
   jest.mocked(readMatchReferee).mockResolvedValue(3);
@@ -84,8 +81,14 @@ beforeEach(() => {
 });
 
 /** Avant le désistement : le caster 4 tient sa ligne ; après : elle est partie, et lui écarté (candidats autonomes : sans prod). */
-function casterData(options: { confirmed: boolean; candidates?: number[] }) {
-  const members = [loadedMember({ userId: 4, roles: ["CASTER"] }), ...(options.candidates ?? []).map((userId) => loadedMember({ userId, roles: ["CASTER"], soloCaster: true }))];
+/** `suspended` : candidats qu'une suspension tient (lu avec le compte). */
+function casterData(options: { confirmed: boolean; candidates?: number[]; suspended?: number[] }) {
+  const members = [
+    loadedMember({ userId: 4, roles: ["CASTER"] }),
+    ...(options.candidates ?? []).map((userId) =>
+      loadedMember({ userId, roles: ["CASTER"], soloCaster: true, suspended: options.suspended?.includes(userId) ?? false }),
+    ),
+  ];
   const availability = (options.candidates ?? []).map((userId) => available("m:1", userId, "CASTER"));
   jest
     .mocked(loadPlanningData)
@@ -220,8 +223,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
   });
 
   it("withdrawFromEntry_onlyCandidateSuspended_slotUnfilled", async () => {
-    casterData({ confirmed: true, candidates: [6] });
-    jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set([6]));
+    casterData({ confirmed: true, candidates: [6], suspended: [6] });
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
@@ -229,9 +231,26 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: true });
   });
 
-  it("withdrawFromEntry_suspendedAndActiveCandidates_activeReplacementPicked", async () => {
+  it("withdrawFromEntry_twoActiveCandidates_firstPicked", async () => {
     casterData({ confirmed: true, candidates: [6, 7] });
-    jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set([6]));
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6 });
+  });
+
+  it("withdrawFromEntry_candidateSuspendedUnderLock_notPlaced", async () => {
+    casterData({ confirmed: true, candidates: [6] });
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 6, roles: ["CASTER"], suspended: true })]);
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true });
+    expect(statements()).not.toContain("INSERT INTO bg_planning_assignments (ent");
+  });
+
+  it("withdrawFromEntry_suspendedAndActiveCandidates_activeReplacementPicked", async () => {
+    casterData({ confirmed: true, candidates: [6, 7], suspended: [6] });
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 

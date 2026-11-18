@@ -91,6 +91,14 @@ describe("loadPlanningView — comptes", () => {
     expect(view.members).toEqual([{ userId: 4, pseudo: "Membre", roles: ["CASTER"], soloCaster: false }]);
   });
 
+  it("loadPlanningView_suspendedMember_flagNotSentToPage", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], seesHidden: false, suspended: true })]);
+
+    const view = await loadPlanningView(staff, MONDAY);
+
+    expect(view.members[0]).not.toHaveProperty("suspended");
+  });
+
   it("loadPlanningView_staff_membersCarrySeesHidden", async () => {
     jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], seesHidden: false })]);
 

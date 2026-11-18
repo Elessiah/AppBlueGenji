@@ -11,7 +11,6 @@ jest.mock("@/lib/server/planning/load", () => ({
   loadPlanningEntries: jest.fn(),
   loadPlanningMembersByIds: jest.fn(),
   loadHiddenTournamentIds: jest.fn(),
-  loadSuspendedUserIds: jest.fn(),
 }));
 jest.mock("@/lib/server/planning/profiles");
 jest.mock("@/lib/server/planning/notices");
@@ -27,7 +26,7 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { withNamedLock } from "@/lib/server/named-lock";
 import { PLANNING_STATUSES, setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
 import { MATCH_REFEREE_REFUSAL_CODES } from "@/lib/server/planning/auto-assign";
-import { loadHiddenTournamentIds, loadPlanningData, loadPlanningEntries, loadPlanningMembersByIds, loadSuspendedUserIds } from "@/lib/server/planning/load";
+import { loadHiddenTournamentIds, loadPlanningData, loadPlanningEntries, loadPlanningMembersByIds } from "@/lib/server/planning/load";
 import { announceAssignments } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { writeSoloCaster } from "@/lib/server/planning/profiles";
@@ -133,7 +132,6 @@ beforeEach(() => {
     ids.map((userId) => loadedMember({ userId, roles: ["REFEREE", "CASTER", "PROD"], seesHidden: true })),
   );
   jest.mocked(loadHiddenTournamentIds).mockResolvedValue(new Set());
-  jest.mocked(loadSuspendedUserIds).mockResolvedValue(new Set());
 });
 
 describe("setAvailability", () => {

@@ -112,7 +112,11 @@ export type LoadedWithdrawal = {
  * Un compte du planning. `seesHidden` : il voit les tournois encore cachés
  * (permission `tournaments`, la même que `includeHidden` des lectures).
  */
-export type LoadedMember = { userId: number; pseudo: string; roles: PlanningRole[]; soloCaster: boolean; seesHidden: boolean };
+/**
+ * `suspended` : une suspension le tient à la lecture — plus aucun droit
+ * effectif au planning (`holdingRefusal`) ; jamais rendu à la page.
+ */
+export type LoadedMember = { userId: number; pseudo: string; roles: PlanningRole[]; soloCaster: boolean; seesHidden: boolean; suspended: boolean };
 
 export type PlanningData = {
   entries: LoadedEntry[];
@@ -333,12 +337,16 @@ type MemberRow = RowDataPacket & {
   is_admin: number;
   platform_roles_json: string | null;
   solo_caster: number | null;
+  suspended: number;
 };
+
+/** Une suspension qui court tient le compte `u` (sous-requête, lue avec la ligne du compte). */
+const MEMBER_SUSPENDED_SQL = `EXISTS (SELECT 1 FROM bg_account_suspensions s WHERE s.user_id = u.id AND ${activeSuspensionSql("s")}) AS suspended`;
 
 /** Comptes qui tiennent un rôle du planning (droits **réels**, la vue joueur n'y change rien). */
 export async function loadPlanningMembers(executor: Executor): Promise<LoadedMember[]> {
   const [rows] = await executor.execute<MemberRow[]>(
-    `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster
+    `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster, ${MEMBER_SUSPENDED_SQL}
        FROM bg_users u
        LEFT JOIN bg_planning_profiles p ON p.user_id = u.id
       WHERE u.is_deleted = 0 AND ${PLANNING_MEMBER_SQL}
@@ -360,6 +368,7 @@ function toMembers(rows: readonly MemberRow[]): LoadedMember[] {
         roles: planningRolesOf(account),
         soloCaster: Number(row.solo_caster ?? 0) === 1,
         seesHidden: can(account, "tournaments"),
+        suspended: Number(row.suspended) === 1,
       };
     })
     .filter((member) => member.roles.length > 0);
@@ -373,8 +382,10 @@ function toMembers(rows: readonly MemberRow[]): LoadedMember[] {
  * en partage (`LOCK IN SHARE MODE`, compris de MariaDB) — un retrait de rôle
  * concurrent attend que l'écriture qui s'appuie sur cette lecture soit validée ;
  * cette lecture-là, sans jointure, ne lit **pas** le réglage « caster
- * autonome » (`soloCaster` toujours faux) : elle ne sert qu'à juger rôles et
- * visibilité (`lockedHolding`).
+ * autonome » (`soloCaster` toujours faux) : elle ne sert qu'à juger rôles,
+ * suspension et visibilité (`lockedHolding`) ; la suspension, lue par
+ * sous-requête, est verrouillée avec elle (une suspension posée pendant le
+ * geste attend).
  */
 export async function loadPlanningMembersByIds(
   executor: Executor,
@@ -385,11 +396,11 @@ export async function loadPlanningMembersByIds(
   // Le compte seul est verrouillé (requête sans jointure) ; le réglage autonome se lit à part.
   const [rows] = await executor.execute<MemberRow[]>(
     options.lock
-      ? `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, 0 AS solo_caster
+      ? `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, 0 AS solo_caster, ${MEMBER_SUSPENDED_SQL}
            FROM bg_users u
           WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
           ORDER BY u.id LOCK IN SHARE MODE`
-      : `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster
+      : `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster, ${MEMBER_SUSPENDED_SQL}
            FROM bg_users u
            LEFT JOIN bg_planning_profiles p ON p.user_id = u.id
           WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
@@ -414,23 +425,6 @@ export async function loadHiddenTournamentIds(executor: Executor, tournamentIds:
     [...tournamentIds],
   );
   return new Set(rows.filter((row) => Number(row.hidden) === 1).map((row) => Number(row.id)));
-}
-
-/**
- * Parmi ces comptes, ceux qu'une suspension tient **à cet instant** : un
- * compte suspendu n'a plus de droit effectif, le calcul ne le propose à aucun
- * rôle (ni lot, ni remplacement d'un désistement).
- */
-export async function loadSuspendedUserIds(executor: Executor, userIds: readonly number[]): Promise<Set<number>> {
-  const ids = [...new Set(userIds)];
-  if (ids.length === 0) return new Set();
-  const [rows] = await executor.execute<(RowDataPacket & { user_id: number })[]>(
-    `SELECT DISTINCT s.user_id
-       FROM bg_account_suspensions s
-      WHERE s.user_id IN (${inList(ids.length)}) AND ${activeSuspensionSql("s")}`,
-    ids,
-  );
-  return new Set(rows.map((row) => Number(row.user_id)));
 }
 
 type AvailabilityRow = RowDataPacket & {

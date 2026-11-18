@@ -82,7 +82,7 @@
     },
     "PLANNING_UNFILLED": {
       "label": "Open slots",
-      "description": "After the withdrawal from a confirmed assignment, no replacement was found: the slot is open on the planning. Also turns off the Discord direct message."
+      "description": "After the withdrawal from a confirmed assignment, no replacement was found: the slot is open. Also turns off the Discord direct message."
     },
     "STAFF_REPORT": {
       "label": "Incoming reports",
@@ -95,7 +95,7 @@
     "compactLead": "Get notified even when the site is closed.",
     "devices": "{count, plural, one {1 device subscribed} other {{count} devices subscribed}} to your account. The settings below apply to all of them.",
     "legend": "Notify me about",
-    "discordHint": "Discord direct messages have their own box: “Discord direct messages about my matches and teams”. Planning excepted.",
+    "discordHint": "Discord direct messages about your matches and teams have their own box: “Discord direct messages about my matches and teams”.",
     "notConfigured": "Push notifications aren't enabled on the site yet.",
     "checking": "Checking this device…",
     "enabledHere": "Enabled on this device",

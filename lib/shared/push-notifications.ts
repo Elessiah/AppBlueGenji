@@ -142,7 +142,7 @@ export const PUSH_TOPICS = {
   },
   PLANNING_UNFILLED: {
     label: "Places à pourvoir",
-    description: "Après le désistement d'une affectation confirmée, aucun remplaçant n'a été trouvé : la place est à pourvoir sur le planning. Coupe aussi le message privé Discord.",
+    description: "Après le désistement d'une affectation confirmée, aucun remplaçant n'a été trouvé : la place est à pourvoir. Coupe aussi le message privé Discord.",
     audience: "tournaments",
   },
   STAFF_REPORT: {

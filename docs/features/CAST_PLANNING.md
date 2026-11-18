@@ -378,9 +378,13 @@ autre arbitre (`REPLACED`, désignation avec `replacedRefereeId`), jugés par
 partent en message privé Discord sans nommer de joueur ni de membre du
 staff ; la ligne « place à pourvoir » va au canal de logs, anonyme (T12, T20).
 Le motif d'un désistement n'est lu que du staff des tournois ; la pastille
-« à pourvoir » (`unfilled`) est montrée à tous les membres, sans motif.
-Un compte **suspendu** n'est proposé par le calcul à aucun rôle, ni en lot ni
-en remplacement d'un désistement (`loadExclusions` → `loadSuspendedUserIds`). Le staff des
+« à pourvoir » (`unfilled`) est montrée à tous les membres, sans motif, tant
+que plus personne ne tient (confirmé) le rôle quitté ; l'avis au staff part,
+lui, dès qu'une attribution confirmée reste sans remplaçant (`unfilledRoles`).
+Un compte **suspendu** (`LoadedMember.suspended`, lu avec le compte par
+sous-requête, verrouillée avec lui sous `lockedHolding`) n'est ni proposé, ni
+confirmé, ni désigné, ni pris en remplaçant : `excludeSuspended` (tous les
+rôles) et `holdingRefusal` (`PLANNING_ROLE_NOT_HELD`) ; jamais rendu à la page. Le staff des
 tournois (`tournaments` : arbitres et administrateurs) lit disponibilités,
 préférences et motifs ; les autres membres lisent le motif d'une proposition du
 calcul comme « Calcul » (`visibleAssignment`). Tests :
