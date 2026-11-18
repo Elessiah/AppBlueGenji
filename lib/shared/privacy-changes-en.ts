@@ -13,6 +13,7 @@
  * this module.
  */
 
+import { PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
@@ -1169,6 +1170,19 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Nothing is said about it on Discord. In the server logs, each switch (on or off) leaves a line with the username and identifier of its author, according to their automatic rotation; basis: legitimate interest (administration of the platform), to which the person concerned may object.",
       "The player-view deadline is noted on the login session and is erased with it (logout, end of the session or deletion of the account). For the time of the switch, the server keeps in memory only, never written, the account number, the time of the switches and the hash of the session.",
       "What does not change: for a player without a platform role, nothing new is collected, and what deleting the account removes stays the same.",
+    ],
+  },
+  "2026-11-planning-casts-arbitres": {
+    linkLabels: ["Read record T20 of the register"],
+    title: "Cast and referee schedule",
+    summary: `Referees, casters and prods (a new platform role) get a \u201cSchedule\u201d page: they give their availability and preferences there, slot by slot, and the tournament staff assigns who covers each match. These data are kept ${PLANNING_RETENTION_DAYS} days after the start of the slot; the “solo caster” setting, as long as the account holds the caster role.`,
+    details: [
+      "What is kept: for each slot and each role held, the availability given and the preference; the assignments (who holds which role, proposed by the calculation or chosen by the staff, provisional or confirmed, with the staff account that set it) and their history (with the account that acted through the schedule, none when the site aligns the schedule with the match); the \u201csolo caster\u201d setting. Basis: the association's legitimate interest (organising its volunteers), with a right to object.",
+      "Who reads it: referees, casters, prods and administrators see each slot's assignments (the reason for a calculated proposal — preference, load — only appears as “Calculation”, except to the tournament staff and the person concerned); only the tournament staff (referees and administrators) sees everyone's availability and preferences.",
+      "Through the schedule, confirming or assigning a match's referee, or removing its assigned referee, acts on the match itself, like the staff does (register, T04 and T05): the staff log on Discord notes each change of the match's referee without naming anyone, and a referee removed by someone else is notified by push. Nothing else from the schedule is published on Discord.",
+      "Deleting the account removes everything about it in the schedule (the actions it took as staff remain, without naming it); the export of your data contains it, actions taken as staff included.",
+      "The “prod” title joins the platform role titles shown on the player page to every logged-in member.",
+      "What does not change: for a player without a platform role, nothing new is collected.",
     ],
   },
 };

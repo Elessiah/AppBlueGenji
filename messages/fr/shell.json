@@ -35,6 +35,7 @@
   "account": {
     "menuLabel": "{pseudo}, menu du compte",
     "profile": "Mon profil",
+    "planning": "Planning",
     "devDocs": "Documentation dev",
     "logout": "Déconnexion",
     "loggingOut": "Déconnexion…",

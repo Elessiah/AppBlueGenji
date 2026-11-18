@@ -99,6 +99,7 @@ export async function PublicHeader() {
                   affiché (WCAG 2.5.3). */}
               <AccountMenu pseudo={user.pseudo} avatarUrl={user.avatarUrl} activeTeam={activeTeam}
                 devDocs={can(user, "dev")}
+                planning={can(user, "planning")}
                 playerViewEntry={playerViewMenuMode(user)}
               />
             </>

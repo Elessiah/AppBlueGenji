@@ -44,6 +44,7 @@
  * Voir `docs/features/PRIVACY_CHANGES_CONSENT.md`.
  */
 
+import { PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
@@ -2211,6 +2212,28 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Rien n'en est dit sur Discord. Dans les journaux du serveur, chaque bascule (activée ou quittée) laisse une ligne avec le pseudo et l'identifiant de son auteur, selon leur rotation automatique ; base : l'intérêt légitime (administration de la plateforme), auquel la personne concernée peut s'opposer.",
       "L'échéance de la vue joueur est notée sur la session de connexion et s'efface avec elle (déconnexion, fin de la session ou suppression du compte). Le temps de la bascule, le serveur garde en mémoire seulement, jamais écrits, le numéro du compte, l'heure des bascules et l'empreinte de la session.",
       "Ce qui ne change pas : pour un joueur sans rôle de plateforme, rien de nouveau n'est collecté, et ce que la suppression du compte emporte reste le même.",
+    ],
+  },
+  {
+    // CAST-PLANNING — planning des casts et arbitres (`docs/features/CAST_PLANNING.md`) :
+    // disponibilités, préférences, attributions (provisoires puis confirmées),
+    // leur historique et le réglage « caster autonome », pour les arbitres,
+    // casters et prods (nouveau rôle). Registre T20, /rgpd (FR et EN). Pour
+    // tous les comptes, comme les rôles de plateforme : n'importe quel compte
+    // peut recevoir un rôle. Datée du lendemain de la mise en ligne prévue,
+    // comme `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
+    id: "2026-11-planning-casts-arbitres",
+    publishedAt: "2026-11-21",
+    title: "Planning des casts et arbitres",
+    links: [{ href: "/rgpd/registre#t20", label: "Lire la fiche T20 du registre" }],
+    summary: `Les arbitres, casters et prods (nouveau rôle de plateforme) disposent d'une page « Planning » : ils y donnent leurs disponibilités et leurs préférences, créneau par créneau, et le staff des tournois y attribue qui couvre chaque match. Ces données sont gardées ${PLANNING_RETENTION_DAYS} jours après le début du créneau ; le réglage « caster autonome », tant que le compte tient le rôle caster.`,
+    details: [
+      "Ce qui est gardé : pour chaque créneau et chaque rôle tenu, la disponibilité donnée et la préférence ; les attributions (qui tient quel rôle, proposée par le calcul ou choisie par le staff, provisoire ou confirmée, avec le compte du staff qui l'a posée) et leur historique (avec le compte qui a agi par le planning, sans compte quand le site aligne le planning sur le match) ; le réglage « caster autonome ». Base : intérêt légitime de l'association (organiser ses bénévoles), avec droit d'opposition.",
+      "Qui le lit : les arbitres, casters, prods et administrateurs voient les attributions de chaque créneau (le motif d'une proposition du calcul — préférence, charge — n'y paraît, hors le staff des tournois et la personne concernée, que comme « Calcul ») ; seul le staff des tournois (arbitres et administrateurs) voit les disponibilités et préférences de tous.",
+      "Par le planning, confirmer ou désigner l'arbitre d'un match, ou retirer son arbitre désigné, agit sur le match lui-même, comme un geste du staff (registre, T04 et T05) : le journal du staff sur Discord note chaque changement d'arbitre du match sans nommer personne, et l'arbitre retiré par un autre que lui en est prévenu par notification. Rien d'autre du planning n'est publié sur Discord.",
+      "La suppression du compte emporte tout ce qui le concerne dans le planning (les gestes qu'il a faits comme staff restent, sans le désigner) ; l'export de tes données le contient, gestes faits comme staff compris.",
+      "Le titre « prod » rejoint les titres de rôle de plateforme affichés sur la fiche du joueur à tout membre connecté.",
+      "Ce qui ne change pas : pour un joueur sans rôle de plateforme, rien de nouveau n'est collecté.",
     ],
   },
 ];

@@ -1299,6 +1299,26 @@ export type PersonalDataExport = {
   /** Matchs dont il a posé le mode d'antenne (`bg_matches.live_trigger_user_id`, T16). */
   liveTriggers: { matchId: number; tournamentId: number; liveTrigger: string | null }[];
   /**
+   * Planning des casts et arbitres (`docs/features/CAST_PLANNING.md`) : ses
+   * disponibilités et préférences, les attributions qui le nomment, ses gestes
+   * comme staff et son réglage « caster autonome » (`null` : jamais posé).
+   */
+  planning: {
+    availability: { tournamentId: number; matchId: number | null; role: string; status: string; preferred: boolean; updatedAt: string | null }[];
+    /** `reason` : motif de l'attribution (`PREFERENCE`, `LOAD`, `MANUAL`), tel que sa page le lui montre. */
+    assignments: { tournamentId: number; matchId: number | null; role: string; source: string; reason: string; confirmed: boolean; createdAt: string | null }[];
+    /** Historique des attributions (attribuée, confirmée, retirée), sans l'auteur du geste. */
+    history: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
+    /**
+     * Ses gestes comme staff (attribution posée, confirmée, retirée) : la
+     * trace qui le nomme comme auteur, sans l'identifiant de la personne visée (art. 15.4).
+     */
+    staffActions: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
+    /** Attributions en cours qu'il a posées comme staff, sans l'identifiant de la personne visée. */
+    assignmentsSet: { tournamentId: number; matchId: number | null; role: string; source: string; confirmed: boolean; createdAt: string | null }[];
+    soloCaster: boolean | null;
+  };
+  /**
    * Suspensions du compte encore conservées (`lib/shared/account-suspension.ts`) :
    * faits retenus, clause invoquée et dates — jamais qui les a prononcées.
    */

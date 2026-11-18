@@ -88,9 +88,10 @@ import {
 import { frEn, localize, type Localizable } from "@/lib/shared/bilingual";
 import { ACCOUNT_REACTIVATION_DAYS, REACTIVATION_TICKET_MINUTES } from "@/lib/shared/account-deletion";
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
+import { PLANNING_HISTORY_WEEKS, PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-20";
+export const REGISTER_UPDATED_AT = "2026-11-21";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -507,8 +508,8 @@ const ACTIVITIES = registerActivities({
         "Parties to the same match: in its “Contacts” window and its launch window, for the BattleTag of any contact presented (player, caster, assigned referee); on the match page as well, for the BattleTag of the assigned referee and the casters and, for the parties to the match alone (never a referee with no role in that match), that of both teams' contacts — (BattleTag even when hidden, to add each other in game, in Overwatch tournaments only; durations of record T04)"),
       frEn("Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible ; pastilles de certification de la fiche (tag Discord certifié, « BattleTag vérifié » — BattleTag tiré d'un compte Battle.net rattaché), même tag masqué, sans le tag",
         "Logged-in players of the site: certified Discord username, if the player makes it visible; certification badges on the player page (certified Discord tag, “Verified BattleTag” — BattleTag taken from a linked Battle.net account), even when the tag is hidden, without the tag"),
-      frEn("Joueurs connectés du site : titre de rôle de plateforme (administrateur, arbitre, caster, community manager, recruteur) sur la fiche du joueur, quels que soient ses réglages de visibilité — jamais le rôle développeur, qui n'y paraît pas",
-        "Logged-in players of the site: platform role title (administrator, referee, caster, community manager, recruiter) on the player page, whatever their visibility settings — never the developer role, which does not appear there"),
+      frEn("Joueurs connectés du site : titre de rôle de plateforme (administrateur, arbitre, caster, prod, community manager, recruteur) sur la fiche du joueur, quels que soient ses réglages de visibilité — jamais le rôle développeur, qui n'y paraît pas",
+        "Logged-in players of the site: platform role title (administrator, referee, caster, prod, community manager, recruiter) on the player page, whatever their visibility settings — never the developer role, which does not appear there"),
       frEn("Staff de l'association selon son rôle (administration, arbitrage)",
         "The association's staff according to their role (administration, refereeing)"),
       frEn("Bot Discord de l'association (T08) : la langue du compte, avec le seul code envoyé en message privé",
@@ -818,8 +819,8 @@ const ACTIVITIES = registerActivities({
         "Match refereeing: an assigned referee taking a match, being assigned it by the staff or removed from it (by themselves, by the staff or automatically, with the reason), self-management of a match or of a whole round (one line per round), first map set or cleared, map picked from the round pool (by the staff or, in self-management, by a team of the match) or pick cleared — without naming the referee or the staff; a referee's objection upheld or lifted by the staff: a single line, naming no one nor the matches they are removed from (no line per match)"),
       frEn("Autres gestes du staff sur les matchs et tournois : résultat validé ou score enregistré par l'arbitrage, lancement forcé, hôte du salon désigné ou retiré, réglage de la diffusion d'un match, mise à l'antenne ou retrait, lien de rediffusion, modification d'un tournoi, cartes de manche (pool et cartes imposées) ou règles de ban modifiées, options « Salons vocaux d'équipe » et « Check-in des matchs » allumées ou éteintes, salon vocal d'une équipe vidé (son auteur, s'il n'est pas l'arbitre désigné du match, est en outre nommé dans les journaux du serveur, voir T18), ordre des têtes de série, étape suivante avancée, équipes fantômes inscrites (leur nombre), image et lien de diffusion d'un tournoi — le geste, le tournoi et le match (le tournoi seul pour un score qui suspend la validation automatique et pour un geste sur le tournoi : modification, cartes de manche, règles de ban, options « Salons vocaux d'équipe » et « Check-in des matchs », têtes de série, étape avancée, équipes fantômes, image et lien de diffusion), sans nommer son auteur (« le staff », ou « un caster » pour un geste de diffusion de qui n'a que cette permission) ni le lien posé ; cette ligne n'ajoute rien aux journaux du serveur (un litige tranché ou un résultat corrigé y garde la trace courte nominative décrite à la première ligne (traçabilité des gestes d'arbitrage), comme une validation automatique suspendue), sauf, quand elle n'a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur",
         "Other staff actions on matches and tournaments: result confirmed or score saved by the referees, forced launch, lobby host set or removed, a match's broadcast settings, putting on air or taking off air, replay link, tournament edited, round maps (pool and imposed maps) or ban rules changed, “Team voice channels” and “Match check-in” options turned on or off, a team's voice channel cleared (its author, unless they are the match's assigned referee, is also named in the server logs, see T18), seeding order, next stage brought forward, ghost teams registered (their number), a tournament's image and broadcast link — the action, the tournament and the match (the tournament alone for a score that pauses the automatic confirmation and for an action on the tournament: edits, round maps, ban rules, “Team voice channels” and “Match check-in” options, seeding, stage brought forward, ghost teams, image and broadcast link), without naming its author (“the staff”, or “a caster” for a broadcast action by someone who only holds that permission) or the link set; this line adds nothing to the server logs (a dispute settled or a result corrected keeps there the short named trace described in the first line (traceability of refereeing actions), as does a paused automatic confirmation), except, when it could not be composed, the action and the match or tournament number, without its author"),
-      frEn("Rôles de plateforme : attribution ou retrait d'un rôle (administrateur, arbitre, caster, community manager, recruteur, développeur) par un administrateur, y compris sur son propre compte, où il ne peut pas se retirer l'administration — une ligne sans nommer personne ; dans les journaux du serveur, son auteur, l'identifiant du compte visé et les rôles enregistrés",
-        "Platform roles: an administrator granting or removing a role (administrator, referee, caster, community manager, recruiter, developer), including on their own account, where they cannot remove their own administration — one line naming no one; in the server logs, its author, the identifier of the account concerned and the roles saved"),
+      frEn("Rôles de plateforme : attribution ou retrait d'un rôle (administrateur, arbitre, caster, prod, community manager, recruteur, développeur) par un administrateur, y compris sur son propre compte, où il ne peut pas se retirer l'administration — une ligne sans nommer personne ; dans les journaux du serveur, son auteur, l'identifiant du compte visé et les rôles enregistrés",
+        "Platform roles: an administrator granting or removing a role (administrator, referee, caster, prod, community manager, recruiter, developer), including on their own account, where they cannot remove their own administration — one line naming no one; in the server logs, its author, the identifier of the account concerned and the roles saved"),
       frEn(`Vue joueur : un compte qui porte un rôle de plateforme (membre du staff ou développeur) suspend ses droits sur une de ses sessions pour voir le site comme un joueur, ${PLAYER_VIEW_MAX_HOURS} heures au plus, puis les reprend — aucune ligne sur Discord ; dans les journaux du serveur, une ligne à chaque bascule (activée ou quittée) qui nomme son auteur ; l'échéance de la vue est portée par la session (T01) et y reste, même passée, jusqu'à l'effacement de la session ; en mémoire seulement, jamais écrits, le numéro du compte et l'heure de chaque bascule, pour leur plafond (une minute et demie au plus), et le numéro du compte avec l'empreinte de la session, pour en rouvrir les flux en direct (ignorés au bout d'une minute, oubliés au passage suivant du serveur)`,
         `Player view: an account holding a platform role (staff member or developer) suspends its rights on one of its sessions to see the site as a player, for ${PLAYER_VIEW_MAX_HOURS} hours at most, then takes them back — no line on Discord; in the server logs, one line at each switch (on or off) naming its author; the deadline of the view is held by the session (T01) and stays there, even once passed, until the session is erased; in memory only, never written, the account number and the time of each switch, for their cap (one and a half minutes at most), and the account number with the hash of the session, to reopen its live streams (ignored after one minute, forgotten at the server's next pass)`),
     ],
@@ -1736,6 +1737,58 @@ const ACTIVITIES = registerActivities({
         "No cookie nor browser storage for the measurement; the session is never read: the measurement does not know whether the visitor is logged in"),
       frEn("Opposition relue côté serveur (en-têtes Sec-GPC et DNT, cookie d'opposition) : une page vue refusée n'est ni hachée, ni décomptée du plafond d'envois, ni écrite ; robots connus écartés de la même façon",
         "Objection read again on the server side (Sec-GPC and DNT headers, objection cookie): a refused page view is neither hashed, nor counted against the submission cap, nor written; known bots are set aside in the same way"),
+    ],
+  },
+  T20: {
+    name: frEn("Planning des casts et arbitres", "Cast and referee schedule"),
+    purpose: frEn("Organiser qui arbitre, caste et produit (prod) les matchs et les tournois à venir",
+      "Organising who referees, casts and produces the upcoming matches and tournaments"),
+    subPurposes: [
+      frEn("Recueillir, créneau par créneau (match planifié, ou tournoi entier), la disponibilité de chaque arbitre, caster et prod pour chaque rôle qu'il tient, et sa préférence",
+        "Collecting, slot by slot (scheduled match, or whole tournament), the availability of each referee, caster and prod for each role they hold, and their preference"),
+      frEn(`Proposer les attributions par un calcul qui suit les disponibilités et les préférences et répartit la charge (semaine en cours et ${PLANNING_HISTORY_WEEKS} semaines précédentes) ; propositions provisoires jusqu'à leur confirmation par le staff des tournois, qui peut aussi désigner ou retirer quelqu'un à la main`,
+        `Proposing assignments through a calculation that follows availability and preferences and balances the load (current week and the ${PLANNING_HISTORY_WEEKS} previous weeks); proposals stay provisional until confirmed by the tournament staff, who can also assign or remove someone by hand`),
+      frEn("Retenir si un caster diffuse seul (caster autonome), réglage posé par le caster ou par le staff des tournois",
+        "Recording whether a caster streams alone (solo caster), a setting made by the caster or by the tournament staff"),
+    ],
+    legalBasis: frEn("Intérêt légitime de l'association (RGPD, art. 6.1.f : organiser les bénévoles qui arbitrent et diffusent ses tournois), avec droit d'opposition ; les données viennent des bénévoles eux-mêmes ou du staff qui les organise",
+      "Legitimate interest of the association (GDPR, art. 6.1.f: organising the volunteers who referee and stream its tournaments), with a right to object; the data come from the volunteers themselves or from the staff who organises them"),
+    dataSubjects: [
+      frEn("Arbitres, casters et prods du site (rôles de plateforme), administrateurs compris", "Referees, casters and prods of the site (platform roles), administrators included"),
+    ],
+    dataCategories: [
+      frEn("Pour chaque créneau et chaque rôle : disponibilité (disponible, absent, à voir), préférence, date de la dernière réponse",
+        "For each slot and each role: availability (available, away, maybe), preference, date of the last answer"),
+      frEn("Attributions : qui tient quel rôle sur quel créneau, provenance (calcul ou choix du staff), motif (préférence, charge, choix du staff ; l'inscription de cast ou l'arbitre désigné du match, montrés comme motif, se lisent sur l'inscription et sur le match, T04, sans être gardés ici), état (provisoire ou confirmée), compte du staff qui l'a posée, et leur historique (pose, confirmation, retrait — arbitre changé ou retiré depuis le match compris —, avec la date et le compte qui a agi par le planning, sans compte quand le site aligne le planning sur le match)",
+        "Assignments: who holds which role on which slot, origin (calculation or staff choice), reason (preference, load, staff choice; the cast signup or the match's assigned referee, shown as a reason, are read from the signup and from the match, T04, without being kept here), state (provisional or confirmed), the staff account that set it, and their history (set, confirmed, removed — a referee changed or removed from the match included —, with the date and the account that acted through the schedule, none when the site aligns the schedule with the match)"),
+      frEn("Réglage « caster autonome »", "\u201cSolo caster\u201d setting"),
+    ],
+    sensitiveData: frEn("Aucune", "None"),
+    retention: [
+      frEn(`Disponibilités, préférences, attributions et leur historique : ${PLANNING_RETENTION_DAYS} jours après le début du créneau, puis effacés par une purge quotidienne, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
+        `Availability, preferences, assignments and their history: ${PLANNING_RETENTION_DAYS} days after the start of the slot, then erased by a daily purge, apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`),
+      frEn("Réglage « caster autonome » : tant que le compte tient le rôle caster ; effacé à la purge quotidienne qui suit son retrait",
+        "\u201cSolo caster\u201d setting: as long as the account holds the caster role; erased by the daily purge that follows its removal"),
+      frEn("Suppression du compte : tout ce qui le concerne dans le planning part avec lui ; les gestes qu'il a faits comme staff restent, sans le désigner. L'export de ses données (art. 15 et 20) contient ses disponibilités, préférences, attributions avec leur motif, leur historique, son réglage « caster autonome » et les gestes qu'il a faits comme staff (sans l'identifiant de la personne visée)",
+        "Account deletion: everything about it in the schedule goes with it; the actions it took as staff remain, without naming it. The export of its data (art. 15 and 20) contains its availability, preferences, assignments with their reason, their history, its \u201csolo caster\u201d setting and the actions it took as staff (without the identifier of the person concerned)"),
+    ],
+    recipients: [
+      frEn("Arbitres, casters, prods et administrateurs connectés du site (page « Planning ») : les attributions de chaque créneau — le motif d'une proposition du calcul (préférence, charge) n'y paraît que comme « Calcul », hors le staff des tournois et la personne concernée — et le réglage « caster autonome » de chacun ; chacun voit ses propres disponibilités et préférences",
+        "Logged-in referees, casters, prods and administrators of the site (\u201cSchedule\u201d page): each slot's assignments \u2014 the reason for a calculated proposal (preference, load) only appears there as \u201cCalculation\u201d, except to the tournament staff and the person concerned \u2014 and everyone's \u201csolo caster\u201d setting; each person sees their own availability and preferences"),
+      frEn("Staff des tournois (arbitres et administrateurs) : les disponibilités et préférences de tous, et le motif de chaque attribution, pour attribuer",
+        "Tournament staff (referees and administrators): everyone's availability and preferences, and the reason for each assignment, to assign"),
+      frEn("Par le planning, confirmer ou désigner l'arbitre d'un match, ou retirer son arbitre désigné, agit sur le match lui-même, comme un geste du staff (T04, T05) : une ligne sans nom au journal du staff sur Discord à chaque changement d'arbitre du match, une notification push à l'arbitre retiré par un autre que lui ; rien d'autre du planning n'est publié sur Discord",
+        "Through the schedule, confirming or assigning a match's referee, or removing its assigned referee, acts on the match itself, like the staff does (T04, T05): a line naming no one in the staff log on Discord for each change of the match's referee, a push notification to a referee removed by someone else; nothing else from the schedule is published on Discord"),
+      frEn("Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)",
+        "The association's technical manager, who is also the site's host (database)"),
+    ],
+    transfers: [
+      frEn("Aucun", "None"),
+    ],
+    security: [
+      ...COMMON_SECURITY,
+      frEn("Page et routes réservées aux comptes qui tiennent un rôle du planning ; la vue joueur n'y donne aucun accès",
+        "Page and routes reserved for accounts holding a schedule role; player view gives no access to them"),
     ],
   },
 });

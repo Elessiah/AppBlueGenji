@@ -12,6 +12,7 @@ import { TOURNAMENTS, type SeedFormat, type TournamentDef } from "./cases";
 import { clearDatabase } from "./cleanup";
 import { SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "./lock";
 import { applyMatchLaunchCases, applyNewMatchNoticeCases, applyTiebreakCases } from "./match-states";
+import { applyPlanningCases } from "./planning";
 import { applyMapPointTargetCases } from "./point-targets";
 import { checkDiscordChallengeRules } from "./sql-checks";
 import {
@@ -134,6 +135,7 @@ async function seed(db: Pool): Promise<void> {
   await applyTiebreakCases(db);
   await applyMapPointTargetCases(db);
   await applyNewMatchNoticeCases(db);
+  await applyPlanningCases(db, specialUserIds);
   await attachDeletedAccountToPlayedTeam(db, specialUserIds.get("CompteSupprime") ?? null);
   await acceptTermsForSeededAccounts(db);
   // Requêtes que seule une base simulée exerçait : jouées ici sur la vraie.

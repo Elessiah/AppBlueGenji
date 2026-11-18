@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { BookOpen, Eye, LogOut, Shield, UserRound } from "lucide-react";
+import { BookOpen, CalendarClock, Eye, LogOut, Shield, UserRound } from "lucide-react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { entrantHref } from "@/lib/shared/participants";
 import { DEVDOC_PATH } from "@/lib/shared/dev-docs";
+import { PLANNING_PATH } from "@/lib/shared/planning";
 import { UserAvatar } from "./user-avatar";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";
@@ -26,6 +27,8 @@ type AccountMenuProps = {
   activeTeam?: AccountMenuTeam | null;
   /** Lien vers la documentation développeur (permission `dev`, `DEVDOC.md`). */
   devDocs?: boolean;
+  /** Lien « Planning » des casts et arbitres (permission `planning`, `CAST_PLANNING.md`). */
+  planning?: boolean;
   /**
    * Entrée de la vue joueur (`ADMIN_PLAYER_VIEW.md`) : `"enter"` (« Passer en
    * vue joueur ») quand le compte porte des droits de plateforme que la session
@@ -54,6 +57,7 @@ export function AccountMenu({
   avatarUrl,
   activeTeam = null,
   devDocs = false,
+  planning = false,
   playerViewEntry = null,
 }: Readonly<AccountMenuProps>) {
   const { t } = useShellText();
@@ -121,6 +125,7 @@ export function AccountMenu({
           id={panelId}
           activeTeam={activeTeam}
           devDocs={devDocs}
+          planning={planning}
           playerView={playerViewEntry ? { mode: playerViewEntry, pending: switching, toggle: () => toggle(playerViewEntry === "enter") } : null}
           leaving={leaving}
           onNavigate={close}
@@ -136,6 +141,7 @@ export function AccountMenuPanel({
   id,
   activeTeam,
   devDocs = false,
+  planning = false,
   playerView = null,
   leaving,
   onNavigate,
@@ -144,6 +150,7 @@ export function AccountMenuPanel({
   id: string;
   activeTeam: AccountMenuTeam | null;
   devDocs?: boolean;
+  planning?: boolean;
   /** Entrée de la vue joueur, quand le compte porte des droits à suspendre ({@link AccountMenuProps.playerViewEntry}). */
   playerView?: { mode: PlayerViewMenuMode; pending: boolean; toggle: () => void } | null;
   leaving: boolean;
@@ -176,6 +183,12 @@ export function AccountMenuPanel({
               </span>
             ) : null}
           </span>
+        </LocaleLink>
+      )}
+      {planning && (
+        <LocaleLink href={PLANNING_PATH} className={s.item} onClick={onNavigate}>
+          <CalendarClock className={s.itemIcon} size={16} aria-hidden="true" />
+          <span className={s.itemText}>{t("account.planning")}</span>
         </LocaleLink>
       )}
       {devDocs && (

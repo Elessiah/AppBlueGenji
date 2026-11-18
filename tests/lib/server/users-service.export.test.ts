@@ -25,6 +25,9 @@ jest.mock("@/lib/server/users/match-roles-export", () => ({
     liveTriggers: [{ matchId: 7, tournamentId: 2, liveTrigger: "MANUAL" }],
   })),
 }));
+jest.mock("@/lib/server/users/planning-export", () => ({
+  exportOwnPlanning: jest.fn(async () => ({ availability: [], assignments: [], history: [], soloCaster: true })),
+}));
 jest.mock("@/lib/server/match-map-entries", () => ({
   listOwnMapEntries: jest.fn(async () => [
     {
@@ -397,6 +400,7 @@ describe("exportOwnData", () => {
     expect(data.providedStreamLinks).toEqual([{ matchId: 5, tournamentId: 2, liveUrl: "https://twitch.tv/x", createdAt: "2026-10-20T17:00:00.000Z" }]);
     expect(data.refereeAssignments).toEqual([{ matchId: 6, tournamentId: 2, readyAt: "2026-10-20T17:30:00.000Z" }]);
     expect(data.liveTriggers).toEqual([{ matchId: 7, tournamentId: 2, liveTrigger: "MANUAL" }]);
+    expect(data.planning).toEqual({ availability: [], assignments: [], history: [], soloCaster: true });
   });
 
   it("une autre panne de la lecture du compte n'est pas masquée par le repli", async () => {

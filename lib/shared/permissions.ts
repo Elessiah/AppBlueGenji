@@ -11,7 +11,7 @@
  */
 
 /** Rôles attribuables à un utilisateur. Cumulables. */
-export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" | "RECRUTEUR" | "DEV";
+export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "PROD" | "COMMUNITY_MANAGER" | "RECRUTEUR" | "DEV";
 
 /**
  * Domaines d'action protégés :
@@ -33,6 +33,10 @@ export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" 
  *   (`/devdoc`, `docs/features/DEVDOC.md`). Lecture seule : aucune écriture,
  *   aucune donnée de membre lue en base (seulement les `.md` de la liste
  *   blanche, tels que sur le serveur — jamais de note privée dans ces dossiers).
+ * - `planning` — page « Planning » des casts, prods et arbitres
+ *   (`docs/features/CAST_PLANNING.md`) : lire le planning et y donner ses
+ *   propres disponibilités. Attribuer à la main, lancer l'attribution
+ *   automatique et régler les minimums restent à `tournaments`.
  */
 export type Permission =
   | "tournaments"
@@ -42,13 +46,15 @@ export type Permission =
   | "recruitment"
   | "roles"
   | "moderation"
-  | "dev";
+  | "dev"
+  | "planning";
 
 /** Tous les rôles, dans un ordre d'affichage stable (ADMIN en tête). */
 export const PLATFORM_ROLES: readonly PlatformRole[] = [
   "ADMIN",
   "ARBITRE",
   "CASTER",
+  "PROD",
   "COMMUNITY_MANAGER",
   "RECRUTEUR",
   "DEV",
@@ -59,6 +65,7 @@ export const ROLE_LABELS: Record<PlatformRole, string> = {
   ADMIN: "Administrateur",
   ARBITRE: "Arbitre",
   CASTER: "Caster",
+  PROD: "Prod",
   COMMUNITY_MANAGER: "Community Manager",
   RECRUTEUR: "Recruteur",
   DEV: "Développeur",
@@ -69,20 +76,25 @@ export const ROLE_DESCRIPTIONS: Record<PlatformRole, string> = {
   ADMIN: "Tous les droits, dont l'attribution des rôles.",
   ARBITRE: "Créer et gérer les tournois.",
   CASTER: "Préparer et diffuser les matchs en direct (aperçu du plateau, antenne).",
+  PROD: "Assurer la production des diffusions (planning des casts).",
   COMMUNITY_MANAGER: "Gérer le site vitrine et l'association.",
   RECRUTEUR: "Gérer la page recrutement.",
   DEV: "Lire la documentation technique du site et du bot.",
 };
 
 const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
-  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev"],
+  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev", "planning"],
   // L'arbitre gère le tournoi : l'aperçu lui est acquis, sans rôle en plus, et
   // il ouvre aussi l'antenne — sans quoi il faudrait deux personnes pour lancer
   // un match casté.
-  ARBITRE: ["tournaments", "casting", "live"],
+  ARBITRE: ["tournaments", "casting", "live", "planning"],
   // Les deux faces du métier de caster : préparer (lecture de l'aperçu) et
   // diffuser (écriture sur l'état de direct des matchs, et rien d'autre).
-  CASTER: ["casting", "live"],
+  // Le planning des casts (`CAST_PLANNING.md`) : ses disponibilités de caster.
+  CASTER: ["casting", "live", "planning"],
+  // La production d'une diffusion (régie, scènes, son) : le planning seul, pour
+  // y donner ses disponibilités — ni l'antenne ni l'aperçu du plateau.
+  PROD: ["planning"],
   COMMUNITY_MANAGER: ["showcase"],
   RECRUTEUR: ["recruitment"],
   // Lecture de `/devdoc` seulement : la doc des dépôts, publiée sur GitHub,

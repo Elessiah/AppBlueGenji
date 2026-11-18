@@ -113,4 +113,7 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // annoncés `lang="fr"`). Espace sécurisé : `noindex`, hors sitemap.
   "/devdoc",
   "/devdoc/[...path]",
+  // CAST-PLANNING — planning des casts et arbitres (`docs/features/CAST_PLANNING.md`),
+  // réservé à la permission `planning`. Espace sécurisé : `noindex`, hors sitemap.
+  "/planning",
 ];

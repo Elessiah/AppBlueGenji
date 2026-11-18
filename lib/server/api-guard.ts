@@ -485,6 +485,55 @@ export const TEAM_OWN_ROLES_WRITE_RULE: RateLimitRule = {
 };
 
 /**
+ * Lectures du planning des casts et arbitres (`GET /api/planning`), par
+ * compte : une page en lit une à l'ouverture et après chaque geste qui ne se
+ * reporte pas sur place ; sans plafond, un membre en boucle occupait le pool
+ * (sept lectures chacune). Au-dessus de la somme des gestes permis
+ * (`PLANNING_WRITE_RULE` + `PLANNING_BATCH_RULE`, même fenêtre) : une rafale
+ * de gestes acceptés ne se voit jamais refuser sa relecture.
+ */
+export const PLANNING_READ_RULE: RateLimitRule = {
+  name: "planning-read",
+  limit: 400,
+  windowMs: 5 * 60_000,
+};
+
+/**
+ * Rafale des lectures du planning, en plus de `PLANNING_READ_RULE` : sans
+ * elle, les 400 lectures de la fenêtre pouvaient partir en une minute (près
+ * de 2 800 requêtes au pool). 200 par minute, autant que les gestes permis
+ * en cinq minutes (`PLANNING_WRITE_RULE` + `PLANNING_BATCH_RULE`) : même
+ * tassée en une minute, une rafale de gestes acceptés garde sa relecture (un
+ * geste refusé pour excès, lui, ne relit pas la page).
+ */
+export const PLANNING_READ_BURST_RULE: RateLimitRule = {
+  name: "planning-read-burst",
+  limit: 200,
+  windowMs: 60_000,
+};
+
+/**
+ * Gestes unitaires du planning (sa disponibilité, « caster autonome »,
+ * désignation et réglages du staff), par compte. Large : on coche des
+ * créneaux en rafale, une semaine chargée en compte quelques dizaines.
+ */
+export const PLANNING_WRITE_RULE: RateLimitRule = {
+  name: "planning-write",
+  limit: 180,
+  windowMs: 5 * 60_000,
+};
+
+/**
+ * Gestes de lot du staff (calcul, confirmation), par compte : chacun tient le
+ * verrou du planning ; vingt en cinq minutes suffisent à tout reprendre.
+ */
+export const PLANNING_BATCH_RULE: RateLimitRule = {
+  name: "planning-batch",
+  limit: 20,
+  windowMs: 5 * 60_000,
+};
+
+/**
  * Ouvertures du flux temps réel, par utilisateur.
  *
  * Distinct du plafond de flux *simultanés* (`MAX_STREAMS_PER_USER`) : celui-ci

@@ -158,6 +158,10 @@
       "label": "Caster",
       "description": "Préparer et diffuser les matchs en direct (aperçu du plateau, antenne)."
     },
+    "PROD": {
+      "label": "Prod",
+      "description": "Assurer la production des diffusions (planning des casts)."
+    },
     "COMMUNITY_MANAGER": {
       "label": "Community Manager",
       "description": "Gérer le site vitrine et l'association."

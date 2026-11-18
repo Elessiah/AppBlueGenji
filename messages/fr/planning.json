@@ -1,0 +1,154 @@
+{
+  "meta": {
+    "title": "Planning"
+  },
+  "eyebrow": "CASTS · ARBITRAGE",
+  "title": "Planning",
+  "lead": "Qui arbitre, caste et produit chaque match à venir.",
+  "loading": "Chargement du planning…",
+  "empty": "Aucun créneau à venir.",
+  "refresh": "Actualiser",
+  "filters": {
+    "label": "Filtrer l'agenda",
+    "mine": "Mes créneaux",
+    "uncovered": "À couvrir",
+    "tournament": "Tournoi",
+    "allTournaments": "Tous les tournois",
+    "reset": "Réinitialiser les filtres",
+    "count": "{shown, plural, one {# créneau affiché} other {# créneaux affichés}} sur {total}",
+    "empty": "Aucun créneau ne correspond à ces filtres.",
+    "hint": "« Mes créneaux » : ceux où tu es attribué·e, proposition provisoire comprise. « À couvrir » : il manque un caster, un prod ou un arbitre (hors autogestion voulue)."
+  },
+  "mineBadge": "Mon créneau",
+  "week": "Semaine du {date}",
+  "hidden": "Non publié",
+  "event": "Tournoi entier",
+  "round": "Manche {round}",
+  "versus": "contre",
+  "tbd": "À déterminer",
+  "until": "jusqu'à {time}",
+  "roles": {
+    "REFEREE": "Arbitre",
+    "CASTER": "Caster",
+    "PROD": "Prod"
+  },
+  "coverage": {
+    "COMPLETE": "Complet",
+    "STREAMED": "Diffusé",
+    "REFEREED": "Arbitré seul",
+    "SELF_MANAGED": "Autogestion",
+    "priority": "À arbitrer en priorité",
+    "needsProd": "Caster sans prod",
+    "idleProds": "Prod sans caster",
+    "label": "Couverture",
+    "hint": "Complet : arbitre, caster et prod. Diffusé : un caster autonome, ou un caster et un prod. Autogestion : personne, les équipes se gèrent."
+  },
+  "status": {
+    "AVAILABLE": "Dispo",
+    "UNAVAILABLE": "Absent",
+    "PENDING": "À voir"
+  },
+  "mine": {
+    "legend": "Ma disponibilité — {role}",
+    "preferOn": "Retirer la préférence ({role})",
+    "preferOff": "Je préfère ce créneau ({role})",
+    "closed": "Disponibilités closes"
+  },
+  "assignment": {
+    "provisional": "Provisoire",
+    "reason": {
+      "PREFERENCE": "Préférence",
+      "LOAD": "Charge",
+      "MANUAL": "Choix du staff",
+      "CAST": "Inscrit au cast",
+      "MATCH": "Désigné sur le match",
+      "AUTO": "Calcul"
+    },
+    "reasonHint": "Préférence (créneau marqué par la personne), Charge (elle a le moins servi ces dernières semaines) ou Calcul (motif visible du staff et de la personne seuls) : pourquoi le calcul l'a choisie. Provisoire : proposé par le calcul, pas encore confirmé.",
+    "reasonSubject": "Raisons d'attribution",
+    "nobody": "Personne",
+    "remove": "Retirer {name} ({role})",
+    "add": "Ajouter — {role}",
+    "option": "{name} · {status}",
+    "optionPreferred": "{name} · {status} ★",
+    "unknown": "Pas répondu"
+  },
+  "solo": {
+    "label": "Je diffuse seul (caster autonome)",
+    "hint": "Un caster autonome diffuse sans prod ; les autres ont besoin d'un prod pour qu'un match soit diffusé.",
+    "staffTitle": "Casters autonomes"
+  },
+  "staff": {
+    "title": "Calcul et confirmation",
+    "hint": "Le calcul propose, pour toute une semaine, qui couvre chaque créneau. Ses propositions restent provisoires jusqu'à confirmation ; les choix du staff ne sont jamais remplacés.",
+    "runWeek": "Calculer la semaine",
+    "runTitle": "Calculer la semaine du {date} ?",
+    "runBody": "Les propositions provisoires de toute la semaine, tous tournois confondus, sont recalculées. Les choix du staff et ce qui est confirmé ne bougent pas.",
+    "runConfirm": "Calculer",
+    "running": "Calcul…",
+    "runDone": "{proposed, plural, one {# proposition} other {# propositions}} sur {entries, plural, one {# créneau} other {# créneaux}}.",
+    "confirmEntry": "Confirmer",
+    "confirmEntryLabel": "Confirmer les propositions : {slot}",
+    "leadLabel": "Confirmer ce qui commence dans les prochaines heures",
+    "confirmLead": "Confirmer",
+    "confirmDone": "{confirmed, plural, one {# confirmée} other {# confirmées}}, {refused, plural, =0 {aucune refusée} one {# refusée par le match} other {# refusées par le match}}."
+  },
+  "settings": {
+    "title": "Durées estimées",
+    "hint": "Une personne ne tient pas deux créneaux qui se chevauchent. Un match dure son nombre maximal de cartes fois la durée d'une carte, plus la marge.",
+    "mapOW": "Minutes par carte (Overwatch)",
+    "mapMR": "Minutes par carte (Marvel Rivals)",
+    "buffer": "Marge par match (minutes)",
+    "defaultMaps": "Cartes sans format connu",
+    "eventHours": "Durée d'un tournoi entier (heures)",
+    "save": "Enregistrer les durées",
+    "saved": "Durées enregistrées."
+  },
+  "saved": {
+    "availability": "Disponibilité enregistrée.",
+    "assigned": "Désignation enregistrée.",
+    "removed": "Retrait enregistré.",
+    "solo": "Réglage enregistré."
+  },
+  "errors": {
+    "TOO_MANY_REQUESTS": "Trop de gestes coup sur coup. Patiente quelques minutes avant de réessayer.",
+    "UNAUTHORIZED": "Ta session a expiré : reconnecte-toi.",
+    "FORBIDDEN": "Ce geste est réservé au staff des tournois.",
+    "NETWORK_ERROR": "Connexion impossible. Vérifie ton réseau puis réessaie.",
+    "PLANNING_ENTRY_NOT_FOUND": "Ce créneau n'existe plus. La page est rechargée.",
+    "PLANNING_ENTRY_CLOSED": "Ce créneau est fermé : il a commencé ou il est joué.",
+    "PLANNING_ROLE_NOT_HELD": "Ce rôle n'est pas tenu par ce compte.",
+    "PLANNING_HIDDEN_FOR_MEMBER": "Ce tournoi est encore caché : ce compte ne le voit pas.",
+    "PLANNING_ROLE_CONFLICT": "Une même personne ne peut pas être caster et prod sur un même créneau.",
+    "PLANNING_IS_PLAYER": "Cette personne joue pendant ce créneau : elle ne peut pas le couvrir.",
+    "PLANNING_OVERLAP": "Cette personne tient déjà un créneau qui chevauche celui-ci : retire-la d'abord de l'autre.",
+    "PLANNING_OVERLAP_MANAGED": "Cette personne tient déjà, sur le match lui-même, un créneau qui chevauche celui-ci (caster inscrit ou arbitre désigné) : retire-la d'abord depuis ce match.",
+    "PLANNING_CAST_MANAGED": "Ce caster est inscrit sur le match : retire-le depuis le match.",
+    "PLANNING_NOT_ASSIGNED": "Cette personne n'est déjà plus attribuée.",
+    "PLANNING_BUSY": "Un autre geste du planning est en cours, réessaie.",
+    "PLANNING_CONFIRM_PARTIAL": "Confirmation partielle : une partie des propositions est confirmée, les autres sont restées provisoires après une panne. Relance la confirmation.",
+    "NOT_CASTER": "Ce compte n'a pas le rôle caster.",
+    "MATCH_NOT_FOUND": "Ce match n'existe plus.",
+    "MATCH_ALREADY_COMPLETED": "Ce match est déjà joué.",
+    "MATCH_NOT_LAUNCHABLE": "Ce match ne peut plus recevoir d'arbitre.",
+    "NOT_REFEREE": "Ce compte ne peut pas arbitrer.",
+    "REFEREE_IDENTITY_REQUIRED": "Cet arbitre doit d'abord certifier son identité de jeu.",
+    "REFEREE_DISCORD_REQUIRED": "Cet arbitre doit d'abord lier son compte Discord.",
+    "REFEREE_OBJECTION": "Une équipe du match s'oppose à cet arbitre.",
+    "REFEREE_IS_PLAYER": "Cet arbitre joue ce match.",
+    "REFEREE_CHANGED": "L'arbitre du match vient de changer. La page est rechargée.",
+    "CONCURRENT_UPDATE_RETRY": "Le planning vient de changer, réessaie.",
+    "INVALID_WINDOW": "Période invalide (31 jours au plus).",
+    "INVALID_CONFIRM_SCOPE": "Rien à confirmer dans cette sélection.",
+    "INVALID_DURATIONS": "Une durée est hors des bornes permises.",
+    "generic": "L'opération a échoué. Réessaie dans un instant."
+  },
+  "staffConfirm": {
+    "entryTitle": "Confirmer ce créneau ?",
+    "entryBody": "Les propositions provisoires de ce créneau deviennent des désignations : l'arbitre est posé sur le match.",
+    "leadTitle": "Confirmer ce qui commence dans {hours, plural, one {# heure} other {# heures}} ?",
+    "leadBody": "Toutes les propositions provisoires des créneaux qui commencent d'ici là deviennent des désignations : les arbitres sont posés sur leurs matchs.",
+    "confirm": "Confirmer",
+    "pending": "Confirmation…"
+  }
+}

@@ -158,6 +158,10 @@
       "label": "Caster",
       "description": "Prepare and broadcast live matches (stage preview, going on air)."
     },
+    "PROD": {
+      "label": "Prod",
+      "description": "Run the production of broadcasts (cast planning)."
+    },
     "COMMUNITY_MANAGER": {
       "label": "Community Manager",
       "description": "Manage the showcase site and the association."

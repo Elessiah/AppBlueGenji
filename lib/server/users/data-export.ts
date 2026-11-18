@@ -15,6 +15,7 @@ import { getFullProfile } from "./full-profile";
 import { accountLocaleFromRow } from "./account-locale";
 import { listOwnLiveAnnouncements } from "./live-announcement-export";
 import { listOwnMatchRoles } from "./match-roles-export";
+import { exportOwnPlanning } from "./planning-export";
 import { battletagFromBlizzard } from "@/lib/server/battletag-origin";
 import { matchDmEnabled } from "./match-dm-preference";
 import { recruitmentModalBackOn, recruitmentModalOff } from "./recruitment-modal-preference";
@@ -207,6 +208,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     mapEntries: await listOwnMapEntries(userId),
     liveAnnouncements: await listOwnLiveAnnouncements(userId),
     ...(await listOwnMatchRoles(userId)),
+    planning: await exportOwnPlanning(userId),
     suspensions: (await listOwnSuspensions(userId)).map((suspension) => ({
       reason: suspension.reason,
       ground: suspension.ground,

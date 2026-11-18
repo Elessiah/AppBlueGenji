@@ -241,6 +241,12 @@ export const TOURNAMENTS: TournamentDef[] = [
   // date), et un second planifié dans le futur (en attente de départ).
   { name: "Planification Arbitre (à planifier)", game: "OW", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -1, swissTotalRounds: 3, playWaves: 0, teamOffset: 108, refereeScheduling: true },
   { name: "Planification Arbitre (en attente)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 0, teamOffset: 116, refereeScheduling: true, matchSchedule: { firstRoundHours: 2, hoursPerRound: 1 } },
+  // Planning des casts et arbitres (CAST_PLANNING.md) : des matchs planifiés
+  // étalés sur deux semaines (quatre manches qui se chevauchent, puis une
+  // manche tous les quatre jours), et une soirée sans planification des
+  // matchs, qui n'est qu'une seule entrée à son début.
+  { name: "Planning Casts (sur deux semaines)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 0, teamOffset: 148, refereeScheduling: true, matchSchedule: { firstRoundHours: 30, hoursPerRound: 96 } },
+  { name: "Planning Soirée (sans planification)", game: "MR", state: "REGISTRATION", format: "SINGLE", teamCount: 4, maxTeams: 8, daysOffset: 3, teamOffset: 40 },
   { name: "Plateau Horaires (sans live)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 100, matchSchedule: { firstRoundHours: -1, hoursPerRound: 2 } },
 
   // ---- RUNNING · BlueGenji Survie (endurance puis play-offs) ---------------

@@ -238,6 +238,17 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   // (`created_by` ne se lit nulle part). Table tolérée : une base qui en
   // manque n'a rien à effacer.
   await ignoreMissingTable(connection.execute(`DELETE FROM bg_account_suspensions WHERE user_id = ?`, [userId]));
+  // Le planning des casts et arbitres (`CAST_PLANNING.md`) : disponibilités,
+  // préférences, attributions, leur historique et le réglage « caster
+  // autonome » ne désignent plus personne. Tables tolérées.
+  for (const table of ["bg_planning_availability", "bg_planning_assignments", "bg_planning_events", "bg_planning_profiles"]) {
+    await ignoreMissingTable(connection.execute(`DELETE FROM ${table} WHERE user_id = ?`, [userId]));
+  }
+  // Les gestes qu'il a faits comme staff restent, sans le désigner.
+  await ignoreMissingTable(connection.execute(`UPDATE bg_planning_events SET actor_user_id = NULL WHERE actor_user_id = ?`, [userId]));
+  await ignoreMissingTable(
+    connection.execute(`UPDATE bg_planning_assignments SET assigned_by_user_id = NULL WHERE assigned_by_user_id = ?`, [userId]),
+  );
   await connection.execute(`UPDATE bg_reports SET reporter_user_id = NULL WHERE reporter_user_id = ?`, [userId]);
   // Détail map par map (`docs/features/MAP_SCORES.md`) : le résultat reste,
   // le lien vers le compte qui l'a saisi disparaît — c'est ce que promettent
