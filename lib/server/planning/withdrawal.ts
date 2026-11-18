@@ -145,6 +145,10 @@ async function placeReplacement(
 ): Promise<boolean> {
   const matchReferee = entry.kind === "MATCH" && pick.role === "REFEREE" && entry.matchId !== null;
   if (matchReferee && confirmed) {
+    // Relu verrouillé juste avant la désignation : le choix vient de la lecture du début du geste, un
+    // rôle retiré ou une suspension posée depuis laisse la place à pourvoir (le match n'est pas touché).
+    const holds = await lockedHolding(connection, [{ userId: pick.userId, entry }]);
+    if (holds(pick.userId, entry, pick.role) !== null) return false;
     try {
       await assignMatchReferee(entry.matchId as number, actorId, pick.userId, null);
     } catch (error) {

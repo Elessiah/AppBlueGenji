@@ -1121,8 +1121,9 @@ function RgpdFr({
             Un membre de la modération peut <strong>suspendre un compte</strong> contraire aux
             conditions d&apos;utilisation, pour une durée déterminée ou indéterminée : toutes ses
             sessions sont fermées et aucune connexion n&apos;est possible tant que la suspension court ;
-            s&apos;il arbitre, caste ou produit, il n&apos;est plus ni proposé, ni confirmé, ni pris en
-            remplaçant au planning (<Link href="/rgpd/registre#t20">registre, T20</Link>).
+            s&apos;il arbitre, caste ou produit, il n&apos;est plus ni proposé, ni confirmé, ni désigné, ni
+            pris en remplaçant par le planning, ni prévenu par lui ; les attributions qu&apos;il tenait déjà
+            restent jusqu&apos;à ce que le staff des tournois les retire (<Link href="/rgpd/registre#t20">registre, T20</Link>).
           </p>
           <ul>
             <li>
@@ -1548,7 +1549,7 @@ function RgpdFr({
             (un récapitulatif par vague), de leurs affectations confirmées ou posées à la main, et du
             désistement d&apos;une attribution confirmée sur un créneau où leur propre attribution est
             confirmée ; le staff des tournois, d&apos;une place restée à pourvoir (ligne sans nom au journal
-            du staff sur Discord ; le rôle paraît aussi « à pourvoir » sur le planning quand plus personne ne le tient, sans le motif). Aucun de ces messages ne nomme un
+            du staff sur Discord ; le rôle paraît aussi « à pourvoir » sur le planning quand plus personne n&apos;y est confirmé, sans le motif). Aucun de ces messages ne nomme un
             joueur ni un membre du staff ; chacun de ces sujets se coupe dans les réglages de notifications
             de « Mon profil », ce qui coupe aussi son message privé. Chacun peut se désister d&apos;une
             attribution jusqu&apos;au début du créneau, avec un motif facultatif lu par le seul staff des

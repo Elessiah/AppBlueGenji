@@ -383,9 +383,12 @@ function toMembers(rows: readonly MemberRow[]): LoadedMember[] {
  * concurrent attend que l'écriture qui s'appuie sur cette lecture soit validée ;
  * cette lecture-là, sans jointure, ne lit **pas** le réglage « caster
  * autonome » (`soloCaster` toujours faux) : elle ne sert qu'à juger rôles,
- * suspension et visibilité (`lockedHolding`) ; la suspension, lue par
- * sous-requête, est verrouillée avec elle (une suspension posée pendant le
- * geste attend).
+ * suspension et visibilité (`lockedHolding`). La suspension s'y relit à part,
+ * **après** les comptes, par sa propre lecture verrouillante (une sous-requête
+ * d'une lecture verrouillante n'est qu'une lecture d'instantané, qui ne verrait
+ * pas une suspension validée pendant l'attente du verrou) : une suspension
+ * posée pendant le geste (`suspendAccount` tient la ligne du compte jusqu'à sa
+ * validation) est donc lue.
  */
 export async function loadPlanningMembersByIds(
   executor: Executor,
@@ -396,7 +399,7 @@ export async function loadPlanningMembersByIds(
   // Le compte seul est verrouillé (requête sans jointure) ; le réglage autonome se lit à part.
   const [rows] = await executor.execute<MemberRow[]>(
     options.lock
-      ? `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, 0 AS solo_caster, ${MEMBER_SUSPENDED_SQL}
+      ? `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, 0 AS solo_caster, 0 AS suspended
            FROM bg_users u
           WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
           ORDER BY u.id LOCK IN SHARE MODE`
@@ -407,7 +410,15 @@ export async function loadPlanningMembersByIds(
           ORDER BY u.id`,
     [...ids],
   );
-  return toMembers(rows);
+  if (!options.lock || rows.length === 0) return toMembers(rows);
+  // Les comptes tenus, la suspension se relit verrouillée (comptes puis suspensions, l'ordre de `suspendAccount`).
+  const [suspended] = await executor.execute<(RowDataPacket & { user_id: number })[]>(
+    `SELECT s.user_id FROM bg_account_suspensions s
+      WHERE s.user_id IN (${inList(rows.length)}) AND ${activeSuspensionSql("s")} LOCK IN SHARE MODE`,
+    rows.map((row) => Number(row.id)),
+  );
+  const held = new Set(suspended.map((row) => Number(row.user_id)));
+  return toMembers(rows.map((row) => ({ ...row, suspended: held.has(Number(row.id)) ? 1 : 0 })));
 }
 
 /**

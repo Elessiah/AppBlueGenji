@@ -571,6 +571,21 @@ describe("setManualAssignment — pose", () => {
     expect(callsWith("INSERT IGNORE")).toHaveLength(1);
   });
 
+  it("setManualAssignment_matchRefereeSuspendedAfterCommit_refusedAndUndone", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
+    routeSql({ rows: [assignmentRow()], matchReferee: 7 });
+    jest
+      .mocked(loadPlanningMembersByIds)
+      .mockResolvedValueOnce([loadedMember({ userId: 3, roles: ["REFEREE"] })])
+      .mockResolvedValueOnce([loadedMember({ userId: 3, roles: ["REFEREE"], suspended: true })]);
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "REFEREE", userId: 3, assigned: true })).rejects.toThrow(
+      "PLANNING_ROLE_NOT_HELD",
+    );
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+    expect(callsWith("INSERT IGNORE")).toHaveLength(1);
+  });
+
   it("setManualAssignment_matchAlreadyHasWanted_noDesignationCall", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchRefereeId: 7 })], members }));
     routeSql({ rows: [assignmentRow()], matchReferee: 3 });

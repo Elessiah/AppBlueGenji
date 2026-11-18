@@ -931,8 +931,9 @@ export function RgpdEn({
           <p>
             A member of moderation can <strong>suspend an account</strong> contrary to the terms of use, for a fixed
             or indefinite period: all its sessions are closed and no login is possible while the suspension runs;
-            if it referees, casts or produces, it is no longer proposed, confirmed or taken as a replacement in the
-            schedule (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
+            if it referees, casts or produces, it is no longer proposed, confirmed, assigned or taken as a replacement
+            by the schedule, nor notified by it; the assignments it already held stay until the tournament staff
+            removes them (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
           </p>
           <ul>
             <li>
@@ -1321,7 +1322,7 @@ export function RgpdEn({
             can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of the
             withdrawal from a confirmed assignment on a slot where their own assignment is confirmed; the
             tournament staff, of a slot left open (a line naming no one in the staff log on Discord; the role
-            also appears “open” on the schedule when no one holds it any more, without the reason). None of these messages names a player or a staff
+            also appears “open” on the schedule when no one is confirmed in it any more, without the reason). None of these messages names a player or a staff
             member; each of these topics can be turned off in the notification settings of “My profile”,
             which also turns off its direct message. Everyone can withdraw from an assignment until the slot
             starts, with an optional reason read by the tournament staff only; the site keeps the withdrawal

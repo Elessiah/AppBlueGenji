@@ -26,6 +26,7 @@ import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-loc
 import {
   batchEntries,
   confirmAssignments,
+  confirmPendingReferees,
   entriesToConfirm,
   excludeFromHidden,
   excludeSuspended,
@@ -180,6 +181,25 @@ function statements(): string[] {
     )
     .map(([sql]) => sql.replace(/\s+/g, " ").trim().slice(0, 40));
 }
+
+describe("confirmPendingReferees", () => {
+  it("confirmPendingReferees_sql_confirmationsExcludeSuspendedAccounts", async () => {
+    await confirmPendingReferees(fakeConnection(connection));
+
+    const confirming = execute.mock.calls
+      .map(([sql]) => sql)
+      .filter((sql) => sql.includes("'CONFIRMED'") || sql.includes("SET a.confirmed = 1"));
+    expect(confirming).toHaveLength(2);
+    for (const sql of confirming) expect(sql).toContain("NOT EXISTS (SELECT 1 FROM bg_account_suspensions s WHERE s.user_id = a.user_id");
+  });
+
+  it("confirmPendingReferees_sql_staleRemovalNotGuardedBySuspension", async () => {
+    await confirmPendingReferees(fakeConnection(connection));
+
+    const removing = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.startsWith("DELETE a"));
+    expect(removing).not.toContain("bg_account_suspensions");
+  });
+});
 
 describe("writeEvent", () => {
   it("writeEvent_noInsertId_throws", async () => {
@@ -984,14 +1004,41 @@ describe("confirmAssignments", () => {
     expect(report).toEqual({ confirmed: 1, refused: 0 });
   });
 
-  it("confirmAssignments_matchRefereeOnly_notReReadByIds", async () => {
+  it("confirmAssignments_matchRefereeOnly_reReadOnceJustBeforeDesignation", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
       confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
     );
 
     await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
 
-    expect(loadPlanningMembersByIds).not.toHaveBeenCalled();
+    expect(jest.mocked(loadPlanningMembersByIds).mock.calls.map((call) => call.slice(1))).toEqual([[[3], { lock: true }]]);
+    expect(jest.mocked(loadPlanningMembersByIds).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(assignMatchReferee).mock.invocationCallOrder[0],
+    );
+  });
+
+  it("confirmAssignments_matchRefereeSuspendedUnderLock_notDesignatedAndRemoved", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 3, roles: ["REFEREE"], suspended: true })]);
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+    expect(report).toEqual({ confirmed: 0, refused: 1 });
+    expect(writeParams()[1]).toContain("REMOVED");
+  });
+
+  it("confirmAssignments_matchRefereeConfirmSql_excludesSuspendedAccounts", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 3, role: "REFEREE" })] }),
+    );
+
+    await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    const confirmSql = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("SET a.confirmed = 1") && sql.includes("a.entry_key = ?"));
+    expect(confirmSql).toContain("NOT EXISTS (SELECT 1 FROM bg_account_suspensions s WHERE s.user_id = a.user_id");
   });
 
   it("confirmAssignments_subset_confirmsOnlyNamedProvisional", async () => {

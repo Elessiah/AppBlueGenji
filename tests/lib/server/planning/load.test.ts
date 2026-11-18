@@ -208,15 +208,50 @@ describe("loadPlanningMembersByIds", () => {
     expect(member.suspended).toBe(true);
   });
 
-  it("loadPlanningMembersByIds_lock_suspensionSubqueryWithoutJoin", async () => {
+  it("loadPlanningMembersByIds_lock_suspensionReadSeparatelyWithShareLock", async () => {
+    jest.mocked(resolveRoles).mockReturnValue(["CASTER"]);
+    connection.execute
+      .mockResolvedValueOnce([[{ id: 4, pseudo: "Caster", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: 0, suspended: 0 }], []])
+      .mockResolvedValueOnce([[], []]);
+
+    await loadPlanningMembersByIds(executor, [4], { lock: true });
+
+    const [accountsSql] = connection.execute.mock.calls[0];
+    const [suspensionSql, params] = connection.execute.mock.calls[1];
+    expect(accountsSql).not.toContain("bg_account_suspensions");
+    expect(suspensionSql).toContain("FROM bg_account_suspensions s");
+    expect(suspensionSql).toContain("s.lifted_at IS NULL");
+    expect(suspensionSql).toContain("LOCK IN SHARE MODE");
+    expect(suspensionSql).not.toContain("JOIN");
+    expect(params).toEqual([4]);
+  });
+
+  it("loadPlanningMembersByIds_lock_suspendedRow_flagsMember", async () => {
+    jest.mocked(resolveRoles).mockReturnValue(["CASTER"]);
+    connection.execute
+      .mockResolvedValueOnce([
+        [
+          { id: 4, pseudo: "Caster", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: 0, suspended: 0 },
+          { id: 5, pseudo: "Autre", is_admin: 0, platform_roles_json: '["CASTER"]', solo_caster: 0, suspended: 0 },
+        ],
+        [],
+      ])
+      .mockResolvedValueOnce([[{ user_id: 4 }], []]);
+
+    const members = await loadPlanningMembersByIds(executor, [4, 5], { lock: true });
+
+    expect(members.map(({ userId, suspended }) => ({ userId, suspended }))).toEqual([
+      { userId: 4, suspended: true },
+      { userId: 5, suspended: false },
+    ]);
+  });
+
+  it("loadPlanningMembersByIds_lock_noAccount_skipsSuspensionRead", async () => {
     connection.execute.mockResolvedValue([[], []]);
 
     await loadPlanningMembersByIds(executor, [4], { lock: true });
 
-    const [sql] = connection.execute.mock.calls[0];
-    expect(sql).toContain("FROM bg_account_suspensions s WHERE s.user_id = u.id");
-    expect(sql).toContain("s.lifted_at IS NULL");
-    expect(sql).not.toContain("JOIN");
+    expect(connection.execute).toHaveBeenCalledTimes(1);
   });
 
   it("loadPlanningMembersByIds_lock_shareLockOnAccountsOnly", async () => {

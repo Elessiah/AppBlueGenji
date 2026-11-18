@@ -307,6 +307,29 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     ]);
   });
 
+  it("withdrawFromEntry_refereeReplacementSuspendedUnderLock_slotUnfilledMatchUntouched", async () => {
+    const members = [loadedMember({ userId: 3 }), loadedMember({ userId: 5 })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(
+        planningData({ entries: [loadedEntry({ matchRefereeId: 3 })], assignments: [loadedAssignment({ userId: 3, confirmed: true })], members }),
+      )
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry()],
+          members,
+          availability: [available("m:1", 5, "REFEREE")],
+          removals: [{ entryKey: "m:1", userId: 3, role: "REFEREE" }],
+        }),
+      );
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 5, suspended: true })]);
+
+    const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true });
+    expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([[1, 3, null, 3]]);
+  });
+
   it("withdrawFromEntry_matchRefereeChangedMeanwhile_noReplacementNorOpenSlot", async () => {
     // Le staff a posé l'arbitre 7 sur le match entre la lecture et le retrait : la place est tenue.
     // Les co-affectés se lisent dans la lecture déjà faite, sans recharger tout le planning.

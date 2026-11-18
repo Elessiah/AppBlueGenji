@@ -12,6 +12,7 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
+import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
 import type { RefereeIneligibility } from "@/lib/shared/match-referee";
@@ -538,9 +539,16 @@ export function confirmSteps(data: PlanningData, scope: ConfirmScope): ConfirmSt
 }
 
 /** Confirme une proposition d'arbitre de match **seulement** si le match a (encore) cet arbitre. */
-const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments SET confirmed = 1
-  WHERE entry_key = ? AND user_id = ? AND role = 'REFEREE' AND confirmed = 0
-    AND EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?)`;
+/**
+ * Le compte de la ligne `a` n'est pas suspendu : une suspension laisse le
+ * match tel quel (il fait foi), mais le planning n'en confirme pas la ligne.
+ */
+const NOT_SUSPENDED_SQL = (alias: string) =>
+  `NOT EXISTS (SELECT 1 FROM bg_account_suspensions s WHERE s.user_id = ${alias}.user_id AND ${activeSuspensionSql("s")})`;
+
+const CONFIRM_MATCH_REFEREE_SQL = `UPDATE bg_planning_assignments a SET a.confirmed = 1
+  WHERE a.entry_key = ? AND a.user_id = ? AND a.role = 'REFEREE' AND a.confirmed = 0
+    AND EXISTS (SELECT 1 FROM bg_matches WHERE id = ? AND referee_user_id = ?) AND ${NOT_SUSPENDED_SQL("a")}`;
 
 /** Retire une proposition d'arbitre de match refusée, **sauf** si le match porte cet arbitre (il fait foi). */
 const REFUSE_MATCH_REFEREE_SQL = `DELETE FROM bg_planning_assignments
@@ -551,9 +559,9 @@ const REFUSE_MATCH_REFEREE_SQL = `DELETE FROM bg_planning_assignments
 const STALE_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
   WHERE a.role = 'REFEREE' AND a.confirmed = 1 AND (m.referee_user_id IS NULL OR m.referee_user_id <> a.user_id)`;
 
-/** Une proposition d'arbitre provisoire que le match porte déjà. */
+/** Une proposition d'arbitre provisoire que le match porte déjà (compte non suspendu : elle reste sinon provisoire). */
 const PENDING_ON_MATCH_SQL = `FROM bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
-  WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id`;
+  WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id AND ${NOT_SUSPENDED_SQL("a")}`;
 
 /**
  * Réconcilie les arbitres de match du planning avec les matchs, en un nombre
@@ -588,7 +596,7 @@ export async function confirmPendingReferees(executor: Executor): Promise<number
      SELECT a.entry_key, a.user_id, 'REFEREE', a.tournament_id, a.match_id, 'CONFIRMED', 'AUTO', NULL ${PENDING_ON_MATCH_SQL}`,
   );
   const [result] = await executor.execute(`UPDATE bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
-     SET a.confirmed = 1 WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id`);
+     SET a.confirmed = 1 WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id AND ${NOT_SUSPENDED_SQL("a")}`);
   return affected(result);
 }
 
@@ -613,6 +621,12 @@ async function designateReferees(steps: ConfirmStep[], actorId: number): Promise
         const [held] = await connection.execute<RowDataPacket[]>(MATCH_HAS_REFEREE_SQL, [matchId, step.userId]);
         if (held.length > 0) {
           step.onMatchBefore = true;
+          return;
+        }
+        // Relu juste avant la désignation : un rôle retiré ou une suspension posée depuis la lecture refuse.
+        const holds = await lockedHolding(connection, [{ userId: step.userId, entry: step.entry }]);
+        if (holds(step.userId, step.entry, step.role) !== null) {
+          step.refused = true;
           return;
         }
         await assignMatchReferee(matchId, actorId, step.userId, null);
