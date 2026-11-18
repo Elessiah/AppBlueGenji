@@ -247,6 +247,7 @@ export async function renderDevDoc(
   index: DevDocIndex,
   summary: DevDocSummary,
   localize: (href: string) => string = (href) => href,
+  tableLabel?: string,
 ): Promise<LoadedDevDoc> {
   const entry = index.bySlug.get(key(summary.repo, summary.slug));
   if (!entry) return { summary, html: null, updatedAt: null, language: "fr" };
@@ -258,6 +259,7 @@ export async function renderDevDoc(
     const [raw, stat] = await Promise.all([fs.readFile(entry.file, "utf8"), fs.stat(entry.file)]);
     const html = renderMarkdown(raw, {
       headingIds: true,
+      tableLabel,
       resolveLink: (href) => internal(resolveDevDocLink(href, origin, lookup)),
       linkCode: (code) => internal(resolveDevDocCodeRef(code, origin, lookup)),
     });

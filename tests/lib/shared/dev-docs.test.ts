@@ -3,6 +3,7 @@ import {
   DEFAULT_DEV_DOC,
   devDocHref,
   devDocSlug,
+  docOutline,
   filterDevDocs,
   groupDevDocs,
   guessDocLanguage,
@@ -250,5 +251,33 @@ describe("guessDocLanguage", () => {
 
   it("guessDocLanguage_onlyCode_defaultsToFr", () => {
     expect(guessDocLanguage("```\nthe and is of to\n```")).toBe("fr");
+  });
+});
+
+describe("docOutline", () => {
+  const heading = (level: number, id: string, text: string) => `<h${level} id="${id}">${text}</h${level}>`;
+
+  it("docOutline_fourHeadings_listsLevelsAndIds", () => {
+    const html = [heading(3, "a", "A"), heading(4, "b", "B"), heading(3, "c", "C"), heading(4, "d", "D")].join("\n");
+    expect(docOutline(html).map((item) => [item.id, item.text, item.level])).toEqual([
+      ["a", "A", 2],
+      ["b", "B", 3],
+      ["c", "C", 2],
+      ["d", "D", 3],
+    ]);
+  });
+
+  it("docOutline_fewerThanFourHeadings_returnsEmpty", () => {
+    expect(docOutline([heading(3, "a", "A"), heading(3, "b", "B"), heading(3, "c", "C")].join("\n"))).toEqual([]);
+  });
+
+  it("docOutline_inlineMarkupAndEntities_returnsPlainText", () => {
+    const html = [heading(3, "a", "<code>x</code> &amp; &lt;y&gt;"), heading(3, "b", "B"), heading(3, "c", "C"), heading(3, "d", "D")].join("\n");
+    expect(docOutline(html)[0].text).toBe("x & <y>");
+  });
+
+  it("docOutline_deeperLevelsAndNoIds_ignored", () => {
+    const html = [heading(5, "x", "X"), heading(2, "t", "T"), "<h3>sans id</h3>", heading(3, "a", "A"), heading(3, "b", "B"), heading(3, "c", "C")].join("\n");
+    expect(docOutline(html)).toEqual([]);
   });
 });

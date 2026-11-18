@@ -13,7 +13,8 @@
   "nav": {
     "label": "Documents",
     "count": "{count, plural, one {# document} other {# documents}}",
-    "tree": "Document tree"
+    "tree": "Document tree",
+    "toggle": "Browse documents"
   },
   "search": {
     "label": "Search a document",
@@ -27,6 +28,9 @@
     "updated": "Modified on {date}",
     "frenchOnly": "This document is written in French.",
     "missing": "This document could not be read.",
-    "repoEmpty": "No document found in this repository."
+    "repoEmpty": "No document found in this repository.",
+    "table": "Table, scrollable",
+    "newTab": "(new tab)",
+    "outline": "On this page"
   }
 }

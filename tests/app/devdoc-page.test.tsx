@@ -41,6 +41,10 @@ beforeAll(async () => {
   await fs.mkdir(path.join(site, "docs/features"), { recursive: true });
   await fs.writeFile(path.join(site, "docs/features/INDEX.md"), "# Index des fonctionnalités\n\nVoir [boutons](BUSY_BUTTONS.md).\n");
   await fs.writeFile(path.join(site, "docs/features/BUSY_BUTTONS.md"), "# Boutons occupés\n\nTexte.\n");
+  await fs.writeFile(
+    path.join(site, "docs/features/LONG.md"),
+    "# Long\n\n## Un\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n## Deux\n\n### Trois\n\n## Quatre\n",
+  );
   index = await buildDevDocIndex({
     site: { root: site, dirs: ["docs"], files: [] },
     bot: { root: path.join(base, "absent"), dirs: ["doc"], files: [] },
@@ -97,6 +101,28 @@ describe("DevDocPage — garde", () => {
     const html = await renderPage(["site", "features", "INDEX"]);
     expect(html).toContain('href="/en/devdoc/site/features/BUSY_BUTTONS"');
     expect(html).toContain("This document is written in French.");
+  });
+
+  it("DevDocPage_longDoc_rendersOutlineNamedTableAndNewTabLink", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ isAdmin: true }));
+    const html = await renderPage(["site", "features", "LONG"]);
+    expect(html).toContain("Sur cette page");
+    expect(html).toContain('<a href="#trois">Trois</a>');
+    expect(html).toContain('role="region" tabindex="0" aria-label="Tableau, défilable"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain("(nouvel onglet)");
+  });
+
+  it("DevDocPage_shortDoc_hasNoOutline", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ isAdmin: true }));
+    expect(await renderPage(["site", "features", "BUSY_BUTTONS"])).not.toContain("Sur cette page");
+  });
+
+  it("DevDocPage_navigation_startsCollapsedWithToggle", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ isAdmin: true }));
+    const html = await renderPage(["site", "features", "BUSY_BUTTONS"]);
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("Parcourir les documents");
   });
 
   it("DevDocPage_unknownDoc_notFound", async () => {

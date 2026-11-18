@@ -158,14 +158,19 @@
 .docs-content ol > li { padding-left: 4px; }
 .docs-content ol > li::before { content: none; }
 .docs-content ol > li::marker { color: var(--cyan-400); font-family: var(--font-mono); font-size: 12px; }
-/* Un tableau large se resserre et coupe ses mots plutôt que de déborder. */
+/* Un tableau large défile dans son enveloppe (`.docs-table`) au lieu de s'écraser. */
+.docs-content .docs-table {
+  margin: 0 0 18px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.docs-content .docs-table:focus-visible { outline: 2px solid var(--cyan-400); outline-offset: 2px; }
 .docs-content table {
   width: 100%;
-  margin: 0 0 18px;
+  min-width: 520px;
   border-collapse: collapse;
-  table-layout: fixed;
   font-size: 13px;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .docs-content th,
 .docs-content td {

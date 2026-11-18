@@ -100,9 +100,14 @@ casse, aux accents et aux `_`, nombre de résultats annoncé —, puis arboresce
 par dépôt et par dossier, `INDEX` en tête, dossier du document ouvert déplié
 et amené dans la zone)
 dans une `ScrollArea` verticale nommée ; le document à côté (une colonne sous
-960 px), avec son chemin et le lien « Voir sur GitHub ». Corps stylé par
-`.docs-content` (`app/bot/docs/docs.css`) ; tableaux en `table-layout: fixed`,
-qui coupent leurs mots plutôt que de déborder.
+960 px, où la navigation se **replie** derrière un bouton « Parcourir les
+documents » et se referme au choix d'un document), avec son chemin et le lien
+« Voir sur GitHub » (nouvel onglet, annoncé). Échap ou le choix d'un résultat vide
+la recherche. Un document de 4 titres `##`/`###` ou plus porte un sommaire
+dépliable (`docOutline`). La prose est bornée à 80 caractères par ligne. Corps
+stylé par `.docs-content` (`app/bot/docs/docs.css`) ; tableaux larges, qui défilent dans leur enveloppe `.docs-table` (région focalisable nommée par
+`tableLabel` — le HTML étant rendu côté serveur, c'est l'exception à
+`<ScrollArea>`) au lieu de s'écraser.
 
 ## Tests
 

@@ -289,3 +289,37 @@ export function guessDocLanguage(markdown: string): "fr" | "en" {
   }
   return english > french ? "en" : "fr";
 }
+
+/** Une entrée du sommaire d'un document : titre `##` (niveau 2) ou `###` (niveau 3) du fichier et son ancre. */
+export interface DevDocOutlineItem {
+  id: string;
+  text: string;
+  level: 2 | 3;
+}
+
+/** Au moins ce nombre de titres pour qu'un sommaire serve (en dessous, le document tient d'un coup d'œil). */
+export const DEV_DOC_OUTLINE_MIN = 4;
+
+function plainHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&");
+}
+
+/**
+ * Sommaire d'un document rendu avec ses ancres (`headingIds`) : ses titres de
+ * `##` et `###` du fichier (le `#` est le titre de la page), dans l'ordre. Vide sous {@link DEV_DOC_OUTLINE_MIN} titres.
+ * Lit le HTML produit par `renderMarkdown` (source de confiance), jamais une
+ * entrée utilisateur.
+ */
+export function docOutline(html: string): DevDocOutlineItem[] {
+  const items: DevDocOutlineItem[] = [];
+  for (const match of html.matchAll(/<h([34]) id="([^"]+)">(.*?)<\/h\1>/g)) { // NOSONAR typescript:S8786 — HTML rendu par nous
+    const text = plainHtml(match[3]).trim();
+    if (text) items.push({ id: plainHtml(match[2]), text, level: match[1] === "3" ? 2 : 3 });
+  }
+  return items.length >= DEV_DOC_OUTLINE_MIN ? items : [];
+}

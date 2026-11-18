@@ -250,9 +250,20 @@ describe("loadBotDoc", () => {
 describe("renderMarkdown — blocs de /devdoc", () => {
   it("renderMarkdown_tableWithSeparator_rendersHeadAndBody", () => {
     expect(renderMarkdown("| a | b |\n|---|:-:|\n| 1 | `x` |")).toBe(
-      "<table>\n<thead><tr><th>a</th><th>b</th></tr></thead>\n<tbody>\n<tr><td>1</td><td><code>x</code></td></tr>\n</tbody>\n</table>",
+      '<div class="docs-table">\n<table>\n<thead><tr><th>a</th><th>b</th></tr></thead>\n<tbody>\n<tr><td>1</td><td><code>x</code></td></tr>\n</tbody>\n</table>\n</div>',
     );
   });
+
+  it("renderMarkdown_tableWithLabel_wrapsInFocusableRegion", () => {
+    expect(renderMarkdown("| a |\n|---|\n| 1 |", { tableLabel: 'Table "x"' })).toContain(
+      '<div class="docs-table" role="region" tabindex="0" aria-label="Table &quot;x&quot;">',
+    );
+  });
+
+  it("renderMarkdown_tableWithoutLabel_wrapsWithoutRegionRole", () => {
+    expect(renderMarkdown("| a |\n|---|\n| 1 |")).not.toContain("role=");
+  });
+
 
   it("renderMarkdown_barsWithoutSeparator_staysParagraph", () => {
     expect(renderMarkdown("| a |\nsuite")).toBe("<p>| a | suite</p>");

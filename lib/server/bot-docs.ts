@@ -98,6 +98,11 @@ export interface MarkdownRenderOptions {
   linkCode?: (code: string) => string | null;
   /** Pose un `id` sur chaque titre (ancre d'un lien `#…`). */
   headingIds?: boolean;
+  /**
+   * Nom accessible de la zone qui fait défiler un tableau large (région
+   * focalisable au clavier). Absent : l'enveloppe défile sans être nommée.
+   */
+  tableLabel?: string;
 }
 
 function escapeHtml(value: string): string {
@@ -362,10 +367,13 @@ class MarkdownWriter {
     this.flush();
     const [head, , ...body] = rows.map(tableCells);
     const cells = (row: string[], tag: "th" | "td") => row.map((cell) => `<${tag}>${this.inline(cell)}</${tag}>`).join("");
+    const region = this.options.tableLabel
+      ? ` role="region" tabindex="0" aria-label="${escapeHtml(this.options.tableLabel)}"`
+      : "";
     this.out.push(
-      `<table>\n<thead><tr>${cells(head, "th")}</tr></thead>\n<tbody>\n${body
+      `<div class="docs-table"${region}>\n<table>\n<thead><tr>${cells(head, "th")}</tr></thead>\n<tbody>\n${body
         .map((row) => `<tr>${cells(row, "td")}</tr>`)
-        .join("\n")}\n</tbody>\n</table>`,
+        .join("\n")}\n</tbody>\n</table>\n</div>`,
     );
   }
 

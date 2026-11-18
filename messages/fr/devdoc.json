@@ -13,7 +13,8 @@
   "nav": {
     "label": "Documents",
     "count": "{count, plural, one {# document} other {# documents}}",
-    "tree": "Arborescence des documents"
+    "tree": "Arborescence des documents",
+    "toggle": "Parcourir les documents"
   },
   "search": {
     "label": "Rechercher un document",
@@ -27,6 +28,9 @@
     "updated": "Modifié le {date}",
     "frenchOnly": "Ce document est rédigé en français.",
     "missing": "Ce document n'a pas pu être lu.",
-    "repoEmpty": "Aucun document trouvé dans ce dépôt."
+    "repoEmpty": "Aucun document trouvé dans ce dépôt.",
+    "table": "Tableau, défilable",
+    "newTab": "(nouvel onglet)",
+    "outline": "Sur cette page"
   }
 }

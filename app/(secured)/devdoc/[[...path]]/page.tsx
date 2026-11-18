@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { findDevDoc, loadDevDocIndex, renderDevDoc } from "@/lib/server/dev-docs";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { DEV_DOC_SOURCE_URLS, groupDevDocs, parseDevDocParams } from "@/lib/shared/dev-docs";
+import { DEV_DOC_SOURCE_URLS, docOutline, groupDevDocs, parseDevDocParams } from "@/lib/shared/dev-docs";
 import { INTL_LOCALE, localeHref } from "@/lib/shared/locales";
 import { can } from "@/lib/shared/permissions";
 import { scopedText } from "@/lib/shared/scoped-text";
@@ -48,7 +48,8 @@ export default async function DevDocPage({ params }: Readonly<PageProps>) {
 
   const messages = messagesFor(locale).devdoc;
   const { t } = scopedText(locale, messages);
-  const doc = await renderDevDoc(index, summary, (href) => localeHref(href, locale));
+  const doc = await renderDevDoc(index, summary, (href) => localeHref(href, locale), t("doc.table"));
+  const outline = doc.html === null ? [] : docOutline(doc.html);
   const foreign = doc.language !== locale;
   const sourceUrl = `${DEV_DOC_SOURCE_URLS[summary.repo]}/blob/main/${summary.path.split("/").map(encodeURIComponent).join("/")}`;
 
@@ -72,8 +73,9 @@ export default async function DevDocPage({ params }: Readonly<PageProps>) {
           <div className={styles.docHead}>
             <span className={`pill pill-info ${styles.docRepo}`}>{t(`repos.${summary.repo}`)}</span>
             <span className={styles.docSource}>{t("doc.source", { file: summary.path })}</span>
-            <a className={styles.docGithub} href={sourceUrl} rel="noreferrer">
+            <a className={styles.docGithub} href={sourceUrl} target="_blank" rel="noreferrer">
               {t("doc.github")}
+              <span className="sr-only"> {t("doc.newTab")}</span>
             </a>
           </div>
           <div className={styles.docBody} lang={foreign ? doc.language : undefined}>
@@ -81,6 +83,18 @@ export default async function DevDocPage({ params }: Readonly<PageProps>) {
               <p className={styles.docNotice} lang={locale}>
                 {t("doc.frenchOnly")}
               </p>
+            ) : null}
+            {outline.length > 0 ? (
+              <details className={styles.outline}>
+                <summary className={styles.outlineTitle} lang={foreign ? locale : undefined}>{t("doc.outline")}</summary>
+                <ul className={styles.outlineList}>
+                  {outline.map((item) => (
+                    <li key={item.id} className={item.level === 3 ? styles.outlineSub : undefined}>
+                      <a href={`#${encodeURIComponent(item.id)}`}>{item.text}</a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             ) : null}
             {doc.html === null ? (
               <p className={styles.docNotice} lang={foreign ? locale : undefined}>
