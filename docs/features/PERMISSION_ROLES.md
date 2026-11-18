@@ -13,6 +13,7 @@ s'additionnent.
 | `CASTER`            | Aperçu du plateau avant lancement en lecture seule (`casting`), et diffusion en direct des matchs (`live`). |
 | `COMMUNITY_MANAGER` | Site vitrine (sponsors) + association (`showcase`).       |
 | `RECRUTEUR`         | Page recrutement (`recruitment`).                         |
+| `DEV`               | Documentation développeur `/devdoc`, lecture seule (`dev`). |
 
 `ADMIN` est un super-rôle : il débloque toutes les permissions, y compris
 `roles` (attribution des rôles à n'importe quel utilisateur).
@@ -33,6 +34,17 @@ s'additionnent.
 - `showcase` — `/api/landing/sponsors/*`, `/api/association/*`, `/api/benevoles/*`.
 - `recruitment` — `/api/recruitment/*`.
 - `roles` — `POST /api/admin/users/[id]/roles` (réservé `ADMIN`).
+- `dev` — page `/devdoc` (documentation du site et du bot, `DEVDOC.md`) et
+  lien « Documentation dev » du menu du compte. **Lecture seule**, aucune
+  donnée de membre lue en base : la page sert les `.md` des dossiers de la
+  liste blanche tels qu'ils sont sur le serveur (copie de travail, publiée sur
+  GitHub — d'où la règle : jamais de note privée dans ces dossiers). Rôle `DEV`
+  (et `ADMIN`). `DEV` ne fait **pas** du staff : `isStaffMember` l'écarte
+  (`NON_STAFF_ROLES`), si bien qu'il n'ouvre ni les commandes ni les sections
+  staff de `/bot` et `/bot/docs` — mais `/devdoc` lui montre tout `doc/` du
+  bot, dont les fichiers de ces sections (publics sur GitHub) : la réserve de
+  `/bot/docs` est une présentation, pas un secret. `DEV` n'est pas non plus un
+  titre public : la fiche du joueur ne l'affiche pas (`displayRoles`).
 - `moderation` — panneau `/admin/signalements`, `/api/admin/reports/*`,
   `/api/admin/logo-quarantines/*`, `DELETE /api/admin/teams/[id]/logo`,
   `DELETE /api/admin/users/[id]/avatar` (réservé `ADMIN` : retirer le contenu
@@ -77,7 +89,7 @@ s'additionnent.
 `POST /api/admin/users/[id]/roles` avec `id` = l'appelant :
 
 - ✅ un **administrateur** (colonne `is_admin`) règle ses rôles cumulables
-  (`ARBITRE`, `CASTER`, `COMMUNITY_MANAGER`, `RECRUTEUR`) — ils s'affichent en
+  (`ARBITRE`, `CASTER`, `COMMUNITY_MANAGER`, `RECRUTEUR`, `DEV`) — ils s'affichent en
   titres sur sa fiche (`displayRoles`) et lui restent si un autre administrateur
   lui retire l'administration ;
 - ❌ il ne retire **jamais** son propre `ADMIN` : la sélection doit le contenir,
@@ -151,4 +163,4 @@ l'édition, non divulgué aux autres).
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Rôles de permission de plateforme** (cumulables, distincts des rôles d'équipe) : `ADMIN`, `ARBITRE` (tournois + diffusion), `CASTER` (aperçu du plateau en lecture seule + diffusion), `COMMUNITY_MANAGER` (site vitrine + association), `RECRUTEUR` (recrutement). Toujours protéger une route avec `can(user, "<permission>")` de `@/lib/shared/permissions` (permissions : `tournaments`, `casting`, `live`, `showcase`, `recruitment`, `roles`, `moderation`) — ne pas tester `user.isAdmin` directement pour un domaine scopé. `canAny(user, [...])` pour un accès ouvert à plusieurs domaines. `casting` ne donne **que** la lecture de l'aperçu ; `live` est le droit d'écriture sur l'état de diffusion. `ADMIN` a tous les droits. Voir `docs/features/PERMISSION_ROLES.md`.
+- **Rôles de permission de plateforme** (cumulables, distincts des rôles d'équipe) : `ADMIN`, `ARBITRE` (tournois + diffusion), `CASTER` (aperçu du plateau en lecture seule + diffusion), `COMMUNITY_MANAGER` (site vitrine + association), `RECRUTEUR` (recrutement), `DEV` (documentation `/devdoc`). Toujours protéger une route avec `can(user, "<permission>")` de `@/lib/shared/permissions` (permissions : `tournaments`, `casting`, `live`, `showcase`, `recruitment`, `roles`, `moderation`, `dev`) — ne pas tester `user.isAdmin` directement pour un domaine scopé. `canAny(user, [...])` pour un accès ouvert à plusieurs domaines. `casting` ne donne **que** la lecture de l'aperçu ; `live` est le droit d'écriture sur l'état de diffusion. `ADMIN` a tous les droits. Voir `docs/features/PERMISSION_ROLES.md`.

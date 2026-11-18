@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 
 import { withConnection } from "@/lib/server/database";
 import { loadRefereePanel } from "@/lib/server/tournaments/referee-panel";
+import { rolesGranting } from "@/lib/shared/permissions";
 import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 
 /**
@@ -222,11 +223,18 @@ describe("loadRefereePanel", () => {
     expect(sql).toContain("OR referee_objection_at IS NOT NULL");
   });
 
-  it("loadRefereePanel_staffQuery_filtersEmptyRolesWithJsonLength", async () => {
+  it("loadRefereePanel_staffQuery_selectsOnlyRolesGrantingTournaments", async () => {
     await loadRefereePanel(42, VIEWER);
     const [sql] = execute.mock.calls.find(([query]) => query.includes("FROM bg_users")) ?? [""];
+    expect(sql).toContain("is_admin = 1");
+    for (const role of rolesGranting("tournaments")) {
+      expect(sql).toContain(`JSON_CONTAINS(platform_roles_json, '"${role}"')`);
+    }
+    // Ni un rôle qui n'arbitre pas, ni « au moins un rôle » quel qu'il soit.
+    expect(sql).not.toContain(`'"DEV"'`);
+    expect(sql).not.toContain(`'"CASTER"'`);
+    expect(sql).not.toContain("JSON_LENGTH");
     // `<> '[]'` comparerait le JSON à une chaîne sous MySQL : toujours vrai.
-    expect(sql).toContain("JSON_LENGTH(platform_roles_json) > 0");
     expect(sql).not.toContain("<> '[]'");
   });
 

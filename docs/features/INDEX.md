@@ -206,6 +206,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 
 ## Infra et outillage
 
+- `DEVDOC.md` — Documentation développeur `/devdoc` (permission `dev`, rôle `DEV`) : Markdown du site et du bot relus à chaud par liste blanche, arborescence, recherche, liens entre documents réécrits.
 - `MIGRATION_LOCK.md` — Migrations sous verrou nommé.
 - `VERSIONING.md` — Bump, tag et release automatiques à la fusion.
 - `DEPENDENCY_RISKS.md` — Avis npm audit restants (`braces`, `deepmerge`), surcharges (`uri-js`, `sprintf-js`) et règle du lockfile Windows.

@@ -86,12 +86,23 @@ export function splitLocalePrefix(pathname: string): { locale: Locale; path: str
 /**
  * Un chemin sans préfixe correspond-il à un motif de la liste blanche ?
  * `[id]` n'accepte qu'un entier (`/tournois/12`, pas `/tournois/creer`) ; tout
- * autre segment entre crochets (`[slug]`), n'importe quel segment non vide.
+ * autre segment entre crochets (`[slug]`), n'importe quel segment non vide ;
+ * un dernier segment `[...x]` (attrape-tout), un ou plusieurs segments non
+ * vides (`/devdoc/site/features/X`).
  */
 function matchesRoutePattern(path: string, pattern: string): boolean {
   if (pattern === path) return true;
   const want = pattern.split("/");
   const got = path.split("/");
+  const last = want.at(-1) ?? "";
+  if (last.startsWith("[...") && last.endsWith("]")) {
+    const head = want.slice(0, -1);
+    if (got.length <= head.length) return false;
+    return (
+      head.every((segment, index) => matchesSegment(segment, got[index])) &&
+      got.slice(head.length).every((segment) => segment !== "")
+    );
+  }
   if (want.length !== got.length) return false;
   return want.every((segment, index) => matchesSegment(segment, got[index]));
 }

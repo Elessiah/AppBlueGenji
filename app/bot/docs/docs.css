@@ -146,6 +146,74 @@
 }
 .docs-content a:hover { text-decoration-color: var(--blue-300); }
 
+/* Listes numérotées, tableaux, citations, filets, langue des blocs de code :
+   rendus par `renderMarkdown` pour `/bot/docs` comme pour `/devdoc`. */
+.docs-content ol {
+  margin: 0 0 16px;
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.docs-content ol > li { padding-left: 4px; }
+.docs-content ol > li::before { content: none; }
+.docs-content ol > li::marker { color: var(--cyan-400); font-family: var(--font-mono); font-size: 12px; }
+/* Un tableau large défile dans son enveloppe (`.docs-table`) au lieu de s'écraser.
+   HTML rendu en chaîne (`renderMarkdown`), hors de portée de `<ScrollArea>` : la
+   région nommée et focalisable est posée par le rendu (`tableLabel`), sur les
+   deux pages. */
+.docs-content .docs-table {
+  margin: 0 0 18px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.docs-content .docs-table:focus-visible { outline: 2px solid var(--cyan-400); outline-offset: 2px; }
+.docs-content table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 13px;
+  overflow-wrap: break-word;
+}
+.docs-content th,
+.docs-content td {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.docs-content th {
+  color: var(--ink);
+  font-weight: 500;
+  background: rgba(var(--blue-500-rgb), 0.06);
+}
+.docs-content blockquote {
+  margin: 0 0 16px;
+  padding: 10px 16px;
+  border-left: 2px solid var(--violet-400);
+  background: rgba(var(--violet-400-rgb), 0.05);
+  color: var(--ink-mute);
+}
+.docs-content blockquote p { margin: 0; }
+.docs-content hr {
+  margin: 28px 0;
+  border: none;
+  border-top: 1px solid var(--line);
+}
+.docs-content pre[data-lang] { position: relative; padding-top: 30px; }
+.docs-content pre[data-lang]::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.docs-content a > code { color: inherit; border-color: rgba(var(--blue-500-rgb), 0.35); }
+
 /* ---------- Pied de document ---------- */
 .docs-foot {
   display: flex;

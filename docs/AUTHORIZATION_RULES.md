@@ -10,7 +10,7 @@ motif, dans la section du domaine concerné.
 Deux systèmes de rôles **indépendants** cohabitent, et rien ne les mélange :
 
 - les **rôles de plateforme** (`PlatformRole`) — staff du site : `ADMIN`,
-  `ARBITRE`, `CASTER`, `COMMUNITY_MANAGER`, `RECRUTEUR` ;
+  `ARBITRE`, `CASTER`, `COMMUNITY_MANAGER`, `RECRUTEUR`, `DEV` ;
 - les **rôles d'équipe** (`TeamRole`) — position dans un roster : `OWNER`,
   `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`.
 
@@ -249,7 +249,7 @@ Un `OWNER` d'équipe n'a **aucun** pouvoir sur la plateforme.
   d'un message privé. Chaque demande laisse par ailleurs une trace chez la
   victime, qui reçoit le message.
 
-### 1.2 Les sept permissions
+### 1.2 Les huit permissions
 
 | Permission    | Domaine                                                          |
 | ------------- | ---------------------------------------------------------------- |
@@ -260,17 +260,19 @@ Un `OWNER` d'équipe n'a **aucun** pouvoir sur la plateforme.
 | `recruitment` | Annonces de recrutement                                           |
 | `roles`       | Attribution des rôles de plateforme                               |
 | `moderation`  | Signalements, retrait et quarantaine d'un logo ou d'un avatar (§6.1) |
+| `dev`         | **Lecture seule** de la documentation développeur `/devdoc` (site et bot) |
 
 ### 1.3 Qui a quoi
 
-| Rôle                | `tournaments` | `casting` | `live` | `showcase` | `recruitment` | `roles` | `moderation` |
-| ------------------- | :-----------: | :-------: | :----: | :--------: | :-----------: | :-----: | :----------: |
-| `ADMIN`             | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ARBITRE`           | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `CASTER`            | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `COMMUNITY_MANAGER` | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `RECRUTEUR`         | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| *(aucun rôle)*      | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Rôle                | `tournaments` | `casting` | `live` | `showcase` | `recruitment` | `roles` | `moderation` | `dev` |
+| ------------------- | :-----------: | :-------: | :----: | :--------: | :-----------: | :-----: | :----------: | :---: |
+| `ADMIN`             | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ARBITRE`           | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `CASTER`            | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `COMMUNITY_MANAGER` | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `RECRUTEUR`         | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `DEV`               | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| *(aucun rôle)*      | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 Les rôles sont **cumulables** : un compte `ARBITRE` + `RECRUTEUR` obtient
 l'union des deux lignes. `ADMIN` est un super-rôle — `can()` lui rend `true` sur

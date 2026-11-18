@@ -11,7 +11,7 @@
  */
 
 /** Rôles attribuables à un utilisateur. Cumulables. */
-export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" | "RECRUTEUR";
+export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" | "RECRUTEUR" | "DEV";
 
 /**
  * Domaines d'action protégés :
@@ -29,6 +29,10 @@ export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" 
  *   par un membre (logo d'équipe, avatar de joueur). Réservé ADMIN : retirer
  *   le contenu d'un tiers engage la responsabilité de l'association, ce n'est
  *   pas un geste d'arbitrage ni de vitrine.
+ * - `dev` — lecture de la documentation technique du site et du bot
+ *   (`/devdoc`, `docs/features/DEVDOC.md`). Lecture seule : aucune écriture,
+ *   aucune donnée de membre lue en base (seulement les `.md` de la liste
+ *   blanche, tels que sur le serveur — jamais de note privée dans ces dossiers).
  */
 export type Permission =
   | "tournaments"
@@ -37,7 +41,8 @@ export type Permission =
   | "showcase"
   | "recruitment"
   | "roles"
-  | "moderation";
+  | "moderation"
+  | "dev";
 
 /** Tous les rôles, dans un ordre d'affichage stable (ADMIN en tête). */
 export const PLATFORM_ROLES: readonly PlatformRole[] = [
@@ -46,6 +51,7 @@ export const PLATFORM_ROLES: readonly PlatformRole[] = [
   "CASTER",
   "COMMUNITY_MANAGER",
   "RECRUTEUR",
+  "DEV",
 ];
 
 /** Libellés FR pour l'UI. */
@@ -55,6 +61,7 @@ export const ROLE_LABELS: Record<PlatformRole, string> = {
   CASTER: "Caster",
   COMMUNITY_MANAGER: "Community Manager",
   RECRUTEUR: "Recruteur",
+  DEV: "Développeur",
 };
 
 /** Description courte du périmètre de chaque rôle (UI). */
@@ -64,10 +71,11 @@ export const ROLE_DESCRIPTIONS: Record<PlatformRole, string> = {
   CASTER: "Préparer et diffuser les matchs en direct (aperçu du plateau, antenne).",
   COMMUNITY_MANAGER: "Gérer le site vitrine et l'association.",
   RECRUTEUR: "Gérer la page recrutement.",
+  DEV: "Lire la documentation technique du site et du bot.",
 };
 
 const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
-  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation"],
+  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev"],
   // L'arbitre gère le tournoi : l'aperçu lui est acquis, sans rôle en plus, et
   // il ouvre aussi l'antenne — sans quoi il faudrait deux personnes pour lancer
   // un match casté.
@@ -77,6 +85,9 @@ const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
   CASTER: ["casting", "live"],
   COMMUNITY_MANAGER: ["showcase"],
   RECRUTEUR: ["recruitment"],
+  // Lecture de `/devdoc` seulement : la doc des dépôts, publiée sur GitHub,
+  // relue sur le serveur et rassemblée pour qui travaille sur le code.
+  DEV: ["dev"],
 };
 
 /** Vrai si `value` est un `PlatformRole` connu. */
@@ -157,17 +168,25 @@ export function canAny(
 }
 
 /**
- * Vrai si l'utilisateur porte au moins un rôle de permission de plateforme
- * (`ADMIN` compris). Sert à distinguer le staff — qui gère un domaine ou un
- * autre, peu importe lequel — d'un simple visiteur ou joueur : pas un domaine
- * précis, juste « a un rôle sur le site ».
+ * Rôles qui ne font pas du staff : `DEV` ne donne que la lecture de `/devdoc`,
+ * jamais les commandes ni les sections réservées au staff de `/bot` et
+ * `/bot/docs` (leurs fichiers, publics sur GitHub, restent lisibles dans
+ * `/devdoc` avec le reste de `doc/`), ni un titre public sur la fiche du joueur.
+ */
+export const NON_STAFF_ROLES: readonly PlatformRole[] = ["DEV"];
+
+/**
+ * Vrai si l'utilisateur porte au moins un rôle de staff de plateforme
+ * (`ADMIN` compris, {@link NON_STAFF_ROLES} exclus). Sert à distinguer le
+ * staff — qui gère un domaine ou un autre, peu importe lequel — d'un simple
+ * visiteur ou joueur : pas un domaine précis, juste « a un rôle sur le site ».
  */
 export function isStaffMember(
   user: { roles?: readonly PlatformRole[]; isAdmin?: boolean } | null | undefined,
 ): boolean {
   if (!user) return false;
   if (user.isAdmin) return true;
-  return (user.roles?.length ?? 0) > 0;
+  return (user.roles ?? []).some((role) => !NON_STAFF_ROLES.includes(role));
 }
 
 /** Rôles accordés et retirés par un enregistrement, dans l'ordre d'affichage. */

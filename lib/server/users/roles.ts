@@ -51,7 +51,7 @@ function assertExpectedRoles(expected: readonly PlatformRole[] | undefined, prev
 /**
  * Remplace l'intégralité des rôles de permission d'un utilisateur.
  * Le rôle `ADMIN` est persisté via la colonne `is_admin` ; les autres rôles
- * cumulables (ARBITRE, COMMUNITY_MANAGER, RECRUTEUR) dans `platform_roles_json`.
+ * cumulables (ARBITRE, CASTER, COMMUNITY_MANAGER, RECRUTEUR, DEV) dans `platform_roles_json`.
  * Réservé aux administrateurs (contrôle d'accès effectué côté route API).
  *
  * `expected` : les rôles affichés quand l'auteur a ouvert la fiche ; s'ils ne

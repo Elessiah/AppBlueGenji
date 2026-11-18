@@ -108,4 +108,9 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // STATS-PAGE — statistiques de fréquentation pour les partenaires
   // (`docs/features/STATS_PAGE.md`) : `noindex`, hors menus et hors sitemap.
   "/frequentation",
+  // DEVDOC-PAGE — documentation développeur réservée (`docs/features/DEVDOC.md`) :
+  // l'interface suit la langue, les documents restent dans la leur (français,
+  // annoncés `lang="fr"`). Espace sécurisé : `noindex`, hors sitemap.
+  "/devdoc",
+  "/devdoc/[...path]",
 ];

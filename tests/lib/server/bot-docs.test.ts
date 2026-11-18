@@ -6,6 +6,9 @@ import path from "node:path";
 import {
   BOT_DOC_SECTIONS,
   findBotDocSection,
+  headingAnchor,
+  isSafeHref,
+  isTableSeparator,
   renderInline,
   renderMarkdown,
 } from "@/lib/server/bot-docs";
@@ -163,7 +166,7 @@ describe("renderMarkdown", () => {
   });
 
   it("ignore le BOM en tête de fichier", () => {
-    expect(renderMarkdown("﻿# Titre")).toBe("<h2>Titre</h2>");
+    expect(renderMarkdown("\uFEFF# Titre")).toBe("<h2>Titre</h2>");
   });
 
   it("gère les fins de ligne Windows", () => {
@@ -243,5 +246,201 @@ describe("loadBotDoc", () => {
     expect(help.html).toContain("Aide");
     expect(other.html).toContain("Autre");
     clearCache();
+  });
+});
+
+describe("renderMarkdown — blocs de /devdoc", () => {
+  it("renderMarkdown_tableWithSeparator_rendersHeadAndBody", () => {
+    expect(renderMarkdown("| a | b |\n|---|:-:|\n| 1 | `x` |")).toBe(
+      '<div class="docs-table">\n<table>\n<thead><tr><th>a</th><th>b</th></tr></thead>\n<tbody>\n<tr><td>1</td><td><code>x</code></td></tr>\n</tbody>\n</table>\n</div>',
+    );
+  });
+
+  it("renderMarkdown_tableWithLabel_wrapsInFocusableRegion", () => {
+    expect(renderMarkdown("| a |\n|---|\n| 1 |", { tableLabel: 'Table "x"' })).toContain(
+      '<div class="docs-table" role="region" tabindex="0" aria-label="Table &quot;x&quot;">',
+    );
+  });
+
+  it("renderMarkdown_tableWithoutLabel_wrapsWithoutRegionRole", () => {
+    expect(renderMarkdown("| a |\n|---|\n| 1 |")).not.toContain("role=");
+  });
+
+
+  const blockCases: [name: string, source: string, html: string][] = [
+    ["renderMarkdown_barsWithoutSeparator_staysParagraph", "| a |\nsuite", "<p>| a | suite</p>"],
+    ["renderMarkdown_orderedList_rendersOl", "1. un\n2. deux", "<ol>\n<li>un</li>\n<li>deux</li>\n</ol>"],
+    ["renderMarkdown_orderedThenBullet_switchesList", "1. un\n- deux", "<ol>\n<li>un</li>\n</ol>\n<ul>\n<li>deux</li>\n</ul>"],
+    ["renderMarkdown_wrappedBulletLine_continuesItem", "- un\n  suite\n- deux", "<ul>\n<li>un suite</li>\n<li>deux</li>\n</ul>"],
+    ["renderMarkdown_textAfterBlankLine_closesList", "- un\n\nsuite", "<ul>\n<li>un</li>\n</ul>\n<p>suite</p>"],
+    ["renderMarkdown_blockquote_joinsLines", "> cité\n> suite", "<blockquote><p>cité suite</p></blockquote>"],
+    ["renderMarkdown_rule_rendersHr", "---", "<hr>"],
+  ];
+
+  it.each(blockCases)("%s", (_name, source, html) => {
+    expect(renderMarkdown(source)).toBe(html);
+  });
+
+  it("renderMarkdown_fenceWithLanguage_tagsBlock", () => {
+    expect(renderMarkdown("```ts\nconst a = 1;\n```")).toBe(
+      '<pre data-lang="ts"><code class="language-ts">const a = 1;</code></pre>',
+    );
+  });
+
+  it("renderMarkdown_headingIds_dedupesAnchors", () => {
+    expect(renderMarkdown("# Titre\n## Titre", { headingIds: true })).toBe(
+      '<h2 id="titre">Titre</h2>\n<h3 id="titre-1">Titre</h3>',
+    );
+  });
+
+  it("renderMarkdown_noOptions_noHeadingIds", () => {
+    expect(renderMarkdown("## Titre")).toBe("<h3>Titre</h3>");
+  });
+});
+
+describe("renderInline — options de liens", () => {
+  it("renderInline_resolverRefuses_keepsLabelOnly", () => {
+    expect(renderInline("[x](a.md)", { resolveLink: () => null })).toBe("x");
+  });
+
+  it("renderInline_resolverReturnsUnsafeScheme_dropsLink", () => {
+    expect(renderInline("[x](a.md)", { resolveLink: () => "javascript:alert(1)" })).toBe("x");
+  });
+
+  it("renderInline_linkCodeResolves_wrapsCodeInLink", () => {
+    expect(renderInline("`A.md`", { linkCode: () => "/devdoc/site/A" })).toBe(
+      '<a href="/devdoc/site/A"><code>A.md</code></a>',
+    );
+  });
+
+  it("renderInline_linkCodeRefuses_keepsPlainCode", () => {
+    expect(renderInline("`A.md`", { linkCode: () => null })).toBe("<code>A.md</code>");
+  });
+});
+
+describe("renderInline — code dans le formatage", () => {
+  it("renderInline_boldAroundCode_keepsBoldAndCode", () => {
+    expect(renderInline("**ne pas `disabled` natif**")).toBe("<strong>ne pas <code>disabled</code> natif</strong>");
+  });
+
+  it("renderInline_codeLabelInLink_neverNestsLinks", () => {
+    expect(renderInline("[`X.md`](https://example.org)", { linkCode: () => "/devdoc/x" })).toBe(
+      '<a href="https://example.org" rel="noreferrer"><code>X.md</code></a>',
+    );
+  });
+
+  it("renderInline_slotMarkerInSource_isDropped", () => {
+    expect(renderInline("a\uE0000\uE000 b")).toBe("a0 b");
+  });
+});
+
+describe("headingAnchor", () => {
+  it("headingAnchor_punctuationAndAccents_githubLikeSlug", () => {
+    expect(headingAnchor("Été & co — `x`")).toBe("été--co--x");
+  });
+});
+
+describe("renderInline — cible de lien et emphase (revue cycle 1)", () => {
+  it("renderInline_linkTargetContainsInlineCode_isNotALink", () => {
+    const html = renderInline("[x](https://a/`B.md`)", { linkCode: () => "/devdoc/site/B" });
+    expect(html).not.toContain('href="https://a/');
+    expect(html).toBe('[x](https://a/<a href="/devdoc/site/B"><code>B.md</code></a>)');
+  });
+
+  it("renderInline_asteriskInLinkTarget_emphasisNeverEntersHref", () => {
+    expect(renderInline("[a](https://x/*) and *b*")).toBe('<a href="https://x/*" rel="noreferrer">a</a> and <em>b</em>');
+  });
+
+  it("renderInline_boldAroundLink_wrapsAnchor", () => {
+    expect(renderInline("**[a](https://x)**")).toBe('<strong><a href="https://x" rel="noreferrer">a</a></strong>');
+  });
+
+  it("renderInline_emphasisInLinkLabel_rendered", () => {
+    expect(renderInline("[**a**](https://x)")).toBe('<a href="https://x" rel="noreferrer"><strong>a</strong></a>');
+  });
+
+  it("renderInline_linkSlotMarkerInSource_isDropped", () => {
+    expect(renderInline("a\uE0010\uE001 b")).toBe("a0 b");
+  });
+});
+
+describe("renderMarkdown — numérotation des listes coupées (revue cycle 1)", () => {
+  it("renderMarkdown_numberedListSplitByBlankLine_continuesNumbering", () => {
+    expect(renderMarkdown("1. un\n\n2. deux")).toBe("<ol>\n<li>un</li>\n</ol>\n<ol start=\"2\">\n<li>deux</li>\n</ol>");
+  });
+
+  it("renderMarkdown_numberedListAfterCodeBlock_keepsNumber", () => {
+    expect(renderMarkdown("```sh\nx\n```\n3. trois")).toContain('<ol start="3">\n<li>trois</li>');
+  });
+
+  it("renderMarkdown_numberedListStartingAtOne_noStartAttribute", () => {
+    expect(renderMarkdown("1. a\n2. b")).toBe("<ol>\n<li>a</li>\n<li>b</li>\n</ol>");
+  });
+});
+
+/** Revue de sécurité, cycle 1 : cibles hors site, motifs en temps linéaire, tableaux nommés. */
+describe("revue sécurité cycle 1 — rendu Markdown", () => {
+  it("isSafeHref_protocolRelative_rejected", () => {
+    expect(isSafeHref("//evil.example/phish")).toBe(false);
+    expect(renderInline("[Guide](//evil.example/phish)")).toBe("Guide");
+  });
+
+  it("isSafeHref_backslashHost_rejected", () => {
+    expect(isSafeHref("/\\evil.example")).toBe(false);
+  });
+
+  it("isSafeHref_singleSlashPath_accepted", () => {
+    expect(isSafeHref("/regles")).toBe(true);
+    expect(renderInline("[r](/regles)")).toBe('<a href="/regles" rel="noreferrer">r</a>');
+  });
+
+  it("renderInline_manyOpenBrackets_rendersInLinearTime", () => {
+    const line = "[".repeat(200_000);
+    const start = performance.now();
+    renderInline(line);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  it("renderInline_repeatedUnclosedLinkTargets_rendersInLinearTime", () => {
+    const line = "[a](".repeat(100_000);
+    const start = performance.now();
+    renderInline(line);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  it("renderInline_nestedBracketLabel_onlyInnerLinkRendered", () => {
+    expect(renderInline("[a [b](/x)")).toBe('[a <a href="/x" rel="noreferrer">b</a>');
+  });
+
+  it("isTableSeparator_alignedCells_true", () => {
+    expect(isTableSeparator("| :-- | :-: | --: |")).toBe(true);
+    expect(isTableSeparator("---|---")).toBe(true);
+  });
+
+  it("isTableSeparator_emptyOrTextCell_false", () => {
+    expect(isTableSeparator("| --- |  |")).toBe(false);
+    expect(isTableSeparator("| --- | a |")).toBe(false);
+    expect(isTableSeparator("|")).toBe(false);
+  });
+
+  it("isTableSeparator_longSpaceLine_answersInLinearTime", () => {
+    const line = `|${" ".repeat(200_000)}x`;
+    const start = performance.now();
+    expect(isTableSeparator(line)).toBe(false);
+    expect(performance.now() - start).toBeLessThan(200);
+  });
+
+  it("renderMarkdown_tableAfterLongSpaceLine_rendersQuickly", () => {
+    const start = performance.now();
+    renderMarkdown(`| a |\n${" ".repeat(100_000)}x`);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+
+  it("renderMarkdown_tableLabel_namesScrollRegion", () => {
+    const table = "| a | b |\n|---|---|\n| 1 | 2 |";
+    expect(renderMarkdown(table, { tableLabel: "Table, scrollable" })).toContain(
+      '<div class="docs-table" role="region" tabindex="0" aria-label="Table, scrollable">',
+    );
+    expect(renderMarkdown(table)).toContain('<div class="docs-table">');
   });
 });

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { LogOut, Shield, UserRound } from "lucide-react";
+import { BookOpen, LogOut, Shield, UserRound } from "lucide-react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { entrantHref } from "@/lib/shared/participants";
+import { DEVDOC_PATH } from "@/lib/shared/dev-docs";
 import { UserAvatar } from "./user-avatar";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";
@@ -16,6 +17,8 @@ type AccountMenuProps = {
   pseudo: string;
   avatarUrl: string | null;
   activeTeam?: AccountMenuTeam | null;
+  /** Lien vers la documentation développeur (permission `dev`, `DEVDOC.md`). */
+  devDocs?: boolean;
 };
 
 /**
@@ -31,7 +34,7 @@ type AccountMenuProps = {
  * en dehors, sur un lien, avec Échap (le focus revient au bouton) et quand la
  * tabulation en sort — mêmes règles que le menu de la vitrine.
  */
-export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<AccountMenuProps>) {
+export function AccountMenu({ pseudo, avatarUrl, activeTeam = null, devDocs = false }: Readonly<AccountMenuProps>) {
   const { t } = useShellText();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -89,6 +92,7 @@ export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<A
         <AccountMenuPanel
           id={panelId}
           activeTeam={activeTeam}
+          devDocs={devDocs}
           leaving={leaving}
           onNavigate={close}
           onLogout={onLogout}
@@ -102,12 +106,14 @@ export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<A
 export function AccountMenuPanel({
   id,
   activeTeam,
+  devDocs = false,
   leaving,
   onNavigate,
   onLogout,
 }: Readonly<{
   id: string;
   activeTeam: AccountMenuTeam | null;
+  devDocs?: boolean;
   leaving: boolean;
   onNavigate: () => void;
   onLogout: () => void;
@@ -138,6 +144,12 @@ export function AccountMenuPanel({
               </span>
             ) : null}
           </span>
+        </LocaleLink>
+      )}
+      {devDocs && (
+        <LocaleLink href={DEVDOC_PATH} className={s.item} onClick={onNavigate}>
+          <BookOpen className={s.itemIcon} size={16} aria-hidden="true" />
+          <span className={s.itemText}>{t("account.devDocs")}</span>
         </LocaleLink>
       )}
       <button type="button" className={`${s.item} ${s.logout}`} onClick={() => !leaving && onLogout()}

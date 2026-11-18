@@ -1249,11 +1249,15 @@ function RgpdFr({
             un résultat corrigé ou une validation suspendue garde sa trace nominative (<Link href="/rgpd/registre#t05">registre,
             T05</Link>), sauf, quand elle n&apos;a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
             Quand un administrateur attribue ou retire un rôle de plateforme (administrateur, arbitre, caster, community
-            manager, recruteur), y compris sur son propre compte, où il ne peut pas se retirer l&apos;administration, le
+            manager, recruteur, développeur), y compris sur son propre compte, où il ne peut pas se retirer l&apos;administration, le
             journal du staff sur Discord le note sans nommer personne ; les journaux du serveur gardent son auteur,
             l&apos;identifiant du compte visé et les rôles enregistrés, au titre de l&apos;intérêt légitime
             (administration de la plateforme), auquel la personne concernée peut s&apos;opposer (section{" "}
             <a href="#exercer-vos-droits">« Exercer vos droits »</a> ; <Link href="/rgpd/registre#t05">registre, T05</Link>).
+            Un rôle de plateforme s&apos;affiche aussi comme un titre (administrateur, arbitre…) sur votre fiche de joueur,
+            que lit tout membre connecté, quels que soient vos réglages de visibilité ; le rôle développeur, qui
+            n&apos;ouvre que la lecture de la documentation technique du site et du bot (publiée sur GitHub), n&apos;y
+            paraît pas (<Link href="/rgpd/registre#t01">registre, T01</Link>).
           </p>
           <p id="messages-d-equipe">
             <strong>Messages privés Discord d&apos;équipe.</strong> Le bot vous écrit aussi en privé, dans la langue

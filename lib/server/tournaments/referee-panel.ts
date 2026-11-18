@@ -11,6 +11,8 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
+import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
+import { rolesGranting } from "@/lib/shared/permissions";
 import type { RefereeIneligibility } from "@/lib/shared/match-referee";
 import type { TournamentGame } from "@/lib/shared/types";
 import { parseStoredSlots } from "@/lib/shared/round-maps";
@@ -18,6 +20,17 @@ import { visibleText } from "@/lib/shared/visible-text";
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import { refereeEligibilityBlock, type CastEligibilityRow } from "./cast-eligibility";
 import { loadMatchPlayerIds } from "./match-players";
+
+/**
+ * Comptes à relire pour la fenêtre : administrateurs et rôles qui accordent
+ * `tournaments` (celle d'un arbitre) — jamais un autre rôle (`CASTER`, `DEV`…),
+ * dont les coordonnées n'ont rien à faire ici. Les rôles sont des constantes du
+ * code, vérifiées par `jsonRoleLiteral` : rien de saisi n'entre dans la requête.
+ * Une colonne `NULL` ou `'[]'` ne contient aucun rôle (`JSON_CONTAINS` faux ou nul).
+ */
+const REFEREE_ROLE_SQL = `(is_admin = 1${rolesGranting("tournaments")
+  .map((role) => ` OR JSON_CONTAINS(platform_roles_json, ${jsonRoleLiteral(role)})`)
+  .join("")})`;
 
 /** Un compte de l'arbitrage, tel que la fenêtre le nomme. */
 export type RefereePanelUser = { userId: number; pseudo: string };
@@ -101,15 +114,16 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
     if (!match) return null;
     // Le staff tient en quelques comptes : rôles relus en base, condition
     // rejouée ici (`refereeEligibilityBlock`), jamais prise d'une session.
-    // Un rôle retiré laisse `'[]'`, pas `NULL` (`users/roles.ts`) : ces comptes
-    // sont écartés en SQL plutôt que décodés un à un à chaque ouverture.
-    // `JSON_LENGTH` : MySQL comparerait `<> '[]'` à une chaîne JSON (toujours vrai).
+    // Seuls les rôles qui arbitrent sont présélectionnés en SQL
+    // (`REFEREE_ROLE_SQL`) : un compte sans rôle (`'[]'` ou `NULL`), caster ou
+    // développeur n'est pas lu — l'arbitre en place, le lecteur et une
+    // opposition retenue le sont toujours.
     const [staff] = await connection.execute<StaffRow[]>(
       `SELECT id, pseudo, discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag,
               overwatch_battletag_typed, is_deleted, is_admin, platform_roles_json, referee_objection_at
          FROM bg_users
         WHERE is_deleted = 0
-          AND (is_admin = 1 OR JSON_LENGTH(platform_roles_json) > 0
+          AND (${REFEREE_ROLE_SQL}
                OR id IN (?, ?) OR referee_objection_at IS NOT NULL)`,
       [match.referee_user_id ?? 0, viewerUserId],
     );

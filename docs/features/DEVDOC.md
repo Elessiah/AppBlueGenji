@@ -1,0 +1,172 @@
+# Documentation développeur (`/devdoc`)
+
+Page réservée qui rassemble **toute** la documentation Markdown du site et du
+bot, relue à chaud sur le serveur, dans la copie de travail des deux dépôts
+(voir « Copie de travail, pas Git »). Ces documents sont publiés sur GitHub :
+la porte ne protège que la page elle-même (rien n'y est masqué ni caviardé), et
+le lecteur `DEV` ne lit aucune donnée de membre en base. Les fichiers des
+sections staff de `/bot/docs` (`doc/internal-api.md`, `doc/main.md`…) y sont
+lisibles comme le reste de `doc/` : leur réserve sur `/bot/docs` n'est qu'une
+présentation, le dépôt du bot étant public.
+
+## Accès
+
+- Permission **`dev`** (`lib/shared/permissions.ts`), accordée par le rôle de
+  plateforme **`DEV`** (« Développeur » / « Developer ») et, comme toute
+  permission, à `ADMIN`. Le rôle s'attribue comme les autres : fiche du joueur
+  (« Rôles & permissions ») ou « Mes rôles » de `/profil` pour un
+  administrateur — voir `PERMISSION_ROLES.md`. Stocké dans
+  `bg_users.platform_roles_json` (JSON) : aucun changement de schéma.
+- Sans session : carte « Connexion requise » de l'espace sécurisé. Connecté sans
+  la permission : **404**, comme `/admin/signalements` (rien à révéler).
+- Le contrôle est fait **deux fois** : `app/(secured)/devdoc/layout.tsx` et la
+  page elle-même, avant toute lecture de fichier (les segments enfants sont
+  rendus en parallèle de leur mise en page, qui n'est donc pas une frontière).
+  Aucune route d'API : la liste des documents est servie par la page, la
+  recherche filtre côté navigateur.
+- Lien « Documentation dev » dans le menu du compte (`AccountMenu`, prop
+  `devDocs`, posée par `SiteShell` et l'en-tête des pages publiques
+  `PublicHeader` selon `can(user, "dev")`).
+
+## Documents lus (liste blanche)
+
+`lib/server/dev-docs.ts` (`devDocSources`) :
+
+| Dépôt | Racine | Dossiers parcourus | Fichiers de la racine |
+| ----- | ------ | ------------------ | --------------------- |
+| site | `process.cwd()` (`~/apps/AppBlueGenji` en production) | `docs/**` | `CLAUDE.md`, `README.md`, `ACCESSIBILITE.md` |
+| bot | `BOT_PROJECT_DIR` (`../blueGenjiBot`, ou `BOT_DOCS_PATH`) — le même que `/bot/docs` | `doc/**`, `dev-notes/**` | `helpfr.md`, `help.md`, `README.md`, `CLAUDE.md` |
+
+Les conditions du bot (`LegalTerms/`) restent sur leurs propres pages.
+
+**Garde-fou anti-traversée.** L'adresse ne touche jamais le disque :
+
+1. `parseDevDocParams` refuse tout segment vide, `.`, `..`, contenant `/`, `\`
+   ou un caractère nul, ou mal encodé, et tout dépôt inconnu ;
+2. le document est cherché **dans l'index** (`buildDevDocIndex`), qui ne retient
+   que des fichiers `.md` ordinaires — ni lien symbolique, ni lien dur
+   (`nlink` > 1), ni dossier caché, 1 Mo au plus, 1 000 par dépôt, 6 niveaux de dossiers — dont le **chemin réel**
+   reste sous le dossier autorisé ;
+3. le fichier lu est celui de l'index, jamais un chemin bâti depuis l'adresse ;
+4. à chaque lecture, tout se revérifie (l'index échu reste servi jusqu'à
+   10 minutes) : `lstat` (fichier ordinaire, ni lien symbolique ni dur, taille),
+   chemin réel inchangé, puis ouverture sans suivre de lien (`O_NOFOLLOW` là où
+   le système l'offre) et même périphérique + inode que le fichier vérifié.
+
+**Copie de travail, pas Git.** L'index lit le disque, pas `git ls-files` : un
+`.md` non suivi ou ignoré posé dans ces dossiers sur le serveur (note locale,
+journal) serait lisible par tout compte `dev`. Ne jamais y déposer de note
+privée, de donnée de membre ni de secret ; les secrets vivent dans `.env*`,
+hors liste blanche. C'est cette règle qui fonde « aucune donnée de membre »
+(`PERMISSION_ROLES.md`), et ce que veut dire « lue sur le serveur » dans
+l'en-tête de la page. Un correctif posé à la main sur le serveur y paraît avant
+d'être sur `main`, que vise le lien « Voir sur GitHub ».
+
+**Rôle `DEV` et vie privée.** Le rôle s'attribue et se retire comme les autres
+(journal du staff sur Discord sans nom, auteur dans les journaux du serveur —
+`/rgpd`, registre T05) ; il ne paraît pas sur la fiche du joueur, où seuls les
+titres de staff sont publics (`displayRoles`, `NON_STAFF_ROLES`), et il
+n'ouvre pas la fenêtre « Arbitrage » ni n'y est lu (`REFEREE_ROLE_SQL`).
+Le nouveau rôle et la publicité des titres de staff sur la fiche (rectification :
+le registre T01 ne la disait pas) sont annoncés par l'entrée
+`2026-11-roles-de-plateforme-fiche` de `PRIVACY_CHANGES` (FR et EN), `/rgpd`
+et le registre T01.
+
+L'index est refait au plus une fois par minute (`loadDevDocIndex`), en lisant
+seulement les 8 premiers Ko de chaque fichier pour son titre (premier `#` hors
+bloc de code), 16 fichiers à la fois. Passé la minute, le lecteur suivant reçoit
+l'ancien index (gardé 10 minutes) pendant que le nouveau se refait en
+arrière-plan : seul le tout premier appel du processus attend la réindexation.
+
+Un document est relu à chaque vue (taille revérifiée : un fichier a pu grossir
+depuis l'indexation), mais son rendu (HTML, langue, sommaire) est gardé
+24 par index — donc au plus une minute — sous la clé fichier + date + taille +
+langue des liens ; hors du cache commun, dont ~200 rendus par langue auraient
+chassé des entrées plus utiles.
+
+**Coûts mesurés** (202 documents, machine de dev) : index à froid ~35 ms ; rendu du
+plus gros document (131 Ko) ~19 ms, un document courant < 5 ms. L'arborescence
+(~35 Ko dans le flux RSC + ~45 Ko de HTML pour 200 documents, ~10 Ko compressés)
+vit dans la mise en page : elle n'est envoyée qu'une fois par visite. Les liens
+de la navigation ne se préchargent pas (`prefetch={false}`) : chaque lien visible
+aurait lancé un rendu serveur en production. Les motifs du rendu sont en temps
+linéaire : liens bornés (libellé 500 caractères, cible 2 000) et sans crochet
+dans le libellé ni parenthèse ou crochet dans la cible (une ligne de milliers de
+`[` se rendait en temps quadratique, même bornée), ligne de séparation de
+tableau découpée cellule par cellule, `#` de fermeture d'un titre retirés sans
+expression à blancs répétés.
+
+## Adresses
+
+- `/devdoc` : l'index des fonctionnalités du site (`docs/features/INDEX.md`).
+- `/devdoc/site/<chemin sous docs/ sans .md>` — `/devdoc/site/features/BUSY_BUTTONS`,
+  `/devdoc/site/DATABASE_SCHEMA` ; un fichier de la racine du dépôt garde son
+  seul nom (`/devdoc/site/CLAUDE`). Les fichiers de la racine sont indexés
+  d'abord : si un document de `docs/` porte le même nom (`docs/README.md`), il
+  garde son chemin complet (`/devdoc/site/docs/README`) au lieu d'effacer l'autre.
+- `/devdoc/bot/<chemin depuis la racine du bot sans .md>` — `/devdoc/bot/doc/main`,
+  `/devdoc/bot/helpfr`.
+- Sous `/en` aussi (`MIGRATED_ROUTES` : `/devdoc`, `/devdoc/[...path]`, motif
+  attrape-tout ajouté à `matchesRoutePattern`) : l'interface est traduite
+  (espace `devdoc`, FR + EN), les documents restent dans leur langue, annoncée
+  par `lang` (`guessDocLanguage`, sur les mots courants) avec la mention « Ce
+  document est rédigé en français. » sous `/en`.
+
+## Rendu
+
+Le Markdown passe par le rendu de `/bot/docs` (`renderMarkdown`,
+`lib/server/bot-docs.ts`), étendu pour les deux pages (listes numérotées,
+tableaux, citations, filets, langue des blocs de code, gras ou lien qui
+contient du code, ligne repliée sous une puce qui prolonge son élément) et réglé ici par
+`MarkdownRenderOptions` :
+
+- **liens** (`resolveDevDocLink`) : ancre, `https://`, `mailto:` et chemin du
+  site tels quels (un chemin du site prend la langue de la page : `/regles`
+  devient `/en/regles` sous `/en`) ; chemin relatif vers un document listé → sa page `/devdoc`
+  (préfixe de langue compris), ancre gardée ; vers un autre fichier du dépôt
+  (code, dossier) → ce fichier sur GitHub (`DEV_DOC_SOURCE_URLS`) ; chemin qui
+  sort du dépôt, `//hôte` ou autre schéma → texte seul ; une cible qui contient
+  un code inline n'est pas un lien (le code prime), et gras/italique n'entrent
+  jamais dans l'attribut d'un lien ;
+- **code inline qui nomme un document** (`resolveDevDocCodeRef`) :
+  `` `BUSY_BUTTONS.md` `` de l'index ou de `CLAUDE.md` devient un lien — cherché
+  relatif au document, depuis la racine, puis dans `docs/features`, `docs`
+  (site) ou `doc`, `dev-notes` (bot) ;
+- **ancres** sur les titres, à la manière de GitHub (`headingAnchor`) ;
+- **listes numérotées coupées** (ligne vide, bloc de code, sous-liste) : la
+  suite reprend à son numéro (`<ol start="N">`).
+
+Le titre de l'onglet n'est posé que pour un lecteur autorisé : la 404 servie
+aux autres comptes n'annonce pas la page.
+
+## Écran
+
+`app/(secured)/devdoc/layout.tsx` (en-tête et navigation, une fois par visite) +
+`_components/DevDocNav.tsx` (le document ouvert se lit dans l'adresse) +
+`[[...path]]/page.tsx` (le document) :
+navigation (recherche par titre ou fichier — `filterDevDocs`, insensible à la
+casse, aux accents et aux `_`, nombre de résultats annoncé, textes normalisés une
+fois —, puis arborescence
+par dépôt et par dossier, `INDEX` en tête, dossier du document ouvert déplié
+et amené dans la zone)
+dans une `ScrollArea` verticale nommée ; le document à côté (une colonne sous
+960 px, où la navigation se **replie** derrière un bouton « Parcourir les
+documents » et se referme au choix d'un document), avec son chemin et le lien
+« Voir sur GitHub » (nouvel onglet, annoncé). Échap ou le choix d'un résultat vide
+la recherche. Un document de 4 titres `##`/`###` ou plus porte un sommaire
+dépliable (`docOutline`). La prose est bornée à 80 caractères par ligne. Corps
+stylé par `.docs-content` (`app/bot/docs/docs.css`) ; tableaux larges, qui défilent dans leur enveloppe `.docs-table` (région focalisable nommée par
+`tableLabel` — le HTML étant rendu côté serveur, c'est l'exception à
+`<ScrollArea>`) au lieu de s'écraser.
+
+## Tests
+
+`tests/lib/shared/dev-docs.test.ts` (adresses, refus des traversées, liens,
+regroupement, recherche, langue), `tests/lib/server/dev-docs.test.ts` (index
+sur un faux dépôt : liste blanche, liens symboliques et sorties refusés, rendu
+avec liens réécrits), `tests/app/devdoc-page.test.tsx` (porte : sans session,
+sans permission, `DEV`, administrateur ; document inconnu),
+`tests/app/devdoc-layout.test.tsx` (navigation, document ouvert lu dans l'adresse),
+`tests/app/devdoc-nav-prefetch.test.tsx` (pas de préchargement),
+`tests/lib/server/dev-docs-perf.test.ts` (rendus gardés, index échu, motifs bornés),
+`tests/lib/server/bot-docs.test.ts` (nouveaux blocs du rendu).

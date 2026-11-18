@@ -43,7 +43,9 @@ export interface BotDocSection {
    */
   fileEn?: string;
   /**
-   * Réservée au staff (au moins un rôle de permission de plateforme). Ces
+   * Réservée au staff (`isStaffMember` : un rôle de plateforme hors
+   * `NON_STAFF_ROLES` — `DEV` n'y suffit pas ; ces fichiers, publics sur GitHub,
+   * restent lisibles dans `/devdoc` avec tout `doc/`). Ces
    * pages décrivent le fonctionnement interne du bot (API, base de données,
    * commandes d'adhésion réservées aux serveurs BlueGenji) et n'ont rien à
    * dire à un visiteur sans rôle. Absent ou `false` = publique.
@@ -93,7 +95,7 @@ export function botDocLanguage(section: BotDocSection, locale: Locale): Locale {
   return locale === "en" && section.fileEn ? "en" : "fr";
 }
 
-/** Sous-ensemble visible par un visiteur sans rôle de permission de plateforme. */
+/** Sous-ensemble visible par qui n'est pas du staff (`isStaffMember` faux). */
 export function visibleBotDocSections(isStaff: boolean): BotDocSection[] {
   return BOT_DOC_SECTIONS.filter((s) => isStaff || !s.staffOnly);
 }

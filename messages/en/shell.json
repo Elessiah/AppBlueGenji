@@ -35,6 +35,7 @@
   "account": {
     "menuLabel": "{pseudo}, account menu",
     "profile": "My profile",
+    "devDocs": "Developer docs",
     "logout": "Log out",
     "loggingOut": "Logging out…",
     "logoutFailed": "Couldn't log you out. Try again in a moment."

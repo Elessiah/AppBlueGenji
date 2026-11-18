@@ -89,6 +89,37 @@ describe("users-service admin management", () => {
       expect(profile?.displayRoles).toEqual(["ARBITRE", "RECRUTEUR"]);
     });
 
+    it("getFullProfile_devRole_neverShownAsPublicTitle", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 0, platform_roles_json: JSON.stringify(["DEV", "ARBITRE"]) })]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]]);
+      await mockDb(execute);
+
+      const profile = await getFullProfile({ id: 1 }, 7);
+
+      // `DEV` n'est pas un titre de staff : seul `ARBITRE` paraît sur la fiche.
+      expect(profile?.displayRoles).toEqual(["ARBITRE"]);
+    });
+
+    it("getFullProfile_devOnlyRole_noPublicTitle", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 0, platform_roles_json: JSON.stringify(["DEV"]) })]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]]);
+      await mockDb(execute);
+
+      const profile = await getFullProfile({ id: 1, isAdmin: true }, 7);
+
+      expect(profile?.displayRoles).toEqual([]);
+      // L'administrateur lit toujours le rôle dans le champ de gestion.
+      expect(profile?.roles).toEqual(["DEV"]);
+    });
+
     it("annonce un compte supprimé", async () => {
       // Tel que l'anonymisation le laisse : ni rôle ni statut d'administrateur,
       // donc aucun titre de staff à afficher.

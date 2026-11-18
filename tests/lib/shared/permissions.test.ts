@@ -6,6 +6,7 @@ import {
   canAny,
   hasPermission,
   isPlatformRole,
+  isStaffMember,
   permissionsForRoles,
   sanitizePlatformRoles,
   type PlatformRole,
@@ -70,12 +71,14 @@ describe("permissions", () => {
       expect([...permissionsForRoles(["CASTER"])]).toEqual(["casting", "live"]);
       expect([...permissionsForRoles(["COMMUNITY_MANAGER"])]).toEqual(["showcase"]);
       expect([...permissionsForRoles(["RECRUTEUR"])]).toEqual(["recruitment"]);
+      // Le développeur lit la documentation technique, rien d'autre.
+      expect([...permissionsForRoles(["DEV"])]).toEqual(["dev"]);
     });
 
     it("grants every scope to ADMIN", () => {
       const perms = permissionsForRoles(["ADMIN"]);
       expect(perms).toEqual(
-        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation"]),
+        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev"]),
       );
     });
 
@@ -111,6 +114,12 @@ describe("permissions", () => {
     it("is safe on null/undefined", () => {
       expect(hasPermission(null, "tournaments")).toBe(false);
       expect(hasPermission(undefined, "tournaments")).toBe(false);
+    });
+    it("keeps a DEV user out of every other scope", () => {
+      expect(hasPermission(["DEV"], "dev")).toBe(true);
+      expect(hasPermission(["DEV"], "tournaments")).toBe(false);
+      expect(hasPermission(["DEV"], "moderation")).toBe(false);
+      expect(hasPermission(["DEV"], "roles")).toBe(false);
     });
   });
 
@@ -158,5 +167,25 @@ describe("canAny", () => {
     expect(canAny({ roles: ["RECRUTEUR"] }, ["tournaments", "casting"])).toBe(false);
     expect(canAny({ roles: ["ADMIN"] }, [])).toBe(false);
     expect(canAny(null, ["casting"])).toBe(false);
+  });
+});
+
+/** Revue de sécurité, cycle 1 : `DEV` lit `/devdoc`, il n'est pas du staff. */
+describe("isStaffMember", () => {
+  it("isStaffMember_devOnly_false", () => {
+    expect(isStaffMember({ roles: ["DEV"] })).toBe(false);
+  });
+
+  it("isStaffMember_devAndCaster_true", () => {
+    expect(isStaffMember({ roles: ["DEV", "CASTER"] })).toBe(true);
+  });
+
+  it("isStaffMember_admin_true", () => {
+    expect(isStaffMember({ isAdmin: true, roles: [] })).toBe(true);
+  });
+
+  it("isStaffMember_noRoleOrNoUser_false", () => {
+    expect(isStaffMember({ roles: [] })).toBe(false);
+    expect(isStaffMember(null)).toBe(false);
   });
 });

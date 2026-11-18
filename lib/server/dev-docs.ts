@@ -1,0 +1,358 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { BOT_PROJECT_DIR, renderMarkdown } from "@/lib/server/bot-docs";
+import { cached, cachedStale } from "@/lib/server/cache";
+import {
+  DEV_DOC_REPOS,
+  devDocSlug,
+  docOutline,
+  guessDocLanguage,
+  resolveDevDocCodeRef,
+  resolveDevDocLink,
+  type DevDocLookup,
+  type DevDocOutlineItem,
+  type DevDocRepo,
+  type DevDocSummary,
+} from "@/lib/shared/dev-docs";
+import { isInternalPath } from "@/lib/shared/locales";
+
+/**
+ * Documentation développeur `/devdoc` (`docs/features/DEVDOC.md`) : lecture
+ * des Markdown des deux dépôts, relus à chaud comme ceux de `/bot/docs`.
+ *
+ * **Liste blanche.** Une adresse ne touche jamais le disque : elle est cherchée
+ * dans l'index des fichiers listés au préalable (`buildDevDocIndex`), qui ne
+ * retient que des fichiers `.md` ordinaires — ni lien symbolique, ni dossier
+ * caché — dont le chemin réel reste sous les dossiers autorisés de chaque
+ * dépôt. Le fichier lu est celui de l'index, jamais un chemin bâti depuis
+ * l'adresse.
+ */
+
+/** Racine du dépôt du site : le dossier d'où tourne l'application (`~/apps/AppBlueGenji` en production). */
+export const SITE_PROJECT_DIR = process.cwd();
+
+interface DevDocSource {
+  /** Racine du dépôt. */
+  root: string;
+  /** Dossiers parcourus récursivement, relatifs à la racine. */
+  dirs: readonly string[];
+  /** Fichiers isolés de la racine. */
+  files: readonly string[];
+}
+
+/**
+ * Ce qui est lisible, par dépôt. Le site : tout `docs/` et les fichiers de
+ * travail de la racine. Le bot : sa doc (`doc/`, servie aussi sur `/bot/docs`),
+ * ses notes de développement (`dev-notes/`) et les fichiers de sa racine — pas
+ * ses conditions (`LegalTerms/`, servies sur leurs propres pages).
+ */
+export function devDocSources(): Record<DevDocRepo, DevDocSource> {
+  return {
+    site: { root: SITE_PROJECT_DIR, dirs: ["docs"], files: ["CLAUDE.md", "README.md", "ACCESSIBILITE.md"] },
+    bot: { root: BOT_PROJECT_DIR, dirs: ["doc", "dev-notes"], files: ["helpfr.md", "help.md", "README.md", "CLAUDE.md"] },
+  };
+}
+
+/** Profondeur maximale de dossiers parcourue sous un dossier autorisé. */
+const MAX_DEPTH = 6;
+/** Plafond de documents par dépôt : un dossier imprévu ne fait pas exploser l'index. */
+export const MAX_DOCS_PER_REPO = 1000;
+/** Taille maximale d'un document lu (1 Mo) : au-delà, il est ignoré. */
+export const MAX_DOC_BYTES = 1024 * 1024;
+/**
+ * Durée pendant laquelle l'index est resservi tel quel. Passé ce délai, le
+ * lecteur suivant reçoit l'ancien index pendant que le nouveau se refait en
+ * arrière-plan (jusqu'à {@link DEV_DOC_STALE_MS}) : personne n'attend les
+ * ~2 000 lectures de fichiers d'une réindexation.
+ */
+export const DEV_DOC_TTL_MS = 60_000;
+/** Durée pendant laquelle un index échu reste servi en attendant son remplaçant. */
+export const DEV_DOC_STALE_MS = 10 * DEV_DOC_TTL_MS;
+/**
+ * Rendus gardés par index (donc au plus une minute, puis ils repartent avec
+ * lui) : les quelques documents qu'un lecteur parcourt, pas les ~200. Hors du
+ * cache commun, dont ils chasseraient des entrées plus utiles.
+ */
+export const RENDERED_DOCS_PER_INDEX = 24;
+
+interface IndexedDoc {
+  summary: DevDocSummary;
+  /** Chemin absolu réel du fichier. */
+  file: string;
+}
+
+export interface DevDocIndex {
+  docs: DevDocSummary[];
+  /** `<dépôt>:<chemin relatif>` → document. */
+  byPath: Map<string, IndexedDoc>;
+  /** `<dépôt>:<slug>` → document. */
+  bySlug: Map<string, IndexedDoc>;
+}
+
+const key = (repo: DevDocRepo, value: string) => `${repo}:${value}`;
+
+/** `child` est-il `parent` lui-même ou sous lui ? */
+function isInside(parent: string, child: string): boolean {
+  const relative = path.relative(parent, child);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+/**
+ * Titre d'un document : son premier titre `#` hors bloc de code (un
+ * commentaire `# …` d'un exemple shell n'en est pas un), à défaut le nom du
+ * fichier.
+ */
+export function devDocTitle(markdown: string, fallback: string): string {
+  let inFence = false;
+  for (const line of markdown.replace(/^\uFEFF/, "").split(/\r?\n/)) {
+    if (line.trim().startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const heading = /^#\s+(\S.*)$/.exec(line);
+    // Les `#` de fermeture (`# Titre ##`) partent ; sans expression à blancs
+    // répétés, qui se reparcourait en temps cubique sur une longue file d'espaces.
+    const title = heading?.[1].replace(/[`*]/g, "").trimEnd().replace(/\s#+$/, "").trim();
+    if (title) return title;
+  }
+  return fallback;
+}
+
+/**
+ * Octets lus pour trouver le titre d'un document à l'indexation : le premier
+ * titre est en tête de fichier, inutile de lire tout le document.
+ */
+export const TITLE_SCAN_BYTES = 8 * 1024;
+/** Fichiers examinés en parallèle pendant l'indexation. */
+const INDEX_CONCURRENCY = 16;
+
+async function readHead(file: string): Promise<string | null> {
+  const handle = await fs.open(file, "r").catch(() => null);
+  if (!handle) return null;
+  try {
+    const buffer = Buffer.allocUnsafe(TITLE_SCAN_BYTES);
+    const { bytesRead } = await handle.read(buffer, 0, TITLE_SCAN_BYTES, 0);
+    // Un caractère coupé en fin de tampon devient « � » : sans effet sur le titre.
+    return buffer.subarray(0, bytesRead).toString("utf8");
+  } catch {
+    return null;
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
+}
+
+/**
+ * Un fichier servable : ordinaire, jamais un lien symbolique ni un lien dur
+ * (un second nom qui pourrait désigner un fichier hors des dossiers
+ * autorisés), de taille raisonnable.
+ */
+function isServableFile(stat: { isFile(): boolean; isSymbolicLink(): boolean; nlink: number; size: number }): boolean {
+  return stat.isFile() && !stat.isSymbolicLink() && stat.nlink <= 1 && stat.size <= MAX_DOC_BYTES;
+}
+
+/**
+ * Fichier candidat : un `.md` servable ({@link isServableFile}), dont le
+ * chemin réel reste sous `allowedReal`. Rend son titre (lu sur le début du
+ * fichier), ou `null`.
+ */
+async function readCandidate(file: string, allowedReal: string): Promise<{ real: string; title: string } | null> {
+  const stat = await fs.lstat(file).catch(() => null);
+  if (!stat || !isServableFile(stat)) return null;
+  const real = await fs.realpath(file).catch(() => null);
+  if (!real || !isInside(allowedReal, real)) return null;
+  const head = await readHead(real);
+  if (head === null) return null;
+  return { real, title: devDocTitle(head, path.basename(file, ".md")) };
+}
+
+/** `fn` sur chaque élément, `limit` à la fois au plus ; résultats dans l'ordre d'entrée. */
+async function mapLimited<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+async function walk(dir: string, depth: number, found: string[]): Promise<void> {
+  if (depth > MAX_DEPTH || found.length >= MAX_DOCS_PER_REPO) return;
+  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (found.length >= MAX_DOCS_PER_REPO) return;
+    if (entry.name.startsWith(".") || entry.isSymbolicLink()) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) await walk(full, depth + 1, found);
+    else if (entry.isFile() && entry.name.endsWith(".md")) found.push(full);
+  }
+}
+
+async function indexRepo(repo: DevDocRepo, source: DevDocSource): Promise<IndexedDoc[]> {
+  const rootReal = await fs.realpath(source.root).catch(() => null);
+  if (!rootReal) return [];
+  // Les fichiers de la racine d'abord : ils gardent leur adresse courte même si
+  // un document de `docs/` porte le même nom (`docs/README.md`).
+  const candidates: { file: string; allowedReal: string }[] = source.files.map((name) => ({
+    file: path.join(rootReal, name),
+    allowedReal: rootReal,
+  }));
+  for (const dir of source.dirs) {
+    const dirReal = await fs.realpath(path.join(rootReal, dir)).catch(() => null);
+    // Un dossier autorisé qui serait lui-même un lien hors du dépôt : ignoré.
+    if (!dirReal || !isInside(rootReal, dirReal)) continue;
+    const files: string[] = [];
+    await walk(dirReal, 0, files);
+    for (const file of files) candidates.push({ file, allowedReal: dirReal });
+  }
+
+  const read = await mapLimited(candidates, INDEX_CONCURRENCY, (c) => readCandidate(c.file, c.allowedReal));
+  const docs: IndexedDoc[] = [];
+  const seenSlugs = new Set<string>();
+  for (const candidate of read) {
+    if (!candidate || docs.length >= MAX_DOCS_PER_REPO) continue;
+    const relative = path.relative(rootReal, candidate.real).split(path.sep).join("/");
+    const short = devDocSlug(repo, relative);
+    if (!short) continue;
+    // Adresse courte déjà prise : le document garde son chemin complet, sans effacer l'autre.
+    const slug = seenSlugs.has(short) ? relative.slice(0, -".md".length) : short;
+    if (seenSlugs.has(slug)) continue;
+    seenSlugs.add(slug);
+    docs.push({ summary: { repo, slug, path: relative, title: candidate.title }, file: candidate.real });
+  }
+  return docs;
+}
+
+/** Liste les documents des deux dépôts (sans cache — la page passe par {@link loadDevDocIndex}). */
+export async function buildDevDocIndex(sources: Record<DevDocRepo, DevDocSource> = devDocSources()): Promise<DevDocIndex> {
+  const perRepo = await Promise.all(DEV_DOC_REPOS.map((repo) => indexRepo(repo, sources[repo])));
+  const all = perRepo.flat();
+  return {
+    docs: all.map((doc) => doc.summary),
+    byPath: new Map(all.map((doc) => [key(doc.summary.repo, doc.summary.path), doc])),
+    bySlug: new Map(all.map((doc) => [key(doc.summary.repo, doc.summary.slug), doc])),
+  };
+}
+
+const INDEX_KEY = "devdoc:index";
+
+/**
+ * {@link buildDevDocIndex}, refait au plus une fois par minute. Un index échu
+ * est resservi tel quel pendant que le nouveau se construit (un seul calcul à
+ * la fois) ; seul le tout premier appel du processus attend.
+ */
+export function loadDevDocIndex(): Promise<DevDocIndex> {
+  const stale = cachedStale<DevDocIndex>(INDEX_KEY);
+  const fresh = cached(INDEX_KEY, DEV_DOC_TTL_MS, () => buildDevDocIndex(), { retainMs: DEV_DOC_STALE_MS });
+  if (stale === undefined) return fresh;
+  // Un échec du rafraîchissement ne touche pas ce lecteur : le suivant retente.
+  fresh.catch(() => undefined);
+  return Promise.resolve(stale);
+}
+
+/** Le document d'une adresse, cherché dans l'index seulement. */
+export function findDevDoc(index: DevDocIndex, repo: DevDocRepo, slug: string): DevDocSummary | null {
+  return index.bySlug.get(key(repo, slug))?.summary ?? null;
+}
+
+export interface LoadedDevDoc {
+  summary: DevDocSummary;
+  /** HTML rendu (liens réécrits), ou `null` si le fichier n'a pas pu être relu. */
+  html: string | null;
+  /** Dernière modification du fichier, ISO, ou `null`. */
+  updatedAt: string | null;
+  /** Langue du document (`guessDocLanguage`), pour son attribut `lang`. */
+  language: "fr" | "en";
+  /** Sommaire des titres (`docOutline`), vide pour un document court ou illisible. */
+  outline: DevDocOutlineItem[];
+}
+
+/**
+ * Lit le fichier vérifié par `checked` (son `lstat`) : ouvert sans suivre de
+ * lien symbolique là où le système le permet, puis comparé au fichier vérifié
+ * (même périphérique, même inode) — un remplacement entre la vérification et
+ * la lecture rend `null` au lieu d'un autre contenu.
+ */
+async function readVerified(file: string, checked: { dev: number; ino: number }): Promise<string | null> {
+  const handle = await fs.open(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0)).catch(() => null);
+  if (!handle) return null;
+  try {
+    const opened = await handle.stat();
+    // Un descripteur ouvert n'est jamais un lien symbolique : seuls type, liens durs et taille se revérifient.
+    const same = opened.dev === checked.dev && opened.ino === checked.ino;
+    if (!same || !opened.isFile() || opened.nlink > 1 || opened.size > MAX_DOC_BYTES) return null;
+    return await handle.readFile("utf8");
+  } catch {
+    return null;
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
+}
+
+/** Rendus récents, par index : un nouvel index (liens à jour) repart d'une table vide. */
+const renderedDocs = new WeakMap<DevDocIndex, Map<string, LoadedDevDoc>>();
+
+function rememberRender(index: DevDocIndex, cacheKey: string, doc: LoadedDevDoc): void {
+  const renders = renderedDocs.get(index) ?? new Map<string, LoadedDevDoc>();
+  renderedDocs.set(index, renders);
+  // Le plus ancien part le premier ; une clé relue repasse en fin d'ordre.
+  renders.delete(cacheKey);
+  if (renders.size >= RENDERED_DOCS_PER_INDEX) renders.delete(renders.keys().next().value as string);
+  renders.set(cacheKey, doc);
+}
+
+/**
+ * Lit et rend un document de l'index. Les liens entre documents mènent à leur
+ * page `/devdoc` (passée par `localize`, qui pose le préfixe de langue), les
+ * autres fichiers des dépôts à GitHub ; un code inline qui nomme un document
+ * devient un lien.
+ */
+export async function renderDevDoc(
+  index: DevDocIndex,
+  summary: DevDocSummary,
+  localize: (href: string) => string = (href) => href,
+  tableLabel?: string,
+): Promise<LoadedDevDoc> {
+  const entry = index.bySlug.get(key(summary.repo, summary.slug));
+  if (!entry) return { summary, html: null, updatedAt: null, language: "fr", outline: [] };
+  const lookup: DevDocLookup = (repo, relative) => index.byPath.get(key(repo, relative))?.summary ?? null;
+  const origin = { repo: summary.repo, path: summary.path };
+  // Tout chemin du site (`/devdoc/…`, `/regles`…) prend la langue de la page.
+  const internal = (href: string | null) => (href !== null && isInternalPath(href) ? localize(href) : href);
+  try {
+    // Le fichier a pu changer depuis l'indexation (l'index échu reste servi
+    // jusqu'à dix minutes) : grossi, remplacé par un lien symbolique ou dur, ou
+    // atteint désormais par un dossier devenu lien. Tout se revérifie avant lecture.
+    const stat = await fs.lstat(entry.file);
+    if (!isServableFile(stat) || (await fs.realpath(entry.file)) !== entry.file) {
+      return { summary, html: null, updatedAt: null, language: "fr", outline: [] };
+    }
+    // Même fichier, même état, même langue de liens : le rendu précédent resservi.
+    const cacheKey = [entry.file, stat.mtimeMs, stat.size, localize("/devdoc"), tableLabel ?? ""].join("|");
+    const remembered = renderedDocs.get(index)?.get(cacheKey);
+    if (remembered) return remembered;
+    const raw = await readVerified(entry.file, stat);
+    if (raw === null) return { summary, html: null, updatedAt: null, language: "fr", outline: [] };
+    const html = renderMarkdown(raw, {
+      headingIds: true,
+      tableLabel,
+      resolveLink: (href) => internal(resolveDevDocLink(href, origin, lookup)),
+      linkCode: (code) => internal(resolveDevDocCodeRef(code, origin, lookup)),
+    });
+    const doc: LoadedDevDoc = {
+      summary,
+      html,
+      updatedAt: stat.mtime.toISOString(),
+      language: guessDocLanguage(raw),
+      outline: docOutline(html),
+    };
+    rememberRender(index, cacheKey, doc);
+    return doc;
+  } catch {
+    return { summary, html: null, updatedAt: null, language: "fr", outline: [] };
+  }
+}

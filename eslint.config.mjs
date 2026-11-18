@@ -69,6 +69,7 @@ const I18N_MIGRATED_FILES = [
   "components/ui/toast.tsx",
   // Bot (lot 5a) — `/bot`, `/bot/docs`.
   "app/bot/**",
+  "app/(secured)/devdoc/**",
   "components/bot/**",
   // Association, bénévoles, recrutement (lot 5b). Les sections à éditeur
   // (`BureauSection`, `BenevolesSection`, `RecruitmentSection`,

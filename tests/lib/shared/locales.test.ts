@@ -3,7 +3,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 // Liste blanche simulée : au lot 0 elle est vide, et ces règles ne se
 // vérifient que sur des routes traduites.
 jest.mock("@/lib/shared/i18n-routes", () => ({
-  MIGRATED_ROUTES: ["/", "/regles", "/regles/[slug]", "/equipes/[id]"],
+  MIGRATED_ROUTES: ["/", "/regles", "/regles/[slug]", "/equipes/[id]", "/devdoc", "/devdoc/[...path]"],
 }));
 
 import {
@@ -38,20 +38,19 @@ describe("splitLocalePrefix — langue lue dans le chemin", () => {
   });
 });
 
-describe("isMigratedRoute — liste blanche", () => {
-  it("accepte les routes listées, segments dynamiques compris, barre finale tolérée", () => {
-    expect(isMigratedRoute("/")).toBe(true);
-    expect(isMigratedRoute("/regles")).toBe(true);
-    expect(isMigratedRoute("/regles/")).toBe(true);
-    expect(isMigratedRoute("/regles/swiss")).toBe(true);
-    expect(isMigratedRoute("/equipes/12")).toBe(true);
+describe("isMigratedRoute — liste blanche et segment attrape-tout [...x]", () => {
+  // Routes listées, segments dynamiques compris, barre finale tolérée ; la
+  // racine et une ou plusieurs parties sous /devdoc.
+  const accepted: string[] = ["/", "/regles", "/regles/", "/regles/swiss", "/equipes/12", "/devdoc", "/devdoc/", "/devdoc/site/INDEX", "/devdoc/site/features/BUSY_BUTTONS"];
+  // Le reste, un segment dynamique vide ou en trop, une tête différente, une partie vide.
+  const refused: string[] = ["/classement", "/regles/swiss/x", "/equipes/", "/equipes", "/devdocs", "/devdoc//x", "/x/devdoc/site"];
+
+  it.each(accepted)("accepte %s", (route) => {
+    expect(isMigratedRoute(route)).toBe(true);
   });
 
-  it("refuse le reste, et un segment dynamique vide ou en trop", () => {
-    expect(isMigratedRoute("/classement")).toBe(false);
-    expect(isMigratedRoute("/regles/swiss/x")).toBe(false);
-    expect(isMigratedRoute("/equipes/")).toBe(false);
-    expect(isMigratedRoute("/equipes")).toBe(false);
+  it.each(refused)("refuse %s", (route) => {
+    expect(isMigratedRoute(route)).toBe(false);
   });
 });
 
