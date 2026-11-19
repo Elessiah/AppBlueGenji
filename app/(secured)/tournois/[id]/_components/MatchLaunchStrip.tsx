@@ -20,6 +20,9 @@ import { useSpectatorView } from "@/components/spectator-view";
  * (hôte, premier ban, carte de départ, arbitrage, casters) vivent sur la page
  * du match — voir `docs/features/MATCH_CARD_LAYOUT.md`.
  */
+/** En deçà, la date butoir est « proche » : elle reprend la teinte d'avertissement de la pastille. */
+const SOON_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Pastille de la phase de lancement : à planifier, en attente de départ, en
  * lancement (avec le décompte des « Prêt »), ou lancé — la phase vient de
@@ -34,18 +37,21 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
   // minuteur, posé sur la date butoir elle-même.
   const deadlineMs = kind === "TO_PLAN" && match.scheduleDeadlineAt !== null ? new Date(match.scheduleDeadlineAt).getTime() : null;
   const now = useInstantClock(deadlineMs);
-  const deadlineAt = kind === "TO_PLAN" ? upcomingScheduleDeadline(match.scheduleDeadlineAt, now) : null;
+  // Rien avant que l'horloge soit connue : une date passée ne doit pas clignoter dans le HTML rendu.
+  const deadlineAt = kind === "TO_PLAN" && now !== null ? upcomingScheduleDeadline(match.scheduleDeadlineAt, now) : null;
+  // Ambre seulement quand l'échéance approche (moins de 24 h) : plus loin, la date se lit en teinte neutre.
+  const soon = deadlineAt !== null && now !== null && new Date(deadlineAt).getTime() - now < SOON_MS;
   if (kind === "TO_PLAN") {
     return (
       <span className={styles.toPlan} title={t("launch.toPlanTitle")}>
         <span aria-hidden="true">📅</span> {t("launch.toPlan")}
+        <span className="sr-only">{t("launch.toPlanSr")}</span>
         {deadlineAt && (
-          <span className={styles.deadline} data-testid="schedule-deadline">
+          <span className={styles.deadline} data-soon={soon || undefined} data-testid="schedule-deadline">
             {" · "}
             {t("launch.toPlanDeadline", { date: formatScheduleDeadline(deadlineAt, locale) })}
           </span>
         )}
-        <span className="sr-only">{t("launch.toPlanSr")}</span>
       </span>
     );
   }

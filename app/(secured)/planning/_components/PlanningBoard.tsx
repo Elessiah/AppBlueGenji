@@ -533,9 +533,8 @@ function Entrant({ entrant, text }: Readonly<{ entrant: PlanningEntrant | null; 
   );
 }
 
-/** La ligne de confirmation d'office : à venir, ou en attente (instant passé, propositions encore provisoires). */
-function confirmText(t: Text["t"], pending: boolean, time: string, deadline: string | null): string {
-  if (pending) return t("autoConfirm.pending", { time });
+/** La ligne de confirmation d'office à venir (avec la date butoir qui la fixe, s'il y en a une). */
+function confirmText(t: Text["t"], time: string, deadline: string | null): string {
   return deadline === null ? t("autoConfirm.at", { time }) : t("autoConfirm.atWithDeadline", { time, deadline });
 }
 
@@ -604,10 +603,21 @@ const EntryCard = memo(function EntryCard({
           <Entrant entrant={entry.team2} text={text} />
         </p>
       )}
-      {confirmAt !== null && (
+      {confirmAt !== null && !entry.confirmPending && (
         <p className={styles.confirmAt} data-testid="planning-confirm-at">
-          {confirmText(t, entry.confirmPending, confirmAt, deadline)}
+          {confirmText(t, confirmAt, deadline)}
         </p>
+      )}
+      {confirmAt !== null && entry.confirmPending && (
+        <div className={styles.confirmPending} data-testid="planning-confirm-at">
+          <InfoHintRow inline>
+            <Pill variant="waiting">{t("autoConfirm.pending")}</Pill>
+            <span className={styles.confirmAt}>{t("autoConfirm.pendingAt", { time: confirmAt })}</span>
+            <InfoHint id={`planning-confirm-pending-${entry.key}`} subject={t("autoConfirm.pending")}>
+              <p>{t("autoConfirm.pendingHint")}</p>
+            </InfoHint>
+          </InfoHintRow>
+        </div>
       )}
 
       <dl className={styles.roles}>

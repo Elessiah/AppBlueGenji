@@ -481,6 +481,7 @@
     "title": "Scheduling deadline",
     "bulkTitle": "Deadline for matches to schedule",
     "bulkScope": "{count, plural, =1 {1 match to schedule} other {# matches to schedule}}: the same deadline for all.",
+    "bulkHint": "Replaces the deadline already set on these matches; \"No deadline\" removes them. Matches already scheduled are left alone.",
     "hint": "Both teams must agree on a time before this date (Paris time), otherwise the match is closed as a double forfeit. They are told when it is set, then 24 h and 3 h before.",
     "day": "Day (Paris time)",
     "hour": "Hour",
@@ -493,6 +494,6 @@
     "bulkCleared": "{count, plural, =0 {No deadline to remove.} =1 {Deadline removed from 1 match.} other {Deadline removed from # matches.}}",
     "matchLabel": "{team1} vs {team2}",
     "tbd": "TBD",
-    "bulkOpen": "Matches deadline"
+    "bulkOpen": "Deadline for matches to schedule"
   }
 }

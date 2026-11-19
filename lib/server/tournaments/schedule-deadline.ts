@@ -211,8 +211,8 @@ export async function setMatchScheduleDeadline(
 /**
  * Fixe (ou efface, `null`) la date butoir de **tous** les matchs encore à
  * planifier d'un tournoi (deux engagées connues, sans horaire) — le geste de
- * l'ouverture d'une manche. Effacer touche toutes les dates butoir des matchs
- * non joués.
+ * l'ouverture d'une manche. Effacer vise les mêmes matchs : celle d'un match
+ * déjà programmé ou lancé (retirée, lue par le planning) n'est pas touchée.
  *
  * @returns le nombre de matchs visés, qui portent désormais cette date butoir
  *          (une date identique déjà en place n'est ni réécrite ni réannoncée).
@@ -244,10 +244,10 @@ export async function setTournamentScheduleDeadlines(
             FOR UPDATE`,
           [tournamentId],
         );
-        const targets = rows.filter((row) => {
-          if (deadlineAt === null) return row.schedule_deadline_at !== null;
-          return matchLaunchPhase(deadlineMatchOf(row, tournament.refereeScheduling), now) === "TO_PLAN";
-        });
+        // Effacer vise, comme poser, les matchs à planifier : la date butoir retirée d'un match déjà
+        // programmé ou lancé reste lue par le planning (confirmation d'office), et celle d'une
+        // manche pas encore remplie se retire match par match.
+        const targets = rows.filter((row) => matchLaunchPhase(deadlineMatchOf(row, tournament.refereeScheduling), now) === "TO_PLAN");
         let changed = 0;
         for (const row of targets) {
           if (await writeDeadline(connection, Number(row.id), row.schedule_deadline_at, deadlineAt)) changed += 1;

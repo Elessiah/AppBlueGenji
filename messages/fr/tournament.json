@@ -349,7 +349,7 @@
     "referee": "Arbitre désigné",
     "selfManaged": "Autogestion",
     "selfManagedTitle": "Sans arbitre : les équipes créent et règlent la partie elles-mêmes",
-    "toPlanDeadline": "avant le {date}"
+    "toPlanDeadline": "avant le {date} (heure de Paris)"
   },
   "ranking": {
     "title": "Classement",

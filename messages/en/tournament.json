@@ -349,7 +349,7 @@
     "referee": "Referee assigned",
     "selfManaged": "Self-managed",
     "selfManagedTitle": "No referee: the teams create and run the game themselves",
-    "toPlanDeadline": "before {date}"
+    "toPlanDeadline": "before {date} (Paris time)"
   },
   "ranking": {
     "title": "Standings",

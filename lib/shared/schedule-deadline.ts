@@ -264,6 +264,40 @@ export function deadlineEntryDays(now: number, count: number = SCHEDULE_DEADLINE
   });
 }
 
+/** Cette heure pile du jour est-elle acceptée à la saisie (ni trop proche, ni trop lointaine) ? */
+function entryAccepted(day: string, hour: number, now: number): boolean {
+  const at = deadlineFromEntry(day, hour);
+  return at !== null && at >= now + SCHEDULE_DEADLINE_MIN_AHEAD_MS && at <= now + SCHEDULE_DEADLINE_MAX_AHEAD_MS;
+}
+
+/** Les heures pile d'un jour (Paris) que la saisie peut encore poser : aujourd'hui, celles d'au moins une heure devant. */
+export function deadlineEntryHours(day: string, now: number): number[] {
+  return Array.from({ length: 24 }, (_, hour) => hour).filter((hour) => entryAccepted(day, hour, now));
+}
+
+/**
+ * Les jours proposés, **dans l'ordre** : ceux de {@link deadlineEntryDays} qui
+ * ont encore une heure acceptée (aujourd'hui tard le soir n'en a plus), plus
+ * le jour `keep` (celui de la date butoir en place) s'il en a une et qu'il
+ * est plus loin que la liste.
+ */
+export function deadlineEntryChoices(now: number, keep: string | null = null): string[] {
+  const days = deadlineEntryDays(now);
+  if (keep !== null && !days.includes(keep)) days.push(keep);
+  return days.sort().filter((day) => deadlineEntryHours(day, now).length > 0);
+}
+
+/**
+ * Où la saisie s'ouvre : la date butoir en place si elle serait encore
+ * acceptée, sinon la date proposée (une date butoir passée ou à moins d'une
+ * heure ne se rejoue pas telle quelle).
+ */
+export function deadlineEntryStart(current: number | null, suggested: number, now: number): { day: string; hour: number; fromCurrent: boolean } {
+  const usable = current !== null && current >= now + SCHEDULE_DEADLINE_MIN_AHEAD_MS && current <= now + SCHEDULE_DEADLINE_MAX_AHEAD_MS;
+  const at = usable ? current : suggested;
+  return { ...deadlineEntryOf(at), fromCurrent: usable };
+}
+
 /** Le jour et l'heure (Paris) d'un instant, pour préremplir la saisie. */
 export function deadlineEntryOf(at: number): { day: string; hour: number } {
   const p = parisParts(at);

@@ -188,6 +188,8 @@
   "autoConfirm": {
     "at": "Confirmation d'office : {time}",
     "atWithDeadline": "Confirmation d'office : {time} (date butoir du match : {deadline})",
-    "pending": "Confirmation d'office en attente (prévue : {time})"
+    "pending": "Confirmation d'office en attente",
+    "pendingAt": "prévue : {time}",
+    "pendingHint": "L'heure de confirmation est passée mais des propositions sont encore provisoires : le calcul réessaie à chaque minute, sans rien à faire."
   }
 }

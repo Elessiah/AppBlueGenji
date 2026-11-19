@@ -797,11 +797,25 @@ describe("setTournamentScheduleDeadlines", () => {
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
-  it("setTournamentScheduleDeadlines_clear_onlyMatchesWithDeadline", async () => {
-    routeSql(connection, tournamentRoutes(1));
+  it("setTournamentScheduleDeadlines_clear_onlyToPlanMatchesWithDeadline", async () => {
+    routeSql(connection, [
+      [/FROM bg_tournaments/, () => [[{ referee_scheduling: 1, state: "RUNNING" }]]],
+      [
+        /FROM bg_matches\s+WHERE tournament_id/,
+        () => [
+          [
+            row({ id: 40 }),
+            row({ id: 41, start_at: new Date(DEADLINE) }),
+            row({ id: 42, team2_id: null }),
+            row({ id: 43, launched_at: new Date(DEADLINE), launch_pairing: PAIRING }),
+          ],
+        ],
+      ],
+    ]);
 
+    // Seul le match à planifier perd sa date butoir : celle d'un match programmé ou lancé
+    // (retirée, lue par le planning) et celle d'une manche pas remplie restent.
     await expect(setTournamentScheduleDeadlines(10, null, ACTOR, NOW)).resolves.toBe(1);
-    expect(updatedIds()).toEqual([42]);
+    expect(updatedIds()).toEqual([40]);
   });
 });
-

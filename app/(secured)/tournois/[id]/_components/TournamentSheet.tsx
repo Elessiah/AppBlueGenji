@@ -568,6 +568,7 @@ function TournamentSheetView({
   const [matchForScheduleId, setMatchForScheduleId] = useState<number | null>(null);
   // Date butoir de planification ouverte : un match, ou tous les matchs à planifier (`SCHEDULE_DEADLINE.md`).
   const [deadlineTarget, setDeadlineTarget] = useState<ScheduleDeadlineTarget | null>(null);
+  const [reopenScheduleId, setReopenScheduleId] = useState<number | null>(null);
   // Même raison encore : identifiant, pas objet.
   const [matchForReplayId, setMatchForReplayId] = useState<number | null>(null);
   // Stables pour la vie de la page : les `setState` de React le sont déjà. Sans
@@ -1450,6 +1451,8 @@ function TournamentSheetView({
           onClose={() => setMatchForScheduleId(null)}
           onSaved={() => void refresh()}
           onEditDeadline={() => {
+            // La fenêtre d'horaire se rouvre à la fermeture de la date butoir : le focus y revient.
+            setReopenScheduleId(matchForSchedule.id);
             setMatchForScheduleId(null);
             setDeadlineTarget({
               kind: "match",
@@ -1463,7 +1466,15 @@ function TournamentSheetView({
       )}
 
       {deadlineTarget && (
-        <ScheduleDeadlineDialog target={deadlineTarget} matches={detail.matches} onClose={() => setDeadlineTarget(null)} />
+        <ScheduleDeadlineDialog
+          target={deadlineTarget}
+          matches={detail.matches}
+          onClose={() => {
+            setDeadlineTarget(null);
+            if (reopenScheduleId !== null) setMatchForScheduleId(reopenScheduleId);
+            setReopenScheduleId(null);
+          }}
+        />
       )}
 
       {matchForReplay && detail.canManageLive && (

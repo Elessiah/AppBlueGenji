@@ -2,7 +2,10 @@ import { describe, expect, it } from "@jest/globals";
 import {
   acceptsScheduleDeadline,
   deadlineArmed,
+  deadlineEntryChoices,
   deadlineEntryDays,
+  deadlineEntryHours,
+  deadlineEntryStart,
   deadlineEntryOf,
   deadlineFromEntry,
   deadlineOutcome,
@@ -367,5 +370,67 @@ describe("upcomingScheduleDeadline", () => {
 
   it("upcomingScheduleDeadline_reachedOrPast_hidden", () => {
     expect(upcomingScheduleDeadline(AT, AT_MS)).toBeNull();
+  });
+});
+
+describe("saisie : heures et jours permis", () => {
+  // Mercredi 18 novembre 2026, 15:40 à Paris (14:40 UTC).
+  const NOW = at("2026-11-18T14:40:00Z");
+
+  it("deadlineEntryHours_today_skipsHoursUnderOneHourAhead", () => {
+    const hours = deadlineEntryHours("2026-11-18", NOW);
+
+    expect(hours[0]).toBe(17);
+    expect(hours).toContain(21);
+    expect(hours).not.toContain(16);
+  });
+
+  it("deadlineEntryHours_exactlyOneHourAhead_isOffered", () => {
+    // 15:00 pile : 16:00 est à une heure exacte.
+    expect(deadlineEntryHours("2026-11-18", at("2026-11-18T14:00:00Z"))[0]).toBe(16);
+  });
+
+  it("deadlineEntryHours_laterDay_offersAll24", () => {
+    expect(deadlineEntryHours("2026-11-20", NOW)).toHaveLength(24);
+  });
+
+  it("deadlineEntryHours_pastDayOrBeyondSixtyDays_none", () => {
+    expect(deadlineEntryHours("2026-11-17", NOW)).toEqual([]);
+    expect(deadlineEntryHours("2027-02-01", NOW)).toEqual([]);
+  });
+
+  it("deadlineEntryChoices_lateEvening_dropsToday", () => {
+    // 23:30 à Paris : plus aucune heure pile n'est à une heure d'ici aujourd'hui.
+    const days = deadlineEntryChoices(at("2026-11-18T22:30:00Z"));
+
+    expect(days[0]).toBe("2026-11-19");
+  });
+
+  it("deadlineEntryChoices_farKeptDay_isSortedIn", () => {
+    const days = deadlineEntryChoices(NOW, "2026-12-30");
+
+    expect(days[0]).toBe("2026-11-18");
+    expect(days.at(-1)).toBe("2026-12-30");
+    expect([...days].sort()).toEqual(days);
+  });
+
+  it("deadlineEntryChoices_keptDayBeyondLimit_dropped", () => {
+    expect(deadlineEntryChoices(NOW, "2027-03-01")).not.toContain("2027-03-01");
+  });
+
+  it("deadlineEntryStart_currentStillValid_usesCurrent", () => {
+    expect(deadlineEntryStart(at("2026-11-20T17:00:00Z"), at("2026-11-21T20:00:00Z"), NOW)).toEqual({
+      day: "2026-11-20",
+      hour: 18,
+      fromCurrent: true,
+    });
+  });
+
+  it("deadlineEntryStart_currentPastOrTooSoon_fallsBackToSuggestion", () => {
+    const suggested = at("2026-11-21T20:00:00Z");
+
+    expect(deadlineEntryStart(at("2026-11-18T10:00:00Z"), suggested, NOW)).toEqual({ day: "2026-11-21", hour: 21, fromCurrent: false });
+    expect(deadlineEntryStart(NOW + 30 * MINUTE, suggested, NOW).fromCurrent).toBe(false);
+    expect(deadlineEntryStart(null, suggested, NOW).fromCurrent).toBe(false);
   });
 });

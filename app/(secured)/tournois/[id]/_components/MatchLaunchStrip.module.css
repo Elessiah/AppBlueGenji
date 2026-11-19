@@ -33,6 +33,14 @@
 /* La date butoir passe à la ligne : à 375 px, la pastille entière déborderait de la carte. */
 .deadline {
   white-space: normal;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink-soft);
+}
+
+.deadline[data-soon] {
+  color: var(--amber);
 }
 
 .scheduled {

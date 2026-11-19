@@ -188,6 +188,8 @@
   "autoConfirm": {
     "at": "Automatic confirmation: {time}",
     "atWithDeadline": "Automatic confirmation: {time} (match scheduling deadline: {deadline})",
-    "pending": "Automatic confirmation pending (due: {time})"
+    "pending": "Automatic confirmation pending",
+    "pendingAt": "due: {time}",
+    "pendingHint": "The confirmation time has passed but some proposals are still provisional: the sweep retries every minute, nothing to do."
   }
 }

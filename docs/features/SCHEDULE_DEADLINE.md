@@ -169,7 +169,29 @@ s'il est passé alors qu'une confirmation d'office reste à faire
 en base, marques lues pour ces seules entrées : propositions provisoires sans marque pour ce début,
 ou plus nombreuses qu'à la marque — semaine en échec, reprise plus tard) ;
 rien sinon : un reste que la confirmation n'a pas pu confirmer se confirme à
-la main (`entryConfirmState`).
+la main (`entryConfirmState`). L'état « en attente » est une pastille
+(`waiting`) suivie de l'heure prévue et d'un « i » qui dit que le balayage
+réessaie ; la ligne « à venir » reste un texte discret.
+
+## Écrans (revue UI/UX)
+
+- **Fenêtre de saisie** (`ScheduleDeadlineDialog`) : jour et heure de Paris.
+  Les jours et heures **refusés d'avance ne sont pas proposés** (aujourd'hui,
+  les heures à moins d'une heure ; plus de jour passé) — `deadlineEntryChoices`,
+  `deadlineEntryHours` ; une date butoir en place **déjà passée** n'est pas
+  rejouée (`deadlineEntryStart` repart de la date proposée) ; une plus lointaine
+  est **triée** dans la liste. Un refus « trop proche » se rattache à l'**heure**,
+  les autres au jour. La saisie en masse prévient (« i ») qu'elle remplace les
+  dates butoirs posées ; « Aucune date butoir » n'efface, comme la pose, que les
+  matchs **à planifier** (celle d'un match programmé ou lancé — retirée, lue par
+  le planning — reste).
+- **Fenêtre d'horaire** : « Date butoir… » est bloqué (toast) tant qu'une date
+  saisie n'est pas enregistrée ; la fermeture de la date butoir **rouvre** la
+  fenêtre d'horaire (le focus y revient).
+- **Pastille « À planifier »** : la date n'apparaît qu'une fois l'horloge connue
+  (rien dans le HTML serveur), suivie de « (heure de Paris) », en teinte neutre
+  et en ambre seulement à moins de 24 h ; le texte lu par les lecteurs d'écran
+  suit le libellé, avant la date.
 
 ## RGPD
 
@@ -187,4 +209,5 @@ privés passent par la remise existante.
 `tests/lib/server/planning/view.test.ts` (`entryConfirmState`),
 `tests/lib/server/match-schedule-service.test.ts` (horaire retiré),
 `tests/app/api/admin/match-schedule-deadline.test.ts`,
-`tests/app/api/admin/tournament-schedule-deadlines.test.ts`.
+`tests/app/api/admin/tournament-schedule-deadlines.test.ts`,
+`tests/app/schedule-deadline-ui-render.test.tsx` (fenêtre, pastille, câblage).
