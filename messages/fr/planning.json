@@ -85,7 +85,8 @@
   "solo": {
     "label": "Je diffuse seul (caster autonome)",
     "hint": "Un caster autonome diffuse sans prod ; les autres ont besoin d'un prod pour qu'un match soit diffusé.",
-    "staffTitle": "Casters autonomes"
+    "staffTitle": "Casters autonomes",
+    "staffItem": "{pseudo} : caster autonome"
   },
   "staff": {
     "title": "Calcul et confirmation",
@@ -143,7 +144,7 @@
     "PLANNING_CONFIRM_PARTIAL": "Confirmation partielle : une partie des propositions est confirmée, les autres sont restées provisoires après une panne. Relance la confirmation.",
     "PLANNING_WITHDRAWAL_CLOSED": "Ce créneau a commencé : il n'est plus possible de s'en désister.",
     "PLANNING_REASON_TOO_LONG": "Motif trop long : 300 caractères au plus.",
-    "NOT_CASTER": "Ce compte n'a pas le rôle caster.",
+    "NOT_CASTER": "Ce compte ne peut pas être caster autonome.",
     "MATCH_NOT_FOUND": "Ce match n'existe plus.",
     "MATCH_ALREADY_COMPLETED": "Ce match est déjà joué.",
     "MATCH_NOT_LAUNCHABLE": "Ce match ne peut plus recevoir d'arbitre.",

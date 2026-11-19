@@ -97,12 +97,23 @@ export async function setAvailability(
 /**
  * Le réglage « caster autonome » d'un compte qui tient le rôle `CASTER`
  * (relu en base). Qui peut le poser — lui-même ou le staff — est jugé par la route.
+ * Le poser demande de tenir le rôle au planning (`holdingRefusal`, la règle d'une
+ * désignation à la main : un compte suspendu ne tient rien). Tout refus répond
+ * le même code, `NOT_CASTER` : rien ne distingue un compte suspendu d'un compte
+ * sans le rôle. Le **retirer** reste permis à un caster suspendu : rien n'en
+ * découle, et le staff efface ainsi un réglage que les autres membres comptent
+ * encore (`coveringSoloCasterIds`). Deux lectures en tout (le compte, puis
+ * l'écriture), sans transaction ni verrou : une suspension validée entre les deux
+ * laisse au pire un réglage posé sur un compte suspendu, sans effet pour le calcul
+ * (ses droits sont écartés à la lecture), et verrouiller coûterait quatre
+ * allers-retours de plus par clic.
  */
 export async function setSoloCaster(targetUserId: number, solo: boolean): Promise<void> {
   await withConnection(async (connection) => {
     // Le seul compte visé, relu par sa clé : ses rôles du moment.
     const [member] = await loadPlanningMembersByIds(connection, [targetUserId]);
-    if (!member?.roles.includes("CASTER")) {
+    const clearsHeldCasterFlag = !solo && member?.roles.includes("CASTER") === true;
+    if (!clearsHeldCasterFlag && holdingRefusal(member, { hidden: false }, "CASTER") !== null) {
       throw new Error("NOT_CASTER");
     }
     await writeSoloCaster(connection, targetUserId, solo);
