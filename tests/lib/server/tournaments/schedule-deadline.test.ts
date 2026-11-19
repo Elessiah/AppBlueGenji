@@ -37,6 +37,7 @@ import {
   deadlineNoticesFor,
   forfeitMissedScheduleDeadline,
   NO_NOTICES,
+  botUnreachable,
   reachedSomeone,
   scheduleDeadlineForfeitDue,
   SCHEDULE_DEADLINES_LOCK,
@@ -928,7 +929,7 @@ describe("sweepScheduleDeadlines : coût du passage", () => {
 
     const released = pool.execute.mock.calls.filter(([sql]) => /DELETE FROM bg_schedule_deadline_notices/.test(String(sql)));
     expect(released).toHaveLength(1);
-    expect(released[0][1]).toEqual([40, PAIRING, "SET"]);
+    expect(released[0][1]).toEqual([40, PAIRING, new Date(DEADLINE), "SET"]);
     expect(failureCounts().get(40)?.failures).toBe(1);
   });
 
@@ -1036,18 +1037,20 @@ describe("setTournamentScheduleDeadlines : écritures groupées", () => {
   });
 });
 
+/** Base hors connexion (remises, retours de réservation) : chaque instruction réussit. */
+function poolMock() {
+  const pool = { execute: jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]) };
+  jest.mocked(getDatabase).mockResolvedValue(fakePool(pool));
+  return pool;
+}
+const poolCalls = (pool: ReturnType<typeof poolMock>, pattern: RegExp) =>
+  pool.execute.mock.calls.filter(([sql]) => pattern.test(String(sql)));
+
 describe("revue sécurité 1 : avis remis, réservations, traces", () => {
   const claimed = (affectedRows: number) => [{ affectedRows }];
   const reached = { discord: null, discordUnreachedUserIds: [], pushed: 1 };
   const nobody = { discord: null, discordUnreachedUserIds: [], pushed: 0 };
 
-  function poolMock() {
-    const pool = { execute: jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]) };
-    jest.mocked(getDatabase).mockResolvedValue(fakePool(pool));
-    return pool;
-  }
-  const poolCalls = (pool: ReturnType<typeof poolMock>, pattern: RegExp) =>
-    pool.execute.mock.calls.filter(([sql]) => pattern.test(String(sql)));
 
   it("sweepScheduleDeadlines_reminderClaim_insertRequiresStillToPlan", async () => {
     poolMock();
@@ -1105,7 +1108,8 @@ describe("revue sécurité 1 : avis remis, réservations, traces", () => {
 
     const marked = poolCalls(pool, /SET delivered = 1/);
     expect(marked).toHaveLength(1);
-    expect(marked[0][1]).toEqual([40, PAIRING, "SET"]);
+    expect(marked[0][1]).toEqual([40, PAIRING, new Date(DEADLINE), "SET"]);
+    expect(String(marked[0][0])).toContain("deadline_at = ?");
   });
 
   it("sweepScheduleDeadlines_noticeReachedNobody_notArmedClaimKept", async () => {
@@ -1144,7 +1148,8 @@ describe("revue sécurité 1 : avis remis, réservations, traces", () => {
 
     const released = poolCalls(pool, /DELETE FROM bg_schedule_deadline_notices/);
     expect(released).toHaveLength(1);
-    expect(released[0][1]).toEqual([40, PAIRING, "DL24"]);
+    expect(released[0][1]).toEqual([40, PAIRING, new Date(DEADLINE), "DL24"]);
+    expect(String(released[0][0])).toContain("deadline_at = ?");
   });
 
   it("sweepScheduleDeadlines_repeatedSendFailures_countBuildsUpToParking", async () => {
@@ -1297,6 +1302,122 @@ describe("revue sécurité 1 : avis remis, réservations, traces", () => {
 
       expect(publishStaffAction).not.toHaveBeenCalled();
       expect(auditStaffAction).toHaveBeenCalledWith(expect.stringContaining("(0 changée(s))"), ACTOR);
+    });
+  });
+});
+
+describe("revue sécurité 2 : date butoir des remises, bot injoignable, gestes inchangés", () => {
+  const claimed = (affectedRows: number) => [{ affectedRows }];
+
+  const announcementRoutes = (): Route[] => [
+    [/FROM bg_matches m/, () => [[row()]]],
+    [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+  ];
+
+  it("sweepScheduleDeadlines_botUnreachable_claimReleasedForRetry", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const pool = poolMock();
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [7], pushed: 0 });
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    const released = poolCalls(pool, /DELETE FROM bg_schedule_deadline_notices/);
+    expect(released.length).toBeGreaterThan(0);
+    expect(released[0][1]).toEqual([40, PAIRING, new Date(DEADLINE), "SET"]);
+    expect(poolCalls(pool, /SET delivered = 1/)).toHaveLength(0);
+  });
+
+  it("sweepScheduleDeadlines_nobodyReachableBotUp_claimKept", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const pool = poolMock();
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: { sent: 0, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 0 });
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(poolCalls(pool, /DELETE/)).toHaveLength(0);
+  });
+
+  it("botUnreachable_unreachedIds_true", () => {
+    expect(botUnreachable({ discordUnreachedUserIds: [7] })).toBe(true);
+  });
+
+  it("botUnreachable_emptyOrNull_false", () => {
+    expect(botUnreachable({ discordUnreachedUserIds: [] })).toBe(false);
+    expect(botUnreachable(null)).toBe(false);
+  });
+
+  it("sweepScheduleDeadlines_reminderClaim_insertRequiresRefereeSchedulingTournament", async () => {
+    poolMock();
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    const [sql] = executed(connection, /INSERT IGNORE/)[0];
+    expect(sql).toContain("t.referee_scheduling = 1");
+    expect(sql).toContain("t.state <> 'FINISHED'");
+  });
+
+  describe("gestes de l'arbitrage", () => {
+    beforeEach(() => {
+      jest.mocked(withNamedLock).mockRejectedValue(new NamedLockUnavailableError(SCHEDULE_DEADLINES_LOCK, 0));
+    });
+    const matchRoutes = (match: SweepRow): Route[] => [
+      [/SELECT tournament_id FROM bg_matches/, () => [[{ tournament_id: 10 }]]],
+      [/FROM bg_tournaments/, () => [[{ referee_scheduling: 1, state: "RUNNING" }]]],
+      [/FROM bg_matches WHERE id = \? LIMIT 1 FOR UPDATE/, () => [[match]]],
+    ];
+    const roundRoutes = (matches: SweepRow[]): Route[] => [
+      [/FROM bg_tournaments/, () => [[{ referee_scheduling: 1, state: "RUNNING" }]]],
+      [/FROM bg_matches\s+WHERE tournament_id/, () => [matches]],
+    ];
+    const updatedIds = () => executed(connection, /UPDATE bg_matches SET schedule_deadline_at/).map(([, params]) => (params as unknown[])[1]);
+
+    it("setMatchScheduleDeadline_sameDeadline_auditOnlyNoDiscordLog", async () => {
+      routeSql(connection, matchRoutes(row()));
+
+      await setMatchScheduleDeadline(40, "2026-11-17T20:00:00Z", ACTOR, NOW);
+
+      expect(publishStaffAction).not.toHaveBeenCalled();
+      expect(auditStaffAction).toHaveBeenCalledWith(expect.stringContaining("inchangée"), ACTOR);
+      expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    });
+
+    it("setMatchScheduleDeadline_clearWithoutDeadline_auditOnly", async () => {
+      routeSql(connection, matchRoutes(row({ schedule_deadline_at: null })));
+
+      await setMatchScheduleDeadline(40, null, ACTOR, NOW);
+
+      expect(publishStaffAction).not.toHaveBeenCalled();
+      expect(auditStaffAction).toHaveBeenCalled();
+    });
+
+    it("setTournamentScheduleDeadlines_roundDateWithin24h_reappliedToNewMatches", async () => {
+      const now = DEADLINE - 20 * HOUR;
+      routeSql(connection, roundRoutes([row({ id: 40 }), row({ id: 43, schedule_deadline_at: null })]));
+
+      await expect(setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, now)).resolves.toBe(2);
+
+      expect(updatedIds()).toEqual([43]);
+    });
+
+    it("setTournamentScheduleDeadlines_newDateWithin24h_throwsTooSoon", async () => {
+      const now = DEADLINE - 20 * HOUR;
+      routeSql(connection, roundRoutes([row({ id: 43, schedule_deadline_at: null })]));
+
+      await expect(setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, now)).rejects.toThrow("SCHEDULE_DEADLINE_TOO_SOON");
+
+      expect(updatedIds()).toEqual([]);
+      expect(connection.rollback).toHaveBeenCalled();
+    });
+
+    it("setTournamentScheduleDeadlines_dateUnder12h_throwsTooSoonWithoutDb", async () => {
+      await expect(setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, DEADLINE - 11 * HOUR)).rejects.toThrow(
+        "SCHEDULE_DEADLINE_TOO_SOON",
+      );
+
+      expect(withConnection).not.toHaveBeenCalled();
     });
   });
 });

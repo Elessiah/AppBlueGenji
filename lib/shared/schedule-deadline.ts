@@ -66,16 +66,22 @@ export type ScheduleDeadlineInput =
 
 /**
  * Lit la date butoir reçue (`null` efface ; chaîne ISO sinon), contre l'horloge
- * `now`. Arrondie à la minute : la colonne `DATETIME` n'a pas de fractions, et
+ * `now`, au moins `minAheadMs` devant elle (par défaut
+ * {@link SCHEDULE_DEADLINE_MIN_AHEAD_MS} ; la date d'une manche **reposée**
+ * pour ses nouveaux matchs se contente de {@link SCHEDULE_DEADLINE_ARM_MIN_MS}). Arrondie à la minute : la colonne `DATETIME` n'a pas de fractions, et
  * l'horaire annoncé doit être celui que la base garde.
  */
-export function readScheduleDeadline(raw: unknown, now: number): ScheduleDeadlineInput {
+export function readScheduleDeadline(
+  raw: unknown,
+  now: number,
+  minAheadMs: number = SCHEDULE_DEADLINE_MIN_AHEAD_MS,
+): ScheduleDeadlineInput {
   if (raw === null) return { kind: "clear" };
   if (typeof raw !== "string" || raw.length > 40) return { kind: "invalid", code: "INVALID_SCHEDULE_DEADLINE" };
   const parsed = Date.parse(raw);
   if (!Number.isFinite(parsed)) return { kind: "invalid", code: "INVALID_SCHEDULE_DEADLINE" };
   const at = parsed - (((parsed % MINUTE_MS) + MINUTE_MS) % MINUTE_MS);
-  if (at < now + SCHEDULE_DEADLINE_MIN_AHEAD_MS) return { kind: "invalid", code: "SCHEDULE_DEADLINE_TOO_SOON" };
+  if (at < now + minAheadMs) return { kind: "invalid", code: "SCHEDULE_DEADLINE_TOO_SOON" };
   if (at > now + SCHEDULE_DEADLINE_MAX_AHEAD_MS) return { kind: "invalid", code: "SCHEDULE_DEADLINE_TOO_FAR" };
   return { kind: "set", at };
 }
@@ -269,15 +275,48 @@ export function deadlineEntryDays(now: number, count: number = SCHEDULE_DEADLINE
   });
 }
 
-/** Cette heure pile du jour est-elle acceptée à la saisie (ni trop proche, ni trop lointaine) ? */
-function entryAccepted(day: string, hour: number, now: number): boolean {
-  const at = deadlineFromEntry(day, hour);
-  return at !== null && at >= now + SCHEDULE_DEADLINE_MIN_AHEAD_MS && at <= now + SCHEDULE_DEADLINE_MAX_AHEAD_MS;
+/**
+ * La date butoir d'une manche qu'une saisie en masse peut **reposer** pour ses
+ * matchs remplis depuis, même à moins de 24 heures : encore assez loin pour
+ * qu'une annonce l'arme ({@link SCHEDULE_DEADLINE_ARM_MIN_MS}), sinon `null`.
+ */
+function reappliable(at: number | null, now: number): number | null {
+  return at !== null && at >= now + SCHEDULE_DEADLINE_ARM_MIN_MS && at <= now + SCHEDULE_DEADLINE_MAX_AHEAD_MS ? at : null;
 }
 
-/** Les heures pile d'un jour (Paris) que la saisie peut encore poser : celles d'au moins 24 heures devant. */
-export function deadlineEntryHours(day: string, now: number): number[] {
-  return Array.from({ length: 24 }, (_, hour) => hour).filter((hour) => entryAccepted(day, hour, now));
+/**
+ * La date butoir en place sur la manche, pour la saisie en masse : la plus
+ * lointaine des matchs pas encore joués, si elle se repose encore
+ * ({@link reappliable}) ; `null` sinon.
+ */
+export function roundScheduleDeadline(
+  matches: readonly { status: string; scheduleDeadlineAt: string | null }[],
+  now: number,
+): number | null {
+  let latest: number | null = null;
+  for (const match of matches) {
+    if (match.status === "COMPLETED" || match.scheduleDeadlineAt === null) continue;
+    const at = reappliable(Date.parse(match.scheduleDeadlineAt), now);
+    if (at !== null && (latest === null || at > latest)) latest = at;
+  }
+  return latest;
+}
+
+/** Cette heure pile du jour est-elle acceptée à la saisie (ni trop proche, ni trop lointaine ; ou la date `reapply` reposée) ? */
+function entryAccepted(day: string, hour: number, now: number, reapply: number | null): boolean {
+  const at = deadlineFromEntry(day, hour);
+  if (at === null) return false;
+  if (at === reappliable(reapply, now)) return true;
+  return at >= now + SCHEDULE_DEADLINE_MIN_AHEAD_MS && at <= now + SCHEDULE_DEADLINE_MAX_AHEAD_MS;
+}
+
+/**
+ * Les heures pile d'un jour (Paris) que la saisie peut encore poser : celles
+ * d'au moins 24 heures devant, plus l'heure de `reapply` (date butoir de la
+ * manche reposée en masse, {@link roundScheduleDeadline}).
+ */
+export function deadlineEntryHours(day: string, now: number, reapply: number | null = null): number[] {
+  return Array.from({ length: 24 }, (_, hour) => hour).filter((hour) => entryAccepted(day, hour, now, reapply));
 }
 
 /**
@@ -286,19 +325,27 @@ export function deadlineEntryHours(day: string, now: number): number[] {
  * le jour `keep` (celui de la date butoir en place) s'il en a une et qu'il
  * est plus loin que la liste.
  */
-export function deadlineEntryChoices(now: number, keep: string | null = null): string[] {
+export function deadlineEntryChoices(now: number, keep: string | null = null, reapply: number | null = null): string[] {
   const days = deadlineEntryDays(now);
   if (keep !== null && !days.includes(keep)) days.push(keep);
-  return days.sort().filter((day) => deadlineEntryHours(day, now).length > 0);
+  return days.sort().filter((day) => deadlineEntryHours(day, now, reapply).length > 0);
 }
 
 /**
  * Où la saisie s'ouvre : la date butoir en place si elle serait encore
  * acceptée, sinon la date proposée (une date butoir passée ou à moins de 24
- * heures ne se rejoue pas telle quelle).
+ * heures ne se rejoue pas telle quelle — sauf celle de la manche, `reapply`,
+ * reposée en masse).
  */
-export function deadlineEntryStart(current: number | null, suggested: number, now: number): { day: string; hour: number; fromCurrent: boolean } {
-  const usable = current !== null && current >= now + SCHEDULE_DEADLINE_MIN_AHEAD_MS && current <= now + SCHEDULE_DEADLINE_MAX_AHEAD_MS;
+export function deadlineEntryStart(
+  current: number | null,
+  suggested: number,
+  now: number,
+  reapply: number | null = null,
+): { day: string; hour: number; fromCurrent: boolean } {
+  const usable =
+    current !== null &&
+    (current === reappliable(reapply, now) || (current >= now + SCHEDULE_DEADLINE_MIN_AHEAD_MS && current <= now + SCHEDULE_DEADLINE_MAX_AHEAD_MS));
   const at = usable ? current : suggested;
   return { ...deadlineEntryOf(at), fromCurrent: usable };
 }

@@ -36,7 +36,11 @@ Code : `lib/shared/schedule-deadline.ts` (règle pure),
   409 `SCHEDULE_DEADLINE_NOT_ALLOWED`. **24 heures** devant au moins (le
   préavis minimal d'un match : une saisie hâtive ou malveillante ne peut pas
   forfaiter une manche dans l'heure), 60 jours au plus
-  (`SCHEDULE_DEADLINE_TOO_SOON` / `_TOO_FAR`), arrondie à la minute.
+  (`SCHEDULE_DEADLINE_TOO_SOON` / `_TOO_FAR`), arrondie à la minute. Seule
+  exception : la saisie en masse peut **reposer** la date butoir déjà portée
+  par un match non joué du tournoi (celle de la manche, pour les matchs
+  remplis depuis) jusqu'à 12 heures devant (`SCHEDULE_DEADLINE_ARM_MIN_MS` :
+  une annonce l'arme encore) — la fenêtre la propose (`roundScheduleDeadline`).
 - Transaction : `lockTournamentRow` en **première** instruction, puis les
   matchs `FOR UPDATE` ; changer ou retirer la date butoir efface les traces
   d'avis (les paliers repartent pour la nouvelle). Reposer la **même** date
@@ -46,8 +50,9 @@ Code : `lib/shared/schedule-deadline.ts` (règle pure),
   (`publishStaffAction`, catégorie `schedule`, lot du tournoi :
   « ⏳ Date butoir de planification — … : match #N, fixée au … (heure de
   Paris), par le staff », ou « N match(s) à planifier » ; aucun nom
-  d'engagée, l'auteur nommé dans pm2 seulement) ; un geste en masse qui ne
-  change rien n'a que sa trace pm2 (`auditStaffAction`). Flux SSE réveillé.
+  d'engagée, l'auteur nommé dans pm2 seulement) ; un geste qui ne change
+  rien (même date reposée, match sans date butoir « effacé », en masse ou
+  match par match) n'a que sa trace pm2 (`auditStaffAction`). Flux SSE réveillé.
 - Saisie : un jour et une heure pile, **heure de Paris** ; préremplie par la
   date butoir en place, sinon par celle d'usage comptée depuis l'**ouverture**
   de la planification : la fin du dernier match joué qui alimente ce match
@@ -97,13 +102,21 @@ pure `sweepAction` :
 (`SCHEDULE_DEADLINE_ARM_MIN_MS`). Remis = un message privé ou un push au
 moins est réellement parti (`reachedSomeone`, colonne `delivered` de
 `bg_schedule_deadline_notices`, notée après l'envoi) : un palier réservé dont
-rien n'est parti (bot injoignable, aucun responsable joignable, sujet coupé
-par tous) n'arme rien — il n'est pas renvoyé chaque minute, le palier suivant
-peut armer, sinon la date butoir s'éteint. Une paire complétée trop tard
+rien n'est parti n'arme rien. Bot qui ne répond pas (`botUnreachable`, appel
+perdu) : la réservation est rendue, le passage suivant retente (une courte
+panne à l'annonce n'éteint pas la date butoir). Aucun responsable joignable
+ou sujet coupé par tous : la réservation reste — pas de renvoi chaque minute
+—, le palier suivant peut armer, sinon la date butoir s'éteint. Remise et
+retour d'une réservation visent la paire **et la date butoir** de l'envoi
+(une date changée pendant un envoi lent garde ses propres avis). Remis à
+**une** engagée suffit : la date butoir est affichée aux deux sur la carte du
+match, et exiger les deux laisserait une équipe échapper au forfait en
+coupant le sujet. Une paire complétée trop tard
 (match d'origine fini juste avant) ou changée après l'annonce n'est donc
 jamais forfaitée. Un rappel ne se réserve que si le match est **toujours à
 planifier** au moment de la réservation (ni horaire, ni lancement de la
-paire, ni résultat) : un horaire posé entre la lecture et la réservation ne
+paire, ni résultat, tournoi toujours planifié par l'arbitrage et pas
+terminé) : un horaire posé entre la lecture et la réservation ne
 reçoit pas « toujours sans horaire ». Un envoi en échec ne rend que les
 paliers posés par **sa** réservation (un palier parti avant garde sa date). Le
 double forfait passe par un contrôle sans verrou (`scheduleDeadlineForfeitDue`)
@@ -112,9 +125,11 @@ ligne « Match terminé » dit « date butoir de planification passée sans
 horaire » (`markDeadlineForfeit`).
 
 **Retour en arrière** : un résultat défait (`rollback.ts`, `clearMatchResults`)
-efface la date butoir **déjà passée** de la rencontre rendue à jouer, et ses
-traces d'avis — sinon le balayage referait le double forfait dans la minute ;
-une date butoir encore devant reste. Retirer l'horaire d'un match après une
+efface la date butoir **déjà passée** d'une rencontre close en **double
+forfait** rendue à jouer, et ses traces d'avis (`clearPastScheduleDeadlines`,
+avant l'effacement du résultat) — sinon le balayage referait le double
+forfait dans la minute ; une date butoir encore devant reste, comme celle,
+passée et retirée, d'une rencontre jouée à son horaire (le planning la lit). Retirer l'horaire d'un match après une
 date butoir passée l'efface de même, traces comprises (`setMatchStartAt`). Un match dont le passage échoue
 5 fois d'affilée pour la même date butoir (`SWEEP_MAX_FAILURES`, forfait
 refusé à chaque fois, avis qui n'arrive jamais à partir — la réservation qui

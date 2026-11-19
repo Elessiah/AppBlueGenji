@@ -56,9 +56,13 @@ describe("forfeitMissedScheduleDeadlinePublic", () => {
 
   it("rollback_clearedMatches_pastDeadlineAndNoticesCleared", () => {
     const rollback = readSource("lib/server/tournaments/rollback.ts");
-    const clear = body(rollback, "async function clearPastScheduleDeadlines(");
+    const clear = body(rollback, "export async function clearPastScheduleDeadlines(");
+    const results = body(rollback, "async function clearMatchResults(");
 
-    expect(body(rollback, "async function clearMatchResults(")).toContain("await clearPastScheduleDeadlines(connection, ids);");
+    // Avant l'effacement du résultat : `double_forfeit` désigne encore la rencontre close par la date butoir.
+    expect(results.indexOf("await clearPastScheduleDeadlines(connection, ids, now);")).toBeGreaterThan(-1);
+    expect(results.indexOf("await clearPastScheduleDeadlines(connection, ids, now);")).toBeLessThan(results.indexOf("double_forfeit = 0"));
+    expect(clear).toContain("double_forfeit = 1");
     expect(clear).toContain("schedule_deadline_at <= ?");
     expect(clear).toContain("UPDATE bg_matches SET schedule_deadline_at = NULL");
     expect(clear).toContain("DELETE FROM bg_schedule_deadline_notices");

@@ -12,6 +12,7 @@ import {
   deadlineEntryChoices,
   deadlineEntryHours,
   deadlineEntryStart,
+  roundScheduleDeadline,
   deadlineFromEntry,
   scheduleOpenedAt,
   suggestedScheduleDeadline,
@@ -28,6 +29,9 @@ const NONE = "";
 export type ScheduleDeadlineTarget =
   | { kind: "match"; matchId: number; team1Name: string | null; team2Name: string | null; deadlineAt: string | null }
   | { kind: "tournament"; tournamentId: number; count: number };
+
+/** Matchs lus par la fenêtre : ouverture de la planification, et date butoir de la manche (saisie en masse). */
+type DialogMatch = OpenedAtMatch & { scheduleDeadlineAt: string | null };
 
 /** Le toast de réussite : un match, ou le nombre de matchs d'une saisie en masse. */
 function successText(t: ReturnType<typeof useActionsText>["t"], kind: ScheduleDeadlineTarget["kind"], cleared: boolean, count: number): string {
@@ -57,7 +61,7 @@ export function ScheduleDeadlineDialog({
 }: Readonly<{
   target: ScheduleDeadlineTarget;
   /** Matchs du tournoi : la fin du dernier joué ouvre la planification. */
-  matches: readonly OpenedAtMatch[];
+  matches: readonly DialogMatch[];
   onClose: () => void;
 }>) {
   const text = useActionsText();
@@ -66,13 +70,19 @@ export function ScheduleDeadlineDialog({
   const { showError, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(SCHEDULE_DEADLINE_FIELD_ERRORS, FIELD_IDS);
   const [now] = useState(() => Date.now());
-  const current = target.kind === "match" && target.deadlineAt !== null ? Date.parse(target.deadlineAt) : null;
+  // En masse : la date butoir de la manche, qui se repose pour les matchs remplis depuis, même à moins de 24 heures.
+  const [reapply] = useState(() => (target.kind === "tournament" ? roundScheduleDeadline(matches, now) : null));
+  const matchDeadline = target.kind === "match" && target.deadlineAt !== null ? Date.parse(target.deadlineAt) : null;
+  const current = target.kind === "match" ? matchDeadline : reapply;
   const [suggested] = useState(() => suggestedScheduleDeadline(scheduleOpenedAt(matches, now, target.kind === "match" ? target.matchId : null), now));
   // Une date butoir en place déjà passée (ou à moins de 24 heures) ne se rejoue pas : on repart de la proposée.
-  const initial = deadlineEntryStart(current, suggested, now);
-  const days = useMemo(() => deadlineEntryChoices(now, initial.fromCurrent ? initial.day : null), [now, initial.day, initial.fromCurrent]);
+  const initial = deadlineEntryStart(current, suggested, now, reapply);
+  const days = useMemo(
+    () => deadlineEntryChoices(now, initial.fromCurrent ? initial.day : null, reapply),
+    [now, initial.day, initial.fromCurrent, reapply],
+  );
   const [day, setDay] = useState<string>(days.includes(initial.day) ? initial.day : (days[0] ?? NONE));
-  const hours = useMemo(() => (day === NONE ? [] : deadlineEntryHours(day, now)), [day, now]);
+  const hours = useMemo(() => (day === NONE ? [] : deadlineEntryHours(day, now, reapply)), [day, now, reapply]);
   const [pickedHour, setHour] = useState<number>(initial.hour);
   // Aujourd'hui, les heures trop proches ne sont pas proposées : une heure choisie plus tôt glisse vers la première permise.
   const hour = hours.includes(pickedHour) ? pickedHour : (hours[0] ?? pickedHour);

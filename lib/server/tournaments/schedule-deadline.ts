@@ -36,6 +36,7 @@ import {
   deadlineOutcome,
   dueDeadlineReminder,
   readScheduleDeadline,
+  SCHEDULE_DEADLINE_ARM_MIN_MS,
   SCHEDULE_DEADLINE_FORFEIT_KEY,
   SCHEDULE_DEADLINE_REMINDERS,
   SCHEDULE_DEADLINE_RETIRED_KEY,
@@ -216,7 +217,7 @@ export async function setMatchScheduleDeadline(
   const input = readScheduleDeadline(raw, now);
   if (input.kind === "invalid") throw new Error(input.code);
   const deadlineAt = input.kind === "set" ? input.at : null;
-  const { tournamentId, tournamentName } = await retryOnDeadlock(() =>
+  const { tournamentId, tournamentName, changed } = await retryOnDeadlock(() =>
     withConnection(async (connection) => {
       const id = await matchTournamentId(connection, matchId);
       if (id === null) throw new Error("MATCH_NOT_FOUND");
@@ -237,17 +238,23 @@ export async function setMatchScheduleDeadline(
         ) {
           throw new Error("SCHEDULE_DEADLINE_NOT_ALLOWED");
         }
-        await writeDeadline(connection, matchId, row.schedule_deadline_at, deadlineAt);
-        return { tournamentId: id, tournamentName: tournament.name };
+        const changed = await writeDeadline(connection, matchId, row.schedule_deadline_at, deadlineAt);
+        return { tournamentId: id, tournamentName: tournament.name, changed };
       });
     }),
   );
   const written = deadlineAt === null ? null : new Date(deadlineAt).toISOString();
+  const auditLine = `[schedule-deadline] match ${matchId} : date butoir ${written ?? "effacée"}${changed ? "" : " (inchangée)"}`;
+  if (!changed) {
+    // Rien de changé (même date reposée, ou effacer un match qui n'en avait pas) : la trace pm2 seule.
+    auditStaffAction(auditLine, actor);
+    return written;
+  }
   // Anonyme sur Discord (« le staff »), nominatif dans pm2 : la trace d'un geste qui peut finir en double forfait.
   publishStaffAction(
     formatScheduleDeadlineLog({ tournament: { id: tournamentId, name: tournamentName }, matchId, matches: 1, deadlineAt: written }),
     actor,
-    { category: "schedule", tournamentId, auditLine: `[schedule-deadline] match ${matchId} : date butoir ${written ?? "effacée"}` },
+    { category: "schedule", tournamentId, auditLine },
   );
   publishMatchUpdatedEvent(tournamentId);
   if (written !== null) wakeSweep();
@@ -272,8 +279,12 @@ export async function setTournamentScheduleDeadlines(
   actor: StaffActor,
   now: number = Date.now(),
 ): Promise<number> {
-  const input = readScheduleDeadline(raw, now);
-  if (input.kind === "invalid") throw new Error(input.code);
+  let input = readScheduleDeadline(raw, now);
+  // Trop proche pour une date neuve, mais peut-être celle de la manche, reposée pour les matchs
+  // remplis depuis : permise tant qu'une annonce arme encore (vérifié sous verrou).
+  const reapplyOnly = input.kind === "invalid" && input.code === "SCHEDULE_DEADLINE_TOO_SOON";
+  if (reapplyOnly) input = readScheduleDeadline(raw, now, SCHEDULE_DEADLINE_ARM_MIN_MS);
+  if (input.kind === "invalid") throw new Error(reapplyOnly ? "SCHEDULE_DEADLINE_TOO_SOON" : input.code);
   const deadlineAt = input.kind === "set" ? input.at : null;
   const { count, changed, tournamentName } = await retryOnDeadlock(() =>
     withConnection((connection) =>
@@ -293,6 +304,9 @@ export async function setTournamentScheduleDeadlines(
         // Effacer vise, comme poser, les matchs à planifier : la date butoir retirée d'un match déjà
         // programmé ou lancé reste lue par le planning (confirmation d'office), et celle d'une
         // manche pas encore remplie se retire match par match.
+        if (reapplyOnly && !rows.some((row) => sameDeadline(row.schedule_deadline_at, deadlineAt))) {
+          throw new Error("SCHEDULE_DEADLINE_TOO_SOON");
+        }
         const targets = rows.filter((row) => matchLaunchPhase(deadlineMatchOf(row, tournament.refereeScheduling), now) === "TO_PLAN");
         const changing = targets.filter((row) => !sameDeadline(row.schedule_deadline_at, deadlineAt)).map((row) => Number(row.id));
         await writeDeadlines(connection, changing, deadlineAt);
@@ -469,7 +483,8 @@ export function sweepAction(row: SweepRow, sent: SentNotices, now: number): Swee
  * toujours celles lues (insertion conditionnelle) : un avis ne part jamais
  * pour une date butoir que l'arbitrage vient de changer, ni pour une paire
  * remplacée. Un rappel (`toPlan`) exige en plus un match **toujours à
- * planifier** — ni horaire, ni lancement de cette paire, ni résultat — : la
+ * planifier** — ni horaire, ni lancement de cette paire, ni résultat, dans un
+ * tournoi toujours planifié par l'arbitrage et pas terminé — : la
  * lecture du balayage précède ce verrou, et un horaire posé entre les deux ne
  * doit pas recevoir « toujours sans horaire ». `mine` : le palier `key` est à
  * nous ; `inserted` : les paliers que **cette** réservation a posés (les seuls
@@ -489,7 +504,9 @@ async function claimNotices(
   const pairing = rowPairing(row);
   const stillToPlan = toPlan
     ? ` AND start_at IS NULL AND status NOT IN ('COMPLETED', 'AWAITING_CONFIRMATION')
-        AND NOT (launched_at IS NOT NULL AND launch_pairing <=> ?)`
+        AND NOT (launched_at IS NOT NULL AND launch_pairing <=> ?)
+        AND EXISTS (SELECT 1 FROM bg_tournaments t
+                     WHERE t.id = bg_matches.tournament_id AND t.referee_scheduling = 1 AND t.state <> 'FINISHED')`
     : "";
   for (const each of keys) {
     const [result] = await executor.execute<ResultSetHeader>(
@@ -596,6 +613,7 @@ export async function sendDeadlineNotices(
     if (progress) {
       progress.delivered = sent;
       if (reachedSomeone(report)) progress.reached += 1;
+      else if (botUnreachable(report)) progress.unreachable += 1;
     }
   }
   return sent;
@@ -607,7 +625,16 @@ export async function sendDeadlineNotices(
  * moins un message privé ou un push est **réellement parti** — seul un avis
  * qui a joint quelqu'un arme le double forfait (`markDelivered`).
  */
-export type SendProgress = { delivered: number; reached: number };
+export type SendProgress = { delivered: number; reached: number; unreachable: number };
+
+/**
+ * Personne de joint **parce que le bot n'a pas répondu** (appel perdu ou pas
+ * tenté pour des comptes joignables sur Discord) — une panne passagère, à
+ * retenter, et non un refus durable (sujet coupé, aucun moyen de joindre).
+ */
+export function botUnreachable(report: Pick<NotificationReport, "discordUnreachedUserIds"> | null | undefined): boolean {
+  return (report?.discordUnreachedUserIds.length ?? 0) > 0;
+}
 
 /** Un message privé ou un push au moins est parti (bot injoignable, sujet coupé, aucun appareil : non). */
 export function reachedSomeone(report: Pick<NotificationReport, "discord" | "pushed"> | null | undefined): boolean {
@@ -804,26 +831,31 @@ export type PendingSend = { row: SweepRow; key: DeadlineNoticeKey; deadlineAt: n
 
 /**
  * Note les paliers d'un avis comme **remis** (un message privé ou un push est
- * parti) : eux seuls arment le double forfait (`armsDeadline`).
+ * parti) : eux seuls arment le double forfait (`armsDeadline`). Ceux de cette
+ * date butoir seulement : une date changée pendant l'envoi a ses propres avis.
  */
 async function markDelivered(send: PendingSend): Promise<void> {
   if (send.release === null || send.release.length === 0) return;
   const db = await getDatabase();
   await db.execute(
     `UPDATE bg_schedule_deadline_notices SET delivered = 1
-      WHERE match_id = ? AND pairing <=> ? AND notice_key IN (${send.release.map(() => "?").join(", ")})`,
-    [Number(send.row.id), rowPairing(send.row), ...send.release],
+      WHERE match_id = ? AND pairing <=> ? AND deadline_at = ? AND notice_key IN (${send.release.map(() => "?").join(", ")})`,
+    [Number(send.row.id), rowPairing(send.row), new Date(send.deadlineAt), ...send.release],
   );
 }
 
-/** Rend les paliers réservés d'un avis qui n'a pu partir (la même paire, la même date butoir). */
+/**
+ * Rend les paliers réservés d'un avis qui n'a pu partir. Même paire **et même
+ * date butoir** (comme `markDelivered`) : l'envoi se termine hors verrou, et la
+ * réservation d'une date butoir posée entre-temps n'est ni rendue ni armée par lui.
+ */
 async function releaseNotices(send: PendingSend): Promise<void> {
   if (send.release === null || send.release.length === 0) return;
   const db = await getDatabase();
   await db.execute(
     `DELETE FROM bg_schedule_deadline_notices
-      WHERE match_id = ? AND pairing <=> ? AND notice_key IN (${send.release.map(() => "?").join(", ")})`,
-    [Number(send.row.id), rowPairing(send.row), ...send.release],
+      WHERE match_id = ? AND pairing <=> ? AND deadline_at = ? AND notice_key IN (${send.release.map(() => "?").join(", ")})`,
+    [Number(send.row.id), rowPairing(send.row), new Date(send.deadlineAt), ...send.release],
   );
 }
 
@@ -839,7 +871,7 @@ export async function flushSends(outbox: readonly PendingSend[], now: number): P
   for (let from = 0; from < outbox.length; from += SEND_CONCURRENCY) {
     await Promise.all(
       outbox.slice(from, from + SEND_CONCURRENCY).map(async (send) => {
-        const progress: SendProgress = { delivered: 0, reached: 0 };
+        const progress: SendProgress = { delivered: 0, reached: 0, unreachable: 0 };
         const matchId = Number(send.row.id);
         try {
           await sendDeadlineNotices(send.row, send.key, send.deadlineAt, progress);
@@ -865,14 +897,22 @@ export async function flushSends(outbox: readonly PendingSend[], now: number): P
 }
 
 /**
- * Arme la date butoir si l'avis a joint quelqu'un ; sinon le dit au journal :
- * personne de joint (bot injoignable, aucun responsable joignable, sujet coupé
- * par tous), la réservation reste — pas de renvoi chaque minute — mais
- * n'arme rien, et sans avis remis à temps la date butoir s'éteindra.
+ * Arme la date butoir si l'avis a joint quelqu'un. Personne de joint parce que
+ * le bot n'a pas répondu (panne passagère) : la réservation est rendue, le
+ * passage suivant retente — sans quoi une courte panne au moment de l'annonce
+ * éteindrait la date butoir. Personne de joignable (aucun responsable
+ * joignable, sujet coupé par tous) : la réservation reste — pas de renvoi
+ * chaque minute — mais n'arme rien, et sans avis remis à temps la date butoir
+ * s'éteindra.
  */
 async function settleReached(send: PendingSend, progress: SendProgress): Promise<void> {
   const matchId = Number(send.row.id);
   if (progress.reached === 0) {
+    if (progress.unreachable > 0 && send.release !== null) {
+      console.warn(`[schedule-deadline] match ${matchId} : avis ${send.key} non remis, bot injoignable — nouvel essai au prochain passage`);
+      await releaseNotices(send).catch(() => undefined);
+      return;
+    }
     console.warn(`[schedule-deadline] match ${matchId} : avis ${send.key} remis à personne, date butoir non armée par lui`);
     return;
   }
