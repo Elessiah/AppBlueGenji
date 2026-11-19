@@ -869,15 +869,17 @@ describe("textes du refus réservé aux administrateurs", () => {
   });
 });
 
-/** Une proposition se confirme par un administrateur ou d'office : l'aide le dit dans les deux langues. */
+/** Une proposition devient ferme par un administrateur, d'office ou reprise à la main : l'aide le dit dans les deux langues. */
 describe("assignment.reasonHint", () => {
-  it("reasonHint_fr_namesAdministratorAndAutomaticConfirmation", () => {
+  it("reasonHint_fr_namesEveryFirmingPath", () => {
     expect(frPlanning.assignment.reasonHint).toContain("par un administrateur");
     expect(frPlanning.assignment.reasonHint).toContain("d'office avant le créneau");
+    expect(frPlanning.assignment.reasonHint).toContain("repris à la main par le staff");
   });
 
-  it("reasonHint_en_namesAdministratorAndAutomaticConfirmation", () => {
+  it("reasonHint_en_namesEveryFirmingPath", () => {
     expect(enPlanning.assignment.reasonHint).toContain("by an administrator");
     expect(enPlanning.assignment.reasonHint).toContain("automatically before the slot");
+    expect(enPlanning.assignment.reasonHint).toContain("picked by hand by the staff");
   });
 });

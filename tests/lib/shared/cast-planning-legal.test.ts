@@ -148,11 +148,14 @@ describe("planning — registre T20", () => {
     expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain("a referee changed or removed from the match included");
   });
 
-  it("legalTexts_history_noAccountForWhatComesFromMatch", () => {
-    expect(t20(PROCESSING_ACTIVITIES).dataCategories.join(" ")).toContain("sans compte quand le site aligne le planning sur le match");
-    expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain("none when the site aligns the schedule with the match");
-    expect(planningParagraph("app/rgpd/page.tsx")).toContain("sans compte quand le site aligne le planning sur le match");
-    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("none when the site aligns the schedule with the match");
+  // Le registre et /rgpd disent « quand le site agit de lui-même » (alignement
+  // sur le match, confirmation d'office, remplacement) ; l'entrée publiée garde
+  // sa formulation d'origine (immuable).
+  it("legalTexts_history_noAccountWhenSiteActsOnItsOwn", () => {
+    expect(t20(PROCESSING_ACTIVITIES).dataCategories.join(" ")).toContain("sans compte quand le site agit de lui-même");
+    expect(t20(PROCESSING_ACTIVITIES_EN).dataCategories.join(" ")).toContain("none when the site acts on its own");
+    expect(planningParagraph("app/rgpd/page.tsx")).toContain("sans compte quand le site agit de lui-même");
+    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("none when the site acts on its own");
     expect(frEntry()).toContain("sans compte quand le site aligne le planning sur le match");
     expect(enEntry()).toContain("none when the site aligns the schedule with the match");
   });

@@ -1537,8 +1537,8 @@ function RgpdFr({
             leur préférence ; un caster y dit aussi s&apos;il diffuse seul (« caster autonome »), ce qu&apos;un
             administrateur peut régler pour lui. Un calcul propose les attributions selon ces réponses et
             la charge de chacun (semaine en cours et {PLANNING_HISTORY_WEEKS} semaines précédentes) ; ses
-            propositions restent provisoires jusqu&apos;à leur confirmation par un administrateur ; le staff des tournois peut, lui, désigner ou retirer quelqu&apos;un à la main. Le site garde, avec chaque attribution, qui l&apos;a
-            posée et son historique (pose, confirmation, retrait, avec le compte qui a agi par le planning, sans compte quand le site aligne le planning sur le match). Les attributions et
+            propositions restent provisoires jusqu&apos;à leur confirmation, par un administrateur ou d&apos;office par le site ; le staff des tournois peut, lui, désigner ou retirer quelqu&apos;un à la main, une désignation à la main étant ferme d&apos;emblée. Le site garde, avec chaque attribution, qui l&apos;a
+            posée et son historique (pose, confirmation, retrait, avec le compte qui a agi par le planning, sans compte quand le site agit de lui-même). Les attributions et
             le réglage « caster autonome » se lisent par les arbitres, casters, prods et administrateurs
             connectés, le motif d&apos;une proposition du calcul (préférence, charge) n&apos;y paraissant, hors le
             staff des tournois et la personne concernée, que comme « Calcul » ; les disponibilités et
@@ -1558,7 +1558,7 @@ function RgpdFr({
             attribution jusqu&apos;au début du créneau, avec un motif facultatif lu par le seul staff des
             tournois ; le site garde le désistement (rôle, date, motif, s&apos;il est tardif — moins de 24 h
             avant) avec l&apos;historique, et cherche automatiquement un remplaçant (un créneau compte au plus deux
-            casters : quand l&apos;un d&apos;eux part et que l&apos;autre reste, la place n&apos;est pas forcément à pourvoir). Chaque créneau du planning se confirme d&apos;office à l&apos;approche de son début (délai réglé par un administrateur, 24 h au moins), ou plus tôt à la date butoir de planification de son match ; ses affectés en sont prévenus comme d&apos;une confirmation par le staff, et le site note, sans personne, quels créneaux ont été confirmés d&apos;office. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
+            casters : quand l&apos;un d&apos;eux part et que l&apos;autre reste, la place n&apos;est pas forcément à pourvoir). Chaque créneau du planning se confirme d&apos;office à l&apos;approche de son début (délai réglé par un administrateur, 24 h au moins), ou plus tôt à la date butoir de planification de son match ; ses affectés en sont prévenus comme d&apos;une confirmation par un administrateur, et le site note, sans personne, quels créneaux ont été confirmés d&apos;office. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
             créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
             le rôle caster ; la suppression du compte emporte tout ce qui le concerne (les gestes faits comme
             staff restent, sans le désigner), l&apos;export de vos données le contient, gestes faits comme staff
