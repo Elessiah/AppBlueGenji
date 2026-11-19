@@ -118,7 +118,7 @@ export type PlanningView = {
 };
 
 /** Issue d'un désistement (`POST /api/planning/withdrawal`). */
-export type WithdrawalResponse = { late: boolean; replaced: boolean; unfilled: boolean; streamLost: boolean };
+export type WithdrawalResponse = { late: boolean; replaced: boolean; unfilled: boolean; streamLost: boolean; stillSignedUp: boolean };
 
 /** Bilan d'un calcul automatique : ce qui est posé, et ce que le match a refusé. */
 export type AutoAssignReport = {

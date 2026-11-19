@@ -444,6 +444,15 @@ describe("loadExclusions", () => {
 
     expect(excluded.has("m:2|4|CASTER")).toBe(true);
   });
+
+  it("loadExclusions_neighboursFalse_overlappingEntryNotInScope", async () => {
+    const hidden = loadedEntry({ key: "m:2", matchId: 2, hidden: true });
+    const data = planningData({ entries: [batch, hidden], members: [loadedMember({ userId: 4, roles: ["CASTER"] })] });
+
+    const excluded = await loadExclusions(fakeConnection(connection), data, [batch], { neighbours: false });
+
+    expect(excluded.has("m:2|4|CASTER")).toBe(false);
+  });
 });
 
 describe("holdingRefusal", () => {

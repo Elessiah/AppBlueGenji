@@ -201,7 +201,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: "Malade" }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(statements()).toEqual([
       "DELETE FROM bg_planning_assignments WHER",
       "INSERT INTO bg_planning_events (entry_ke",
@@ -218,7 +218,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: true, withdrawnUserId: 4 });
   });
 
@@ -227,7 +227,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: true });
   });
 
@@ -245,7 +245,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false });
     expect(statements()).not.toContain("INSERT INTO bg_planning_assignments (ent");
   });
 
@@ -254,7 +254,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 7 });
   });
 
@@ -272,7 +272,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(execute.mock.calls[1][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "AUTO", null, 0]);
     expect(execute.mock.calls[2][1]).toEqual(["m:1", 6, "CASTER", 10, 1, "LOAD", 0]);
     expect(announceWithdrawal).not.toHaveBeenCalled();
@@ -326,7 +326,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(assignMatchReferee).mock.calls[1]).toEqual([1, 3, 5, null, { refuseSuspended: true }]);
     expect(loadPlanningMembersByIds).not.toHaveBeenCalled();
   });
@@ -346,7 +346,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(assignMatchReferee).not.toHaveBeenCalled();
     expect(loadPlanningData).toHaveBeenCalledTimes(1);
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: false, coAssignedIds: [5] });
@@ -371,7 +371,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([[1, 3, 5, null, { refuseSuspended: true }]]);
   });
 
@@ -422,7 +422,7 @@ describe("withdrawFromEntry — panne après le désistement", () => {
 
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     const row = execute.mock.calls.find(([sql]) => sql.includes("INSERT INTO bg_planning_assignments"));
     expect(row?.[1]).toEqual(expect.arrayContaining(["m:1", 5, "REFEREE", 1]));
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 5, unfilled: false });
@@ -436,7 +436,7 @@ describe("withdrawFromEntry — panne après le désistement", () => {
 
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false });
     expect(execute.mock.calls.some(([sql]) => sql.includes("INSERT INTO bg_planning_assignments"))).toBe(false);
     expect(error).toHaveBeenCalledWith("[planning] remplaçant d'arbitre non posé.", expect.anything());
     error.mockRestore();
@@ -449,7 +449,7 @@ describe("withdrawFromEntry — panne après le désistement", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: true, withdrawnUserId: 4 });
     error.mockRestore();
   });
@@ -461,7 +461,7 @@ describe("withdrawFromEntry — panne après le désistement", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, unfilled: true });
     error.mockRestore();
   });
@@ -487,7 +487,7 @@ describe("withdrawFromEntry — panne après le désistement", () => {
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
     // Le match porte déjà l'arbitre 5 : il tient le rôle, la réconciliation écrira sa ligne.
-    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 5, unfilled: false });
     error.mockRestore();
   });
@@ -550,7 +550,7 @@ describe("withdrawFromEntry — deux casters", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({
       replacementId: null,
       unfilled: false,
@@ -580,7 +580,7 @@ describe("withdrawFromEntry — deux casters", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6, stillHeldBy: [] });
   });
 
@@ -589,7 +589,7 @@ describe("withdrawFromEntry — deux casters", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(statements()).toEqual(["DELETE FROM bg_planning_assignments WHER", "INSERT INTO bg_planning_events (entry_ke"]);
   });
 });
@@ -600,7 +600,7 @@ describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: true });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: true, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ unfilled: true, stillHeldBy: [], streamLost: true });
   });
 
@@ -610,7 +610,7 @@ describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6, streamLost: false });
   });
 
@@ -620,7 +620,7 @@ describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: true });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: true, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, streamLost: true });
   });
 
@@ -630,7 +630,7 @@ describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(announceWithdrawal).not.toHaveBeenCalled();
   });
 
@@ -640,7 +640,7 @@ describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6, streamLost: false });
   });
 
@@ -658,7 +658,7 @@ describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6, streamLost: false });
   });
 
@@ -668,7 +668,7 @@ describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: true });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: true, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, stillHeldBy: [], streamLost: true });
   });
 });
@@ -689,7 +689,7 @@ describe("withdrawFromEntry — inscriptions de cast entre les deux lectures", (
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ stillHeldBy: [], streamLost: false });
   });
 
@@ -715,7 +715,7 @@ describe("withdrawFromEntry — inscriptions de cast entre les deux lectures", (
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ stillHeldBy: [5, 8], streamLost: false });
   });
 });
@@ -723,6 +723,27 @@ describe("withdrawFromEntry — inscriptions de cast entre les deux lectures", (
 describe("withdrawFromEntry — désisté encore inscrit sur le match", () => {
   const withdrawn = loadedAssignment({ userId: 4, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true });
   const prod = loadedAssignment({ userId: 7, role: "PROD", source: "MANUAL", reason: "MANUAL", confirmed: true });
+
+  it("withdrawFromEntry_withdrawerSignedUpAloneWithAvailableCandidate_noReplacementSearched", async () => {
+    const members = [loadedMember({ userId: 4, roles: ["CASTER"] }), loadedMember({ userId: 6, roles: ["CASTER"] })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(planningData({ entries: [loadedEntry()], assignments: [withdrawn], matchCasters: new Map([["m:1", [4]]]), members }))
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry()],
+          matchCasters: new Map([["m:1", [4]]]),
+          members,
+          availability: [available("m:1", 6, "CASTER")],
+          removals: [{ entryKey: "m:1", userId: 4, role: "CASTER" }],
+        }),
+      );
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: true });
+    expect(statements()).not.toContain("INSERT INTO bg_planning_assignments (ent");
+  });
 
   it("withdrawFromEntry_withdrawerStillSignedUpAlone_noMemberAnnouncement", async () => {
     const members = [loadedMember({ userId: 4, roles: ["CASTER"] }), loadedMember({ userId: 7, roles: ["PROD"] })];
@@ -743,7 +764,7 @@ describe("withdrawFromEntry — désisté encore inscrit sur le match", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: true });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({
       stillHeldBy: [],
       coAssignedIds: [],
@@ -780,7 +801,7 @@ describe("withdrawFromEntry — désisté encore inscrit sur le match", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: false });
     const announced = jest.mocked(announceWithdrawal).mock.calls[0][0];
     expect(announced.stillHeldBy).toEqual([5]);
     expect(announced.coAssignedIds).toEqual([5, 7]);
@@ -798,7 +819,7 @@ describe("withdrawFromEntry — désisté encore inscrit sur le match", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: true });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({
       stillHeldBy: [],
       coAssignedIds: [],
@@ -826,7 +847,7 @@ describe("withdrawFromEntry — désisté encore inscrit sur le match", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: true });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({
       stillHeldBy: [],
       coAssignedIds: [],
@@ -1010,6 +1031,25 @@ describe("casterHold — inscription au match et suspension", () => {
   });
 });
 
+describe("pickReplacement — plafond", () => {
+  it("pickReplacement_matchSignupsReachCap_returnsNull", () => {
+    const data = planningData({
+      entries: [loadedEntry()],
+      matchCasters: new Map([["m:1", [5, 8]]]),
+      members: [
+        loadedMember({ userId: 5, roles: ["CASTER"] }),
+        loadedMember({ userId: 6, roles: ["CASTER"], soloCaster: true }),
+        loadedMember({ userId: 8, roles: ["CASTER"] }),
+      ],
+      availability: [available("m:1", 6, "CASTER")],
+    });
+
+    const pick = pickReplacement(data, data.entries[0], "CASTER", new Map(), new Set(), MONDAY);
+
+    expect(pick).toBeNull();
+  });
+});
+
 describe("pickReplacement — caster suspendu", () => {
   it("pickReplacement_neighbourHeldOnlyBySuspendedCaster_spareNotTakenFromNeighbour", () => {
     // m:1 garde 5 (confirmé) : renfort. m:2 (qui chevauche) n'est tenu que par 8, suspendu : 6 y est attendu.
@@ -1051,8 +1091,8 @@ describe("pickReplacement — caster suspendu", () => {
     expect(pick).toMatchObject({ entryKey: "m:1", userId: 6, role: "CASTER" });
   });
 
-  it("pickReplacement_spareWithSuspendedThirdRow_spareNotBlockedByCap", () => {
-    // 5 tient l'entrée ; 8, suspendu, n'occupe pas la seconde place : 6 la prend.
+  it("pickReplacement_suspendedCasterFillsCap_noThirdCaster", () => {
+    // 5 tient l'entrée ; 8, suspendu, ne tient rien mais sa ligne compte au plafond : aucun troisième caster.
     const data = planningData({
       entries: [loadedEntry()],
       assignments: [
@@ -1069,7 +1109,7 @@ describe("pickReplacement — caster suspendu", () => {
 
     const pick = pickReplacement(data, data.entries[0], "CASTER", new Map(), new Set(), MONDAY);
 
-    expect(pick).toMatchObject({ entryKey: "m:1", userId: 6, role: "CASTER" });
+    expect(pick).toBeNull();
   });
 });
 
@@ -1088,7 +1128,7 @@ describe("withdrawFromEntry — caster restant suspendu", () => {
 
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({
       unfilled: false,
       stillHeldBy: [5],

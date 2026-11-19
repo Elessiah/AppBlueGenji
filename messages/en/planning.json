@@ -76,7 +76,8 @@
     "castersFullProvisional": "Two casters at most: remove a proposal to pick another.",
     "castersFullMatch": "Two casters at most, signed up on the match: remove one from the match.",
     "castersHint": "Two casters at most per slot. Without a solo caster, they need a prod.",
-    "castersHintSubject": "Casters of a slot"
+    "castersHintSubject": "Casters of a slot",
+    "castersFullOver": "More than two casters, match sign-ups included: remove them until only one is left to pick another."
   },
   "solo": {
     "label": "I stream alone (solo caster)",
@@ -173,7 +174,8 @@
     "done": "Withdrawal saved.",
     "doneReplaced": "Withdrawal saved: a replacement has been assigned.",
     "doneUnfilled": "Withdrawal saved: the slot is open, the staff has been told.",
-    "doneStreamLost": "Withdrawal saved: the stream is lost, the staff has been told."
+    "doneStreamLost": "Withdrawal saved: the stream is lost, the staff has been told.",
+    "doneStillSignedUp": "Removed from the planning, but you are still signed up on the match: withdraw from the match to stop casting it."
   },
   "withdrawals": {
     "title": "Withdrawals",

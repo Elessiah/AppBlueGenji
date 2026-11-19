@@ -629,6 +629,21 @@ const EntryCard = memo(function EntryCard({
   );
 });
 
+/**
+ * Zone d'état du plafond de casters, montée dès un premier caster. Le texte
+ * s'y pose après le montage : une zone qui naît déjà pleine (deux casters
+ * posés d'un coup) ne serait pas annoncée.
+ */
+function CapStatus({ text }: { text: string | null }) {
+  const [shown, setShown] = useState<string | null>(null);
+  useEffect(() => setShown(text), [text]);
+  return (
+    <span /* NOSONAR S6819 — région live d'état : l'apparition du plafond est annoncée */ role="status" className={styles.muted}>
+      {shown}
+    </span>
+  );
+}
+
 const RoleRow = memo(function RoleRow({
   role,
   entry,
@@ -697,12 +712,7 @@ const RoleRow = memo(function RoleRow({
             </span>
           );
         })}
-        {role === "CASTER" && manage && rows.length > 0 && (
-          // Zone d'état montée dès un premier caster (avant que le plafond n'apparaisse) : son apparition est annoncée.
-          <span /* NOSONAR S6819 — région live d'état : l'apparition du plafond est annoncée */ role="status" className={styles.muted}>
-            {full ? t(`assignment.${castersFullKind(entry)}`) : null}
-          </span>
-        )}
+        {role === "CASTER" && manage && rows.length > 0 && <CapStatus text={full ? t(`assignment.${castersFullKind(entry)}`) : null} />}
         {manage && candidates.length > 0 && (
           <>
             <label htmlFor={selectId} className="sr-only">

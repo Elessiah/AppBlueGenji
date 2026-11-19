@@ -76,7 +76,8 @@
     "castersFullProvisional": "Deux casters au plus : retire une proposition pour en choisir un autre.",
     "castersFullMatch": "Deux casters au plus, inscrits sur le match : retire-en un depuis le match.",
     "castersHint": "Deux casters au plus par créneau. Sans caster autonome, il leur faut un prod.",
-    "castersHintSubject": "Casters d'un créneau"
+    "castersHintSubject": "Casters d'un créneau",
+    "castersFullOver": "Plus de deux casters, inscrits au match compris : retire-les jusqu'à n'en laisser qu'un pour en choisir un autre."
   },
   "solo": {
     "label": "Je diffuse seul (caster autonome)",
@@ -173,7 +174,8 @@
     "done": "Désistement enregistré.",
     "doneReplaced": "Désistement enregistré : un remplaçant a été affecté.",
     "doneUnfilled": "Désistement enregistré : la place est à pourvoir, le staff est prévenu.",
-    "doneStreamLost": "Désistement enregistré : la diffusion est perdue, le staff est prévenu."
+    "doneStreamLost": "Désistement enregistré : la diffusion est perdue, le staff est prévenu.",
+    "doneStillSignedUp": "Retiré du planning, mais tu restes inscrit sur le match : retire-toi depuis le match pour ne plus le caster."
   },
   "withdrawals": {
     "title": "Désistements",

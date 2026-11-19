@@ -70,6 +70,8 @@ export async function loadExclusions(
   executor: Executor,
   data: PlanningData,
   entries: readonly LoadedEntry[],
+  /** `neighbours: false` : les seules entrées du lot (aucun renfort de caster à juger, `neededElsewhere`). */
+  options: { neighbours?: boolean } = {},
 ): Promise<Set<string>> {
   // Les entrées qui chevauchent le lot aussi : le second caster ne se prend pas à qui y est attendu
   // (`neededElsewhere`), et n'y est attendu que qui pourrait vraiment les tenir (ni joueur, ni tournoi caché
@@ -78,7 +80,7 @@ export async function loadExclusions(
   // par le tournoi) : rien de plus n'est lu sous le verrou du planning.
   const around = data.entries.filter((other) => entries.some((entry) => other.key === entry.key || slotsOverlap(other, entry)));
   const batchKeys = new Set(entries.map((entry) => entry.key));
-  const scope = [...entries, ...around.filter((other) => !batchKeys.has(other.key) && other.open)];
+  const scope = options.neighbours === false ? [...entries] : [...entries, ...around.filter((other) => !batchKeys.has(other.key) && other.open)];
   const excluded = new Set<string>();
   // Les joueurs se lisent sur les seules entrées autour du lot (pas les voisines des voisines) : un joueur d'une
   // telle entrée lointaine reste « attendu » sur la voisine, ce qui ne fait que le garder pour elle.

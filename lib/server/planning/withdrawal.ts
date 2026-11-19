@@ -29,7 +29,7 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
 import { can } from "@/lib/shared/permissions";
-import { LATE_WITHDRAWAL_MS, planningWeekStart, WITHDRAWAL_REASON_MAX, type PlanningRole } from "@/lib/shared/planning";
+import { LATE_WITHDRAWAL_MS, PLANNING_MAX_CASTERS, planningWeekStart, WITHDRAWAL_REASON_MAX, type PlanningRole } from "@/lib/shared/planning";
 import { exclusionKey, planAssignments, type PlannedAssignment, type PlannerInput } from "@/lib/shared/planning-planner";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { visibleText } from "@/lib/shared/visible-text";
@@ -57,6 +57,12 @@ export type WithdrawalResult = {
   unfilled: boolean;
   /** Avec `unfilled` : le départ d'un caster autonome a fait perdre la diffusion. */
   streamLost: boolean;
+  /**
+   * Caster encore inscrit sur le match (`CAST`), seul à tenir le rôle : il le
+   * cast toujours, rien n'a changé — ni remplaçant, ni place à pourvoir ; il
+   * se retire depuis le match.
+   */
+  stillSignedUp: boolean;
 };
 
 /** Motif nettoyé (`visibleText`), `null` s'il est vide ; `undefined` s'il dépasse la borne. */
@@ -117,9 +123,12 @@ export function pickReplacement(
   historyWeek: number,
   streamLost = false,
 ): PlannedAssignment | null {
+  const all = role === "CASTER" ? entryAssignments(entry, data) : [];
+  // Le plafond compte toute ligne de caster restée (proposition, inscription au match, compte suspendu compris),
+  // comme la pose à la main : un remplaçant ne le dépasse jamais.
+  if (new Set(all.filter((row) => row.role === "CASTER").map((row) => row.userId)).size >= PLANNING_MAX_CASTERS) return null;
   const base = preparePlanner(data, [], history, excluded, historyWeek);
   const suspended = suspendedIds(data);
-  const all = role === "CASTER" ? entryAssignments(entry, data) : [];
   // Un compte suspendu ne tient rien (il ne peut pas venir) : ni renfort, ni place prise sous le plafond.
   const rows = all.filter((row) => !suspended.has(row.userId));
   const casters = rows.filter((row) => row.role === "CASTER");
@@ -165,7 +174,8 @@ async function findReplacement(
   const entry = data.entries.find((candidate) => candidate.key === entryKey);
   // Jugé sur la relecture : une inscription de cast (hors verrou du planning) faite ou défaite entre-temps y compte.
   const hold = casterHolds(entry ?? before, data, withdrawn);
-  if (!entry?.open || !entry.editable) return { data, entry, hold, pick: null };
+  // Encore inscrit sur le match, seul à tenir le rôle, le désisté le cast toujours : rien à remplacer.
+  if (!entry?.open || !entry.editable || selfOnly(hold.staff)) return { data, entry, hold, pick: null };
   // Personne d'autre n'a répondu « disponible » pour ce rôle : aucun remplaçant possible, on s'épargne l'historique,
   // les exclusions et le calcul (le cas courant d'un renfort quitté).
   const offered = data.availability.some(
@@ -174,7 +184,8 @@ async function findReplacement(
   if (!offered) return { data, entry, hold, pick: null };
   const anchor = Math.max(now, entry.startAt);
   const history = await loadPlanningHistory(connection, anchor);
-  const excluded = await loadExclusions(connection, data, [entry]);
+  // Les voisines ne servent qu'au renfort d'un caster (`neededElsewhere`) : inutiles pour un prod ou un arbitre.
+  const excluded = await loadExclusions(connection, data, [entry], { neighbours: role === "CASTER" });
   return { data, entry, hold, pick: pickReplacement(data, entry, role, history, excluded, planningWeekStart(anchor), hold.staff.streamLost) };
 }
 
@@ -301,6 +312,11 @@ function held(hold: CasterHold): boolean {
   return hold.casterIds.length > 0 || hold.selfHeld;
 }
 
+/** Le désisté, encore inscrit sur le match, est seul à tenir le rôle : il le cast toujours. */
+function selfOnly(hold: CasterHold): boolean {
+  return hold.selfHeld && hold.casterIds.length === 0;
+}
+
 /**
  * `skipSuspended` : un compte suspendu ne tient rien (ni caster, ni prod, ni
  * caster autonome) — vue du calcul et du staff des tournois. Faux : la vue
@@ -345,11 +361,6 @@ type CasterHolds = { shown: CasterHold; staff: CasterHold };
 
 export function casterHolds(entry: LoadedEntry, data: PlanningData, withdrawn: PlanningAssignmentView): CasterHolds {
   return { shown: casterHold(entry, data, withdrawn, false), staff: casterHold(entry, data, withdrawn, true) };
-}
-
-/** L'alerte du staff : sa lecture, ou celle des membres si elle seule voit la place à pourvoir (diffusion perdue). */
-function staffView(hold: CasterHolds): { streamLost: boolean } {
-  return { streamLost: held(hold.staff) ? hold.shown.streamLost : hold.staff.streamLost };
 }
 
 /** Les comptes suspendus parmi les membres (lus avec eux, `LoadedMember.suspended`). */
@@ -446,6 +457,7 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
         unfilled: false,
         stillHeldBy: [],
         streamLost: false,
+        stillSignedUp: false,
         staffUnfilled: null,
         confirmed,
         entry,
@@ -465,16 +477,18 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
     const open = confirmed && replacementId === null;
     // Inscrit sur le match, le désisté le cast encore (`selfHeld`) ; seul à tenir le rôle, rien ne change pour
     // les autres membres (le planning le montre toujours caster), qui n'ont rien à apprendre.
-    const selfKept = replacementId === null && hold.shown.selfHeld && hold.shown.casterIds.length === 0;
+    const selfKept = replacementId === null && selfOnly(hold.shown);
     return {
       late,
       replaced: replacementId !== null,
       unfilled: open && !held(hold.shown),
       stillHeldBy: replacementId === null ? hold.shown.casterIds : [],
       streamLost: open && hold.shown.streamLost,
+      stillSignedUp: selfKept,
       // La lecture du staff ne retire que des comptes suspendus à celle des membres : une place à pourvoir pour eux
-      // l'est aussi pour le staff, que le message rendu au désisté (« le staff est prévenu ») ne mente pas.
-      staffUnfilled: open && (!held(hold.staff) || !held(hold.shown)) ? staffView(hold) : null,
+      // (diffusion perdue comprise) l'est aussi pour le staff, et le message rendu au désisté (« le staff est
+      // prévenu ») ne ment pas.
+      staffUnfilled: open && !held(hold.staff) ? { streamLost: hold.staff.streamLost } : null,
       confirmed,
       entry: fresh,
       replacementId,
@@ -497,5 +511,11 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
       coAssignedIds: outcome.coAssignedIds,
     });
   }
-  return { late: outcome.late, replaced: outcome.replaced, unfilled: outcome.unfilled, streamLost: outcome.streamLost };
+  return {
+    late: outcome.late,
+    replaced: outcome.replaced,
+    unfilled: outcome.unfilled,
+    streamLost: outcome.streamLost,
+    stillSignedUp: outcome.stillSignedUp,
+  };
 }

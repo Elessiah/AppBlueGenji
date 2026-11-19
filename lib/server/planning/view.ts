@@ -127,7 +127,9 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       channelUrl: entry.channelUrl,
       selfManaged: entry.selfManaged,
       assignments: assignments.map((row) => visibleAssignment(row, user.id, canManage)),
-      coverage: entryCoverage(assignments, solo),
+      // Pour le staff, un compte suspendu ne tient rien (comme pour le calcul, `preparePlanner`, et l'alerte) ;
+      // les autres lecteurs gardent la couverture d'avant.
+      coverage: entryCoverage(canManage ? assignments.filter((row) => !suspended.has(row.userId)) : assignments, solo),
       mine: availability
         .filter((row) => row.userId === user.id)
         .map(({ userId, role, status, preferred }) => ({ userId, role, status, preferred })),

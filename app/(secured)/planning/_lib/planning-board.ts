@@ -216,12 +216,16 @@ export function roleChoices(
  * calcul, le dire ; si tous sont inscrits sur le match, ou si les inscrits y
  * suffisent à atteindre le plafond, il faut passer par le match.
  */
-export function castersFullKind(entry: PlanningEntryView): "castersFull" | "castersFullProvisional" | "castersFullMatch" {
+export function castersFullKind(
+  entry: PlanningEntryView,
+): "castersFull" | "castersFullProvisional" | "castersFullMatch" | "castersFullOver" {
   const casters = entry.assignments.filter((row) => row.role === "CASTER");
   const removable = casters.filter((row) => row.source !== "CAST");
   // Les inscrits sur le match atteignent seuls le plafond (inscriptions non plafonnées) : retirer une ligne du
   // planning ne rouvrirait pas la liste, il faut passer par le match.
   if (removable.length === 0 || casters.length - removable.length >= PLANNING_MAX_CASTERS) return "castersFullMatch";
+  // Au-delà du plafond (inscrits compris) : un seul retrait ne suffit pas, il faut n'en laisser qu'un.
+  if (casters.length > PLANNING_MAX_CASTERS) return "castersFullOver";
   return removable.every((row) => row.provisional) ? "castersFullProvisional" : "castersFull";
 }
 
@@ -233,8 +237,15 @@ export function withdrawBodyKey(role: PlanningRole): "withdraw.body" | "withdraw
 /** Le message de succès d'un désistement, selon son issue. */
 export function withdrawDoneKey(
   result: WithdrawalResponse,
-): "withdraw.doneReplaced" | "withdraw.doneStreamLost" | "withdraw.doneUnfilled" | "withdraw.done" {
+):
+  | "withdraw.doneReplaced"
+  | "withdraw.doneStreamLost"
+  | "withdraw.doneUnfilled"
+  | "withdraw.doneStillSignedUp"
+  | "withdraw.done" {
   if (result.replaced) return "withdraw.doneReplaced";
+  // Encore inscrit sur le match, il le cast toujours : à lui de s'en retirer depuis le match.
+  if (result.stillSignedUp) return "withdraw.doneStillSignedUp";
   if (!result.unfilled) return "withdraw.done";
   // Diffusion perdue : le caster restant est toujours affiché, rien n'est montré « à pourvoir ».
   return result.streamLost ? "withdraw.doneStreamLost" : "withdraw.doneUnfilled";

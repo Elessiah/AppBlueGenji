@@ -600,8 +600,14 @@ describe("castersFullKind", () => {
     expect(castersFullKind(entryView({ assignments }))).toBe("castersFullMatch");
   });
 
+  it("castersFullKind_signupPushesTotalOverCap_returnsOver", () => {
+    const assignments = [caster(1, "CAST", false), caster(2, "MANUAL", false), caster(3, "AUTO", true)];
+
+    expect(castersFullKind(entryView({ assignments }))).toBe("castersFullOver");
+  });
+
   it("castersFullKind_everyKind_hasFrAndEnText", () => {
-    for (const kind of ["castersFull", "castersFullProvisional", "castersFullMatch"] as const) {
+    for (const kind of ["castersFull", "castersFullProvisional", "castersFullMatch", "castersFullOver"] as const) {
       expect(frPlanning.assignment[kind]).toBeTruthy();
       expect(enPlanning.assignment[kind]).toBeTruthy();
     }
@@ -619,20 +625,28 @@ describe("withdrawBodyKey", () => {
 });
 
 describe("withdrawDoneKey", () => {
+  it("withdrawDoneKey_stillSignedUp_returnsStillSignedUp", () => {
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: true })).toBe(
+      "withdraw.doneStillSignedUp",
+    );
+    expect(frPlanning.withdraw.doneStillSignedUp).toBeTruthy();
+    expect(enPlanning.withdraw.doneStillSignedUp).toBeTruthy();
+  });
+
   it("withdrawDoneKey_replaced_returnsReplaced", () => {
-    expect(withdrawDoneKey({ late: false, replaced: true, unfilled: false, streamLost: false })).toBe("withdraw.doneReplaced");
+    expect(withdrawDoneKey({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false })).toBe("withdraw.doneReplaced");
   });
 
   it("withdrawDoneKey_unfilledStreamLost_returnsStreamLost", () => {
-    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: true, streamLost: true })).toBe("withdraw.doneStreamLost");
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: true, streamLost: true, stillSignedUp: false })).toBe("withdraw.doneStreamLost");
   });
 
   it("withdrawDoneKey_unfilled_returnsUnfilled", () => {
-    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: true, streamLost: false })).toBe("withdraw.doneUnfilled");
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false })).toBe("withdraw.doneUnfilled");
   });
 
   it("withdrawDoneKey_held_returnsDone", () => {
-    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: false, streamLost: false })).toBe("withdraw.done");
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: false })).toBe("withdraw.done");
   });
 
   it("withdrawDoneKey_streamLostText_hasFrAndEn", () => {
