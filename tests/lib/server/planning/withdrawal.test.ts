@@ -778,11 +778,60 @@ describe("withdrawFromEntry — désisté encore inscrit sur le match", () => {
         }),
       );
 
-    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
     const announced = jest.mocked(announceWithdrawal).mock.calls[0][0];
     expect(announced.stillHeldBy).toEqual([5]);
-    expect(announced.coAssignedIds).toEqual(expect.arrayContaining([5, 7]));
+    expect(announced.coAssignedIds).toEqual([5, 7]);
+    expect(announced.staffUnfilled).toBeNull();
+  });
+
+  it("withdrawFromEntry_withdrawerSignedUpAloneReReadFails_noMemberAnnouncement", async () => {
+    const members = [loadedMember({ userId: 4, roles: ["CASTER"] }), loadedMember({ userId: 7, roles: ["PROD"] })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(
+        planningData({ entries: [loadedEntry()], assignments: [withdrawn, prod], matchCasters: new Map([["m:1", [4]]]), members }),
+      )
+      .mockRejectedValueOnce(new Error("outage"));
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({
+      stillHeldBy: [],
+      coAssignedIds: [],
+      staffUnfilled: null,
+    });
+  });
+
+  it("withdrawFromEntry_suspendedWithdrawerSignedUpAlone_staffAlertedMembersSilent", async () => {
+    // Pour le staff, un compte suspendu ne tient rien : la place y est à pourvoir ; les membres n'apprennent rien.
+    const members = [loadedMember({ userId: 4, roles: ["CASTER"], suspended: true }), loadedMember({ userId: 7, roles: ["PROD"] })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(
+        planningData({ entries: [loadedEntry()], assignments: [withdrawn, prod], matchCasters: new Map([["m:1", [4]]]), members }),
+      )
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry()],
+          assignments: [prod],
+          matchCasters: new Map([["m:1", [4]]]),
+          members,
+          removals: [{ entryKey: "m:1", userId: 4, role: "CASTER" }],
+        }),
+      );
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({
+      stillHeldBy: [],
+      coAssignedIds: [],
+      staffUnfilled: { streamLost: false },
+    });
   });
 });
 
@@ -823,7 +872,7 @@ describe("casterHold", () => {
 
     const hold = casterHold(data.entries[0], data, { userId: 4, role: "CASTER", source: "AUTO", reason: "LOAD", provisional: true });
 
-    expect(hold).toEqual({ casterIds: [5], streamLost: false });
+    expect(hold).toEqual({ casterIds: [5], selfHeld: false, streamLost: false });
   });
 
   it("casterHold_provisionalProdKept_streamLostTrue", () => {
@@ -843,7 +892,7 @@ describe("casterHold", () => {
 
     const hold = casterHold(data.entries[0], data, { userId: 4, role: "CASTER", source: "AUTO", reason: "LOAD", provisional: false });
 
-    expect(hold).toEqual({ casterIds: [], streamLost: true });
+    expect(hold).toEqual({ casterIds: [], selfHeld: false, streamLost: true });
   });
 });
 
@@ -892,7 +941,7 @@ describe("casterHold — inscription au match et suspension", () => {
 
     const hold = casterHold(data.entries[0], data, withdrawn);
 
-    expect(hold).toEqual({ casterIds: [4, 5], streamLost: false });
+    expect(hold).toEqual({ casterIds: [5], selfHeld: true, streamLost: false });
   });
 
   it("casterHold_preRemovalReadWithdrawerSignedUpOnMatch_keepsWithdrawer", () => {
@@ -906,7 +955,7 @@ describe("casterHold — inscription au match et suspension", () => {
 
     const hold = casterHold(data.entries[0], data, withdrawn);
 
-    expect(hold).toEqual({ casterIds: [4], streamLost: false });
+    expect(hold).toEqual({ casterIds: [], selfHeld: true, streamLost: false });
   });
 
   it("casterHold_preRemovalReadWithdrawerNotSignedUp_dropsWithdrawer", () => {
@@ -918,7 +967,7 @@ describe("casterHold — inscription au match et suspension", () => {
 
     const hold = casterHold(data.entries[0], data, withdrawn);
 
-    expect(hold).toEqual({ casterIds: [], streamLost: false });
+    expect(hold).toEqual({ casterIds: [], selfHeld: false, streamLost: false });
   });
 
   it("casterHolds_remainingSoloCasterSuspended_shownHeldStaffStreamLost", () => {
@@ -933,7 +982,19 @@ describe("casterHold — inscription au match et suspension", () => {
 
     const holds = casterHolds(data.entries[0], data, withdrawn);
 
-    expect(holds).toEqual({ shown: { casterIds: [5], streamLost: false }, staff: { casterIds: [], streamLost: false } });
+    expect(holds).toEqual({ shown: { casterIds: [5], selfHeld: false, streamLost: false }, staff: { casterIds: [], selfHeld: false, streamLost: false } });
+  });
+
+  it("casterHolds_suspendedWithdrawerSignedUp_shownSelfHeldStaffNot", () => {
+    const data = planningData({
+      entries: [loadedEntry()],
+      matchCasters: new Map([["m:1", [4]]]),
+      members: [loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })],
+    });
+
+    const holds = casterHolds(data.entries[0], data, withdrawn);
+
+    expect(holds).toEqual({ shown: { casterIds: [], selfHeld: true, streamLost: false }, staff: { casterIds: [], selfHeld: false, streamLost: false } });
   });
 
   it("casterHolds_remainingNonSoloCasterSuspended_staffUnheld", () => {
@@ -945,7 +1006,7 @@ describe("casterHold — inscription au match et suspension", () => {
 
     const holds = casterHolds(data.entries[0], data, withdrawn);
 
-    expect(holds).toEqual({ shown: { casterIds: [5], streamLost: false }, staff: { casterIds: [], streamLost: false } });
+    expect(holds).toEqual({ shown: { casterIds: [5], selfHeld: false, streamLost: false }, staff: { casterIds: [], selfHeld: false, streamLost: false } });
   });
 });
 

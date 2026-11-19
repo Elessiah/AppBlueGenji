@@ -325,9 +325,11 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   ni pastille, ni avis au staff (`stillHeldBy`) ; les autres co-affectés lisent
   « un autre caster reste affecté », le caster restant « tu restes affecté
   comme caster » (`bodySelfHeld`). Le désisté encore inscrit sur le match
-  (`CAST`) n'est jamais « un autre caster » (`stillHeldBy` l'exclut) ; seul à
-  tenir le rôle, il le cast toujours : aucun avis aux co-affectés ni au staff
-  (`selfKept`). Un caster **autonome** parti laissant un
+  (`CAST`) n'est jamais « un autre caster » : `casterHold` l'écarte de
+  `casterIds` et le dit par `selfHeld` ; seul à tenir le rôle, il le cast
+  toujours : aucun avis aux co-affectés (`selfKept`) ni au staff — sauf s'il
+  est suspendu : pour le staff, un compte suspendu ne tient rien, la place
+  y est à pourvoir et le staff prévenu (`staffUnfilled`). Un caster **autonome** parti laissant un
   caster sans prod (`casterHold` → `streamLost`) : son remplaçant doit rendre
   la diffusion — un caster **autonome** seulement (`restoreStream`), pris même
   si une entrée qui chevauche l'attend, la diffusion de celle-ci passant
