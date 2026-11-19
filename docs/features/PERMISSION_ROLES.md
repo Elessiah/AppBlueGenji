@@ -38,7 +38,7 @@ s'additionnent.
   gestes du staff du planning sous `/api/admin/planning/*` : l'attribution
   manuelle demande `tournaments` en plus ; hors de `/api/admin/`, le **caster
   autonome d'un autre** (section « Casters autonomes », `PUT
-  /api/planning/solo-caster` avec `userId`) demande `planning` puis
+  /api/planning/solo-caster` avec `userId`) demande `planning` (`403 PLANNING_MEMBERS_ONLY` sinon) puis
   `tournaments` (`403 FORBIDDEN` sinon) ; le **calcul, la confirmation et les
   durées** (panneau « Calcul et confirmation »)
   sont réservés aux **administrateurs** (`canComputePlanning`, décision

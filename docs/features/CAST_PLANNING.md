@@ -12,7 +12,7 @@ Remplace le tableur partagé tenu jusqu'ici.
 | --- | --- | --- |
 | Voir le planning (attributions de tous, ses propres réponses) | `planning` | `GET /api/planning` |
 | Donner sa disponibilité / sa préférence | `planning` + le rôle concerné | `PUT /api/planning/availability` |
-| Se dire caster autonome | `planning` + rôle `CASTER` | `PUT /api/planning/solo-caster` |
+| Se dire caster autonome | `planning` + rôle `CASTER` tenu (non suspendu pour l'allumer) | `PUT /api/planning/solo-caster` |
 | Régler le caster autonome d'un autre | `tournaments` (le staff, **pas** réservé aux administrateurs) | `PUT /api/planning/solo-caster` (`userId`) |
 | Attribuer / retirer à la main | `tournaments` | `PUT /api/admin/planning/assignment` |
 | Calculer un lot | **administrateur** (`canComputePlanning`) | `POST /api/admin/planning/auto-assign` |
@@ -32,8 +32,8 @@ n'est rendu que si la vue porte aussi les durées (jamais de valeurs par défaut
 qu'un enregistrement écrirait). **Caster autonome d'un autre** : hors de cette
 exception, il reste au staff des tournois (`tournaments`, `403 FORBIDDEN` sinon) ;
 son réglage vit dans la section « Casters autonomes » de `/planning`, rendue
-à tout `canManage` hors du panneau de calcul (`SoloCastersStaff` : compteur, `InfoHint`, un nom accessible par case, zone `data-tap-zone` ; le lecteur caster n'y figure pas, il règle le sien dans la barre d'outils) ; le
-poser le réglage demande de tenir le rôle au planning (`holdingRefusal`, la règle
+à tout `canManage` hors du panneau de calcul (`SoloCastersStaff` : compteur, `InfoHint`, un nom accessible par case, zone `data-tap-zone` ; le lecteur caster n'y figure pas, il règle le sien dans la barre d'outils) ;
+poser le réglage (l'allumer ; l'éteindre reste permis) demande de tenir le rôle au planning (`holdingRefusal`, la règle
 d'une désignation à la main) : un compte suspendu, sans le rôle ou inconnu reçoit
 le même `409 NOT_CASTER` (« ne peut pas être caster autonome »), sans rien qui
 nomme la suspension ; le **retirer** reste permis à un caster suspendu (rien n'en
@@ -595,7 +595,8 @@ staff des tournois ; les autres lecteurs gardent la couverture d'avant, mais
 voient ce que le calcul propose à sa place. Le staff des tournois — et, par ces
 propositions, les autres membres — peuvent donc **déduire** qu'un compte n'est
 plus retenu (plus proposé ni confirmé, désignation à la main refusée par le
-texte neutre `PLANNING_ROLE_NOT_HELD`, créneau autonome plus couvert ; déclaré :
+texte neutre `PLANNING_ROLE_NOT_HELD`, créneau autonome plus couvert, case « caster autonome » refusée par le
+`409 NOT_CASTER` uniforme ; déclaré :
 registre T11 et T20, `/rgpd` §5, `PRIVACY_CHANGES`), sans voir la suspension ni
 ses motifs. Les avis déclarent ces effets en **une phrase générale, la même
 partout** (FR = EN), sans énumérer les mécanismes du calcul : « écarté des

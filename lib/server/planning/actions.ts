@@ -112,8 +112,8 @@ export async function setSoloCaster(targetUserId: number, solo: boolean): Promis
   await withConnection(async (connection) => {
     // Le seul compte visé, relu par sa clé : ses rôles du moment.
     const [member] = await loadPlanningMembersByIds(connection, [targetUserId]);
-    const clearsOwnRole = !solo && member?.roles.includes("CASTER") === true;
-    if (!clearsOwnRole && holdingRefusal(member, { hidden: false }, "CASTER") !== null) {
+    const clearsHeldCasterFlag = !solo && member?.roles.includes("CASTER") === true;
+    if (!clearsHeldCasterFlag && holdingRefusal(member, { hidden: false }, "CASTER") !== null) {
       throw new Error("NOT_CASTER");
     }
     await writeSoloCaster(connection, targetUserId, solo);

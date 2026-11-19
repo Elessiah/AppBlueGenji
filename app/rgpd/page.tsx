@@ -1122,7 +1122,7 @@ function RgpdFr({
             conditions d&apos;utilisation, pour une durée déterminée ou indéterminée : toutes ses
             sessions sont fermées et aucune connexion n&apos;est possible tant que la suspension court ;
             s&apos;il arbitre, caste ou produit, il est écarté des propositions, confirmations, désignations,
-            remplacements et avis du planning (nouveaux créneaux, affectations, désistements, places à pourvoir, diffusions perdues) ; ce
+            remplacements et avis du planning (nouveaux créneaux, affectations, désistements, places à pourvoir, diffusions perdues) et ne peut plus y être dit caster autonome ; ce
             qui lui était déjà confirmé ou désigné reste jusqu&apos;à son retrait ; le staff des tournois et les autres
             membres du planning peuvent seulement en déduire que le planning ne le retient plus, sans voir la suspension
             ni ses motifs (<Link href="/rgpd/registre#t20">registre, T20</Link>).
@@ -1562,7 +1562,7 @@ function RgpdFr({
             créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
             le rôle caster ; la suppression du compte emporte tout ce qui le concerne (les gestes faits comme
             staff restent, sans le désigner), l&apos;export de vos données le contient, gestes faits comme staff
-            compris. Base : intérêt légitime de l&apos;association (organiser ses bénévoles),
+            sur les attributions compris. Base : intérêt légitime de l&apos;association (organiser ses bénévoles),
             avec droit d&apos;opposition (<Link href="/rgpd/registre#t20">registre, T20</Link>).
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>
