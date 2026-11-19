@@ -120,8 +120,10 @@ describe("canEditReplay — logique pure", () => {
 
 describe("MatchReplayStrip — noms non fiables", () => {
   it("MatchReplayStrip_bidiTeamName_ariaLabelStripsInvisibles", () => {
-    const html = render({ ...played, team1Name: "Drag‮ons​", replayUrl: VIDEO });
+    const RLO = String.fromCodePoint(0x202e);
+    const ZWSP = String.fromCodePoint(0x200b);
+    const html = render({ ...played, team1Name: `Drag${RLO}ons${ZWSP}`, replayUrl: VIDEO });
     expect(html).toMatch(/aria-label="Rediff disponible — revoir Dragons contre Lions sur YouTube/);
-    expect(html).not.toContain("‮");
+    expect(html).not.toContain(RLO);
   });
 });
