@@ -28,6 +28,11 @@ function publishAfterCommit(actor: { id: number; pseudo: string }, targetId: num
   // qu'une panne ici ne doit pas emporter) : retour imposé par la
   // rétrogradation, la ligne pm2 du retour, comme toute bascule (registre,
   // T05), au nom de l'administrateur qui l'a imposé — jamais sur Discord.
+  // Promotion : une incarnation restée sur le compte, déjà sans effet, est
+  // levée — ligne sans nom, comme le balayage du démarrage (registre, T05).
+  if (saved.strayImpersonationsLifted) {
+    console.info(`${PLAYER_VIEW_OFF_AUDIT} : levée à la promotion, compte sans administration (${saved.strayImpersonationsLifted} session(s))`);
+  }
   if (!saved.impersonationsCleared) return;
   try {
     auditStaffAction(`${PLAYER_VIEW_OFF_AUDIT} : administration retirée au compte #${targetId} (${saved.impersonationsCleared} session(s))`, actor);

@@ -146,18 +146,20 @@ async function isStillAdmin(db: Pool, userId: number): Promise<boolean> {
 }
 
 /**
- * Lève l'incarnation **en cours** de **toutes** les sessions d'un compte qui perd
- * l'administration (`setUserRoles`) : sans quoi l'échéance et les rôles
- * restaient sur la session, ignorés tant que le compte n'est plus
- * administrateur, puis relus tels quels s'il le redevenait dans les 12 h —
- * une incarnation revenue sans geste ni ligne pm2. Sur la connexion de la
+ * Lève l'incarnation **en cours** de **toutes** les sessions d'un compte dont
+ * l'administration change (`setUserRoles`) — retirée : sans quoi l'échéance et
+ * les rôles restaient sur la session, ignorés tant que le compte n'est plus
+ * administrateur, puis relus tels quels s'il le redevenait dans les 12 h ;
+ * rendue : une incarnation restée là malgré tout reprendrait effet — une
+ * incarnation revenue sans geste. Sur la connexion de la
  * transaction de l'appelant (qui a verrouillé `bg_users` d'abord : seul ordre
  * de verrouillage des deux tables). Une échéance déjà passée reste, sans effet
  * (registre, T05) : elle ne peut plus revenir. Sans la colonne des rôles
  * (`ALTER` non joué), seule l'échéance est levée.
  *
  * @returns le nombre de sessions dont l'incarnation a été levée (ligne pm2 de
- *   l'appelant, après le commit).
+ *   l'appelant, après le commit : retour imposé nommant l'auteur pour une
+ *   rétrogradation, ligne sans nom pour une promotion).
  */
 export async function clearAccountImpersonation(connection: Pick<PoolConnection, "execute">, userId: number): Promise<number> {
   return liftImpersonations(connection, "user_id = ?", [userId]);

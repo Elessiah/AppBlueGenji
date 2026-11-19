@@ -71,11 +71,17 @@ compte (`clearAccountImpersonation`) : sans quoi l'échéance et les rôles,
 ignorés tant que le compte n'est plus administrateur, revenaient tels quels
 s'il le redevenait dans les 12 h. Une échéance déjà passée reste, sans effet.
 À l'inverse, `setUserRoles` qui **accorde** `ADMIN` lève aussi, dans la même
-transaction et sans ligne pm2, l'incarnation en cours restée sur le compte
-(défaire en échec, ci-dessous) : elle ne reprend jamais effet avec
-l'administration rendue (registre T01 et T05 : « sans effet » sur un compte
-qui n'est plus administrateur ; une panne de cette levée fait échouer la
-promotion).
+transaction, l'incarnation en cours restée sur le compte (défaire en échec,
+ci-dessous) : elle ne reprend jamais effet avec l'administration rendue
+(registre T01 et T05 : « sans effet » sur un compte qui n'est plus
+administrateur ; une panne de cette levée fait échouer la promotion). La
+route en laisse une ligne pm2 **sans nom** qui donne le nombre de sessions,
+comme le balayage du démarrage (`strayImpersonationsLifted`) : une entrée
+annoncée puis levée ainsi a toujours une ligne de sortie. Le changement
+d'administration se lit sur la colonne `is_admin`, jamais sur les rôles
+résolus (une ligne héritée porte `ADMIN` dans son JSON sans être
+administrateur). `setUserRoles` est le seul écrivain de `is_admin` : tout
+autre chemin qui la rendrait devrait lever l'incarnation de même.
 La route des rôles en laisse la ligne pm2 du retour (`PLAYER_VIEW_OFF_AUDIT`,
 au nom de l'administrateur qui rétrograde, avec le numéro du compte et le
 nombre de sessions), à part de la publication du changement de rôles (une
@@ -243,7 +249,7 @@ rétrogradation et au balayage.
 Les colonnes ne servent qu'à réduire des droits, à la demande de
 l'administrateur lui-même, et partent avec la session (déconnexion, purge des
 sessions échues, suppression du compte), ou plus tôt au retour ou quand le
-compte perd l'administration pendant l'incarnation ; une échéance passée, ou
+l'administration du compte change ; une échéance passée, ou
 celle d'un compte qui n'est plus administrateur, peut rester sur la ligne, sans
 effet, avec ses rôles, jusque-là (un retour en échec laisse simplement
 l'incarnation courir jusqu'à son échéance). Jusqu'au déploiement de cette version, tout titulaire d'un
@@ -255,7 +261,8 @@ fausse si le déploiement glissait).
 - Registre : T01 décrit l'échéance parmi les données de la session ; T05 décrit
   la bascule (sous-finalité « Incarner un rôle »), la ligne pm2 (pseudo, identifiant,
   sens ; retour imposé : administrateur qui rétrograde, compte, nombre de
-  sessions ; levée au démarrage : nombre de sessions seul), la mémoire du plafond
+  sessions ; levée sur un compte non administrateur, au démarrage ou à la
+  promotion : nombre de sessions seul), la mémoire du plafond
   (chaque demande de bascule, corps invalide compris) (`PLAYER_VIEW_TOGGLE_RULE` pour les entrées,
   `PLAYER_VIEW_EXIT_RULE` pour les retours) et des reconnexions
   (`session-streams`), la base (intérêt légitime) et les développeurs parmi les

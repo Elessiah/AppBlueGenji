@@ -281,12 +281,38 @@ describe("setUserRoles — open tournament streams", () => {
   it("setUserRoles_legacyAdminInJsonSameRoles_rewritesRow", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["ADMIN"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     await setUserRoles(7, ["ADMIN"], 3);
 
-    expect(connection.execute).toHaveBeenCalledTimes(2);
     const [, params] = connection.execute.mock.calls[1] as [string, unknown[]];
     expect(params).toEqual([1, "[]", 7]);
+  });
+
+  // Revue juridique 3 : l'administration se lit sur `is_admin`, pas sur les
+  // rôles résolus — une ligne héritée (`ADMIN` dans le JSON, `is_admin = 0`)
+  // n'est pas administrateur, et la promouvoir doit lever l'incarnation restée.
+  it("setUserRoles_legacyAdminInJsonPromoted_clearsSessions", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["ADMIN"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const result = await setUserRoles(7, ["ADMIN"], 3);
+
+    const [clearSql, clearParams] = connection.execute.mock.calls[2] as [string, unknown[]];
+    expect(clearSql).toContain("UPDATE bg_user_sessions SET player_view_until = NULL");
+    expect(clearParams).toEqual([7]);
+    expect(result.strayImpersonationsLifted).toBe(1);
+  });
+
+  it("setUserRoles_legacyAdminInJsonDemoted_doesNotClearSessions", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["ADMIN"]' }]);
+
+    const result = await setUserRoles(7, [], 3);
+
+    expect(connection.execute).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ roles: [], previous: ["ADMIN"] });
   });
 
   it("closes the streams on a role grant too, so the viewer context is recomputed", async () => {
@@ -350,14 +376,24 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
     expect(connection.execute.mock.invocationCallOrder[2]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
   });
 
-  it("setUserRoles_adminGrantedWithStrayImpersonation_omitsImpersonationsCleared", async () => {
+  it("setUserRoles_adminGrantedWithStrayImpersonation_returnsStrayImpersonationsLifted", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
     connection.execute.mockResolvedValueOnce([{ affectedRows: 2 }]);
 
     const result = await setUserRoles(7, ["ADMIN"], 3);
 
-    expect(result).toEqual({ roles: ["ADMIN"], previous: [] });
+    expect(result).toEqual({ roles: ["ADMIN"], previous: [], strayImpersonationsLifted: 2 });
+  });
+
+  it("setUserRoles_promotionWithStaleExpectedRoles_leavesSessionsUntouched", async () => {
+    const connection = await mockTransaction();
+    connection.execute.mockResolvedValueOnce([[ACTOR_ADMIN, TARGET]]);
+
+    await expect(setUserRoles(7, ["ADMIN"], 3, ["ARBITRE"])).rejects.toThrow("ROLES_CHANGED");
+
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
   });
 
   it("setUserRoles_adminGrantedClearFails_rollsBackAndRethrows", async () => {

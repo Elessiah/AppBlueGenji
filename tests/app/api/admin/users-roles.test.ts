@@ -220,6 +220,17 @@ describe("POST /api/admin/users/[id]/roles", () => {
     expect(error.mock.calls.some(([line]) => String(line).includes("ligne du retour imposé non publiée"))).toBe(true);
   });
 
+  it("post_promotionLiftedStrayImpersonation_logsAnonymousLine", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue({ roles: ["ADMIN"], previous: [], strayImpersonationsLifted: 2 });
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await POST(jsonReq({ roles: ["ADMIN"] }), params("7"));
+
+    const lines = info.mock.calls.map(([line]) => String(line)).filter((line) => line.includes(PLAYER_VIEW_OFF_AUDIT));
+    expect(lines).toEqual([`${PLAYER_VIEW_OFF_AUDIT} : levée à la promotion, compte sans administration (2 session(s))`]);
+  });
+
   it("post_nothingCleared_writesNoForcedReturnLine", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.setUserRoles).mockResolvedValue(saved([], ["ADMIN"]));

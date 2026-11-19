@@ -1,4 +1,4 @@
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { resolveRoles } from "@/lib/server/auth";
 import { getDatabase } from "@/lib/server/database";
 import { clearAccountImpersonation } from "@/lib/server/player-view";
@@ -28,6 +28,12 @@ export interface RolesSaveResult {
    * (`clearAccountImpersonation`) : la route en laisse la ligne pm2 du retour.
    */
   impersonationsCleared?: number;
+  /**
+   * Sessions dont une incarnation restée sur le compte, sans effet tant qu'il
+   * n'était pas administrateur, a été levée par la promotion : la route en
+   * laisse une ligne pm2 sans nom, comme le balayage du démarrage (T05).
+   */
+  strayImpersonationsLifted?: number;
 }
 
 /**
@@ -36,6 +42,23 @@ export interface RolesSaveResult {
  */
 function storedRoles(row: { is_admin: unknown; platform_roles_json: unknown }): PlatformRole[] {
   return resolveRoles(Number(row.is_admin) === 1, row.platform_roles_json);
+}
+
+/**
+ * Lève l'incarnation des sessions d'un compte dont l'administration change
+ * (colonne `is_admin`), dans la transaction de {@link setUserRoles} :
+ * `impersonationsCleared` pour une rétrogradation (retour imposé, nommé),
+ * `strayImpersonationsLifted` pour une promotion (ligne sans nom).
+ */
+async function clearOnAdminChange(
+  connection: PoolConnection,
+  userId: number,
+  wasAdmin: boolean,
+  isAdmin: boolean,
+): Promise<{ impersonationsCleared: number; strayImpersonationsLifted: number }> {
+  if (wasAdmin === isAdmin) return { impersonationsCleared: 0, strayImpersonationsLifted: 0 };
+  const lifted = await clearAccountImpersonation(connection, userId);
+  return wasAdmin ? { impersonationsCleared: lifted, strayImpersonationsLifted: 0 } : { impersonationsCleared: 0, strayImpersonationsLifted: lifted };
 }
 
 /** Vrai quand deux listes portent les mêmes rôles, sans égard à l'ordre ni aux doublons. */
@@ -88,6 +111,7 @@ export async function setUserRoles(
   let previous: PlatformRole[];
   let unchanged = false;
   let impersonationsCleared = 0;
+  let strayImpersonationsLifted = 0;
   try {
     await connection.beginTransaction();
     // L'**auteur** doit être encore administrateur au moment d'écrire : la
@@ -133,10 +157,21 @@ export async function setUserRoles(
         `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ? AND is_deleted = 0`,
         [isAdmin ? 1 : 0, JSON.stringify(nonAdminRoles), targetUserId],
       );
+      // Changement d'administration, lu sur la colonne `is_admin` — la seule
+      // qui fasse un administrateur (`auth.ts`) — et non sur `previous`, où
+      // une ligne héritée porte `ADMIN` par son JSON sans l'être.
       // Rétrogradation : l'incarnation posée sur ses sessions tombe avec
       // l'administration (`ADMIN_ROLE_IMPERSONATION.md`), elle ne reviendrait
       // pas d'elle-même si l'administration était rendue.
-      // Ordre de verrouillage : `bg_users` (ci-dessus) puis les sessions.
+      // Promotion : une incarnation restée sur un compte non administrateur
+      // (entrée concurrente d'une rétrogradation dont le défaire a échoué,
+      // avant le balayage du démarrage) reprendrait effet avec
+      // l'administration rendue, sans geste. Elle tombe donc ici, dans la
+      // même transaction que la promotion — une panne fait échouer la
+      // promotion (registre T01 et T05 : sans effet sur un compte qui n'est
+      // plus administrateur). Tout autre chemin qui rendrait `is_admin`
+      // devrait faire de même : `setUserRoles` est aujourd'hui le seul.
+      // Ordre de verrouillage, dans les deux sens : `bg_users` (ci-dessus) puis les sessions.
       // Les autres écrivains des sessions tiennent en une instruction et ne
       // verrouillent pas de ligne de session avant `bg_users` : l'insertion
       // d'une session pose un verrou partagé sur `bg_users` par sa clé
@@ -144,18 +179,12 @@ export async function setUserRoles(
       // d'une incarnation relit l'administration après coup, sans verrou
       // (`setPlayerView`) ; le balayage du démarrage lit sans verrou puis
       // n'écrit que les sessions (`liftStrayImpersonations`).
-      if (previous.includes("ADMIN") && !isAdmin) {
-        impersonationsCleared = await clearAccountImpersonation(connection, targetUserId);
-      } else if (!previous.includes("ADMIN") && isAdmin) {
-        // Promotion : une incarnation restée sur un compte non administrateur
-        // (entrée concurrente d'une rétrogradation dont le défaire a échoué,
-        // avant le balayage du démarrage) reprendrait effet avec
-        // l'administration rendue, sans geste ni ligne pm2. Elle tombe donc
-        // ici, dans la même transaction que la promotion (registre T01 et
-        // T05 : sans effet sur un compte qui n'est plus administrateur).
-        // Aucune ligne pm2 : aucun retour, l'incarnation était déjà sans effet.
-        await clearAccountImpersonation(connection, targetUserId);
-      }
+      ({ impersonationsCleared, strayImpersonationsLifted } = await clearOnAdminChange(
+        connection,
+        targetUserId,
+        Number(targetRow.is_admin) === 1,
+        isAdmin,
+      ));
     }
     await connection.commit();
   } catch (error) {
@@ -174,7 +203,12 @@ export async function setUserRoles(
   // enregistrés — retrait comme ajout (`session-streams.ts`).
   if (!unchanged) closeUserStreams(targetUserId);
 
-  return { roles: sanitized, previous, ...(impersonationsCleared > 0 ? { impersonationsCleared } : {}) };
+  return {
+    roles: sanitized,
+    previous,
+    ...(impersonationsCleared > 0 ? { impersonationsCleared } : {}),
+    ...(strayImpersonationsLifted > 0 ? { strayImpersonationsLifted } : {}),
+  };
 }
 
 /**
