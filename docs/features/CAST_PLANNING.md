@@ -326,7 +326,10 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   caster sans prod (`casterHold` → `streamLost`) : son remplaçant doit rendre
   la diffusion — un caster **autonome** seulement (`restoreStream`), pris même
   si une entrée qui chevauche l'attend, la diffusion de celle-ci passant
-  d'abord. Sans lui, la diffusion est perdue : la place est à pourvoir, le
+  d'abord. Un prod seulement **proposé** auprès du caster restant tient déjà
+  la diffusion pour le calcul : la règle ordinaire du second caster
+  s'applique alors. Une **proposition** de caster autonome quittée n'ôtait
+  aucune diffusion confirmée : jamais `streamLost`. Sans remplaçant, la diffusion est perdue : la place est à pourvoir, le
   staff prévenu, et tous lisent « diffusion perdue, il manque un prod ou un
   caster autonome » (`bodyStreamLost`, push et message privé ; pas de
   pastille : un caster reste confirmé, la couverture de la carte le dit). Le groupe d'arbitres d'un tournoi entier garde la règle

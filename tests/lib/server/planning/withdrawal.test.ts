@@ -38,7 +38,7 @@ import {
 import { announceWithdrawal } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "@/lib/server/planning/planning-undo";
-import { cleanWithdrawalReason, isLateWithdrawal, pickReplacement, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
+import { casterHold, cleanWithdrawalReason, isLateWithdrawal, pickReplacement, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
 import { LATE_WITHDRAWAL_MS, WITHDRAWAL_REASON_MAX } from "@/lib/shared/planning";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -498,29 +498,49 @@ describe("withdrawFromEntry — panne après le désistement", () => {
  * pour un renfort ; `elsewhere` : une entrée m:2 qui chevauche, sans caster,
  * où ces candidats sont aussi disponibles.
  */
-function twoCasterData(options: { candidates?: number[]; elsewhere?: boolean; onlySolo?: number; soloIds?: number[] }) {
+function twoCasterData(options: {
+  candidates?: number[];
+  elsewhere?: boolean;
+  onlySolo?: number;
+  soloIds?: number[];
+  /** La ligne de 4 (le désisté) n'est qu'une proposition. */
+  withdrawnProvisional?: boolean;
+  /** Un prod proposé (provisoire) sur m:1. */
+  provisionalProd?: number;
+}) {
   const candidates = options.candidates ?? [];
   const entries = [loadedEntry(), ...(options.elsewhere ? [loadedEntry({ key: "m:2", matchId: 2 })] : [])];
   const solo = (userId: number) =>
     options.soloIds !== undefined ? options.soloIds.includes(userId) : options.onlySolo === undefined || options.onlySolo === userId;
-  const members = [4, 5, ...candidates].map((userId) => loadedMember({ userId, roles: ["CASTER"], soloCaster: solo(userId) }));
+  const prodIds = options.provisionalProd === undefined ? [] : [options.provisionalProd];
+  const members = [
+    ...[4, 5, ...candidates].map((userId) => loadedMember({ userId, roles: ["CASTER"], soloCaster: solo(userId) })),
+    ...prodIds.map((userId) => loadedMember({ userId, roles: ["PROD"] })),
+  ];
   const availability = candidates.flatMap((userId) => [
     available("m:1", userId, "CASTER"),
     ...(options.elsewhere ? [available("m:2", userId, "CASTER")] : []),
   ]);
   const second = loadedAssignment({ userId: 5, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true });
+  const prods = prodIds.map((userId) => loadedAssignment({ userId, role: "PROD", confirmed: false }));
   jest
     .mocked(loadPlanningData)
     .mockResolvedValueOnce(
       planningData({
         entries,
-        assignments: [loadedAssignment({ userId: 4, role: "CASTER", confirmed: true }), second],
+        assignments: [loadedAssignment({ userId: 4, role: "CASTER", confirmed: options.withdrawnProvisional !== true }), second, ...prods],
         members,
         availability,
       }),
     )
     .mockResolvedValueOnce(
-      planningData({ entries, assignments: [second], members, availability, removals: [{ entryKey: "m:1", userId: 4, role: "CASTER" }] }),
+      planningData({
+        entries,
+        assignments: [second, ...prods],
+        members,
+        availability,
+        removals: [{ entryKey: "m:1", userId: 4, role: "CASTER" }],
+      }),
     );
 }
 
@@ -588,6 +608,26 @@ describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, streamLost: true });
   });
 
+  it("withdrawFromEntry_provisionalSoloCasterLeavesConfirmedNonSolo_spareRuleKeepsCandidateNeededElsewhere", async () => {
+    // 4 (autonome) n'était qu'une proposition : aucune diffusion confirmée perdue ; 6, attendu sur m:2, n'est pas pris.
+    twoCasterData({ candidates: [6], elsewhere: true, soloIds: [4, 6], withdrawnProvisional: true });
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false });
+    expect(announceWithdrawal).not.toHaveBeenCalled();
+  });
+
+  it("withdrawFromEntry_streamLostButProdProposed_nonSoloSpareReplaces", async () => {
+    // 7 est proposé comme prod auprès de 5 : l'entrée reste diffusée pour le calcul, la règle du renfort s'applique.
+    twoCasterData({ candidates: [6], soloIds: [4], provisionalProd: 7 });
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6, streamLost: false });
+  });
+
   it("withdrawFromEntry_secondCasterLeavesStreamKept_streamLostFalse", async () => {
     twoCasterData({});
 
@@ -618,6 +658,23 @@ describe("withdrawFromEntry — autre rôle du désisté", () => {
 
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ coAssignedIds: [4], unfilled: true });
     error.mockRestore();
+  });
+});
+
+describe("casterHold", () => {
+  it("casterHold_provisionalWithdrawnSolo_streamLostFalse", () => {
+    const data = planningData({
+      entries: [loadedEntry()],
+      assignments: [
+        loadedAssignment({ userId: 4, role: "CASTER", confirmed: false }),
+        loadedAssignment({ userId: 5, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true }),
+      ],
+      members: [loadedMember({ userId: 4, roles: ["CASTER"], soloCaster: true }), loadedMember({ userId: 5, roles: ["CASTER"] })],
+    });
+
+    const hold = casterHold(data.entries[0], data, { userId: 4, role: "CASTER", source: "AUTO", reason: "LOAD", provisional: true });
+
+    expect(hold).toEqual({ casterIds: [5], streamLost: false });
   });
 });
 

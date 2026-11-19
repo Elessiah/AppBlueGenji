@@ -100,9 +100,11 @@ async function writeWithdrawalEvent(
  * (`PLANNING_MAX_CASTERS`) : il n'est remplacé que par un caster libre, attendu
  * sur aucune entrée qui la chevauche (la règle du second caster du calcul),
  * cherché seul (`spareOnly`). Un caster autonome parti en emportant la
- * diffusion (`restoreStream`) n'est remplacé que par un caster autonome, qui
- * la rend, même attendu ailleurs. Une simple proposition de caster restée sur
- * l'entrée ne la tient pas : la place quittée est la première.
+ * diffusion (`streamLost`, {@link casterHold}) n'est remplacé que par un
+ * caster autonome, qui la rend, même attendu ailleurs — sauf si l'entrée reste
+ * diffusée avec ses propositions (un prod proposé auprès du caster restant) :
+ * la règle du renfort s'applique alors. Une simple proposition de caster
+ * restée sur l'entrée ne la tient pas : la place quittée est la première.
  */
 export function pickReplacement(
   data: PlanningData,
@@ -111,18 +113,22 @@ export function pickReplacement(
   history: ReadonlyMap<number, number>,
   excluded: ReadonlySet<string>,
   historyWeek: number,
-  restoreStream = false,
+  streamLost = false,
 ): PlannedAssignment | null {
   const base = preparePlanner(data, [], history, excluded, historyWeek);
-  const casters = role === "CASTER" ? entryAssignments(entry, data).filter((row) => row.role === "CASTER") : [];
+  const rows = role === "CASTER" ? entryAssignments(entry, data) : [];
+  const casters = rows.filter((row) => row.role === "CASTER");
   // Renfort : un autre caster **confirmé** tient l'entrée. Sinon la place quittée est la première, et une simple
   // proposition de caster restée sur l'entrée ne la tient pas : écartée de ce seul calcul, elle reste en base.
   const spare = casters.some((row) => !row.provisional);
   const proposals = new Set(spare ? [] : casters.filter((row) => row.provisional).map((row) => row.userId));
+  // `streamLost` n'est vrai qu'auprès d'un autre caster confirmé (donc en renfort). Le calcul juge la diffusion avec
+  // les propositions : un prod proposé la tient déjà, aucun caster autonome n'est alors exigé.
+  const restoreStream = streamLost && !entryCoverage(rows, coveringSoloCasterIds(data.members, true)).streamed;
   const input: PlannerInput = {
     ...base,
     // Un renfort se cherche seul : rien d'autre n'est posé sur l'entrée (aucun prod d'essai qui écarterait un candidat).
-    entries: base.entries.map((item) => (item.key === entry.key ? { ...item, open: true, spareOnly: spare, restoreStream: spare && restoreStream } : item)),
+    entries: base.entries.map((item) => (item.key === entry.key ? { ...item, open: true, spareOnly: spare, restoreStream } : item)),
     locked: base.locked.filter((row) => !(row.entryKey === entry.key && row.role === "CASTER" && proposals.has(row.userId))),
     excluded: new Set([...base.excluded, ...[...proposals].map((userId) => exclusionKey(entry.key, userId, "CASTER"))]),
     spareCasters: spare,
@@ -136,7 +142,7 @@ async function findReplacement(
   role: PlanningRole,
   now: number,
   members: LoadedMember[],
-  userId: number,
+  streamLost: boolean,
 ): Promise<{ data: PlanningData; entry: LoadedEntry | undefined; pick: PlannedAssignment | null }> {
   // Relu après le retrait (les affectations ont changé), mais pas les membres : déjà lus sous le même verrou.
   const data = await loadPlanningData(connection, { now, includeHidden: true, members });
@@ -145,7 +151,6 @@ async function findReplacement(
   const anchor = Math.max(now, entry.startAt);
   const history = await loadPlanningHistory(connection, anchor);
   const excluded = await loadExclusions(connection, data, [entry]);
-  const { streamLost } = casterHold(entry, data, role, userId);
   return { data, entry, pick: pickReplacement(data, entry, role, history, excluded, planningWeekStart(anchor), streamLost) };
 }
 
@@ -255,22 +260,25 @@ async function releaseMatchReferee(matchId: number, userId: number, undo: Planni
  * `entryCoverage`) ; vide sinon. `streamLost` : un caster autonome est parti
  * en laissant un caster sans prod — la place est à pourvoir et le staff
  * prévenu. Les autres rôles (dont le groupe d'arbitres d'un tournoi entier)
- * gardent leur règle. Seule la ligne quittée (membre **et** rôle) est ôtée :
- * `data` peut encore la porter (relu avant le retrait).
+ * gardent leur règle. `data` : lu avant le retrait, sous le même verrou ;
+ * `withdrawn` : la ligne quittée telle qu'elle était (seule elle est ôtée,
+ * membre **et** rôle). Une simple proposition quittée ne tenait aucune
+ * diffusion : jamais `streamLost`.
  */
 export function casterHold(
   entry: LoadedEntry,
   data: PlanningData,
-  role: PlanningRole,
-  userId: number,
+  withdrawn: PlanningAssignmentView,
 ): { casterIds: number[]; streamLost: boolean } {
-  if (role !== "CASTER") return { casterIds: [], streamLost: false };
-  const kept = entryAssignments(entry, data).filter((row) => !row.provisional && !(row.userId === userId && row.role === "CASTER"));
+  if (withdrawn.role !== "CASTER") return { casterIds: [], streamLost: false };
+  const kept = entryAssignments(entry, data).filter(
+    (row) => !row.provisional && !(row.userId === withdrawn.userId && row.role === "CASTER"),
+  );
   const casterIds = kept.filter((row) => row.role === "CASTER").map((row) => row.userId);
   if (casterIds.length === 0) return { casterIds: [], streamLost: false };
   const solo = coveringSoloCasterIds(data.members, true);
-  const withdrawn: PlanningAssignmentView = { userId, role: "CASTER", source: "AUTO", reason: "LOAD", provisional: false };
-  const streamLost = entryCoverage([...kept, withdrawn], solo).streamed && !entryCoverage(kept, solo).streamed;
+  const streamLost =
+    !withdrawn.provisional && entryCoverage([...kept, withdrawn], solo).streamed && !entryCoverage(kept, solo).streamed;
   return { casterIds: streamLost ? [] : casterIds, streamLost };
 }
 
@@ -292,15 +300,17 @@ function coAssigned(entry: LoadedEntry, data: PlanningData, userId: number, role
  */
 async function replaceWithdrawn(
   connection: PoolConnection,
-  gesture: { entry: LoadedEntry; data: PlanningData; role: PlanningRole; now: number; confirmed: boolean; userId: number },
+  gesture: { entry: LoadedEntry; data: PlanningData; current: PlanningAssignmentView; now: number; confirmed: boolean; userId: number },
 ): Promise<{ fresh: LoadedEntry; replacementId: number | null; coAssignedIds: number[]; stillHeldBy: number[]; streamLost: boolean }> {
-  const { entry, data, role, now, confirmed, userId } = gesture;
+  const { entry, data, current, now, confirmed, userId } = gesture;
+  const role = current.role;
+  // Lu une fois, avant le retrait et sous le même verrou : la relecture ne change que la ligne quittée.
+  const hold = casterHold(entry, data, current);
   try {
-    const found = await findReplacement(connection, entry.key, role, now, data.members, userId);
+    const found = await findReplacement(connection, entry.key, role, now, data.members, hold.streamLost);
     const fresh = found.entry ?? entry;
     const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, userId));
     const replacementId = placed && found.pick ? found.pick.userId : null;
-    const hold = casterHold(fresh, found.data, role, userId);
     return {
       fresh,
       replacementId,
@@ -310,7 +320,6 @@ async function replaceWithdrawn(
     };
   } catch (error) {
     console.error("[planning] remplaçant introuvable après un désistement.", failureReason(error));
-    const hold = casterHold(entry, data, role, userId);
     return {
       fresh: entry,
       replacementId: null,
@@ -375,7 +384,7 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
     const { fresh, replacementId, coAssignedIds, stillHeldBy, streamLost } = await replaceWithdrawn(connection, {
       entry,
       data,
-      role: input.role,
+      current,
       now,
       confirmed,
       userId: user.id,
