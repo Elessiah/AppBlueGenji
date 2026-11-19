@@ -635,6 +635,73 @@ describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
 
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ stillHeldBy: [5], streamLost: false });
   });
+
+  it("withdrawFromEntry_streamLostProdProposedSpareNeededElsewhere_soloFallbackPicked", async () => {
+    // 7 n'est que proposé : la règle du renfort écarte 6 (attendu sur m:2) ; à défaut, 6, autonome, rend la diffusion.
+    twoCasterData({ candidates: [6], elsewhere: true, soloIds: [4, 6], provisionalProd: 7 });
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6, streamLost: false });
+  });
+
+  it("withdrawFromEntry_streamLostProdProposedNoCandidate_unfilledStreamLost", async () => {
+    // La diffusion se juge sur les rôles confirmés : un prod seulement proposé ne la tient pas.
+    twoCasterData({ soloIds: [4], provisionalProd: 7 });
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, stillHeldBy: [], streamLost: true });
+  });
+});
+
+describe("withdrawFromEntry — inscriptions de cast entre les deux lectures", () => {
+  const withdrawn = loadedAssignment({ userId: 4, role: "CASTER", confirmed: true });
+
+  it("withdrawFromEntry_coCasterCastSignupGoneBeforeReread_unfilled", async () => {
+    const members = [loadedMember({ userId: 4, roles: ["CASTER"] }), loadedMember({ userId: 5, roles: ["CASTER"] })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(
+        planningData({ entries: [loadedEntry()], assignments: [withdrawn], matchCasters: new Map([["m:1", [5]]]), members }),
+      )
+      .mockResolvedValueOnce(
+        planningData({ entries: [loadedEntry()], members, removals: [{ entryKey: "m:1", userId: 4, role: "CASTER" }] }),
+      );
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ stillHeldBy: [], streamLost: false });
+  });
+
+  it("withdrawFromEntry_soloSignupAddedBeforeReread_streamKept", async () => {
+    const second = loadedAssignment({ userId: 5, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true });
+    const members = [
+      loadedMember({ userId: 4, roles: ["CASTER"], soloCaster: true }),
+      loadedMember({ userId: 5, roles: ["CASTER"] }),
+      loadedMember({ userId: 8, roles: ["CASTER"], soloCaster: true }),
+    ];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(planningData({ entries: [loadedEntry()], assignments: [withdrawn, second], members }))
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry()],
+          assignments: [second],
+          matchCasters: new Map([["m:1", [8]]]),
+          members,
+          removals: [{ entryKey: "m:1", userId: 4, role: "CASTER" }],
+        }),
+      );
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ stillHeldBy: [5, 8], streamLost: false });
+  });
 });
 
 describe("withdrawFromEntry — autre rôle du désisté", () => {
@@ -675,6 +742,26 @@ describe("casterHold", () => {
     const hold = casterHold(data.entries[0], data, { userId: 4, role: "CASTER", source: "AUTO", reason: "LOAD", provisional: true });
 
     expect(hold).toEqual({ casterIds: [5], streamLost: false });
+  });
+
+  it("casterHold_provisionalProdKept_streamLostTrue", () => {
+    const data = planningData({
+      entries: [loadedEntry()],
+      assignments: [
+        loadedAssignment({ userId: 4, role: "CASTER", confirmed: true }),
+        loadedAssignment({ userId: 5, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true }),
+        loadedAssignment({ userId: 7, role: "PROD", confirmed: false }),
+      ],
+      members: [
+        loadedMember({ userId: 4, roles: ["CASTER"], soloCaster: true }),
+        loadedMember({ userId: 5, roles: ["CASTER"] }),
+        loadedMember({ userId: 7, roles: ["PROD"] }),
+      ],
+    });
+
+    const hold = casterHold(data.entries[0], data, { userId: 4, role: "CASTER", source: "AUTO", reason: "LOAD", provisional: false });
+
+    expect(hold).toEqual({ casterIds: [], streamLost: true });
   });
 });
 

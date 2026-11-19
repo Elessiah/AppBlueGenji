@@ -522,6 +522,7 @@ function neededElsewhere(state: PlannerState, entry: PlannerEntry, userId: numbe
     if (state.held(key, "CASTER").length === 0) missing.push("CASTER");
     // Un prod n'y manque qu'auprès d'un caster qui l'attend (entrée pas encore diffusée) : sans caster, ou avec un
     // caster autonome, il n'y servirait à rien.
+    // Sans prod tenu, « pas diffusée » (`planningCoverage`) revient à « aucun caster autonome » : même règle.
     const casters = state.held(key, "CASTER");
     if (state.held(key, "PROD").length === 0 && casters.length > 0 && !casters.some((id) => state.input.soloCasterIds.has(id))) {
       missing.push("PROD");

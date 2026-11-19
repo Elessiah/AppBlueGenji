@@ -1557,10 +1557,11 @@ function RgpdFr({
             attribution jusqu&apos;au début du créneau, avec un motif facultatif lu par le seul staff des
             tournois ; le site garde le désistement (rôle, date, motif, s&apos;il est tardif — moins de 24 h
             avant) avec l&apos;historique, et remplace automatiquement la personne (un créneau tient deux casters au
-            plus ; le second caster qui se désiste n&apos;est remplacé que par un caster attendu nulle part ailleurs,
-            et la place n&apos;est pas montrée « à pourvoir » tant que l&apos;autre caster y reste confirmé ; seule
-            exception, un caster autonome dont le départ fait perdre la diffusion n&apos;est remplacé que par un caster
-            autonome, même attendu ailleurs, à défaut le staff des tournois en est prévenu). Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
+            plus ; le second caster qui se désiste n&apos;est remplacé que par un caster attendu nulle part ailleurs ;
+            un caster autonome dont le départ fait perdre la diffusion est remplacé par un caster autonome, même
+            attendu ailleurs — si un prod est déjà proposé auprès de l&apos;autre caster, un caster attendu nulle part
+            ailleurs, même non autonome, est cherché d&apos;abord —, à défaut le staff des tournois en est prévenu ;
+            la place n&apos;est jamais montrée « à pourvoir » tant que l&apos;autre caster y reste confirmé). Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
             créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
             le rôle caster ; la suppression du compte emporte tout ce qui le concerne (les gestes faits comme
             staff restent, sans le désigner), l&apos;export de vos données le contient, gestes faits comme staff
