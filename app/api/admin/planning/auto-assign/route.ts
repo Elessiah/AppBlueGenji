@@ -5,10 +5,10 @@ import { runAutoAssign } from "@/lib/server/planning/auto-assign";
 import { readWindow } from "@/lib/server/planning/request";
 import { planningFailure } from "@/lib/server/planning/routes";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
-import { can } from "@/lib/shared/permissions";
+import { canComputePlanning } from "@/lib/shared/planning";
 
 /**
- * Lance un lot du calcul automatique (permission `tournaments`) sur une
+ * Lance un lot du calcul automatique (administrateur seul, `canComputePlanning`) sur une
  * fenêtre `{ from, to }` (ISO, 31 jours au plus) : les propositions
  * provisoires de la fenêtre sont recalculées ensemble, sans toucher aux choix
  * du staff ni aux confirmées. Rend son bilan (`AutoAssignReport`).
@@ -16,7 +16,7 @@ import { can } from "@/lib/shared/permissions";
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
+  if (!canComputePlanning(user)) return fail("FORBIDDEN", 403);
   const read = await readJsonObject(req, "INVALID_BODY", SMALL_JSON_BODY_MAX_BYTES);
   if ("refusal" in read) return fail(read.refusal, 400);
   const window = readWindow(read.body);

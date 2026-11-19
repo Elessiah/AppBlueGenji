@@ -5,10 +5,10 @@ import { confirmAssignments } from "@/lib/server/planning/auto-assign";
 import { readConfirmScope } from "@/lib/server/planning/request";
 import { planningFailure } from "@/lib/server/planning/routes";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
-import { can } from "@/lib/shared/permissions";
+import { canComputePlanning } from "@/lib/shared/planning";
 
 /**
- * Confirme des propositions provisoires (permission `tournaments`) : celles
+ * Confirme des propositions provisoires (administrateur seul, `canComputePlanning`) : celles
  * des entrées nommées (`entryKeys`) et/ou de toutes les entrées qui
  * commencent avant `until` (ISO). Les autres restent provisoires ; les lots
  * suivants se calculent autour des confirmées. Rend `ConfirmReport`.
@@ -16,7 +16,7 @@ import { can } from "@/lib/shared/permissions";
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
+  if (!canComputePlanning(user)) return fail("FORBIDDEN", 403);
   const read = await readJsonObject(req, "INVALID_BODY", SMALL_JSON_BODY_MAX_BYTES);
   if ("refusal" in read) return fail(read.refusal, 400);
   const scope = readConfirmScope(read.body);

@@ -6,12 +6,13 @@ import { planningFailure } from "@/lib/server/planning/routes";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
 import { isPositiveId } from "@/lib/server/tournaments/match-launch-routes";
 import { can } from "@/lib/shared/permissions";
+import { canComputePlanning } from "@/lib/shared/planning";
 
 /**
  * Réglage « caster autonome » (il diffuse seul, sans prod). Corps :
  * `{ solo: boolean, userId?: number }`. Sans `userId` (ou le sien) : un
- * caster règle le sien (permission `planning`) ; pour un autre compte, la
- * permission `tournaments` est requise.
+ * caster règle le sien (permission `planning`) ; pour un autre compte,
+ * il faut être administrateur (`canComputePlanning`, panneau de calcul).
  */
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
@@ -26,7 +27,7 @@ export async function PUT(req: Request) {
   if (typeof solo !== "boolean") return fail("INVALID_SOLO", 400);
   if (userId !== undefined && !isPositiveId(userId)) return fail("INVALID_USER_ID", 400);
   const target = userId ?? user.id;
-  if (target !== user.id && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
+  if (target !== user.id && !canComputePlanning(user)) return fail("FORBIDDEN", 403);
 
   try {
     await setSoloCaster(target, solo);

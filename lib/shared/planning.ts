@@ -77,6 +77,15 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
 
 /** Clé stable d'une entrée : `m:<match>` ou `t:<tournoi>`. */
+/**
+ * Calcul, confirmation et réglages du planning : aux administrateurs seuls
+ * (décision explicite, exception à la règle des permissions scopées, voir
+ * `PERMISSION_ROLES.md`) ; l'attribution à la main reste à `tournaments`.
+ */
+export function canComputePlanning(user: { isAdmin?: boolean } | null | undefined): boolean {
+  return user?.isAdmin === true;
+}
+
 export function planningEntryKey(kind: PlanningEntryKind, id: number): string {
   return `${kind === "MATCH" ? "m" : "t"}:${id}`;
 }

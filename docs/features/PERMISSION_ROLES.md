@@ -35,9 +35,14 @@ s'additionnent.
 - `planning` — page `/planning`, `GET /api/planning`, `PUT /api/planning/availability`
   (ses propres disponibilités) et `PUT /api/planning/solo-caster` pour soi
   (`CAST_PLANNING.md`). Rôles `ARBITRE`, `CASTER`, `PROD` (et `ADMIN`). Les
-  gestes du staff du planning (attribution manuelle, calcul, confirmation,
-  durées, caster autonome d'un autre) demandent `tournaments` en plus, sous
-  `/api/admin/planning/*`. La vue joueur n'y donne aucun accès (404).
+  gestes du staff du planning sous `/api/admin/planning/*` : l'attribution
+  manuelle demande `tournaments` en plus ; le **calcul, la confirmation, les
+  durées et le caster autonome d'un autre** (panneau « Calcul et confirmation »)
+  sont réservés aux **administrateurs** (`canComputePlanning`, décision
+  explicite : **exception** à la règle « jamais `user.isAdmin` pour un domaine
+  scopé »). Un non-administrateur reçoit `403 FORBIDDEN` et la vue
+  (`canCompute: false`) ne porte ni panneau ni durées. La vue joueur n'y donne
+  aucun accès (404).
 - `showcase` — `/api/landing/sponsors/*`, `/api/association/*`, `/api/benevoles/*`.
 - `recruitment` — `/api/recruitment/*`.
 - `roles` — `POST /api/admin/users/[id]/roles` (réservé `ADMIN`).

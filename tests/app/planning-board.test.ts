@@ -363,6 +363,7 @@ function viewOf(overrides: Partial<PlanningView> = {}): PlanningView {
     me: 1,
     myRoles: ["CASTER"],
     canManage: false,
+    canCompute: false,
     entries: [entryView({ key: "m:1" }), entryView({ key: "m:2", matchId: 2 })],
     members: [member()],
     durations: DEFAULT_PLANNING_DURATIONS,

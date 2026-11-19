@@ -14,9 +14,22 @@ Remplace le tableur partagé tenu jusqu'ici.
 | Se dire caster autonome | `planning` + rôle `CASTER` | `PUT /api/planning/solo-caster` |
 | Régler le caster autonome d'un autre | `tournaments` | `PUT /api/planning/solo-caster` (`userId`) |
 | Attribuer / retirer à la main | `tournaments` | `PUT /api/admin/planning/assignment` |
-| Calculer un lot | `tournaments` | `POST /api/admin/planning/auto-assign` |
-| Confirmer des propositions | `tournaments` | `POST /api/admin/planning/confirm` |
-| Durées estimées | `tournaments` | `PUT /api/admin/planning/settings` |
+| Calculer un lot | **administrateur** (`canComputePlanning`) | `POST /api/admin/planning/auto-assign` |
+| Confirmer des propositions | **administrateur** | `POST /api/admin/planning/confirm` |
+| Durées estimées | **administrateur** | `PUT /api/admin/planning/settings` |
+
+**Calcul réservé aux administrateurs** (décision explicite, exception à la
+règle des permissions scopées) : `canComputePlanning(user)` (`user.isAdmin`).
+Le panneau « Calcul et confirmation » (confirmation à l'avance, caster
+autonome d'un autre, durées), le bouton « Calculer la semaine » et le bouton
+de confirmation d'un créneau n'existent que pour eux : la vue (`GET
+/api/planning`, seule porte, le planning n'a pas de flux) porte `canCompute`
+et `durations` seulement pour un administrateur ; sinon rien n'est rendu (ni
+coquille vide ni indice). Les routes de calcul, de confirmation, de réglages
+et le caster autonome d'un autre rendent `403 FORBIDDEN` à tout autre compte,
+`tournaments` compris. L'attribution à la main reste à `tournaments`
+(`canManage`), la confirmation d'office (`auto-confirm`) n'est pas un geste
+d'utilisateur et ne change pas.
 
 `planning` : rôles `ARBITRE`, `CASTER`, `PROD` (nouveau rôle de plateforme,
 production d'un direct) et `ADMIN` (`PERMISSION_ROLES.md`). Rôles du planning
@@ -81,7 +94,7 @@ la requête : une requête mal formée n'use pas ce quota). Le refus `429`
   défaut**, la semaine la plus récente en tête (`newestFirst`). Le choix du lecteur est gardé
   sur son appareil, par compte (`planning:past-open:<empreinte du compte>`, jamais le numéro en clair, `localStorage`,
   `try/catch` : sans stockage, l'état par défaut vaut).
-- **Calcul et confirmation** (staff) : même bouton repliable, **replié par
+- **Calcul et confirmation** (administrateurs seuls) : même bouton repliable, **replié par
   défaut** ; le contenu reste monté (les durées en cours de saisie ne se
   perdent pas au repli).
 - **Nom du tour** : une carte de match porte le nom de la fiche du tournoi

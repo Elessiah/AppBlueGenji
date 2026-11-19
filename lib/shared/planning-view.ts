@@ -129,10 +129,12 @@ export type PlanningView = {
   myRoles: PlanningRole[];
   /** Attribution manuelle et calcul automatique (permission `tournaments`). */
   canManage: boolean;
+  /** Calcul, confirmation et réglages (administrateur seul) : sans lui, la page ne montre rien de ce panneau. */
+  canCompute: boolean;
   entries: PlanningEntryView[];
   members: PlanningMember[];
-  /** Durées estimées qui servent aux chevauchements. */
-  durations: PlanningDurationSettings;
+  /** Durées estimées qui servent aux chevauchements (rendues avec `canCompute` seulement). */
+  durations?: PlanningDurationSettings;
 };
 
 /** Issue d'un désistement (`POST /api/planning/withdrawal`). */

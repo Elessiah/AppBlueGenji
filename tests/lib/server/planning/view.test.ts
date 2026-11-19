@@ -31,6 +31,7 @@ import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 const connection = connectionMock();
 const staff = authUser({ id: 9, roles: ["ARBITRE"] });
 const caster = authUser({ id: 4, roles: ["CASTER"] });
+const admin = authUser({ id: 1, isAdmin: true });
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -137,6 +138,28 @@ describe("loadPlanningView — comptes", () => {
     expect(view.members[0]).not.toHaveProperty("suspended");
   });
 
+  it("loadPlanningView_admin_canComputeWithDurations", async () => {
+    const view = await loadPlanningView(admin, MONDAY);
+
+    expect(view.canCompute).toBe(true);
+    expect(view.durations).toBeDefined();
+  });
+
+  it("loadPlanningView_tournamentsStaff_canManageButNotComputeNoDurations", async () => {
+    const view = await loadPlanningView(staff, MONDAY);
+
+    expect(view.canManage).toBe(true);
+    expect(view.canCompute).toBe(false);
+    expect(view).not.toHaveProperty("durations");
+  });
+
+  it("loadPlanningView_caster_cannotComputeNoDurations", async () => {
+    const view = await loadPlanningView(caster, MONDAY);
+
+    expect(view.canCompute).toBe(false);
+    expect(view).not.toHaveProperty("durations");
+  });
+
   it("loadPlanningView_staff_membersCarrySeesHidden", async () => {
     jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], seesHidden: false })]);
 
@@ -209,7 +232,7 @@ describe("loadPlanningView — disponibilités", () => {
     const data = planningData({ entries: [loadedEntry()] });
     jest.mocked(loadPlanningData).mockResolvedValue(data);
 
-    const view = await loadPlanningView(staff, MONDAY);
+    const view = await loadPlanningView(admin, MONDAY);
 
     expect(view.durations).toBe(data.durations);
   });

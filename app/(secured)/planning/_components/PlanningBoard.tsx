@@ -24,7 +24,7 @@ import {
   type PlanningRole,
 } from "@/lib/shared/planning";
 import { planningRoundText, planningRoundTextOf, type PlanningRoundMessages } from "@/lib/shared/planning-round";
-import { PLANNING_DURATION_BOUNDS, type PlanningDurationSettings } from "@/lib/shared/planning-durations";
+import { DEFAULT_PLANNING_DURATIONS, PLANNING_DURATION_BOUNDS, type PlanningDurationSettings } from "@/lib/shared/planning-durations";
 import type {
   AutoAssignReport,
   ConfirmReport,
@@ -99,8 +99,8 @@ function json(method: string, body: unknown): RequestInit {
 /**
  * L'écran « Planning » (permission `planning`) : chaque créneau à venir, sa
  * couverture et qui le tient ; sa disponibilité par rôle tenu ; pour le staff
- * des tournois, la désignation à la main, le calcul par semaine, la
- * confirmation et les durées estimées.
+ * des tournois, la désignation à la main ; pour les administrateurs seuls
+ * (`canCompute`), le calcul par semaine, la confirmation et les durées estimées.
  */
 export function PlanningBoard({
   locale,
@@ -207,9 +207,10 @@ export function PlanningBoard({
   const me = view?.me;
   const myRoles = view?.myRoles;
   const canManage = view?.canManage;
+  const canCompute = view?.canCompute;
   const context = useMemo(
-    () => (me === undefined || !myRoles || canManage === undefined || !members ? null : { me, myRoles, canManage, members }),
-    [me, myRoles, canManage, members],
+    () => (me === undefined || !myRoles || canManage === undefined || canCompute === undefined || !members ? null : { me, myRoles, canManage, canCompute, members }),
+    [me, myRoles, canManage, canCompute, members],
   );
   const shown = useMemo(() => filterEntries(view?.entries ?? [], filters, view?.me ?? 0), [view, filters]);
   // Un match passe dans « Matchs passés » une fois joué (relecture de la page), jamais sur la seule horloge.
@@ -235,7 +236,7 @@ export function PlanningBoard({
   const isCaster = view.myRoles.includes("CASTER");
   const meSolo = view.members.find((member) => member.userId === view.me)?.soloCaster ?? false;
 
-  const weekProps: Omit<WeekListProps, "weeks" | "zone"> = { view: context, canManage: view.canManage, text, format, names, roundText, pending, act, onRunWeek: setRunWeek, onConfirm: confirmEntry, onAvailability: saveAvailability, onWithdraw: askWithdraw };
+  const weekProps: Omit<WeekListProps, "weeks" | "zone"> = { view: context, canCompute: view.canCompute, text, format, names, roundText, pending, act, onRunWeek: setRunWeek, onConfirm: confirmEntry, onAvailability: saveAvailability, onWithdraw: askWithdraw };
   const active = filtersActive({ ...filters, tournamentId });
   const patch = (change: Partial<PlanningFilters>) => setFilters({ ...filters, tournamentId, ...change });
   return (
@@ -324,7 +325,7 @@ export function PlanningBoard({
         <output className={styles.count}>{t("filters.count", { shown: shown.length, total: view.entries.length })}</output>
       </section>
 
-      {view.canManage && (
+      {view.canCompute && (
         <StaffPanel text={text} view={view} pending={pending} act={act} onConfirmLead={(hours) => setConfirming({ kind: "lead", hours })} />
       )}
 
@@ -490,7 +491,7 @@ type ConfirmTarget = { kind: "entry"; key: string; slot: string } | { kind: "lea
 type Act = <T>(gesture: string, task: () => Promise<T>, success: (result: T) => string, patch?: () => void) => Promise<boolean>;
 
 /** Ce que les cartes lisent du lecteur (et non toute la page : une relecture sans effet sur elles ne les redessine pas). */
-type Reader = Pick<PlanningView, "me" | "myRoles" | "canManage" | "members">;
+type Reader = Pick<PlanningView, "me" | "myRoles" | "canManage" | "canCompute" | "members">;
 
 /**
  * Le geste en cours, vu d'une carte : le sien, ou `"other"` pour celui d'une
@@ -520,7 +521,7 @@ type WeekListProps = Readonly<{
   /** « Matchs passés » : semaines et jours descendent d'un niveau de titre. */
   zone: "past" | "upcoming";
   view: Reader | null;
-  canManage: boolean;
+  canCompute: boolean;
   text: Text;
   format: Formatters;
   names: ReadonlyMap<number, string>;
@@ -538,7 +539,7 @@ const WeekList = memo(function WeekList({
   weeks,
   zone,
   view,
-  canManage,
+  canCompute,
   text,
   format,
   names,
@@ -560,7 +561,7 @@ const WeekList = memo(function WeekList({
         <WeekTitle id={`planning-${zone}-week-${week.weekStart}`} className={styles.weekTitle}>
           {t("week", { date: format.day.format(week.weekStart) })}
         </WeekTitle>
-        {canManage && week.entries.some((entry) => entry.open) && (
+        {canCompute && week.entries.some((entry) => entry.open) && (
           <BusyButton
             busy={pending === `run:${week.weekStart}`}
             blocked={pending !== null}
@@ -712,7 +713,7 @@ const EntryCard = memo(function EntryCard({
         <MyAvailability entry={entry} view={view} text={text} pending={pending} act={act} onSaved={onAvailability} />
       )}
 
-      {view.canManage && entry.open && hasProvisional(entry) && (
+      {view.canCompute && entry.open && hasProvisional(entry) && (
         <BusyButton
           busy={pending === `confirm:${entry.key}`}
           blocked={pending !== null}
@@ -952,7 +953,7 @@ function StaffPanel({
 }: Readonly<{ text: Text; view: PlanningView; pending: string | null; act: Act; onConfirmLead: (hours: number) => void }>) {
   const { t } = text;
   const [hours, setHours] = useState(48);
-  const [durations, setDurations] = useState<PlanningDurationSettings>(view.durations);
+  const [durations, setDurations] = useState<PlanningDurationSettings>(view.durations ?? DEFAULT_PLANNING_DURATIONS);
   const casters = view.members.filter((member) => member.roles.includes("CASTER"));
   const b = PLANNING_DURATION_BOUNDS;
   const field = (
