@@ -320,6 +320,13 @@
   padding: 4px 8px;
 }
 
+.soloStaff {
+  --disclosure-body-gap: 10px;
+  padding: 10px 14px;
+  border: 1px dashed var(--line-soft);
+  border-radius: var(--r-cy-md, 10px);
+}
+
 .fields {
   display: flex;
   flex-wrap: wrap;

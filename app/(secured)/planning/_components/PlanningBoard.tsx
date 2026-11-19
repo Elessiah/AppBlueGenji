@@ -103,7 +103,8 @@ function json(method: string, body: unknown): RequestInit {
 /**
  * L'écran « Planning » (permission `planning`) : chaque créneau à venir, sa
  * couverture et qui le tient ; sa disponibilité par rôle tenu ; pour le staff
- * des tournois, la désignation à la main ; pour les administrateurs seuls
+ * des tournois, la désignation à la main et le « caster autonome » des autres
+ * (section « Casters autonomes ») ; pour les administrateurs seuls
  * (`canCompute`), le calcul par semaine, la confirmation et les durées estimées.
  */
 export function PlanningBoard({
@@ -859,11 +860,12 @@ const RoleRow = memo(function RoleRow({
 });
 
 /**
- * « Casters autonomes » : le staff des tournois (`canManage`, pas seulement
- * l'administrateur) règle le « caster autonome » d'un autre compte. Hors du
- * panneau de calcul, réservé aux administrateurs.
+ * « Casters autonomes » : le staff des tournois (`canManage`, permission
+ * `tournaments`, administrateur ou non) règle le « caster autonome » d'un autre
+ * compte. Section à part, hors du panneau « Calcul et confirmation » qui, lui,
+ * est réservé aux administrateurs (`canCompute`).
  */
-function SoloCastersStaff({
+export function SoloCastersStaff({
   text,
   view,
   pending,
@@ -873,7 +875,7 @@ function SoloCastersStaff({
   const casters = view.members.filter((member) => member.roles.includes("CASTER"));
   if (casters.length === 0) return null;
   return (
-    <Disclosure title={t("solo.staffTitle")} storageKey={planningOpenKey("solo", view.me)} keepMounted className={styles.staff}>
+    <Disclosure title={t("solo.staffTitle")} storageKey={planningOpenKey("solo", view.me)} keepMounted className={styles.soloStaff}>
       <fieldset className={styles.solo}>
         <legend className="sr-only">{t("solo.staffTitle")}</legend>
         {casters.map((member) => (
@@ -999,7 +1001,7 @@ function StaffPanel({
   pending,
   act,
   onConfirmLead,
-}: Readonly<{ text: Text; view: Omit<PlanningView, "durations">; durations: PlanningDurationSettings; pending: string | null; act: Act; onConfirmLead: (hours: number) => void }>) {
+}: Readonly<{ text: Text; view: Pick<PlanningView, "me">; durations: PlanningDurationSettings; pending: string | null; act: Act; onConfirmLead: (hours: number) => void }>) {
   const { t } = text;
   const [hours, setHours] = useState(48);
   const [durations, setDurations] = useState<PlanningDurationSettings>(savedDurations);

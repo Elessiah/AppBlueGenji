@@ -1,9 +1,8 @@
 /**
- * Revue juridique de PLANNING-ADMIN-COMPUTE : le calcul, la confirmation, les
- * réglages du planning et le « caster autonome » réglé pour un autre sont
- * réservés aux administrateurs (`canComputePlanning`). /rgpd (FR et EN) et la
- * fiche T20 du registre le disent, sans plus nommer le staff des tournois
- * comme celui qui confirme ou règle.
+ * Revue juridique de PLANNING-ADMIN-COMPUTE : le calcul, la confirmation et les
+ * réglages du planning sont réservés aux administrateurs (`canComputePlanning`) ;
+ * le « caster autonome » réglé pour un autre revient au staff des tournois
+ * (SOLO-CASTER-STAFF). /rgpd (FR et EN) et la fiche T20 du registre le disent.
  */
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
@@ -33,8 +32,7 @@ describe("/rgpd — planning (FR)", () => {
     expect(fr).not.toContain("confirmation par le staff des tournois");
     expect(fr).not.toContain("délai réglé par le staff des tournois");
     expect(fr).not.toContain("ce qu&apos;un administrateur peut régler pour lui");
-    expect(fr).toContain("ce que le staff");
-    expect(fr).toContain("des tournois peut régler pour lui");
+    expect(fr).toContain("s&apos;il diffuse seul (« caster autonome »), ce que le staff des tournois peut régler pour lui.");
     expect(fr).toContain("délai réglé par un administrateur");
     expect(fr).toContain("comme d&apos;une confirmation par un administrateur");
   });
@@ -53,7 +51,7 @@ describe("/rgpd — planning (EN)", () => {
     expect(en).not.toContain("tournament staff confirms them");
     expect(en).not.toContain("a lead time set by the tournament staff");
     expect(en).not.toContain("which an administrator can set for them");
-    expect(en).toContain("which the tournament staff can set for");
+    expect(en).toContain("whether they stream alone (“solo caster”), which the tournament staff can set for them.");
     expect(en).toContain("a lead time set by an administrator");
     expect(en).toContain("as for a confirmation by an administrator");
   });

@@ -215,6 +215,13 @@ describe("setSoloCaster", () => {
     expect(writeSoloCaster).not.toHaveBeenCalled();
   });
 
+  it("setSoloCaster_suspendedCaster_throwsRoleNotHeldWithoutWriting", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })]);
+
+    await expect(setSoloCaster(4, true)).rejects.toThrow("PLANNING_ROLE_NOT_HELD");
+    expect(writeSoloCaster).not.toHaveBeenCalled();
+  });
+
   it("setSoloCaster_caster_readsOnlyTargetAndWrites", async () => {
     jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
 

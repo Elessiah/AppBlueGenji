@@ -850,6 +850,14 @@ describe("PlanningBoard : branchement des gardes de calcul", () => {
     expect(panel).not.toContain("solo.staffTitle");
   });
 
+  it("planningBoard_soloCasters_renderedBeforeAndOutsidePanelDurations", () => {
+    const soloLine = source.indexOf("      {view.canManage && <SoloCastersStaff text={text} view={view} pending={pending} act={act} />}\n");
+    const panelBlock = source.indexOf("      {panelDurations && (");
+
+    expect(soloLine).toBeGreaterThan(-1);
+    expect(soloLine).toBeLessThan(panelBlock);
+  });
+
   it("planningBoard_manualAssignment_staysOnCanManage", () => {
     expect(source).toContain("roleChoices(entry, role, view.members, view.canManage)");
   });

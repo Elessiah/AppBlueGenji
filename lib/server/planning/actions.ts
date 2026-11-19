@@ -97,6 +97,9 @@ export async function setAvailability(
 /**
  * Le réglage « caster autonome » d'un compte qui tient le rôle `CASTER`
  * (relu en base). Qui peut le poser — lui-même ou le staff — est jugé par la route.
+ * Un compte suspendu n'a plus de droit effectif : son réglage ne se change pas
+ * (`PLANNING_ROLE_NOT_HELD`, le refus d'une désignation à la main), sans que le
+ * refus nomme la suspension.
  */
 export async function setSoloCaster(targetUserId: number, solo: boolean): Promise<void> {
   await withConnection(async (connection) => {
@@ -105,6 +108,7 @@ export async function setSoloCaster(targetUserId: number, solo: boolean): Promis
     if (!member?.roles.includes("CASTER")) {
       throw new Error("NOT_CASTER");
     }
+    if (member.suspended) throw new Error("PLANNING_ROLE_NOT_HELD");
     await writeSoloCaster(connection, targetUserId, solo);
   });
 }
