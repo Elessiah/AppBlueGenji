@@ -64,11 +64,36 @@ describe("ImpersonateRoleDialog — français", () => {
     expect(html).toContain("Incarner un rôle");
   });
 
-  it("render_french_offersThePlayerChoiceFirstWithAutofocus", () => {
+  it("render_french_offersThePlayerChoiceFirst", () => {
     const html = render("fr");
 
     expect(html).toContain("Joueur (aucun rôle)");
-    expect(html.indexOf("data-autofocus")).toBeLessThan(html.indexOf('type="checkbox"'));
+    expect(html.indexOf("Joueur (aucun rôle)")).toBeLessThan(html.indexOf('type="checkbox"'));
+  });
+
+  it("render_french_noControlGrabsTheOpeningFocus", () => {
+    // Entrée à l'ouverture ne doit rien basculer : le focus va à la modale.
+    const source = readSource("components/impersonate-role-dialog.tsx");
+
+    expect(render("fr")).not.toContain("data-autofocus");
+    expect(source).toContain('initialFocus: "container"');
+  });
+
+  it("render_french_confirmButtonCarriesTheEmptySelectionRule", () => {
+    const html = render("fr");
+    const confirm = /<button type="submit"[^>]*>/.exec(html)?.[0] ?? "";
+    const describedBy = /aria-describedby="([^"]+)"/.exec(confirm)?.[1] ?? "";
+
+    expect(describedBy).toMatch(/-lead$/);
+    expect(html).toContain(`id="${describedBy}"`);
+  });
+
+  it("css_narrowLabel_isHiddenFromAssistiveTechnology", () => {
+    expect(readSource("components/impersonate-role-dialog.module.css")).toContain('content: attr(data-label) " · " / "";');
+  });
+
+  it("render_french_checkboxRowsKeepTheHintApart", () => {
+    expect(count(render("fr"), 'class="row rowSeparated')).toBeGreaterThanOrEqual(6);
   });
 
   it("render_french_listsEachImpersonableRoleWithACheckboxAndAHint", () => {

@@ -39,7 +39,7 @@ export function PlayerViewBanner({ until, roles = [] }: Readonly<{ until: string
     <section className={s.banner} aria-label={t("playerView.label")}>
       <div className={s.state}>
         <Eye className={s.icon} size={16} aria-hidden="true" />
-        <span>{state}</span>
+        <span className={s.stateText}>{state}</span>
         <InfoHint id="player-view-hint" subject={t("playerView.label")}>
           {t("playerView.hint", { hours: PLAYER_VIEW_MAX_HOURS })}
         </InfoHint>

@@ -240,3 +240,10 @@ describe("schéma", () => {
     );
   });
 });
+
+describe("bannière — plusieurs rôles", () => {
+  it("source_stateText_breaksLongRoleListsInsteadOfOverflowing", () => {
+    expect(readSource("components/player-view.tsx")).toContain("className={s.stateText}");
+    expect(readSource("components/player-view.module.css")).toMatch(/\.stateText \{[^}]*overflow-wrap: anywhere;/);
+  });
+});

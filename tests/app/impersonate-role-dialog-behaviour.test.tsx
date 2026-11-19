@@ -75,7 +75,7 @@ const find = (tree: Element, match: (props: Props) => boolean) => {
   if (!found) throw new Error("élément introuvable");
   return found.props;
 };
-const playerButton = (tree: Element) => find(tree, (props) => "data-autofocus" in props);
+const playerButton = (tree: Element) => find(tree, (props) => props.children === "impersonate.player");
 const form = (tree: Element) => find(tree, (props) => props.role === "dialog");
 const cancelButton = (tree: Element) => find(tree, (props) => props.children === "impersonate.cancel");
 const rows = (tree: Element) => elements(tree).filter((element) => typeof element.props.role === "string" && "onToggle" in element.props);

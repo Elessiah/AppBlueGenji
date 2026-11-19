@@ -38,7 +38,7 @@ const ImpersonateRoleRow = memo(function ImpersonateRoleRow({ role, hintId, chec
   return (
     <div role="row" className={s.row}>
       <span role="rowheader" className={s.roleCell}>
-        <InfoHintRow>
+        <InfoHintRow separated>
           <Coche
             label={label}
             checked={checked}
@@ -80,7 +80,7 @@ export function ImpersonateRoleDialog({ onClose, onConfirm }: Readonly<Impersona
   const [busy, setBusy] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
+  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy, initialFocus: "container" });
   const backdrop = useBackdropDismiss(onClose, busy);
   // Garde synchrone : un double clic n'envoie qu'une bascule.
   const inFlight = useRef(false);
@@ -139,7 +139,6 @@ export function ImpersonateRoleDialog({ onClose, onConfirm }: Readonly<Impersona
               onClick={() => void send([])}
               aria-disabled={busy || undefined}
               aria-describedby={`${baseId}-player`}
-              data-autofocus
             >
               {t("impersonate.player")}
             </button>
@@ -180,7 +179,7 @@ export function ImpersonateRoleDialog({ onClose, onConfirm }: Readonly<Impersona
           <button type="button" className="btn ghost" onClick={() => !busy && onClose()} aria-disabled={busy || undefined}>
             {t("impersonate.cancel")}
           </button>
-          <button type="submit" className="btn" aria-disabled={busy || undefined} aria-busy={busy || undefined}>
+          <button type="submit" className="btn" aria-describedby={`${baseId}-lead`} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
             {busy ? t("impersonate.pending") : t("impersonate.confirm")}
           </button>
           {/* Le libellé d'un bouton focalisé qui change n'est pas annoncé. */}

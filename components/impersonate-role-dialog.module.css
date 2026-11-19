@@ -126,7 +126,7 @@
   }
 
   .opensCell[data-label]::before {
-    content: attr(data-label) " · ";
+    content: attr(data-label) " · " / "";
     color: var(--blue-300);
     font-weight: 600;
   }

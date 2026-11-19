@@ -25,6 +25,12 @@
   text-transform: uppercase;
 }
 
+/* Plusieurs rôles : un nom trop long coupe plutôt que de déborder la bannière. */
+.stateText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .icon {
   flex-shrink: 0;
 }
