@@ -206,7 +206,8 @@
   margin: 0;
   align-self: flex-start;
   padding: 3px 9px;
-  border-radius: 999px;
+  /* Rayon fini : une étiquette longue passe à la ligne (375 px) sans devenir un œuf. */
+  border-radius: 12px;
   background: rgba(90, 200, 255, 0.16);
   border: 1px solid rgba(90, 200, 255, 0.45);
   color: var(--blue-100, #d9f3ff);

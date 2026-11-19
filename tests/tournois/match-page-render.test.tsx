@@ -111,6 +111,7 @@ function launch(overrides: Partial<MatchLaunchInfo> = {}): MatchLaunchInfo {
     team2: side(BRAVO, "Bravo"),
     casters: [],
     referee: null,
+    refereeAssigned: overrides.referee != null,
     selfManaged: false,
     viewer: { role: "TEAM1", canDeclareReady: true, isReferee: false, isCaster: false, earlyContacts: true, ready: false },
     ...overrides,
@@ -393,6 +394,56 @@ describe("page d'un match — cartes du round et bans", () => {
     expect(lobby).toContain("Bans de la carte 1 Alpha d'abord, puis Bravo");
     expect(lobby).toContain("L'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité");
     expect(lobby).not.toContain("Cartes du tour");
+  });
+
+  it("keyFacts_refereedMatch_hostPlaysLeftAndRefereeCreatesGame", () => {
+    const facts = visible(render(match({ refereeAssigned: true }), "public"));
+    expect(facts).toContain("Hôte B Bravo Côté gauche en jeu");
+    expect(facts).toContain("Arbitre Arbitre désigné Un arbitre suit ce match. Crée la partie");
+    expect(facts).not.toContain("Bravo Crée la partie");
+  });
+
+  it("keyFacts_selfManaged_hostKeepsCreatesGame", () => {
+    const facts = visible(render(match({ selfManaged: true }), "public"));
+    expect(facts).toContain("Hôte B Bravo Crée la partie");
+    expect(facts).not.toContain("Côté gauche en jeu");
+    expect(facts).not.toContain("Arbitre désigné Crée la partie");
+  });
+
+  it("keyFacts_refereeRemovedUndecided_hostCreatesGameAgain", () => {
+    // Arbitre retiré (opposition retenue comprise) : sans arbitre, l'hôte reprend la main.
+    const facts = visible(render(match({ refereeAssigned: false, selfManaged: false }), "public"));
+
+    expect(facts).toContain("Hôte B Bravo Crée la partie");
+    expect(facts).not.toContain("Côté gauche en jeu");
+  });
+
+  it("keyFacts_refereedOpponentsPending_hostPendingWithoutDetail", () => {
+    const html = render(match({ refereeAssigned: true, team2Id: null, team2Name: null, hostTeamId: null, firstBanTeamId: null }), "public");
+
+    const facts = visible(html.slice(html.indexOf('data-fact="host"')));
+    expect(facts).toContain("Hôte Adversaires à venir");
+    expect(facts).not.toContain("Côté gauche en jeu");
+  });
+
+  it("keyFacts_completedRefereed_hostFactWithoutDetail", () => {
+    // Match arbitré déjà joué (peut-être avant la règle) : personne n'affirme qui a créé la partie.
+    const facts = visible(render(match({ status: "COMPLETED", refereeAssigned: true }), "public"));
+    expect(facts).toContain("Hôte B Bravo");
+    expect(facts).not.toContain("Côté gauche en jeu");
+    expect(facts).not.toContain("Crée la partie");
+  });
+
+  it("OfficiatingSection_refereedMatch_refereeCardWithoutCreatesBadge", () => {
+    // Le fait « Arbitre » dit déjà « Crée la partie » : la fiche de la page ne le répète pas.
+    const source = readSource("app/(secured)/tournois/[id]/_components/MatchPage.tsx");
+    expect(source).toContain("createsBadge={false}");
+  });
+
+  it("keyFacts_refereedMatchEnglish_playsOnLeftAndCreatesGame", () => {
+    const facts = visible(render(match({ refereeAssigned: true }), "public", false, "en"));
+    expect(facts).toContain("Left side in the game");
+    expect(facts).toContain("Creates the game");
   });
 
   it("MatchMaps_playedRefereedMatch_hidesBanOrderRow", () => {
@@ -795,6 +846,25 @@ describe("page d'un match — infos de connexion", () => {
     const html = render(match(), "player");
 
     expect(visible(html)).toContain("Infos de connexion");
+  });
+
+  it("render_connectionSectionRefereedLaunch_hostBadgeLeftSideInGame", () => {
+    // La fiche lit sa propre lecture : elle ne contredit pas les cartes voisines si l'instantané la devance.
+    mockLaunch = launch({ referee: null, refereeAssigned: true });
+
+    const html = visible(render(match({ refereeAssigned: false }), "player"));
+
+    expect(html).toContain("Équipe hôte — côté gauche en jeu");
+    expect(html).not.toContain("Héberge la partie — crée le salon");
+  });
+
+  it("render_connectionSectionUnrefereedLaunchRefereedSnapshot_hostBadgeCreatesLobby", () => {
+    mockLaunch = launch({ referee: null, refereeAssigned: false });
+
+    const html = visible(render(match({ refereeAssigned: true }), "player"));
+
+    expect(html).toContain("Héberge la partie — crée le salon");
+    expect(html).not.toContain("côté gauche en jeu");
   });
 
   it("render_connectionSection_hostTeamFirst", () => {

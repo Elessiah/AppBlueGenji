@@ -505,6 +505,7 @@ describe("GET /api/matches/[matchId]/contacts", () => {
     team2: side(20, "Bravo"),
     casters: [],
     referee: null,
+    refereeAssigned: false,
     selfManaged: false,
     viewer: {
       role: "TEAM1",

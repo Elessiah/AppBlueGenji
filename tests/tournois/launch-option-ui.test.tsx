@@ -234,14 +234,32 @@ describe("fiches de contact — noms cliquables", () => {
   const TEAM_VIEWER = { role: "TEAM1", isCaster: false, earlyContacts: true } as const;
   const LATER = "Contacts non affichés.";
 
+  it("SideCard_hostWithoutReferee_badgeSaysCreatesLobby", () => {
+    const html = renderToStaticMarkup(<SideCard side={side()} isHost refereed={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} />);
+    expect(html).toContain("crée le salon");
+  });
+
+  it("SideCard_hostWithReferee_badgeSaysLeftSideInGame", () => {
+    const html = renderToStaticMarkup(<SideCard side={side()} isHost refereed phase="LAUNCHED" onCopy={noop} laterText={LATER} />);
+    expect(html).toContain("côté gauche en jeu");
+    expect(html).not.toContain("crée le salon");
+  });
+
+  it("SideCard_nonHostRefereed_noHostBadge", () => {
+    const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} refereed phase="LAUNCHED" onCopy={noop} laterText={LATER} />);
+
+    expect(html).not.toContain("côté gauche en jeu");
+    expect(html).not.toContain("crée le salon");
+  });
+
   it("modale de lancement (par défaut) : aucun lien — elle survit à la navigation", () => {
-    const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} />);
+    const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} refereed={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} />);
     expect(html).not.toContain("href=");
   });
 
   it("équipe → sa fiche, contact → son profil", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} linkNames />,
+      <SideCard side={side()} isHost={false} refereed={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} linkNames />,
     );
     expect(html).toContain('href="/equipes/42"');
     expect(html).toContain('href="/joueurs/7"');
@@ -255,23 +273,23 @@ describe("fiches de contact — noms cliquables", () => {
     const forCaster = launchSidesLaterText(FR_LAUNCH_TEXT, { earlyContacts: false });
     expect(forCaster).toBe("Les contacts s'affichent au lancement.");
     const closed = side({ contacts: [], contactsShown: false });
-    const html = renderToStaticMarkup(<SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={forCaster} />);
+    const html = renderToStaticMarkup(<SideCard side={closed} isHost={false} refereed={false} phase="SCHEDULED" onCopy={noop} laterText={forCaster} />);
     expect(html).toContain("Les contacts s&#x27;affichent au lancement.</p>");
     expect(html).not.toContain("« Contacts »");
     // La modale « Contacts » passe sa note : jamais un renvoi à elle-même.
-    const inDialog = renderToStaticMarkup(<SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} />);
+    const inDialog = renderToStaticMarkup(<SideCard side={closed} isHost={false} refereed={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} />);
     expect(inDialog).toContain("Contacts non affichés.");
     expect(inDialog).not.toContain("« Contacts »");
   });
 
   it("entrée solo → le profil du joueur, jamais une fiche d'équipe", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true })} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} linkNames />,
+      <SideCard side={side({ isSolo: true })} isHost={false} refereed={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} linkNames />,
     );
     expect(html).not.toContain("/equipes/");
     expect(html).toContain('href="/joueurs/7"');
     const hidden = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true, contacts: [], contactsShown: false })} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames />,
+      <SideCard side={side({ isSolo: true, contacts: [], contactsShown: false })} isHost={false} refereed={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames />,
     );
     expect(hidden).not.toContain("href=");
   });
@@ -283,6 +301,7 @@ describe("fiches de contact — noms cliquables", () => {
       <SideCard
         side={side({ isSolo: true, contacts: [], contactsShown: false })}
         isHost={false}
+        refereed={false}
         phase="SCHEDULED"
         onCopy={noop}
         laterText={LATER}
@@ -295,7 +314,7 @@ describe("fiches de contact — noms cliquables", () => {
 
   it("SideCard_renderNameWithoutLinkNames_plainName", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} renderName={() => <a href="/x">x</a>} />,
+      <SideCard side={side()} isHost={false} refereed={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} renderName={() => <a href="/x">x</a>} />,
     );
     expect(html).not.toContain("href=");
   });
@@ -304,21 +323,21 @@ describe("fiches de contact — noms cliquables", () => {
   // la carte ne double pas le sien.
   it("SideCard_renderNameWithLinkNames_omitsOwnEmblem", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side()} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames renderName={(s) => <span>{s.name}</span>} />,
+      <SideCard side={side()} isHost={false} refereed={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames renderName={(s) => <span>{s.name}</span>} />,
     );
     expect(html).not.toContain('class="emblem"');
   });
 
   it("SideCard_linkNamesWithoutRenderName_keepsOwnEmblem", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side()} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames />,
+      <SideCard side={side()} isHost={false} refereed={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames />,
     );
     expect(html).toContain('class="emblem"');
   });
 
   it("SideCard_renderNameWithoutLinkNames_keepsOwnEmblem", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side()} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} renderName={(s) => <span>{s.name}</span>} />,
+      <SideCard side={side()} isHost={false} refereed={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} renderName={(s) => <span>{s.name}</span>} />,
     );
     expect(html).toContain('class="emblem"');
   });
@@ -581,7 +600,7 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
       contactsShown: true,
     };
 
-    const html = renderToStaticMarkup(<SideCard side={side} isHost={false} phase="LAUNCHED" onCopy={noop} laterText="—" />);
+    const html = renderToStaticMarkup(<SideCard side={side} isHost={false} refereed={false} phase="LAUNCHED" onCopy={noop} laterText="—" />);
 
     expect(html).toContain("alice");
     expect(html).not.toContain("BattleTag");
@@ -643,6 +662,64 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
     );
 
     expect(html).not.toContain(">juge<");
+  });
+
+  it("RefereeCard_refereeDesignated_badgeSaysHostsGame", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ userId: 77, pseudo: "Juge", ready: false, contactsShown: true, isViewer: false }}
+        selfManaged={false}
+        phase="LOBBY"
+        onCopy={noop}
+      />,
+    );
+
+    expect(html).toContain("Héberge la partie — crée le salon");
+  });
+
+  it("RefereeCard_refereeDesignated_badgeUsesControllerNotHouse", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ userId: 77, pseudo: "Juge", ready: false, contactsShown: true, isViewer: false }}
+        selfManaged={false}
+        phase="LOBBY"
+        onCopy={noop}
+      />,
+    );
+
+    expect(html).toContain("🎮");
+    expect(html).not.toContain("🏠");
+  });
+
+  it("messages_refereeCreatesKeys_removedInFrAndEn", () => {
+    // Le badge de l'arbitre et son fait reprennent les clés de l'hôte : une seule phrase à tenir.
+    for (const lang of ["fr", "en"]) {
+      const read = (file: string) => JSON.parse(readFileSync(join(process.cwd(), "messages", lang, file), "utf8"));
+      expect(read("launchModal.json")).not.toHaveProperty("refereeCreates");
+      expect(read("matchPage.json").facts).not.toHaveProperty("refereeCreates");
+    }
+  });
+
+  it("RefereeCard_createsBadgeFalse_noCreatesBadge", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ userId: 77, pseudo: "Juge", ready: false, contactsShown: true, isViewer: false }}
+        selfManaged={false}
+        createsBadge={false}
+        phase="LOBBY"
+        onCopy={noop}
+      />,
+    );
+
+    expect(html).toContain("Juge");
+    expect(html).not.toContain("🎮");
+    expect(html).not.toContain("Héberge la partie");
+  });
+
+  it("RefereeCard_selfManagedNoReferee_noHostsGameBadge", () => {
+    const html = renderToStaticMarkup(<RefereeCard referee={null} selfManaged phase="LOBBY" onCopy={noop} />);
+
+    expect(html).not.toContain("crée le salon");
   });
 
   it("RefereeCard_selfManaged_noteWithoutNamedRegion", () => {

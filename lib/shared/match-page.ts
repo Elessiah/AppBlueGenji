@@ -73,7 +73,7 @@ export type MatchPageSide = {
   teamId: number | null;
   name: string | null;
   placeholder: string | null;
-  /** Crée la partie (côté gauche). */
+  /** Hôte, côté gauche : crée la partie, sauf sur un match arbitré (l'arbitre désigné). */
   host: boolean;
   /** Bannit la première (l'équipe qui n'héberge pas). */
   firstBan: boolean;
@@ -170,6 +170,20 @@ export function matchPageDecision(
   if (isByeMatch(match)) return null;
   const decision = refereeDecision(match);
   return decision === "UNDECIDED" && !staff ? null : decision;
+}
+
+/**
+ * Détail du fait « Hôte » : « Crée la partie » sans arbitre, « Côté gauche en
+ * jeu » quand l'arbitre désigné la crée (décision `REFEREE`), rien sur un match
+ * arbitré **déjà joué** (`COMPLETED`, aucune décision) : on ne sait plus qui l'a
+ * créée (match joué avant la règle), comme le premier ban qui s'y tait aussi.
+ */
+export function hostFactDetailKey(
+  refereeAssigned: boolean,
+  decision: RefereeDecision | null,
+): "facts.hostDetail" | "facts.hostRefereedDetail" | null {
+  if (!refereeAssigned) return "facts.hostDetail";
+  return decision === "REFEREE" ? "facts.hostRefereedDetail" : null;
 }
 
 /**

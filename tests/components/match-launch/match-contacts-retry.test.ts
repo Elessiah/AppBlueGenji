@@ -196,6 +196,7 @@ const info = (
     contactsShown: exposesCasterContacts(phase, role),
   })),
   referee: null,
+  refereeAssigned: false,
   selfManaged: false,
   viewer: {
     role,

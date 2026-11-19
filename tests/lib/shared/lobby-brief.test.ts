@@ -123,7 +123,7 @@ describe("formatLobbyBriefDm", () => {
         "## Avant le coup d'envoi",
         `* Le salon de check-in est ouvert sur Discord — ${INVITE}`,
         "* Gauche (hôte) : « Renards » · Droite : « Nova »",
-        "* **C'est à ton équipe de créer la partie.**",
+        "* **C'est à ton équipe de créer la partie.** Si un arbitre est nommé ensuite, c'est lui qui la crée : la page du match fait foi.",
         "",
         "## Paramètres de partie",
         "* Paramètres compétitifs",
@@ -253,7 +253,7 @@ describe("formatLobbyBriefDm", () => {
         "## Before kickoff",
         `* The check-in channel is open on Discord — ${INVITE}`,
         "* Left (host): “Renards” · Right: “Nova”",
-        "* **Your team creates the game.**",
+        "* **Your team creates the game.** A referee assigned later creates it instead: the match page prevails.",
         "",
         "## Game settings",
         "* Competitive settings",
@@ -326,6 +326,30 @@ describe("formatLobbyBriefDm", () => {
     // ERREUR.txt (#558) : un engagé solo n'a pas d'équipe — la ligne parle de lui.
     expect(formatLobbyBriefDm(solo, URL)).toContain("* Ton adversaire crée la partie : **vérifie les paramètres** avant de lancer.");
     expect(formatLobbyBriefDm(solo, URL, "en")).toContain("* Your opponent creates the game: **check the settings** before starting.");
+  });
+
+  it("formatLobbyBriefDm_notHosting_checkSettingsCarriesRefereeLaterCaveat", () => {
+    const guest = side({ hosting: false });
+
+    expect(formatLobbyBriefDm(guest, URL)).toContain(
+      "* L'équipe hôte crée la partie : **vérifie les paramètres** avant de lancer. Si un arbitre est nommé ensuite, c'est lui qui la crée : la page du match fait foi.",
+    );
+    expect(formatLobbyBriefDm(guest, URL, "en")).toContain(
+      "* The host team creates the game: **check the settings** before starting. A referee assigned later creates it instead: the match page prevails.",
+    );
+  });
+
+  it("formatLobbyBriefDm_soloEitherSide_carriesRefereeLaterCaveat", () => {
+    expect(formatLobbyBriefDm(side({ solo: true, hosting: true }), URL)).toContain(
+      "* **C'est à toi de créer la partie.** Si un arbitre est nommé ensuite, c'est lui qui la crée : la page du match fait foi.",
+    );
+    expect(formatLobbyBriefDm(side({ solo: true, hosting: false }), URL, "en")).toContain(
+      "* Your opponent creates the game: **check the settings** before starting. A referee assigned later creates it instead: the match page prevails.",
+    );
+  });
+
+  it("formatLobbyBriefDm_selfManagedIntro_noRefereeCaveatInIntro", () => {
+    expect(formatLobbyBriefDm(side(), URL)).toContain("**Ton match est en autogestion.** Voici les éléments importants à savoir.\n");
   });
 
   it("formatLobbyBriefDm_soloHosting_youCreateTheGame", () => {

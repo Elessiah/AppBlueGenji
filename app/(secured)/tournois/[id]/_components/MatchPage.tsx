@@ -27,6 +27,7 @@ import {
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
   firstMapFieldFollows,
+  hostFactDetailKey,
   matchPageDecision,
   matchPageSides,
   matchPageStreams,
@@ -63,7 +64,7 @@ import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText, useMapError } from "../_lib/error-map";
 import { useMatchCardModel } from "../_lib/match-card-model";
 import { useMatchFormat } from "../_lib/match-format-context";
-import { useMatchPageText } from "../_lib/match-page-text";
+import { useMatchPageText, type MatchPageText } from "../_lib/match-page-text";
 import { matchPageHeaderScore, matchPageMapFacts, type MatchPageMapFact } from "../_lib/match-page-facts";
 import { matchSideViews } from "../_lib/match-row-sides";
 import {
@@ -380,6 +381,8 @@ function useOfficiatingFact(match: BracketMatch, decision: ReturnType<typeof mat
     return {
       id: "officiating",
       label: page.t("facts.referee"),
+      // Même texte que l'hôte d'un match sans arbitre (`facts.hostDetail`).
+      detail: page.t("facts.hostDetail"),
       // Pseudo de l'arbitre pour un membre connecté (décision 52), « Arbitre
       // désigné » sans compte, ou tant que le pseudo de la désignation manque.
       value: (
@@ -481,6 +484,26 @@ function MapFactList({ mapFacts }: Readonly<{ mapFacts: readonly MatchPageMapFac
 }
 
 /**
+ * Fait « Hôte » : l'équipe qui joue à gauche (règlement §14). Elle crée la
+ * partie, sauf sur un match arbitré où c'est l'arbitre désigné (fait
+ * « Arbitre ») : elle ne fait alors que jouer à gauche.
+ */
+function hostFact(
+  hostSide: PageSide | null,
+  detailKey: ReturnType<typeof hostFactDetailKey>,
+  pending: ReactNode,
+  page: MatchPageText,
+): KeyFact {
+  const detail = hostSide && detailKey ? page.t(detailKey) : undefined;
+  return {
+    id: "host",
+    label: page.t("facts.host"),
+    value: hostSide ? <SideName side={hostSide} logoSize={20} /> : pending,
+    detail,
+  };
+}
+
+/**
  * Faits clés du match, au gabarit de l'en-tête des pages de règles
  * (`KeyFacts`) : chacun titré en toutes lettres — hôte, premier ban, arbitre ou
  * autogestion, maps, format, côtés, casters, lancement. Rien de nouveau n'est
@@ -526,12 +549,7 @@ function MatchKeyFacts({
 
   const facts: KeyFact[] = [];
   if (hostSide || opponentsPending) {
-    facts.push({
-      id: "host",
-      label: page.t("facts.host"),
-      value: hostSide ? <SideName side={hostSide} logoSize={20} /> : pending,
-      detail: hostSide ? page.t("facts.hostDetail") : undefined,
-    });
+    facts.push(hostFact(hostSide, hostFactDetailKey(match.refereeAssigned, decision), pending, page));
   }
   if (banSide || opponentsPending) {
     facts.push({
@@ -776,7 +794,10 @@ function connectionLaunchOf(launch: MatchLaunchInfo | null): MatchLaunchInfo | n
 function ConnectionSection({
   launch: read,
   onCopy,
-}: Readonly<{ launch: MatchLaunchInfo | null; onCopy: (value: string, label: string) => Promise<void> }>) {
+}: Readonly<{
+  launch: MatchLaunchInfo | null;
+  onCopy: (value: string, label: string) => Promise<void>;
+}>) {
   const page = useMatchPageText();
   const launchText = useLaunchText();
   const titleId = useId();
@@ -795,6 +816,7 @@ function ConnectionSection({
             key={side.teamId}
             side={side}
             isHost={launch.hostTeamId === side.teamId}
+            refereed={launch.refereeAssigned}
             phase={launch.phase}
             onCopy={onCopy}
             linkNames
@@ -991,6 +1013,8 @@ function OfficiatingSection({
         <RefereeCard
           referee={refereeCard}
           selfManaged={false}
+          // Le fait « Arbitre » dit déjà « Crée la partie » sur cette page.
+          createsBadge={false}
           phase={launch.phase}
           onCopy={onCopy}
           linkNames

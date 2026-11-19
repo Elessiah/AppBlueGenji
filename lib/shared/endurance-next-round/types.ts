@@ -37,7 +37,8 @@ export type EnduranceNextRoundMatch = {
   /**
    * Les côtés sont-ils acquis eux aussi ? Deux équipes certaines de s'affronter
    * peuvent encore se disputer la meilleure des deux places — celle qui part à
-   * gauche, et qui accueille la partie par défaut.
+   * gauche : l'hôte, qui crée la partie sauf sur un match arbitré (l'arbitre
+   * désigné la crée alors).
    */
   sidesKnown: boolean;
 };

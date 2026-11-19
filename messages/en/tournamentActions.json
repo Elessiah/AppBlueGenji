@@ -472,7 +472,7 @@
     "byeRound": "sits out this round (odd number of entrants)",
     "versus": "vs",
     "sidesUnknown": "Sides to be confirmed",
-    "sidesHint": "The matchup is certain; the remaining matches will decide who, ranked higher, takes the left side and hosts the game.",
+    "sidesHint": "The matchup is certain; the remaining matches will decide who, ranked higher, takes the left side.",
     "footnoteRound": "Certain whatever the score of the remaining matches, barring a referee decision (withdrawal, penalty, double forfeit). The round is only set up once the previous one is over.",
     "footnoteShort": "Certain matchups, barring a referee decision.",
     "footnoteSubject": "Certain matchups"

@@ -365,11 +365,11 @@ export function MatchLaunchCenter({
 
           <div className={styles.body}>
             <div className={styles.sides}>
-              <SideCard side={current.team1} isHost={current.hostTeamId === current.team1.teamId} phase={current.phase} onCopy={copy} laterText={sidesLaterText} />
+              <SideCard side={current.team1} isHost={current.hostTeamId === current.team1.teamId} refereed={current.refereeAssigned} phase={current.phase} onCopy={copy} laterText={sidesLaterText} />
               <div className={styles.divider} aria-hidden="true">
                 {t("vs")}
               </div>
-              <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} laterText={sidesLaterText} />
+              <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} refereed={current.refereeAssigned} phase={current.phase} onCopy={copy} laterText={sidesLaterText} />
             </div>
 
             <CasterCards casters={current.casters} phase={current.phase} onCopy={copy} laterText={castersLaterText} />

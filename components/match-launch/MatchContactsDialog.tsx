@@ -554,6 +554,7 @@ export function MatchContactsDialog({
                   <SideCard
                     side={launch.team1}
                     isHost={launch.hostTeamId === launch.team1.teamId}
+                    refereed={launch.refereeAssigned}
                     phase={launch.phase}
                     onCopy={copy}
                     linkNames
@@ -564,6 +565,7 @@ export function MatchContactsDialog({
                   <SideCard
                     side={launch.team2}
                     isHost={launch.hostTeamId === launch.team2.teamId}
+                    refereed={launch.refereeAssigned}
                     phase={launch.phase}
                     onCopy={copy}
                     linkNames
