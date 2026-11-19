@@ -11,21 +11,99 @@
   font-size: 16px;
 }
 
+/* Une section = une carte discrète : filet glacier, fond à peine éclairci. */
 .section {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  margin: 0 0 16px;
+  margin: 0 0 12px;
+  padding: 14px;
+  border: 1px solid rgba(90, 200, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(90, 200, 255, 0.025);
+}
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+}
+
+/* Un réglage à deux valeurs : légende, puis deux segments côte à côte. */
+.rule {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
   padding: 0;
   border: 0;
 }
 
-.legend {
-  margin: 0 0 4px;
+.ruleLegend {
+  margin: 0 0 6px;
   padding: 0;
   font-size: 13px;
-  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.segments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.segment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid rgba(90, 200, 255, 0.22);
+  border-radius: 999px;
+  font-size: 13px;
   color: var(--ink);
+  cursor: pointer;
+}
+
+/* Choix retenu : la pastille ronde cochée (le texte et le contrôle le disent), puis le contour et le fond bleu glacier. */
+.segment:has(input:checked) {
+  border-color: rgba(90, 200, 255, 0.7);
+  background: rgba(90, 200, 255, 0.14);
+}
+
+.segment:has(input:focus-visible) {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+/* Contrôles compacts : la pilule de `.btn`, en plus fine (la cible tactile remonte à 44 px). */
+button.compact {
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+button.iconButton {
+  min-width: 32px;
+  padding: 4px 8px;
+}
+
+@media (pointer: coarse) {
+  button.compact {
+    min-height: 44px;
+  }
+
+  button.iconButton {
+    min-width: 44px;
+  }
 }
 
 .slots {
@@ -40,9 +118,24 @@
   display: grid;
   gap: 8px;
   min-width: 0;
-  padding: 10px;
+  padding: 8px 10px;
   border: 1px solid rgba(90, 200, 255, 0.18);
+  border-left: 3px solid rgba(90, 200, 255, 0.3);
   border-radius: 8px;
+  background: rgba(6, 8, 12, 0.35);
+}
+
+/* Etat d'une carte : pool = glacier plein, imposée = bleu, à compléter = filet pointillé (le texte de la pastille le dit aussi). */
+.slot[data-state="pool"] {
+  border-left-color: var(--blue-500);
+}
+
+.slot[data-state="imposed"] {
+  border-left-color: rgba(90, 200, 255, 0.6);
+}
+
+.slot[data-state="empty"] {
+  border-left-style: dashed;
 }
 
 .slotHead {
@@ -52,11 +145,27 @@
   gap: 8px;
 }
 
+.slotNumber {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--blue-300);
+  background: rgba(90, 200, 255, 0.12);
+}
+
 .slotTitle {
-  flex: 1 1 auto;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
+}
+
+/* Les boutons de la carte se rangent à droite de son titre. */
+.slotToggle {
+  margin-left: auto;
 }
 
 .chips {
@@ -116,31 +225,58 @@
 .modeLegend {
   margin: 0 0 6px;
   padding: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+}
+
+/* La liste d'Overwatch défile dans sa propre zone : la fenêtre ne s'allonge pas de quarante cartes. */
+.mapList {
+  display: grid;
+  gap: 10px;
+  max-height: min(280px, 40dvh);
+  padding: 8px;
+  border: 1px solid rgba(90, 200, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(6, 8, 12, 0.4);
 }
 
 .options {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 4px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
+/* Une carte = une pastille à cocher ; retenue : contour et fond bleu glacier en plus de la case cochée. */
 .option {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 28px;
-  font-size: 13px;
+  gap: 6px;
+  min-height: 30px;
+  padding: 3px 12px 3px 8px;
+  border: 1px solid rgba(90, 200, 255, 0.2);
+  border-radius: 999px;
+  font-size: 12px;
   color: var(--ink);
   cursor: pointer;
 }
 
-/* Au toucher, une case de 28 px serrée à 4 px de la suivante se rate : 44 px de cible (WCAG 2.5.5). */
+.option:has(input:checked) {
+  border-color: rgba(90, 200, 255, 0.7);
+  background: rgba(90, 200, 255, 0.14);
+}
+
+.option:has(input:focus-visible) {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+/* Au toucher, des pastilles de 30 px serrées à 6 px se ratent : 44 px de cible (WCAG 2.5.5). */
 @media (pointer: coarse) {
   .options {
-    gap: 8px 12px;
+    gap: 8px;
   }
 
   .option {
@@ -172,6 +308,8 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(90, 200, 255, 0.12);
 }
 
 .grow {
@@ -196,6 +334,12 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* Barre d'enregistrement d'un tour : séparée des cartes qu'elle valide. */
+.actionsBar {
+  padding-top: 12px;
+  border-top: 1px solid rgba(90, 200, 255, 0.12);
 }
 
 /* Témoin « non enregistré » : à gauche des boutons de son formulaire. */
@@ -253,4 +397,19 @@
 .pointMap {
   gap: 4px;
   min-width: 0;
+}
+
+/* 375 px : les cartes de section rendent leur marge intérieure au contenu. */
+@media (max-width: 480px) {
+  .section {
+    padding: 12px 10px;
+  }
+
+  .segments {
+    grid-template-columns: 1fr;
+  }
+
+  .slot {
+    padding: 8px;
+  }
 }

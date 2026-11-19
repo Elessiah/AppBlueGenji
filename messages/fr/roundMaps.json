@@ -65,6 +65,7 @@
     "removeMap": "Retirer {map} de la carte {number}",
     "chooseMaps": "Choisir les cartes",
     "hideMaps": "Masquer la liste",
+    "mapListLabel": "Cartes disponibles pour la carte {number}",
     "searchLabel": "Rechercher une carte",
     "searchPlaceholder": "Ex. : Ilios",
     "noResult": "Aucune carte de la liste ne correspond.",

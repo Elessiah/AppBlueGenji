@@ -398,3 +398,16 @@ score, câblage), `tests/lib/shared/round-maps-tiebreak-plan.test.ts`,
   map de départage inactive rend le focus à la ligne voisine, ou à « Fermer ».
 - Deux fermetures d'écran simultanées sont chaînées côté serveur (`flushRoundMapsNotice`)
   : la seconde attend le verdict de la première au lieu d'être écartée par le plafond.
+
+## Fenêtre allégée (balisage)
+
+Même comportement, présentation refaite : chaque section (règles de ban, cartes d'un tour,
+map de départage, points) est une carte à filet glacier dont la légende est une étiquette ;
+les deux règles de ban sont des **segments radio** (bouton rond coché + contour bleu : l'état
+se dit par le contrôle, pas par la seule couleur) ; une carte du tour tient en une ligne
+(numéro, état en texte — « À compléter » / « Imposée » / « Pool · N cartes » —, « Choisir les
+cartes » et ✕, pastilles dessous ; `data-state` ajoute un liseré) ; la liste d'Overwatch est une
+`ScrollArea` verticale nommée (`dialog.mapListLabel`, FR + EN) de pastilles à cocher ; les
+boutons sont compacts (`button.compact`, cible portée à 44 px au toucher). La barre
+d'enregistrement du tour et la copie sont séparées par un filet. Tests :
+`tests/tournois/round-maps-dialog-markup.test.ts`.
