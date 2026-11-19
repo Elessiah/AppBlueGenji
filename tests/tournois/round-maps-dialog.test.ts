@@ -289,7 +289,8 @@ describe("RoundMapsDialog per-map points fields wiring", () => {
     expect(source).toContain("const shownDrafts = useMemo(");
   });
 
-  it("perMapLegend_flexLivesInInnerSpan_notOnLegend", () => {
-    expect(source).toContain("styles.pointMapsLegend");
+  it("perMapLegend_flexLivesOutsideTheTextOnlyLegend", () => {
+    expect(source).toContain('<legend className="sr-only">{t("dialog.pointsPerMapTitle")}</legend>');
+    expect(source).not.toContain("styles.pointMapsLegend");
   });
 });

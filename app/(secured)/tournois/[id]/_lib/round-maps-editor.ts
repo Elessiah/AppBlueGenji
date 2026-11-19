@@ -4,7 +4,16 @@
  * renettoie tout (`normalizeRoundMapSlots`) ; ceci ne règle que l'écran.
  */
 import { FIRST_MAP_MAX_LENGTH } from "@/lib/shared/match-referee";
-import { ROUND_MAP_CANDIDATES_MAX, roundKeyId, roundMapsOf, type RoundKey, type RoundMapConfig } from "@/lib/shared/round-maps";
+import {
+  ROUND_MAP_CANDIDATES_MAX,
+  roundKeyId,
+  roundMapsOf,
+  type FirstBanRule,
+  type NextBanRule,
+  type RoundKey,
+  type RoundMapConfig,
+  type TournamentMapRules,
+} from "@/lib/shared/round-maps";
 import { visibleText } from "@/lib/shared/visible-text";
 
 /** Comparaison des noms, comme le serveur (sans casse). */
@@ -75,6 +84,15 @@ export type SlotState = "empty" | "imposed" | "pool";
 export function slotState(count: number): SlotState {
   if (count <= 0) return "empty";
   return count === 1 ? "imposed" : "pool";
+}
+
+/** Corps de l'enregistrement des règles (`PUT …/map-rules`) : les deux bans choisis, et la règle
+ * « carte suivante », qui n'est plus proposée, renvoyée telle qu'elle est en base. */
+export function mapRulesPayload(
+  draft: Readonly<{ firstBan: FirstBanRule; nextBan: NextBanRule }>,
+  saved: Pick<TournamentMapRules, "nextPick">,
+): Pick<TournamentMapRules, "firstBan" | "nextBan" | "nextPick"> {
+  return { firstBan: draft.firstBan, nextBan: draft.nextBan, nextPick: saved.nextPick };
 }
 
 /** Tours découpés en lots d'au plus `size` (une écriture par lot). */

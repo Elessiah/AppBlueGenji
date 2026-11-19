@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,7 +16,7 @@ import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { FieldErrorText } from "@/components/ui/field-error-text";
-import { InfoHint } from "@/components/ui/info-hint";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { BanRuleSegments } from "./BanRuleSegments";
 import { NumberInput } from "@/components/ui/number-input";
@@ -73,6 +74,7 @@ import {
   slotOverMax,
   slotState,
   type SlotState,
+  mapRulesPayload,
   slotsDirty,
   slotsToEdit,
   slotsToSave,
@@ -241,8 +243,12 @@ function MapPicker({
   }, [ids, overwatch]);
   // Rappel stable (dernier `onEdit` lu par référence) : seule la case dont l'état
   // change se redessine, pas les quarante de la liste.
+  // Mis à jour après le rendu validé (jamais pendant le rendu : un rendu abandonné
+  // ne doit pas y laisser un `onEdit` qui n'a jamais été affiché).
   const latestEdit = useRef(onEdit);
-  latestEdit.current = onEdit;
+  useLayoutEffect(() => {
+    latestEdit.current = onEdit;
+  }, [onEdit]);
   const toggleMap = useCallback((map: string) => {
     latestEdit.current((current) => toggleMapInSlot(current, map));
   }, []);
@@ -847,14 +853,16 @@ function RoundPointsForm({
             un champ désactivé sous le focus le renverrait sur la page. */}
         {rows > 0 && (
           <fieldset className={styles.pointMaps} disabled={locked}>
-            <legend className={styles.pointMapsLegend}>
-              <span className={styles.labelRow}>
-                <span className={styles.pointMapsTitle}>{t("dialog.pointsPerMapTitle")}</span>
-                <InfoHint id={`${ids}-points-maps-hint`} subject={t("dialog.pointsPerMapTitle")}>
-                  {t("dialog.pointsPerMapHint")}
-                </InfoHint>
+            {/* Légende en texte seul ; l'aide (des `div`) hors légende. */}
+            <legend className="sr-only">{t("dialog.pointsPerMapTitle")}</legend>
+            <div className={styles.labelRow}>
+              <span className={styles.pointMapsTitle} aria-hidden="true">
+                {t("dialog.pointsPerMapTitle")}
               </span>
-            </legend>
+              <InfoHint id={`${ids}-points-maps-hint`} subject={t("dialog.pointsPerMapTitle")}>
+                {t("dialog.pointsPerMapHint")}
+              </InfoHint>
+            </div>
             <ol className={styles.pointMapList}>
               {shownDrafts.map((draft, index) => (
                 <MapPointRow
@@ -955,13 +963,18 @@ function StaleTiebreaks({
   }, [items, ids, fallbackFocusId]);
   if (items.length === 0) return null;
   return (
-    <fieldset className={styles.section} aria-labelledby={`${ids}-title`}>
-      <legend className={styles.legend}>
-        <span id={`${ids}-title`}>{t("dialog.staleTiebreakTitle")}</span>
+    <fieldset className={styles.section}>
+      {/* Légende en texte seul (nom du groupe) ; l'aide (des `div`) hors légende, qui
+          n'admet que du texte courant. */}
+      <legend className="sr-only">{t("dialog.staleTiebreakTitle")}</legend>
+      <InfoHintRow>
+        <span className={styles.legend} aria-hidden="true">
+          {t("dialog.staleTiebreakTitle")}
+        </span>
         <InfoHint id={`${ids}-hint`} subject={t("dialog.staleTiebreakTitle")}>
           {t("dialog.staleTiebreakHint")}
         </InfoHint>
-      </legend>
+      </InfoHintRow>
       <ul className={styles.stale}>
         {items.map((item, index) => {
           const label = roundLabel(item);
@@ -1206,7 +1219,7 @@ export function RoundMapsDialog({
     if (isBusy() || !rulesDirty) return;
     void run(async () => {
       // La règle « carte suivante » n'est plus proposée (`NextPickRule`) : la valeur en place est renvoyée telle quelle.
-      await putJson(`/api/admin/tournaments/${tournamentId}/map-rules`, { firstBan, nextBan, nextPick: rules.nextPick });
+      await putJson(`/api/admin/tournaments/${tournamentId}/map-rules`, mapRulesPayload({ firstBan, nextBan }, rules));
       showSuccess(t("dialog.rulesSaved"));
     });
   };

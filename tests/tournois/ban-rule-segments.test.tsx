@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BanRuleSegments } from "@/app/(secured)/tournois/[id]/_components/BanRuleSegments";
+import { BanRuleSegments, movesRadioChoice } from "@/app/(secured)/tournois/[id]/_components/BanRuleSegments";
 import { FIRST_BAN_RULES, type FirstBanRule } from "@/lib/shared/round-maps";
 
 /**
@@ -14,6 +14,7 @@ type InputProps = {
   value: string;
   onChange: () => void;
   onKeyDown: (event: { key: string; currentTarget: { type: string }; preventDefault: () => void }) => void;
+  onClick: (event: { preventDefault: () => void }) => void;
 };
 
 const LABELS: Record<FirstBanRule, string> = { NON_HOST: "L'équipe non hôte", HOST: "L'équipe hôte" };
@@ -98,5 +99,49 @@ describe("BanRuleSegments", () => {
     radio(BanRuleSegments(props()), "HOST").onKeyDown(event);
 
     expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("banRuleSegments_arrowKeyWhileBusy_preventsDefault", () => {
+    const event = keyEvent("ArrowRight");
+
+    radio(BanRuleSegments(props({ isBusy: () => true })), "HOST").onKeyDown(event);
+
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it("banRuleSegments_spaceWhileBusy_preventsDefault", () => {
+    const event = keyEvent(" ");
+
+    radio(BanRuleSegments(props({ isBusy: () => true })), "NON_HOST").onKeyDown(event);
+
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it("banRuleSegments_clickWhileBusy_preventsDefault", () => {
+    const event = { preventDefault: jest.fn<() => void>() };
+
+    radio(BanRuleSegments(props({ isBusy: () => true })), "NON_HOST").onClick(event);
+
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it("banRuleSegments_clickIdle_doesNotPreventDefault", () => {
+    const event = { preventDefault: jest.fn<() => void>() };
+
+    radio(BanRuleSegments(props()), "NON_HOST").onClick(event);
+
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+});
+
+describe("movesRadioChoice", () => {
+  it("movesRadioChoice_arrowsHomeEndSpace_true", () => {
+    for (const key of ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", " "]) {
+      expect(movesRadioChoice(key)).toBe(true);
+    }
+  });
+
+  it("movesRadioChoice_enterTabEscape_false", () => {
+    for (const key of ["Enter", "Tab", "Escape"]) expect(movesRadioChoice(key)).toBe(false);
   });
 });

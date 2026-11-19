@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   firstTargetOverMax,
   focusIndexAfterRemoval,
+  mapRulesPayload,
   sameRoundKeys,
   storedRoundsSignature,
   slotOverMax,
@@ -138,5 +139,13 @@ describe("slotState", () => {
 
   it("slotState_twoMaps_isPool", () => {
     expect(slotState(2)).toBe("pool");
+  });
+});
+
+describe("mapRulesPayload", () => {
+  it("mapRulesPayload_draftDiffersFromSaved_sendsDraftBansAndSavedNextPick", () => {
+    const payload = mapRulesPayload({ firstBan: "HOST", nextBan: "WINNER" }, { nextPick: "FREE" });
+
+    expect(payload).toEqual({ firstBan: "HOST", nextBan: "WINNER", nextPick: "FREE" });
   });
 });

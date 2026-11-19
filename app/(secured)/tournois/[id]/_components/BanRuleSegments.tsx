@@ -7,10 +7,19 @@ import { blocksImplicitSubmit } from "../_lib/round-maps-editor";
  *
  * Les radios d'un même `name` se parcourent aux flèches (natif). Pendant un envoi
  * (`busy`), elles restent focalisables mais figées (`aria-disabled`, geste ignoré :
- * `docs/features/BUSY_BUTTONS.md`) — ce qui est affiché est ce qui part. Entrée sur
+ * `docs/features/BUSY_BUTTONS.md`) — ce qui est affiché est ce qui part : flèches,
+ * Espace et clic y sont annulés, la radio cochée ne bouge même pas un instant. Entrée sur
  * une radio n'envoie pas le formulaire (`blocksImplicitSubmit`) : l'enregistrement
  * reste un geste explicite, comme avec l'ancienne liste déroulante.
  */
+/** Touches qui, sur une radio, en cochent une autre (ou celle sous le focus). */
+const CHOICE_KEYS: ReadonlySet<string> = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", " "]);
+
+/** La touche change-t-elle la radio cochée du groupe ? */
+export function movesRadioChoice(key: string): boolean {
+  return CHOICE_KEYS.has(key);
+}
+
 export function BanRuleSegments<Rule extends string>({
   legend,
   name,
@@ -32,8 +41,10 @@ export function BanRuleSegments<Rule extends string>({
   labelOf: (rule: Rule) => string;
   onChange: (rule: Rule) => void;
 }>) {
-  const blockSubmit = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (blocksImplicitSubmit(event.key, event.currentTarget.type)) event.preventDefault();
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (blocksImplicitSubmit(event.key, event.currentTarget.type) || (isBusy() && movesRadioChoice(event.key))) {
+      event.preventDefault();
+    }
   };
   return (
     <fieldset className="radio-segments-group">
@@ -47,7 +58,11 @@ export function BanRuleSegments<Rule extends string>({
               value={rule}
               checked={value === rule}
               aria-disabled={busy || undefined}
-              onKeyDown={blockSubmit}
+              onKeyDown={onKeyDown}
+              onClick={(event) => {
+                // Annulé, le clic laisse la radio cochée en place : rien ne s'affiche comme choisi.
+                if (isBusy()) event.preventDefault();
+              }}
               onChange={() => {
                 if (!isBusy()) onChange(rule);
               }}

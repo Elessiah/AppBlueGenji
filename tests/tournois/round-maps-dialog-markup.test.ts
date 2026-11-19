@@ -16,14 +16,23 @@ describe("ban rules segments", () => {
   it("dialog_banRules_bothGroupsUseBanRuleSegmentsWithStoredValue", () => {
     const source = readSource(DIALOG);
 
-    expect(source).toMatch(/<BanRuleSegments\s+legend=\{t\("dialog\.firstBan"\)\}\s+name=\{`\$\{ids\}-first`\}\s+rules=\{FIRST_BAN_RULES\}\s+value=\{firstBan\}\s+busy=\{busy\}\s+isBusy=\{isBusy\}/);
-    expect(source).toMatch(/<BanRuleSegments\s+legend=\{t\("dialog\.nextBan"\)\}\s+name=\{`\$\{ids\}-next`\}\s+rules=\{NEXT_BAN_RULES\}\s+value=\{nextBan\}\s+busy=\{busy\}\s+isBusy=\{isBusy\}/);
-    expect(source).toContain("onChange={setFirstBan}");
-    expect(source).toContain("onChange={setNextBan}");
+    // Chaque groupe lu dans son propre bloc JSX : l'ordre des props est libre, un échange de setter ne passe pas.
+    const blocks = source.match(/<BanRuleSegments\b[\s\S]*?\/>/g) ?? [];
+    const first = blocks.find((block) => block.includes('t("dialog.firstBan")'));
+    const next = blocks.find((block) => block.includes('t("dialog.nextBan")'));
+
+    expect(blocks).toHaveLength(2);
+    for (const prop of ["rules={FIRST_BAN_RULES}", "value={firstBan}", "onChange={setFirstBan}", "busy={busy}", "isBusy={isBusy}"]) {
+      expect(first).toContain(prop);
+    }
+    for (const prop of ["rules={NEXT_BAN_RULES}", "value={nextBan}", "onChange={setNextBan}", "busy={busy}", "isBusy={isBusy}"]) {
+      expect(next).toContain(prop);
+    }
   });
 
-  it("dialog_saveRules_payloadUnchanged", () => {
-    expect(readSource(DIALOG)).toContain("{ firstBan, nextBan, nextPick: rules.nextPick }");
+  it("dialog_saveRules_sendsMapRulesPayload", () => {
+    // Le corps lui-même est vérifié sur `mapRulesPayload` (round-maps-editor-guards.test.ts).
+    expect(readSource(DIALOG)).toContain("mapRulesPayload({ firstBan, nextBan }, rules)");
   });
 
   it("dialog_banRules_everyOptionHasFrenchAndEnglishLabel", () => {
@@ -149,11 +158,34 @@ describe("lighter dialog details", () => {
     const css = readSource(STYLES);
 
     expect(css).toContain("max-height: max(180px, min(280px, 40dvh));");
-    expect(css).toMatch(/@media \(max-width: 480px\) \{[\s\S]*\.mapList \{\s*padding: 0;\s*border: 0;/);
+    expect(css).toMatch(/@media \(max-width: 480px\) \{[\s\S]*\.mapList \{\s*padding: 6px 0;\s*border: 0;/);
   });
 
-  it("dialog_staleTiebreaks_titleIsARealLegend", () => {
-    expect(readSource(DIALOG)).toMatch(/<legend className={styles\.legend}>\s*<span id={`\${ids}-title`}>/);
+  it("styles_mapList_narrowKeepsTopAndBottomRule", () => {
+    expect(readSource(STYLES)).toMatch(/\.mapList \{\s*padding: 6px 0;\s*border: 0;\s*border-block: 1px solid/);
+  });
+
+  it("dialog_staleTiebreaks_legendIsTextOnlyAndHintOutside", () => {
+    expect(readSource(DIALOG)).toMatch(
+      /<legend className="sr-only">\{t\("dialog\.staleTiebreakTitle"\)\}<\/legend>\s*<InfoHintRow>[\s\S]*?<InfoHint id=\{`\$\{ids\}-hint`\}/,
+    );
+  });
+
+  it("dialog_pointsPerMap_legendIsTextOnlyAndHintOutside", () => {
+    expect(readSource(DIALOG)).toMatch(
+      /<legend className="sr-only">\{t\("dialog\.pointsPerMapTitle"\)\}<\/legend>\s*<div className=\{styles\.labelRow\}>[\s\S]*?<InfoHint id=\{`\$\{ids\}-points-maps-hint`\}/,
+    );
+  });
+
+  it("dialog_noLegendContainsInfoHint", () => {
+    expect(readSource(DIALOG)).not.toMatch(/<legend\b(?:(?!<\/legend>)[\s\S])*<InfoHint\b/);
+  });
+
+  it("mapPicker_latestEdit_updatedInLayoutEffectNotDuringRender", () => {
+    const source = readSource(DIALOG);
+
+    expect(source).toMatch(/useLayoutEffect\(\(\) => \{\s*latestEdit\.current = onEdit;\s*\}, \[onEdit\]\);/);
+    expect(source.match(/latestEdit\.current = onEdit;/g)).toHaveLength(1);
   });
 });
 
