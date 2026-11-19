@@ -1005,11 +1005,31 @@ describe("clearPastScheduleDeadlines", () => {
     for (const sql of [deleteSql, updateSql]) {
       // Double forfait, ou close sans horaire ni lancement (résultat d'office, forfait simple) : la date butoir armée
       // la reclorait aussitôt ; celle d'une rencontre programmée ou lancée reste (lue par le planning).
-      expect(String(sql)).toContain("(double_forfeit = 1 OR (start_at IS NULL AND launched_at IS NULL))");
+      expect(String(sql)).toContain("(double_forfeit = 1 OR (start_at IS NULL");
       expect(String(sql)).toContain("schedule_deadline_at <= ?");
     }
     expect(deleteParams).toEqual([40, 41, NOW]);
     expect(updateParams).toEqual([40, 41, NOW]);
+  });
+
+  it("clearPastScheduleDeadlines_ids_onlyCompletedMatchesTargeted", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+
+    await clearPastScheduleDeadlines(fakeConnection({ execute }), [40], NOW);
+
+    // Un match de la manche jamais joué garde sa date butoir passée : le balayage le clora.
+    for (const [sql] of execute.mock.calls) expect(String(sql)).toContain("status = 'COMPLETED'");
+  });
+
+  it("clearPastScheduleDeadlines_ids_launchCountedForCurrentPairingOnly", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+
+    await clearPastScheduleDeadlines(fakeConnection({ execute }), [40], NOW);
+
+    for (const [sql] of execute.mock.calls) {
+      expect(String(sql)).toContain("NOT (launched_at IS NOT NULL AND launch_pairing <=> CONCAT(team1_id, ':', team2_id))");
+      expect(String(sql)).not.toContain("launched_at IS NULL");
+    }
   });
 
   it("clearPastScheduleDeadlines_noIds_noQuery", async () => {

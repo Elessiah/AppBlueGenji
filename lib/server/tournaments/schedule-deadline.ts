@@ -916,7 +916,8 @@ export async function flushSends(outbox: readonly PendingSend[], now: number): P
  * Arme la date butoir si l'avis a joint quelqu'un. Personne de joint parce que
  * le bot n'a pas répondu (panne passagère), et `retry` permis : la réservation
  * est rendue et le match mis de côté {@link BOT_RETRY_DELAY_MS}, au plus
- * {@link BOT_RETRY_MAX} fois pour cette date butoir — sans quoi une courte
+ * {@link BOT_RETRY_MAX} fois pour cette date butoir et cette paire, paliers
+ * compris — sans quoi une courte
  * panne au moment de l'annonce éteindrait la date butoir. Personne de
  * joignable (aucun responsable joignable, sujet coupé par tous), ou essais
  * épuisés : la réservation reste — pas de renvoi — mais n'arme rien, et sans
@@ -934,25 +935,37 @@ async function settleReached(send: PendingSend, progress: SendProgress, now: num
     return false;
   }
   if (retry && progress.unreachable > 0 && send.release !== null) {
+    const pairing = rowPairing(send.row);
     const previous = botRetries().get(matchId);
-    const retries = previous?.deadlineAt === send.deadlineAt ? previous.retries : 0;
-    if (retries < BOT_RETRY_MAX) {
-      botRetries().set(matchId, { deadlineAt: send.deadlineAt, retries: retries + 1 });
-      console.warn(
-        `[schedule-deadline] match ${matchId} : avis ${send.key} non remis, bot injoignable — nouvel essai dans ${BOT_RETRY_DELAY_MS / 60000} min (${retries + 1}/${BOT_RETRY_MAX})`,
-      );
-      await releaseNotices(send).catch(() => undefined);
-      failureCounts().set(matchId, { deadlineAt: send.deadlineAt, failures: 0, retryAt: now + BOT_RETRY_DELAY_MS });
-      return true;
+    const retries = previous?.deadlineAt === send.deadlineAt && previous.pairing === pairing ? previous.retries : 0;
+    if (retries >= BOT_RETRY_MAX) {
+      console.error(`[schedule-deadline] match ${matchId} : avis ${send.key} non remis après ${BOT_RETRY_MAX} nouveaux essais, bot injoignable`);
+      return false;
     }
-    console.error(`[schedule-deadline] match ${matchId} : avis ${send.key} non remis après ${BOT_RETRY_MAX} nouveaux essais, bot injoignable`);
+    botRetries().set(matchId, { deadlineAt: send.deadlineAt, pairing, retries: retries + 1 });
+    console.warn(
+      `[schedule-deadline] match ${matchId} : avis ${send.key} non remis, bot injoignable — nouvel essai dans ${BOT_RETRY_DELAY_MS / 60000} min (${retries + 1}/${BOT_RETRY_MAX})`,
+    );
+    await releaseNotices(send).catch(() => undefined);
+    // Le délai court depuis la fin de l'envoi (le vidage attend le bot, bien après le début du passage), et la
+    // série d'échecs en cours pour cette date butoir se poursuit (`recordFailure`) : ni l'un ni l'autre n'est remis à zéro.
+    const prior = failureCounts().get(matchId);
+    const failures = prior?.deadlineAt === send.deadlineAt ? prior.failures : 0;
+    failureCounts().set(matchId, { deadlineAt: send.deadlineAt, failures, retryAt: Math.max(now, Date.now()) + BOT_RETRY_DELAY_MS, botWait: true });
+    return true;
   }
   console.warn(`[schedule-deadline] match ${matchId} : avis ${send.key} remis à personne, date butoir non armée par lui`);
   return false;
 }
 
-/** Nouveaux essais « bot injoignable » d'un match, pour une date butoir (une autre date repart de zéro). */
-type BotRetryState = { deadlineAt: number; retries: number };
+/**
+ * Nouveaux essais « bot injoignable » d'un match, pour une date butoir et une
+ * paire (une autre date ou une autre paire repart de zéro). Tenus à part des
+ * échecs ({@link failureCounts}), que tout passage réussi efface : le budget,
+ * lui, vaut pour toute la date butoir, paliers compris, et ne s'oublie qu'une
+ * fois celle-ci passée (`forgetUnseen`).
+ */
+type BotRetryState = { deadlineAt: number; pairing: string | null; retries: number };
 
 const globalBotRetries = globalThis as typeof globalThis & { __bgScheduleDeadlineBotRetries?: Map<number, BotRetryState> };
 
@@ -963,7 +976,13 @@ export function botRetries(): Map<number, BotRetryState> {
 }
 
 /** Échecs d'affilée d'un match, pour une date butoir (une autre date repart de zéro). */
-type FailureState = { deadlineAt: number | null; failures: number; retryAt: number };
+type FailureState = {
+  deadlineAt: number | null;
+  failures: number;
+  retryAt: number;
+  /** Mis de côté pour un nouvel essai « bot injoignable », pas pour ses échecs : la série reprend au retour. */
+  botWait?: true;
+};
 
 const globalFailures = globalThis as typeof globalThis & { __bgScheduleDeadlineFailures?: Map<number, FailureState> };
 
@@ -988,7 +1007,7 @@ export function recordFailure(row: SweepRow, error: unknown, now: number): void 
   const deadlineAt = deadlineOf(row);
   const previous = failureCounts().get(matchId);
   // Une série mise de côté puis reprise repart de zéro : le compte reste borné.
-  const continued = previous !== undefined && previous.deadlineAt === deadlineAt && previous.retryAt === 0;
+  const continued = previous !== undefined && previous.deadlineAt === deadlineAt && (previous.retryAt === 0 || previous.botWait === true);
   const failures = (continued ? previous.failures : 0) + 1;
   const parked = failures >= SWEEP_MAX_FAILURES;
   failureCounts().set(matchId, { deadlineAt, failures, retryAt: parked ? now + SWEEP_FAILURE_BACKOFF_MS : 0 });
@@ -1007,15 +1026,17 @@ function parkedIds(now: number): number[] {
 
 /**
  * Oublie les échecs des matchs que la lecture complète n'a plus rendus (joués,
- * date butoir effacée…), hors ceux mis de côté : la table ne grossit pas.
+ * date butoir effacée…), hors ceux mis de côté, et les nouveaux essais
+ * « bot injoignable » des dates butoir passées : les tables ne grossissent pas.
  */
 function forgetUnseen(seen: ReadonlySet<number>, now: number): void {
   for (const [id, state] of failureCounts()) {
     if (!seen.has(id) && state.retryAt <= now) failureCounts().delete(id);
   }
-  // Les essais d'un match parti de la lecture (joué, date butoir effacée…) ; celui mis de côté reste compté.
-  for (const id of botRetries().keys()) {
-    if (!seen.has(id) && !failureCounts().has(id)) botRetries().delete(id);
+  // Le budget de nouveaux essais vaut pour toute la date butoir : un match hors de la lecture entre deux paliers
+  // (annonce, puis 24 h avant) le garde ; il ne s'oublie qu'une fois la date butoir passée.
+  for (const [id, state] of botRetries()) {
+    if (state.deadlineAt <= now) botRetries().delete(id);
   }
 }
 

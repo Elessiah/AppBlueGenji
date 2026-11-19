@@ -469,6 +469,12 @@ describe("saisie en masse : date butoir de la manche reposée", () => {
     expect(roundScheduleDeadlines(matches, NOW)).toEqual([ROUND, later]);
   });
 
+  it("roundScheduleDeadlines_deadlineNotOnTheHour_excluded", () => {
+    const matches = [{ status: "READY", scheduleDeadlineAt: new Date(ROUND + 30 * MINUTE).toISOString() }];
+
+    expect(roundScheduleDeadlines(matches, NOW)).toEqual([]);
+  });
+
   it("roundScheduleDeadlines_completedUnder13hBeyond24hOrNone_excluded", () => {
     const matches = [
       { status: "COMPLETED", scheduleDeadlineAt: new Date(ROUND).toISOString() },

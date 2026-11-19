@@ -301,7 +301,9 @@ export function deadlineEntryAcceptable(at: number, now: number, reapply: readon
  * masse peut **reposer** pour les matchs remplis depuis, même à moins de 24
  * heures (encore assez loin pour qu'une annonce l'arme,
  * {@link SCHEDULE_DEADLINE_REAPPLY_MIN_MS}) — toutes : un tournoi à plusieurs
- * manches ouvertes (haut et bas de tableau) en porte plusieurs. Croissantes,
+ * manches ouvertes (haut et bas de tableau) en porte plusieurs. À l'heure
+ * pile seulement : la saisie va d'heure en heure ({@link deadlineEntryHours}),
+ * une date posée à une autre minute ne pourrait être choisie. Croissantes,
  * sans doublon.
  */
 export function roundScheduleDeadlines(
@@ -312,7 +314,7 @@ export function roundScheduleDeadlines(
   for (const match of matches) {
     if (match.status === "COMPLETED" || match.scheduleDeadlineAt === null) continue;
     const at = Date.parse(match.scheduleDeadlineAt);
-    if (Number.isFinite(at) && at < now + SCHEDULE_DEADLINE_MIN_AHEAD_MS && deadlineEntryAcceptable(at, now, [at])) found.add(at);
+    if (Number.isFinite(at) && at % HOUR_MS === 0 && at < now + SCHEDULE_DEADLINE_MIN_AHEAD_MS && deadlineEntryAcceptable(at, now, [at])) found.add(at);
   }
   return [...found].sort((a, b) => a - b);
 }

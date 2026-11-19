@@ -42,6 +42,7 @@ import {
   BOT_RETRY_MAX,
   botRetries,
   reachedSomeone,
+  recordFailure,
   scheduleDeadlineForfeitDue,
   SCHEDULE_DEADLINES_LOCK,
   sentNoticesByMatch,
@@ -1338,10 +1339,76 @@ describe("revue sécurité 2 : date butoir des remises, bot injoignable, gestes 
     jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [7], pushed: 0 });
     routeSql(connection, announcementRoutes());
 
+    jest.spyOn(Date, "now").mockReturnValue(NOW);
+
     await sweepScheduleDeadlines(NOW);
 
-    expect(failureCounts().get(40)).toEqual({ deadlineAt: DEADLINE, failures: 0, retryAt: NOW + BOT_RETRY_DELAY_MS });
-    expect(botRetries().get(40)).toEqual({ deadlineAt: DEADLINE, retries: 1 });
+    expect(failureCounts().get(40)).toEqual({ deadlineAt: DEADLINE, failures: 0, retryAt: NOW + BOT_RETRY_DELAY_MS, botWait: true });
+    expect(botRetries().get(40)).toEqual({ deadlineAt: DEADLINE, pairing: PAIRING, retries: 1 });
+  });
+
+  it("sweepScheduleDeadlines_botUnreachable_retryDelayCountedFromSendEnd", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    poolMock();
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [7], pushed: 0 });
+    routeSql(connection, announcementRoutes());
+    jest.spyOn(Date, "now").mockReturnValue(NOW + 5 * MINUTE);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(failureCounts().get(40)?.retryAt).toBe(NOW + 5 * MINUTE + BOT_RETRY_DELAY_MS);
+  });
+
+  it("sweepScheduleDeadlines_botUnreachableDuringFailureSeries_failuresKept", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    poolMock();
+    failureCounts().set(40, { deadlineAt: DEADLINE, failures: 3, retryAt: 0 });
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [7], pushed: 0 });
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(failureCounts().get(40)).toMatchObject({ failures: 3, botWait: true });
+  });
+
+  it("recordFailure_afterBotWait_seriesContinues", () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    failureCounts().set(40, { deadlineAt: DEADLINE, failures: 3, retryAt: NOW - MINUTE, botWait: true });
+
+    recordFailure(row(), new Error("boom"), NOW);
+
+    expect(failureCounts().get(40)).toEqual({ deadlineAt: DEADLINE, failures: 4, retryAt: 0 });
+  });
+
+  it("sweepScheduleDeadlines_botRetriesOfOtherPairing_countRestarts", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const pool = poolMock();
+    botRetries().set(40, { deadlineAt: DEADLINE, pairing: "100:300", retries: BOT_RETRY_MAX });
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [7], pushed: 0 });
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(poolCalls(pool, /DELETE FROM bg_schedule_deadline_notices/).length).toBeGreaterThan(0);
+    expect(botRetries().get(40)).toEqual({ deadlineAt: DEADLINE, pairing: PAIRING, retries: 1 });
+  });
+
+  it("sweepScheduleDeadlines_unseenMatchFutureDeadline_botRetriesKept", async () => {
+    botRetries().set(9999, { deadlineAt: DEADLINE, pairing: PAIRING, retries: BOT_RETRY_MAX });
+    routeSql(connection, [[/FROM bg_matches m/, () => [[]]]]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(botRetries().has(9999)).toBe(true);
+  });
+
+  it("sweepScheduleDeadlines_botRetriesDeadlinePassed_forgotten", async () => {
+    botRetries().set(9999, { deadlineAt: NOW, pairing: PAIRING, retries: 1 });
+    routeSql(connection, [[/FROM bg_matches m/, () => [[]]]]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(botRetries().has(9999)).toBe(false);
   });
 
   it("sweepScheduleDeadlines_parkedForBotRetry_matchSkippedByRead", async () => {
@@ -1356,10 +1423,10 @@ describe("revue sécurité 2 : date butoir des remises, bot injoignable, gestes 
   });
 
   it("sweepScheduleDeadlines_botUnreachableRetriesExhausted_claimKeptNotParked", async () => {
-    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const pool = poolMock();
-    botRetries().set(40, { deadlineAt: DEADLINE, retries: BOT_RETRY_MAX });
+    botRetries().set(40, { deadlineAt: DEADLINE, pairing: PAIRING, retries: BOT_RETRY_MAX });
     jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [7], pushed: 0 });
     routeSql(connection, announcementRoutes());
 
@@ -1368,24 +1435,26 @@ describe("revue sécurité 2 : date butoir des remises, bot injoignable, gestes 
     expect(poolCalls(pool, /DELETE FROM bg_schedule_deadline_notices/)).toHaveLength(0);
     expect(failureCounts().has(40)).toBe(false);
     expect(error).toHaveBeenCalledWith(expect.stringContaining(`après ${BOT_RETRY_MAX} nouveaux essais`));
+    // Une seule ligne de journal pour l'événement.
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("remis à personne"));
   });
 
   it("sweepScheduleDeadlines_botUnreachableRetriesOfOtherDeadline_countRestarts", async () => {
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
     const pool = poolMock();
-    botRetries().set(40, { deadlineAt: DEADLINE - 2 * HOUR, retries: BOT_RETRY_MAX });
+    botRetries().set(40, { deadlineAt: DEADLINE - 2 * HOUR, pairing: PAIRING, retries: BOT_RETRY_MAX });
     jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [7], pushed: 0 });
     routeSql(connection, announcementRoutes());
 
     await sweepScheduleDeadlines(NOW);
 
     expect(poolCalls(pool, /DELETE FROM bg_schedule_deadline_notices/).length).toBeGreaterThan(0);
-    expect(botRetries().get(40)).toEqual({ deadlineAt: DEADLINE, retries: 1 });
+    expect(botRetries().get(40)).toEqual({ deadlineAt: DEADLINE, pairing: PAIRING, retries: 1 });
   });
 
   it("sweepScheduleDeadlines_reachedAfterBotRetry_retriesForgotten", async () => {
     const pool = poolMock();
-    botRetries().set(40, { deadlineAt: DEADLINE, retries: 2 });
+    botRetries().set(40, { deadlineAt: DEADLINE, pairing: PAIRING, retries: 2 });
     jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [], pushed: 1 });
     routeSql(connection, announcementRoutes());
 

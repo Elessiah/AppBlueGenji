@@ -44,7 +44,8 @@ Code : `lib/shared/schedule-deadline.ts` (règle pure),
   après la pose), et **seulement sur les matchs sans date butoir** : une date
   butoir plus lointaine déjà en place n'est jamais raccourcie. La fenêtre
   propose toutes ces dates parmi ses choix (`roundScheduleDeadlines`, une par
-  manche ouverte), sans les préremplir : elle s'ouvre sur la date proposée.
+  manche ouverte, à l'heure pile seulement : la saisie va d'heure en heure, une
+  date posée à une autre minute par l'API ne s'y repose pas), sans les préremplir : elle s'ouvre sur la date proposée.
 - Transaction : `lockTournamentRow` en **première** instruction, puis les
   matchs `FOR UPDATE` ; changer ou retirer la date butoir efface les traces
   d'avis (les paliers repartent pour la nouvelle). Reposer la **même** date
@@ -108,8 +109,10 @@ moins est réellement parti (`reachedSomeone`, colonne `delivered` de
 `bg_schedule_deadline_notices`, notée après l'envoi) : un palier réservé dont
 rien n'est parti n'arme rien. Bot qui ne répond pas (`botUnreachable`, appel
 perdu) : la réservation est rendue et le match mis de côté 10 minutes
-(`BOT_RETRY_DELAY_MS`), au plus 3 fois pour une même date butoir
-(`BOT_RETRY_MAX`) — une courte panne à l'annonce n'éteint pas la date
+(`BOT_RETRY_DELAY_MS`, compté depuis la fin de l'envoi), au plus 3 fois pour
+une même date butoir et une même paire, tous paliers confondus (`BOT_RETRY_MAX`,
+budget oublié une fois la date butoir passée ; la série d'échecs en cours du
+match n'est pas remise à zéro par cette mise de côté) — une courte panne à l'annonce n'éteint pas la date
 butoir, et un bot lent qui remet pourtant le message ne le répète pas sans
 fin ; essais épuisés, la réservation reste. Pas de nouvel essai quand l'envoi
 échoue en route (une engagée a pu être prévenue). Aucun responsable joignable
@@ -133,9 +136,11 @@ ligne « Match terminé » dit « date butoir de planification passée sans
 horaire » (`markDeadlineForfeit`).
 
 **Retour en arrière** : un résultat défait (`rollback.ts`, `clearMatchResults`)
-efface la date butoir **déjà passée** d'une rencontre close en **double
-forfait**, ou close **sans horaire ni lancement** (résultat d'office, forfait
-simple), rendue à jouer, et ses traces d'avis (`clearPastScheduleDeadlines`,
+efface la date butoir **déjà passée** d'une rencontre **close** (`COMPLETED` :
+un match de la manche jamais joué garde la sienne, le balayage le clora) en
+**double forfait**, ou **sans horaire ni lancement de sa paire actuelle**
+(résultat d'office, forfait simple ; un lancement d'une paire d'avant ne
+compte pas, comme pour `deadlineMatchOf`), rendue à jouer, et ses traces d'avis (`clearPastScheduleDeadlines`,
 avant l'effacement du résultat) — sinon le balayage referait le double
 forfait dans la minute ; une date butoir encore devant reste, comme celle,
 passée et retirée, d'une rencontre programmée ou lancée (le planning la lit). Retirer l'horaire d'un match après une
