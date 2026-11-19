@@ -72,7 +72,7 @@ export const PUSH_TOPICS = {
   },
   SCHEDULE_DEADLINE: {
     label: "Date butoir de planification",
-    description: "Ton équipe gère un match dont l'arbitrage a fixé une date butoir pour convenir d'un horaire : l'annonce, des rappels 24 h et 3 h avant s'il n'a toujours pas d'horaire, puis le double forfait s'il n'en a pas reçu. Coupe aussi le message privé Discord.",
+    description: "Un match que tu mènes (capitaine, manager, propriétaire, ou joueur d'un tournoi individuel) a reçu du staff une date butoir pour convenir d'un horaire : l'annonce, des rappels 24 h et 3 h avant s'il n'a toujours pas d'horaire, puis le double forfait qui peut suivre. Coupe aussi le message privé Discord.",
     audience: null,
   },
   TEAM_JOIN_REQUEST: {
