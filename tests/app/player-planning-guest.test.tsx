@@ -23,12 +23,22 @@ import { planningGuestErrorMessage } from "@/app/(secured)/joueurs/[id]/_lib/pla
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { PlayersTextProvider } from "@/components/i18n/players-text-provider";
 import { messagesFor } from "@/lib/server/i18n-messages";
+import type { BusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { scopedText } from "@/lib/shared/scoped-text";
 
 const EN = messagesFor("en");
 
-function field(guest: boolean): string {
-  return renderToStaticMarkup(<PlanningGuestField userId="7" pseudo="Test_Caster" guest={guest} onSaved={() => undefined} />);
+const guard: BusyGuard = {
+  busy: false,
+  isBusy: () => false,
+  run: async (task) => task(),
+  isMounted: () => true,
+  hold: () => undefined,
+  whenIdle: (handler) => handler,
+};
+
+function field(guest: boolean | null): string {
+  return renderToStaticMarkup(<PlanningGuestField userId="7" pseudo="Test_Caster" guest={guest} guard={guard} onSaved={() => undefined} />);
 }
 
 describe("PlanningGuestField", () => {
@@ -50,6 +60,20 @@ describe("PlanningGuestField", () => {
     expect(html).toContain("Hors planning : garde ses droits de caster/prod mais n&#x27;apparaît pas au planning.");
   });
 
+  it("planningGuestField_unreadableFlag_rendersDisabledBoxWithNote", () => {
+    const html = field(null);
+
+    expect(html).toMatch(/type="checkbox"[^>]*disabled/);
+    expect(html).toContain("Le réglage n&#x27;a pas pu être lu : recharge la page.");
+  });
+
+  it("planningGuestField_partialFailure_isAnError", () => {
+    const source = readSource("app/(secured)/joueurs/[id]/_components/PlanningGuestField.tsx");
+
+    expect(source).toContain('showError(text.t("planningGuest.saved.partial"');
+    expect(source).not.toContain("showInfo(text.t(\"planningGuest.saved.partial");
+  });
+
   it("planningGuestField_save_putsToTheAdminRoute", () => {
     const source = readSource("app/(secured)/joueurs/[id]/_components/PlanningGuestField.tsx");
 
@@ -64,7 +88,7 @@ describe("PlanningGuestField — anglais sous /en", () => {
     const html = renderToStaticMarkup(
       <AppLocaleProvider locale="en">
         <PlayersTextProvider locale="en" messages={EN.players}>
-          <PlanningGuestField userId="7" pseudo="Test_Caster" guest={false} onSaved={() => undefined} />
+          <PlanningGuestField userId="7" pseudo="Test_Caster" guest={false} guard={guard} onSaved={() => undefined} />
         </PlayersTextProvider>
       </AppLocaleProvider>,
     );
@@ -87,7 +111,11 @@ describe("PlayerRolesPanel — câblage de la case", () => {
     const panel = readSource("app/(secured)/joueurs/[id]/_components/PlayerRolesPanel.tsx");
     const page = readSource("app/(secured)/joueurs/[id]/page.tsx");
 
-    expect(panel).toContain('typeof planningGuest === "boolean"');
+    expect(panel).toContain("planningGuest !== undefined");
+    // un seul envoi à la fois : la garde du panneau est celle de la case
+    expect(panel).toContain("guard={guard}");
+    // relire la fiche sans changer les rôles ne remet pas les cases cochées à zéro
+    expect(panel).toContain("}, [rolesKey]);");
     expect(page).toContain("planningGuest={data.planningGuest}");
   });
 });

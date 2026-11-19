@@ -382,9 +382,9 @@ export async function loadNotificationRecipients(
     ? ` AND NOT ${userSuspendedSql("bg_users.id")}`
     : "";
   const planningOnly = options.planningMembersOnly === true;
-  const select = (withMatchDm: boolean, withLocale: boolean) =>
+  const select = (withMatchDm: boolean, withLocale: boolean, withGuest: boolean) =>
     db.query<(RecipientRow & { match_dm_enabled?: number | null } & PlanningRightsColumns)[]>(
-      `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at${withMatchDm ? ", match_dm_enabled" : ""}${withLocale ? ", locale" : ""}${planningOnly ? ", is_admin, platform_roles_json, is_guest_staff" : ""}
+      `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at${withMatchDm ? ", match_dm_enabled" : ""}${withLocale ? ", locale" : ""}${planningOnly ? ", is_admin, platform_roles_json" : ""}${planningOnly && withGuest ? ", is_guest_staff" : ""}
        FROM bg_users WHERE is_deleted = 0 AND id IN (${ids.map(() => "?").join(", ")})${active}`,
       ids,
     );
@@ -397,10 +397,16 @@ export async function loadNotificationRecipients(
   // **avant** le réglage : une langue absente ne fait jamais perdre une
   // opposition aux messages de match (RGPD, article 21).
   const matchDm = options.matchDm === true;
-  const attempts: readonly [[boolean, boolean], ...[boolean, boolean][]] = matchDm
+  const pairs: [boolean, boolean][] = matchDm
     ? [[true, true], [true, false], [false, true], [false, false]]
     : [[false, true], [false, false]];
-  const read = await firstReadable(attempts, ([withMatchDm, withLocale]) => select(withMatchDm, withLocale));
+  // Le drapeau « invité » (colonne récente) tombe en premier : une base qui ne
+  // l'a pas encore n'a aucun invité, la relecture sans lui est donc exacte.
+  const guestReads = planningOnly ? [true, false] : [false];
+  const attempts = guestReads.flatMap((withGuest) =>
+    pairs.map(([withMatchDm, withLocale]): [boolean, boolean, boolean] => [withMatchDm, withLocale, withGuest]),
+  ) as [[boolean, boolean, boolean], ...[boolean, boolean, boolean][]];
+  const read = await firstReadable(attempts, ([withMatchDm, withLocale, withGuest]) => select(withMatchDm, withLocale, withGuest));
   const rows = planningOnly ? read.filter(holdsPlanning) : read;
   return rows.map((row) => {
     const recipient = toNotificationRecipient(row, reach);

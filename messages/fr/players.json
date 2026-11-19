@@ -199,6 +199,7 @@
       "pending": "Enregistrement…",
       "body": "Il garde ses rôles et peut toujours caster un match, mais il sort du planning : il quitte ses créneaux à venir (un remplaçant est cherché comme pour un désistement), ses disponibilités à venir sont effacées et il n'y est plus proposé ni prévenu. Son historique reste."
     },
+    "unreadable": "Le réglage n'a pas pu être lu : recharge la page.",
     "busy": "Un autre envoi est en cours, réessaye.",
     "errors": {
       "UNAUTHORIZED": "Ta session a expiré : reconnecte-toi.",

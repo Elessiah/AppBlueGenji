@@ -491,6 +491,22 @@ describe("destinataires", () => {
     expect(String(query.mock.calls[0][0])).toContain("is_guest_staff");
   });
 
+  it("loadNotificationRecipients_planningMembersOnly_guestColumnMissing_readsWithoutIt", async () => {
+    const query = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
+      if (String(sql).includes("is_guest_staff")) {
+        throw Object.assign(new Error("Unknown column 'is_guest_staff' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" });
+      }
+      return [[{ ...recipientRow({ id: 5 }), is_admin: 0, platform_roles_json: JSON.stringify(["CASTER"]) }]];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const recipients = await loadNotificationRecipients([5], "proven", { planningMembersOnly: true });
+
+    expect(recipients.map((recipient) => recipient.userId)).toEqual([5]);
+    expect(String(query.mock.calls[0][0])).toContain("is_guest_staff");
+    expect(String(query.mock.calls.at(-1)?.[0])).not.toContain("is_guest_staff");
+  });
+
   it("loadNotificationRecipients_withoutPlanningOption_readsNoRights", async () => {
     const query = jest.fn<SqlQuery>().mockResolvedValue([[row]]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));

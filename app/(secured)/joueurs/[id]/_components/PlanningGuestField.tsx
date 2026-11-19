@@ -5,7 +5,7 @@ import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import { usePlayersText } from "@/components/i18n/players-text";
-import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
+import type { BusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { reloadSucceeded } from "@/lib/shared/reload-outcome";
 import { planningGuestErrorMessage } from "../_lib/planning-guest-errors";
 
@@ -21,17 +21,21 @@ export function PlanningGuestField({
   userId,
   pseudo,
   guest,
+  guard,
   onSaved,
 }: Readonly<{
   userId: string;
   pseudo: string;
-  guest: boolean;
+  /** Valeur lue ; `null` : la lecture du drapeau a échoué, la case est offerte désactivée. */
+  guest: boolean | null;
+  /** Garde du panneau, partagée avec l'envoi des rôles : un seul envoi à la fois sur ce compte. */
+  guard: BusyGuard;
   /** Relit la fiche ; `false` : relecture échouée. */
   onSaved: () => Promise<boolean | void> | void;
 }>) {
   const { showError, showInfo, showSuccess } = useToast();
   const text = usePlayersText();
-  const { busy, isBusy, run } = useBusyGuard();
+  const { busy, isBusy, run } = guard;
   const [confirming, setConfirming] = useState(false);
 
   const send = async (next: boolean): Promise<boolean> => {
@@ -44,7 +48,7 @@ export function PlanningGuestField({
       const payload = (await res.json().catch(() => ({}))) as { error?: string; failed?: number };
       if (!res.ok) throw new Error(payload.error || "PLANNING_GUEST_UPDATE_FAILED");
       if (!next) showSuccess(text.t("planningGuest.saved.member", { pseudo }));
-      else if ((payload.failed ?? 0) > 0) showInfo(text.t("planningGuest.saved.partial", { pseudo }));
+      else if ((payload.failed ?? 0) > 0) showError(text.t("planningGuest.saved.partial", { pseudo }));
       else showSuccess(text.t("planningGuest.saved.guest", { pseudo }));
       if (!(await reloadSucceeded(onSaved))) showError(planningGuestErrorMessage("PROFILE_RELOAD_FAILED", text));
       return true;
@@ -68,6 +72,7 @@ export function PlanningGuestField({
       showInfo(text.t("planningGuest.busy"), { once: true });
       return;
     }
+    if (guest === null) return;
     if (guest) void save(false);
     else setConfirming(true);
   };
@@ -81,13 +86,15 @@ export function PlanningGuestField({
         >
           <input
             type="checkbox"
-            checked={guest}
+            checked={guest === true}
+            disabled={guest === null}
             aria-readonly={busy || undefined}
             aria-describedby="player-planning-guest-help"
             onChange={onChange}
           />
           <span style={{ fontSize: 14, color: "var(--ink)" }}>{text.t("planningGuest.label")}</span>
         </label>
+        {guest === null ? <span style={{ fontSize: 12, color: "var(--ink-mute)" }}>{text.t("planningGuest.unreadable")}</span> : null}
         <InfoHint id="player-planning-guest-help" subject={text.t("planningGuest.label")}>
           <p>{text.t("planningGuest.hint")}</p>
         </InfoHint>
@@ -97,7 +104,7 @@ export function PlanningGuestField({
           title={text.t("planningGuest.dialog.title", { pseudo })}
           confirmLabel={text.t("planningGuest.dialog.confirm")}
           pendingLabel={text.t("planningGuest.dialog.pending")}
-          tone="danger"
+          tone="primary"
           onClose={() => setConfirming(false)}
           onConfirm={() => save(true)}
         >

@@ -44,7 +44,7 @@ export function PlayerRolesPanel({
   userId: string;
   pseudo: string;
   roles: PlatformRole[] | undefined;
-  /** Drapeau « invité » (hors planning) ; sans valeur lue (`null`, absent), la case n'est pas offerte. */
+  /** Drapeau « invité » (hors planning) ; `undefined` : la case n'est pas offerte ; `null` : lecture échouée, case désactivée. */
   planningGuest?: boolean | null;
   /** Relit la fiche ; `false` : relecture échouée, les rôles affichés sont peut-être périmés. */
   onSaved: () => Promise<boolean | void> | void;
@@ -54,14 +54,19 @@ export function PlayerRolesPanel({
   const toastLang = staffLang ? { lang: staffLang } : undefined;
   // Un enregistrement à la fois ; pendant l'envoi, les cases gardent le focus
   // (`aria-readonly`, choix ignoré) et le bouton s'annonce occupé (`BUSY_BUTTONS.md`).
-  const { busy: rolesBusy, isBusy, run } = useBusyGuard();
+  const guard = useBusyGuard();
+  const { busy: rolesBusy, isBusy, run } = guard;
   const [selectedRoles, setSelectedRoles] = useState<PlatformRole[]>([]);
   const [pendingChange, setPendingChange] = useState<PlatformRoleChange | null>(null);
 
   // Resynchronise la sélection locale à chaque (re)chargement du profil.
+  // Clé de contenu : une relecture de la fiche qui rend les mêmes rôles (case « Invité »)
+  // ne doit pas effacer les cases cochées et pas encore enregistrées.
+  const rolesKey = roles ? [...roles].sort().join(",") : null;
   useEffect(() => {
     if (roles) setSelectedRoles(roles);
-  }, [roles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `rolesKey` porte le contenu de `roles`
+  }, [rolesKey]);
 
   const toggleRole = (role: PlatformRole) => {
     // Ce qui est coché est ce qui part : une case changée pendant l'envoi est ignorée.
@@ -173,8 +178,8 @@ export function PlayerRolesPanel({
           Enregistrer les rôles
         </BusyButton>
       </div>
-      {typeof planningGuest === "boolean" ? (
-        <PlanningGuestField userId={userId} pseudo={pseudo} guest={planningGuest} onSaved={onSaved} />
+      {planningGuest !== undefined ? (
+        <PlanningGuestField userId={userId} pseudo={pseudo} guest={planningGuest} guard={guard} onSaved={onSaved} />
       ) : null}
       {pendingChange ? (
         <ConfirmActionDialog
