@@ -4,7 +4,7 @@ import { publishRolesChange, setOwnPlatformRoles, setUserRoles, type RolesSaveRe
 import { failureReason, unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { can, isPlatformRole, type PlatformRole } from "@/lib/shared/permissions";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
-import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
+import { PLAYER_VIEW_OFF_AUDIT, strayLiftAuditLine } from "@/lib/server/player-view-audit";
 import { auditStaffAction } from "@/lib/server/staff-audit";
 
 /** Refus du service rendus tels quels, avec leur statut. */
@@ -29,9 +29,11 @@ function publishAfterCommit(actor: { id: number; pseudo: string }, targetId: num
   // rétrogradation, la ligne pm2 du retour, comme toute bascule (registre,
   // T05), au nom de l'administrateur qui l'a imposé — jamais sur Discord.
   // Promotion : une incarnation restée sur le compte, déjà sans effet, est
-  // levée — ligne sans nom, comme le balayage du démarrage (registre, T05).
+  // levée — ligne sans nom, le seul nombre de sessions, comme le balayage du
+  // démarrage ; elle suit celle du rôle accordé, qui désigne le compte
+  // (registre, T05, qui le dit).
   if (saved.strayImpersonationsLifted) {
-    console.info(`${PLAYER_VIEW_OFF_AUDIT} : levée à la promotion, compte sans administration (${saved.strayImpersonationsLifted} session(s))`);
+    console.info(strayLiftAuditLine("promotion", saved.strayImpersonationsLifted));
   }
   if (!saved.impersonationsCleared) return;
   try {

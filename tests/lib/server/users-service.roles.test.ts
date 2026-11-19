@@ -312,7 +312,8 @@ describe("setUserRoles — open tournament streams", () => {
     const result = await setUserRoles(7, [], 3);
 
     expect(connection.execute).toHaveBeenCalledTimes(2);
-    expect(result).toEqual({ roles: [], previous: ["ADMIN"] });
+    // `previous` suit `is_admin` : le compte n'était pas administrateur.
+    expect(result).toEqual({ roles: [], previous: [] });
   });
 
   it("closes the streams on a role grant too, so the viewer context is recomputed", async () => {
@@ -374,6 +375,31 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
     expect(clearSql).toContain("WHERE (user_id = ?) AND player_view_until > NOW()");
     expect(clearParams).toEqual([7]);
     expect(connection.execute.mock.invocationCallOrder[2]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  // Revue sécurité 5 : une ligne héritée rendue administratrice doit être
+  // notée « ADMIN accordé » au journal — `previous` suit `is_admin`.
+  it("setUserRoles_legacyAdminInJsonKeptAdmin_previousOmitsAdminSoJournalGrantsIt", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["ADMIN"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+    const result = await setUserRoles(7, ["ADMIN", "ARBITRE"], 3);
+
+    expect(result.previous).toEqual([]);
+    expect(rolesChangeAuditLine(7, result, false)).toContain("accordés : Administrateur");
+  });
+
+  it("setUserRoles_promotionWithoutDeadlineColumn_commitsWithoutCount", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    const unknown = Object.assign(new Error("Unknown column 'player_view_until'"), { code: "ER_BAD_FIELD_ERROR" });
+    connection.execute.mockRejectedValueOnce(unknown).mockRejectedValueOnce(unknown);
+
+    const result = await setUserRoles(7, ["ADMIN"], 3);
+
+    expect(result).toEqual({ roles: ["ADMIN"], previous: [] });
+    expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 
   it("setUserRoles_adminGrantedWithStrayImpersonation_returnsStrayImpersonationsLifted", async () => {

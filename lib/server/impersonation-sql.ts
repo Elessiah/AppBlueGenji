@@ -26,6 +26,7 @@ export async function withRolesColumn<T>(run: (roles: boolean) => Promise<T>): P
  * des rôles, l'échéance seule) des sessions désignées par `where` — une
  * condition sur `bg_user_sessions` seule, jamais sur une autre table (aucun
  * verrou pris hors des sessions). Une échéance déjà passée reste, sans effet.
+ * Sans la colonne `player_view_until` : 0, rien n'a pu être posé.
  *
  * @returns le nombre de sessions levées.
  */
@@ -34,12 +35,20 @@ export async function liftImpersonations(
   where: string,
   params: (string | number)[],
 ): Promise<number> {
-  const [result] = await withRolesColumn((roles) =>
-    db.execute<ResultSetHeader>(
-      `UPDATE bg_user_sessions SET player_view_until = NULL${roles ? ", impersonated_roles_json = NULL" : ""}
-       WHERE (${where}) AND player_view_until > NOW()`,
-      params,
-    ),
-  );
-  return Number(result.affectedRows ?? 0);
+  try {
+    const [result] = await withRolesColumn((roles) =>
+      db.execute<ResultSetHeader>(
+        `UPDATE bg_user_sessions SET player_view_until = NULL${roles ? ", impersonated_roles_json = NULL" : ""}
+         WHERE (${where}) AND player_view_until > NOW()`,
+        params,
+      ),
+    );
+    return Number(result.affectedRows ?? 0);
+  } catch (error) {
+    // Sans la colonne de l'échéance non plus (`ALTER` non joué, que la lecture
+    // de la session tolère) : aucune incarnation ne peut exister, rien à lever —
+    // un changement d'administration ne doit pas échouer pour autant.
+    if (isUnknownColumnError(error)) return 0;
+    throw error;
+  }
 }

@@ -21,7 +21,10 @@ import type { TeamRole } from "@/lib/shared/types";
 export interface RolesSaveResult {
   /** Les rôles enregistrés, normalisés. */
   roles: PlatformRole[];
-  /** Les rôles du compte juste avant l'écriture, lus sous le verrou de la ligne. */
+  /**
+   * Les rôles du compte juste avant l'écriture, lus sous le verrou de la ligne,
+   * `ADMIN` selon la colonne `is_admin` (le journal compare sur elle).
+   */
   previous: PlatformRole[];
   /**
    * Sessions dont une incarnation en cours a été levée par la rétrogradation
@@ -46,19 +49,25 @@ function storedRoles(row: { is_admin: unknown; platform_roles_json: unknown }): 
 
 /**
  * Lève l'incarnation des sessions d'un compte dont l'administration change
- * (colonne `is_admin`), dans la transaction de {@link setUserRoles} :
- * `impersonationsCleared` pour une rétrogradation (retour imposé, nommé),
- * `strayImpersonationsLifted` pour une promotion (ligne sans nom).
+ * (colonne `is_admin`), dans la transaction de {@link setUserRoles}. La route
+ * en tire, selon le sens du changement, la ligne pm2 du retour imposé
+ * (rétrogradation) ou la ligne sans nom de la levée (promotion).
+ *
+ * @returns le nombre de sessions levées (0 sans changement d'administration).
  */
-async function clearOnAdminChange(
-  connection: PoolConnection,
-  userId: number,
-  wasAdmin: boolean,
-  isAdmin: boolean,
-): Promise<{ impersonationsCleared: number; strayImpersonationsLifted: number }> {
-  if (wasAdmin === isAdmin) return { impersonationsCleared: 0, strayImpersonationsLifted: 0 };
-  const lifted = await clearAccountImpersonation(connection, userId);
-  return wasAdmin ? { impersonationsCleared: lifted, strayImpersonationsLifted: 0 } : { impersonationsCleared: 0, strayImpersonationsLifted: lifted };
+async function clearOnAdminChange(connection: PoolConnection, userId: number, wasAdmin: boolean, isAdmin: boolean): Promise<number> {
+  return wasAdmin === isAdmin ? 0 : clearAccountImpersonation(connection, userId);
+}
+
+/**
+ * Les rôles d'avant l'écriture tels que le journal du staff les compare : `ADMIN`
+ * selon la seule colonne `is_admin`. Une ligne héritée qui porte `ADMIN` dans
+ * son JSON sans être administratrice et qui en garde le rôle à l'enregistrement
+ * devient administratrice : le journal doit le dire (« ADMIN accordé »).
+ */
+function journalPrevious(previous: readonly PlatformRole[], wasAdmin: boolean): PlatformRole[] {
+  const scoped = previous.filter((role) => role !== "ADMIN");
+  return wasAdmin ? ["ADMIN", ...scoped] : scoped;
 }
 
 /** Vrai quand deux listes portent les mêmes rôles, sans égard à l'ordre ni aux doublons. */
@@ -110,8 +119,8 @@ export async function setUserRoles(
   const connection = await db.getConnection();
   let previous: PlatformRole[];
   let unchanged = false;
-  let impersonationsCleared = 0;
-  let strayImpersonationsLifted = 0;
+  let wasAdmin = false;
+  let lifted = 0;
   try {
     await connection.beginTransaction();
     // L'**auteur** doit être encore administrateur au moment d'écrire : la
@@ -146,6 +155,7 @@ export async function setUserRoles(
     // journal compare aux rôles enregistrés (accordés / retirés).
     previous = storedRoles(targetRow);
     assertExpectedRoles(expected, previous);
+    wasAdmin = Number(targetRow.is_admin) === 1;
 
     // Rien à changer : ni écriture, ni flux fermés (un enregistrement identique
     // reconnectait pour rien tous les flux du compte). Une ligne héritée qui
@@ -169,8 +179,10 @@ export async function setUserRoles(
       // l'administration rendue, sans geste. Elle tombe donc ici, dans la
       // même transaction que la promotion — une panne fait échouer la
       // promotion (registre T01 et T05 : sans effet sur un compte qui n'est
-      // plus administrateur). Tout autre chemin qui rendrait `is_admin`
-      // devrait faire de même : `setUserRoles` est aujourd'hui le seul.
+      // plus administrateur). Tout autre chemin qui accorderait `is_admin`
+      // devrait faire de même : `setUserRoles` est aujourd'hui le seul chemin
+      // applicatif à l'accorder (l'effacement d'un compte ne fait que la retirer,
+      // avec ses sessions ; le seed et les fixtures E2E écrivent des comptes neufs).
       // Ordre de verrouillage, dans les deux sens : `bg_users` (ci-dessus) puis les sessions.
       // Les autres écrivains des sessions tiennent en une instruction et ne
       // verrouillent pas de ligne de session avant `bg_users` : l'insertion
@@ -179,12 +191,7 @@ export async function setUserRoles(
       // d'une incarnation relit l'administration après coup, sans verrou
       // (`setPlayerView`) ; le balayage du démarrage lit sans verrou puis
       // n'écrit que les sessions (`liftStrayImpersonations`).
-      ({ impersonationsCleared, strayImpersonationsLifted } = await clearOnAdminChange(
-        connection,
-        targetUserId,
-        Number(targetRow.is_admin) === 1,
-        isAdmin,
-      ));
+      lifted = await clearOnAdminChange(connection, targetUserId, wasAdmin, isAdmin);
     }
     await connection.commit();
   } catch (error) {
@@ -203,11 +210,12 @@ export async function setUserRoles(
   // enregistrés — retrait comme ajout (`session-streams.ts`).
   if (!unchanged) closeUserStreams(targetUserId);
 
+  // Un seul des deux comptes, selon le sens du changement d'administration.
+  const liftKey = wasAdmin ? "impersonationsCleared" : "strayImpersonationsLifted";
   return {
     roles: sanitized,
-    previous,
-    ...(impersonationsCleared > 0 ? { impersonationsCleared } : {}),
-    ...(strayImpersonationsLifted > 0 ? { strayImpersonationsLifted } : {}),
+    previous: journalPrevious(previous, wasAdmin),
+    ...(lifted > 0 ? { [liftKey]: lifted } : {}),
   };
 }
 

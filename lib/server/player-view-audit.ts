@@ -13,3 +13,13 @@ export const PLAYER_VIEW_OFF_AUDIT = "🎭 Incarnation quittée sur une session"
 export function impersonationAuditLine(roles: readonly PlatformRole[]): string {
   return `${PLAYER_VIEW_ON_AUDIT} : ${roles.length > 0 ? roles.join(", ") : "joueur (aucun rôle)"}`;
 }
+
+/**
+ * La ligne pm2, sans nom, d'une incarnation restée sur un compte qui n'était
+ * pas administrateur, levée à la promotion du compte ou au démarrage du
+ * serveur : le seul nombre de sessions (registre, T05).
+ */
+export function strayLiftAuditLine(origin: "promotion" | "startup", sessions: number): string {
+  const when = origin === "promotion" ? "à la promotion du compte" : "au démarrage";
+  return `${PLAYER_VIEW_OFF_AUDIT} : restée sans administration, levée ${when} (${sessions} session(s))`;
+}

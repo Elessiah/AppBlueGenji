@@ -29,4 +29,16 @@ describe("liftImpersonations", () => {
 
     expect(execute).toHaveBeenCalledTimes(1);
   });
+
+  // Revue sécurité 5 : sans la colonne de l'échéance, aucune incarnation ne
+  // peut exister — un changement d'administration ne doit pas échouer.
+  it("liftImpersonations_deadlineColumnMissing_returnsZero", async () => {
+    const unknown = Object.assign(new Error("Unknown column 'player_view_until'"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(unknown);
+
+    const lifted = await liftImpersonations(fakeConnection({ execute }), "user_id = ?", [7]);
+
+    expect(lifted).toBe(0);
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
 });

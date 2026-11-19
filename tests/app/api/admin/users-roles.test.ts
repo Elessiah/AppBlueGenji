@@ -228,7 +228,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
     await POST(jsonReq({ roles: ["ADMIN"] }), params("7"));
 
     const lines = info.mock.calls.map(([line]) => String(line)).filter((line) => line.includes(PLAYER_VIEW_OFF_AUDIT));
-    expect(lines).toEqual([`${PLAYER_VIEW_OFF_AUDIT} : levée à la promotion, compte sans administration (2 session(s))`]);
+    expect(lines).toEqual([`${PLAYER_VIEW_OFF_AUDIT} : restée sans administration, levée à la promotion du compte (2 session(s))`]);
   });
 
   it("post_nothingCleared_writesNoForcedReturnLine", async () => {

@@ -76,12 +76,20 @@ ci-dessous) : elle ne reprend jamais effet avec l'administration rendue
 (registre T01 et T05 : « sans effet » sur un compte qui n'est plus
 administrateur ; une panne de cette levée fait échouer la promotion). La
 route en laisse une ligne pm2 **sans nom** qui donne le nombre de sessions,
-comme le balayage du démarrage (`strayImpersonationsLifted`) : une entrée
-annoncée puis levée ainsi a toujours une ligne de sortie. Le changement
-d'administration se lit sur la colonne `is_admin`, jamais sur les rôles
-résolus (une ligne héritée porte `ADMIN` dans son JSON sans être
-administrateur). `setUserRoles` est le seul écrivain de `is_admin` : tout
-autre chemin qui la rendrait devrait lever l'incarnation de même.
+comme le balayage du démarrage (`strayImpersonationsLifted`, texte commun
+`strayLiftAuditLine`) : une entrée annoncée puis levée ainsi a toujours une
+ligne de sortie. Elle suit la ligne du rôle accordé, qui désigne le compte :
+le registre (T05) le dit. Le changement d'administration se lit sur la
+colonne `is_admin`, jamais sur les rôles résolus (une ligne héritée porte
+`ADMIN` dans son JSON sans être administrateur) — le journal du staff aussi :
+`previous` y porte `ADMIN` selon `is_admin`, si bien que l'enregistrement qui
+rend administratrice une ligne héritée est noté « ADMIN accordé ».
+`setUserRoles` est le seul chemin applicatif qui **accorde** `is_admin`
+(l'effacement d'un compte la retire, avec ses sessions ; le seed et les
+fixtures E2E écrivent des comptes neufs) : tout autre chemin qui l'accorderait
+devrait lever l'incarnation de même. Une levée sur une base où la colonne
+`player_view_until` manque compte zéro session (aucune incarnation ne peut y
+exister) au lieu de faire échouer le changement de rôles.
 La route des rôles en laisse la ligne pm2 du retour (`PLAYER_VIEW_OFF_AUDIT`,
 au nom de l'administrateur qui rétrograde, avec le numéro du compte et le
 nombre de sessions), à part de la publication du changement de rôles (une

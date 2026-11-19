@@ -1,5 +1,5 @@
 import type { Pool, RowDataPacket } from "mysql2/promise";
-import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
+import { strayLiftAuditLine } from "@/lib/server/player-view-audit";
 import { liftImpersonations } from "@/lib/server/impersonation-sql";
 import { CONTACT_DISCORD_URL_KEY, CONTACT_EMAIL_KEY, SUPERSEDED_CONTACT_EMAILS } from "@/lib/shared/contact";
 import { DISCORD_INVITE_URL, SUPERSEDED_DISCORD_INVITE_URLS } from "@/lib/shared/discord";
@@ -110,7 +110,7 @@ export async function liftStrayImpersonations(db: Pool): Promise<void> {
     const where = rows.map(() => "(id = ? AND player_view_until = ?)").join(" OR ");
     const params = rows.flatMap((row) => [Number(row.id), String(row.until_key)]);
     const lifted = await liftImpersonations(db, where, params);
-    if (lifted > 0) console.info(`${PLAYER_VIEW_OFF_AUDIT} : levée au démarrage, compte sans administration (${lifted} session(s))`);
+    if (lifted > 0) console.info(strayLiftAuditLine("startup", lifted));
   } catch {
     // Rattrapage remis au prochain démarrage.
   }

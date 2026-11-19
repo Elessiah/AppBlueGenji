@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import type { ResultSetHeader } from "mysql2/promise";
 import { liftStrayImpersonations } from "@/lib/server/database/catch-ups";
 import { applyRecentSchemaChanges } from "@/lib/server/database/recent-schema-changes";
-import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
+import { PLAYER_VIEW_OFF_AUDIT, strayLiftAuditLine } from "@/lib/server/player-view-audit";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
@@ -78,7 +78,7 @@ describe("liftStrayImpersonations", () => {
 
     await liftStrayImpersonations(db);
 
-    expect(info).toHaveBeenCalledWith(`${PLAYER_VIEW_OFF_AUDIT} : levée au démarrage, compte sans administration (2 session(s))`);
+    expect(info).toHaveBeenCalledWith(`${PLAYER_VIEW_OFF_AUDIT} : restée sans administration, levée au démarrage (2 session(s))`);
   });
 
   it("liftStrayImpersonations_nothingAffected_logsNothing", async () => {
@@ -126,5 +126,18 @@ describe("RECENT_SCHEMA_CHANGES — plus de rattrapage des sessions", () => {
     await applyRecentSchemaChanges(fakePool({ execute }));
 
     expect(execute.mock.calls.some(([sql]) => oneLine(String(sql)).startsWith("UPDATE bg_user_sessions"))).toBe(false);
+  });
+});
+
+describe("strayLiftAuditLine", () => {
+  it("strayLiftAuditLine_promotion_namesNoOneAndGivesCount", () => {
+    const line = strayLiftAuditLine("promotion", 3);
+
+    expect(line).toBe(`${PLAYER_VIEW_OFF_AUDIT} : restée sans administration, levée à la promotion du compte (3 session(s))`);
+    expect(line).not.toMatch(/#\d/);
+  });
+
+  it("strayLiftAuditLine_startup_saysAtStartup", () => {
+    expect(strayLiftAuditLine("startup", 1)).toBe(`${PLAYER_VIEW_OFF_AUDIT} : restée sans administration, levée au démarrage (1 session(s))`);
   });
 });

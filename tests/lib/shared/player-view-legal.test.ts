@@ -199,6 +199,16 @@ describe("registre", () => {
     expect(JSON.stringify(en.dataCategories)).toContain("identifier of the account concerned and number of sessions");
   });
 
+  it("register_t05_promotionLineSaysItFollowsGrantedRoleLine", () => {
+    const fr = activity(PROCESSING_ACTIVITIES, "T05");
+    const en = activity(PROCESSING_ACTIVITIES_EN, "T05");
+
+    expect(JSON.stringify(fr.subPurposes)).toContain("levée à la promotion du compte, elle suit la ligne du rôle accordé, qui désigne le compte");
+    expect(JSON.stringify(fr.dataCategories)).toContain("le seul nombre de sessions, sans nom (levée à la promotion du compte, la ligne suit celle du rôle accordé, qui désigne le compte)");
+    expect(JSON.stringify(en.subPurposes)).toContain("when lifted on the account's promotion, it follows the line of the role granted, which identifies the account");
+    expect(JSON.stringify(en.dataCategories)).toContain("the number of sessions alone, naming no one (when lifted on the account's promotion, the line follows that of the role granted, which identifies the account)");
+  });
+
   it("register_t05_coversAdminsBasisLegacySubjectsAndCategoriesInBothLanguages", () => {
     const fr = activity(PROCESSING_ACTIVITIES, "T05");
     const en = activity(PROCESSING_ACTIVITIES_EN, "T05");
