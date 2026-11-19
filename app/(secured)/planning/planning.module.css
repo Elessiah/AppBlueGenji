@@ -139,6 +139,14 @@
   overflow-wrap: anywhere;
 }
 
+/* Instant de la confirmation d’office (SCHEDULE_DEADLINE.md § Planning). */
+.confirmAt {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-mute);
+  overflow-wrap: anywhere;
+}
+
 .tournament {
   color: var(--ink);
   font-weight: 600;

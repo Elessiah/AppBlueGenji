@@ -30,6 +30,11 @@
   color: var(--amber);
 }
 
+/* La date butoir passe à la ligne : à 375 px, la pastille entière déborderait de la carte. */
+.deadline {
+  white-space: normal;
+}
+
 .scheduled {
   color: var(--blue-300);
 }

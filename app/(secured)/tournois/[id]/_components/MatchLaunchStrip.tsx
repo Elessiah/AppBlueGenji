@@ -34,7 +34,7 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
       <span className={styles.toPlan} title={t("launch.toPlanTitle")}>
         <span aria-hidden="true">📅</span> {t("launch.toPlan")}
         {match.scheduleDeadlineAt && (
-          <span data-testid="schedule-deadline">
+          <span className={styles.deadline} data-testid="schedule-deadline">
             {" · "}
             {t("launch.toPlanDeadline", { date: formatScheduleDeadline(match.scheduleDeadlineAt, locale) })}
           </span>

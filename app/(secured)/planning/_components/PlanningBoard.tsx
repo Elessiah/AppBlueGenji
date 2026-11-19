@@ -599,7 +599,7 @@ const EntryCard = memo(function EntryCard({
         </p>
       )}
       {confirmAt !== null && (
-        <p className={styles.muted} data-testid="planning-confirm-at">
+        <p className={styles.confirmAt} data-testid="planning-confirm-at">
           {deadline === null
             ? t("autoConfirm.at", { time: confirmAt })
             : t("autoConfirm.atWithDeadline", { time: confirmAt, deadline })}
