@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { planningRoundMessages, planningRoundText, planningRoundTextOf } from "@/lib/shared/planning-round";
+import type { StageKey } from "@/lib/shared/bracket-stage";
+import type { ShareRound, ShareRoundNoun } from "@/lib/shared/share-round";
 import { entryView } from "../../helpers/planning";
 
 /** Nom du tour d'une entrée du planning : celui de la fiche (CAST_PLANNING.md). */
@@ -51,9 +53,35 @@ describe("planningRoundText", () => {
     expect(planningRoundText(FR, entry)).toBe("Manche 2 · Match 5");
   });
 
-  it("planningRoundText_noMatchNumber_defaultsToOne", () => {
+  it("planningRoundText_noMatchNumber_returnsRoundWithoutInventedMatch", () => {
     const entry = entryView({ round: null, roundNumber: 2, matchNumber: null });
 
-    expect(planningRoundText(FR, entry)).toBe("Manche 2 · Match 1");
+    expect(planningRoundText(FR, entry)).toBe("Manche 2");
+    expect(planningRoundText(EN, entry)).toBe("Round 2");
+  });
+
+  it("planningRoundText_playoffRoundUnknownMatchNumber_returnsFinalPhaseRank", () => {
+    const entry = entryView({ round: null, roundNumber: 1001, matchNumber: null });
+
+    expect(planningRoundText(FR, entry)).toMatch(/· Manche 2$/);
+  });
+
+  it("planningRoundText_everyRoundShape_neverRendersRawKey", () => {
+    const stages: StageKey[] = ["grandFinal", "thirdPlace", "lowerFinal", "final", "semis", "quarters", "roundOf16", "early"];
+    const nouns: ShareRoundNoun[] = ["swiss", "survival", "round"];
+    const rounds: (ShareRound | null)[] = [
+      ...stages.flatMap((stage) => [false, true].map((lower) => ({ kind: "stage" as const, stage, lower, round: 2 }))),
+      ...nouns.map((noun) => ({ kind: "numbered" as const, noun, number: 3 })),
+      null,
+    ];
+
+    const texts = [FR, EN].flatMap((text) =>
+      rounds.flatMap((round) => [
+        planningRoundText(text, entryView({ round, roundNumber: 1002, matchNumber: 2 })),
+        planningRoundText(text, entryView({ round, roundNumber: 2, matchNumber: null })),
+      ]),
+    );
+
+    expect(texts.filter((label) => label === null || /bracket\.|page\./.test(label))).toEqual([]);
   });
 });

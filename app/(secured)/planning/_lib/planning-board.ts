@@ -44,22 +44,32 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 }
 
 /**
- * Une entrée passée : jouée (match clos, tournoi terminé : plus modifiable) ou
- * dont la fin estimée est écoulée. Un match commencé, pas fini, reste « à venir ».
+ * Une entrée passée : jouée — match clos, tournoi terminé, plus rien n'y est
+ * modifiable. Une fin estimée écoulée n'y suffit pas : un match en retard ou
+ * qui s'éternise se joue encore et reste « à venir », avec ses actions.
  */
-export function isPastEntry(entry: Pick<PlanningEntryView, "editable" | "endAt">, now: number): boolean {
-  return !entry.editable || Date.parse(entry.endAt) <= now;
+export function isPastEntry(entry: Pick<PlanningEntryView, "editable">): boolean {
+  return !entry.editable;
 }
 
 /** Sépare les entrées en (à venir, passées), l'ordre de chacune restant celui reçu. */
-export function splitPast<T extends Pick<PlanningEntryView, "editable" | "endAt">>(
-  entries: readonly T[],
-  now: number,
-): { upcoming: T[]; past: T[] } {
+export function splitPast<T extends Pick<PlanningEntryView, "editable">>(entries: readonly T[]): { upcoming: T[]; past: T[] } {
   const upcoming: T[] = [];
   const past: T[] = [];
-  for (const entry of entries) (isPastEntry(entry, now) ? past : upcoming).push(entry);
+  for (const entry of entries) (isPastEntry(entry) ? past : upcoming).push(entry);
   return { upcoming, past };
+}
+
+/**
+ * Les semaines passées, **la plus récente en tête** (jours et créneaux aussi) :
+ * on rouvre « Matchs passés » pour le match d'hier, pas pour celui d'il y a trois mois.
+ */
+export function newestFirst(weeks: readonly PlanningWeek[]): PlanningWeek[] {
+  return [...weeks].reverse().map((week) => ({
+    ...week,
+    entries: [...week.entries].reverse(),
+    days: [...week.days].reverse().map((day) => ({ ...day, entries: [...day.entries].reverse() })),
+  }));
 }
 
 /** Les entrées par semaine (lundi, minuit à Paris), dans l'ordre chronologique. */

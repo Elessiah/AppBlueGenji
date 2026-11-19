@@ -51,6 +51,7 @@ import {
   isThrottled,
   leadUntil,
   mergeView,
+  newestFirst,
   splitPast,
   tournamentChoices,
   weekWindow,
@@ -65,9 +66,6 @@ type PlanningMessages = Messages["planning"];
 type Text = ReturnType<typeof scopedText<PlanningMessages>>;
 
 const TIME_ZONE = "Europe/Paris";
-
-/** Relue chaque minute : la frontière entre matchs à venir et passés avance sans relecture de la page. */
-const PAST_CLOCK_MS = 60_000;
 
 function formatters(locale: Locale) {
   const tag = locale === "fr" ? "fr-FR" : "en-GB";
@@ -211,11 +209,10 @@ export function PlanningBoard({
     [me, myRoles, canManage, members],
   );
   const shown = useMemo(() => filterEntries(view?.entries ?? [], filters, view?.me ?? 0), [view, filters]);
-  // Relue chaque minute : un match qui se termine passe dans « Matchs passés » sans relecture de la page.
-  const now = useClock(PAST_CLOCK_MS) ?? Date.now();
-  const split = useMemo(() => splitPast(shown, now), [shown, now]);
+  // Un match passe dans « Matchs passés » une fois joué (relecture de la page), jamais sur la seule horloge.
+  const split = useMemo(() => splitPast(shown), [shown]);
   const weeks = useMemo(() => groupByWeek(split.upcoming), [split.upcoming]);
-  const pastWeeks = useMemo(() => groupByWeek(split.past), [split.past]);
+  const pastWeeks = useMemo(() => newestFirst(groupByWeek(split.past)), [split.past]);
   const tournaments = useMemo(() => tournamentChoices(view?.entries ?? []), [view]);
   // Un tournoi choisi qui n'a plus de créneau (relecture) : le filtre retombe sur « tous ».
   const tournamentId = tournaments.some((choice) => choice.id === filters.tournamentId) ? filters.tournamentId : null;
@@ -382,7 +379,7 @@ export function PlanningBoard({
         <StaffPanel text={text} view={view} pending={pending} act={act} onConfirmLead={(hours) => setConfirming({ kind: "lead", hours })} />
       )}
 
-      {view.entries.length > 0 && split.upcoming.length === 0 && shown.length > 0 && (
+      {shown.length > 0 && split.upcoming.length === 0 && (
         <p className={styles.empty}>{t("past.noUpcoming")}</p>
       )}
       {shown.length === 0 && <p className={styles.empty}>{t(view.entries.length === 0 ? "empty" : "filters.empty")}</p>}
@@ -937,11 +934,9 @@ function StaffPanel({
       keepMounted
       className={styles.staff}
       aside={
-        <InfoHintRow>
-          <InfoHint id="planning-staff-hint" subject={t("staff.title")}>
-            {t("staff.hint")}
-          </InfoHint>
-        </InfoHintRow>
+        <InfoHint id="planning-staff-hint" subject={t("staff.title")}>
+          {t("staff.hint")}
+        </InfoHint>
       }
     >
 

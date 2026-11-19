@@ -25,10 +25,6 @@ type MatchRow = RowDataPacket & {
   match_number: number;
   status: ShareRoundSource["matches"][number]["status"];
   double_forfeit: number;
-};
-
-type TournamentRow = RowDataPacket & {
-  id: number;
   format: ShareRoundSource["card"]["format"];
   state: ShareRoundSource["card"]["state"];
 };
@@ -47,9 +43,10 @@ function groupBy<T>(rows: readonly T[], keyOf: (row: T) => number): Map<number, 
 }
 
 /**
- * Le tour de chacun des matchs `matchIds`, par identifiant de match : un
- * tournoi se lit une fois (son format, ses phases, tous ses matchs). Vide
- * sans match demandé — aucune requête.
+ * Le tour de chacun des matchs `matchIds`, par identifiant de match : une
+ * requête lit tous les matchs des tournois (avec leur format et leur état),
+ * une seconde les phases des seuls tournois `MULTI`. Vide sans match demandé —
+ * aucune requête.
  */
 export async function loadEntryRounds(
   executor: Executor,
@@ -59,30 +56,31 @@ export async function loadEntryRounds(
   const result = new Map<number, EntryRound>();
   const ids = [...new Set(tournamentIds)];
   if (ids.length === 0 || matchIds.size === 0) return result;
-  const placeholders = inList(ids.length);
-  const [tournaments] = await executor.execute<TournamentRow[]>(
-    `SELECT id, format, state FROM bg_tournaments WHERE id IN (${placeholders})`,
-    ids,
-  );
-  const [phases] = await executor.execute<PhaseRow[]>(
-    `SELECT id, tournament_id, format FROM bg_tournament_phases WHERE tournament_id IN (${placeholders})`,
-    ids,
-  );
   const [matches] = await executor.execute<MatchRow[]>(
-    `SELECT id, tournament_id, phase_id, bracket, round_number, match_number, status, double_forfeit
-       FROM bg_matches WHERE tournament_id IN (${placeholders})`,
+    `SELECT m.id, m.tournament_id, m.phase_id, m.bracket, m.round_number, m.match_number, m.status, m.double_forfeit,
+            t.format, t.state
+       FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
+      WHERE m.tournament_id IN (${inList(ids.length)})`,
     ids,
   );
-  const phasesOf = groupBy(phases, (row) => Number(row.tournament_id));
   const matchesOf = groupBy(matches, (row) => Number(row.tournament_id));
-  for (const tournament of tournaments) {
-    const own = matchesOf.get(Number(tournament.id)) ?? [];
+  const multiIds = [...matchesOf.entries()].filter(([, rows]) => rows[0].format === "MULTI").map(([id]) => id);
+  const phasesOf = new Map<number, PhaseRow[]>();
+  if (multiIds.length > 0) {
+    const [phases] = await executor.execute<PhaseRow[]>(
+      `SELECT id, tournament_id, format FROM bg_tournament_phases WHERE tournament_id IN (${inList(multiIds.length)})`,
+      multiIds,
+    );
+    for (const [id, rows] of groupBy(phases, (row) => Number(row.tournament_id))) phasesOf.set(id, rows);
+  }
+  for (const [tournamentId, own] of matchesOf) {
+    const { format, state } = own[0];
     const numbers = new Map<number, number>();
     const source: ShareRoundSource = {
-      card: { format: tournament.format, state: tournament.state },
+      card: { format, state },
       phases:
-        tournament.format === "MULTI"
-          ? (phasesOf.get(Number(tournament.id)) ?? []).map((phase) => ({ id: Number(phase.id), format: phase.format }))
+        format === "MULTI"
+          ? (phasesOf.get(tournamentId) ?? []).map((phase) => ({ id: Number(phase.id), format: phase.format }))
           : null,
       matches: own.map((row) => {
         numbers.set(Number(row.id), Number(row.match_number));

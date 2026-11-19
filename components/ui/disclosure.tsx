@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import styles from "./disclosure.module.css";
 
@@ -22,7 +23,11 @@ type DisclosureProps = Readonly<{
   storageKey?: string;
   /** Garde le contenu monté une fois replié (état local d'un formulaire à ne pas perdre). */
   keepMounted?: boolean;
-  /** À côté du titre, hors du bouton (un « i » d'aide). */
+  /**
+   * À côté du titre, hors du bouton : un `<InfoHint>` **nu** (sans
+   * `InfoHintRow`) — l'en-tête est déjà la rangée, son explication y passe à la
+   * ligne sur toute la largeur.
+   */
   aside?: ReactNode;
   className?: string;
   children: ReactNode;
@@ -50,7 +55,8 @@ function writeStored(key: string, open: boolean): void {
 /**
  * Section repliable : un bouton `aria-expanded` / `aria-controls` dans un
  * titre, clavier natif (Entrée, Espace). Repliée par défaut ; le choix du
- * lecteur peut être gardé sur son appareil (`storageKey`).
+ * lecteur peut être gardé sur son appareil (`storageKey`) —
+ * `docs/features/DISCLOSURE.md`.
  */
 export function Disclosure({
   title,
@@ -85,9 +91,7 @@ export function Disclosure({
       <div className={styles.head}>
         <Heading className={styles.heading}>
           <button type="button" className={styles.toggle} aria-expanded={open} aria-controls={open || keepMounted ? bodyId : undefined} onClick={toggle}>
-            <svg className={styles.caret} width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <ChevronRight className={styles.caret} size={16} strokeWidth={2} aria-hidden="true" />
             <span>{title}</span>
             {count !== undefined && <span className={styles.count}>({count})</span>}
           </button>

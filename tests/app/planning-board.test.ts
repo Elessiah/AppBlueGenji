@@ -11,6 +11,7 @@ import {
   groupByWeek,
   hasProvisional,
   isPastEntry,
+  newestFirst,
   splitPast,
   heldBy,
   isThrottled,
@@ -658,37 +659,45 @@ describe("withdrawDoneKey", () => {
 });
 
 describe("matchs passés", () => {
-  const NOW = Date.parse("2026-11-19T12:00:00.000Z");
-  const hour = 60 * 60 * 1000;
-
   it("isPastEntry_notEditable_isPast", () => {
-    expect(isPastEntry({ editable: false, endAt: new Date(NOW + hour).toISOString() }, NOW)).toBe(true);
+    expect(isPastEntry({ editable: false })).toBe(true);
   });
 
-  it("isPastEntry_endedEditable_isPast", () => {
-    expect(isPastEntry({ editable: true, endAt: new Date(NOW).toISOString() }, NOW)).toBe(true);
-  });
-
-  it("isPastEntry_startedButNotEnded_isUpcoming", () => {
-    expect(isPastEntry({ editable: true, endAt: new Date(NOW + hour).toISOString() }, NOW)).toBe(false);
+  it("isPastEntry_editableAfterEstimatedEnd_staysUpcoming", () => {
+    // Un match en retard se joue encore : sa fin estimée écoulée ne le range pas dans « Matchs passés ».
+    expect(isPastEntry({ editable: true })).toBe(false);
   });
 
   it("splitPast_mixed_keepsOrderInEachHalf", () => {
     const entries = [
-      { key: "a", editable: true, endAt: new Date(NOW + hour).toISOString() },
-      { key: "b", editable: false, endAt: new Date(NOW - hour).toISOString() },
-      { key: "c", editable: true, endAt: new Date(NOW + 2 * hour).toISOString() },
-      { key: "d", editable: true, endAt: new Date(NOW - 2 * hour).toISOString() },
+      { key: "a", editable: true },
+      { key: "b", editable: false },
+      { key: "c", editable: true },
+      { key: "d", editable: false },
     ];
 
-    const { upcoming, past } = splitPast(entries, NOW);
+    const { upcoming, past } = splitPast(entries);
 
     expect(upcoming.map((entry) => entry.key)).toEqual(["a", "c"]);
     expect(past.map((entry) => entry.key)).toEqual(["b", "d"]);
   });
 
   it("splitPast_empty_returnsTwoEmptyLists", () => {
-    expect(splitPast([], NOW)).toEqual({ upcoming: [], past: [] });
+    expect(splitPast([])).toEqual({ upcoming: [], past: [] });
+  });
+
+  it("newestFirst_twoWeeks_reversesWeeksDaysAndEntries", () => {
+    const weeks = groupByWeek([
+      entryView({ key: "w1-mon-a", startAt: "2026-11-02T18:00:00.000Z" }),
+      entryView({ key: "w1-mon-b", startAt: "2026-11-02T20:00:00.000Z" }),
+      entryView({ key: "w1-tue", startAt: "2026-11-03T18:00:00.000Z" }),
+      entryView({ key: "w2-mon", startAt: "2026-11-09T18:00:00.000Z" }),
+    ]);
+
+    const result = newestFirst(weeks);
+
+    expect(result.map((week) => week.entries.map((entry) => entry.key))).toEqual([["w2-mon"], ["w1-tue", "w1-mon-b", "w1-mon-a"]]);
+    expect(result[1].days.map((day) => day.entries.map((entry) => entry.key))).toEqual([["w1-tue"], ["w1-mon-b", "w1-mon-a"]]);
   });
 
   it("planningMessages_pastKeys_presentInBothLanguagesAndOldRoundKeyGone", () => {

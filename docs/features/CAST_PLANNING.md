@@ -72,11 +72,11 @@ la requête : une requête mal formée n'use pas ce quota). Le refus `429`
 ## Affichage : matchs passés repliés, nom du tour
 
 - **Matchs passés** : une entrée est passée quand elle n'est plus modifiable
-  (match joué, tournoi terminé) ou que sa fin estimée est écoulée
-  (`isPastEntry`, relue chaque minute). Elles sont rangées sous un bouton
-  « Matchs passés (N) » (`components/ui/disclosure.tsx` : `aria-expanded`,
-  `aria-controls`, clavier natif), **replié par défaut** ; un match commencé
-  mais pas fini reste dans la liste à venir. Le choix du lecteur est gardé
+  (match joué, tournoi terminé — `isPastEntry`). Une fin estimée écoulée n'y
+  suffit pas : un match en retard ou qui s'éternise se joue encore et reste
+  dans la liste à venir, avec ses actions. Elles sont rangées sous un bouton
+  « Matchs passés (N) » (`Disclosure`, `DISCLOSURE.md`), **replié par
+  défaut**, la semaine la plus récente en tête (`newestFirst`). Le choix du lecteur est gardé
   dans son navigateur (`localStorage`, `try/catch` : sans stockage, l'état par
   défaut vaut).
 - **Calcul et confirmation** (staff) : même bouton repliable, **replié par
@@ -89,8 +89,9 @@ la requête : une requête mal formée n'use pas ce quota). Le refus `429`
   `shareRoundText`, `SHARE_EMBEDS.md`) : le serveur (`round-names.ts`) lit tous
   les matchs du tournoi (un tour se nomme depuis le dernier de son tableau) et
   rend un descripteur sans texte (`round`, `matchNumber`) ; l'écran le rédige
-  dans la langue de l'adresse (`planning-round.ts`). Match inconnu du calcul :
-  « Manche n · Match m ». Les notifications du planning (récapitulatif,
+  dans la langue de l'adresse (`planning-round.ts`) ; seuls les mots des tours
+  de `tournament.bracket` partent avec la page. Match inconnu du calcul :
+  « Manche n » seul (aucun numéro de match inventé). Les notifications du planning (récapitulatif,
   affectation, désistement) ne citent aucun tour : rien à y changer.
 
 ## Couverture (du meilleur au pire)

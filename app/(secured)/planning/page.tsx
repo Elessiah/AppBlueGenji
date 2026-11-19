@@ -11,7 +11,8 @@ import styles from "./planning.module.css";
 /**
  * Page « Planning » (`docs/features/CAST_PLANNING.md`). Le contrôle de la
  * mise en page est refait ici : Next rend page et mise en page en parallèle.
- * Les textes de l'écran partent avec la page (un seul espace de noms) ; les
+ * Les textes de l'écran partent avec la page (l'espace `planning`, plus les
+ * seuls mots des tours de `tournament.bracket`, `planningRoundMessages`) ; les
  * données se lisent par `GET /api/planning`.
  */
 export default async function PlanningPage() {

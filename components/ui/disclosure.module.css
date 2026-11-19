@@ -12,6 +12,12 @@
   column-gap: 6px;
 }
 
+/* L'en-tête est la rangée d'un « i » (`InfoHintRow`) : le titre lui laisse sa
+   place, l'explication passe dessous sur toute la largeur. */
+.head > :first-child {
+  max-inline-size: calc(100% - 30px);
+}
+
 .heading {
   margin: 0;
   font-size: 18px;
