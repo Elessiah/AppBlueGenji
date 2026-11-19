@@ -40,7 +40,7 @@ s'additionnent.
   durées et le caster autonome d'un autre** (panneau « Calcul et confirmation »)
   sont réservés aux **administrateurs** (`canComputePlanning`, décision
   explicite : **exception** à la règle « jamais `user.isAdmin` pour un domaine
-  scopé »). Un non-administrateur reçoit `403 FORBIDDEN` et la vue
+  scopé »). Un non-administrateur reçoit `403 PLANNING_ADMIN_ONLY` et la vue
   (`canCompute: false`) ne porte ni panneau ni durées. La vue joueur n'y donne
   aucun accès (404).
 - `showcase` — `/api/landing/sponsors/*`, `/api/association/*`, `/api/benevoles/*`.

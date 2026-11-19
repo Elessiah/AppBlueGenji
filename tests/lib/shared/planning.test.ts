@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-  canComputePlanning,
   parsePlanningEntryKey,
   planningCastersFull,
   planningCoverage,
@@ -226,21 +225,5 @@ describe("planningCoverage — deux casters", () => {
     const coverage = planningCoverage({ hasReferee: false, casterIds: [1, 2], prodIds: [], soloCasterIds: new Set([2]) });
 
     expect(coverage).toMatchObject({ level: "STREAMED", streamed: true, refereePriority: true });
-  });
-});
-
-describe("canComputePlanning", () => {
-  it("canComputePlanning_admin_returnsTrue", () => {
-    expect(canComputePlanning({ isAdmin: true })).toBe(true);
-  });
-
-  it("canComputePlanning_notAdmin_returnsFalse", () => {
-    expect(canComputePlanning({ isAdmin: false })).toBe(false);
-    expect(canComputePlanning({})).toBe(false);
-  });
-
-  it("canComputePlanning_noUser_returnsFalse", () => {
-    expect(canComputePlanning(null)).toBe(false);
-    expect(canComputePlanning(undefined)).toBe(false);
   });
 });

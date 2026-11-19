@@ -36,6 +36,7 @@ import type { PlanningMember, PlanningView } from "@/lib/shared/planning-view";
 import { fieldForError } from "@/lib/shared/field-errors";
 import { planningCoverage, WITHDRAWAL_FIELD_ERRORS } from "@/lib/shared/planning";
 import { entryView, HOUR_MS, MONDAY } from "../helpers/planning";
+import { readSource } from "../helpers/read-source";
 
 /** Logique pure de l'écran « Planning » et ses textes de refus (`CAST_PLANNING.md` § Interface). */
 
@@ -366,7 +367,6 @@ function viewOf(overrides: Partial<PlanningView> = {}): PlanningView {
     canCompute: false,
     entries: [entryView({ key: "m:1" }), entryView({ key: "m:2", matchId: 2 })],
     members: [member()],
-    durations: DEFAULT_PLANNING_DURATIONS,
     ...overrides,
   };
 }
@@ -429,7 +429,7 @@ describe("mergeView", () => {
   });
 
   it("mergeView_identicalReread_keepsEveryObject", () => {
-    const previous = viewOf();
+    const previous = viewOf({ canManage: true, canCompute: true, durations: DEFAULT_PLANNING_DURATIONS });
     const next = structuredClone(previous);
 
     const merged = mergeView(previous, next);
@@ -728,5 +728,45 @@ describe("planningOpenKey", () => {
   it("planningOpenKey_otherSection_differs", () => {
     expect(planningOpenKey("staff", 42)).toMatch(/^planning:staff-open:[0-9a-z]+$/);
     expect(planningOpenKey("past", 42)).toMatch(/^planning:past-open:[0-9a-z]+$/);
+  });
+});
+
+/** Ce que l'écran montre selon les droits : jamais un contrôle que le serveur refuse (`CAST_PLANNING.md`). */
+describe("PlanningBoard : calcul réservé aux administrateurs", () => {
+  const source = readSource("app/(secured)/planning/_components/PlanningBoard.tsx");
+
+  it("planningBoard_staffPanel_onlyWithCanComputeAndDurations", () => {
+    expect(source).toMatch(/\{view\.canCompute && view\.durations && \(\s*<StaffPanel[^>]*durations=\{view\.durations\}/);
+    expect(source).not.toContain("DEFAULT_PLANNING_DURATIONS");
+  });
+
+  it("planningBoard_runWeek_gatedOnCanCompute", () => {
+    expect(source).toMatch(/\{canCompute && week\.entries\.some\(\(entry\) => entry\.open\) && \(\s*<BusyButton/);
+  });
+
+  it("planningBoard_confirmEntry_gatedOnCanCompute", () => {
+    expect(source).toContain("{view.canCompute && entry.open && hasProvisional(entry) && (");
+  });
+
+  it("planningBoard_computeControls_neverGatedOnCanManage", () => {
+    expect(source).not.toMatch(/canManage && \(\s*<StaffPanel/);
+    expect(source).not.toContain("canManage && week.entries");
+    expect(source).not.toContain("canManage && entry.open && hasProvisional");
+  });
+
+  it("planningBoard_manualAssignment_staysOnCanManage", () => {
+    expect(source).toContain("roleChoices(entry, role, view.members, view.canManage)");
+  });
+});
+
+describe("textes du refus réservé aux administrateurs", () => {
+  it("planningErrors_adminOnly_frAndEnPresentAndDistinctFromForbidden", () => {
+    expect(frPlanning.errors.PLANNING_ADMIN_ONLY).toBe("Ce geste est réservé aux administrateurs.");
+    expect(enPlanning.errors.PLANNING_ADMIN_ONLY).toBe("This action is reserved for administrators.");
+    expect(frPlanning.errors.PLANNING_ADMIN_ONLY).not.toBe(frPlanning.errors.FORBIDDEN);
+  });
+
+  it("errorKey_adminOnly_resolvesToItsOwnKey", () => {
+    expect(errorKey("PLANNING_ADMIN_ONLY", frPlanning.errors)).toBe("PLANNING_ADMIN_ONLY");
   });
 });

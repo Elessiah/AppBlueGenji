@@ -124,6 +124,7 @@
     "TOO_MANY_REQUESTS": "Trop de gestes coup sur coup. Patiente quelques minutes avant de réessayer.",
     "UNAUTHORIZED": "Ta session a expiré : reconnecte-toi.",
     "FORBIDDEN": "Ce geste est réservé au staff des tournois.",
+    "PLANNING_ADMIN_ONLY": "Ce geste est réservé aux administrateurs.",
     "NETWORK_ERROR": "Connexion impossible. Vérifie ton réseau puis réessaie.",
     "PLANNING_ENTRY_NOT_FOUND": "Ce créneau n'existe plus. La page est rechargée.",
     "PLANNING_ENTRY_CLOSED": "Ce créneau est fermé : il a commencé ou il est joué.",

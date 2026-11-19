@@ -5,7 +5,7 @@ import { runAutoAssign } from "@/lib/server/planning/auto-assign";
 import { readWindow } from "@/lib/server/planning/request";
 import { planningFailure } from "@/lib/server/planning/routes";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
-import { canComputePlanning } from "@/lib/shared/planning";
+import { canComputePlanning } from "@/lib/shared/permissions";
 
 /**
  * Lance un lot du calcul automatique (administrateur seul, `canComputePlanning`) sur une
@@ -16,7 +16,7 @@ import { canComputePlanning } from "@/lib/shared/planning";
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!canComputePlanning(user)) return fail("FORBIDDEN", 403);
+  if (!canComputePlanning(user)) return fail("PLANNING_ADMIN_ONLY", 403);
   const read = await readJsonObject(req, "INVALID_BODY", SMALL_JSON_BODY_MAX_BYTES);
   if ("refusal" in read) return fail(read.refusal, 400);
   const window = readWindow(read.body);

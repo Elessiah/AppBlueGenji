@@ -67,7 +67,6 @@ const VIEW: PlanningView = {
   canCompute: false,
   entries: [],
   members: [],
-  durations: DEFAULT_PLANNING_DURATIONS,
 };
 
 function request(method: string, body?: unknown): Request {
@@ -98,7 +97,7 @@ const ROUTES: Record<string, Call> = {
   "PUT /api/admin/planning/settings": () => settingsPut(request("PUT", DEFAULT_PLANNING_DURATIONS)),
 };
 const STAFF_ROUTES = ["PUT /api/admin/planning/assignment"];
-/** Calcul, confirmation, réglages : administrateur seul (`canComputePlanning`). */
+/** Calcul, confirmation, réglages : administrateur seul (`canComputePlanning`, refus `PLANNING_ADMIN_ONLY`). */
 const COMPUTE_ROUTES = [
   "POST /api/admin/planning/auto-assign",
   "POST /api/admin/planning/confirm",
@@ -167,11 +166,11 @@ describe("toutes les routes du planning", () => {
 describe("routes de calcul du planning (administrateur seul)", () => {
   for (const name of COMPUTE_ROUTES) {
     for (const [label, who] of [["caster", caster], ["prod", prod], ["arbitre", arbitre]] as const) {
-      it(`${name}_${label}_returns403WithCodeOnly`, async () => {
+      it(`${name}_${label}_returns403AdminOnly`, async () => {
         jest.mocked(getCurrentUser).mockResolvedValue(who);
         const response = await ROUTES[name]();
         expect(response.status).toBe(403);
-        expect(await errorOf(response)).toBe("FORBIDDEN");
+        expect(await errorOf(response)).toBe("PLANNING_ADMIN_ONLY");
         expect(runAutoAssign).not.toHaveBeenCalled();
         expect(confirmAssignments).not.toHaveBeenCalled();
         expect(writeDurationSettings).not.toHaveBeenCalled();
@@ -196,6 +195,25 @@ describe("GET /api/planning", () => {
   it("planningGet_arbitre_returns200", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     expect((await planningGet()).status).toBe(200);
+  });
+
+  it("planningGet_tournamentsStaffView_payloadHasNoDurations", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(loadPlanningView).mockResolvedValue({ ...VIEW, me: 9, myRoles: ["REFEREE"], canManage: true });
+
+    const body = (await (await planningGet()).json()) as { planning: Record<string, unknown> };
+
+    expect(body.planning.canCompute).toBe(false);
+    expect(body.planning).not.toHaveProperty("durations");
+  });
+
+  it("planningGet_adminView_payloadCarriesDurations", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(loadPlanningView).mockResolvedValue({ ...VIEW, me: 1, canManage: true, canCompute: true, durations: DEFAULT_PLANNING_DURATIONS });
+
+    const body = (await (await planningGet()).json()) as { planning: Record<string, unknown> };
+
+    expect(body.planning.durations).toEqual(DEFAULT_PLANNING_DURATIONS);
   });
 
   it("planningGet_loadFails_returns500", async () => {
@@ -262,9 +280,11 @@ describe("PUT /api/planning/solo-caster", () => {
     expect(setSoloCaster).not.toHaveBeenCalled();
   });
 
-  it("soloPut_arbitreForAnother_returns403", async () => {
+  it("soloPut_arbitreForAnother_returns403AdminOnly", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    expect((await soloPut(request("PUT", { solo: false, userId: 5 }))).status).toBe(403);
+    const response = await soloPut(request("PUT", { solo: false, userId: 5 }));
+    expect(response.status).toBe(403);
+    expect(await errorOf(response)).toBe("PLANNING_ADMIN_ONLY");
     expect(setSoloCaster).not.toHaveBeenCalled();
   });
 

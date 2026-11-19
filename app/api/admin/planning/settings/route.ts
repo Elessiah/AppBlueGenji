@@ -5,7 +5,7 @@ import { fail, ok } from "@/lib/server/http";
 import { writeDurationSettings } from "@/lib/server/planning/load";
 import { planningFailure } from "@/lib/server/planning/routes";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
-import { canComputePlanning } from "@/lib/shared/planning";
+import { canComputePlanning } from "@/lib/shared/permissions";
 import { validateDurationSettings } from "@/lib/shared/planning-durations";
 
 /**
@@ -16,7 +16,7 @@ import { validateDurationSettings } from "@/lib/shared/planning-durations";
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!canComputePlanning(user)) return fail("FORBIDDEN", 403);
+  if (!canComputePlanning(user)) return fail("PLANNING_ADMIN_ONLY", 403);
   const throttled = enforceRateLimit(PLANNING_WRITE_RULE, user.id);
   if (throttled) return throttled;
 

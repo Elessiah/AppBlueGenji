@@ -24,7 +24,7 @@ import {
   type PlanningRole,
 } from "@/lib/shared/planning";
 import { planningRoundText, planningRoundTextOf, type PlanningRoundMessages } from "@/lib/shared/planning-round";
-import { DEFAULT_PLANNING_DURATIONS, PLANNING_DURATION_BOUNDS, type PlanningDurationSettings } from "@/lib/shared/planning-durations";
+import { PLANNING_DURATION_BOUNDS, type PlanningDurationSettings } from "@/lib/shared/planning-durations";
 import type {
   AutoAssignReport,
   ConfirmReport,
@@ -325,8 +325,9 @@ export function PlanningBoard({
         <output className={styles.count}>{t("filters.count", { shown: shown.length, total: view.entries.length })}</output>
       </section>
 
-      {view.canCompute && (
-        <StaffPanel text={text} view={view} pending={pending} act={act} onConfirmLead={(hours) => setConfirming({ kind: "lead", hours })} />
+      {/* Sans durées reçues, pas de panneau : un formulaire prérempli de valeurs par défaut écraserait les réglages. */}
+      {view.canCompute && view.durations && (
+        <StaffPanel text={text} view={view} durations={view.durations} pending={pending} act={act} onConfirmLead={(hours) => setConfirming({ kind: "lead", hours })} />
       )}
 
       {shown.length > 0 && split.upcoming.length === 0 && (
@@ -947,13 +948,14 @@ function MyAvailability({
 function StaffPanel({
   text,
   view,
+  durations: savedDurations,
   pending,
   act,
   onConfirmLead,
-}: Readonly<{ text: Text; view: PlanningView; pending: string | null; act: Act; onConfirmLead: (hours: number) => void }>) {
+}: Readonly<{ text: Text; view: PlanningView; durations: PlanningDurationSettings; pending: string | null; act: Act; onConfirmLead: (hours: number) => void }>) {
   const { t } = text;
   const [hours, setHours] = useState(48);
-  const [durations, setDurations] = useState<PlanningDurationSettings>(view.durations ?? DEFAULT_PLANNING_DURATIONS);
+  const [durations, setDurations] = useState<PlanningDurationSettings>(savedDurations);
   const casters = view.members.filter((member) => member.roles.includes("CASTER"));
   const b = PLANNING_DURATION_BOUNDS;
   const field = (

@@ -12,7 +12,7 @@ Remplace le tableur partagé tenu jusqu'ici.
 | Voir le planning (attributions de tous, ses propres réponses) | `planning` | `GET /api/planning` |
 | Donner sa disponibilité / sa préférence | `planning` + le rôle concerné | `PUT /api/planning/availability` |
 | Se dire caster autonome | `planning` + rôle `CASTER` | `PUT /api/planning/solo-caster` |
-| Régler le caster autonome d'un autre | `tournaments` | `PUT /api/planning/solo-caster` (`userId`) |
+| Régler le caster autonome d'un autre | **administrateur** | `PUT /api/planning/solo-caster` (`userId`) |
 | Attribuer / retirer à la main | `tournaments` | `PUT /api/admin/planning/assignment` |
 | Calculer un lot | **administrateur** (`canComputePlanning`) | `POST /api/admin/planning/auto-assign` |
 | Confirmer des propositions | **administrateur** | `POST /api/admin/planning/confirm` |
@@ -26,9 +26,13 @@ de confirmation d'un créneau n'existent que pour eux : la vue (`GET
 /api/planning`, seule porte, le planning n'a pas de flux) porte `canCompute`
 et `durations` seulement pour un administrateur ; sinon rien n'est rendu (ni
 coquille vide ni indice). Les routes de calcul, de confirmation, de réglages
-et le caster autonome d'un autre rendent `403 FORBIDDEN` à tout autre compte,
-`tournaments` compris. L'attribution à la main reste à `tournaments`
-(`canManage`), la confirmation d'office (`auto-confirm`) n'est pas un geste
+et le caster autonome d'un autre rendent `403 PLANNING_ADMIN_ONLY` (« réservé
+aux administrateurs ») à tout autre compte, `tournaments` compris ; le panneau
+n'est rendu que si la vue porte aussi les durées (jamais de valeurs par défaut
+qu'un enregistrement écrirait). L'attribution à la main reste à `tournaments`
+(`canManage`) : choisir à la main une personne déjà proposée remplace la
+proposition par un choix du staff (`MANUAL`, ferme par nature), ce n'est pas
+confirmer le calcul ; la confirmation d'office (`auto-confirm`) n'est pas un geste
 d'utilisateur et ne change pas.
 
 `planning` : rôles `ARBITRE`, `CASTER`, `PROD` (nouveau rôle de plateforme,
@@ -398,7 +402,7 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   et l'alerte se jugent sur les rôles **confirmés** seuls, à la relecture qui
   suit le retrait (une inscription de cast faite ou défaite entre-temps compte) ;
   un remplaçant non autonome posé auprès d'un prod proposé ne déclenche pas
-  d'alerte : le staff confirme ce prod depuis le tableau. Une **proposition** de caster autonome quittée n'ôtait
+  d'alerte : un administrateur confirme ce prod depuis le tableau. Une **proposition** de caster autonome quittée n'ôtait
   aucune diffusion confirmée : jamais `streamLost`. Sans remplaçant, la diffusion est perdue : la place est à pourvoir, le
   staff prévenu, et tous lisent « diffusion perdue, il manque un prod ou un
   caster autonome » (`bodyStreamLost`, push et message privé ; pas de

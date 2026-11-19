@@ -4,6 +4,7 @@ import {
   ROLE_LABELS,
   can,
   canAny,
+  canComputePlanning,
   hasPermission,
   isPlatformRole,
   isStaffMember,
@@ -174,6 +175,28 @@ describe("canAny", () => {
 });
 
 /** Revue de sécurité, cycle 1 : `DEV` lit `/devdoc`, il n'est pas du staff. */
+describe("canComputePlanning", () => {
+  it("canComputePlanning_admin_returnsTrue", () => {
+    expect(canComputePlanning({ isAdmin: true })).toBe(true);
+  });
+
+  it("canComputePlanning_tournamentsStaffNotAdmin_returnsFalse", () => {
+    const arbitre = { roles: ["ARBITRE"] as PlatformRole[], isAdmin: false };
+
+    expect(can(arbitre, "tournaments")).toBe(true);
+    expect(canComputePlanning(arbitre)).toBe(false);
+  });
+
+  it("canComputePlanning_noAdminFlag_returnsFalse", () => {
+    expect(canComputePlanning({})).toBe(false);
+  });
+
+  it("canComputePlanning_noUser_returnsFalse", () => {
+    expect(canComputePlanning(null)).toBe(false);
+    expect(canComputePlanning(undefined)).toBe(false);
+  });
+});
+
 describe("isStaffMember", () => {
   it("isStaffMember_devOnly_false", () => {
     expect(isStaffMember({ roles: ["DEV"] })).toBe(false);
