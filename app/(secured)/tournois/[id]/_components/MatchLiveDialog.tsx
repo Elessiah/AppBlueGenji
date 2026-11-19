@@ -26,7 +26,7 @@ import {
   viewerMayChangeLiveTrigger,
   viewerMayUnmarkLiveTrigger,
 } from "@/lib/shared/live-trigger-owner";
-import { canEditReplay } from "@/lib/shared/match-replay";
+import { canEditReplay, mayEditReplay } from "@/lib/shared/match-replay";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import { useActionsText } from "../_lib/actions-text";
 import { useLiveControls, useViewerRefereesMatch } from "../_lib/live-context";
@@ -97,17 +97,8 @@ export function lockedOnClosedMatch(
   return triggerLocked && match.liveTrigger !== null && !isMatchCastable(match);
 }
 
-/**
- * La rediff depuis cette fenêtre : la seule `live` ne règle que celle de son
- * cast (`NOT_MATCH_CASTER` au serveur), le staff `tournaments` toutes.
- */
-export function mayEditReplay(
-  match: { casters: readonly { userId: number }[] },
-  controls: { canManage: boolean; canSchedule: boolean; viewerUserId: number | null },
-): boolean {
-  if (!controls.canManage) return false;
-  return controls.canSchedule || match.casters.some((caster) => caster.userId === controls.viewerUserId);
-}
+/** Porte de la rediff : définie une seule fois, miroir de la route (`lib/shared/match-replay.ts`). */
+export { mayEditReplay };
 
 /** Aide du lien du staff : verrouillé par le mode d'un autre, ou réservé au staff. */
 function StaffLinkHint({ staffSide, linkLocked }: Readonly<{ staffSide: boolean; linkLocked: boolean }>) {
@@ -420,7 +411,7 @@ export function MatchLiveDialog({
   const mapError = useMapError();
   const text = useDialogsText();
   const { t } = text;
-  // Libellés déjà rédigés pour le pied d'action de la carte (antenne, rediff) :
+  // Libellés déjà rédigés pour le menu d'actions de la carte (antenne, rediff) :
   // les mêmes mots ici, dans le seul espace qui les porte.
   const actions = useActionsText();
   const controls = useLiveControls();
@@ -728,6 +719,10 @@ export function MatchLiveDialog({
             </BusyButton>
           </div>
         )}
+        {/* Voulu en double avec l'entrée de la carte : cette fenêtre s'ouvre aussi
+            pour l'arbitre désigné du match (sans `tournaments`), qui n'a l'entrée
+            de la carte que s'il porte les deux permissions — s'il caste ce match
+            (`live`), il y règle sa rediff. Le caster, lui, a `CastSettingsDialog`. */}
         {canEditReplay(match, mayEditReplay(match, controls)) && (
           <div className={styles.section}>
             <BusyButton

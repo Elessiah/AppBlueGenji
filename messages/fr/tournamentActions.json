@@ -226,6 +226,7 @@
     "streamMatch": "Diffuser ce match",
     "editReplay": "Modifier la rediff",
     "addReplay": "Ajouter la rediff",
+    "removeReplay": "Retirer la rediff",
     "playerScore": {
       "forfeit": "Déclarer forfait",
       "confirm": "Confirmer le score",
