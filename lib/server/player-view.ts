@@ -1,8 +1,9 @@
-import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { playerViewSessionKey, type AuthUser } from "@/lib/server/auth";
 import { reconnectSessionStreams } from "@/lib/server/session-streams";
 import { auditStaffAction } from "@/lib/server/staff-audit";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import { parseImpersonatedRoles, PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import type { PlatformRole } from "@/lib/shared/permissions";
@@ -82,12 +83,7 @@ export async function setPlayerView(
     auditStaffAction(active ? impersonationAuditLine(kept) : PLAYER_VIEW_OFF_AUDIT, { id: user.id, pseudo: user.pseudo });
   }
 
-  const [rows] = await db.execute<SessionViewRow[]>(
-    `SELECT player_view_until, impersonated_roles_json, player_view_until > NOW() AS active FROM bg_user_sessions
-     WHERE token_hash = ? AND user_id = ? AND expires_at > NOW() LIMIT 1`,
-    [key.tokenHash, user.id],
-  );
-  const row = rows[0];
+  const row = await readSessionView(db, key.tokenHash, user.id);
   // Une session à cookie disparue entre-temps (déconnexion croisée) : refus.
   // La ligne du contournement, elle, n'existe qu'en vue joueur.
   if (!row && !key.devBypass) throw new Error(PLAYER_VIEW_NO_SESSION);
@@ -96,21 +92,85 @@ export async function setPlayerView(
 }
 
 /**
+ * Lève l'incarnation de **toutes** les sessions d'un compte qui perd
+ * l'administration (`setUserRoles`) : sans quoi l'échéance et les rôles
+ * restaient sur la session, ignorés tant que le compte n'est plus
+ * administrateur, puis relus tels quels s'il le redevenait dans les 12 h —
+ * une incarnation revenue sans geste ni ligne pm2. Sur la connexion de la
+ * transaction de l'appelant. Sans la colonne des rôles (`ALTER` non joué),
+ * seule l'échéance est levée.
+ */
+export async function clearAccountImpersonation(connection: Pick<PoolConnection, "execute">, userId: number): Promise<void> {
+  const clear = (roles: boolean) =>
+    connection.execute<ResultSetHeader>(
+      `UPDATE bg_user_sessions SET player_view_until = NULL${roles ? ", impersonated_roles_json = NULL" : ""}
+       WHERE user_id = ? AND player_view_until IS NOT NULL`,
+      [userId],
+    );
+  try {
+    await clear(true);
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    await clear(false);
+  }
+}
+
+/**
+ * Relit la ligne de session après la bascule. Sans la colonne
+ * `impersonated_roles_json` (`ALTER` non joué), la lecture de la session
+ * retombe sur la vue joueur (`getCurrentUser`) : la relecture fait de même,
+ * rôles vides, plutôt que d'échouer.
+ */
+async function readSessionView(db: Pool, tokenHash: string, userId: number): Promise<SessionViewRow | undefined> {
+  const select = (roles: boolean) =>
+    db.execute<SessionViewRow[]>(
+      `SELECT player_view_until${roles ? ", impersonated_roles_json" : ", NULL AS impersonated_roles_json"}, player_view_until > NOW() AS active
+       FROM bg_user_sessions WHERE token_hash = ? AND user_id = ? AND expires_at > NOW() LIMIT 1`,
+      [tokenHash, userId],
+    );
+  try {
+    const [rows] = await select(true);
+    return rows[0];
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    const [rows] = await select(false);
+    return rows[0];
+  }
+}
+
+/**
  * Session à cookie : pose (rôles en JSON) ou retire (`null`) l'incarnation si
  * l'état change. `true` si une ligne a changé.
+ *
+ * Le retour reste possible sans la colonne `impersonated_roles_json` (`ALTER`
+ * non joué : la session se lit alors en vue joueur) — il ne lève que
+ * l'échéance. Une entrée, elle, échoue : elle ne poserait pas les rôles choisis.
  */
 async function writeSessionView(db: Pool, tokenHash: string, userId: number, rolesJson: string | null): Promise<boolean> {
-  const [result] = await db.execute<ResultSetHeader>(
-    rolesJson !== null
-      ? `UPDATE bg_user_sessions
-           SET player_view_until = DATE_ADD(NOW(), INTERVAL ? HOUR), impersonated_roles_json = ?
-         WHERE token_hash = ? AND user_id = ? AND expires_at > NOW()
-           AND (player_view_until IS NULL OR player_view_until <= NOW())`
-      : `UPDATE bg_user_sessions SET player_view_until = NULL, impersonated_roles_json = NULL
-         WHERE token_hash = ? AND user_id = ? AND expires_at > NOW() AND player_view_until > NOW()`,
-    rolesJson !== null ? [PLAYER_VIEW_MAX_HOURS, rolesJson, tokenHash, userId] : [tokenHash, userId],
-  );
-  return Number(result.affectedRows ?? 0) > 0;
+  if (rolesJson !== null) {
+    const [result] = await db.execute<ResultSetHeader>(
+      `UPDATE bg_user_sessions
+         SET player_view_until = DATE_ADD(NOW(), INTERVAL ? HOUR), impersonated_roles_json = ?
+       WHERE token_hash = ? AND user_id = ? AND expires_at > NOW()
+         AND (player_view_until IS NULL OR player_view_until <= NOW())`,
+      [PLAYER_VIEW_MAX_HOURS, rolesJson, tokenHash, userId],
+    );
+    return Number(result.affectedRows ?? 0) > 0;
+  }
+  const exit = (roles: boolean) =>
+    db.execute<ResultSetHeader>(
+      `UPDATE bg_user_sessions SET player_view_until = NULL${roles ? ", impersonated_roles_json = NULL" : ""}
+       WHERE token_hash = ? AND user_id = ? AND expires_at > NOW() AND player_view_until > NOW()`,
+      [tokenHash, userId],
+    );
+  try {
+    const [result] = await exit(true);
+    return Number(result.affectedRows ?? 0) > 0;
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    const [result] = await exit(false);
+    return Number(result.affectedRows ?? 0) > 0;
+  }
 }
 
 /**

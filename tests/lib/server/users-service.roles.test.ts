@@ -319,6 +319,53 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
     resetSessionStreams();
   });
 
+  it("setUserRoles_adminDemoted_clearsImpersonationOnAllItsSessionsBeforeCommit", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: "[]" }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 2 }]);
+
+    await setUserRoles(7, ["ARBITRE"], 3);
+
+    const [clearSql, clearParams] = connection.execute.mock.calls[2] as [string, unknown[]];
+    expect(clearSql).toContain("UPDATE bg_user_sessions SET player_view_until = NULL, impersonated_roles_json = NULL");
+    expect(clearSql).toContain("WHERE user_id = ? AND player_view_until IS NOT NULL");
+    expect(clearParams).toEqual([7]);
+    expect(connection.execute.mock.invocationCallOrder[2]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  it("setUserRoles_adminDemotedWithoutRolesColumn_clearsDeadlineOnly", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: "[]" }]);
+    connection.execute
+      .mockRejectedValueOnce(Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" }))
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    await setUserRoles(7, [], 3);
+
+    const [fallbackSql] = connection.execute.mock.calls[3] as [string, unknown[]];
+    expect(fallbackSql).toContain("SET player_view_until = NULL");
+    expect(fallbackSql).not.toContain("impersonated_roles_json");
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("setUserRoles_adminKept_leavesSessionsUntouched", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: "[]" }]);
+
+    await setUserRoles(7, ["ADMIN", "ARBITRE"], 3);
+
+    expect(connection.execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("setUserRoles_nonAdminRolesChanged_leavesSessionsUntouched", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, ARBITRE_TARGET]);
+
+    await setUserRoles(7, ["CASTER"], 3);
+
+    expect(connection.execute).toHaveBeenCalledTimes(2);
+  });
+
   it("setUserRoles_storedRoles_returnsThemAsPrevious", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: '["CASTER"]' }]);

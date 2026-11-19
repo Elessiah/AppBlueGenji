@@ -3424,6 +3424,29 @@ describe("cast et arbitrage — vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () =>
     expect(state.match?.referee_user_id ?? null).toBeNull();
   });
 
+  it("setMatchReady_refereeCasterImpersonatingCaster_setsCasterReadyOnly", async () => {
+    // Arbitre désigné qui caste aussi, session réduite au seul rôle CASTER : son
+    // « Prêt » de caster ne déclare pas l'arbitre, et le match ne part pas.
+    state.users[REFEREE] = { ...ELIGIBLE_CASTER, is_admin: 1, platform_roles_json: null };
+    state.match = matchState({ referee_user_id: REFEREE, caster_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+
+    await setMatchReady(42, REFEREE, true, { playerView: true, roles: ["CASTER"] });
+
+    expect(casterReadyOf(state)).toBe(STAMP);
+    expect(state.match?.referee_ready_at ?? null).toBeNull();
+    expect(state.match?.launched_at ?? null).toBeNull();
+  });
+
+  it("setMatchReady_refereeCasterImpersonatingCasterAndArbitre_setsBothReadies", async () => {
+    state.users[REFEREE] = { ...ELIGIBLE_CASTER, is_admin: 1, platform_roles_json: null };
+    state.match = matchState({ referee_user_id: REFEREE, caster_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+
+    await setMatchReady(42, REFEREE, true, { playerView: true, roles: ["CASTER", "ARBITRE"] });
+
+    expect(casterReadyOf(state)).toBe(STAMP);
+    expect(state.match?.referee_ready_at).toBe(STAMP);
+  });
+
   it("releaseMatchCast_impersonatingArbitre_isNotRefusedForPlayerView", async () => {
     state.match = matchState({ caster_user_id: CASTER });
 

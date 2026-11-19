@@ -112,6 +112,30 @@ describe("POST /api/auth/player-view", () => {
     expect((await toggle({ active: false })).status).toBe(200);
   });
 
+  it("POST_entriesRefusedByEntryRule_giveBackTheirBroadRulePlace", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    // Dix entrées admises, puis des entrées répétées au-delà du plafond de la
+    // règle large : refusées par leur règle, elles n'y laissent pas leur place.
+    for (let i = 0; i < PLAYER_VIEW_TOGGLE_RULE.limit; i += 1) await toggle({ active: true });
+    for (let i = 0; i < PLAYER_VIEW_EXIT_RULE.limit; i += 1) expect((await toggle({ active: true })).status).toBe(429);
+    jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
+
+    const res = await toggle({ active: false });
+
+    expect(res.status).toBe(200);
+    expect(setPlayerView).toHaveBeenLastCalledWith(adminInPlayerView, false, []);
+  });
+
+  it("POST_admittedEntriesAndExits_stillCappedByTheBroadRule", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    for (let i = 0; i < PLAYER_VIEW_TOGGLE_RULE.limit; i += 1) await toggle({ active: true });
+    jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
+    const exits = PLAYER_VIEW_EXIT_RULE.limit - PLAYER_VIEW_TOGGLE_RULE.limit;
+    for (let i = 0; i < exits; i += 1) expect((await toggle({ active: false })).status).toBe(200);
+
+    expect((await toggle({ active: false })).status).toBe(429);
+  });
+
   it("POST_enterNothingWrittenAndReadBackInactive_returns409", async () => {
     // Une sortie croisée a levé l'incarnation qui avait refusé l'entrée.
     jest.mocked(getCurrentUser).mockResolvedValue(admin);

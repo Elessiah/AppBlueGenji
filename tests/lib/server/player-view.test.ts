@@ -184,6 +184,62 @@ describe("setPlayerView — relecture en échec", () => {
   });
 });
 
+describe("setPlayerView — colonne des rôles absente (ALTER non joué)", () => {
+  const unknownColumn = () => Object.assign(new Error("Unknown column 'impersonated_roles_json'"), { code: "ER_BAD_FIELD_ERROR" });
+
+  /** Toute requête qui nomme la colonne échoue, comme sur une base où l'ALTER n'a pas pris. */
+  function databaseWithoutRolesColumn(written: number, readBack: ReadBack) {
+    execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
+      const text = String(sql);
+      if (text.replace("NULL AS impersonated_roles_json", "").includes("impersonated_roles_json")) throw unknownColumn();
+      return text.trimStart().startsWith("SELECT") ? [readBack === null ? [] : [readBack], []] : [header(written), []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  }
+
+  it("setPlayerView_deactivateWithoutRolesColumn_clearsDeadlineOnly", async () => {
+    databaseWithoutRolesColumn(1, { player_view_until: null, active: null });
+
+    const result = await setPlayerView(admin, false);
+
+    expect(result).toEqual({ until: null, roles: [], changed: true });
+    const exitWrites = sqlCalls().filter((sql) => sql.includes("SET player_view_until = NULL"));
+    expect(exitWrites).toHaveLength(2);
+    expect(exitWrites[1]).not.toContain("impersonated_roles_json");
+    expect(auditStaffAction).toHaveBeenCalledWith(PLAYER_VIEW_OFF_AUDIT, { id: 7, pseudo: "Chef" });
+  });
+
+  it("setPlayerView_readBackWithoutRolesColumn_readsPlayerView", async () => {
+    execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
+      const text = String(sql);
+      if (text.trimStart().startsWith("SELECT") && !text.includes("NULL AS impersonated_roles_json")) throw unknownColumn();
+      return text.trimStart().startsWith("SELECT")
+        ? [[{ player_view_until: DEADLINE, impersonated_roles_json: null, active: 1 }], []]
+        : [header(0), []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    const result = await setPlayerView(admin, true);
+
+    expect(result).toEqual({ until: "2026-11-18T22:00:00.000Z", roles: [], changed: false });
+  });
+
+  it("setPlayerView_activateWithoutRolesColumn_fails", async () => {
+    databaseWithoutRolesColumn(1, { player_view_until: DEADLINE, active: 1 });
+
+    await expect(setPlayerView(admin, true, ["CASTER"])).rejects.toThrow("Unknown column");
+    expect(auditStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("setPlayerView_deactivateOtherError_rethrows", async () => {
+    execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("pool lost"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(setPlayerView(admin, false)).rejects.toThrow("pool lost");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("setPlayerView — contournement de développement", () => {
   beforeEach(() => {
     jest.mocked(playerViewSessionKey).mockResolvedValue({ tokenHash: "dev-auth-bypass:7", devBypass: true });

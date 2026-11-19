@@ -58,8 +58,18 @@ sans session, une ligne dédiée de `bg_user_sessions` (`devBypassSessionKey`)
 porte l'échéance.
 
 Si l'une des deux colonnes manque (son `ALTER` a échoué), la lecture se
-rejoue sans elles : aucune session n'incarne alors de rôle, les droits restent
-entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
+rejoue sans elles : sans `impersonated_roles_json`, une session encore marquée
+se lit en vue joueur (repli fermé) ; sans `player_view_until`, aucune session
+n'incarne de rôle. L'entrée échoue alors (`500 PLAYER_VIEW_FAILED`), mais **le
+retour reste possible** : sans la colonne des rôles, il ne lève que
+l'échéance, et la relecture rend des rôles vides (`readSessionView`) — un
+administrateur n'est jamais enfermé hors de ses droits.
+
+**Perte de l'administration.** `setUserRoles` qui retire `ADMIN` lève, dans
+la même transaction, l'incarnation de toutes les sessions du compte
+(`clearAccountImpersonation`) : sans quoi l'échéance et les rôles, ignorés
+tant que le compte n'est plus administrateur, revenaient tels quels s'il le
+redevenait dans les 12 h.
 
 ## Ce qui reste au compte pendant l'incarnation
 
@@ -84,7 +94,9 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
   ce seul bouton). La résolution de la
   partie du match (`resolveMatchParty`, qui lit l'éligibilité en base) prend
   **obligatoirement** l'état de la session (`PartySession` = `SessionRights`,
-  `{ playerView, roles }`, requis aussi par `setMatchReady` ; et `LaunchViewer`
+  `{ playerView, roles }`, requis aussi par `setMatchReady` — le « Prêt » d'un
+  arbitre désigné qui caste aussi ne déclare l'arbitre que si la session tient
+  `tournaments` (`writeCasterReady`) ; et `LaunchViewer`
   côté lancement et contacts) : un nouvel appelant qui l'oublie ne compile
   pas, et des rôles absents valent « aucun » (refus, jamais ouverture).
   Revenir en vue admin les lui rend tels quels.
@@ -103,8 +115,9 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
   **entrées** par minute et par compte (`PLAYER_VIEW_TOGGLE_RULE`) — le retour,
   qui ne fait que rendre des droits, est compté à part (`PLAYER_VIEW_EXIT_RULE`,
   trente par minute) ; cette règle large garde aussi **avant** la lecture du
-  corps (un corps refusé se compte), si bien que dix entrées par minute au plus
-  n'en épuisent jamais la moitié ;
+  corps (un corps refusé se compte) ; une entrée refusée par sa propre règle y
+  rend sa place (`reserveRateLimit`), si bien que seules les dix entrées
+  admises de la minute y comptent et n'épuisent jamais le retour ;
   `409 IMPERSONATION_ALREADY_ACTIVE` pour une entrée qui n'a rien écrit alors
   que la session incarne déjà **d'autres** rôles (ou qu'une sortie croisée vient de la lever) (posés depuis un autre
   onglet : le client le dit et relit la page — une entrée qui a écrit rend
@@ -128,7 +141,7 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
   trame avant sa fermeture. Le client rouvre sur-le-champ, sans témoin « Hors
   ligne » ni sondage de secours ; une seconde demande sans ouverture entre
   les deux passe par l'attente croissante. Les traces sont bornées **par
-  compte** (`RECONNECT_MEMORY_PER_USER` = 20, le double du débit permis) :
+  compte** (`RECONNECT_MEMORY_PER_USER` = 60, le double de `PLAYER_VIEW_EXIT_RULE`, qui compte toute bascule) :
   les bascules d'un compte ne chassent jamais la trace en attente d'un autre. Flux et ligne pm2 partent sitôt l'écriture faite, avant la
   relecture : une relecture en échec (500) ne les perd pas.
 - Contournement de développement : la ligne `dev-auth-bypass:<id>` est
@@ -197,8 +210,9 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
 
 Les colonnes ne servent qu'à réduire des droits, à la demande de
 l'administrateur lui-même, et partent avec la session (déconnexion, purge des
-sessions échues, suppression du compte) ; une échéance passée reste sur la
-ligne, sans effet, avec ses rôles, jusque-là. Jusqu'au déploiement de cette
+sessions échues, suppression du compte), ou plus tôt quand le compte perd
+l'administration ; une échéance passée reste sur la ligne, sans effet, avec
+ses rôles, jusque-là. Jusqu'au déploiement de cette
 version (novembre 2026), tout titulaire d'un rôle de plateforme (développeur
 compris) pouvait passer en vue joueur : ses lignes pm2 restent jusqu'à leur rotation, d'où les mentions
 « jusqu'en novembre 2026 » du registre.
@@ -259,7 +273,7 @@ compris) pouvait passer en vue joueur : ses lignes pm2 restent jusqu'à leur rot
 
 - Le drapeau est lu dans la requête de session existante (`s.player_view_until > NOW()`), sans requête de plus ni index nouveau ; l'échéance est une simple comparaison.
 - La bannière est chargée par `next/dynamic` (rendue côté serveur, code absent du morceau des pages publiques) ; le hook et le focus vivent dans `player-view-toggle.ts`, que le menu du compte importe sans la bannière.
-- Les changements de contexte (reconnexion) sont gardés à part des révocations (une minute, `RECONNECT_MEMORY_PER_USER` = 20 par compte, filet global `RECONNECT_MEMORY_MAX` = 1024) : une bascule répétée ne ralentit pas `revokedSince`. La reconnexion des flux porte déjà une gigue (`reconnectDelayMs`).
+- Les changements de contexte (reconnexion) sont gardés à part des révocations (une minute, `RECONNECT_MEMORY_PER_USER` = 60 par compte, filet global `RECONNECT_MEMORY_MAX` = 1024) : une bascule répétée ne ralentit pas `revokedSince`. La reconnexion des flux porte déjà une gigue (`reconnectDelayMs`).
 
 ## Coût par requête (revue de performance)
 

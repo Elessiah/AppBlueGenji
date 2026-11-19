@@ -718,13 +718,16 @@ export async function queueDeferredNoRefereeAlerts(candidates: readonly NoRefere
 
 /**
  * « Prêt » d'un caster : le sien seul change. L'arbitre désigné qui caste
- * aussi le match donne les deux d'un clic.
+ * aussi le match donne les deux d'un clic — seulement si la session tient
+ * l'arbitrage (`tournaments`) : une incarnation du seul rôle de caster ne
+ * déclare jamais l'arbitre prêt (`ADMIN_ROLE_IMPERSONATION.md`).
  */
 async function writeCasterReady(
   connection: PoolConnection,
   row: LaunchMatchRow,
   userId: number,
   ready: boolean,
+  session: PartySession,
 ): Promise<void> {
   const stamp = ready ? "NOW()" : "NULL";
   await connection.execute(`UPDATE bg_match_casters SET ready_at = ${stamp} WHERE match_id = ? AND user_id = ?`, [
@@ -733,7 +736,7 @@ async function writeCasterReady(
   ]);
   const readyAt = ready ? new Date() : null;
   for (const caster of row.casters) if (caster.userId === userId) caster.readyAt = readyAt;
-  const alsoReferee = isEligibleReferee(row, userId);
+  const alsoReferee = sessionHolds(session, "tournaments") && isEligibleReferee(row, userId);
   if (alsoReferee) row.referee_ready_at = readyAt;
   const refereeReady = alsoReferee ? `, referee_ready_at = ${stamp}` : "";
   await connection.execute(
@@ -772,7 +775,7 @@ export async function setMatchReady(
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
 
     if (party.role === "CASTER") {
-      await writeCasterReady(connection, row, userId, ready);
+      await writeCasterReady(connection, row, userId, ready, session);
     } else {
       // Nom de colonne tiré d'une table fermée, jamais de l'entrée.
       const column = READY_AT_COLUMNS[party.role];

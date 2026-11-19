@@ -1,4 +1,4 @@
-import { enforceRateLimit, PLAYER_VIEW_EXIT_RULE, PLAYER_VIEW_TOGGLE_RULE } from "@/lib/server/api-guard";
+import { enforceRateLimit, PLAYER_VIEW_EXIT_RULE, PLAYER_VIEW_TOGGLE_RULE, reserveRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
@@ -20,8 +20,9 @@ import { parsePlayerViewBody } from "@/lib/shared/player-view";
  * **entrées** par `PLAYER_VIEW_TOGGLE_RULE`, le retour, qui ne fait que rendre
  * des droits, par une règle à part et plus large (`PLAYER_VIEW_EXIT_RULE`),
  * qui borne aussi, avant la lecture du corps, toute requête du compte (corps
- * invalide compris) : dix entrées par minute au plus n'en épuisent jamais la
- * moitié.
+ * invalide compris). Une entrée refusée par sa propre règle y rend sa place :
+ * seules les dix entrées admises de la minute y comptent, si bien que des
+ * entrées répétées n'épuisent jamais le retour.
  *
  * Une entrée alors que la session incarne déjà **d'autres** rôles (un autre
  * onglet l'a posée) ne change rien et répond `409 IMPERSONATION_ALREADY_ACTIVE`
@@ -42,15 +43,19 @@ export async function POST(req: Request) {
   // trop de rôles, `roles` à la sortie) se compte aussi — une boucle de
   // requêtes invalides ne martèle pas la lecture et l'analyse du JSON. Les
   // entrées ont, en plus, leur règle plus étroite, après l'analyse.
-  const broad = enforceRateLimit(PLAYER_VIEW_EXIT_RULE, user.id);
-  if (broad) return broad;
+  const broad = reserveRateLimit(PLAYER_VIEW_EXIT_RULE, user.id);
+  if (broad.refused) return broad.refused;
   const read = await readJsonObject(req, "INVALID_PLAYER_VIEW", SMALL_JSON_BODY_MAX_BYTES);
   if ("refusal" in read) return fail(read.refusal, 400);
   const parsed = parsePlayerViewBody(read.body);
   if (parsed === null) return fail("INVALID_PLAYER_VIEW", 400);
   if (parsed.active) {
     const throttled = enforceRateLimit(PLAYER_VIEW_TOGGLE_RULE, user.id);
-    if (throttled) return throttled;
+    if (throttled) {
+      // Entrée refusée : sa place dans la règle large est rendue, le retour reste possible.
+      broad.refund();
+      return throttled;
+    }
   }
 
   try {

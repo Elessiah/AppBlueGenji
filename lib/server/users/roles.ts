@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { resolveRoles } from "@/lib/server/auth";
 import { getDatabase } from "@/lib/server/database";
+import { clearAccountImpersonation } from "@/lib/server/player-view";
 import { normalizePseudo, parseRoles } from "@/lib/server/serialization";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { publishStaffAction } from "@/lib/server/staff-audit";
@@ -126,6 +127,10 @@ export async function setUserRoles(
         `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ? AND is_deleted = 0`,
         [isAdmin ? 1 : 0, JSON.stringify(nonAdminRoles), targetUserId],
       );
+      // Rétrogradation : l'incarnation posée sur ses sessions tombe avec
+      // l'administration (`ADMIN_ROLE_IMPERSONATION.md`), elle ne reviendrait
+      // pas d'elle-même si l'administration était rendue.
+      if (previous.includes("ADMIN") && !isAdmin) await clearAccountImpersonation(connection, targetUserId);
     }
     await connection.commit();
   } catch (error) {
