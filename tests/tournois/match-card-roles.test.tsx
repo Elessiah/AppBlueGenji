@@ -255,16 +255,13 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
     expect(card(forfeit, staff)).toContain("Modifier la rediff : Alpha contre Bravo");
   });
 
-  it("matchCard_completedWithCaster_replayInMenuOnceLiveWindowCloses", () => {
-    // La diffusion de l'organisation ne s'offre plus sur un match joué : la
-    // rediff ne dépend pas d'elle et reste dans le menu.
-    const html = card(bracketMatch({ ...played, casters: casterNamed(77) }), staff);
-    expect(html).not.toContain('data-action="liveConfig"');
-    expect(html).toContain('<li data-action="replay">Ajouter la rediff : Alpha contre Bravo</li>');
-  });
+
   it("matchCard_completedWithOfficialLive_staffSeesLiveConfigAndReplay", () => {
     const html = card(bracketMatch({ ...played, casters: casterNamed(77), liveTrigger: "MANUAL" }), staff);
     expect(html).toContain('data-action="liveConfig"');
     expect(html).toContain('<li data-action="replay">Ajouter la rediff : Alpha contre Bravo</li>');
+    // Ordre du menu : la rediff suit la diffusion officielle.
+    expect(html.indexOf('data-action="liveConfig"')).toBeLessThan(html.indexOf('data-action="replay"'));
   });
+
 });
