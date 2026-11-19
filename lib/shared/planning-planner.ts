@@ -56,6 +56,13 @@ export type PlannerEntry = {
    */
   spareOnly?: boolean;
   /**
+   * Avec `spareOnly` : le départ d'un caster autonome y a fait perdre la
+   * diffusion (le caster restant attend son prod). Le second caster cherché
+   * doit la rendre — un caster autonome seulement —, et c'est la place qui
+   * diffuse : il n'est pas écarté parce qu'une autre entrée l'attend. Absent : faux.
+   */
+  restoreStream?: boolean;
+  /**
    * Peut encore recevoir quelqu'un, dans ce lot ou un autre (à venir, non
    * jouée). Faux : commencée ou jouée, elle n'attend plus personne et ne
    * retient aucun renfort. Absent : vrai.
@@ -501,7 +508,8 @@ function fillAll(state: PlannerState, open: readonly PlannerEntry[]): boolean {
 /**
  * Un candidat au renfort est-il attendu ailleurs : une entrée qui chevauche
  * celle-ci, qui peut encore recevoir quelqu'un ({@link PlannerEntry.fillable}),
- * et à qui il manque un rôle qu'il pourrait prendre — caster, prod, ou une
+ * et à qui il manque un rôle qu'il pourrait prendre — caster, prod (auprès
+ * d'un caster qui l'attend), ou une
  * place d'arbitre (ouverte au calcul ou non : un lot ne prend jamais une
  * personne à une entrée d'un autre lot, et un caster qui est aussi prod ou
  * arbitre n'est pas pris à l'entrée qui l'attend dans cet autre rôle).
@@ -512,7 +520,11 @@ function neededElsewhere(state: PlannerState, entry: PlannerEntry, userId: numbe
     if (other === undefined || other.fillable === false) return false;
     const missing: PlanningRole[] = [];
     if (state.held(key, "CASTER").length === 0) missing.push("CASTER");
-    if (state.held(key, "PROD").length === 0) missing.push("PROD");
+    // Un prod n'y manque qu'auprès d'un caster qui l'attend (entrée pas encore diffusée) : sans caster, ou avec un
+    // caster autonome, il n'y servirait à rien.
+    if (state.held(key, "PROD").length === 0 && state.held(key, "CASTER").length > 0 && !state.coverage(key).streamed) {
+      missing.push("PROD");
+    }
     if (!state.input.refereeDecided.has(key) && state.held(key, "REFEREE").length < (other.refereeSlots ?? 1)) missing.push("REFEREE");
     return missing.some((role) => state.eligible(other, userId, role));
   });
@@ -522,7 +534,9 @@ function neededElsewhere(state: PlannerState, entry: PlannerEntry, userId: numbe
  * Le second caster d'une entrée, en renfort : l'entrée a déjà son premier
  * caster (jamais un second sans premier) et pas encore son plafond ; le
  * candidat n'est pas déjà sur l'entrée (aucun cumul pour un renfort) ni
- * attendu ailleurs ({@link neededElsewhere}). `preferredOnly` : seuls
+ * attendu ailleurs ({@link neededElsewhere} ; une diffusion à rendre,
+ * {@link PlannerEntry.restoreStream}, veut un caster autonome et passe
+ * outre). `preferredOnly` : seuls
  * ceux qui préfèrent l'entrée. Ordre : ce qui rend l'entrée diffusée (un
  * caster autonome auprès d'un caster qui attend son prod), la préférence, la
  * charge de la semaine, celle des semaines précédentes, l'identifiant.
@@ -535,7 +549,7 @@ function spareCaster(state: PlannerState, entry: PlannerEntry, preferredOnly: bo
     .candidates(entry, "CASTER")
     .filter((userId) => state.rolesOn(entry.key, userId).length === 0)
     .filter((userId) => !preferredOnly || state.preferred(entry.key, userId, "CASTER"))
-    .filter((userId) => !neededElsewhere(state, entry, userId))
+    .filter((userId) => (entry.restoreStream === true ? state.input.soloCasterIds.has(userId) : !neededElsewhere(state, entry, userId)))
     .map((userId) => ({
       userId,
       streams: !streamed && state.input.soloCasterIds.has(userId) ? 0 : 1,

@@ -170,6 +170,54 @@ describe("formatPlanningUnfilledDm", () => {
   });
 });
 
+describe("diffusion perdue", () => {
+  it("formatPlanningWithdrawalDm_streamLostFr_saysProdOrSoloNeeded", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ streamLost: true }), SITE, "fr");
+
+    expect(message).toContain("La diffusion est perdue : il manque un prod ou un caster autonome.");
+    expect(message).not.toContain("La place est à pourvoir.");
+  });
+
+  it("formatPlanningWithdrawalDm_streamLostEn_saysProdOrSoloNeeded", () => {
+    expect(formatPlanningWithdrawalDm(withdrawal({ streamLost: true }), SITE, "en")).toContain(
+      "The stream is lost: a prod or a solo caster is needed.",
+    );
+  });
+
+  it("formatPlanningUnfilledDm_streamLostFr_saysStreamLost", () => {
+    expect(formatPlanningUnfilledDm(withdrawal({ streamLost: true }), SITE, "fr")).toContain(
+      "aucun remplaçant trouvé, diffusion perdue (il manque un prod ou un caster autonome).",
+    );
+  });
+
+  it("formatPlanningUnfilledDm_streamLostEn_saysStreamLost", () => {
+    expect(formatPlanningUnfilledDm(withdrawal({ streamLost: true }), SITE, "en")).toContain(
+      "no replacement found, the stream is lost (a prod or a solo caster is needed).",
+    );
+  });
+
+  it("planningWithdrawalPush_streamLost_bodyStreamLost", () => {
+    const notice = withdrawal({ streamLost: true });
+
+    expect(planningWithdrawalPush(notice, "fr").body).toContain("la diffusion est perdue");
+    expect(planningWithdrawalPush(notice, "en").body).toContain("the stream is lost");
+  });
+
+  it("planningUnfilledPush_streamLostNotLate_bodyStreamLost", () => {
+    const push = planningUnfilledPush(withdrawal({ streamLost: true }), "en");
+
+    expect(push.body).toContain("the stream is lost");
+    expect(push.body).not.toContain("less than 24 hours");
+  });
+
+  it("planningUnfilledPush_streamLostLate_bodyStreamLostLate", () => {
+    const push = planningUnfilledPush(withdrawal({ streamLost: true, late: true }), "fr");
+
+    expect(push.body).toContain("diffusion perdue");
+    expect(push.body).toContain("moins de 24 h avant");
+  });
+});
+
 describe("formatPlanningUnfilledLine", () => {
   it("formatPlanningUnfilledLine_late_flagsLateWithdrawal", () => {
     expect(formatPlanningUnfilledLine(withdrawal({ late: true }), SITE)).toContain("désistement tardif");

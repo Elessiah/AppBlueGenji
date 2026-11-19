@@ -1250,10 +1250,23 @@ function withdrawalBody(
   | "planning.withdrawal.bodyReplaced"
   | "planning.withdrawal.bodyStillHeld"
   | "planning.withdrawal.bodySelfHeld"
+  | "planning.withdrawal.bodyStreamLost"
   | "planning.withdrawal.bodyOpen" {
   if (notice.replaced) return "planning.withdrawal.bodyReplaced";
-  if (notice.stillHeld !== true) return "planning.withdrawal.bodyOpen";
+  if (notice.stillHeld !== true) return notice.streamLost === true ? "planning.withdrawal.bodyStreamLost" : "planning.withdrawal.bodyOpen";
   return notice.selfHeld === true ? "planning.withdrawal.bodySelfHeld" : "planning.withdrawal.bodyStillHeld";
+}
+
+/** Texte d'une place à pourvoir : tardive ou non, diffusion perdue (départ d'un caster autonome) ou non. */
+function unfilledBody(
+  notice: PlanningWithdrawalNotice,
+):
+  | "planning.unfilled.body"
+  | "planning.unfilled.bodyLate"
+  | "planning.unfilled.bodyStreamLost"
+  | "planning.unfilled.bodyStreamLostLate" {
+  if (notice.streamLost === true) return notice.late ? "planning.unfilled.bodyStreamLostLate" : "planning.unfilled.bodyStreamLost";
+  return notice.late ? "planning.unfilled.bodyLate" : "planning.unfilled.body";
 }
 
 /** Place à pourvoir après un désistement sans remplaçant (`PLANNING_UNFILLED`, staff des tournois). */
@@ -1266,7 +1279,7 @@ export function planningUnfilledPush(notice: PlanningWithdrawalNotice, locale: L
   };
   return {
     title: text.t("planning.unfilled.title"),
-    body: text.t(notice.late ? "planning.unfilled.bodyLate" : "planning.unfilled.body", values),
+    body: text.t(unfilledBody(notice), values),
     url: localeHref(PLANNING_PATH, locale),
     tag: `planning-unfilled-${notice.key}-${notice.role}`,
   };

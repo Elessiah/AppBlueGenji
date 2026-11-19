@@ -195,17 +195,18 @@ export function candidatesFor(
 /**
  * Ce que la ligne d'un rôle offre au staff : `full`, le plafond de casters
  * atteint (`PLANNING_MAX_CASTERS` : liste masquée, « Deux casters au plus ») ;
- * `candidates`, la liste « Ajouter » (vide sans droit, entrée close ou plafond).
+ * `candidates`, la liste « Ajouter » (vide sans droit, entrée close ou plafond) ;
+ * `manage`, le staff peut modifier la ligne (droit et entrée modifiable).
  */
 export function roleChoices(
   entry: PlanningEntryView,
   role: PlanningRole,
   members: readonly PlanningMember[],
   canManage: boolean,
-): { full: boolean; candidates: ReturnType<typeof candidatesFor> } {
+): { manage: boolean; full: boolean; candidates: ReturnType<typeof candidatesFor> } {
   const manage = canManage && entry.editable;
   const full = manage && role === "CASTER" && planningCastersFull(entry.assignments);
-  return { full, candidates: manage && !full ? candidatesFor(entry, role, members) : [] };
+  return { manage, full, candidates: manage && !full ? candidatesFor(entry, role, members) : [] };
 }
 
 /** Clé du texte d'un refus : un code connu de `errors`, sinon `generic`. */

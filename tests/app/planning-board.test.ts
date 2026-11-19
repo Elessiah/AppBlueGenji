@@ -540,7 +540,7 @@ describe("roleChoices", () => {
   it("roleChoices_twoCastersManager_fullNoCandidates", () => {
     const choices = roleChoices(entryView({ assignments: casters }), "CASTER", members, true);
 
-    expect(choices).toEqual({ full: true, candidates: [] });
+    expect(choices).toEqual({ manage: true, full: true, candidates: [] });
   });
 
   it("roleChoices_oneCasterManager_candidatesListed", () => {
@@ -553,7 +553,13 @@ describe("roleChoices", () => {
   it("roleChoices_notManager_notFullNoCandidates", () => {
     const choices = roleChoices(entryView({ assignments: casters }), "CASTER", members, false);
 
-    expect(choices).toEqual({ full: false, candidates: [] });
+    expect(choices).toEqual({ manage: false, full: false, candidates: [] });
+  });
+
+  it("roleChoices_closedEntryManager_notManaged", () => {
+    const choices = roleChoices(entryView({ assignments: casters, editable: false }), "CASTER", members, true);
+
+    expect(choices).toEqual({ manage: false, full: false, candidates: [] });
   });
 
   it("roleChoices_twoCastersProdRole_notFull", () => {

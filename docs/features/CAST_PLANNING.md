@@ -92,8 +92,9 @@ compte les **rôles**, pas les personnes.
   caster, jamais à quelqu'un déjà sur l'entrée (aucun cumul pour un renfort),
   ni à qui une entrée qui la chevauche attend encore : à venir et non jouée
   (`fillable` ; une entrée commencée ou jouée n'attend plus personne), il lui
-  manque un rôle qu'il pourrait prendre — caster, prod ou place d'arbitre
-  (un caster qui est aussi prod ou arbitre n'y est pas pris) —, ouverte au lot
+  manque un rôle qu'il pourrait prendre — caster, prod (seulement auprès d'un
+  caster qui l'attend : entrée avec caster, pas encore diffusée) ou place
+  d'arbitre (un caster qui est aussi prod ou arbitre n'y est pas pris) —, ouverte au lot
   ou non (jamais pris à une autre entrée). Ordre :
   ceux qui préfèrent l'entrée (sur tout le lot) d'abord, puis les autres
   entrée par entrée dans l'ordre du calendrier ; parmi les candidats, ce qui
@@ -322,8 +323,13 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   ni pastille, ni avis au staff (`stillHeldBy`) ; les autres co-affectés lisent
   « un autre caster reste affecté », le caster restant « tu restes affecté
   comme caster » (`bodySelfHeld`). Un caster **autonome** parti laissant un
-  caster sans prod : la diffusion est perdue, la place est à pourvoir et le
-  staff prévenu (pas de pastille : un caster reste confirmé). Le groupe d'arbitres d'un tournoi entier garde la règle
+  caster sans prod (`casterHold` → `streamLost`) : son remplaçant doit rendre
+  la diffusion — un caster **autonome** seulement (`restoreStream`), pris même
+  si une entrée qui chevauche l'attend, la diffusion de celle-ci passant
+  d'abord. Sans lui, la diffusion est perdue : la place est à pourvoir, le
+  staff prévenu, et tous lisent « diffusion perdue, il manque un prod ou un
+  caster autonome » (`bodyStreamLost`, push et message privé ; pas de
+  pastille : un caster reste confirmé, la couverture de la carte le dit). Le groupe d'arbitres d'un tournoi entier garde la règle
   d'avant (un arbitre quitté sans remplaçant laisse sa place à pourvoir). La ligne remplaçante hérite de l'état de la ligne quittée :
   confirmée (et le remplaçant prévenu, `PLANNING_ASSIGNED`) si elle l'était,
   provisoire sinon (sans message). Aucun candidat : la place est **« à

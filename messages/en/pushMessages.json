@@ -222,12 +222,15 @@
       "bodyReplaced": "A {role} withdrew from {entry} ({start}): a replacement has been assigned.",
       "bodyOpen": "A {role} withdrew from {entry} ({start}): the slot is open.",
       "bodyStillHeld": "A {role} withdrew from {entry} ({start}): another {role} is still assigned.",
-      "bodySelfHeld": "A {role} withdrew from {entry} ({start}): you remain assigned as {role}."
+      "bodySelfHeld": "A {role} withdrew from {entry} ({start}): you remain assigned as {role}.",
+      "bodyStreamLost": "A {role} withdrew from {entry} ({start}): the stream is lost, a prod or a solo caster is needed."
     },
     "unfilled": {
       "title": "Open slot",
       "body": "A {role} withdrew from {entry} ({start}): no replacement found.",
-      "bodyLate": "A {role} withdrew from {entry} ({start}), less than 24 hours before: no replacement found."
+      "bodyLate": "A {role} withdrew from {entry} ({start}), less than 24 hours before: no replacement found.",
+      "bodyStreamLost": "A {role} withdrew from {entry} ({start}): no replacement found, the stream is lost (a prod or a solo caster is needed).",
+      "bodyStreamLostLate": "A {role} withdrew from {entry} ({start}), less than 24 hours before: no replacement found, the stream is lost (a prod or a solo caster is needed)."
     }
   }
 }

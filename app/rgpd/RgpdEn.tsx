@@ -1330,7 +1330,8 @@ export function RgpdEn({
             (role, date, reason, whether it is late — less than 24 h before) with the history, and replaces
             the person automatically (a slot holds two casters at most; a second caster who withdraws is only
             replaced by a caster needed nowhere else, and the slot is not “open” while the other caster stays
-            confirmed there, unless a solo caster&apos;s departure loses the stream). Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
+            confirmed there; a solo caster whose departure loses the stream is only replaced by a solo caster,
+            failing which the tournament staff is told). Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
             of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds the
             caster role; deleting the account removes everything about it (the actions it took as staff
             remain, without naming it), and the export of your data contains it, actions taken as staff

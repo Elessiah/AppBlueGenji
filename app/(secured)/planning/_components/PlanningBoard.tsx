@@ -657,9 +657,8 @@ function RoleRow({
   const rows = entry.assignments.filter((row) => row.role === role);
   const selectId = useId();
   const roleName = t(`roles.${role}`);
-  const manage = view.canManage && entry.editable;
   // Plafond de casters atteint : plus de liste de choix (le serveur refuse aussi, `PLANNING_CASTERS_FULL`).
-  const { full, candidates } = roleChoices(entry, role, view.members, view.canManage);
+  const { manage, full, candidates } = roleChoices(entry, role, view.members, view.canManage);
   const assign = (userId: number, assigned: boolean) =>
     act(
       `assign:${entry.key}:${role}:${userId}`,

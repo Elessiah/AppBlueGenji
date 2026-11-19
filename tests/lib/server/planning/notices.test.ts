@@ -128,6 +128,27 @@ describe("announceWithdrawal", () => {
     expect(calls[1][1].discord?.message("fr")).toContain("Tu restes affecté comme caster.");
   });
 
+  it("announceWithdrawal_stillHeldAndOthers_recipientsLoadedOnce", async () => {
+    await announceWithdrawal(withdrawal({ unfilled: false, stillHeldBy: [6], coAssignedIds: [5, 6] }));
+
+    expect(jest.mocked(loadNotificationRecipients).mock.calls).toEqual([[[5, 6], "proven", { excludeSuspended: true }]]);
+  });
+
+  it("announceWithdrawal_unfilledStreamLost_everyoneToldStreamLost", async () => {
+    await announceWithdrawal(withdrawal({ unfilled: true, streamLost: true, coAssignedIds: [5] }));
+
+    const calls = jest.mocked(notifyUsers).mock.calls;
+    expect(calls[0][1].discord?.message("fr")).toContain("La diffusion est perdue");
+    expect(calls[1][1].topic).toBe("PLANNING_UNFILLED");
+    expect(calls[1][1].discord?.message("fr")).toContain("diffusion perdue");
+  });
+
+  it("announceWithdrawal_notUnfilledStreamLostFlag_ignored", async () => {
+    await announceWithdrawal(withdrawal({ replacementId: 6, unfilled: false, streamLost: true, coAssignedIds: [5] }));
+
+    expect(jest.mocked(notifyUsers).mock.calls[0][1].discord?.message("fr")).toContain("Un remplaçant a été affecté.");
+  });
+
   it("announceWithdrawal_noReplacement_tournamentStaffWarnedWithoutTheWithdrawer", async () => {
     await announceWithdrawal(withdrawal({ role: "PROD", late: true }));
 

@@ -498,10 +498,11 @@ describe("withdrawFromEntry — panne après le désistement", () => {
  * pour un renfort ; `elsewhere` : une entrée m:2 qui chevauche, sans caster,
  * où ces candidats sont aussi disponibles.
  */
-function twoCasterData(options: { candidates?: number[]; elsewhere?: boolean; onlySolo?: number }) {
+function twoCasterData(options: { candidates?: number[]; elsewhere?: boolean; onlySolo?: number; soloIds?: number[] }) {
   const candidates = options.candidates ?? [];
   const entries = [loadedEntry(), ...(options.elsewhere ? [loadedEntry({ key: "m:2", matchId: 2 })] : [])];
-  const solo = (userId: number) => options.onlySolo === undefined || options.onlySolo === userId;
+  const solo = (userId: number) =>
+    options.soloIds !== undefined ? options.soloIds.includes(userId) : options.onlySolo === undefined || options.onlySolo === userId;
   const members = [4, 5, ...candidates].map((userId) => loadedMember({ userId, roles: ["CASTER"], soloCaster: solo(userId) }));
   const availability = candidates.flatMap((userId) => [
     available("m:1", userId, "CASTER"),
@@ -564,7 +565,59 @@ describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
     expect(result).toEqual({ late: false, replaced: false, unfilled: true });
-    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ unfilled: true, stillHeldBy: [] });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ unfilled: true, stillHeldBy: [], streamLost: true });
+  });
+
+  it("withdrawFromEntry_streamLostSoloCandidateNeededElsewhere_soloReplacementPicked", async () => {
+    // 6, autonome, est aussi attendu sur m:2 (qui chevauche, sans caster) : rendre la diffusion de m:1 passe d'abord.
+    twoCasterData({ candidates: [6], elsewhere: true, soloIds: [4, 6] });
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6, streamLost: false });
+  });
+
+  it("withdrawFromEntry_streamLostOnlyNonSoloCandidate_unfilledStreamLost", async () => {
+    // 6 n'est pas autonome : il ne rendrait pas la diffusion.
+    twoCasterData({ candidates: [6], soloIds: [4] });
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: null, streamLost: true });
+  });
+
+  it("withdrawFromEntry_secondCasterLeavesStreamKept_streamLostFalse", async () => {
+    twoCasterData({});
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ stillHeldBy: [5], streamLost: false });
+  });
+});
+
+describe("withdrawFromEntry — autre rôle du désisté", () => {
+  it("withdrawFromEntry_casterAlsoRefereeSearchFails_otherRoleStillCoAssigned", async () => {
+    // Tournoi entier : 4 y est caster et arbitre ; la recherche échoue, `data` (avant le retrait) porte encore ses deux lignes.
+    const entry = loadedEntry({ kind: "TOURNAMENT", key: "t:10", matchId: null, roundNumber: null, team1: null, team2: null });
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(
+      planningData({
+        entries: [entry],
+        assignments: [
+          loadedAssignment({ entryKey: "t:10", userId: 4, role: "CASTER", confirmed: true }),
+          loadedAssignment({ entryKey: "t:10", userId: 4, role: "REFEREE", confirmed: true }),
+        ],
+        members: [loadedMember({ userId: 4, roles: ["CASTER", "REFEREE"] })],
+      }),
+    );
+    jest.mocked(loadPlanningData).mockRejectedValueOnce(new Error("outage"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await withdrawFromEntry(caster, { entryKey: "t:10", role: "CASTER", reason: null }, EARLY);
+
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ coAssignedIds: [4], unfilled: true });
+    error.mockRestore();
   });
 });
 

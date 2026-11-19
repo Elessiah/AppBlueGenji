@@ -121,6 +121,11 @@ export type WithdrawalAnnouncement = {
    * qu'ils restent affectés ; les autres, qu'un autre caster reste. Absent : vide.
    */
   stillHeldBy?: readonly number[];
+  /**
+   * Avec `unfilled` : le départ d'un caster autonome a fait perdre la
+   * diffusion (le caster restant attend un prod ou un caster autonome). Absent : faux.
+   */
+  streamLost?: boolean;
   /** Les autres affectés de l'entrée (tenus, ni le désisté ni le remplaçant). */
   coAssignedIds: readonly number[];
 };
@@ -138,6 +143,7 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
     role: input.role,
     replaced: !input.unfilled && !stillHeld,
     stillHeld,
+    streamLost: input.unfilled && input.streamLost === true,
     late: input.late,
   };
   try {
@@ -148,9 +154,12 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
       [others.filter((id) => stillHeldBy.has(id)), { ...notice, selfHeld: true }],
     ];
     const base = siteCanonicalBase();
+    // Une seule lecture des destinataires, répartis ensuite entre les deux textes.
+    const loaded = others.length === 0 ? [] : await loadNotificationRecipients(others, "proven", { excludeSuspended: true });
     for (const [ids, text] of groups) {
-      if (ids.length === 0) continue;
-      const recipients = await loadNotificationRecipients(ids, "proven", { excludeSuspended: true });
+      const wanted = new Set(ids);
+      const recipients = loaded.filter((recipient) => wanted.has(recipient.userId));
+      if (recipients.length === 0) continue;
       await notifyUsers(recipients, {
         topic: "PLANNING_WITHDRAWAL",
         push: (locale) => planningWithdrawalPush(text, locale),
