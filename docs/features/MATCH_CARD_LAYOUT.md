@@ -35,7 +35,7 @@ De haut en bas, par ordre d'importance :
    page du match (`MatchKeyFacts` : hôte, premier ban, arbitrage, maps, format,
    côtés, casters, lancement), à laquelle chaque carte mène. Seuls restent sur
    la carte l'horaire, l'état de diffusion avec **les liens des chaînes**, la
-   phase, la rediff et le pied d'action.
+   phase, la rediff (le lien) et le pied d'action (dont le menu porte la rediff, doublée à dessein dans les fenêtres de diffusion pour le caster).
 4. Bandeau « Rediff disponible » (lien seul) et proposition de score en attente.
 5. **Pied d'action** (`MatchCardActions`) — une action principale pleine
    largeur et, s'il reste des actions, un bouton « Plus d'actions » (⋯).

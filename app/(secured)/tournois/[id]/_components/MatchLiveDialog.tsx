@@ -420,7 +420,7 @@ export function MatchLiveDialog({
   const mapError = useMapError();
   const text = useDialogsText();
   const { t } = text;
-  // Libellés déjà rédigés pour le pied d'action de la carte (antenne, rediff) :
+  // Libellés déjà rédigés pour le menu d'actions de la carte (antenne, rediff) :
   // les mêmes mots ici, dans le seul espace qui les porte.
   const actions = useActionsText();
   const controls = useLiveControls();

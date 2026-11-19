@@ -1,8 +1,8 @@
 /**
  * Rediffusion d'un match terminé.
  *
- * Une fois une rencontre jouée, le staff de diffusion (permission `live` :
- * admin, arbitre, caster) y pose le lien YouTube de sa rediff. Le match
+ * Une fois une rencontre jouée, le staff de diffusion (permission `live` : admin,
+ * arbitre, caster ; l'entrée de la carte demande aussi `tournaments`) y pose le lien YouTube de sa rediff. Le match
  * l'annonce alors à tout le monde par un bandeau « Rediff disponible » sous sa
  * carte — c'est la seule façon, pour un spectateur arrivé après coup, de savoir
  * qu'une rencontre se revoit.
@@ -116,9 +116,10 @@ export function visibleReplayUrl(
 }
 
 /**
- * Le lecteur (permission `live`) peut-il poser, modifier ou retirer la rediff ?
- * Lu par le modèle de la carte (`match-card-model.ts`) : logique pure, hors du
- * composant du bandeau.
+ * Le lecteur peut-il poser, modifier ou retirer la rediff ? `canManage` dit
+ * la permission `live` ; la carte (`match-card-model.ts`) y ajoute `tournaments`
+ * (`canSchedule`), porte de la route, et la fenêtre de diffusion admet aussi le
+ * caster du match. Logique pure, hors du composant du bandeau.
  */
 export function canEditReplay(match: MatchReplayInput & { replayUrl: string | null }, canManage: boolean): boolean {
   return canManage && (canHaveReplay(match) || match.replayUrl !== null);

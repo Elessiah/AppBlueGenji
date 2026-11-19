@@ -265,3 +265,13 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
   });
 
 });
+
+describe("MatchRow — la carte et la fenêtre de rediff s'accordent", () => {
+  it("matchCard_staffWithBothPermissions_mayEditReplayAgreesWithMenu", async () => {
+    const { mayEditReplay } = await import("@/app/(secured)/tournois/[id]/_components/MatchLiveDialog");
+    const controls = { canManage: true, canSchedule: true, viewerUserId: 1 };
+    expect(mayEditReplay({ casters: [] }, controls)).toBe(true);
+    expect(mayEditReplay({ casters: [] }, { ...controls, canSchedule: false })).toBe(false);
+    expect(mayEditReplay({ casters: [{ userId: 1 }] }, { ...controls, canSchedule: false })).toBe(true);
+  });
+});
