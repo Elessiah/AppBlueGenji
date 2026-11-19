@@ -221,12 +221,28 @@ export function staffPanelDurations(view: Pick<PlanningView, "canCompute" | "dur
 }
 
 /**
- * Empreinte des durées enregistrées : quand elle change à la relecture, le
- * formulaire repart des valeurs enregistrées (un autre administrateur a pu les
- * changer) au lieu de renvoyer une copie périmée, sans remonter le panneau.
+ * Le formulaire des durées après une relecture : un champ que l'administrateur
+ * n'a pas touché (encore égal à l'ancienne valeur enregistrée) prend la valeur
+ * relue — un autre administrateur a pu la changer — et un champ qu'il est en
+ * train de modifier garde sa saisie. Sans relecture changée, le même objet.
  */
-export function durationsKey(durations: PlanningDurationSettings): string {
-  return JSON.stringify(durations);
+export function resyncDurations(
+  form: PlanningDurationSettings,
+  previousSaved: PlanningDurationSettings,
+  nextSaved: PlanningDurationSettings,
+): PlanningDurationSettings {
+  if (previousSaved === nextSaved) return form;
+  const pick = (current: number, before: number, after: number) => (current === before ? after : current);
+  return {
+    mapMinutes: {
+      OW: pick(form.mapMinutes.OW, previousSaved.mapMinutes.OW, nextSaved.mapMinutes.OW),
+      MR: pick(form.mapMinutes.MR, previousSaved.mapMinutes.MR, nextSaved.mapMinutes.MR),
+    },
+    bufferMinutes: pick(form.bufferMinutes, previousSaved.bufferMinutes, nextSaved.bufferMinutes),
+    defaultMaps: pick(form.defaultMaps, previousSaved.defaultMaps, nextSaved.defaultMaps),
+    eventHours: pick(form.eventHours, previousSaved.eventHours, nextSaved.eventHours),
+    confirmLeadHours: pick(form.confirmLeadHours, previousSaved.confirmLeadHours, nextSaved.confirmLeadHours),
+  };
 }
 
 /** Bouton « Calculer la semaine » : administrateur seul, semaine ayant au moins un créneau ouvert. */

@@ -44,7 +44,6 @@ import {
   canConfirmEntry,
   canRunWeek,
   canWithdraw,
-  durationsKey,
   errorKey,
   filterEntries,
   filtersActive,
@@ -55,6 +54,7 @@ import {
   leadUntil,
   mergeView,
   newestFirst,
+  resyncDurations,
   planningOpenKey,
   splitPast,
   staffPanelDurations,
@@ -960,12 +960,11 @@ function StaffPanel({
   const { t } = text;
   const [hours, setHours] = useState(48);
   const [durations, setDurations] = useState<PlanningDurationSettings>(savedDurations);
-  // Des réglages relus (un autre administrateur les a changés) repartent dans le formulaire sans le remonter : ni le focus, ni la section ouverte, ni le délai saisi ne sont perdus.
-  const [seenKey, setSeenKey] = useState(() => durationsKey(savedDurations));
-  const savedKey = durationsKey(savedDurations);
-  if (savedKey !== seenKey) {
-    setSeenKey(savedKey);
-    setDurations(savedDurations);
+  // Des réglages relus (un autre administrateur les a changés) repartent dans le formulaire sans le remonter, champ par champ : ni le focus, ni la section ouverte, ni une saisie en cours ne sont perdus. `mergeView` garde l'objet tant que rien ne change : la comparaison est une identité, sans sérialisation.
+  const [seenSaved, setSeenSaved] = useState(savedDurations);
+  if (savedDurations !== seenSaved) {
+    setSeenSaved(savedDurations);
+    setDurations(resyncDurations(durations, seenSaved, savedDurations));
   }
   const casters = view.members.filter((member) => member.roles.includes("CASTER"));
   const b = PLANNING_DURATION_BOUNDS;

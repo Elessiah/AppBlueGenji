@@ -5,7 +5,7 @@ import {
   canConfirmEntry,
   canRunWeek,
   canWithdraw,
-  durationsKey,
+  resyncDurations,
   COVERAGE_PILL,
   errorKey,
   filterEntries,
@@ -451,6 +451,14 @@ describe("mergeView", () => {
     expect("durations" in merged).toBe(false);
   });
 
+  it("mergeView_adminDemoted_dropsStaleDurations", () => {
+    const previous = viewOf({ canManage: true, canCompute: true, durations: DEFAULT_PLANNING_DURATIONS });
+    const merged = mergeView(previous, viewOf({ canManage: true, canCompute: false }));
+
+    expect("durations" in merged).toBe(false);
+    expect(staffPanelDurations(merged)).toBeNull();
+  });
+
   it("mergeView_oneEntryChanged_onlyThatOneIsNew", () => {
     const previous = viewOf();
     const next = structuredClone(previous);
@@ -763,15 +771,29 @@ describe("staffPanelDurations", () => {
   });
 });
 
-describe("durationsKey", () => {
-  it("durationsKey_sameValues_sameKey", () => {
-    expect(durationsKey(structuredClone(DEFAULT_PLANNING_DURATIONS))).toBe(durationsKey(DEFAULT_PLANNING_DURATIONS));
+describe("resyncDurations", () => {
+  const saved = DEFAULT_PLANNING_DURATIONS;
+
+  it("resyncDurations_sameSavedObject_returnsForm", () => {
+    const form = { ...saved, bufferMinutes: 30 };
+
+    expect(resyncDurations(form, saved, saved)).toBe(form);
   });
 
-  it("durationsKey_oneValueChanged_differentKey", () => {
-    const changed = { ...DEFAULT_PLANNING_DURATIONS, bufferMinutes: DEFAULT_PLANNING_DURATIONS.bufferMinutes + 5 };
+  it("resyncDurations_untouchedField_takesReread", () => {
+    const next = { ...saved, eventHours: saved.eventHours + 2 };
 
-    expect(durationsKey(changed)).not.toBe(durationsKey(DEFAULT_PLANNING_DURATIONS));
+    expect(resyncDurations(saved, saved, next)).toEqual(next);
+  });
+
+  it("resyncDurations_fieldBeingEdited_keepsTyping", () => {
+    const form = { ...saved, mapMinutes: { ...saved.mapMinutes, OW: 40 } };
+    const next = { ...saved, mapMinutes: { ...saved.mapMinutes, OW: 20 }, bufferMinutes: saved.bufferMinutes + 5 };
+
+    const merged = resyncDurations(form, saved, next);
+
+    expect(merged.mapMinutes.OW).toBe(40);
+    expect(merged.bufferMinutes).toBe(next.bufferMinutes);
   });
 });
 
@@ -814,7 +836,7 @@ describe("PlanningBoard : branchement des gardes de calcul", () => {
 
   it("planningBoard_computeControls_useTheTestedGates", () => {
     expect(source).toContain("staffPanelDurations(view)");
-    expect(source).toContain("durationsKey(savedDurations)");
+    expect(source).toContain("resyncDurations(durations, seenSaved, savedDurations)");
     expect(source).not.toContain("key={durationsKey(");
     expect(source).toContain("canRunWeek(canCompute, week.entries)");
     expect(source).toContain("canConfirmEntry(view.canCompute, entry)");
