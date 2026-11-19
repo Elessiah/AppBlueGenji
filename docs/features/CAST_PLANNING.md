@@ -33,8 +33,15 @@ qu'un enregistrement écrirait). **Caster autonome d'un autre** : hors de cette
 exception, il reste au staff des tournois (`tournaments`, `403 FORBIDDEN` sinon) ;
 son réglage vit dans la section « Casters autonomes » de `/planning`, rendue
 à tout `canManage` hors du panneau de calcul (`SoloCastersStaff` : compteur, `InfoHint`, un nom accessible par case, zone `data-tap-zone` ; le lecteur caster n'y figure pas, il règle le sien dans la barre d'outils) ; le
-réglage d'un compte suspendu est refusé (`409 PLANNING_ROLE_NOT_HELD`, comme
-une désignation à la main, sans nommer la suspension). L'attribution
+poser le réglage demande de tenir le rôle au planning (`holdingRefusal`, la règle
+d'une désignation à la main) : un compte suspendu, sans le rôle ou inconnu reçoit
+le même `409 NOT_CASTER` (« ne peut pas être caster autonome »), sans rien qui
+nomme la suspension ; le **retirer** reste permis à un caster suspendu (rien n'en
+découle ; la vue des autres membres le compte encore). Ce geste ne garde pas
+son auteur (ni pm2, ni Discord, ni `bg_planning_events`, qui ne suit que les
+créneaux) : une trace nominative serait un nouveau traitement à déclarer. Changer ce réglage ne relance aucun avis du
+planning (ni « diffusion perdue », ni message au caster) : le staff qui le change
+voit aussitôt la couverture recalculée au tableau. L'attribution
 à la main reste à `tournaments` (`canManage`) : choisir à la main une personne déjà proposée remplace la
 proposition par un choix du staff (`MANUAL`, ferme par nature), ce n'est pas
 confirmer le calcul ; la confirmation d'office (`auto-confirm`) n'est pas un geste

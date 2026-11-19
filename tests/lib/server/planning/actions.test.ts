@@ -215,10 +215,32 @@ describe("setSoloCaster", () => {
     expect(writeSoloCaster).not.toHaveBeenCalled();
   });
 
-  it("setSoloCaster_suspendedCaster_throwsRoleNotHeldWithoutWriting", async () => {
+  it("setSoloCaster_suspendedCasterSet_throwsNotCasterWithoutWriting", async () => {
     jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })]);
 
-    await expect(setSoloCaster(4, true)).rejects.toThrow("PLANNING_ROLE_NOT_HELD");
+    await expect(setSoloCaster(4, true)).rejects.toThrow("NOT_CASTER");
+    expect(writeSoloCaster).not.toHaveBeenCalled();
+  });
+
+  it("setSoloCaster_suspendedCasterClear_writesFalse", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })]);
+
+    await setSoloCaster(4, false);
+
+    expect(writeSoloCaster).toHaveBeenCalledWith(expect.anything(), 4, false);
+  });
+
+  it("setSoloCaster_nonCasterClear_throwsNotCaster", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 6, roles: ["PROD"] })]);
+
+    await expect(setSoloCaster(6, false)).rejects.toThrow("NOT_CASTER");
+    expect(writeSoloCaster).not.toHaveBeenCalled();
+  });
+
+  it("setSoloCaster_missingAccountClear_throwsNotCaster", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([]);
+
+    await expect(setSoloCaster(7, false)).rejects.toThrow("NOT_CASTER");
     expect(writeSoloCaster).not.toHaveBeenCalled();
   });
 
