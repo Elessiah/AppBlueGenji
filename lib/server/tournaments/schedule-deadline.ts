@@ -36,7 +36,7 @@ import {
   deadlineOutcome,
   dueDeadlineReminder,
   readScheduleDeadline,
-  SCHEDULE_DEADLINE_ARM_MIN_MS,
+  SCHEDULE_DEADLINE_REAPPLY_MIN_MS,
   SCHEDULE_DEADLINE_FORFEIT_KEY,
   SCHEDULE_DEADLINE_REMINDERS,
   SCHEDULE_DEADLINE_RETIRED_KEY,
@@ -88,6 +88,15 @@ const ANNOUNCE_KEY = SCHEDULE_DEADLINE_REMINDERS[0].key;
 export const SWEEP_MAX_FAILURES = 5;
 /** Mise de côté d'un match en échec répété (voir {@link SWEEP_MAX_FAILURES}). */
 export const SWEEP_FAILURE_BACKOFF_MS = 15 * 60 * 1000;
+/**
+ * Nouveaux essais d'un avis que personne n'a reçu **parce que le bot n'a pas
+ * répondu**, pour une même date butoir : bornés — un bot lent qui remet
+ * pourtant le message (délai d'attente dépassé) ou qui refuse toujours l'appel
+ * ne doit ni répéter l'avis sans fin ni renvoyer chaque minute.
+ */
+export const BOT_RETRY_MAX = 3;
+/** Délai avant chaque nouvel essai d'un avis non remis faute de bot (voir {@link BOT_RETRY_MAX}). */
+export const BOT_RETRY_DELAY_MS = 10 * 60 * 1000;
 
 /** Une colonne `DATETIME` lue (ou absente). */
 type SqlDateTime = Date | string | null;
@@ -281,9 +290,10 @@ export async function setTournamentScheduleDeadlines(
 ): Promise<number> {
   let input = readScheduleDeadline(raw, now);
   // Trop proche pour une date neuve, mais peut-être celle de la manche, reposée pour les matchs
-  // remplis depuis : permise tant qu'une annonce arme encore (vérifié sous verrou).
+  // remplis depuis : permise tant qu'une annonce arme encore (vérifié sous verrou), et seulement
+  // pour les matchs qui n'en ont pas — elle ne raccourcit jamais une date butoir déjà en place.
   const reapplyOnly = input.kind === "invalid" && input.code === "SCHEDULE_DEADLINE_TOO_SOON";
-  if (reapplyOnly) input = readScheduleDeadline(raw, now, SCHEDULE_DEADLINE_ARM_MIN_MS);
+  if (reapplyOnly) input = readScheduleDeadline(raw, now, SCHEDULE_DEADLINE_REAPPLY_MIN_MS);
   if (input.kind === "invalid") throw new Error(reapplyOnly ? "SCHEDULE_DEADLINE_TOO_SOON" : input.code);
   const deadlineAt = input.kind === "set" ? input.at : null;
   const { count, changed, tournamentName } = await retryOnDeadlock(() =>
@@ -308,9 +318,13 @@ export async function setTournamentScheduleDeadlines(
           throw new Error("SCHEDULE_DEADLINE_TOO_SOON");
         }
         const targets = rows.filter((row) => matchLaunchPhase(deadlineMatchOf(row, tournament.refereeScheduling), now) === "TO_PLAN");
-        const changing = targets.filter((row) => !sameDeadline(row.schedule_deadline_at, deadlineAt)).map((row) => Number(row.id));
+        // Reposée à moins de 24 heures : seuls les matchs sans date butoir la reçoivent (une plus lointaine reste).
+        const carrying = reapplyOnly
+          ? targets.filter((row) => row.schedule_deadline_at === null || sameDeadline(row.schedule_deadline_at, deadlineAt))
+          : targets;
+        const changing = carrying.filter((row) => !sameDeadline(row.schedule_deadline_at, deadlineAt)).map((row) => Number(row.id));
         await writeDeadlines(connection, changing, deadlineAt);
-        return { count: targets.length, changed: changing.length, tournamentName: tournament.name };
+        return { count: carrying.length, changed: changing.length, tournamentName: tournament.name };
       }),
     ),
   );
@@ -880,14 +894,16 @@ export async function flushSends(outbox: readonly PendingSend[], now: number): P
             console.error(`[schedule-deadline] match ${matchId} : avis de forfait non envoyé`, failureReason(error));
             return;
           }
-          await settleReached(send, progress);
+          // Pas de nouvel essai « bot injoignable » ici : une engagée a pu recevoir l'avis avant l'échec.
+          await settleReached(send, progress, now, false);
           // Une partie des responsables déjà prévenue : rendre le palier les préviendrait deux fois.
           if (progress.delivered === 0) await releaseNotices(send).catch(() => undefined);
           recordFailure(send.row, error, now);
           return;
         }
         if (send.release === null) return;
-        await settleReached(send, progress);
+        // Un nouvel essai prévu met le match de côté jusqu'à lui : sa trace reste.
+        if (await settleReached(send, progress, now, true)) return;
         // L'échec ne compte qu'une fois l'avis parti : une série d'envois en échec n'est pas remise à zéro par
         // la réservation qui les précède (`sweepPage`).
         failureCounts().delete(matchId);
@@ -898,27 +914,52 @@ export async function flushSends(outbox: readonly PendingSend[], now: number): P
 
 /**
  * Arme la date butoir si l'avis a joint quelqu'un. Personne de joint parce que
- * le bot n'a pas répondu (panne passagère) : la réservation est rendue, le
- * passage suivant retente — sans quoi une courte panne au moment de l'annonce
- * éteindrait la date butoir. Personne de joignable (aucun responsable
- * joignable, sujet coupé par tous) : la réservation reste — pas de renvoi
- * chaque minute — mais n'arme rien, et sans avis remis à temps la date butoir
- * s'éteindra.
+ * le bot n'a pas répondu (panne passagère), et `retry` permis : la réservation
+ * est rendue et le match mis de côté {@link BOT_RETRY_DELAY_MS}, au plus
+ * {@link BOT_RETRY_MAX} fois pour cette date butoir — sans quoi une courte
+ * panne au moment de l'annonce éteindrait la date butoir. Personne de
+ * joignable (aucun responsable joignable, sujet coupé par tous), ou essais
+ * épuisés : la réservation reste — pas de renvoi — mais n'arme rien, et sans
+ * avis remis à temps la date butoir s'éteindra.
+ *
+ * @returns vrai si un nouvel essai est prévu (le match reste de côté).
  */
-async function settleReached(send: PendingSend, progress: SendProgress): Promise<void> {
+async function settleReached(send: PendingSend, progress: SendProgress, now: number, retry: boolean): Promise<boolean> {
   const matchId = Number(send.row.id);
-  if (progress.reached === 0) {
-    if (progress.unreachable > 0 && send.release !== null) {
-      console.warn(`[schedule-deadline] match ${matchId} : avis ${send.key} non remis, bot injoignable — nouvel essai au prochain passage`);
-      await releaseNotices(send).catch(() => undefined);
-      return;
-    }
-    console.warn(`[schedule-deadline] match ${matchId} : avis ${send.key} remis à personne, date butoir non armée par lui`);
-    return;
+  if (progress.reached > 0) {
+    botRetries().delete(matchId);
+    await markDelivered(send).catch((error) => {
+      console.error(`[schedule-deadline] match ${matchId} : remise de l'avis ${send.key} non notée`, failureReason(error));
+    });
+    return false;
   }
-  await markDelivered(send).catch((error) => {
-    console.error(`[schedule-deadline] match ${matchId} : remise de l'avis ${send.key} non notée`, failureReason(error));
-  });
+  if (retry && progress.unreachable > 0 && send.release !== null) {
+    const previous = botRetries().get(matchId);
+    const retries = previous?.deadlineAt === send.deadlineAt ? previous.retries : 0;
+    if (retries < BOT_RETRY_MAX) {
+      botRetries().set(matchId, { deadlineAt: send.deadlineAt, retries: retries + 1 });
+      console.warn(
+        `[schedule-deadline] match ${matchId} : avis ${send.key} non remis, bot injoignable — nouvel essai dans ${BOT_RETRY_DELAY_MS / 60000} min (${retries + 1}/${BOT_RETRY_MAX})`,
+      );
+      await releaseNotices(send).catch(() => undefined);
+      failureCounts().set(matchId, { deadlineAt: send.deadlineAt, failures: 0, retryAt: now + BOT_RETRY_DELAY_MS });
+      return true;
+    }
+    console.error(`[schedule-deadline] match ${matchId} : avis ${send.key} non remis après ${BOT_RETRY_MAX} nouveaux essais, bot injoignable`);
+  }
+  console.warn(`[schedule-deadline] match ${matchId} : avis ${send.key} remis à personne, date butoir non armée par lui`);
+  return false;
+}
+
+/** Nouveaux essais « bot injoignable » d'un match, pour une date butoir (une autre date repart de zéro). */
+type BotRetryState = { deadlineAt: number; retries: number };
+
+const globalBotRetries = globalThis as typeof globalThis & { __bgScheduleDeadlineBotRetries?: Map<number, BotRetryState> };
+
+/** Nouveaux essais « bot injoignable » par match, pour ce processus. */
+export function botRetries(): Map<number, BotRetryState> {
+  globalBotRetries.__bgScheduleDeadlineBotRetries ??= new Map();
+  return globalBotRetries.__bgScheduleDeadlineBotRetries;
 }
 
 /** Échecs d'affilée d'un match, pour une date butoir (une autre date repart de zéro). */
@@ -971,6 +1012,10 @@ function parkedIds(now: number): number[] {
 function forgetUnseen(seen: ReadonlySet<number>, now: number): void {
   for (const [id, state] of failureCounts()) {
     if (!seen.has(id) && state.retryAt <= now) failureCounts().delete(id);
+  }
+  // Les essais d'un match parti de la lecture (joué, date butoir effacée…) ; celui mis de côté reste compté.
+  for (const id of botRetries().keys()) {
+    if (!seen.has(id) && !failureCounts().has(id)) botRetries().delete(id);
   }
 }
 

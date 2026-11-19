@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-  roundScheduleDeadline,
+  roundScheduleDeadlines,
+  deadlineEntryAcceptable,
+  SCHEDULE_DEADLINE_REAPPLY_MIN_MS,
   acceptsScheduleDeadline,
   deadlineArmed,
   deadlineEntryChoices,
@@ -456,39 +458,76 @@ describe("saisie en masse : date butoir de la manche reposée", () => {
     expect(readScheduleDeadline(new Date(NOW + 11 * HOUR).toISOString(), NOW, 12 * HOUR)).toEqual({ kind: "invalid", code: "SCHEDULE_DEADLINE_TOO_SOON" });
   });
 
-  it("roundScheduleDeadline_latestReappliableOfUnplayed_returned", () => {
+  it("roundScheduleDeadlines_severalOpenRounds_allReturnedSortedUnique", () => {
     const later = at("2026-11-19T10:00:00Z");
     const matches = [
-      { status: "READY", scheduleDeadlineAt: new Date(ROUND).toISOString() },
       { status: "PENDING", scheduleDeadlineAt: new Date(later).toISOString() },
+      { status: "READY", scheduleDeadlineAt: new Date(ROUND).toISOString() },
+      { status: "READY", scheduleDeadlineAt: new Date(ROUND).toISOString() },
     ];
 
-    expect(roundScheduleDeadline(matches, NOW)).toBe(later);
+    expect(roundScheduleDeadlines(matches, NOW)).toEqual([ROUND, later]);
   });
 
-  it("roundScheduleDeadline_completedOrUnder12hOrNone_null", () => {
-    expect(roundScheduleDeadline([{ status: "COMPLETED", scheduleDeadlineAt: new Date(ROUND).toISOString() }], NOW)).toBeNull();
-    expect(roundScheduleDeadline([{ status: "READY", scheduleDeadlineAt: new Date(NOW + 11 * HOUR).toISOString() }], NOW)).toBeNull();
-    expect(roundScheduleDeadline([{ status: "READY", scheduleDeadlineAt: null }], NOW)).toBeNull();
+  it("roundScheduleDeadlines_completedUnder13hBeyond24hOrNone_excluded", () => {
+    const matches = [
+      { status: "COMPLETED", scheduleDeadlineAt: new Date(ROUND).toISOString() },
+      { status: "READY", scheduleDeadlineAt: new Date(NOW + 13 * HOUR - MINUTE).toISOString() },
+      { status: "READY", scheduleDeadlineAt: new Date(NOW + 30 * HOUR).toISOString() },
+      { status: "READY", scheduleDeadlineAt: null },
+    ];
+
+    expect(roundScheduleDeadlines(matches, NOW)).toEqual([]);
+  });
+
+  it("deadlineEntryAcceptable_24hAhead_true", () => {
+    expect(deadlineEntryAcceptable(NOW + 24 * HOUR, NOW)).toBe(true);
+  });
+
+  it("deadlineEntryAcceptable_justUnder24hNotReapplied_false", () => {
+    expect(deadlineEntryAcceptable(NOW + 24 * HOUR - MINUTE, NOW)).toBe(false);
+  });
+
+  it("deadlineEntryAcceptable_reappliedAtReapplyMin_true", () => {
+    const reapplied = NOW + SCHEDULE_DEADLINE_REAPPLY_MIN_MS;
+
+    expect(deadlineEntryAcceptable(reapplied, NOW, [reapplied])).toBe(true);
+  });
+
+  it("deadlineEntryAcceptable_reappliedJustUnderReapplyMin_false", () => {
+    const reapplied = NOW + SCHEDULE_DEADLINE_REAPPLY_MIN_MS - MINUTE;
+
+    expect(deadlineEntryAcceptable(reapplied, NOW, [reapplied])).toBe(false);
+  });
+
+  it("deadlineEntryAcceptable_beyond60Days_false", () => {
+    expect(deadlineEntryAcceptable(NOW + 60 * DAY + MINUTE, NOW)).toBe(false);
   });
 
   it("deadlineEntryHours_reapplyWithin24h_offersOnlyThatHour", () => {
-    expect(deadlineEntryHours("2026-11-19", NOW, ROUND)).toContain(9);
-    expect(deadlineEntryHours("2026-11-19", NOW, ROUND)).not.toContain(10);
+    expect(deadlineEntryHours("2026-11-19", NOW, [ROUND])).toContain(9);
+    expect(deadlineEntryHours("2026-11-19", NOW, [ROUND])).not.toContain(10);
   });
 
-  it("deadlineEntryHours_reapplyUnder12h_notOffered", () => {
-    expect(deadlineEntryHours("2026-11-19", NOW, at("2026-11-19T01:00:00Z"))).not.toContain(2);
+  it("deadlineEntryHours_twoReapplyDates_bothOffered", () => {
+    const hours = deadlineEntryHours("2026-11-19", NOW, [ROUND, at("2026-11-19T10:00:00Z")]);
+
+    expect(hours).toContain(9);
+    expect(hours).toContain(11);
   });
 
-  it("deadlineEntryStart_reapplyCurrent_fromCurrent", () => {
-    expect(deadlineEntryStart(ROUND, at("2026-11-21T20:00:00Z"), NOW, ROUND)).toEqual({ day: "2026-11-19", hour: 9, fromCurrent: true });
+  it("deadlineEntryHours_reapplyUnder13h_notOffered", () => {
+    expect(deadlineEntryHours("2026-11-19", NOW, [at("2026-11-19T02:00:00Z")])).not.toContain(3);
+  });
+
+  it("deadlineEntryStart_currentWithin24h_startsFromSuggested", () => {
+    expect(deadlineEntryStart(ROUND, at("2026-11-21T20:00:00Z"), NOW)).toEqual({ day: "2026-11-21", hour: 21, fromCurrent: false });
   });
 
   it("deadlineEntryChoices_lateEveningWithReapply_keepsTomorrow", () => {
     // 23:30 à Paris : demain n'a plus d'heure à 24 heures, mais la manche se clôt demain 21:00.
     const now = at("2026-11-18T22:30:00Z");
 
-    expect(deadlineEntryChoices(now, null, at("2026-11-19T20:00:00Z"))[0]).toBe("2026-11-19");
+    expect(deadlineEntryChoices(now, null, [at("2026-11-19T20:00:00Z")])[0]).toBe("2026-11-19");
   });
 });

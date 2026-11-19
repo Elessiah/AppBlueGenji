@@ -38,6 +38,9 @@ import {
   forfeitMissedScheduleDeadline,
   NO_NOTICES,
   botUnreachable,
+  BOT_RETRY_DELAY_MS,
+  BOT_RETRY_MAX,
+  botRetries,
   reachedSomeone,
   scheduleDeadlineForfeitDue,
   SCHEDULE_DEADLINES_LOCK,
@@ -125,6 +128,7 @@ let connection: ReturnType<typeof connectionMock>;
 beforeEach(() => {
   jest.clearAllMocks();
   delete (globalThis as typeof globalThis & { __bgScheduleDeadlineFailures?: unknown }).__bgScheduleDeadlineFailures;
+  delete (globalThis as typeof globalThis & { __bgScheduleDeadlineBotRetries?: unknown }).__bgScheduleDeadlineBotRetries;
   connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({}));
@@ -1328,6 +1332,88 @@ describe("revue sécurité 2 : date butoir des remises, bot injoignable, gestes 
     expect(poolCalls(pool, /SET delivered = 1/)).toHaveLength(0);
   });
 
+  it("sweepScheduleDeadlines_botUnreachable_matchParkedUntilRetryDelay", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    poolMock();
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [7], pushed: 0 });
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(failureCounts().get(40)).toEqual({ deadlineAt: DEADLINE, failures: 0, retryAt: NOW + BOT_RETRY_DELAY_MS });
+    expect(botRetries().get(40)).toEqual({ deadlineAt: DEADLINE, retries: 1 });
+  });
+
+  it("sweepScheduleDeadlines_parkedForBotRetry_matchSkippedByRead", async () => {
+    poolMock();
+    failureCounts().set(40, { deadlineAt: DEADLINE, failures: 0, retryAt: NOW + BOT_RETRY_DELAY_MS });
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    const [, params] = executed(connection, /FROM bg_matches m/)[0];
+    expect(params).toContain(40);
+  });
+
+  it("sweepScheduleDeadlines_botUnreachableRetriesExhausted_claimKeptNotParked", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const pool = poolMock();
+    botRetries().set(40, { deadlineAt: DEADLINE, retries: BOT_RETRY_MAX });
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [7], pushed: 0 });
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(poolCalls(pool, /DELETE FROM bg_schedule_deadline_notices/)).toHaveLength(0);
+    expect(failureCounts().has(40)).toBe(false);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining(`après ${BOT_RETRY_MAX} nouveaux essais`));
+  });
+
+  it("sweepScheduleDeadlines_botUnreachableRetriesOfOtherDeadline_countRestarts", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const pool = poolMock();
+    botRetries().set(40, { deadlineAt: DEADLINE - 2 * HOUR, retries: BOT_RETRY_MAX });
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [7], pushed: 0 });
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(poolCalls(pool, /DELETE FROM bg_schedule_deadline_notices/).length).toBeGreaterThan(0);
+    expect(botRetries().get(40)).toEqual({ deadlineAt: DEADLINE, retries: 1 });
+  });
+
+  it("sweepScheduleDeadlines_reachedAfterBotRetry_retriesForgotten", async () => {
+    const pool = poolMock();
+    botRetries().set(40, { deadlineAt: DEADLINE, retries: 2 });
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [], pushed: 1 });
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(poolCalls(pool, /SET delivered = 1/).length).toBeGreaterThan(0);
+    expect(botRetries().has(40)).toBe(false);
+    expect(failureCounts().has(40)).toBe(false);
+  });
+
+  it("sweepScheduleDeadlines_sendThrowsAfterUnreachableSide_noBotRetryRelease", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const pool = poolMock();
+    jest
+      .mocked(notifyUsers)
+      .mockResolvedValueOnce({ discord: null, discordUnreachedUserIds: [7], pushed: 0 })
+      .mockRejectedValueOnce(new Error("push down"));
+    routeSql(connection, announcementRoutes());
+
+    await sweepScheduleDeadlines(NOW);
+
+    // La première engagée a pu recevoir l'avis : ni réservation rendue, ni nouvel essai « bot injoignable ».
+    expect(poolCalls(pool, /DELETE FROM bg_schedule_deadline_notices/)).toHaveLength(0);
+    expect(botRetries().has(40)).toBe(false);
+    expect(failureCounts().get(40)?.failures).toBe(1);
+  });
+
   it("sweepScheduleDeadlines_nobodyReachableBotUp_claimKept", async () => {
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
     const pool = poolMock();
@@ -1400,6 +1486,33 @@ describe("revue sécurité 2 : date butoir des remises, bot injoignable, gestes 
       await expect(setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, now)).resolves.toBe(2);
 
       expect(updatedIds()).toEqual([43]);
+    });
+
+    it("setTournamentScheduleDeadlines_roundDateWithin24h_laterDeadlineNotShortened", async () => {
+      const now = DEADLINE - 20 * HOUR;
+      routeSql(
+        connection,
+        roundRoutes([row({ id: 40 }), row({ id: 41, schedule_deadline_at: new Date(DEADLINE + 48 * HOUR) }), row({ id: 43, schedule_deadline_at: null })]),
+      );
+
+      await expect(setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, now)).resolves.toBe(2);
+
+      expect(updatedIds()).toEqual([43]);
+    });
+
+    it("setTournamentScheduleDeadlines_roundDateExactly13hAhead_reapplied", async () => {
+      const now = DEADLINE - 13 * HOUR;
+      routeSql(connection, roundRoutes([row({ id: 40 }), row({ id: 43, schedule_deadline_at: null })]));
+
+      await expect(setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, now)).resolves.toBe(2);
+    });
+
+    it("setTournamentScheduleDeadlines_roundDateJustUnder13h_throwsTooSoonWithoutDb", async () => {
+      await expect(setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, DEADLINE - 13 * HOUR + MINUTE)).rejects.toThrow(
+        "SCHEDULE_DEADLINE_TOO_SOON",
+      );
+
+      expect(withConnection).not.toHaveBeenCalled();
     });
 
     it("setTournamentScheduleDeadlines_newDateWithin24h_throwsTooSoon", async () => {

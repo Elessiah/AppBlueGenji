@@ -209,7 +209,7 @@ async function clearMatchResults(
 ): Promise<void> {
   const now = new Date();
   for (const ids of chunkIds(matchIds, ID_CHUNK)) {
-    // Avant l'effacement du résultat : seul un double forfait désigne la date butoir à retirer.
+    // Avant l'effacement du résultat : le double forfait désigne une date butoir à retirer.
     await clearPastScheduleDeadlines(connection, ids, now);
     await connection.execute(
       `UPDATE bg_matches
@@ -239,14 +239,15 @@ async function clearMatchResults(
 }
 
 /**
- * Une rencontre close en **double forfait** et rendue « à jouer » perd sa date
- * butoir de planification déjà passée, et ses traces d'avis
- * (`./schedule-deadline`) : celle qui l'a close la referait aussitôt — le
- * retour en arrière ne tiendrait qu'une minute. Appelée **avant** l'effacement
- * du résultat (`double_forfeit` la désigne). Une date butoir encore devant
- * reste (annoncée, elle vaut toujours pour la rencontre rejouée), comme celle,
- * passée et retirée, d'une rencontre jouée à son horaire : le planning la lit
- * encore (confirmation d'office).
+ * Une rencontre rendue « à jouer » perd sa date butoir de planification déjà
+ * passée, et ses traces d'avis (`./schedule-deadline`), si elle a été close en
+ * **double forfait** ou **sans horaire ni lancement** (résultat d'office,
+ * forfait simple) : la date butoir armée la clorait aussitôt en double forfait
+ * — le retour en arrière ne tiendrait qu'une minute. Appelée **avant**
+ * l'effacement du résultat (`double_forfeit` la désigne). Une date butoir
+ * encore devant reste (annoncée, elle vaut toujours pour la rencontre
+ * rejouée), comme celle, passée et retirée, d'une rencontre programmée ou
+ * lancée : le planning la lit encore (confirmation d'office).
  */
 export async function clearPastScheduleDeadlines(
   connection: Pick<PoolConnection, "execute">,
@@ -254,7 +255,8 @@ export async function clearPastScheduleDeadlines(
   now: Date,
 ): Promise<void> {
   if (ids.length === 0) return;
-  const forfeited = `id IN (${sqlPlaceholders(ids.length)}) AND double_forfeit = 1 AND schedule_deadline_at <= ?`;
+  const forfeited = `id IN (${sqlPlaceholders(ids.length)}) AND schedule_deadline_at <= ?
+    AND (double_forfeit = 1 OR (start_at IS NULL AND launched_at IS NULL))`;
   // Les traces d'abord : l'effacement de la date butoir ferait perdre la condition qui les désigne.
   await connection.execute(
     `DELETE FROM bg_schedule_deadline_notices WHERE match_id IN (SELECT id FROM bg_matches WHERE ${forfeited})`,

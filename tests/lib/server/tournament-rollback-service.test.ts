@@ -993,7 +993,7 @@ describe("rollbackCurrentRound — compte rendu", () => {
 describe("clearPastScheduleDeadlines", () => {
   const NOW = new Date("2026-11-19T12:00:00Z");
 
-  it("clearPastScheduleDeadlines_ids_deletesNoticesThenClearsOnlyDoubleForfeitedPastDeadlines", async () => {
+  it("clearPastScheduleDeadlines_ids_deletesNoticesThenClearsPastDeadlinesOfForfeitedOrUnscheduledMatches", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
 
     await clearPastScheduleDeadlines(fakeConnection({ execute }), [40, 41], NOW);
@@ -1003,7 +1003,9 @@ describe("clearPastScheduleDeadlines", () => {
     expect(String(deleteSql)).toContain("DELETE FROM bg_schedule_deadline_notices");
     expect(String(updateSql)).toContain("UPDATE bg_matches SET schedule_deadline_at = NULL");
     for (const sql of [deleteSql, updateSql]) {
-      expect(String(sql)).toContain("double_forfeit = 1");
+      // Double forfait, ou close sans horaire ni lancement (résultat d'office, forfait simple) : la date butoir armée
+      // la reclorait aussitôt ; celle d'une rencontre programmée ou lancée reste (lue par le planning).
+      expect(String(sql)).toContain("(double_forfeit = 1 OR (start_at IS NULL AND launched_at IS NULL))");
       expect(String(sql)).toContain("schedule_deadline_at <= ?");
     }
     expect(deleteParams).toEqual([40, 41, NOW]);

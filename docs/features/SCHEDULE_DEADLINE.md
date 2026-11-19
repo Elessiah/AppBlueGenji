@@ -39,8 +39,12 @@ Code : `lib/shared/schedule-deadline.ts` (règle pure),
   (`SCHEDULE_DEADLINE_TOO_SOON` / `_TOO_FAR`), arrondie à la minute. Seule
   exception : la saisie en masse peut **reposer** la date butoir déjà portée
   par un match non joué du tournoi (celle de la manche, pour les matchs
-  remplis depuis) jusqu'à 12 heures devant (`SCHEDULE_DEADLINE_ARM_MIN_MS` :
-  une annonce l'arme encore) — la fenêtre la propose (`roundScheduleDeadline`).
+  remplis depuis) jusqu'à 13 heures devant (`SCHEDULE_DEADLINE_REAPPLY_MIN_MS` :
+  les 12 heures d'armement plus une heure de marge, l'annonce se réservant
+  après la pose), et **seulement sur les matchs sans date butoir** : une date
+  butoir plus lointaine déjà en place n'est jamais raccourcie. La fenêtre
+  propose toutes ces dates parmi ses choix (`roundScheduleDeadlines`, une par
+  manche ouverte), sans les préremplir : elle s'ouvre sur la date proposée.
 - Transaction : `lockTournamentRow` en **première** instruction, puis les
   matchs `FOR UPDATE` ; changer ou retirer la date butoir efface les traces
   d'avis (les paliers repartent pour la nouvelle). Reposer la **même** date
@@ -103,8 +107,12 @@ pure `sweepAction` :
 moins est réellement parti (`reachedSomeone`, colonne `delivered` de
 `bg_schedule_deadline_notices`, notée après l'envoi) : un palier réservé dont
 rien n'est parti n'arme rien. Bot qui ne répond pas (`botUnreachable`, appel
-perdu) : la réservation est rendue, le passage suivant retente (une courte
-panne à l'annonce n'éteint pas la date butoir). Aucun responsable joignable
+perdu) : la réservation est rendue et le match mis de côté 10 minutes
+(`BOT_RETRY_DELAY_MS`), au plus 3 fois pour une même date butoir
+(`BOT_RETRY_MAX`) — une courte panne à l'annonce n'éteint pas la date
+butoir, et un bot lent qui remet pourtant le message ne le répète pas sans
+fin ; essais épuisés, la réservation reste. Pas de nouvel essai quand l'envoi
+échoue en route (une engagée a pu être prévenue). Aucun responsable joignable
 ou sujet coupé par tous : la réservation reste — pas de renvoi chaque minute
 —, le palier suivant peut armer, sinon la date butoir s'éteint. Remise et
 retour d'une réservation visent la paire **et la date butoir** de l'envoi
@@ -126,10 +134,11 @@ horaire » (`markDeadlineForfeit`).
 
 **Retour en arrière** : un résultat défait (`rollback.ts`, `clearMatchResults`)
 efface la date butoir **déjà passée** d'une rencontre close en **double
-forfait** rendue à jouer, et ses traces d'avis (`clearPastScheduleDeadlines`,
+forfait**, ou close **sans horaire ni lancement** (résultat d'office, forfait
+simple), rendue à jouer, et ses traces d'avis (`clearPastScheduleDeadlines`,
 avant l'effacement du résultat) — sinon le balayage referait le double
 forfait dans la minute ; une date butoir encore devant reste, comme celle,
-passée et retirée, d'une rencontre jouée à son horaire (le planning la lit). Retirer l'horaire d'un match après une
+passée et retirée, d'une rencontre programmée ou lancée (le planning la lit). Retirer l'horaire d'un match après une
 date butoir passée l'efface de même, traces comprises (`setMatchStartAt`). Un match dont le passage échoue
 5 fois d'affilée pour la même date butoir (`SWEEP_MAX_FAILURES`, forfait
 refusé à chaque fois, avis qui n'arrive jamais à partir — la réservation qui

@@ -12,7 +12,7 @@ import {
   deadlineEntryChoices,
   deadlineEntryHours,
   deadlineEntryStart,
-  roundScheduleDeadline,
+  roundScheduleDeadlines,
   deadlineFromEntry,
   scheduleOpenedAt,
   suggestedScheduleDeadline,
@@ -30,7 +30,7 @@ export type ScheduleDeadlineTarget =
   | { kind: "match"; matchId: number; team1Name: string | null; team2Name: string | null; deadlineAt: string | null }
   | { kind: "tournament"; tournamentId: number; count: number };
 
-/** Matchs lus par la fenêtre : ouverture de la planification, et date butoir de la manche (saisie en masse). */
+/** Matchs lus par la fenêtre : ouverture de la planification, et dates butoir de manche (saisie en masse). */
 type DialogMatch = OpenedAtMatch & { scheduleDeadlineAt: string | null };
 
 /** Le toast de réussite : un match, ou le nombre de matchs d'une saisie en masse. */
@@ -70,13 +70,13 @@ export function ScheduleDeadlineDialog({
   const { showError, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(SCHEDULE_DEADLINE_FIELD_ERRORS, FIELD_IDS);
   const [now] = useState(() => Date.now());
-  // En masse : la date butoir de la manche, qui se repose pour les matchs remplis depuis, même à moins de 24 heures.
-  const [reapply] = useState(() => (target.kind === "tournament" ? roundScheduleDeadline(matches, now) : null));
-  const matchDeadline = target.kind === "match" && target.deadlineAt !== null ? Date.parse(target.deadlineAt) : null;
-  const current = target.kind === "match" ? matchDeadline : reapply;
+  // En masse : les dates butoir de manche en place, qui se reposent pour les matchs remplis depuis, même à moins de
+  // 24 heures — proposées parmi les choix, sans être préremplies (celle d'une autre manche serait reprise par mégarde).
+  const [reapply] = useState<readonly number[]>(() => (target.kind === "tournament" ? roundScheduleDeadlines(matches, now) : []));
+  const current = target.kind === "match" && target.deadlineAt !== null ? Date.parse(target.deadlineAt) : null;
   const [suggested] = useState(() => suggestedScheduleDeadline(scheduleOpenedAt(matches, now, target.kind === "match" ? target.matchId : null), now));
   // Une date butoir en place déjà passée (ou à moins de 24 heures) ne se rejoue pas : on repart de la proposée.
-  const initial = deadlineEntryStart(current, suggested, now, reapply);
+  const initial = deadlineEntryStart(current, suggested, now);
   const days = useMemo(
     () => deadlineEntryChoices(now, initial.fromCurrent ? initial.day : null, reapply),
     [now, initial.day, initial.fromCurrent, reapply],
