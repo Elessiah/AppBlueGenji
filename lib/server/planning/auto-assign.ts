@@ -73,12 +73,17 @@ export async function loadExclusions(
 ): Promise<Set<string>> {
   // Les entrées qui chevauchent le lot aussi : le second caster ne se prend pas à qui y est attendu
   // (`neededElsewhere`), et n'y est attendu que qui pourrait vraiment les tenir (ni joueur, ni tournoi caché
-  // qu'il ne voit pas, ni arbitre hors condition, ni suspendu). Le calcul ne pose rien sur elles.
-  const scope = data.entries.filter((other) => entries.some((entry) => other.key === entry.key || slotsOverlap(other, entry)));
-  for (const entry of entries) if (!scope.includes(entry)) scope.push(entry);
+  // qu'il ne voit pas, ni arbitre hors condition, ni suspendu). Le calcul ne pose rien sur elles. Seules comptent
+  // les voisines encore ouvertes (`fillable`), et l'arbitrage seulement là où le calcul l'attend (pas d'arbitre géré
+  // par le tournoi) : rien de plus n'est lu sous le verrou du planning.
+  const around = data.entries.filter((other) => entries.some((entry) => other.key === entry.key || slotsOverlap(other, entry)));
+  const batchKeys = new Set(entries.map((entry) => entry.key));
+  const scope = [...entries, ...around.filter((other) => !batchKeys.has(other.key) && other.open)];
   const excluded = new Set<string>();
-  await excludePlayers(executor, data, scope, excluded);
-  await excludeIneligibleReferees(executor, data, scope, excluded);
+  // Les joueurs se lisent sur les seules entrées autour du lot (pas les voisines des voisines) : un joueur d'une
+  // telle entrée lointaine reste « attendu » sur la voisine, ce qui ne fait que le garder pour elle.
+  await excludePlayers(executor, data, scope, excluded, around);
+  await excludeIneligibleReferees(executor, data, scope.filter((entry) => batchKeys.has(entry.key) || !entry.selfManaged), excluded);
   for (const removal of data.removals) excluded.add(exclusionKey(removal.entryKey, removal.userId, removal.role));
   excludeFromHidden(data, scope, excluded);
   excludeSuspended(data, scope, excluded);
@@ -117,9 +122,9 @@ async function excludePlayers(
   data: PlanningData,
   entries: readonly LoadedEntry[],
   excluded: Set<string>,
+  /** Les entrées dont les joueurs se lisent : celles du lot et celles qui en chevauchent une. */
+  around: readonly LoadedEntry[],
 ): Promise<void> {
-  // Seules comptent les entrées du lot et celles qui en chevauchent une.
-  const around = data.entries.filter((other) => entries.some((entry) => other.key === entry.key || slotsOverlap(other, entry)));
   const players = await loadEntryPlayers(executor, around);
   for (const entry of entries) {
     for (const userId of playersDuring(entry, around, players)) {
@@ -164,10 +169,14 @@ export function preparePlanner(
   historyWeek?: number,
 ): PlannerInput {
   const inBatch = new Set(batch.map((entry) => entry.key));
+  // Hors du lot, un compte suspendu ne tient rien : une entrée voisine qu'il seul tient attend encore son rôle
+  // (`neededElsewhere`), comme le staff la lit. Dans le lot, sa ligne reste (le plafond des casters la compte).
+  const suspended = new Set(data.members.filter((member) => member.suspended).map((member) => member.userId));
   const locked: LockedAssignment[] = [];
   for (const entry of data.entries) {
     for (const row of entryAssignments(entry, data)) {
       if (row.provisional && inBatch.has(entry.key)) continue;
+      if (!inBatch.has(entry.key) && suspended.has(row.userId)) continue;
       locked.push({
         entryKey: entry.key,
         userId: row.userId,

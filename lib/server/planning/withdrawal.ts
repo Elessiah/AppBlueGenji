@@ -127,7 +127,8 @@ export function pickReplacement(
   // proposition de caster restée sur l'entrée ne la tient pas : écartée de ce seul calcul, elle reste en base.
   const spare = casters.some((row) => !row.provisional);
   const proposals = new Set(spare ? [] : casters.filter((row) => row.provisional).map((row) => row.userId));
-  // Un caster suspendu s'écarte de ce seul calcul comme une proposition (il reste en base, l'exclusion l'y garde).
+  // Un caster suspendu s'écarte de ce seul calcul comme une proposition (il reste en base, l'exclusion l'y garde ;
+  // `preparePlanner` ne verrouille déjà aucune ligne d'un compte suspendu hors lot).
   for (const row of all) if (row.role === "CASTER" && suspended.has(row.userId)) proposals.add(row.userId);
   // Ce qui ne change pas d'un essai à l'autre se prépare une fois (les deux essais d'une diffusion perdue le partagent).
   const locked = base.locked.filter((row) => !(row.entryKey === entry.key && row.role === "CASTER" && proposals.has(row.userId)));
@@ -304,11 +305,14 @@ export function casterHold(
 ): CasterHold {
   if (withdrawn.role !== "CASTER") return { casterIds: [], streamLost: false };
   const suspended = skipSuspended ? suspendedIds(data) : new Set<number>();
+  // Inscrit sur le match, le désisté le cast encore : sur une lecture d'avant le retrait (repli), sa ligne du
+  // planning masque l'inscription (`entryAssignments`), elle compte donc comme celle-ci.
+  const signedUp = (data.matchCasters.get(entry.key) ?? []).includes(withdrawn.userId);
   const kept = entryAssignments(entry, data).filter(
     (row) =>
       !row.provisional &&
       !suspended.has(row.userId) &&
-      !(row.userId === withdrawn.userId && row.role === "CASTER" && row.source !== "CAST"),
+      !(row.userId === withdrawn.userId && row.role === "CASTER" && row.source !== "CAST" && !signedUp),
   );
   const casterIds = kept.filter((row) => row.role === "CASTER").map((row) => row.userId);
   if (casterIds.length === 0) return { casterIds: [], streamLost: false };
@@ -329,6 +333,11 @@ type CasterHolds = { shown: CasterHold; staff: CasterHold };
 
 export function casterHolds(entry: LoadedEntry, data: PlanningData, withdrawn: PlanningAssignmentView): CasterHolds {
   return { shown: casterHold(entry, data, withdrawn, false), staff: casterHold(entry, data, withdrawn, true) };
+}
+
+/** L'alerte du staff : sa lecture, ou celle des membres si elle seule voit la place à pourvoir (diffusion perdue). */
+function staffView(hold: CasterHolds): { streamLost: boolean } {
+  return { streamLost: hold.staff.casterIds.length === 0 ? hold.staff.streamLost : hold.shown.streamLost };
 }
 
 /** Les comptes suspendus parmi les membres (lus avec eux, `LoadedMember.suspended`). */
@@ -384,8 +393,6 @@ async function replaceWithdrawn(
 type Outcome = WithdrawalResult & {
   /** Les autres casters confirmés qui tiennent encore l'entrée sans remplaçant (aucune place à pourvoir) ; vide sinon. */
   stillHeldBy: number[];
-  /** Sans remplaçant, le départ d'un caster autonome a fait perdre la diffusion. */
-  streamLost: boolean;
   /** La place vue du staff (un compte suspendu n'y tient rien) : à pourvoir, diffusion perdue ou non ; `null` sinon. */
   staffUnfilled: { streamLost: boolean } | null;
   confirmed: boolean;
@@ -450,7 +457,9 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
       unfilled: open && hold.shown.casterIds.length === 0,
       stillHeldBy: replacementId === null ? hold.shown.casterIds : [],
       streamLost: open && hold.shown.streamLost,
-      staffUnfilled: open && hold.staff.casterIds.length === 0 ? { streamLost: hold.staff.streamLost } : null,
+      // La lecture du staff ne retire que des comptes suspendus à celle des membres : une place à pourvoir pour eux
+      // l'est aussi pour le staff, que le message rendu au désisté (« le staff est prévenu ») ne mente pas.
+      staffUnfilled: open && (hold.staff.casterIds.length === 0 || hold.shown.casterIds.length === 0) ? staffView(hold) : null,
       confirmed,
       entry: fresh,
       replacementId,

@@ -50,6 +50,7 @@ import {
   mergeView,
   tournamentChoices,
   weekWindow,
+  withdrawBodyKey,
   withdrawDoneKey,
   type PlanningFilters,
 } from "../_lib/planning-board";
@@ -411,7 +412,7 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
           <p>
             {withdrawing.slot} · {t(`roles.${withdrawing.role}`)}
           </p>
-          <p>{t("withdraw.body")}</p>
+          <p>{t(withdrawBodyKey(withdrawing.role))}</p>
           {withdrawing.late && (
             <p className={styles.lateWarning}>
               <Pill variant="warning">{t("withdrawals.late")}</Pill> {t("withdraw.late")}

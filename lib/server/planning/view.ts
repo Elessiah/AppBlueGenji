@@ -101,6 +101,9 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
   // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul
   // (`preparePlanner`) ; les autres lecteurs gardent la couverture d'avant (rien n'y trahit la suspension).
   const solo = coveringSoloCasterIds(data.members, canManage);
+  // Pour le staff seul, un compte suspendu ne tient pas une place quittée : elle se montre « à pourvoir », comme
+  // l'alerte qu'il a reçue (`staffUnfilled`) ; les autres lecteurs ne lisent rien de la suspension.
+  const suspended = new Set(canManage ? data.members.filter((member) => member.suspended).map((member) => member.userId) : []);
   const availabilityByEntry = groupByEntry(data.availability);
   const withdrawalsByEntry = groupByEntry(data.withdrawals);
   const entries: PlanningEntryView[] = data.entries.map((entry) => {
@@ -132,7 +135,7 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       availability: canManage
         ? availability.map(({ userId, role, status, preferred }) => ({ userId, role, status, preferred }))
         : [],
-      unfilled: unfilledRoles(entry, assignments, withdrawalsByEntry.get(entry.key) ?? []),
+      unfilled: unfilledRoles(entry, canManage ? assignments.filter((row) => !suspended.has(row.userId)) : assignments, withdrawalsByEntry.get(entry.key) ?? []),
       // Motif et auteur d'un désistement : au staff des tournois seul.
       withdrawals: canManage
         ? (withdrawalsByEntry.get(entry.key) ?? []).map(({ userId, role, late, reason, confirmed, createdAt }) => ({

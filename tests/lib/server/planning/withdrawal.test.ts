@@ -829,6 +829,32 @@ describe("casterHold — inscription au match et suspension", () => {
     expect(hold).toEqual({ casterIds: [4, 5], streamLost: false });
   });
 
+  it("casterHold_preRemovalReadWithdrawerSignedUpOnMatch_keepsWithdrawer", () => {
+    // Lecture d'avant le retrait (repli) : la ligne du planning de 4 masque son inscription au match, il cast encore.
+    const data = planningData({
+      entries: [loadedEntry()],
+      assignments: [loadedAssignment({ userId: 4, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true })],
+      matchCasters: new Map([["m:1", [4]]]),
+      members: [loadedMember({ userId: 4, roles: ["CASTER"], soloCaster: true })],
+    });
+
+    const hold = casterHold(data.entries[0], data, withdrawn);
+
+    expect(hold).toEqual({ casterIds: [4], streamLost: false });
+  });
+
+  it("casterHold_preRemovalReadWithdrawerNotSignedUp_dropsWithdrawer", () => {
+    const data = planningData({
+      entries: [loadedEntry()],
+      assignments: [loadedAssignment({ userId: 4, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true })],
+      members: [loadedMember({ userId: 4, roles: ["CASTER"], soloCaster: true })],
+    });
+
+    const hold = casterHold(data.entries[0], data, withdrawn);
+
+    expect(hold).toEqual({ casterIds: [], streamLost: false });
+  });
+
   it("casterHolds_remainingSoloCasterSuspended_shownHeldStaffStreamLost", () => {
     const data = planningData({
       entries: [loadedEntry()],
@@ -858,6 +884,28 @@ describe("casterHold — inscription au match et suspension", () => {
 });
 
 describe("pickReplacement — caster suspendu", () => {
+  it("pickReplacement_neighbourHeldOnlyBySuspendedCaster_spareNotTakenFromNeighbour", () => {
+    // m:1 garde 5 (confirmé) : renfort. m:2 (qui chevauche) n'est tenu que par 8, suspendu : 6 y est attendu.
+    const entries = [loadedEntry(), loadedEntry({ key: "m:2", matchId: 2 })];
+    const data = planningData({
+      entries,
+      assignments: [
+        loadedAssignment({ userId: 5, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true }),
+        loadedAssignment({ entryKey: "m:2", userId: 8, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true }),
+      ],
+      members: [
+        loadedMember({ userId: 5, roles: ["CASTER"], soloCaster: true }),
+        loadedMember({ userId: 6, roles: ["CASTER"], soloCaster: true }),
+        loadedMember({ userId: 8, roles: ["CASTER"], soloCaster: true, suspended: true }),
+      ],
+      availability: [available("m:1", 6, "CASTER"), available("m:2", 6, "CASTER")],
+    });
+
+    const pick = pickReplacement(data, entries[0], "CASTER", new Map(), new Set(), MONDAY);
+
+    expect(pick).toBeNull();
+  });
+
   it("pickReplacement_onlyCoCasterSuspended_firstCasterRuleApplied", () => {
     // 5, confirmé mais suspendu, ne tient rien : 6 est pris comme premier caster, même attendu sur m:2 (qui chevauche).
     const entries = [loadedEntry(), loadedEntry({ key: "m:2", matchId: 2 })];

@@ -352,8 +352,17 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   remplaçant se cherche comme pour une première place (le suspendu est écarté
   de ce seul calcul et ne prend aucune des deux places), et sans remplaçant le
   staff est prévenu (`staffUnfilled`) même si les membres lisent « un autre
-  caster reste affecté ». Un désisté encore **inscrit sur le match** (`CAST`)
-  cast toujours : sa ligne d'inscription compte comme caster restant.
+  caster reste affecté » ; une place que les membres lisent à pourvoir l'est
+  toujours pour le staff (le message « le staff est prévenu » ne ment pas).
+  Sur le tableau du staff seul, la place quittée que ne tient plus qu'un
+  compte suspendu se montre « à pourvoir » (`unfilledRoles`), comme son
+  alerte. Hors du lot, `preparePlanner` ne verrouille aucune ligne d'un compte
+  suspendu : une entrée voisine qu'il tenait seul attend encore son rôle
+  (`neededElsewhere`). Un désisté encore **inscrit sur le match** (`CAST`)
+  cast toujours : sa ligne d'inscription compte comme caster restant, y compris
+  sur la lecture d'avant le retrait (repli quand la relecture échoue).
+  `loadExclusions` juge, outre le lot, ses seules voisines encore ouvertes
+  (joueurs lus autour du lot, arbitrage hors entrées gérées par le tournoi).
 - Arbitre **d'un match** confirmé : le retrait passe par
   `assignMatchReferee` (le match perd son arbitre, ligne anonyme au journal),
   puis le remplaçant y est posé par la même porte — un refus métier compte

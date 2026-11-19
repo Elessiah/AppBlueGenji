@@ -310,3 +310,29 @@ describe("loadPlanningView — caster autonome suspendu", () => {
     expect(view.entries[0].coverage).toMatchObject({ streamed: true, casterNeedsProd: false });
   });
 });
+
+describe("loadPlanningView — place quittée tenue par un compte suspendu", () => {
+  beforeEach(() => {
+    // 5 s'est désisté (confirmé) ; seul 4, suspendu, reste caster.
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        assignments: [loadedAssignment({ userId: 4, role: "CASTER", confirmed: true })],
+        members: [loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })],
+        withdrawals: [withdrawalRow({ userId: 5 })],
+      }),
+    );
+  });
+
+  it("loadPlanningView_suspendedRemainingCaster_staffSeesUnfilled", async () => {
+    const view = await loadPlanningView(staff, MONDAY - 48 * 60 * 60 * 1000);
+
+    expect(view.entries[0].unfilled).toEqual(["CASTER"]);
+  });
+
+  it("loadPlanningView_suspendedRemainingCaster_memberSeesHeld", async () => {
+    const view = await loadPlanningView(caster, MONDAY - 48 * 60 * 60 * 1000);
+
+    expect(view.entries[0].unfilled).toEqual([]);
+  });
+});

@@ -225,6 +225,11 @@ export function castersFullKind(entry: PlanningEntryView): "castersFull" | "cast
   return removable.every((row) => row.provisional) ? "castersFullProvisional" : "castersFull";
 }
 
+/** Le texte du dialogue de désistement : l'exception de l'autre caster qui garde la diffusion ne vaut que pour un caster. */
+export function withdrawBodyKey(role: PlanningRole): "withdraw.body" | "withdraw.bodyCaster" {
+  return role === "CASTER" ? "withdraw.bodyCaster" : "withdraw.body";
+}
+
 /** Le message de succès d'un désistement, selon son issue. */
 export function withdrawDoneKey(
   result: WithdrawalResponse,

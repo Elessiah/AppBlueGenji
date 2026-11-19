@@ -278,6 +278,30 @@ describe("preparePlanner", () => {
     expect(input.locked).toEqual([{ entryKey: "m:1", userId: 4, role: "CASTER", reason: "CAST" }]);
   });
 
+  it("preparePlanner_suspendedRowOutsideBatch_notLocked", () => {
+    const data = planningData({
+      entries: [inside, outside],
+      assignments: [loadedAssignment({ entryKey: "m:2", userId: 2, role: "CASTER", confirmed: true })],
+      members: [loadedMember({ userId: 2, roles: ["CASTER"], suspended: true })],
+    });
+
+    const input = preparePlanner(data, [inside], new Map(), new Set());
+
+    expect(input.locked).toEqual([]);
+  });
+
+  it("preparePlanner_suspendedRowInBatch_stillLocked", () => {
+    const data = planningData({
+      entries: [inside],
+      assignments: [loadedAssignment({ entryKey: "m:1", userId: 2, role: "CASTER", confirmed: true })],
+      members: [loadedMember({ userId: 2, roles: ["CASTER"], suspended: true })],
+    });
+
+    const input = preparePlanner(data, [inside], new Map(), new Set());
+
+    expect(input.locked.map((row) => row.userId)).toEqual([2]);
+  });
+
   it("preparePlanner_confirmedAndManual_locked", () => {
     const data = planningData({
       entries: [inside],
@@ -400,6 +424,16 @@ describe("loadExclusions", () => {
 
     expect(excluded.has("m:2|4|CASTER")).toBe(true);
     expect(excluded.has("m:3|4|CASTER")).toBe(false);
+  });
+
+  it("loadExclusions_closedOverlappingEntry_notInScope", async () => {
+    const closed = loadedEntry({ key: "m:2", matchId: 2, open: false });
+    const data = planningData({ entries: [batch, closed], members: [loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })] });
+
+    const excluded = await loadExclusions(fakeConnection(connection), data, [batch]);
+
+    expect(excluded.has("m:1|4|CASTER")).toBe(true);
+    expect(excluded.has("m:2|4|CASTER")).toBe(false);
   });
 
   it("loadExclusions_hiddenOverlappingEntry_excludedForNonViewer", async () => {

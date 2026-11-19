@@ -17,6 +17,7 @@ import {
   needsCover,
   NO_FILTERS,
   castersFullKind,
+  withdrawBodyKey,
   withdrawDoneKey,
   roleChoices,
   tournamentChoices,
@@ -604,6 +605,16 @@ describe("castersFullKind", () => {
       expect(frPlanning.assignment[kind]).toBeTruthy();
       expect(enPlanning.assignment[kind]).toBeTruthy();
     }
+  });
+});
+
+describe("withdrawBodyKey", () => {
+  it("withdrawBodyKey_caster_returnsBodyCaster", () => {
+    expect(withdrawBodyKey("CASTER")).toBe("withdraw.bodyCaster");
+  });
+
+  it("withdrawBodyKey_prod_returnsBody", () => {
+    expect(withdrawBodyKey("PROD")).toBe("withdraw.body");
   });
 });
 
