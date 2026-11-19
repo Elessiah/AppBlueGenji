@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { BookOpen, CalendarClock, Eye, LogOut, Shield, UserRound } from "lucide-react";
+import dynamic from "next/dynamic";
+import { BookOpen, CalendarClock, Drama, Eye, LogOut, Shield, UserRound } from "lucide-react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { entrantHref } from "@/lib/shared/participants";
 import { DEVDOC_PATH } from "@/lib/shared/dev-docs";
@@ -15,9 +16,18 @@ import type { PlayerViewMenuMode } from "@/lib/shared/player-view";
 import s from "./account-menu.module.css";
 
 const PLAYER_VIEW_MENU_KEYS = {
-  enter: { idle: "account.playerView", pending: "account.playerViewPending" },
+  enter: { idle: "account.impersonate", pending: "account.impersonate" },
   back: { idle: "playerView.back", pending: "playerView.backPending" },
 } as const;
+
+/**
+ * La modale « Incarner un rôle », chargée à l'ouverture : elle ne sert qu'aux
+ * administrateurs, son code reste hors du morceau commun de la barre.
+ */
+const ImpersonateRoleDialog = dynamic(
+  () => import("./impersonate-role-dialog").then((module) => module.ImpersonateRoleDialog),
+  { ssr: false },
+);
 
 export type AccountMenuTeam = { teamId: number; teamName: string };
 
@@ -30,11 +40,11 @@ type AccountMenuProps = {
   /** Lien « Planning » des casts et arbitres (permission `planning`, `CAST_PLANNING.md`). */
   planning?: boolean;
   /**
-   * Entrée de la vue joueur (`ADMIN_PLAYER_VIEW.md`) : `"enter"` (« Passer en
-   * vue joueur ») quand le compte porte des droits de plateforme que la session
-   * n'a pas suspendus, `"back"` (« Revenir en vue admin ») pendant la vue
-   * joueur — la bannière défile avec la page, le menu reste sous la barre
-   * fixe. Rien pour un compte sans droits.
+   * Entrée de l'incarnation (`ADMIN_ROLE_IMPERSONATION.md`) : `"enter"`
+   * (« Incarner un rôle », qui ouvre la modale du choix) pour un
+   * administrateur qui n'incarne rien, `"back"` (« Revenir en vue admin »)
+   * pendant l'incarnation — la bannière défile avec la page, le menu reste
+   * sous la barre fixe. Rien pour un autre compte.
    */
   playerViewEntry?: PlayerViewMenuMode | null;
 };
@@ -93,7 +103,25 @@ export function AccountMenu({
   }, [playerViewEntry]);
 
   const close = () => setOpen(false);
-  const { pending: switching, toggle } = usePlayerViewToggle(close);
+  // Modale « Incarner un rôle » ouverte. Une bascule réussie la ferme avec le menu.
+  const [choosing, setChoosing] = useState(false);
+  const { pending: switching, toggle } = usePlayerViewToggle(() => {
+    setOpen(false);
+    setChoosing(false);
+  });
+  const closeChoice = () => {
+    setChoosing(false);
+    // Le menu s'est refermé à l'ouverture de la modale : le focus revient au compte.
+    buttonRef.current?.focus();
+  };
+  const onEntry = () => {
+    if (playerViewEntry === "enter") {
+      setOpen(false);
+      setChoosing(true);
+      return;
+    }
+    void toggle(false);
+  };
 
   return (
     <div
@@ -126,12 +154,13 @@ export function AccountMenu({
           activeTeam={activeTeam}
           devDocs={devDocs}
           planning={planning}
-          playerView={playerViewEntry ? { mode: playerViewEntry, pending: switching, toggle: () => toggle(playerViewEntry === "enter") } : null}
+          playerView={playerViewEntry ? { mode: playerViewEntry, pending: switching && playerViewEntry === "back", toggle: onEntry } : null}
           leaving={leaving}
           onNavigate={close}
           onLogout={onLogout}
         />
       )}
+      {choosing && <ImpersonateRoleDialog onClose={closeChoice} onConfirm={(roles) => toggle(true, roles)} />}
     </div>
   );
 }
@@ -151,7 +180,7 @@ export function AccountMenuPanel({
   activeTeam: AccountMenuTeam | null;
   devDocs?: boolean;
   planning?: boolean;
-  /** Entrée de la vue joueur, quand le compte porte des droits à suspendre ({@link AccountMenuProps.playerViewEntry}). */
+  /** Entrée de l'incarnation, pour un administrateur ({@link AccountMenuProps.playerViewEntry}). */
   playerView?: { mode: PlayerViewMenuMode; pending: boolean; toggle: () => void } | null;
   leaving: boolean;
   onNavigate: () => void;
@@ -205,7 +234,11 @@ export function AccountMenuPanel({
           aria-disabled={playerView.pending || undefined}
           aria-busy={playerView.pending || undefined}
         >
-          <Eye className={s.itemIcon} size={16} aria-hidden="true" />
+          {playerView.mode === "enter" ? (
+            <Drama className={s.itemIcon} size={16} aria-hidden="true" />
+          ) : (
+            <Eye className={s.itemIcon} size={16} aria-hidden="true" />
+          )}
           <span className={s.itemText}>
             {t(PLAYER_VIEW_MENU_KEYS[playerView.mode][playerView.pending ? "pending" : "idle"])}
           </span>

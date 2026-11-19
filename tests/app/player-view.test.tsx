@@ -15,15 +15,16 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import frShell from "@/messages/fr/shell.json";
 import enShell from "@/messages/en/shell.json";
 import { PLAYER_VIEW_MAX_HOURS, playerViewMenuMode, type PlayerViewMenuMode } from "@/lib/shared/player-view";
+import type { PlatformRole } from "@/lib/shared/permissions";
 import { readSource } from "../helpers/read-source";
 
-/** Vue joueur du staff, côté écran (`docs/features/ADMIN_PLAYER_VIEW.md`). */
+/** Incarnation d'un rôle, côté écran (`docs/features/ADMIN_ROLE_IMPERSONATION.md`). */
 
-const banner = (locale: "fr" | "en" = "fr") =>
+const banner = (locale: "fr" | "en" = "fr", roles: PlatformRole[] = []) =>
   renderToStaticMarkup(
     <ShellTextProvider locale={locale} messages={locale === "en" ? messagesFor("en").shell : undefined}>
       <ToastProvider>
-        <PlayerViewBanner until={null} />
+        <PlayerViewBanner until={null} roles={roles} />
       </ToastProvider>
     </ShellTextProvider>,
   );
@@ -46,7 +47,15 @@ describe("PlayerViewBanner", () => {
 
     expect(html).toContain("Vue joueur active");
     expect(html).toContain("Revenir en vue admin");
-    expect(html).toContain('aria-label="Vue joueur"');
+    expect(html).toContain('aria-label="Rôle incarné"');
+  });
+
+  it("PlayerViewBanner_frenchWithRoles_namesTheImpersonatedRoles", () => {
+    expect(banner("fr", ["ARBITRE", "CASTER"])).toContain("Rôle incarné : Arbitre, Caster");
+  });
+
+  it("PlayerViewBanner_englishWithRoles_namesTheImpersonatedRoles", () => {
+    expect(banner("en", ["ARBITRE"])).toContain("Impersonated role: Referee");
   });
 
   it("PlayerViewBanner_english_isTranslated", () => {
@@ -66,31 +75,34 @@ describe("PlayerViewBanner", () => {
   });
 });
 
-describe("AccountMenuPanel — entrée vue joueur", () => {
-  it("AccountMenuPanel_entryOffered_showsSwitchButton", () => {
-    expect(panel({ mode: "enter", pending: false, toggle: () => undefined })).toContain("Passer en vue joueur");
+describe("AccountMenuPanel — entrée « Incarner un rôle »", () => {
+  it("AccountMenuPanel_entryOffered_showsImpersonateButton", () => {
+    expect(panel({ mode: "enter", pending: false, toggle: () => undefined })).toContain("Incarner un rôle");
   });
 
   it("AccountMenuPanel_playerViewActive_offersReturnToAdminView", () => {
     const html = panel({ mode: "back", pending: false, toggle: () => undefined });
 
     expect(html).toContain("Revenir en vue admin");
-    expect(html).not.toContain("Passer en vue joueur");
+    expect(html).not.toContain("Incarner un rôle");
   });
 
   it("AccountMenuPanel_returnPending_saysReturning", () => {
     expect(panel({ mode: "back", pending: true, toggle: () => undefined })).toContain("Retour en vue admin…");
   });
 
-  it("AccountMenuPanel_entryPending_saysSwitching", () => {
+  it("AccountMenuPanel_entryPending_staysBusyWithItsLabel", () => {
     const html = panel({ mode: "enter", pending: true, toggle: () => undefined });
 
     expect(html).toContain('aria-busy="true"');
-    expect(html).not.toContain("Passer en vue joueur<");
+    expect(html).toContain("Incarner un rôle");
   });
 
-  it("AccountMenuPanel_noEntry_hidesSwitchButton", () => {
-    expect(panel(null)).not.toContain("vue joueur");
+  it("AccountMenuPanel_noEntry_hidesImpersonateButton", () => {
+    const html = panel(null);
+
+    expect(html).not.toContain("Incarner un rôle");
+    expect(html).not.toContain("vue admin");
   });
 });
 
@@ -119,23 +131,39 @@ describe("requestPlayerView", () => {
   it("requestPlayerView_success_postsJsonAndReturnsTrue", async () => {
     const fetchImpl = jest.fn<typeof fetch>().mockResolvedValue(new Response("{}", { status: 200 }));
 
-    await expect(requestPlayerView(true, fetchImpl)).resolves.toBe(true);
+    await expect(requestPlayerView(true, [], fetchImpl)).resolves.toBe(true);
     expect(fetchImpl).toHaveBeenCalledWith(
       "/api/auth/player-view",
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ active: true }) }),
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ active: true, roles: [] }) }),
     );
+  });
+
+  it("requestPlayerView_enterWithRoles_postsTheRoles", async () => {
+    const fetchImpl = jest.fn<typeof fetch>().mockResolvedValue(new Response("{}", { status: 200 }));
+
+    await requestPlayerView(true, ["ARBITRE", "DEV"], fetchImpl);
+
+    expect(fetchImpl.mock.calls[0][1]?.body).toBe(JSON.stringify({ active: true, roles: ["ARBITRE", "DEV"] }));
+  });
+
+  it("requestPlayerView_exit_postsNoRoles", async () => {
+    const fetchImpl = jest.fn<typeof fetch>().mockResolvedValue(new Response("{}", { status: 200 }));
+
+    await requestPlayerView(false, [], fetchImpl);
+
+    expect(fetchImpl.mock.calls[0][1]?.body).toBe(JSON.stringify({ active: false }));
   });
 
   it("requestPlayerView_refused_returnsFalse", async () => {
     const fetchImpl = jest.fn<typeof fetch>().mockResolvedValue(new Response("{}", { status: 403 }));
 
-    await expect(requestPlayerView(false, fetchImpl)).resolves.toBe(false);
+    await expect(requestPlayerView(false, [], fetchImpl)).resolves.toBe(false);
   });
 
   it("requestPlayerView_networkFailure_returnsFalseWithoutThrowing", async () => {
     const fetchImpl = jest.fn<typeof fetch>().mockRejectedValue(new TypeError("offline"));
 
-    await expect(requestPlayerView(true, fetchImpl)).resolves.toBe(false);
+    await expect(requestPlayerView(true, [], fetchImpl)).resolves.toBe(false);
   });
 });
 
@@ -145,14 +173,16 @@ describe("textes FR = EN", () => {
   });
 
   it("shell_accountEntries_existInBothLanguages", () => {
-    const keys = ["playerView", "playerViewPending", "playerViewFailed"] as const;
+    const keys = ["impersonate", "impersonateFailed"] as const;
     expect(keys.filter((key) => !frShell.account[key] || !enShell.account[key])).toEqual([]);
   });
 });
 
 describe("câblage", () => {
   it("la mise en page racine pose la bannière en vue joueur seulement", () => {
-    expect(readSource("app/layout.tsx")).toContain("{user?.playerView && <PlayerViewBanner until={user.playerViewUntil} />}");
+    expect(readSource("app/layout.tsx")).toContain(
+      "{user?.playerView && <PlayerViewBanner until={user.playerViewUntil} roles={user.roles} />}",
+    );
   });
 
   it("bannerBundle_layoutLoadsItDynamically_accountMenuImportsOnlyTheToggle", () => {
@@ -169,6 +199,13 @@ describe("schéma", () => {
     expect(readSource("lib/server/database/schema/accounts.ts")).toMatch(/player_view_until DATETIME NULL/);
     expect(readSource("lib/server/database/recent-schema-changes.ts")).toContain(
       "ALTER TABLE bg_user_sessions ADD COLUMN player_view_until DATETIME NULL",
+    );
+  });
+
+  it("impersonated_roles_json_declaredInCreateTableAndInRecentChanges", () => {
+    expect(readSource("lib/server/database/schema/accounts.ts")).toMatch(/impersonated_roles_json VARCHAR\(255\) NULL/);
+    expect(readSource("lib/server/database/recent-schema-changes.ts")).toContain(
+      "ALTER TABLE bg_user_sessions ADD COLUMN impersonated_roles_json VARCHAR(255) NULL AFTER player_view_until",
     );
   });
 });

@@ -3312,7 +3312,7 @@ describe("jeu du tournoi lu sous le verrou du match (revue sécurité #545)", ()
   });
 });
 
-describe("setMatchReady — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+describe("setMatchReady — vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () => {
   it("setMatchReady_casterInPlayerView_refusesNotMatchParty", async () => {
     state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
     state.users[CASTER] = ELIGIBLE_CASTER;
@@ -3338,13 +3338,47 @@ describe("setMatchReady — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
     expect(state.match?.referee_ready_at ?? null).toBeNull();
   });
 
+  it("setMatchReady_casterImpersonatingCaster_keepsCasterReady", async () => {
+    state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
+    state.users[CASTER] = ELIGIBLE_CASTER;
+
+    await setMatchReady(42, CASTER, true, { playerView: true, roles: ["CASTER"] });
+
+    expect(casterReadyOf(state)).toBe(STAMP);
+  });
+
+  it("setMatchReady_casterImpersonatingProd_refusesNotMatchParty", async () => {
+    state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
+    state.users[CASTER] = ELIGIBLE_CASTER;
+
+    await expect(setMatchReady(42, CASTER, true, { playerView: true, roles: ["PROD"] })).rejects.toThrow("NOT_MATCH_PARTY");
+  });
+
+  it("setMatchReady_designatedRefereeImpersonatingCaster_refusesNotMatchParty", async () => {
+    const referee = 950;
+    state.match = matchState({ referee_user_id: referee, team1_ready_at: STAMP });
+    state.users[referee] = {
+      discord_verified_at: STAMP,
+      discord_pseudo: "arbitre",
+      blizzard_sub: "sub",
+      overwatch_battletag: "Arbitre#1",
+      is_deleted: 0,
+      is_admin: 1,
+      platform_roles_json: JSON.stringify(["ADMIN"]),
+    };
+
+    await expect(setMatchReady(42, referee, true, { playerView: true, roles: ["CASTER"] })).rejects.toThrow(
+      "NOT_MATCH_PARTY",
+    );
+  });
+
   it("setMatchReady_captainInPlayerView_keepsTeamReady", async () => {
     await expect(setMatchReady(42, 1, true, { playerView: true })).resolves.toEqual({ launched: false });
     expect(state.match?.team1_ready_at).toBe(STAMP);
   });
 });
 
-describe("cast et arbitrage — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+describe("cast et arbitrage — vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () => {
   const inPlayerView = (id: number) => ({ id, playerView: true });
   const REFEREE = 950;
 
@@ -3381,5 +3415,19 @@ describe("cast et arbitrage — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
     await expect(releaseMatchReferee(42, inPlayerView(REFEREE), false)).rejects.toThrow("PLAYER_VIEW_ACTIVE");
     expect(state.match?.referee_user_id).toBe(REFEREE);
     expect(queueRefereeChange).not.toHaveBeenCalled();
+  });
+
+  it("takeMatchReferee_impersonatingCaster_throwsPlayerViewActive", async () => {
+    await expect(takeMatchReferee(42, { id: REFEREE, playerView: true, roles: ["CASTER"] })).rejects.toThrow(
+      "PLAYER_VIEW_ACTIVE",
+    );
+    expect(state.match?.referee_user_id ?? null).toBeNull();
+  });
+
+  it("releaseMatchCast_impersonatingArbitre_isNotRefusedForPlayerView", async () => {
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await expect(releaseMatchCast(42, { id: CASTER, playerView: true, roles: ["ARBITRE"] }, false)).resolves.not.toThrow();
+    expect(state.match?.casters).toEqual([]);
   });
 });

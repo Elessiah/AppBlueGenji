@@ -8,14 +8,16 @@ import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { parsePlayerViewBody } from "@/lib/shared/player-view";
 
 /**
- * « Passer en vue joueur » / « Revenir en vue admin »
- * (`docs/features/ADMIN_PLAYER_VIEW.md`). Corps `{ active: boolean }`.
+ * « Incarner un rôle » / « Revenir en vue admin »
+ * (`docs/features/ADMIN_ROLE_IMPERSONATION.md`). Corps `{ active: boolean,
+ * roles?: PlatformRole[] }` — `roles` à l'entrée seulement : les rôles à
+ * incarner (sauf `ADMIN`), vides ou absents pour la vue joueur.
  *
- * Ouverte aux seuls comptes qui portent **réellement** des droits de
- * plateforme (`playerViewAvailable`, lu sur le compte et non sur la session) :
- * c'est ce qui laisse revenir une session en vue joueur, dont `can()` ne voit
- * plus aucun droit. Un joueur sans rôle reçoit `403 FORBIDDEN`. Débit borné
- * par compte (`PLAYER_VIEW_TOGGLE_RULE`, `429`).
+ * Ouverte aux seuls administrateurs **réels** (`playerViewAvailable`, lu sur
+ * le compte et non sur la session) : c'est ce qui laisse revenir une session
+ * qui incarne un rôle, dont `can()` ne voit plus que ce rôle. Tout autre
+ * compte reçoit `403 FORBIDDEN`. Débit borné par compte
+ * (`PLAYER_VIEW_TOGGLE_RULE`, `429`).
  */
 export async function POST(req: Request) {
   const crossSite = rejectCrossSiteRequest(req, { requireJson: true });
@@ -29,14 +31,14 @@ export async function POST(req: Request) {
 
   const read = await readJsonObject(req, "INVALID_PLAYER_VIEW", SMALL_JSON_BODY_MAX_BYTES);
   if ("refusal" in read) return fail(read.refusal, 400);
-  const active = parsePlayerViewBody(read.body);
-  if (active === null) return fail("INVALID_PLAYER_VIEW", 400);
+  const parsed = parsePlayerViewBody(read.body);
+  if (parsed === null) return fail("INVALID_PLAYER_VIEW", 400);
 
   try {
-    const { until } = await setPlayerView(user, active);
+    const { until, roles } = await setPlayerView(user, parsed.active, parsed.roles);
     // L'état relu en base, pas celui demandé : deux bascules croisées ne
-    // peuvent rendre « vue joueur » sans échéance.
-    return ok({ playerView: until !== null, until });
+    // peuvent rendre une incarnation sans échéance.
+    return ok({ playerView: until !== null, until, roles });
   } catch (error) {
     if (error instanceof Error && error.message === PLAYER_VIEW_NO_SESSION) return fail("UNAUTHORIZED", 401);
     console.error("[player-view] bascule impossible :", failureReason(error));

@@ -13,10 +13,11 @@ import { PLAYER_VIEW_TOGGLE_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { authUser } from "../../../../helpers/auth-user";
 
-/** `POST /api/auth/player-view` (`docs/features/ADMIN_PLAYER_VIEW.md`). */
+/** `POST /api/auth/player-view` (`docs/features/ADMIN_ROLE_IMPERSONATION.md`). */
 const adminInPlayerView = authUser({ id: 7, isAdmin: false, roles: [], playerView: true, playerViewAvailable: true });
 const admin = authUser({ id: 7, isAdmin: true });
 const player = authUser({ id: 9, roles: [] });
+const referee = authUser({ id: 11, roles: ["ARBITRE"] });
 
 function toggle(body: unknown, headers: Record<string, string> = {}) {
   return POST(
@@ -31,7 +32,7 @@ function toggle(body: unknown, headers: Record<string, string> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit();
-  jest.mocked(setPlayerView).mockResolvedValue({ until: null });
+  jest.mocked(setPlayerView).mockResolvedValue({ until: null, roles: [] });
 });
 
 describe("POST /api/auth/player-view", () => {
@@ -72,6 +73,36 @@ describe("POST /api/auth/player-view", () => {
     expect(setPlayerView).not.toHaveBeenCalled();
   });
 
+  it("POST_nonAdminPlatformRoleHolder_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
+
+    const res = await toggle({ active: true, roles: ["CASTER"] });
+
+    expect(res.status).toBe(403);
+    expect(setPlayerView).not.toHaveBeenCalled();
+  });
+
+  it("POST_enterWithRoles_passesThemAndReturnsStoredRoles", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["CASTER"] });
+
+    const res = await toggle({ active: true, roles: ["CASTER"] });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ playerView: true, until: "2026-11-20T12:00:00.000Z", roles: ["CASTER"] });
+    expect(setPlayerView).toHaveBeenCalledWith(admin, true, ["CASTER"]);
+  });
+
+  it("POST_adminRoleInBody_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await toggle({ active: true, roles: ["ADMIN"] });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_PLAYER_VIEW" });
+    expect(setPlayerView).not.toHaveBeenCalled();
+  });
+
   it("POST_returnFromPlayerView_returns200", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
 
@@ -79,12 +110,12 @@ describe("POST /api/auth/player-view", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ playerView: false, until: null });
-    expect(setPlayerView).toHaveBeenCalledWith(adminInPlayerView, false);
+    expect(setPlayerView).toHaveBeenCalledWith(adminInPlayerView, false, []);
   });
 
   it("POST_enterPlayerView_returns200WithDeadline", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z" });
+    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: [] });
 
     const res = await toggle({ active: true });
 
@@ -95,7 +126,7 @@ describe("POST /api/auth/player-view", () => {
   it("POST_enterPlayerViewButNothingActiveInDb_returnsPlayerViewFalse", async () => {
     // L'état relu, pas celui demandé : jamais « vue joueur » sans échéance.
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(setPlayerView).mockResolvedValue({ until: null });
+    jest.mocked(setPlayerView).mockResolvedValue({ until: null, roles: [] });
 
     const res = await toggle({ active: true });
 

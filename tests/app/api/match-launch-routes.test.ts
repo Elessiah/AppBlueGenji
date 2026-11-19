@@ -131,7 +131,7 @@ describe("POST /api/matches/[matchId]/ready", () => {
     const res = await readyPost(jsonRequest("POST", { ready: true }), params("42"));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ launched: true });
-    expect(setMatchReady).toHaveBeenCalledWith(42, 2, true, { playerView: false });
+    expect(setMatchReady).toHaveBeenCalledWith(42, 2, true, { playerView: false, roles: [] });
   });
 
   it.each<[string, number]>([
@@ -635,7 +635,7 @@ describe("launchFailure", () => {
   });
 });
 
-describe("vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+describe("vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () => {
   const inPlayerView = authUser({ id: 6, roles: [], playerView: true, playerViewAvailable: true });
 
   it("readyPost_playerView_passesTheFlagToTheService", async () => {
@@ -644,7 +644,41 @@ describe("vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
 
     await readyPost(jsonRequest("POST", { ready: true }), params("42"));
 
-    expect(setMatchReady).toHaveBeenCalledWith(42, 6, true, { playerView: true });
+    expect(setMatchReady).toHaveBeenCalledWith(42, 6, true, { playerView: true, roles: [] });
+  });
+
+  it("readyPost_impersonatingCaster_passesTheImpersonatedRoles", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 6, roles: ["CASTER"], playerView: true, playerViewAvailable: true }),
+    );
+    jest.mocked(setMatchReady).mockResolvedValue({ launched: false });
+
+    await readyPost(jsonRequest("POST", { ready: true }), params("42"));
+
+    expect(setMatchReady).toHaveBeenCalledWith(42, 6, true, { playerView: true, roles: ["CASTER"] });
+  });
+
+  it("casterPost_impersonatingCaster_reachesTheService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 6, roles: ["CASTER"], playerView: true, playerViewAvailable: true }),
+    );
+    jest.mocked(claimMatchCast).mockResolvedValue({ triggerSkipped: false });
+
+    const res = await casterPost(jsonRequest("POST", { liveUrl: "https://twitch.tv/voix" }), params("42"));
+
+    expect(res.status).toBe(200);
+    expect(claimMatchCast).toHaveBeenCalled();
+  });
+
+  it("casterPost_impersonatingProd_returns403WithoutCallingService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 6, roles: ["PROD"], playerView: true, playerViewAvailable: true }),
+    );
+
+    const res = await casterPost(jsonRequest("POST", { liveUrl: "https://twitch.tv/voix" }), params("42"));
+
+    expect(res.status).toBe(403);
+    expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
   it("casterPost_playerView_returns403WithoutCallingService", async () => {

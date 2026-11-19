@@ -43,6 +43,7 @@ const PERMISSIONS: Permission[] = [
   "roles",
   "moderation",
   "dev",
+  "planning",
 ];
 
 const baseRow = {
@@ -98,16 +99,74 @@ describe("getCurrentUser — vue joueur", () => {
     expect(isStaffMember(user)).toBe(false);
   });
 
-  it("getCurrentUser_cumulativeRolesInPlayerView_seesNoPermission", async () => {
+  it("getCurrentUser_nonAdminRoleHolderWithStaleRow_keepsRealRightsAndCannotImpersonate", async () => {
     const roles = JSON.stringify(["ARBITRE", "CASTER", "COMMUNITY_MANAGER", "RECRUTEUR", "DEV"]);
     await withExecute(
-      jest.fn<SqlQuery>().mockResolvedValue([[{ ...baseRow, platform_roles_json: roles, player_view: 1 }], []]),
+      jest
+        .fn<SqlQuery>()
+        .mockResolvedValue([[{ ...baseRow, platform_roles_json: roles, player_view: 1, impersonated_roles_json: "[]" }], []]),
     );
 
     const user = await getCurrentUser();
 
-    expect(user).toMatchObject({ roles: [], playerViewAvailable: true });
-    expect(PERMISSIONS.filter((permission) => can(user, permission))).toEqual([]);
+    expect(user).toMatchObject({ playerView: false, playerViewAvailable: false });
+    expect(can(user, "tournaments")).toBe(true);
+  });
+
+  it("getCurrentUser_adminImpersonatingCaster_seesOnlyCasterPermissions", async () => {
+    await withExecute(
+      jest
+        .fn<SqlQuery>()
+        .mockResolvedValue([[{ ...baseRow, is_admin: 1, player_view: 1, impersonated_roles_json: '["CASTER"]' }], []]),
+    );
+
+    const user = await getCurrentUser();
+
+    expect(user).toMatchObject({ isAdmin: false, roles: ["CASTER"], playerView: true, playerViewAvailable: true });
+    expect(PERMISSIONS.filter((permission) => can(user, permission))).toEqual(["casting", "live", "planning"]);
+  });
+
+  it("getCurrentUser_adminImpersonatingArbitre_seesOnlyArbitrePermissions", async () => {
+    await withExecute(
+      jest
+        .fn<SqlQuery>()
+        .mockResolvedValue([[{ ...baseRow, is_admin: 1, player_view: 1, impersonated_roles_json: '["ARBITRE"]' }], []]),
+    );
+
+    const user = await getCurrentUser();
+
+    expect(user).toMatchObject({ isAdmin: false, roles: ["ARBITRE"], playerView: true });
+    expect(PERMISSIONS.filter((permission) => can(user, permission))).toEqual([
+      "tournaments",
+      "casting",
+      "live",
+      "planning",
+    ]);
+  });
+
+  it("getCurrentUser_storedAdminRole_neverGrantedDuringImpersonation", async () => {
+    await withExecute(
+      jest
+        .fn<SqlQuery>()
+        .mockResolvedValue([[{ ...baseRow, is_admin: 1, player_view: 1, impersonated_roles_json: '["ADMIN","DEV"]' }], []]),
+    );
+
+    const user = await getCurrentUser();
+
+    expect(user).toMatchObject({ isAdmin: false, roles: ["DEV"] });
+    expect(PERMISSIONS.filter((permission) => can(user, permission))).toEqual(["dev"]);
+  });
+
+  it("getCurrentUser_impersonationExpired_ignoresStoredRoles", async () => {
+    await withExecute(
+      jest
+        .fn<SqlQuery>()
+        .mockResolvedValue([[{ ...baseRow, is_admin: 1, player_view: 0, impersonated_roles_json: '["DEV"]' }], []]),
+    );
+
+    const user = await getCurrentUser();
+
+    expect(user).toMatchObject({ isAdmin: true, playerView: false });
   });
 
   it("getCurrentUser_playerViewExpired_restoresRealRights", async () => {
@@ -127,7 +186,7 @@ describe("getCurrentUser — vue joueur", () => {
 
     const user = await getCurrentUser();
 
-    expect(user).toMatchObject({ roles: ["ARBITRE"], playerView: false, playerViewAvailable: true });
+    expect(user).toMatchObject({ roles: ["ARBITRE"], playerView: false, playerViewAvailable: false });
     expect(can(user, "tournaments")).toBe(true);
   });
 
@@ -178,6 +237,7 @@ describe("getCurrentUser — vue joueur", () => {
     await getCurrentUser();
 
     expect(String(execute.mock.calls[0][0])).toContain("s.player_view_until > NOW() AS player_view");
+    expect(String(execute.mock.calls[0][0])).toContain("s.impersonated_roles_json");
   });
 
   it("getCurrentUser_playerViewColumnMissing_readsWithoutItAndKeepsRights", async () => {
@@ -208,6 +268,20 @@ describe("getCurrentUser — vue joueur", () => {
 
     expect(user).toMatchObject({ isAdmin: false, roles: [], playerView: true });
     expect(String(execute.mock.calls[0][0])).toContain("CONCAT('dev-auth-bypass:', bg_users.id)");
+  });
+
+  it("getCurrentUser_devBypassImpersonatingCaster_readsRolesOfTheBypassRow", async () => {
+    devBypass("3");
+    await withCookie(null);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValue([[{ ...baseRow, is_admin: 1, player_view: 1, impersonated_roles_json: '["CASTER"]' }], []]);
+    await withExecute(execute);
+
+    const user = await getCurrentUser();
+
+    expect(user).toMatchObject({ isAdmin: false, roles: ["CASTER"], playerView: true });
+    expect(String(execute.mock.calls[0][0])).toContain("impersonated_roles_json");
   });
 });
 

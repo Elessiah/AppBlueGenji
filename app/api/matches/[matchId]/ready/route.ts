@@ -38,7 +38,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   if (typeof ready !== "boolean") return fail("INVALID_READY_VALUE", 400);
 
   try {
-    return ok(await setMatchReady(matchId, user.id, ready, { playerView: user.playerView }));
+    return ok(await setMatchReady(matchId, user.id, ready, { playerView: user.playerView, roles: user.roles }));
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_READY_FAILED");
   }

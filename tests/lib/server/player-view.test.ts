@@ -11,6 +11,7 @@ import { playerViewSessionKey } from "@/lib/server/auth";
 import { reconnectSessionStreams } from "@/lib/server/session-streams";
 import { auditStaffAction } from "@/lib/server/staff-audit";
 import {
+  impersonationAuditLine,
   PLAYER_VIEW_NO_SESSION,
   PLAYER_VIEW_OFF_AUDIT,
   PLAYER_VIEW_ON_AUDIT,
@@ -28,7 +29,11 @@ function header(affectedRows: number): ResultSetHeader {
 }
 
 /** Ligne relue après l'écriture ; `null` : aucune ligne de session. */
-type ReadBack = { player_view_until: Date | null; active: number | null } | null;
+type ReadBack = {
+  player_view_until: Date | null;
+  impersonated_roles_json?: string | null;
+  active: number | null;
+} | null;
 
 let execute: jest.Mock<SqlQuery>;
 
@@ -55,10 +60,24 @@ describe("setPlayerView — session à cookie", () => {
     await setPlayerView(admin, true);
 
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toContain("SET player_view_until = DATE_ADD(NOW(), INTERVAL ? HOUR)");
+    expect(sql).toContain("SET player_view_until = DATE_ADD(NOW(), INTERVAL ? HOUR), impersonated_roles_json = ?");
     expect(sql).toContain("WHERE token_hash = ? AND user_id = ? AND expires_at > NOW()");
     expect(sql).toContain("(player_view_until IS NULL OR player_view_until <= NOW())");
-    expect(params).toEqual([12, HASH, 7]);
+    expect(params).toEqual([12, "[]", HASH, 7]);
+  });
+
+  it("setPlayerView_activateWithRoles_storesNormalisedRolesWithoutAdmin", async () => {
+    await setPlayerView(admin, true, ["DEV", "ADMIN", "CASTER"]);
+
+    expect(execute.mock.calls[0][1]).toEqual([12, '["CASTER","DEV"]', HASH, 7]);
+  });
+
+  it("setPlayerView_activateWithRoles_returnsRolesReadFromDb", async () => {
+    database(1, { player_view_until: DEADLINE, impersonated_roles_json: '["ARBITRE"]', active: 1 });
+
+    const result = await setPlayerView(admin, true, ["ARBITRE"]);
+
+    expect(result).toEqual({ until: "2026-11-18T22:00:00.000Z", roles: ["ARBITRE"] });
   });
 
   it("setPlayerView_activate_returnsDeadlineReadFromDb", async () => {
@@ -83,10 +102,10 @@ describe("setPlayerView — session à cookie", () => {
     const result = await setPlayerView(admin, false);
 
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toContain("SET player_view_until = NULL");
+    expect(sql).toContain("SET player_view_until = NULL, impersonated_roles_json = NULL");
     expect(sql).toContain("AND player_view_until > NOW()");
     expect(params).toEqual([HASH, 7]);
-    expect(result.until).toBeNull();
+    expect(result).toEqual({ until: null, roles: [] });
   });
 
   it("setPlayerView_deactivateWhenInactive_writesNoAudit", async () => {
@@ -122,7 +141,16 @@ describe("setPlayerView — session à cookie", () => {
   it("setPlayerView_activate_auditsInPm2WithTheAuthor", async () => {
     await setPlayerView(admin, true);
 
-    expect(auditStaffAction).toHaveBeenCalledWith(PLAYER_VIEW_ON_AUDIT, { id: 7, pseudo: "Chef" });
+    expect(auditStaffAction).toHaveBeenCalledWith(`${PLAYER_VIEW_ON_AUDIT} : joueur (aucun rôle)`, {
+      id: 7,
+      pseudo: "Chef",
+    });
+  });
+
+  it("setPlayerView_activateWithRoles_auditsTheChosenRoles", async () => {
+    await setPlayerView(admin, true, ["RECRUTEUR", "CASTER"]);
+
+    expect(auditStaffAction).toHaveBeenCalledWith(`${PLAYER_VIEW_ON_AUDIT} : CASTER, RECRUTEUR`, { id: 7, pseudo: "Chef" });
   });
 
   it("setPlayerView_deactivate_auditsTheReturn", async () => {
@@ -144,7 +172,7 @@ describe("setPlayerView — relecture en échec", () => {
 
     await expect(setPlayerView(admin, true)).rejects.toThrow("pool lost");
     expect(reconnectSessionStreams).toHaveBeenCalledWith(7, HASH);
-    expect(auditStaffAction).toHaveBeenCalledWith(PLAYER_VIEW_ON_AUDIT, { id: 7, pseudo: "Chef" });
+    expect(auditStaffAction).toHaveBeenCalledWith(impersonationAuditLine([]), { id: 7, pseudo: "Chef" });
   });
 });
 
@@ -160,7 +188,14 @@ describe("setPlayerView — contournement de développement", () => {
     expect(stale).toContain("DELETE FROM bg_user_sessions");
     expect(stale).toContain("(player_view_until IS NULL OR player_view_until <= NOW())");
     expect(insert).toContain("INSERT INTO bg_user_sessions");
-    expect(execute.mock.calls[1][1]).toEqual(["dev-auth-bypass:7", 7, 12, 12]);
+    expect(insert).toContain("impersonated_roles_json");
+    expect(execute.mock.calls[1][1]).toEqual(["dev-auth-bypass:7", 7, 12, 12, "[]"]);
+  });
+
+  it("setPlayerView_devBypassActivateWithRoles_insertsTheRoles", async () => {
+    await setPlayerView(admin, true, ["PROD"]);
+
+    expect(execute.mock.calls[1][1]).toEqual(["dev-auth-bypass:7", 7, 12, 12, '["PROD"]']);
   });
 
   it("setPlayerView_devBypassAlreadyActive_writesNoAudit", async () => {
@@ -215,5 +250,15 @@ describe("setPlayerView — contournement de développement", () => {
     await setPlayerView(admin, true);
 
     expect(reconnectSessionStreams).toHaveBeenCalledWith(7, null);
+  });
+});
+
+describe("impersonationAuditLine", () => {
+  it("impersonationAuditLine_roles_namesThem", () => {
+    expect(impersonationAuditLine(["ARBITRE", "DEV"])).toBe(`${PLAYER_VIEW_ON_AUDIT} : ARBITRE, DEV`);
+  });
+
+  it("impersonationAuditLine_noRole_saysPlayer", () => {
+    expect(impersonationAuditLine([])).toBe(`${PLAYER_VIEW_ON_AUDIT} : joueur (aucun rôle)`);
   });
 });

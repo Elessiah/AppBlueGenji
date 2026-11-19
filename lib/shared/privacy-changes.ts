@@ -2277,6 +2277,23 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Staff : une date butoir posée, changée ou retirée est notée au journal du staff sur Discord sans nommer son auteur ; les journaux du serveur gardent son auteur (T05).",
     ],
   },
+  {
+    // ROLE-IMPERSONATE — « Incarner un rôle » (`docs/features/ADMIN_ROLE_IMPERSONATION.md`)
+    // remplace la vue joueur : réservée aux administrateurs, rôles incarnés
+    // notés sur la session et dans la ligne pm2. Registre T01 et T05, /rgpd
+    // (FR et EN). Pour tous les comptes, comme l'entrée de la vue joueur.
+    // Datée du lendemain de la mise en ligne prévue, comme
+    // `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
+    id: "2026-11-incarner-un-role",
+    publishedAt: "2026-11-22",
+    title: "Vue joueur : remplacée par « Incarner un rôle », réservé aux administrateurs",
+    links: [{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }],
+    summary: `Seul un administrateur peut désormais réduire ses droits sur une de ses sessions, aux rôles de plateforme qu'il choisit (aucun : vue joueur), ${PLAYER_VIEW_MAX_HOURS} heures au plus. Chaque bascule est notée, à son nom et avec les rôles incarnés, dans les journaux du serveur.`,
+    details: [
+      "Ce qui est gardé en plus : les rôles incarnés, sur la session de connexion avec l'échéance, effacés avec la session (déconnexion, fin de la session ou suppression du compte), et dans la ligne des journaux du serveur, selon leur rotation ; base : l'intérêt légitime (administration de la plateforme), auquel la personne concernée peut s'opposer. Rien n'en est dit sur Discord.",
+      "Ce qui ne change pas : pour un compte qui n'est pas administrateur, rien de nouveau n'est collecté ; les bascules en vue joueur faites jusqu'ici par les autres titulaires d'un rôle de plateforme restent dans les journaux du serveur, selon leur rotation.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

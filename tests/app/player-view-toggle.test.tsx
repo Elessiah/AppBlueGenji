@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 /**
- * `usePlayerViewToggle` (`docs/features/ADMIN_PLAYER_VIEW.md`), joué sans DOM :
+ * `usePlayerViewToggle` (`docs/features/ADMIN_ROLE_IMPERSONATION.md`), joué sans DOM :
  * le crochet est appelé comme une fonction, `useState` et `useRef` lus dans
  * des cases. Un échec se dit en notification avec le bon texte, la page n'est
  * relue qu'après une réussite, et un double clic n'envoie qu'une requête.
@@ -70,6 +70,19 @@ describe("usePlayerViewToggle", () => {
     expect(showError).not.toHaveBeenCalled();
   });
 
+  it("toggle_enterWithRoles_postsTheRolesAndResolvesTrue", async () => {
+    const done = await ToggleProbe().toggle(true, ["CASTER"]);
+
+    expect(done).toBe(true);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ active: true, roles: ["CASTER"] });
+  });
+
+  it("toggle_failure_resolvesFalse", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 500 }));
+
+    await expect(ToggleProbe().toggle(true, ["ARBITRE"])).resolves.toBe(false);
+  });
+
   it("toggle_enteringSucceeds_handsFocusToTheBannerOnce", async () => {
     await ToggleProbe().toggle(true);
 
@@ -99,13 +112,13 @@ describe("usePlayerViewToggle", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("toggle_failureEntering_showsPlayerViewFailedWithoutRefresh", async () => {
+  it("toggle_failureEntering_showsImpersonateFailedWithoutRefresh", async () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 403 }));
     const onDone = jest.fn();
 
     await ToggleProbe(onDone).toggle(true);
 
-    expect(showError).toHaveBeenCalledWith("account.playerViewFailed");
+    expect(showError).toHaveBeenCalledWith("account.impersonateFailed");
     expect(refresh).not.toHaveBeenCalled();
     expect(onDone).not.toHaveBeenCalled();
   });

@@ -73,6 +73,7 @@ import { retryOnDeadlock } from "./deadlock-retry";
 import { isUnsettled, rollbackKeepingError } from "./lock-wait";
 import { cachedTournamentList } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
+import { sessionHolds, type SessionRights } from "@/lib/shared/player-view";
 
 /**
  * Horizon d'anticipation : un match dont l'heure tombe dans l'heure est déjà
@@ -87,9 +88,10 @@ export type LaunchViewer = {
   isAdmin?: boolean;
   roles?: readonly PlatformRole[];
   /**
-   * Vue joueur de la session (`ADMIN_PLAYER_VIEW.md`) : ni cast ni arbitrage
-   * désigné. Requise, comme `PartySession` : un lecteur bâti à la main sans
-   * elle ne compile pas.
+   * Incarnation d'un rôle par la session (`ADMIN_ROLE_IMPERSONATION.md`) : ses
+   * casts et arbitrages désignés ne comptent que si les rôles incarnés
+   * (`roles`) ouvrent `live` / `tournaments` (vue joueur : aucun). Requise,
+   * comme `PartySession` : un lecteur bâti à la main sans elle ne compile pas.
    */
   playerView: boolean;
 };
@@ -342,7 +344,7 @@ function viewerRole(
   teams: ViewerTeams,
   casters: readonly MatchCasterLink[],
   referee: boolean,
-  playerView: boolean,
+  session: SessionRights,
 ): { role: MatchLaunchViewerRole; canDeclareReady: boolean } | null {
   // Ordre de `resolveMatchParty` : joueur, caster, arbitre désigné.
   // Le rôle de joueur prime, comme dans `resolveMatchParty`.
@@ -355,15 +357,14 @@ function viewerRole(
       return { role, canDeclareReady: membership.solo || canDeclareTeamReady(membership.roles) };
     }
   }
-  // Vue joueur (`ADMIN_PLAYER_VIEW.md`) : la session ne tient ni cast ni
-  // arbitrage, comme un joueur qui n'en aurait jamais pris — seul son rôle de
-  // joueur du match lui reste.
-  if (playerView) return null;
+  // Incarnation (`ADMIN_ROLE_IMPERSONATION.md`) : la session ne tient que les
+  // casts et arbitrages que ses rôles incarnés ouvrent — en vue joueur, aucun,
+  // comme un joueur qui n'en aurait jamais pris.
   // `casters` : ceux que la lecture garde (un caster inéligible n'en est plus).
-  if (casters.some((caster) => caster.userId === userId)) {
+  if (sessionHolds(session, "live") && casters.some((caster) => caster.userId === userId)) {
     return { role: "CASTER", canDeclareReady: true };
   }
-  if (isDesignatedReferee(row, userId)) {
+  if (sessionHolds(session, "tournaments") && isDesignatedReferee(row, userId)) {
     return { role: "MATCH_REFEREE", canDeclareReady: true };
   }
   // Un arbitre n'a pas de « Prêt » à donner : il lit les contacts, rien de plus.
@@ -381,8 +382,14 @@ function viewerRole(
  * joueur, et n'est de toute façon jamais un arbitre éligible avant le départ
  * (`keepEligibleReferees`).
  */
-function casterContactsRole(row: CandidateRow, userId: number, role: MatchLaunchViewerRole): MatchLaunchViewerRole {
-  return role === "CASTER" && isDesignatedReferee(row, userId) ? "MATCH_REFEREE" : role;
+function casterContactsRole(
+  row: CandidateRow,
+  userId: number,
+  role: MatchLaunchViewerRole,
+  session: SessionRights,
+): MatchLaunchViewerRole {
+  // Incarnation sans `tournaments` : l'arbitrage désigné ne compte pas.
+  return role === "CASTER" && sessionHolds(session, "tournaments") && isDesignatedReferee(row, userId) ? "MATCH_REFEREE" : role;
 }
 
 /**
@@ -1094,7 +1101,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase, early, exposes } of visible) {
       const casters = kept.get(Number(row.id)) ?? [];
-      const party = viewerRole(row, viewer.id, teams, casters, referee, viewer.playerView);
+      const party = viewerRole(row, viewer.id, teams, casters, referee, viewer);
       if (!party) continue;
       // À un arbitre qui caste, la modale de lancement renvoie aussi à « Contacts ».
       result.push(
@@ -1112,7 +1119,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           // qu'un filet : jamais le caster sans le match.
           // L'arbitre désigné qui caste lit ses co-casters en arbitre désigné
           // (`casterContactsRole`) : `exposes` reste sa borne, celle de la carte.
-          exposesCaster: exposes && exposesCasterContacts(phase, casterContactsRole(row, viewer.id, party.role)),
+          exposesCaster: exposes && exposesCasterContacts(phase, casterContactsRole(row, viewer.id, party.role, viewer)),
           refereeDiscord: forCard && party.role !== "REFEREE",
           viewerRole: party.role,
         }),

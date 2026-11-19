@@ -4,17 +4,23 @@ import { useState } from "react";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
+import type { PlatformRole } from "@/lib/shared/permissions";
 
 /**
- * Bascule la vue joueur de **cette session** (`docs/features/ADMIN_PLAYER_VIEW.md`).
+ * Pose (rôles à incarner, vides : vue joueur) ou retire l'incarnation de
+ * **cette session** (`docs/features/ADMIN_ROLE_IMPERSONATION.md`).
  * Rend `false` si la requête échoue ou est refusée : l'appelant le dit (toast).
  */
-export async function requestPlayerView(active: boolean, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+export async function requestPlayerView(
+  active: boolean,
+  roles: readonly PlatformRole[] = [],
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
   try {
     const res = await fetchImpl("/api/auth/player-view", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active }),
+      body: JSON.stringify(active ? { active, roles } : { active }),
     });
     return res.ok;
   } catch {
@@ -41,33 +47,34 @@ export function takePlayerViewFocus(target: FocusTarget): boolean {
 }
 
 /**
- * Le geste, commun au menu du compte et à la bannière : un second clic
+ * Le geste, commun à la modale « Incarner un rôle » et à la bannière : un second clic
  * n'envoie rien de plus, un échec se dit en notification, une réussite relit
  * la page (`router.refresh()`) — la barre, les menus et les écrans de gestion
  * changent avec les droits de la session.
  */
 export function usePlayerViewToggle(onDone?: () => void): {
   pending: boolean;
-  toggle: (active: boolean) => Promise<void>;
+  toggle: (active: boolean, roles?: readonly PlatformRole[]) => Promise<boolean>;
 } {
   const router = useLocaleRouter();
   const { showError } = useToast();
   const { t } = useShellText();
   const [pending, setPending] = useState(false);
-  const toggle = async (active: boolean) => {
-    if (inFlight) return;
+  const toggle = async (active: boolean, roles: readonly PlatformRole[] = []) => {
+    if (inFlight) return false;
     inFlight = true;
     setPending(true);
-    const done = await requestPlayerView(active);
+    const done = await requestPlayerView(active, roles);
     inFlight = false;
     setPending(false);
     if (!done) {
-      showError(t(active ? "account.playerViewFailed" : "playerView.backFailed"));
-      return;
+      showError(t(active ? "account.impersonateFailed" : "playerView.backFailed"));
+      return false;
     }
     pendingFocus = active ? "banner" : "account";
     onDone?.();
     router.refresh();
+    return true;
   };
   return { pending, toggle };
 }

@@ -11,6 +11,7 @@ import {
   parseCastTarget,
   parseMatchIdParam,
 } from "@/lib/server/tournaments/match-launch-routes";
+import { sessionHolds } from "@/lib/shared/player-view";
 import { can } from "@/lib/shared/permissions";
 import { castOverseer } from "@/lib/shared/live-trigger-owner";
 import type { AuthUser } from "@/lib/server/auth";
@@ -62,8 +63,8 @@ const STATUSES: Readonly<Record<string, number>> = {
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  // Vue joueur (`ADMIN_PLAYER_VIEW.md`) : aucun geste de cast sur cette session.
-  if (user.playerView) return fail("FORBIDDEN", 403);
+  // Incarnation sans `live` (`ADMIN_ROLE_IMPERSONATION.md`) : aucun geste de cast sur cette session.
+  if (!sessionHolds(user, "live")) return fail("FORBIDDEN", 403);
 
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
@@ -101,8 +102,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
 export async function GET(_req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  // Vue joueur (`ADMIN_PLAYER_VIEW.md`) : aucun geste de cast sur cette session.
-  if (user.playerView) return fail("FORBIDDEN", 403);
+  // Incarnation sans `live` (`ADMIN_ROLE_IMPERSONATION.md`) : aucun geste de cast sur cette session.
+  if (!sessionHolds(user, "live")) return fail("FORBIDDEN", 403);
 
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
@@ -123,8 +124,8 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  // Vue joueur (`ADMIN_PLAYER_VIEW.md`) : aucun geste de cast sur cette session.
-  if (user.playerView) return fail("FORBIDDEN", 403);
+  // Incarnation sans `live` (`ADMIN_ROLE_IMPERSONATION.md`) : aucun geste de cast sur cette session.
+  if (!sessionHolds(user, "live")) return fail("FORBIDDEN", 403);
 
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
@@ -151,8 +152,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
 export async function DELETE(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  // Vue joueur (`ADMIN_PLAYER_VIEW.md`) : aucun geste de cast sur cette session.
-  if (user.playerView) return fail("FORBIDDEN", 403);
+  // Incarnation sans `live` (`ADMIN_ROLE_IMPERSONATION.md`) : aucun geste de cast sur cette session.
+  if (!sessionHolds(user, "live")) return fail("FORBIDDEN", 403);
 
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);

@@ -1,9 +1,13 @@
 /**
- * « Vue joueur » du staff (`docs/features/ADMIN_PLAYER_VIEW.md`) : un compte
- * qui porte des droits de plateforme les suspend, **pour sa session**, afin de
- * voir le site comme un joueur. Logique pure, importable partout.
+ * « Incarner un rôle » (`docs/features/ADMIN_ROLE_IMPERSONATION.md`) : un
+ * administrateur réduit, **pour sa session**, ses droits de plateforme à un
+ * jeu de rôles choisi — aucun rôle : la « vue joueur ». Logique pure,
+ * importable partout.
+ *
+ * Les noms `playerView*` viennent de la première version (vue joueur seule) :
+ * `playerView` dit « la session incarne un rôle (ou aucun) ».
  */
-import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
+import { can, isPlatformRole, PLATFORM_ROLES, type Permission, type PlatformRole } from "@/lib/shared/permissions";
 
 /**
  * Durée maximale d'une vue joueur, en heures : passé ce délai, la session
@@ -12,29 +16,97 @@ import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissio
  */
 export const PLAYER_VIEW_MAX_HOURS = 12;
 
-/** Le compte peut-il passer en vue joueur ? Oui dès qu'il porte un rôle de plateforme (`DEV` compris). */
-export function holdsPlatformRights(user: { isAdmin: boolean; roles: readonly PlatformRole[] }): boolean {
-  return user.isAdmin || sanitizePlatformRoles(user.roles).length > 0;
+/**
+ * Les rôles qu'un administrateur peut incarner, dans l'ordre d'affichage :
+ * tous les rôles de plateforme sauf `ADMIN` (l'incarnation ne fait que
+ * **réduire** les droits). Aucun rôle coché : la vue joueur.
+ */
+export const IMPERSONABLE_ROLES: readonly PlatformRole[] = PLATFORM_ROLES.filter((role) => role !== "ADMIN");
+
+/**
+ * Le compte peut-il incarner un rôle ? Seul un administrateur (colonne
+ * `is_admin`, droits **réels**) : il tient déjà tous les droits, l'incarnation
+ * ne fait que les réduire. Un autre rôle de plateforme n'y ouvre rien.
+ */
+export function canImpersonate(real: { isAdmin: boolean }): boolean {
+  return real.isAdmin;
 }
 
 /**
- * Les droits que la session voit : ceux du compte, ou aucun en vue joueur.
- * Les rôles d'équipe (`OWNER`, `MANAGER`…) ne passent pas par là : ils ne sont
- * pas des droits de plateforme et restent entiers.
+ * Les rôles incarnés, tels que stockés (`bg_user_sessions.impersonated_roles_json`) :
+ * rôles connus seulement, `ADMIN` écarté, dédupliqués et triés. Une valeur
+ * illisible ou absente : aucun rôle (vue joueur) — jamais plus de droits.
+ */
+export function parseImpersonatedRoles(input: unknown): PlatformRole[] {
+  let candidates: unknown = input;
+  if (typeof input === "string") {
+    try {
+      candidates = JSON.parse(input);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(candidates)) return [];
+  return IMPERSONABLE_ROLES.filter((role) => candidates.includes(role));
+}
+
+/**
+ * Les droits que la session voit : ceux du compte, ou, pendant une
+ * incarnation, **exactement** les rôles incarnés (`isAdmin` éteint ; aucun
+ * rôle : vue joueur). Les rôles d'équipe (`OWNER`, `MANAGER`…) ne passent pas
+ * par là : ils ne sont pas des droits de plateforme et restent entiers.
  */
 export function sessionPlatformRights(
   real: { isAdmin: boolean; roles: readonly PlatformRole[] },
   playerView: boolean,
+  impersonatedRoles: unknown = [],
 ): { isAdmin: boolean; roles: PlatformRole[] } {
-  if (playerView) return { isAdmin: false, roles: [] };
+  if (playerView) return { isAdmin: false, roles: parseImpersonatedRoles(impersonatedRoles) };
   return { isAdmin: real.isAdmin, roles: [...real.roles] };
 }
 
-/** Corps attendu par `POST /api/auth/player-view` : `{ active: boolean }`, rien d'autre. */
-export function parsePlayerViewBody(body: unknown): boolean | null {
+/**
+ * Ce qu'une session sait d'elle-même pour ses gestes de cast et d'arbitrage :
+ * l'incarnation (`playerView`) et ses rôles. Les rôles absents valent
+ * « aucun » : un appelant qui ne les passe pas refuse, jamais n'ouvre.
+ */
+export type SessionRights = { playerView: boolean; roles?: readonly PlatformRole[] };
+
+/**
+ * La session tient-elle les casts (`live`) ou les arbitrages (`tournaments`)
+ * désignés du compte ? Hors incarnation, toujours (l'éligibilité se lit en
+ * base) ; pendant une incarnation, seulement si les rôles incarnés ouvrent la
+ * permission — un administrateur qui incarne un caster caste, en vue joueur
+ * il ne tient ni cast ni arbitrage.
+ */
+export function sessionHolds(session: SessionRights, permission: Extract<Permission, "live" | "tournaments">): boolean {
+  if (!session.playerView) return true;
+  return can({ isAdmin: false, roles: session.roles ?? [] }, permission);
+}
+
+/** Coche ou décoche `role` dans la sélection de la modale, rendue dans l'ordre de {@link IMPERSONABLE_ROLES}. */
+export function toggleImpersonatedRole(selected: readonly PlatformRole[], role: PlatformRole): PlatformRole[] {
+  const next = selected.includes(role) ? selected.filter((r) => r !== role) : [...selected, role];
+  return IMPERSONABLE_ROLES.filter((r) => next.includes(r));
+}
+
+/** Nombre maximal d'entrées du tableau `roles` lu dans le corps (au-delà : refus). */
+const MAX_BODY_ROLES = 16;
+
+/**
+ * Corps attendu par `POST /api/auth/player-view` : `{ active: boolean }`,
+ * plus, à l'entrée seulement, `roles` — les rôles à incarner (tableau de
+ * rôles de {@link IMPERSONABLE_ROLES}, vide ou absent : vue joueur). Un rôle
+ * inconnu, `ADMIN`, ou `roles` au retour : refus (`null`), jamais ignoré.
+ */
+export function parsePlayerViewBody(body: unknown): { active: boolean; roles: PlatformRole[] } | null {
   if (typeof body !== "object" || body === null || Array.isArray(body)) return null;
-  const { active } = body as { active?: unknown };
-  return typeof active === "boolean" ? active : null;
+  const { active, roles } = body as { active?: unknown; roles?: unknown };
+  if (typeof active !== "boolean") return null;
+  if (roles === undefined) return { active, roles: [] };
+  if (!active || !Array.isArray(roles) || roles.length > MAX_BODY_ROLES) return null;
+  if (!roles.every((role) => isPlatformRole(role) && IMPERSONABLE_ROLES.includes(role))) return null;
+  return { active, roles: parseImpersonatedRoles(roles) };
 }
 
 /** Ce que le menu du compte propose : passer en vue joueur, en revenir, ou rien. */

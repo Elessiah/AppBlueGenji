@@ -238,7 +238,7 @@ describe("reconnectUserStreams (EF-04)", () => {
   });
 });
 
-describe("reconnectSessionStreams (ADMIN_PLAYER_VIEW.md)", () => {
+describe("reconnectSessionStreams (ADMIN_ROLE_IMPERSONATION.md)", () => {
   it("reconnectSessionStreams_oneSession_closesOnlyThatSessionStreams", () => {
     const here = jest.fn();
     const otherDevice = jest.fn();
@@ -275,7 +275,7 @@ describe("reconnectSessionStreams (ADMIN_PLAYER_VIEW.md)", () => {
   });
 });
 
-describe("reconnectRequestedSince (ADMIN_PLAYER_VIEW.md)", () => {
+describe("reconnectRequestedSince (ADMIN_ROLE_IMPERSONATION.md)", () => {
   it("reconnectRequestedSince_switchAfterMark_isTrueForThatSessionOnly", () => {
     const mark = revocationMark();
 

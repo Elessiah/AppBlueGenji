@@ -1209,6 +1209,15 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Staff: a deadline set, changed or removed is noted in the staff log on Discord without naming its author; the server logs keep its author (T05).",
     ],
   },
+  "2026-11-incarner-un-role": {
+    linkLabels: ["Read record T05 of the register"],
+    title: "Player view: replaced by “Impersonate a role”, for administrators only",
+    summary: `Only an administrator can now narrow their rights on one of their sessions, to the platform roles they choose (none: player view), for ${PLAYER_VIEW_MAX_HOURS} hours at most. Each switch is noted, under their name and with the roles impersonated, in the server logs.`,
+    details: [
+      "What is also kept: the roles impersonated, on the login session with the deadline, erased with the session (logout, end of the session or deletion of the account), and in the server log line, according to its rotation; basis: legitimate interest (administration of the platform), to which the person concerned may object. Nothing is said about it on Discord.",
+      "What does not change: for an account that is not an administrator, nothing new is collected; the switches into player view made until now by the other holders of a platform role stay in the server logs, according to their rotation.",
+    ],
+  },
 };
 
 /**

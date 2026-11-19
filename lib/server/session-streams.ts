@@ -234,7 +234,7 @@ export function closeSessionStreams(tokenHash: string): number {
 
 /**
  * Fait reconnecter les flux d'**une** session, sans la révoquer (`RECONNECT`) :
- * son contexte de lecteur a changé (vue joueur, `ADMIN_PLAYER_VIEW.md`) et la
+ * son contexte de lecteur a changé (vue joueur, `ADMIN_ROLE_IMPERSONATION.md`) et la
  * route doit le relire. `tokenHash` `null` : tous les flux du compte — le
  * contournement de développement, dont les flux portent l'empreinte d'un
  * éventuel cookie resté posé, ou aucune.

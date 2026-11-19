@@ -320,7 +320,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
   });
 });
 
-describe("POST /api/admin/users/[id]/roles — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+describe("POST /api/admin/users/[id]/roles — vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
