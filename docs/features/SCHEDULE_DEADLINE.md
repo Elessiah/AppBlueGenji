@@ -66,9 +66,18 @@ Balayage `sweepScheduleDeadlines`, chaque minute (`startScheduleDeadlineClock`,
 sans attendre (un autre processus le tient : passage sauté). Pages de 200
 matchs (`SWEEP_BATCH`, jusqu'à 10 pages et 100 gestes — forfaits, retraits,
 extinctions, avis — par passage, `SWEEP_MAX_PAGES`/`SWEEP_MAX_ACTIONS` ; la
-suite attend la minute d'après), du plus urgent : dates
-butoir des matchs sans horaire, et dates **échues** des matchs programmés ou
-lancés pas encore retirées. Décision pure `sweepAction` :
+suite attend la minute d'après ; un passage qui épuise ses pages sans finir la lecture le dit dans
+le journal), du plus urgent : seules les lignes **qui ont quelque chose à faire** sont lues — dates
+butoir échues (matchs sans horaire, ou programmés/lancés pas encore retirés), tournoi `FINISHED`, et
+dates butoir à venir d'un match à planifier dont l'annonce n'est pas partie pour la paire actuelle ou
+dont le premier rappel (24 h avant, `SWEEP_LOOKAHEAD_MS`) est ouvert : un match annoncé dont la date
+butoir est lointaine, ou dont une engagée manque, n'est pas relu chaque minute. Les **messages**
+(DM, push) partent **après** le verrou nommé, hors de sa connexion, `SEND_CONCURRENCY` matchs de front
+(`flushSends`) ; un envoi qui échoue avant toute remise rend ses paliers (le passage suivant les
+renvoie) et compte comme un échec du match, celui de l'avis de forfait est seulement journalisé. L'effacement des avis d'une
+paire précédente et la réservation des nouveaux se font dans une même transaction. Une date butoir
+posée d'un coup sur un tournoi s'écrit par paquets (`WRITE_CHUNK`), non match par match. Décision
+pure `sweepAction` :
 
 | Match à l'échéance | Effet |
 | --- | --- |
@@ -86,7 +95,7 @@ refusé à chaque fois, ou verrou tenu longtemps) est **mis de côté** 15 minut
 (`SWEEP_FAILURE_BACKOFF_MS`, sauté par la lecture), avec une erreur dans le
 journal pour l'arbitrage ; repris, il repart d'une série neuve (compte
 borné). Sa date butoir **reste** : une panne passagère ne la fait jamais
-perdre. La pastille « à planifier » n'affiche qu'une date butoir à venir (un seul minuteur posé sur la date butoir, `useInstantClock`). Les échecs d'un match que la lecture ne rend plus sont
+perdre. La pastille « à planifier » n'affiche qu'une date butoir à venir (un minuteur posé sur la date butoir, un autre 24 h avant pour la teinte d'avertissement, `useInstantClock` ; aucun sans date butoir). Les échecs d'un match que la lecture ne rend plus sont
 oubliés.
 
 Le double forfait passe par la chaîne existante, rien de neuf par format :
@@ -146,7 +155,7 @@ planning ; pour chacune, `runAutoAssign(null, semaine)` refait les
 propositions **provisoires** autour de ce qui est confirmé, puis
 `confirmAssignments(null, { entryKeys })` ne confirme **que** les échues ; les
 affectés reçoivent `PLANNING_ASSIGNED`. Écritures sous `bg_planning`
-(`withPlanningLock`). La marque `bg_planning_auto_confirms` (entrée, début
+(`withPlanningLock`). Marques et propositions ne se lisent que pour les entrées dont l'instant de confirmation est atteint (aucune lecture quand aucune ne l'est ; listes `IN` par paquets de `KEY_CHUNK`), et les marques s'écrivent par paquets de `MARK_CHUNK`. Recalculer la semaine entière pour confirmer une entrée échue est voulu (mini-lot précoce, puis réoptimisation des suivantes autour des confirmées). La marque `bg_planning_auto_confirms` (entrée, début
 confirmé `start_at`, propositions provisoires comptées par rôle
 `pending_roles` : celles lues avant la confirmation et encore provisoires
 après, `leftoverRoles` — ce qu'elle n'a pas pu confirmer —, date) est posée

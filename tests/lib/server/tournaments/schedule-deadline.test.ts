@@ -35,7 +35,9 @@ import {
   SCHEDULE_DEADLINES_LOCK,
   sentNoticesByMatch,
   SWEEP_BATCH,
+  SEND_CONCURRENCY,
   SWEEP_FAILURE_BACKOFF_MS,
+  SWEEP_LOOKAHEAD_MS,
   SWEEP_MAX_ACTIONS,
   SWEEP_MAX_FAILURES,
   SWEEP_MAX_PAGES,
@@ -45,9 +47,10 @@ import {
   setTournamentScheduleDeadlines,
   sweepAction,
   sweepScheduleDeadlines,
+  WRITE_CHUNK,
 } from "@/lib/server/tournaments/schedule-deadline";
 import type { RowColumns, RowOverrides } from "../../../helpers/row-overrides";
-import { connectionMock, fakeConnection, fakePool } from "../../../helpers/sql-double";
+import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../../helpers/sql-double";
 
 /**
  * Date butoir de planification, côté serveur (`docs/features/SCHEDULE_DEADLINE.md`) :
@@ -90,6 +93,11 @@ function row(overrides: RowOverrides<SweepRow> = {}): SweepRow {
     team2_solo: null,
   };
   return { ...columns, ...overrides } as SweepRow;
+}
+
+/** Paramètres de la lecture du balayage (hors mis de côté et reprise de page) à l'instant `now`. */
+function sweepParams(now: number): unknown[] {
+  return [new Date(now), "RETIRED", new Date(now), new Date(now + SWEEP_LOOKAHEAD_MS), "SET"];
 }
 
 /** Réponses du double SQL, choisies par motif (la première qui correspond). */
@@ -457,7 +465,7 @@ describe("sweepScheduleDeadlines", () => {
 
     const [sql, params] = executed(connection, /FROM bg_matches m/)[0];
     expect(sql).toContain("(m.start_at IS NULL OR m.schedule_deadline_at <= ?)");
-    expect(params).toEqual([new Date(NOW), "RETIRED"]);
+    expect(params).toEqual(sweepParams(NOW));
   });
 
   it("sweepScheduleDeadlines_scheduledPastDeadline_marksRetiredAndKeepsDeadline", async () => {
@@ -485,7 +493,7 @@ describe("sweepScheduleDeadlines", () => {
 
     const pages = executed(connection, /FROM bg_matches m/);
     expect(pages).toHaveLength(2);
-    expect(pages[1][1]).toEqual([new Date(DEADLINE + HOUR), "RETIRED", new Date(DEADLINE), new Date(DEADLINE), 1000 + SWEEP_BATCH - 1]);
+    expect(pages[1][1]).toEqual([...sweepParams(DEADLINE + HOUR), new Date(DEADLINE), new Date(DEADLINE), 1000 + SWEEP_BATCH - 1]);
   });
 
   it("sweepScheduleDeadlines_staleNotices_deletedBeforeClaimingAnnouncement", async () => {
@@ -528,7 +536,7 @@ describe("sweepScheduleDeadlines", () => {
     expect(executed(connection, /UPDATE bg_matches SET schedule_deadline_at = NULL/)).toHaveLength(0);
     const last = executed(connection, /FROM bg_matches m/).at(-1);
     expect(last?.[0]).toContain("m.id NOT IN (?)");
-    expect(last?.[1]).toEqual([new Date(NOW + MINUTE), "RETIRED", 40]);
+    expect(last?.[1]).toEqual([...sweepParams(NOW + MINUTE), 40]);
   });
 
   it("sweepScheduleDeadlines_backoffElapsed_matchReadAgain", async () => {
@@ -817,5 +825,194 @@ describe("setTournamentScheduleDeadlines", () => {
     // (retirée, lue par le planning) et celle d'une manche pas remplie restent.
     await expect(setTournamentScheduleDeadlines(10, null, ACTOR, NOW)).resolves.toBe(1);
     expect(updatedIds()).toEqual([40]);
+  });
+});
+
+describe("sweepScheduleDeadlines : coût du passage", () => {
+  const claimed = (affectedRows: number) => [{ affectedRows }];
+  let lockHeld: boolean;
+
+  beforeEach(() => {
+    lockHeld = false;
+    jest.mocked(withNamedLock).mockImplementation(async (_db, _name, _timeout, run) => {
+      lockHeld = true;
+      try {
+        return await run(fakeConnection(connection));
+      } finally {
+        lockHeld = false;
+      }
+    });
+  });
+
+  it("sweepScheduleDeadlines_read_skipsFutureRowsNothingWaitsFor", async () => {
+    routeSql(connection, []);
+
+    await sweepScheduleDeadlines(NOW);
+
+    const [sql] = executed(connection, /FROM bg_matches m/)[0];
+    expect(SWEEP_LOOKAHEAD_MS).toBe(24 * HOUR);
+    expect(sql).toContain("m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL AND t.referee_scheduling = 1");
+    expect(sql).toContain("a.pairing = CONCAT(m.team1_id, ':', m.team2_id)");
+    expect(sql).toContain("t.state = 'FINISHED'");
+  });
+
+  it("sweepScheduleDeadlines_announcement_sentAfterNamedLockReleased", async () => {
+    const heldDuringSend: boolean[] = [];
+    jest.mocked(notifyUsers).mockImplementation(async () => {
+      heldDuringSend.push(lockHeld);
+      return { discord: null, discordUnreachedUserIds: [], pushed: 0 };
+    });
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(heldDuringSend).toEqual([false, false]);
+  });
+
+  it("sweepScheduleDeadlines_sends_atMostConcurrencyMatchesAtOnce", async () => {
+    let running = 0;
+    let peak = 0;
+    jest.mocked(notifyUsers).mockImplementation(async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      running -= 1;
+      return { discord: null, discordUnreachedUserIds: [], pushed: 0 };
+    });
+    const rows = Array.from({ length: SEND_CONCURRENCY * 3 }, (_, index) => row({ id: 500 + index }));
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [rows]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(rows.length * 2);
+    expect(peak).toBeLessThanOrEqual(SEND_CONCURRENCY);
+    expect(peak).toBeGreaterThan(1);
+  });
+
+  it("sweepScheduleDeadlines_sendFails_releasesClaimAndCountsFailure", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(loadEntrantMatchLeaderIds).mockRejectedValue(new Error("bot"));
+    const pool = { execute: jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]) };
+    jest.mocked(getDatabase).mockResolvedValue(fakePool(pool));
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await expect(sweepScheduleDeadlines(NOW)).resolves.toMatchObject({ reminded: 1 });
+
+    const released = pool.execute.mock.calls.filter(([sql]) => /DELETE FROM bg_schedule_deadline_notices/.test(String(sql)));
+    expect(released).toHaveLength(1);
+    expect(released[0][1]).toEqual([40, PAIRING, "SET"]);
+    expect(failureCounts().get(40)?.failures).toBe(1);
+  });
+
+  it("sweepScheduleDeadlines_sendFailsAfterFirstSideDelivered_keepsClaim", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(notifyUsers).mockResolvedValueOnce({ discord: null, discordUnreachedUserIds: [], pushed: 0 });
+    jest.mocked(notifyUsers).mockRejectedValueOnce(new Error("bot"));
+    const pool = { execute: jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]) };
+    jest.mocked(getDatabase).mockResolvedValue(fakePool(pool));
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(pool.execute.mock.calls.filter(([sql]) => /DELETE/.test(String(sql)))).toHaveLength(0);
+    expect(failureCounts().get(40)?.failures).toBe(1);
+  });
+
+  it("sweepScheduleDeadlines_forfeitNoticeFails_loggedWithoutFailureCount", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.spyOn(console, "info").mockImplementation(() => undefined);
+    jest.mocked(forfeitMissedScheduleDeadlinePublic).mockResolvedValue(true);
+    jest.mocked(loadEntrantMatchLeaderIds).mockRejectedValue(new Error("bot"));
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(DEADLINE - HOUR) }]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await expect(sweepScheduleDeadlines(DEADLINE)).resolves.toMatchObject({ forfeited: 1 });
+
+    expect(failureCounts().has(40)).toBe(false);
+    expect(error.mock.calls.some(([message]) => String(message).includes("avis de forfait non envoyé"))).toBe(true);
+  });
+
+  it("sweepScheduleDeadlines_staleNotices_deleteAndClaimInOneTransaction", async () => {
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: "100:300", sent_at: new Date(NOW - HOUR) }]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    const sqls = connection.execute.mock.calls.map(([sql]) => String(sql));
+    const order = connection.execute.mock.invocationCallOrder;
+    const deleteAt = order[sqls.findIndex((sql) => /DELETE FROM bg_schedule_deadline_notices/.test(sql))];
+    const insertAt = order[sqls.findIndex((sql) => /INSERT IGNORE/.test(sql))];
+    expect(connection.beginTransaction.mock.invocationCallOrder[0]).toBeLessThan(deleteAt);
+    expect(insertAt).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  it("sweepScheduleDeadlines_pagesExhaustedWithoutEnd_warnsSaturation", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    let reads = 0;
+    const page = () => {
+      reads += 1;
+      return Array.from({ length: SWEEP_BATCH }, (_, index) =>
+        row({ id: 1000 + reads * SWEEP_BATCH + index, schedule_deadline_at: new Date(DEADLINE + 40 * HOUR) }),
+      );
+    };
+    routeSql(connection, [[/FROM bg_matches m/, () => [page()]]]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(executed(connection, /FROM bg_matches m/)).toHaveLength(SWEEP_MAX_PAGES);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("saturé");
+  });
+
+  it("sweepScheduleDeadlines_completeRead_noSaturationWarning", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    routeSql(connection, []);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("setTournamentScheduleDeadlines : écritures groupées", () => {
+  beforeEach(() => {
+    jest.mocked(withNamedLock).mockRejectedValue(new NamedLockUnavailableError(SCHEDULE_DEADLINES_LOCK, 0));
+  });
+
+  it("setTournamentScheduleDeadlines_manyMatches_writtenPerChunkNotPerMatch", async () => {
+    const rows = Array.from({ length: WRITE_CHUNK * 2 + 5 }, (_, index) => row({ id: 2000 + index, schedule_deadline_at: null }));
+    routeSql(connection, [
+      [/FROM bg_tournaments/, () => [[{ referee_scheduling: 1, state: "RUNNING" }]]],
+      [/FROM bg_matches\s+WHERE tournament_id/, () => [rows]],
+    ]);
+
+    await expect(setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, NOW)).resolves.toBe(rows.length);
+
+    const updates = executed(connection, /UPDATE bg_matches SET schedule_deadline_at/);
+    const deletes = executed(connection, /DELETE FROM bg_schedule_deadline_notices/);
+    expect(updates).toHaveLength(3);
+    expect(deletes).toHaveLength(3);
+    expect(updates.flatMap(([, params]) => (params as unknown[]).slice(1))).toHaveLength(rows.length);
+    expect(updates[0][0]).toContain("WHERE id IN (");
   });
 });

@@ -151,13 +151,16 @@ export function leftoverRoles(
 
 /** Propositions provisoires des entrées. */
 async function readPendingProposals(executor: Executor, keys: readonly string[]): Promise<PendingProposal[]> {
-  if (keys.length === 0) return [];
-  const [rows] = await executor.execute<(RowDataPacket & { entry_key: string; user_id: number | string; role: string })[]>(
-    `SELECT entry_key, user_id, role FROM bg_planning_assignments
-      WHERE confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})`,
-    [...keys],
-  );
-  return rows.map((row) => ({ entryKey: row.entry_key, userId: Number(row.user_id), role: row.role }));
+  const proposals: PendingProposal[] = [];
+  for (const chunk of keyChunks(keys)) {
+    const [rows] = await executor.execute<(RowDataPacket & { entry_key: string; user_id: number | string; role: string })[]>(
+      `SELECT entry_key, user_id, role FROM bg_planning_assignments
+        WHERE confirmed = 0 AND entry_key IN (${chunk.map(() => "?").join(", ")})`,
+      chunk,
+    );
+    for (const row of rows) proposals.push({ entryKey: row.entry_key, userId: Number(row.user_id), role: row.role });
+  }
+  return proposals;
 }
 
 /** Propositions provisoires des entrées, comptées par rôle. */
@@ -165,23 +168,34 @@ async function readPendingRoles(executor: Executor, keys: readonly string[]): Pr
   return countPendingRoles(await readPendingProposals(executor, keys));
 }
 
+/** Clés par instruction `IN` (liste bornée, comme les paquets de l'écriture des dates butoir). */
+export const KEY_CHUNK = 500;
+
+/** Découpe `keys` en paquets de {@link KEY_CHUNK} (pur). */
+export function keyChunks<T>(keys: readonly T[], size: number = KEY_CHUNK): T[][] {
+  const chunks: T[][] = [];
+  for (let from = 0; from < keys.length; from += size) chunks.push(keys.slice(from, from + size));
+  return chunks;
+}
+
 /** Une marque lue : début confirmé et restes comptés à la marque. */
 export type StoredAutoConfirm = { startAt: number | null; pending: PendingRoles };
 
 /** Lit les marques des entrées. */
 export async function readStoredAutoConfirms(executor: Executor, keys: readonly string[]): Promise<Map<string, StoredAutoConfirm>> {
-  if (keys.length === 0) return new Map();
-  const [rows] = await executor.execute<
-    (RowDataPacket & { entry_key: string; start_at: Date | string | null; pending_roles: string | null })[]
-  >(`SELECT entry_key, start_at, pending_roles FROM bg_planning_auto_confirms WHERE entry_key IN (${keys.map(() => "?").join(", ")})`, [
-    ...keys,
-  ]);
-  return new Map(
-    rows.map((row) => [
-      row.entry_key,
-      { startAt: row.start_at === null ? null : new Date(row.start_at).getTime(), pending: parsePendingRoles(row.pending_roles) },
-    ]),
-  );
+  const stored = new Map<string, StoredAutoConfirm>();
+  for (const chunk of keyChunks(keys)) {
+    const [rows] = await executor.execute<
+      (RowDataPacket & { entry_key: string; start_at: Date | string | null; pending_roles: string | null })[]
+    >(`SELECT entry_key, start_at, pending_roles FROM bg_planning_auto_confirms WHERE entry_key IN (${chunk.map(() => "?").join(", ")})`, chunk);
+    for (const row of rows) {
+      stored.set(row.entry_key, {
+        startAt: row.start_at === null ? null : new Date(row.start_at).getTime(),
+        pending: parsePendingRoles(row.pending_roles),
+      });
+    }
+  }
+  return stored;
 }
 
 /**
@@ -219,17 +233,28 @@ async function readMarks(executor: Executor, keys: readonly string[]): Promise<A
   return { startAt, reopened: reopenedEntries(stored, await readPendingRoles(executor, [...startAt.keys()])) };
 }
 
+/** Marques écrites par instruction. */
+export const MARK_CHUNK = 100;
+
 async function markConfirmed(
   executor: Executor,
   entries: readonly LoadedEntry[],
   pending: ReadonlyMap<string, PendingRoles>,
 ): Promise<void> {
-  for (const entry of entries) {
-    const counts = JSON.stringify(pending.get(entry.key) ?? {});
+  // Une instruction par paquet (et non une par entrée).
+  for (const chunk of keyChunks(entries, MARK_CHUNK)) {
     await executor.execute(
-      `INSERT INTO bg_planning_auto_confirms (entry_key, tournament_id, match_id, start_at, pending_roles) VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO bg_planning_auto_confirms (entry_key, tournament_id, match_id, start_at, pending_roles) VALUES ${chunk
+        .map(() => "(?, ?, ?, ?, ?)")
+        .join(", ")}
        ON DUPLICATE KEY UPDATE start_at = VALUES(start_at), pending_roles = VALUES(pending_roles), confirmed_at = CURRENT_TIMESTAMP`,
-      [entry.key, entry.tournamentId, entry.matchId, new Date(entry.startAt), counts],
+      chunk.flatMap((entry) => [
+        entry.key,
+        entry.tournamentId,
+        entry.matchId,
+        new Date(entry.startAt),
+        JSON.stringify(pending.get(entry.key) ?? {}),
+      ]),
     );
   }
 }
@@ -253,9 +278,12 @@ export async function sweepAutoConfirms(now: number = Date.now()): Promise<numbe
     return await withNamedLock(db, AUTO_CONFIRM_LOCK, 0, async (connection) => {
       const durations = await loadDurationSettings(connection);
       const entries = await loadPlanningEntries(connection, { now, includeHidden: true, durations });
-      const open = entries.filter((entry) => entry.open);
-      const marks = await readMarks(connection, open.map((entry) => entry.key));
-      const due = dueAutoConfirms(open, marks, durations.confirmLeadHours, now);
+      // L'instant de confirmation se juge sur les entrées seules : marques et propositions ne se lisent
+      // que pour celles qui y sont arrivées (le plus souvent aucune), jamais pour tout l'horizon.
+      const reached = entries.filter((entry) => entry.open && now >= planningConfirmAt(entry.startAt, entry.deadlineAt, durations.confirmLeadHours));
+      if (reached.length === 0) return 0;
+      const marks = await readMarks(connection, reached.map((entry) => entry.key));
+      const due = dueAutoConfirms(reached, marks, durations.confirmLeadHours, now);
       let confirmed = 0;
       for (const week of groupByWeek(due)) {
         if ((retryAfter().get(week.from) ?? 0) > now) continue;

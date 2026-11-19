@@ -34,13 +34,13 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
   const spectator = useSpectatorView();
   const kind = launchPhaseBadgeKind(match, phase);
   // Une date butoir passée (retirée, ou au forfait d'ici la minute) ne s'annonce plus : un seul
-  // minuteur, posé sur la date butoir elle-même.
+  // minuteur posé sur la date butoir elle-même, un autre 24 h avant (la teinte d'avertissement).
   const deadlineMs = kind === "TO_PLAN" && match.scheduleDeadlineAt !== null ? new Date(match.scheduleDeadlineAt).getTime() : null;
-  const now = useInstantClock(deadlineMs);
+  const now = useInstantClock(deadlineMs, SOON_MS);
   // Rien avant que l'horloge soit connue : une date passée ne doit pas clignoter dans le HTML rendu.
   const deadlineAt = kind === "TO_PLAN" && now !== null ? upcomingScheduleDeadline(match.scheduleDeadlineAt, now) : null;
   // Ambre seulement quand l'échéance approche (moins de 24 h) : plus loin, la date se lit en teinte neutre.
-  const soon = deadlineAt !== null && now !== null && new Date(deadlineAt).getTime() - now < SOON_MS;
+  const soon = deadlineAt !== null && now !== null && new Date(deadlineAt).getTime() - now <= SOON_MS;
   if (kind === "TO_PLAN") {
     return (
       <span className={styles.toPlan} title={t("launch.toPlanTitle")}>

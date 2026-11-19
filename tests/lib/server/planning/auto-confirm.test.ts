@@ -20,6 +20,9 @@ import {
   loadedPendingRoles,
   FAILED_WEEK_RETRY_MS,
   groupByWeek,
+  KEY_CHUNK,
+  keyChunks,
+  MARK_CHUNK,
   parsePendingRoles,
   reopenedEntries,
   sweepAutoConfirms,
@@ -301,6 +304,57 @@ describe("sweepAutoConfirms", () => {
     expect(insertedKeys()).toEqual([]);
   });
 
+  it("sweepAutoConfirms_noEntryReachedConfirmTime_readsNoMarkNorProposal", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([
+      loadedEntry({ key: "m:1", matchId: 1, startAt: WEDNESDAY_21 + 24 * HOUR_MS }),
+      loadedEntry({ key: "m:2", matchId: 2, startAt: WEDNESDAY_21 + 48 * HOUR_MS }),
+    ]);
+
+    expect(await sweepAutoConfirms(NOW)).toBe(0);
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
+
+  it("sweepAutoConfirms_someEntriesReached_marksReadForReachedKeysOnly", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([
+      loadedEntry({ key: "m:1", matchId: 1, startAt: WEDNESDAY_21 }),
+      loadedEntry({ key: "m:2", matchId: 2, startAt: WEDNESDAY_21 + 24 * HOUR_MS }),
+    ]);
+
+    await sweepAutoConfirms(NOW);
+
+    const markReads = connection.execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_planning_auto_confirms"));
+    expect(markReads).toHaveLength(1);
+    expect(markReads[0][1]).toEqual(["m:1"]);
+  });
+
+  it("sweepAutoConfirms_severalDueEntriesOfAWeek_markedByOneInsert", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([
+      loadedEntry({ key: "m:1", matchId: 1, tournamentId: 10, startAt: WEDNESDAY_21 }),
+      loadedEntry({ key: "m:2", matchId: 2, tournamentId: 10, startAt: WEDNESDAY_21 + HOUR_MS, deadlineAt: NOW }),
+      loadedEntry({ key: "m:3", matchId: 3, tournamentId: 10, startAt: WEDNESDAY_21 + 2 * HOUR_MS, deadlineAt: NOW }),
+    ]);
+
+    await sweepAutoConfirms(NOW);
+
+    const inserts = connection.execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT INTO bg_planning_auto_confirms"));
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0][0]).toContain("(?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)");
+    expect((inserts[0][1] as unknown[]).filter((value) => typeof value === "string" && value.startsWith("m:"))).toEqual(["m:1", "m:2", "m:3"]);
+  });
+
+  it("sweepAutoConfirms_moreDueEntriesThanChunk_markedInSeveralInserts", async () => {
+    const count = MARK_CHUNK + 1;
+    jest
+      .mocked(loadPlanningEntries)
+      .mockResolvedValue(
+        Array.from({ length: count }, (_, index) => loadedEntry({ key: "m:" + (index + 1), matchId: index + 1, startAt: WEDNESDAY_21 + index * 1000, deadlineAt: NOW })),
+      );
+
+    await sweepAutoConfirms(NOW);
+
+    expect(connection.execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT INTO bg_planning_auto_confirms"))).toHaveLength(2);
+  });
+
   it("sweepAutoConfirms_noOpenEntry_skipsMarkerLookup", async () => {
     jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ open: false })]);
 
@@ -414,5 +468,25 @@ describe("loadedPendingRoles", () => {
     ]);
 
     expect(counts).toEqual(new Map([["m:1", { CASTER: 2 }], ["m:2", { PROD: 1 }]]));
+  });
+});
+
+describe("keyChunks", () => {
+  it("keyChunks_empty_noChunk", () => {
+    expect(keyChunks([])).toEqual([]);
+  });
+
+  it("keyChunks_underSize_oneChunk", () => {
+    expect(keyChunks(["a", "b"], 3)).toEqual([["a", "b"]]);
+  });
+
+  it("keyChunks_overSize_splitsKeepingOrder", () => {
+    expect(keyChunks([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+  });
+
+  it("keyChunks_defaultSize_isKeyChunk", () => {
+    const keys = Array.from({ length: KEY_CHUNK + 1 }, (_, index) => index);
+
+    expect(keyChunks(keys).map((chunk) => chunk.length)).toEqual([KEY_CHUNK, 1]);
   });
 });

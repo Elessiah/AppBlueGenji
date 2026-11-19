@@ -30,6 +30,41 @@ describe("useInstantClock", () => {
   it("useInstantClock_source_noTimerOnceReached", () => {
     const source = readFileSync(SOURCE, "utf8");
 
-    expect(source).toMatch(/if \(at === null \|\| now === null \|\| now >= at\) return;/);
+    expect(source).toMatch(/if \(boundary === null\) return;/);
+  });
+
+  it("useInstantClock_source_skipsClockReadWithoutInstant", () => {
+    const source = readFileSync(SOURCE, "utf8");
+
+    expect(source).toMatch(/if \(at === null\) return;\r?\n\s+setNow\(Date\.now\(\)\);/);
+  });
+});
+
+describe("nextInstantBoundary", () => {
+  const { nextInstantBoundary } = require("@/lib/shared/hooks/useInstantClock");
+  const HOUR = 3_600_000;
+
+  it("nextInstantBoundary_noInstant_returnsNull", () => {
+    expect(nextInstantBoundary(1000, null, 24 * HOUR)).toBeNull();
+  });
+
+  it("nextInstantBoundary_reachedInstant_returnsNull", () => {
+    expect(nextInstantBoundary(5000, 5000)).toBeNull();
+    expect(nextInstantBoundary(6000, 5000, HOUR)).toBeNull();
+  });
+
+  it("nextInstantBoundary_noLead_returnsInstant", () => {
+    expect(nextInstantBoundary(1000, 5000)).toBe(5000);
+  });
+
+  it("nextInstantBoundary_farAhead_returnsLeadThenInstant", () => {
+    const at = 100 * HOUR;
+    expect(nextInstantBoundary(0, at, 24 * HOUR)).toBe(76 * HOUR);
+    expect(nextInstantBoundary(76 * HOUR, at, 24 * HOUR)).toBe(at);
+    expect(nextInstantBoundary(80 * HOUR, at, 24 * HOUR)).toBe(at);
+  });
+
+  it("nextInstantBoundary_negativeLead_treatedAsNone", () => {
+    expect(nextInstantBoundary(0, 5000, -10)).toBe(5000);
   });
 });

@@ -36,6 +36,7 @@ import {
   dueDeadlineReminder,
   readScheduleDeadline,
   SCHEDULE_DEADLINE_FORFEIT_KEY,
+  SCHEDULE_DEADLINE_REMINDERS,
   SCHEDULE_DEADLINE_RETIRED_KEY,
   type DeadlineMatch,
 } from "@/lib/shared/schedule-deadline";
@@ -57,11 +58,23 @@ export const SWEEP_BATCH = 200;
 /** Pages lues par passage au plus : au-delà, la suite attend la minute d'après. */
 export const SWEEP_MAX_PAGES = 10;
 /**
- * Gestes (forfaits, retraits, extinctions, avis envoyés) par passage au plus :
- * les messages privés partent un à un sous le verrou ; au-delà, la suite
- * attend la minute d'après.
+ * Gestes (forfaits, retraits, extinctions, avis réservés) par passage au plus :
+ * au-delà, la suite attend la minute d'après. Les messages, eux, partent après
+ * le verrou ({@link flushSends}), {@link SEND_CONCURRENCY} à la fois.
  */
 export const SWEEP_MAX_ACTIONS = 100;
+/** Avis envoyés de front (messages privés et push) une fois le verrou rendu. */
+export const SEND_CONCURRENCY = 5;
+/**
+ * Avance au-delà de laquelle un match à planifier, déjà annoncé pour sa paire
+ * actuelle, n'a plus rien à faire au balayage : le premier rappel à venir
+ * (24 h avant) ouvre sa lecture.
+ */
+export const SWEEP_LOOKAHEAD_MS = Math.max(
+  ...SCHEDULE_DEADLINE_REMINDERS.map((step) => step.beforeMs).filter((ms) => Number.isFinite(ms)),
+);
+/** Clé de l'annonce (premier palier) : celle qu'un match sans avis pour sa paire attend. */
+const ANNOUNCE_KEY = SCHEDULE_DEADLINE_REMINDERS[0].key;
 /**
  * Passages en échec d'affilée sur un même match (pour la même date butoir)
  * avant qu'il ne soit mis de côté {@link SWEEP_FAILURE_BACKOFF_MS} : un
@@ -141,12 +154,28 @@ async function writeDeadline(
   deadlineAt: number | null,
 ): Promise<boolean> {
   if (sameDeadline(current, deadlineAt)) return false;
-  await connection.execute(`UPDATE bg_matches SET schedule_deadline_at = ? WHERE id = ?`, [
-    deadlineAt === null ? null : new Date(deadlineAt),
-    matchId,
-  ]);
-  await connection.execute(`DELETE FROM bg_schedule_deadline_notices WHERE match_id = ?`, [matchId]);
+  await writeDeadlines(connection, [matchId], deadlineAt);
   return true;
+}
+
+/** Matchs par instruction d'une écriture groupée (liste `IN` bornée). */
+export const WRITE_CHUNK = 200;
+
+/**
+ * Écrit la date butoir de plusieurs matchs et efface leurs avis : une
+ * instruction par paquet de {@link WRITE_CHUNK} (et non une par match), pour
+ * que le verrou du tournoi ne se tienne pas sur des centaines d'allers-retours.
+ */
+async function writeDeadlines(connection: PoolConnection, matchIds: readonly number[], deadlineAt: number | null): Promise<void> {
+  for (let from = 0; from < matchIds.length; from += WRITE_CHUNK) {
+    const ids = matchIds.slice(from, from + WRITE_CHUNK);
+    const marks = ids.map(() => "?").join(", ");
+    await connection.execute(`UPDATE bg_matches SET schedule_deadline_at = ? WHERE id IN (${marks})`, [
+      deadlineAt === null ? null : new Date(deadlineAt),
+      ...ids,
+    ]);
+    await connection.execute(`DELETE FROM bg_schedule_deadline_notices WHERE match_id IN (${marks})`, ids);
+  }
 }
 
 function wakeSweep(): void {
@@ -248,11 +277,9 @@ export async function setTournamentScheduleDeadlines(
         // programmé ou lancé reste lue par le planning (confirmation d'office), et celle d'une
         // manche pas encore remplie se retire match par match.
         const targets = rows.filter((row) => matchLaunchPhase(deadlineMatchOf(row, tournament.refereeScheduling), now) === "TO_PLAN");
-        let changed = 0;
-        for (const row of targets) {
-          if (await writeDeadline(connection, Number(row.id), row.schedule_deadline_at, deadlineAt)) changed += 1;
-        }
-        return { count: targets.length, changed };
+        const changing = targets.filter((row) => !sameDeadline(row.schedule_deadline_at, deadlineAt)).map((row) => Number(row.id));
+        await writeDeadlines(connection, changing, deadlineAt);
+        return { count: targets.length, changed: changing.length };
       }),
     ),
   );
@@ -447,7 +474,12 @@ export function deadlineNoticesFor(row: SweepRow, key: DeadlineNoticeKey, deadli
 }
 
 /** Envoie l'avis aux responsables de match (capitaine, manager, owner ; le joueur d'une entrée solo) des deux engagées. */
-export async function sendDeadlineNotices(row: SweepRow, key: DeadlineNoticeKey, deadlineAt: number): Promise<number> {
+export async function sendDeadlineNotices(
+  row: SweepRow,
+  key: DeadlineNoticeKey,
+  deadlineAt: number,
+  progress?: { delivered: number },
+): Promise<number> {
   const sides = deadlineNoticesFor(row, key, deadlineAt);
   if (sides.length === 0) return 0;
   const leaders = await loadEntrantMatchLeaderIds(sides.map((side) => side.teamId));
@@ -465,6 +497,7 @@ export async function sendDeadlineNotices(row: SweepRow, key: DeadlineNoticeKey,
       dmFollowsTopic: true,
     });
     sent += 1;
+    if (progress) progress.delivered = sent;
   }
   return sent;
 }
@@ -487,7 +520,13 @@ async function readSweepRows(
   skipIds: readonly number[],
   after: SweepCursor | null,
 ): Promise<SweepRow[]> {
-  const params: (Date | number | string)[] = [new Date(now), SCHEDULE_DEADLINE_RETIRED_KEY];
+  const params: (Date | number | string)[] = [
+    new Date(now),
+    SCHEDULE_DEADLINE_RETIRED_KEY,
+    new Date(now),
+    new Date(now + SWEEP_LOOKAHEAD_MS),
+    ANNOUNCE_KEY,
+  ];
   let extra = "";
   if (skipIds.length > 0) {
     extra += ` AND m.id NOT IN (${skipIds.map(() => "?").join(", ")})`;
@@ -509,7 +548,12 @@ async function readSweepRows(
         AND m.status NOT IN ('COMPLETED', 'AWAITING_CONFIRMATION')
         AND (m.start_at IS NULL OR m.schedule_deadline_at <= ?)
         AND NOT ((m.start_at IS NOT NULL OR m.launched_at IS NOT NULL) AND EXISTS (
-              SELECT 1 FROM bg_schedule_deadline_notices n WHERE n.match_id = m.id AND n.notice_key = ?))${extra}
+              SELECT 1 FROM bg_schedule_deadline_notices n WHERE n.match_id = m.id AND n.notice_key = ?))
+        AND (m.schedule_deadline_at <= ? OR t.state = 'FINISHED' OR (
+              m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL AND t.referee_scheduling = 1
+              AND (m.schedule_deadline_at <= ? OR NOT EXISTS (
+                SELECT 1 FROM bg_schedule_deadline_notices a
+                 WHERE a.match_id = m.id AND a.notice_key = ? AND a.pairing = CONCAT(m.team1_id, ':', m.team2_id)))))${extra}
       ORDER BY m.schedule_deadline_at, m.id
       LIMIT ${SWEEP_BATCH}`,
     params,
@@ -600,6 +644,7 @@ async function applySweepAction(
   action: SweepAction,
   sent: SentNotices,
   now: number,
+  outbox: PendingSend[],
 ): Promise<keyof SweepReport | null> {
   const matchId = Number(row.id);
   if (action.kind === "forfeit") {
@@ -607,7 +652,9 @@ async function applySweepAction(
     if (!(await forfeitMissedScheduleDeadlinePublic(Number(row.tournament_id), matchId, action.deadlineAt, now))) return null;
     console.info(`[schedule-deadline] match ${matchId} : date butoir passée sans horaire, double forfait`);
     const key = SCHEDULE_DEADLINE_FORFEIT_KEY;
-    if (await claimNotices(connection, row, action.deadlineAt, [key], key, now)) await sendDeadlineNotices(row, key, action.deadlineAt);
+    if (await claimNotices(connection, row, action.deadlineAt, [key], key, now)) {
+      outbox.push({ row, key, deadlineAt: action.deadlineAt, release: null });
+    }
     return "forfeited";
   }
   if (action.kind === "lapse") return (await lapseDeadline(connection, row, action.deadlineAt)) ? "lapsed" : null;
@@ -616,17 +663,69 @@ async function applySweepAction(
   // Avis d'une paire précédente : la nouvelle repart de l'annonce. La marque de retrait vaut pour
   // toute paire : elle reste (précaution — un rappel suppose une date butoir à venir, un retrait une
   // date échue, et une date changée efface tous les avis : aucun état atteignable ne les réunit).
-  if (sent.stale) {
-    await connection.execute(
-      `DELETE FROM bg_schedule_deadline_notices WHERE match_id = ? AND NOT (pairing <=> ?) AND notice_key <> ?`,
-      [matchId, rowPairing(row), SCHEDULE_DEADLINE_RETIRED_KEY],
+  // Une seule transaction : l'effacement des anciens avis et la réservation des nouveaux ne se
+  // séparent pas (un arrêt entre les deux laisserait un match sans aucun avis, donc jamais armé).
+  const claimed = await transact(connection, async () => {
+    if (sent.stale) {
+      await connection.execute(
+        `DELETE FROM bg_schedule_deadline_notices WHERE match_id = ? AND NOT (pairing <=> ?) AND notice_key <> ?`,
+        [matchId, rowPairing(row), SCHEDULE_DEADLINE_RETIRED_KEY],
+      );
+    }
+    return claimNotices(connection, row, action.deadlineAt, action.consumes, action.key, now);
+  });
+  if (!claimed) return null;
+  outbox.push({ row, key: action.key, deadlineAt: action.deadlineAt, release: action.consumes });
+  return "reminded";
+}
+
+/**
+ * Un avis réservé (`claimNotices`), à envoyer une fois le verrou rendu.
+ * `release` : les paliers à rendre si l'envoi échoue avant toute remise (le
+ * passage suivant les renvoie) ; `null` pour l'avis de forfait, que rien ne
+ * relira (le match est joué).
+ */
+export type PendingSend = { row: SweepRow; key: DeadlineNoticeKey; deadlineAt: number; release: readonly DeadlineNoticeKey[] | null };
+
+/** Rend les paliers réservés d'un avis qui n'a pu partir (la même paire, la même date butoir). */
+async function releaseNotices(send: PendingSend): Promise<void> {
+  if (send.release === null || send.release.length === 0) return;
+  const db = await getDatabase();
+  await db.execute(
+    `DELETE FROM bg_schedule_deadline_notices
+      WHERE match_id = ? AND pairing <=> ? AND notice_key IN (${send.release.map(() => "?").join(", ")})`,
+    [Number(send.row.id), rowPairing(send.row), ...send.release],
+  );
+}
+
+/**
+ * Envoie les avis réservés, **hors** du verrou nommé et de sa connexion
+ * (messages privés et push attendent le bot : ils ne tiennent ni le verrou ni
+ * une connexion du pool), {@link SEND_CONCURRENCY} de front. Un envoi qui
+ * échoue ne défait rien du match : un rappel rend ses paliers (rien n'est
+ * parti) et compte comme échec du match ; l'avis de forfait, lui, est
+ * seulement journalisé.
+ */
+export async function flushSends(outbox: readonly PendingSend[], now: number): Promise<void> {
+  for (let from = 0; from < outbox.length; from += SEND_CONCURRENCY) {
+    await Promise.all(
+      outbox.slice(from, from + SEND_CONCURRENCY).map(async (send) => {
+        const progress = { delivered: 0 };
+        try {
+          await sendDeadlineNotices(send.row, send.key, send.deadlineAt, progress);
+        } catch (error) {
+          const matchId = Number(send.row.id);
+          if (send.release === null) {
+            console.error(`[schedule-deadline] match ${matchId} : avis de forfait non envoyé`, failureReason(error));
+            return;
+          }
+          // Une partie des responsables déjà prévenue : rendre le palier les préviendrait deux fois.
+          if (progress.delivered === 0) await releaseNotices(send).catch(() => undefined);
+          recordFailure(send.row, error, now);
+        }
+      }),
     );
   }
-  if (await claimNotices(connection, row, action.deadlineAt, action.consumes, action.key, now)) {
-    await sendDeadlineNotices(row, action.key, action.deadlineAt);
-    return "reminded";
-  }
-  return null;
 }
 
 /** Échecs d'affilée d'un match, pour une date butoir (une autre date repart de zéro). */
@@ -693,15 +792,20 @@ function forgetUnseen(seen: ReadonlySet<number>, now: number): void {
 export async function sweepScheduleDeadlines(now: number = Date.now()): Promise<SweepReport> {
   const report: SweepReport = { forfeited: 0, lapsed: 0, retired: 0, reminded: 0 };
   const db = await getDatabase();
+  const outbox: PendingSend[] = [];
   try {
     await withNamedLock(db, SCHEDULE_DEADLINES_LOCK, 0, async (connection) => {
       const skipIds = parkedIds(now);
       const seen = new Set<number>();
       let after: SweepCursor | null = null;
       let complete = false;
+      let capped = false;
       for (let page = 0; page < SWEEP_MAX_PAGES; page += 1) {
         const rows = await readSweepRows(connection, now, skipIds, after);
-        if (!(await sweepPage(connection, rows, now, report, seen))) break;
+        if (!(await sweepPage(connection, rows, now, report, seen, outbox))) {
+          capped = true;
+          break;
+        }
         const last = rows[rows.length - 1];
         if (rows.length < SWEEP_BATCH || !last || last.schedule_deadline_at === null) {
           complete = true;
@@ -710,10 +814,18 @@ export async function sweepScheduleDeadlines(now: number = Date.now()): Promise<
         after = { deadlineAt: new Date(last.schedule_deadline_at), id: Number(last.id) };
       }
       if (complete) forgetUnseen(seen, now);
+      // Les pages sont épuisées sans que la lecture soit finie ni les gestes plafonnés : le balayage
+      // sature (les dates butoir les plus lointaines attendent), à rendre visible plutôt que silencieux.
+      if (!complete && !capped) {
+        console.warn(`[schedule-deadline] balayage saturé : ${SWEEP_MAX_PAGES * SWEEP_BATCH} matchs lus, la suite attend la minute d'après`);
+      }
     });
   } catch (error) {
     if (error instanceof NamedLockUnavailableError) return report;
     throw error;
+  } finally {
+    // Même si la lecture a échoué en route : les avis déjà réservés doivent partir.
+    await flushSends(outbox, now);
   }
   return report;
 }
@@ -724,6 +836,7 @@ async function sweepPage(
   now: number,
   report: SweepReport,
   seen: Set<number>,
+  outbox: PendingSend[],
 ): Promise<boolean> {
   const sent = await readSentNotices(connection, rows);
   for (const row of rows) {
@@ -732,7 +845,7 @@ async function sweepPage(
     seen.add(matchId);
     const notices = sent.get(matchId) ?? NO_NOTICES;
     try {
-      const done = await applySweepAction(connection, row, sweepAction(row, notices, now), notices, now);
+      const done = await applySweepAction(connection, row, sweepAction(row, notices, now), notices, now, outbox);
       failureCounts().delete(matchId);
       if (done !== null) report[done] += 1;
     } catch (error) {
