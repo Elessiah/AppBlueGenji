@@ -444,6 +444,13 @@ describe("mergeView", () => {
     expect(merged.durations).toBe(previous.durations);
   });
 
+  it("mergeView_withoutDurations_keyStaysAbsent", () => {
+    const previous = viewOf({ canManage: true, canCompute: false });
+    const merged = mergeView(previous, structuredClone(previous));
+
+    expect("durations" in merged).toBe(false);
+  });
+
   it("mergeView_oneEntryChanged_onlyThatOneIsNew", () => {
     const previous = viewOf();
     const next = structuredClone(previous);
@@ -807,7 +814,8 @@ describe("PlanningBoard : branchement des gardes de calcul", () => {
 
   it("planningBoard_computeControls_useTheTestedGates", () => {
     expect(source).toContain("staffPanelDurations(view)");
-    expect(source).toContain("key={durationsKey(panelDurations)}");
+    expect(source).toContain("durationsKey(savedDurations)");
+    expect(source).not.toContain("key={durationsKey(");
     expect(source).toContain("canRunWeek(canCompute, week.entries)");
     expect(source).toContain("canConfirmEntry(view.canCompute, entry)");
     expect(source).not.toContain("DEFAULT_PLANNING_DURATIONS");

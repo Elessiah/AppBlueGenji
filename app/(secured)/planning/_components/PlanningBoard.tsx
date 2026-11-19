@@ -331,7 +331,7 @@ export function PlanningBoard({
       </section>
 
       {panelDurations && (
-        <StaffPanel key={durationsKey(panelDurations)} text={text} view={view} durations={panelDurations} pending={pending} act={act} onConfirmLead={(hours) => setConfirming({ kind: "lead", hours })} />
+        <StaffPanel text={text} view={view} durations={panelDurations} pending={pending} act={act} onConfirmLead={(hours) => setConfirming({ kind: "lead", hours })} />
       )}
 
       {shown.length > 0 && split.upcoming.length === 0 && (
@@ -960,6 +960,13 @@ function StaffPanel({
   const { t } = text;
   const [hours, setHours] = useState(48);
   const [durations, setDurations] = useState<PlanningDurationSettings>(savedDurations);
+  // Des réglages relus (un autre administrateur les a changés) repartent dans le formulaire sans le remonter : ni le focus, ni la section ouverte, ni le délai saisi ne sont perdus.
+  const [seenKey, setSeenKey] = useState(() => durationsKey(savedDurations));
+  const savedKey = durationsKey(savedDurations);
+  if (savedKey !== seenKey) {
+    setSeenKey(savedKey);
+    setDurations(savedDurations);
+  }
   const casters = view.members.filter((member) => member.roles.includes("CASTER"));
   const b = PLANNING_DURATION_BOUNDS;
   const field = (

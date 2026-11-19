@@ -124,7 +124,8 @@ export function mergeView(previous: PlanningView | null, next: PlanningView): Pl
     entries: entries.length === previous.entries.length && entries.every((entry, i) => entry === previous.entries[i]) ? previous.entries : entries,
     members: same(previous.members, next.members) ? previous.members : next.members,
     myRoles: same(previous.myRoles, next.myRoles) ? previous.myRoles : next.myRoles,
-    durations: same(previous.durations, next.durations) ? previous.durations : next.durations,
+    // `durations` n'existe que pour un administrateur : la clé reste absente sinon.
+    ...(next.durations ? { durations: same(previous.durations, next.durations) ? previous.durations : next.durations } : {}),
   };
 }
 
@@ -220,9 +221,9 @@ export function staffPanelDurations(view: Pick<PlanningView, "canCompute" | "dur
 }
 
 /**
- * Clé du panneau des durées : elle change avec les réglages relus, si bien
- * que le formulaire repart des valeurs enregistrées (un autre administrateur
- * a pu les changer) au lieu de renvoyer une copie périmée.
+ * Empreinte des durées enregistrées : quand elle change à la relecture, le
+ * formulaire repart des valeurs enregistrées (un autre administrateur a pu les
+ * changer) au lieu de renvoyer une copie périmée, sans remonter le panneau.
  */
 export function durationsKey(durations: PlanningDurationSettings): string {
   return JSON.stringify(durations);

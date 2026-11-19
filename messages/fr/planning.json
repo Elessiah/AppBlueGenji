@@ -67,7 +67,7 @@
       "MATCH": "Désigné sur le match",
       "AUTO": "Calcul"
     },
-    "reasonHint": "Préférence (créneau marqué par la personne), Charge (elle a le moins servi ces dernières semaines) ou Calcul (motif visible du staff et de la personne seuls) : pourquoi le calcul l'a choisie. Provisoire : proposé par le calcul, pas encore confirmé.",
+    "reasonHint": "Préférence (créneau marqué par la personne), Charge (elle a le moins servi ces dernières semaines) ou Calcul (motif visible du staff et de la personne seuls) : pourquoi le calcul l'a choisie. Provisoire : proposé par le calcul, pas encore confirmé par un administrateur.",
     "reasonSubject": "Raisons d'attribution",
     "nobody": "Personne",
     "remove": "Retirer {name} ({role})",
