@@ -10,6 +10,7 @@ jest.mock("@/lib/server/planning/load", () => ({
 
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
+import { clearEntryRoundCache } from "@/lib/server/planning/round-names";
 import { loadPlanningData, loadPlanningMembers, loadPlanningMembersByIds, type LoadedAvailability, type LoadedWithdrawal } from "@/lib/server/planning/load";
 import {
   loadPlanningView,
@@ -465,5 +466,59 @@ describe("loadPlanningView — confirmation d'office", () => {
     const view = await loadPlanningView(staff, confirmTime);
 
     expect(view.entries[0].confirmPending).toBe(true);
+  });
+});
+
+describe("loadPlanningView — nom du tour", () => {
+  const roundsQuery = /FROM bg_matches m JOIN bg_tournaments/;
+  const finalRows = [
+    { id: 1, tournament_id: 10, phase_id: 0, bracket: "UPPER", round_number: 1, match_number: 1, status: "COMPLETED", double_forfeit: 0, format: "SINGLE", state: "RUNNING" },
+    { id: 2, tournament_id: 10, phase_id: 0, bracket: "UPPER", round_number: 1, match_number: 2, status: "COMPLETED", double_forfeit: 0, format: "SINGLE", state: "RUNNING" },
+    { id: 3, tournament_id: 10, phase_id: 0, bracket: "UPPER", round_number: 2, match_number: 1, status: "PENDING", double_forfeit: 0, format: "SINGLE", state: "RUNNING" },
+  ];
+
+  beforeEach(() => clearEntryRoundCache());
+
+  function withEntries(entries: ReturnType<typeof loadedEntry>[], rows: object[]): void {
+    jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) => planningData({ entries, members: options.members ?? [] }));
+    connection.execute.mockImplementation(async (sql: string) => (roundsQuery.test(sql) ? [rows, []] : [[], []]));
+  }
+
+  it("loadPlanningView_matchEntry_carriesRoundOfItsMatchAndNumber", async () => {
+    withEntries([loadedEntry({ key: "m:3", matchId: 3, roundNumber: 2 })], finalRows);
+
+    const view = await loadPlanningView(caster, MONDAY);
+
+    expect(view.entries[0].round).toEqual({ kind: "stage", stage: "final", lower: false, round: 2 });
+    expect(view.entries[0].matchNumber).toBe(1);
+  });
+
+  it("loadPlanningView_tournamentEntry_hasNoRoundAndRunsNoRoundQuery", async () => {
+    withEntries([loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null, roundNumber: null })], finalRows);
+
+    const view = await loadPlanningView(caster, MONDAY);
+
+    expect(view.entries[0].round).toBeNull();
+    expect(view.entries[0].matchNumber).toBeNull();
+    expect(connection.execute.mock.calls.some(([sql]) => roundsQuery.test(String(sql)))).toBe(false);
+  });
+
+  it("loadPlanningView_matchMissingFromRounds_hasNullRoundAndNumber", async () => {
+    withEntries([loadedEntry({ key: "m:99", matchId: 99, roundNumber: 2 })], finalRows);
+
+    const view = await loadPlanningView(caster, MONDAY);
+
+    expect(view.entries[0].round).toBeNull();
+    expect(view.entries[0].matchNumber).toBeNull();
+  });
+
+  it("loadPlanningView_twoLoadsWithinTtl_readTheRoundsOnce", async () => {
+    withEntries([loadedEntry({ key: "m:3", matchId: 3, roundNumber: 2 })], finalRows);
+
+    const first = await loadPlanningView(caster, MONDAY);
+    const second = await loadPlanningView(caster, MONDAY + 1000);
+
+    expect(second.entries[0].round).toEqual(first.entries[0].round);
+    expect(connection.execute.mock.calls.filter(([sql]) => roundsQuery.test(String(sql)))).toHaveLength(1);
   });
 });

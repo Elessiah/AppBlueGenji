@@ -23,7 +23,10 @@
   "week": "Week of {date}",
   "hidden": "Unpublished",
   "event": "Whole tournament",
-  "round": "Round {round}",
+  "past": {
+    "title": "Past matches",
+    "noUpcoming": "No upcoming matches."
+  },
   "versus": "vs",
   "tbd": "To be decided",
   "until": "until {time}",

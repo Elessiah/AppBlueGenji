@@ -69,6 +69,44 @@ la requête : une requête mal formée n'use pas ce quota). Le refus `429`
   restent bornés quand toute une saison est planifiée), tournois masqués
   compris pour le staff seulement.
 
+## Affichage : matchs passés repliés, nom du tour
+
+- **Matchs passés** : une entrée est passée quand elle n'est plus modifiable
+  (match joué, tournoi terminé — `isPastEntry` ; un match resté à jouer d'un
+  tournoi terminé, revanche de grande finale non jouée par exemple, est clos
+  comme le tournoi). Une fin estimée écoulée n'y
+  suffit pas : un match en retard ou qui s'éternise se joue encore et reste
+  dans la liste à venir, avec ses actions. Elles sont rangées sous un bouton
+  « Matchs passés (N) » (`Disclosure`, `DISCLOSURE.md`), **replié par
+  défaut**, la semaine la plus récente en tête (`newestFirst`). Le choix du lecteur est gardé
+  sur son appareil, par compte (`planning:past-open:<empreinte du compte>`, jamais le numéro en clair, `localStorage`,
+  `try/catch` : sans stockage, l'état par défaut vaut).
+- **Calcul et confirmation** (staff) : même bouton repliable, **replié par
+  défaut** ; le contenu reste monté (les durées en cours de saisie ne se
+  perdent pas au repli).
+- **Nom du tour** : une carte de match porte le nom de la fiche du tournoi
+  (« Quart de finale 2 », « Finale », « Tableau perdants · Demi-finale »,
+  « Ronde 3 · Match 2 »), jamais le numéro brut du moteur (« Manche 1000 »).
+  Même assistant que les aperçus partagés (`buildShareRounds` /
+  `shareRoundText`, `SHARE_EMBEDS.md`) : le serveur (`round-names.ts`) lit tous
+  les matchs du tournoi (un tour se nomme depuis le dernier de son tableau) et
+  rend un descripteur sans texte (`round`, `matchNumber`) ; l'écran le rédige
+  dans la langue de l'adresse (`planning-round.ts`) ; seuls les mots des tours
+  de `tournament.bracket` partent avec la page (le planning importe le noyau
+  `tournament-page-text-core.ts`, pas le français de la fiche : `tournament.json`
+  n'entre pas dans son paquet). Mémoire courte côté serveur : l'arbre d'un tournoi
+  est gardé 10 s (10 min s'il est terminé : il ne change plus ; 64 tournois au
+  plus, le moins récemment servi sort le premier), donc les relectures et le flux
+  n'ajoutent aucune requête ; un match absent de la mémoire (tirage tout juste
+  fait) ou un tournoi qui vient de se terminer relit son tournoi aussitôt. La
+  mémoire est commune à tous les lecteurs : chacun ne reçoit que les noms des
+  matchs que son planning lui rend déjà (tournois masqués compris ou non selon
+  ses droits). Les matchs passés ne sont regroupés qu'à l'ouverture
+  (`PastWeeks`), et la mise en forme des dates se fait dans la carte (mémorisée).
+  Match inconnu du calcul :
+  « Manche n » seul (aucun numéro de match inventé). Les notifications du planning (récapitulatif,
+  affectation, désistement) ne citent aucun tour : rien à y changer.
+
 ## Couverture (du meilleur au pire)
 
 `planningCoverage` (`lib/shared/planning.ts`) : **complet** (arbitre + caster +

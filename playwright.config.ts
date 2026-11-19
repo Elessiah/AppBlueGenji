@@ -62,6 +62,9 @@ export default defineConfig({
         reuseExistingServer: false,
         timeout: 120_000,
         env: {
+          // Les redirections absolues du middleware suivent `APP_URL` : un `.env` qui vise `:3000` les
+          // enverrait vers un port sans serveur (`ERR_CONNECTION_REFUSED`, `i18n.spec.ts`).
+          APP_URL: baseURL,
           DEV_AUTH_USER_ID: process.env.E2E_AUTH_USER ?? "",
         },
       },

@@ -152,6 +152,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `MODAL_DIALOGS.md` — Modales : portail, `useDialogBehavior`, `useBackdropDismiss`.
 - `INFO_HINTS.md` — Textes explicatifs derrière le bouton « i » (`<InfoHint>`) : 1–2 phrases, information en couches, listes « qui le voit » partagées.
 - `NUMBER_INPUT.md` — `<NumberInput>`.
+- `DISCLOSURE.md` — Section repliable (`<Disclosure>`) : bouton dans le titre, repliée par défaut, choix gardé par lecteur (`localStorage`), sans écart d'hydratation.
 - `CHECKBOX_STYLES.md` — Cases à cocher et radios.
 - `TAP_SELECTION.md` — Sélection de texte au toucher, `data-tap-zone`.
 - `IMAGE_CROP.md` — Recadrage manuel de toute image importée.
@@ -203,7 +204,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `BOT_ACTIVITY_LOG.md` — Journal d'activité : une ligne par fait accompli.
 - `REFEREE_ALERTS.md` — Alertes au rôle arbitre.
 - `PUSH_NOTIFICATIONS.md` — Notifications push, registre `PUSH_TOPICS`, `notifyUsers` / `notifyStaff`.
-- `CAST_PLANNING.md` — Planning des casts, prods et arbitres (`/planning`) : disponibilités et préférences par créneau et par rôle, calcul par lot (provisoire puis confirmé, choix manuels verrouillés, charge répartie, pas de chevauchement), niveaux de couverture, deux casters au plus par créneau (le second en renfort), tournoi sans planification = une entrée, conservation 90 jours ; notifications (récapitulatif des nouvelles entrées, affectation, désistement, place à pourvoir) et désistement avec remplacement automatique.
+- `CAST_PLANNING.md` — Planning des casts, prods et arbitres (`/planning`) : disponibilités et préférences par créneau et par rôle, calcul par lot (provisoire puis confirmé, choix manuels verrouillés, charge répartie, pas de chevauchement), niveaux de couverture, deux casters au plus par créneau (le second en renfort), tournoi sans planification = une entrée, conservation 90 jours ; matchs passés et « calcul et confirmation » repliés par défaut, nom du tour de la fiche sur les cartes ; notifications (récapitulatif des nouvelles entrées, affectation, désistement, place à pourvoir) et désistement avec remplacement automatique.
 - `LIVE_STREAMS.md` — Diffusion en direct, vocabulaire « En cours » / « En direct », annonce des lives sur Discord (#live, un message par soirée, `@everyone` pour la chaîne officielle, rôle StreamViewer sinon).
 - `MATCH_START_DATES.md` — Dates de début des matchs (saisie jour/mois/quart d'heure, mois courant et 21:00 par défaut, année déduite).
 - `MATCH_REPLAYS.md` — Rediff YouTube d'un match terminé.

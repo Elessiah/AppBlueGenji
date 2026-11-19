@@ -21,6 +21,7 @@ import {
 } from "./load";
 import { autoConfirmAwaiting, loadedPendingRoles, readStoredAutoConfirms, type PendingRoles } from "./auto-confirm";
 import { entryAssignments, entryCoverage } from "./model";
+import { loadEntryRounds, type RoundRequest } from "./round-names";
 
 /**
  * Durée de la copie de la **liste** des comptes qui tiennent un rôle du
@@ -129,7 +130,7 @@ export function entriesNeedingMark(
 
 export async function loadPlanningView(user: AuthUser, now: number = Date.now()): Promise<PlanningView> {
   const canManage = can(user, "tournaments");
-  const { data, pending, marks } = await withConnection(async (connection) => {
+  const { data, pending, marks, rounds } = await withConnection(async (connection) => {
     const loaded = await loadPlanningData(connection, {
       now,
       includeHidden: canManage,
@@ -139,7 +140,12 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
     // Comptées sur les lignes en base, comme le balayage (`sweepAutoConfirms`) : la carte et la reprise s'accordent.
     const pending = loadedPendingRoles(loaded.assignments);
     const keys = entriesNeedingMark(loaded.entries, pending, loaded.durations.confirmLeadHours, now);
-    return { data: loaded, pending, marks: await readStoredAutoConfirms(connection, keys) };
+    const requests: RoundRequest[] = [];
+    for (const entry of loaded.entries) {
+      if (entry.matchId !== null) requests.push({ tournamentId: entry.tournamentId, matchId: entry.matchId, finished: entry.tournamentFinished });
+    }
+    const rounds = await loadEntryRounds(connection, requests, now);
+    return { data: loaded, pending, marks: await readStoredAutoConfirms(connection, keys), rounds };
   });
   // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul
   // (`preparePlanner`) ; les autres lecteurs gardent la couverture d'avant (rien n'y trahit la suspension).
@@ -160,6 +166,8 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       game: entry.game,
       matchId: entry.matchId,
       roundNumber: entry.roundNumber,
+      round: entry.matchId === null ? null : (rounds.get(entry.matchId)?.round ?? null),
+      matchNumber: entry.matchId === null ? null : (rounds.get(entry.matchId)?.matchNumber ?? null),
       team1: entry.team1,
       team2: entry.team2,
       startAt: new Date(entry.startAt).toISOString(),

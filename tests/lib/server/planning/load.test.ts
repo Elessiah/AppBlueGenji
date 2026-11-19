@@ -453,3 +453,23 @@ describe("loadPlanningData", () => {
     expect(data.matchCasters.get("m:1")).toEqual([4, 6]);
   });
 });
+
+describe("loadPlanningEntries — match d'un tournoi terminé", () => {
+  it("loadPlanningEntries_unplayedMatchOfFinishedTournament_isClosedAndFinished", async () => {
+    routeSql({ tournaments: [tournamentRow({ referee_scheduling: 1, state: "FINISHED" })], matches: [matchRow(5)] });
+
+    const entries = await loadPlanningEntries(executor, { now: MONDAY, includeHidden: true });
+
+    const match = entries.find((entry) => entry.key === "m:5");
+    expect(match).toMatchObject({ open: false, editable: false, tournamentFinished: true });
+  });
+
+  it("loadPlanningEntries_unplayedMatchOfRunningTournament_staysEditable", async () => {
+    routeSql({ tournaments: [tournamentRow({ referee_scheduling: 1, state: "RUNNING" })], matches: [matchRow(5)] });
+
+    const entries = await loadPlanningEntries(executor, { now: MONDAY, includeHidden: true });
+
+    const match = entries.find((entry) => entry.key === "m:5");
+    expect(match).toMatchObject({ open: true, editable: true, tournamentFinished: false });
+  });
+});

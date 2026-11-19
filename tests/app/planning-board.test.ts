@@ -10,6 +10,10 @@ import {
   groupByDay,
   groupByWeek,
   hasProvisional,
+  isPastEntry,
+  planningOpenKey,
+  newestFirst,
+  splitPast,
   heldBy,
   isThrottled,
   leadUntil,
@@ -652,5 +656,76 @@ describe("withdrawDoneKey", () => {
   it("withdrawDoneKey_streamLostText_hasFrAndEn", () => {
     expect(frPlanning.withdraw.doneStreamLost).toBeTruthy();
     expect(enPlanning.withdraw.doneStreamLost).toBeTruthy();
+  });
+});
+
+describe("matchs passés", () => {
+  it("isPastEntry_notEditable_isPast", () => {
+    expect(isPastEntry({ editable: false })).toBe(true);
+  });
+
+  it("isPastEntry_editableAfterEstimatedEnd_staysUpcoming", () => {
+    // Un match en retard se joue encore : sa fin estimée écoulée ne le range pas dans « Matchs passés ».
+    expect(isPastEntry({ editable: true })).toBe(false);
+  });
+
+  it("splitPast_mixed_keepsOrderInEachHalf", () => {
+    const entries = [
+      { key: "a", editable: true },
+      { key: "b", editable: false },
+      { key: "c", editable: true },
+      { key: "d", editable: false },
+    ];
+
+    const { upcoming, past } = splitPast(entries);
+
+    expect(upcoming.map((entry) => entry.key)).toEqual(["a", "c"]);
+    expect(past.map((entry) => entry.key)).toEqual(["b", "d"]);
+  });
+
+  it("splitPast_empty_returnsTwoEmptyLists", () => {
+    expect(splitPast([])).toEqual({ upcoming: [], past: [] });
+  });
+
+  it("newestFirst_twoWeeks_reversesWeeksDaysAndEntries", () => {
+    const weeks = groupByWeek([
+      entryView({ key: "w1-mon-a", startAt: "2026-11-02T18:00:00.000Z" }),
+      entryView({ key: "w1-mon-b", startAt: "2026-11-02T20:00:00.000Z" }),
+      entryView({ key: "w1-tue", startAt: "2026-11-03T18:00:00.000Z" }),
+      entryView({ key: "w2-mon", startAt: "2026-11-09T18:00:00.000Z" }),
+    ]);
+
+    const result = newestFirst(weeks);
+
+    expect(result.map((week) => week.entries.map((entry) => entry.key))).toEqual([["w2-mon"], ["w1-tue", "w1-mon-b", "w1-mon-a"]]);
+    expect(result[1].days.map((day) => day.entries.map((entry) => entry.key))).toEqual([["w1-tue"], ["w1-mon-b", "w1-mon-a"]]);
+  });
+
+  it("planningMessages_pastKeys_presentInBothLanguagesAndOldRoundKeyGone", () => {
+    expect(frPlanning.past.title).toBe("Matchs passés");
+    expect(enPlanning.past.title).toBe("Past matches");
+    expect(frPlanning.past.noUpcoming).not.toBe("");
+    expect(enPlanning.past.noUpcoming).not.toBe("");
+    expect("round" in frPlanning).toBe(false);
+    expect("round" in enPlanning).toBe(false);
+  });
+});
+
+describe("planningOpenKey", () => {
+  it("planningOpenKey_account_neverHoldsRawId", () => {
+    expect(planningOpenKey("past", 357276)).not.toContain("357276");
+  });
+
+  it("planningOpenKey_sameAccountAndSection_isStable", () => {
+    expect(planningOpenKey("past", 42)).toBe(planningOpenKey("past", 42));
+  });
+
+  it("planningOpenKey_otherAccount_differs", () => {
+    expect(planningOpenKey("past", 42)).not.toBe(planningOpenKey("past", 43));
+  });
+
+  it("planningOpenKey_otherSection_differs", () => {
+    expect(planningOpenKey("staff", 42)).toMatch(/^planning:staff-open:[0-9a-z]+$/);
+    expect(planningOpenKey("past", 42)).toMatch(/^planning:past-open:[0-9a-z]+$/);
   });
 });

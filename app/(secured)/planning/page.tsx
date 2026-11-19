@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { can } from "@/lib/shared/permissions";
+import { planningRoundMessages } from "@/lib/shared/planning-round";
 import { scopedText } from "@/lib/shared/scoped-text";
 import { PlanningBoard } from "./_components/PlanningBoard";
 import styles from "./planning.module.css";
@@ -10,7 +11,8 @@ import styles from "./planning.module.css";
 /**
  * Page « Planning » (`docs/features/CAST_PLANNING.md`). Le contrôle de la
  * mise en page est refait ici : Next rend page et mise en page en parallèle.
- * Les textes de l'écran partent avec la page (un seul espace de noms) ; les
+ * Les textes de l'écran partent avec la page (l'espace `planning`, plus les
+ * seuls mots des tours de `tournament.bracket`, `planningRoundMessages`) ; les
  * données se lisent par `GET /api/planning`.
  */
 export default async function PlanningPage() {
@@ -18,7 +20,8 @@ export default async function PlanningPage() {
   if (!user) return null;
   if (!can(user, "planning")) notFound();
   const locale = await requestLocale();
-  const messages = messagesFor(locale).planning;
+  const all = messagesFor(locale);
+  const messages = all.planning;
   const { t } = scopedText(locale, messages);
   return (
     <section className={`container ${styles.page}`}>
@@ -27,7 +30,7 @@ export default async function PlanningPage() {
         <h1 className={`display text-gradient ${styles.title}`}>{t("title")}</h1>
         <p className={styles.lead}>{t("lead")}</p>
       </header>
-      <PlanningBoard locale={locale} messages={messages} />
+      <PlanningBoard locale={locale} messages={messages} roundMessages={planningRoundMessages(all)} />
     </section>
   );
 }

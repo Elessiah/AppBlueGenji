@@ -61,6 +61,8 @@ export type LoadedEntry = {
   endAt: number;
   open: boolean;
   editable: boolean;
+  /** Tournoi terminé (`FINISHED`) : ses entrées sont closes, ses noms de tour ne bougent plus. */
+  tournamentFinished: boolean;
   hidden: boolean;
   channelUrl: string | null;
   selfManaged: boolean;
@@ -220,6 +222,7 @@ function eventEntry(row: TournamentRow, durations: PlanningDurationSettings, now
     endAt: startAt + estimateEventMinutes(durations) * MINUTE_MS,
     open: row.state !== "FINISHED" && startAt > now,
     editable: row.state !== "FINISHED",
+    tournamentFinished: row.state === "FINISHED",
     hidden: Number(row.hidden) === 1,
     channelUrl: row.live_url,
     selfManaged: false,
@@ -235,7 +238,10 @@ function nullableNumber(value: number | null): number | null {
 /** L'entrée d'un match planifié ; sa fin suit le format de match du tournoi. */
 function matchEntry(match: MatchRow, tournament: TournamentRow, durations: PlanningDurationSettings, now: number): LoadedEntry {
   const startAt = time(match.start_at);
-  const playable = match.status !== "COMPLETED";
+  // Un match resté à jouer d'un tournoi terminé (revanche de grande finale non jouée, Survie close) est clos
+  // comme le tournoi : plus rien ne s'y planifie, il rejoint les matchs passés.
+  const finished = tournament.state === "FINISHED";
+  const playable = match.status !== "COMPLETED" && !finished;
   const minutes = estimateMatchMinutes(
     {
       game: tournament.game,
@@ -259,6 +265,7 @@ function matchEntry(match: MatchRow, tournament: TournamentRow, durations: Plann
     endAt: startAt + minutes * MINUTE_MS,
     open: playable && startAt > now,
     editable: playable,
+    tournamentFinished: finished,
     hidden: Number(tournament.hidden) === 1,
     channelUrl: match.stream_url ?? tournament.live_url,
     selfManaged: Number(match.self_managed) === 1,
