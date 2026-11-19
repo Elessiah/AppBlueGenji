@@ -27,6 +27,7 @@ import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import type { TournamentGame } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
+import { sessionHolds, type SessionRights } from "@/lib/shared/player-view";
 import { loadShownCasterIds } from "./cast-eligibility";
 import { hasOrganisationLink, lockMatchStreams, pruneMatchStreams, streamLinkHolder, type MatchStreamRow } from "./match-casters";
 // Type seul : aucune dépendance d'exécution vers le lancement, qui importe ce
@@ -83,19 +84,22 @@ export const PLAIN_CAST_ACCESS: CastAccess = { oversees: false, manages: false }
 
 /**
  * L'auteur d'un geste de cast ou d'arbitrage, **avec l'état de sa session** :
- * l'éligibilité se lit en base (`is_admin`, rôles), que la vue joueur
- * (`ADMIN_PLAYER_VIEW.md`) ne change pas. Requis : un appelant qui l'oublie ne
- * compile pas, et aucun chemin ne fait caster ou arbitrer une vue joueur.
+ * l'éligibilité se lit en base (`is_admin`, rôles), que l'incarnation d'un
+ * rôle (`ADMIN_ROLE_IMPERSONATION.md`) ne change pas. Requis : un appelant qui
+ * l'oublie ne compile pas. Les rôles incarnés (`roles`) ouvrent le geste quand
+ * ils portent sa permission ; absents, ils valent « aucun » (refus).
  */
-export type SessionActor = { id: number; playerView: boolean };
+export type SessionActor = SessionRights & { id: number };
 
 /**
- * L'identifiant de l'auteur, refusé en vue joueur.
+ * L'identifiant de l'auteur, refusé quand la session incarne des rôles qui
+ * n'ouvrent pas `permission` (`live` pour un cast, `tournaments` pour un
+ * arbitrage ; vue joueur : aucun).
  *
- * @throws `PLAYER_VIEW_ACTIVE` — la session est en vue joueur.
+ * @throws `PLAYER_VIEW_ACTIVE` — la session incarne un rôle sans cette permission.
  */
-export function actingUserId(actor: SessionActor): number {
-  if (actor.playerView) throw new Error("PLAYER_VIEW_ACTIVE");
+export function actingUserId(actor: SessionActor, permission: "live" | "tournaments"): number {
+  if (!sessionHolds(actor, permission)) throw new Error("PLAYER_VIEW_ACTIVE");
   return actor.id;
 }
 
@@ -464,7 +468,7 @@ type OwnCastRow = RowDataPacket & {
  * @throws `NOT_MATCH_CASTER` — le lecteur ne caste pas ce match.
  */
 export async function loadOwnCastSettings(matchId: number, actor: SessionActor): Promise<OwnCastSettings> {
-  const userId = actingUserId(actor);
+  const userId = actingUserId(actor, "live");
   const db = await getDatabase();
   const [rows] = await db.execute<OwnCastRow[]>(
     `SELECT c.stream_id, c.cast_battletag, s.live_url, s.staff_owned, m.live_trigger

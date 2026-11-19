@@ -411,13 +411,15 @@ describe("auth", () => {
 
       expect(user?.id).toBe(3);
       expect(user?.recruitmentModalOff).toBe(false);
-      // Repli par colonne : sans la vue joueur, puis sans la certification,
-      // puis sans le recrutement — les deux autres, présentes, restent lues.
-      expect(execute).toHaveBeenCalledTimes(5);
-      expect(String(execute.mock.calls[4][0])).toContain("FROM bg_user_sessions s");
-      expect(String(execute.mock.calls[4][0])).not.toContain("recruitment_modal_off");
-      expect(String(execute.mock.calls[4][0])).toContain("s.certify_prompt_due");
-      expect(String(execute.mock.calls[4][0])).toContain("s.player_view_until");
+      // Repli par colonne : sans les rôles incarnés, puis sans l'échéance,
+      // puis sans la certification, puis sans le recrutement — les autres,
+      // présentes, restent lues.
+      expect(execute).toHaveBeenCalledTimes(7);
+      expect(String(execute.mock.calls[6][0])).toContain("FROM bg_user_sessions s");
+      expect(String(execute.mock.calls[6][0])).not.toContain("recruitment_modal_off");
+      expect(String(execute.mock.calls[6][0])).toContain("s.certify_prompt_due");
+      expect(String(execute.mock.calls[6][0])).toContain("s.player_view_until");
+      expect(String(execute.mock.calls[6][0])).toContain("s.impersonated_roles_json");
     });
 
     it("seule la marque de certification absente : « Ne plus afficher » du recrutement reste lu", async () => {
@@ -434,10 +436,10 @@ describe("auth", () => {
 
       expect(user?.recruitmentModalOff).toBe(true);
       expect(user?.certifyPromptDue).toBe(false);
-      expect(execute).toHaveBeenCalledTimes(3);
-      expect(String(execute.mock.calls[2][0])).toContain("u.recruitment_modal_off");
-      expect(String(execute.mock.calls[2][0])).not.toContain("certify_prompt_due");
-      expect(String(execute.mock.calls[2][0])).toContain("s.player_view_until");
+      expect(execute).toHaveBeenCalledTimes(4);
+      expect(String(execute.mock.calls[3][0])).toContain("u.recruitment_modal_off");
+      expect(String(execute.mock.calls[3][0])).not.toContain("certify_prompt_due");
+      expect(String(execute.mock.calls[3][0])).toContain("s.player_view_until");
 
       // La lecture en échec est retenue : la requête suivante ne la retente pas.
       execute.mockClear();
@@ -471,8 +473,8 @@ describe("auth", () => {
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
       expect((await getCurrentUser())?.recruitmentModalOff).toBe(false);
-      // Sans la vue joueur d'abord, puis sans le recrutement.
-      expect(execute).toHaveBeenCalledTimes(3);
+      // Sans les rôles incarnés, puis sans l'échéance, puis sans le recrutement.
+      expect(execute).toHaveBeenCalledTimes(4);
     });
   });
 

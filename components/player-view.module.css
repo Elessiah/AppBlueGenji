@@ -1,4 +1,4 @@
-/* Bannière de la vue joueur (ADMIN_PLAYER_VIEW.md) : bleu glacier, jamais
+/* Bannière de la vue joueur (ADMIN_ROLE_IMPERSONATION.md) : bleu glacier, jamais
    l'ambre (réservé aux avertissements) — c'est un état choisi, pas une alerte. */
 
 .banner {
@@ -23,6 +23,12 @@
   font-family: var(--font-mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+/* Plusieurs rôles : un nom trop long coupe plutôt que de déborder la bannière. */
+.stateText {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .icon {

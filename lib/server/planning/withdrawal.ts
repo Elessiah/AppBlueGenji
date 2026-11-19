@@ -29,7 +29,7 @@ import { failureReason } from "@/lib/server/failure-reason";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
 import { can } from "@/lib/shared/permissions";
-import { LATE_WITHDRAWAL_MS, PLANNING_MAX_CASTERS, planningWeekStart, WITHDRAWAL_REASON_MAX, type PlanningRole } from "@/lib/shared/planning";
+import { LATE_WITHDRAWAL_MS, PLANNING_MAX_CASTERS, planningWeekStart, WITHDRAWAL_REASON_MAX, withdrawableRoles, type PlanningRole } from "@/lib/shared/planning";
 import { exclusionKey, planAssignments, type PlannedAssignment, type PlannerInput } from "@/lib/shared/planning-planner";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { visibleText } from "@/lib/shared/visible-text";
@@ -428,9 +428,12 @@ type Outcome = WithdrawalResult & {
  * Le membre `user` se désiste de son attribution `input.role` sur
  * `input.entryKey`. Erreurs par code : `PLANNING_ENTRY_NOT_FOUND`,
  * `PLANNING_WITHDRAWAL_CLOSED` (entrée commencée ou close),
- * `PLANNING_NOT_ASSIGNED`, `PLANNING_CAST_MANAGED`, refus du match.
+ * `PLANNING_NOT_ASSIGNED`, `PLANNING_CAST_MANAGED`, `PLAYER_VIEW_ACTIVE`
+ * (la session incarne un rôle qui ne tiendrait pas cette place,
+ * `withdrawableRoles`), refus du match.
  */
 export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, now: number = Date.now()): Promise<WithdrawalResult> {
+  if (!withdrawableRoles(user).includes(input.role)) throw new Error("PLAYER_VIEW_ACTIVE");
   const outcome = await withPlanningLock(async (connection): Promise<Outcome> => {
     const data = await loadPlanningData(connection, { now, includeHidden: can(user, "tournaments") });
     const { entry, current } = withdrawnAssignment(user, input, data, now);

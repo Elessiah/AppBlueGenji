@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 /**
- * Échéance de la vue joueur côté bannière (`docs/features/ADMIN_PLAYER_VIEW.md`) :
+ * Échéance de la vue joueur côté bannière (`docs/features/ADMIN_ROLE_IMPERSONATION.md`) :
  * à `until` (plus la marge), la page est relue — les droits sont revenus et la
  * bannière s'efface. Joué sans DOM : la bannière est appelée comme une
  * fonction, ses effets recueillis puis joués à la main.
@@ -16,6 +16,7 @@ jest.mock("react", () => {
       effects.push(effect);
     },
     useRef: <T,>(initial: T) => ({ current: initial }),
+    useMemo: <T,>(compute: () => T) => compute(),
   };
 });
 

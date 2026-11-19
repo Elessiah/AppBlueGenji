@@ -4,7 +4,7 @@ import { reconnectFrameBytes } from "@/lib/server/tournament-stream-frames";
 import { GZIP_STREAM_HEADER } from "@/lib/server/sse-gzip";
 import { isStreamReconnectData, STREAM_RECONNECT_DATA } from "@/lib/shared/stream-reconnect";
 
-/** Trame « relis ta session » du flux (`lib/shared/stream-reconnect.ts`, `ADMIN_PLAYER_VIEW.md`). */
+/** Trame « relis ta session » du flux (`lib/shared/stream-reconnect.ts`, `ADMIN_ROLE_IMPERSONATION.md`). */
 describe("reconnectFrameBytes", () => {
   it("reconnectFrameBytes_identity_isReconnectDataFrame", () => {
     const text = new TextDecoder().decode(reconnectFrameBytes("identity"));

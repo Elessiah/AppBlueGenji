@@ -6,7 +6,7 @@
 import type { AuthUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { can, canComputePlanning } from "@/lib/shared/permissions";
-import { PLANNING_ROLES, planningRolesOf, type PlanningRole } from "@/lib/shared/planning";
+import { PLANNING_ROLES, planningRolesOf, withdrawableRoles, type PlanningRole } from "@/lib/shared/planning";
 import { planningConfirmAt } from "@/lib/shared/schedule-deadline";
 import type { PlanningAssignmentShown, PlanningAssignmentView, PlanningEntryView, PlanningView } from "@/lib/shared/planning-view";
 import {
@@ -213,6 +213,7 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
   return {
     me: user.id,
     myRoles: planningRolesOf(user),
+    withdrawRoles: withdrawableRoles(user),
     canManage,
     canCompute,
     entries,

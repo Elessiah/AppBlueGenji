@@ -1,0 +1,40 @@
+{
+  "title": "Impersonate a role",
+  "lead": "Tick the roles to impersonate",
+  "hint": "On this device only, your rights narrow to exactly the ticked roles until you switch back, for {hours} hours at most. No role ticked: player view.",
+  "bodyLabel": "Roles to impersonate",
+  "tableLabel": "Roles to impersonate and what they open",
+  "columnRole": "Role",
+  "columnOpens": "Opens",
+  "player": "Player (no role)",
+  "playerHint": "No platform role: the site treats you as a player. Your team roles stay yours.",
+  "cancel": "Cancel",
+  "confirm": "Impersonate",
+  "pending": "Impersonating…",
+  "roles": {
+    "ARBITRE": {
+      "opens": "Tournaments and matches, board preview, live, schedule",
+      "hint": "Creates and manages tournaments, enters and settles scores, takes a match as referee, reads the board preview, opens the live and gives availability on the schedule. No reports, no roles, no schedule computing."
+    },
+    "CASTER": {
+      "opens": "Board preview, live of own casts, schedule",
+      "hint": "Signs up to cast a match, sets up the cast, opens the live and reads the board preview before launch; gives availability on the schedule. No tournament management."
+    },
+    "PROD": {
+      "opens": "Schedule",
+      "hint": "Reads the “Schedule” page and gives availability and preferences there. No live, no board preview."
+    },
+    "COMMUNITY_MANAGER": {
+      "opens": "Showcase site and association",
+      "hint": "Manages the showcase partners, the association pages and the volunteers. No rights on tournaments."
+    },
+    "RECRUTEUR": {
+      "opens": "Recruitment page",
+      "hint": "Manages the posts of the recruitment page, and nothing else."
+    },
+    "DEV": {
+      "opens": "Developer docs",
+      "hint": "Reads the technical documentation of the site and the bot, read-only. Not staff: no bot commands nor staff sections."
+    }
+  }
+}

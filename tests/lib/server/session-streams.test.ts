@@ -14,6 +14,7 @@ import {
   revocationMark,
   revokedSince,
 } from "@/lib/server/session-streams";
+import { PLAYER_VIEW_EXIT_RULE } from "@/lib/server/api-guard";
 
 const cleanups: (() => void)[] = [];
 function register(userId: number, tokenHash: string, close: () => void = jest.fn()): () => void {
@@ -238,7 +239,7 @@ describe("reconnectUserStreams (EF-04)", () => {
   });
 });
 
-describe("reconnectSessionStreams (ADMIN_PLAYER_VIEW.md)", () => {
+describe("reconnectSessionStreams (ADMIN_ROLE_IMPERSONATION.md)", () => {
   it("reconnectSessionStreams_oneSession_closesOnlyThatSessionStreams", () => {
     const here = jest.fn();
     const otherDevice = jest.fn();
@@ -275,7 +276,7 @@ describe("reconnectSessionStreams (ADMIN_PLAYER_VIEW.md)", () => {
   });
 });
 
-describe("reconnectRequestedSince (ADMIN_PLAYER_VIEW.md)", () => {
+describe("reconnectRequestedSince (ADMIN_ROLE_IMPERSONATION.md)", () => {
   it("reconnectRequestedSince_switchAfterMark_isTrueForThatSessionOnly", () => {
     const mark = revocationMark();
 
@@ -318,6 +319,20 @@ describe("mémoire des changements de contexte (perf)", () => {
     for (let i = 0; i < RECONNECT_MEMORY_PER_USER * 2; i += 1) reconnectSessionStreams(2, `s${i}`);
 
     expect(reconnectRequestedSince(1, "premiere", mark)).toBe(true);
+  });
+
+  it("RECONNECT_MEMORY_PER_USER_coversTwoFullWindowsOfEveryToggle", () => {
+    // Toute bascule (entrée ou retour) passe la règle large, à fenêtre fixe :
+    // deux fenêtres jointives tiennent dans la minute de mémoire.
+    expect(RECONNECT_MEMORY_PER_USER).toBeGreaterThanOrEqual(2 * PLAYER_VIEW_EXIT_RULE.limit);
+    expect(RECONNECT_MEMORY_MAX).toBeGreaterThan(RECONNECT_MEMORY_PER_USER);
+  });
+
+  it("reconnectRequestedSince_fortyTogglesInAMinute_firstStillPending", () => {
+    const mark = revocationMark();
+    for (let i = 0; i < 40; i += 1) reconnectSessionStreams(2, `s${i}`);
+
+    expect(reconnectRequestedSince(2, "s0", mark)).toBe(true);
   });
 
   it("reconnectRequestedSince_ownEntriesBeyondPerUserCap_oldestOwnForgottenNewestKept", () => {

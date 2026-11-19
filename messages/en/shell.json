@@ -40,17 +40,43 @@
     "logout": "Log out",
     "loggingOut": "Logging out…",
     "logoutFailed": "Couldn't log you out. Try again in a moment.",
-    "playerView": "Switch to player view",
-    "playerViewPending": "Switching to player view…",
-    "playerViewFailed": "Couldn't switch to player view. Try again in a moment."
+    "impersonate": "Impersonate a role",
+    "impersonateFailed": "Couldn't impersonate this role. Try again in a moment.",
+    "impersonateConflict": "Another impersonation is already running on this session: switch back to admin view before choosing another one."
   },
   "playerView": {
-    "label": "Player view",
+    "label": "Impersonation",
     "active": "Player view on",
+    "activeRole": "Impersonated role: {roles}",
+    "activeRoles": "Impersonated roles: {roles}",
     "back": "Back to admin view",
     "backPending": "Returning to admin view…",
     "backFailed": "Couldn't return to admin view. Try again in a moment.",
-    "hint": "On this device only, the site treats you as a player: your staff rights are suspended until you switch back, for {hours} hours at most. Staff push notifications follow the account and keep arriving."
+    "inProgress": "A switch is already in progress.",
+    "throttled": "Too many switches in a minute. Try again in a moment.",
+    "hint": "On this device only, the site gives you only the rights of the impersonated role (none in player view) until you switch back, for {hours} hours at most. Staff push notifications follow the account and keep arriving."
+  },
+  "impersonate": {
+    "roles": {
+      "ARBITRE": {
+        "label": "Referee"
+      },
+      "CASTER": {
+        "label": "Caster"
+      },
+      "PROD": {
+        "label": "Prod"
+      },
+      "COMMUNITY_MANAGER": {
+        "label": "Community Manager"
+      },
+      "RECRUTEUR": {
+        "label": "Recruiter"
+      },
+      "DEV": {
+        "label": "Developer"
+      }
+    }
   },
   "footer": {
     "brandName": "BlueGenji",

@@ -57,6 +57,7 @@ import {
 import { announceCastChange, queueCastChange, type CastPairing } from "./cast-notices";
 import { announceStaffMatchAction } from "./staff-action-logs";
 import { actingUserId, applyCastSettings, PLAIN_CAST_ACCESS, type CastAccess, type SessionActor, type CastSettings, type CastSettingsOutcome } from "./cast-settings";
+import { sessionHolds, type SessionRights } from "@/lib/shared/player-view";
 import {
   lockMatchCasters,
   lockMatchStreams,
@@ -539,12 +540,14 @@ type PartyMatch = {
 };
 
 /**
- * Ce que la **session** permet au lecteur, au-delà de son compte : en vue
- * joueur (`ADMIN_PLAYER_VIEW.md`), ni cast ni arbitrage désigné — l'éligibilité
- * se lit en base (`is_admin`, rôles), que la vue joueur ne change pas. Requis :
- * un appelant qui l'oublie ne compile pas, aucun chemin ne la contourne.
+ * Ce que la **session** permet au lecteur, au-delà de son compte : pendant
+ * une incarnation (`ADMIN_ROLE_IMPERSONATION.md`), ses casts et arbitrages
+ * désignés ne comptent que si les rôles incarnés ouvrent `live` /
+ * `tournaments` (vue joueur : ni l'un ni l'autre) — l'éligibilité se lit en
+ * base (`is_admin`, rôles), que l'incarnation ne change pas. Requis : un
+ * appelant qui l'oublie ne compile pas ; des rôles absents valent « aucun ».
  */
-export type PartySession = { playerView: boolean };
+export type PartySession = SessionRights;
 
 /**
  * Le lecteur est-il partie de ce match — joueur d'une des deux engagées
@@ -576,10 +579,10 @@ async function resolvePartyOrRefusal(
   // inscription faite avant que son équipe n'arrive est encore en base.
   const team = await resolveTeamParty(connection, match, userId);
   if (team) return team;
-  // Vue joueur : casts et arbitrages restent en base, la session ne les tient pas.
-  if (session.playerView) return "NOT_MATCH_PARTY";
+  // Incarnation : casts et arbitrages restent en base, la session ne tient que
+  // ceux que les rôles incarnés ouvrent.
   let refusal = "NOT_MATCH_PARTY";
-  if (match.casters.some((caster) => caster.userId === userId)) {
+  if (sessionHolds(session, "live") && match.casters.some((caster) => caster.userId === userId)) {
     // Une inscription ne vaut que tant que son titulaire remplit la condition
     // du cast : un compte privé de `live` ou d'identité ne déclare plus rien.
     const block = await loadCastEligibility(connection, userId, match.tournament_game ?? "OW");
@@ -588,7 +591,7 @@ async function resolvePartyOrRefusal(
   }
   // L'arbitre désigné, tant qu'il remplit la condition d'arbitrage. Un arbitre
   // qui caste aussi lit en caster : un seul « Prêt » vaut pour les deux.
-  if (isEligibleReferee(match, userId)) {
+  if (sessionHolds(session, "tournaments") && isEligibleReferee(match, userId)) {
     return { role: "MATCH_REFEREE", canDeclareReady: true };
   }
   return refusal;
@@ -715,13 +718,16 @@ export async function queueDeferredNoRefereeAlerts(candidates: readonly NoRefere
 
 /**
  * « Prêt » d'un caster : le sien seul change. L'arbitre désigné qui caste
- * aussi le match donne les deux d'un clic.
+ * aussi le match donne les deux d'un clic — seulement si la session tient
+ * l'arbitrage (`tournaments`) : une incarnation du seul rôle de caster ne
+ * déclare jamais l'arbitre prêt (`ADMIN_ROLE_IMPERSONATION.md`).
  */
 async function writeCasterReady(
   connection: PoolConnection,
   row: LaunchMatchRow,
   userId: number,
   ready: boolean,
+  session: PartySession,
 ): Promise<void> {
   const stamp = ready ? "NOW()" : "NULL";
   await connection.execute(`UPDATE bg_match_casters SET ready_at = ${stamp} WHERE match_id = ? AND user_id = ?`, [
@@ -730,7 +736,7 @@ async function writeCasterReady(
   ]);
   const readyAt = ready ? new Date() : null;
   for (const caster of row.casters) if (caster.userId === userId) caster.readyAt = readyAt;
-  const alsoReferee = isEligibleReferee(row, userId);
+  const alsoReferee = sessionHolds(session, "tournaments") && isEligibleReferee(row, userId);
   if (alsoReferee) row.referee_ready_at = readyAt;
   const refereeReady = alsoReferee ? `, referee_ready_at = ${stamp}` : "";
   await connection.execute(
@@ -769,7 +775,7 @@ export async function setMatchReady(
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
 
     if (party.role === "CASTER") {
-      await writeCasterReady(connection, row, userId, ready);
+      await writeCasterReady(connection, row, userId, ready, session);
     } else {
       // Nom de colonne tiré d'une table fermée, jamais de l'entrée.
       const column = READY_AT_COLUMNS[party.role];
@@ -1046,7 +1052,7 @@ export async function claimMatchCast(
   settings: CastSettings = {},
   access: CastAccess = PLAIN_CAST_ACCESS,
 ): Promise<{ triggerSkipped: boolean }> {
-  const userId = actingUserId(actor);
+  const userId = actingUserId(actor, "live");
   const castTarget: CastTarget = target;
   // Le lien est jugé avant toute lecture : un refus ne coûte rien. Un stream
   // ouvert sans lien n'apparaissait sur aucune vue et n'annonçait rien : le
@@ -1200,7 +1206,7 @@ export async function setCastSettings(
   settings: CastSettings,
   access: CastAccess = PLAIN_CAST_ACCESS,
 ): Promise<void> {
-  const userId = actingUserId(actor);
+  const userId = actingUserId(actor, "live");
   if (!hasLivePermission) throw new Error("NOT_CASTER");
   // Le lien et le BattleTag sont jugés avant toute lecture : un refus ne coûte rien.
   if (settings.liveUrl !== undefined) parseStreamUrlInput(settings.liveUrl);
@@ -1264,7 +1270,7 @@ export async function releaseMatchCast(
   canManage: boolean,
   target?: number,
 ): Promise<void> {
-  const userId = actingUserId(actor);
+  const userId = actingUserId(actor, "live");
   const casterId = target ?? userId;
   const { tournamentId, releasedCasterId, pairing } = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
@@ -1691,7 +1697,7 @@ function takenOverChange(row: LaunchMatchRow, matchId: number, refereeId: number
  *   | `REFEREE_IS_PLAYER` | `MATCH_ALREADY_REFEREED`
  */
 export async function takeMatchReferee(matchId: number, actor: SessionActor): Promise<void> {
-  const userId = actingUserId(actor);
+  const userId = actingUserId(actor, "tournaments");
   const tournamentId = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const row = await lockLaunchMatch(connection, matchId);
@@ -1752,7 +1758,7 @@ export async function releaseMatchReferee(
   canManage: boolean,
   expected?: number | null,
 ): Promise<void> {
-  await releaseReferee(matchId, actingUserId(actor), canManage, expected);
+  await releaseReferee(matchId, actingUserId(actor, "tournaments"), canManage, expected);
 }
 
 /**

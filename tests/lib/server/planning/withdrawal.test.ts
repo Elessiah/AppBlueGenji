@@ -186,6 +186,24 @@ describe("withdrawFromEntry — refus", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("withdrawFromEntry_impersonatingCasterOnRefereeSlot_throwsPlayerViewActiveWithoutLock", async () => {
+    const impersonatingCaster = authUser({ id: 3, isAdmin: false, roles: ["CASTER"], playerView: true, playerViewAvailable: true });
+
+    await expect(withdrawFromEntry(impersonatingCaster, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY)).rejects.toThrow(
+      "PLAYER_VIEW_ACTIVE",
+    );
+    expect(withNamedLock).not.toHaveBeenCalled();
+  });
+
+  it("withdrawFromEntry_impersonatingProdOnProdSlot_passesTheImpersonationGuard", async () => {
+    const impersonatingProd = authUser({ id: 4, isAdmin: false, roles: ["PROD"], playerView: true, playerViewAvailable: true });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [] }));
+
+    await expect(withdrawFromEntry(impersonatingProd, { entryKey: "m:1", role: "PROD", reason: null }, EARLY)).rejects.toThrow(
+      "PLANNING_ENTRY_NOT_FOUND",
+    );
+  });
+
   it("withdrawFromEntry_castSignup_throwsCastManaged", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()], matchCasters: new Map([["m:1", [4]]]) }));
 

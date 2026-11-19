@@ -86,11 +86,14 @@ export async function createAccountTables(db: Pool): Promise<void> {
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       expires_at DATETIME NOT NULL,
       certify_prompt_due TINYINT(1) NOT NULL DEFAULT 0,
-      -- « Vue joueur » du staff (ADMIN_PLAYER_VIEW.md) : tant
-      -- que l'échéance n'est pas passée, la session ne porte aucun droit de plateforme.
+      -- Incarnation d'un rôle (ADMIN_ROLE_IMPERSONATION.md) : tant que
+      -- l'échéance n'est pas passée, la session ne porte que les rôles incarnés
+      -- (JSON, aucun : vue joueur).
       player_view_until DATETIME NULL,
+      impersonated_roles_json VARCHAR(255) NULL,
       INDEX idx_bg_sessions_user_id (user_id),
       INDEX idx_bg_sessions_expires_at (expires_at),
+      INDEX idx_bg_sessions_player_view (player_view_until),
       CONSTRAINT fk_bg_sessions_user FOREIGN KEY (user_id)
         REFERENCES bg_users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

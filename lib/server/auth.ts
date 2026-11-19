@@ -10,7 +10,7 @@ import { localAvatarUrl } from "@/lib/shared/avatar";
 import { TERMS_POSTPONED_COOKIE } from "@/lib/shared/global-modals";
 import { normalizePseudo, slugifyPseudo, toIso } from "@/lib/server/serialization";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
-import { holdsPlatformRights, sessionPlatformRights } from "@/lib/shared/player-view";
+import { canImpersonate, sessionPlatformRights } from "@/lib/shared/player-view";
 import { recordConnection } from "@/lib/server/connection-logs";
 import { closeSessionStreams, closeUserStreams } from "@/lib/server/session-streams";
 import { assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
@@ -41,33 +41,35 @@ export type AuthUser = {
   googleSub: string | null;
   isAdult: boolean | null;
   /**
-   * Administrateur **pour cette session** : toujours `false` en vue joueur
-   * (`playerView`), quel que soit `bg_users.is_admin`.
+   * Administrateur **pour cette session** : toujours `false` pendant une
+   * incarnation (`playerView`), quel que soit `bg_users.is_admin`.
    */
   isAdmin: boolean;
   /**
    * Rôles de permission cumulables (inclut `ADMIN` si `isAdmin`) **pour cette
-   * session** : vides en vue joueur — `can()`, `canAny()`, `isStaffMember()`
-   * n'y voient alors aucun droit, sans que la moindre route ait à y penser.
+   * session** : pendant une incarnation, exactement les rôles incarnés (vides
+   * en vue joueur) — `can()`, `canAny()`, `isStaffMember()` n'y voient que
+   * ceux-là, sans que la moindre route ait à y penser.
    */
   roles: PlatformRole[];
   /**
-   * La session est en « vue joueur » (`bg_user_sessions.player_view_until`
-   * dans le futur, `docs/features/ADMIN_PLAYER_VIEW.md`) : ses droits de
-   * plateforme sont suspendus jusqu'au retour ou à l'échéance.
+   * La session incarne un rôle — ou aucun, « vue joueur »
+   * (`bg_user_sessions.player_view_until` dans le futur,
+   * `docs/features/ADMIN_ROLE_IMPERSONATION.md`) : ses droits de plateforme
+   * sont réduits aux rôles incarnés (`roles`) jusqu'au retour ou à l'échéance.
    */
   playerView: boolean;
   /**
-   * Échéance de la vue joueur (ISO, relue en base), `null` hors vue joueur :
+   * Échéance de l'incarnation (ISO, relue en base), `null` hors incarnation :
    * la bannière relit la page et le flux SSE se reconnecte à cette heure, quand
    * les droits reviennent d'eux-mêmes.
    */
   playerViewUntil: string | null;
   /**
-   * Le compte porte **réellement** des droits de plateforme (colonne
-   * `is_admin` ou rôle cumulable), vue joueur ou non : seule condition de la
-   * bascule, dans les deux sens — sans quoi le retour serait impossible.
-   * Ce n'est pas un droit : aucun `can()` ne le lit.
+   * Le compte est **réellement** administrateur (colonne `is_admin`),
+   * incarnation ou non : seule condition de la bascule, dans les deux sens —
+   * sans quoi le retour serait impossible. Ce n'est pas un droit : aucun
+   * `can()` ne le lit.
    */
   playerViewAvailable: boolean;
   /** « Ne plus afficher » posé sur la modale d'arrivée du recrutement (`bg_users.recruitment_modal_off`). */
@@ -97,6 +99,7 @@ type UserRow = RowDataPacket & {
   certify_prompt_due?: number | null;
   player_view?: number | string | null;
   player_view_until?: Date | string | null;
+  impersonated_roles_json?: string | null;
 };
 
 /**
@@ -132,11 +135,12 @@ function baseCookieOptions() {
 
 function fromRow(row: UserRow): AuthUser {
   const real = { isAdmin: Boolean(row.is_admin), roles: resolveRoles(Boolean(row.is_admin), row.platform_roles_json) };
-  const playerViewAvailable = holdsPlatformRights(real);
-  // Le point unique où la vue joueur s'applique : un compte sans droit réel
-  // n'a rien à suspendre (une ligne restée posée ne change rien pour lui).
+  const playerViewAvailable = canImpersonate(real);
+  // Le point unique où l'incarnation s'applique : seul un administrateur réel
+  // incarne (une ligne restée posée sur un compte qui ne l'est plus — ou ne
+  // l'a jamais été — ne change rien pour lui).
   const playerView = playerViewAvailable && Number(row.player_view ?? 0) === 1;
-  const rights = sessionPlatformRights(real, playerView);
+  const rights = sessionPlatformRights(real, playerView, row.impersonated_roles_json ?? null);
   return {
     id: Number(row.id),
     pseudo: row.pseudo,
@@ -436,12 +440,22 @@ async function ensureFreshTestUser(): Promise<number> {
  * **Un repli par colonne** : la plus récente (`certify_prompt_due`, sur la
  * table des sessions) tombe seule d'abord, sans emporter
  * `recruitment_modal_off` — un « Ne plus afficher » posé ne doit pas se perdre
- * parce qu'un autre `ALTER` a échoué. `player_view_until`, plus récente
- * encore, tombe avant elles : sans la colonne, aucune session n'est en vue
- * joueur, les droits restent entiers.
+ * parce qu'un autre `ALTER` a échoué. `impersonated_roles_json`, puis
+ * `player_view_until`, plus récentes encore, tombent avant elles : sans les
+ * rôles, une session qui incarne retombe en **vue joueur** (jamais en droits
+ * entiers) ; sans l'échéance, aucune session n'incarne, les droits restent
+ * entiers.
  */
+/**
+ * Colonnes d'incarnation que la lecture porte : toutes (`roles`), l'échéance
+ * sans les rôles (`until`, **vue joueur** : un `ALTER` des rôles échoué
+ * restreint, il ne rend jamais les droits d'administrateur), aucune (`none`).
+ */
+type PlayerViewColumns = "roles" | "until" | "none";
+const PLAYER_VIEW_COLUMN_LEVELS: readonly PlayerViewColumns[] = ["roles", "until", "none"];
+
 async function selectUserRows(
-  sql: (withModalOff: boolean, withCertifyPrompt: boolean, withPlayerView: boolean) => string,
+  sql: (withModalOff: boolean, withCertifyPrompt: boolean, playerView: PlayerViewColumns) => string,
   params: (string | number)[],
 ): Promise<UserRow[]> {
   const db = await getDatabase();
@@ -450,7 +464,7 @@ async function selectUserRows(
   const variants: string[] = [];
   for (const modalOff of [true, false]) {
     for (const certifyPrompt of [true, false]) {
-      for (const playerView of [true, false]) variants.push(sql(modalOff, certifyPrompt, playerView));
+      for (const playerView of PLAYER_VIEW_COLUMN_LEVELS) variants.push(sql(modalOff, certifyPrompt, playerView));
     }
   }
   const all = [...new Set(variants)];
@@ -488,12 +502,18 @@ export function devBypassSessionKey(userId: number): string {
 }
 
 
-const DEV_BYPASS_PLAYER_VIEW_SQL = `EXISTS(SELECT 1 FROM bg_user_sessions dv
-       WHERE dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', bg_users.id)
-         AND dv.player_view_until > NOW()) AS player_view,
-       (SELECT dv.player_view_until FROM bg_user_sessions dv
-       WHERE dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', bg_users.id)
-         AND dv.player_view_until > NOW()) AS player_view_until`;
+/**
+ * Jointure de la ligne d'incarnation du contournement de développement : une
+ * seule lecture de la ligne pour ses trois colonnes.
+ */
+const DEV_BYPASS_VIEW_JOIN = `LEFT JOIN bg_user_sessions dv
+       ON dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', u.id)
+      AND dv.player_view_until > NOW()`;
+
+function devBypassViewColumns(playerView: PlayerViewColumns): string {
+  if (playerView === "none") return "";
+  return `, dv.player_view_until IS NOT NULL AS player_view, dv.player_view_until${playerView === "roles" ? ", dv.impersonated_roles_json" : ""}`;
+}
 
 /**
  * Les utilisateurs résolus par le contournement de développement, tels que
@@ -522,10 +542,11 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
   }
 
   const rows = await selectUserRows(
-    (modalOff, _certifyPrompt, playerView) => `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json${modalOff ? ", recruitment_modal_off" : ""}${playerView ? ", " + DEV_BYPASS_PLAYER_VIEW_SQL : ""}
-     FROM bg_users
-     WHERE id = ?
-       AND is_deleted = 0
+    (modalOff, _certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${devBypassViewColumns(playerView)}
+     FROM bg_users u
+     ${playerView === "none" ? "" : DEV_BYPASS_VIEW_JOIN}
+     WHERE u.id = ?
+       AND u.is_deleted = 0
      LIMIT 1`,
     [userId],
   );
@@ -552,7 +573,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
   if (!token) return null;
 
   const rows = await selectUserRows(
-    (modalOff, certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}${playerView ? ", s.player_view_until > NOW() AS player_view, s.player_view_until" : ""}
+    (modalOff, certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}${playerView === "none" ? "" : ", s.player_view_until > NOW() AS player_view, s.player_view_until"}${playerView === "roles" ? ", s.impersonated_roles_json" : ""}
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?

@@ -367,6 +367,7 @@ function viewOf(overrides: Partial<PlanningView> = {}): PlanningView {
   return {
     me: 1,
     myRoles: ["CASTER"],
+    withdrawRoles: ["REFEREE", "CASTER", "PROD"],
     canManage: false,
     canCompute: false,
     entries: [entryView({ key: "m:1" }), entryView({ key: "m:2", matchId: 2 })],
@@ -441,7 +442,15 @@ describe("mergeView", () => {
     expect(merged.entries).toBe(previous.entries);
     expect(merged.members).toBe(previous.members);
     expect(merged.myRoles).toBe(previous.myRoles);
+    expect(merged.withdrawRoles).toBe(previous.withdrawRoles);
     expect(merged.durations).toBe(previous.durations);
+  });
+
+  it("mergeView_withdrawRolesChanged_takesTheNewList", () => {
+    const previous = viewOf();
+    const next = { ...structuredClone(previous), withdrawRoles: ["CASTER" as const] };
+
+    expect(mergeView(previous, next).withdrawRoles).toEqual(["CASTER"]);
   });
 
   it("mergeView_withoutDurations_keyStaysAbsent", () => {
