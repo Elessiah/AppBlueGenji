@@ -348,6 +348,17 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
     expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 
+  it("setUserRoles_demotionClearFailsWithOtherError_rollsBackAndRethrows", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: "[]" }]);
+    connection.execute.mockRejectedValueOnce(new Error("lock wait timeout"));
+
+    await expect(setUserRoles(7, [], 3)).rejects.toThrow("lock wait timeout");
+
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
   it("setUserRoles_adminKept_leavesSessionsUntouched", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: "[]" }]);

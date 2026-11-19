@@ -3437,6 +3437,16 @@ describe("cast et arbitrage — vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () =>
     expect(state.match?.launched_at ?? null).toBeNull();
   });
 
+  it("setMatchReady_refereeCasterImpersonatingCasterWithdrawsReady_keepsRefereeReady", async () => {
+    state.users[REFEREE] = { ...ELIGIBLE_CASTER, is_admin: 1, platform_roles_json: null };
+    state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP, caster_user_id: REFEREE, caster_ready_at: STAMP });
+
+    await setMatchReady(42, REFEREE, false, { playerView: true, roles: ["CASTER"] });
+
+    expect(casterReadyOf(state)).toBeNull();
+    expect(state.match?.referee_ready_at).toBe(STAMP);
+  });
+
   it("setMatchReady_refereeCasterImpersonatingCasterAndArbitre_setsBothReadies", async () => {
     state.users[REFEREE] = { ...ELIGIBLE_CASTER, is_admin: 1, platform_roles_json: null };
     state.match = matchState({ referee_user_id: REFEREE, caster_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
