@@ -559,6 +559,22 @@ describe("withdrawFromEntry — deux casters", () => {
     });
   });
 
+  it("withdrawFromEntry_oneOfTwoCastersNobodyAvailable_noHistoryRead", async () => {
+    twoCasterData({});
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(loadPlanningHistory).not.toHaveBeenCalled();
+  });
+
+  it("withdrawFromEntry_oneOfTwoCastersSpareAvailable_historyRead", async () => {
+    twoCasterData({ candidates: [6] });
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(loadPlanningHistory).toHaveBeenCalledTimes(1);
+  });
+
   it("withdrawFromEntry_oneOfTwoCastersSpareFree_replaced", async () => {
     twoCasterData({ candidates: [6] });
 

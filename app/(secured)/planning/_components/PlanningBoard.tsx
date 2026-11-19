@@ -633,7 +633,7 @@ const EntryCard = memo(function EntryCard({
   );
 });
 
-function RoleRow({
+const RoleRow = memo(function RoleRow({
   role,
   entry,
   view,
@@ -659,7 +659,10 @@ function RoleRow({
   const selectId = useId();
   const roleName = t(`roles.${role}`);
   // Plafond de casters atteint : plus de liste de choix (le serveur refuse aussi, `PLANNING_CASTERS_FULL`).
-  const { manage, full, candidates } = roleChoices(entry, role, view.members, view.canManage);
+  const { manage, full, candidates } = useMemo(
+    () => roleChoices(entry, role, view.members, view.canManage),
+    [entry, role, view.members, view.canManage],
+  );
   const assign = (userId: number, assigned: boolean) =>
     act(
       `assign:${entry.key}:${role}:${userId}`,
@@ -698,8 +701,8 @@ function RoleRow({
             </span>
           );
         })}
-        {role === "CASTER" && manage && (
-          // Zone d'état toujours montée : l'apparition du plafond est annoncée au lecteur d'écran.
+        {role === "CASTER" && manage && rows.length > 0 && (
+          // Zone d'état montée dès un premier caster (avant que le plafond n'apparaisse) : son apparition est annoncée.
           <span /* NOSONAR S6819 — région live d'état : l'apparition du plafond est annoncée */ role="status" className={styles.muted}>
             {full ? t(`assignment.${castersFullKind(entry)}`) : null}
           </span>
@@ -741,7 +744,7 @@ function RoleRow({
       </dd>
     </div>
   );
-}
+});
 
 /** Les désistements d'une entrée, au staff des tournois seul (la route ne les rend qu'à lui). */
 function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView; text: Text; names: ReadonlyMap<number, string> }>) {

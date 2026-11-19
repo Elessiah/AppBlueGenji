@@ -304,8 +304,11 @@ class PlannerState {
     });
   }
 
-  candidates(entry: PlannerEntry, role: PlanningRole): number[] {
-    return (this.offered.get(`${entry.key}|${role}`) ?? []).filter((userId) => this.eligible(entry, userId, role));
+  /** `preferredOnly` : seuls ceux qui préfèrent l'entrée, écartés **avant** la question d'éligibilité (la plus coûteuse). */
+  candidates(entry: PlannerEntry, role: PlanningRole, preferredOnly = false): number[] {
+    return (this.offered.get(`${entry.key}|${role}`) ?? []).filter(
+      (userId) => (!preferredOnly || this.preferred(entry.key, userId, role)) && this.eligible(entry, userId, role),
+    );
   }
 
   /** Une fois les places verrouillées posées : leur charge par semaine, pour l'historique (propositions provisoires exclues). */
@@ -514,22 +517,26 @@ function fillAll(state: PlannerState, open: readonly PlannerEntry[]): boolean {
  * personne à une entrée d'un autre lot, et un caster qui est aussi prod ou
  * arbitre n'est pas pris à l'entrée qui l'attend dans cet autre rôle).
  */
-function neededElsewhere(state: PlannerState, entry: PlannerEntry, userId: number): boolean {
-  return state.overlapsOf(entry.key).some((key) => {
+function neededElsewhere(state: PlannerState, entry: PlannerEntry): (userId: number) => boolean {
+  // Les rôles qui manquent à chaque entrée voisine ne dépendent pas du candidat : établis une fois, puis seule
+  // l'éligibilité se juge par candidat.
+  const waiting: { other: PlannerEntry; missing: PlanningRole[] }[] = [];
+  for (const key of state.overlapsOf(entry.key)) {
     const other = state.entry(key);
-    if (other === undefined || other.fillable === false) return false;
+    if (other === undefined || other.fillable === false) continue;
     const missing: PlanningRole[] = [];
-    if (state.held(key, "CASTER").length === 0) missing.push("CASTER");
+    const casters = state.held(key, "CASTER");
+    if (casters.length === 0) missing.push("CASTER");
     // Un prod n'y manque qu'auprès d'un caster qui l'attend (entrée pas encore diffusée) : sans caster, ou avec un
     // caster autonome, il n'y servirait à rien.
     // Sans prod tenu, « pas diffusée » (`planningCoverage`) revient à « aucun caster autonome » : même règle.
-    const casters = state.held(key, "CASTER");
     if (state.held(key, "PROD").length === 0 && casters.length > 0 && !casters.some((id) => state.input.soloCasterIds.has(id))) {
       missing.push("PROD");
     }
     if (!state.input.refereeDecided.has(key) && state.held(key, "REFEREE").length < (other.refereeSlots ?? 1)) missing.push("REFEREE");
-    return missing.some((role) => state.eligible(other, userId, role));
-  });
+    if (missing.length > 0) waiting.push({ other, missing });
+  }
+  return (userId) => waiting.some(({ other, missing }) => missing.some((role) => state.eligible(other, userId, role)));
 }
 
 /**
@@ -547,23 +554,33 @@ function spareCaster(state: PlannerState, entry: PlannerEntry, preferredOnly: bo
   const held = state.held(entry.key, "CASTER").length;
   if (held === 0 || held >= PLANNING_MAX_CASTERS) return null;
   const streamed = state.coverage(entry.key).streamed;
-  const ranked = state
-    .candidates(entry, "CASTER")
+  const pool = state
+    .candidates(entry, "CASTER", preferredOnly)
     .filter((userId) => state.rolesOn(entry.key, userId).length === 0)
-    .filter((userId) => !preferredOnly || state.preferred(entry.key, userId, "CASTER"))
-    .filter((userId) => (entry.restoreStream === true ? state.input.soloCasterIds.has(userId) : !neededElsewhere(state, entry, userId)))
-    .map((userId) => ({
+    .filter((userId) => entry.restoreStream !== true || state.input.soloCasterIds.has(userId));
+  // Les entrées voisines ne se parcourent que s'il reste un candidat à juger, et une seule fois.
+  const needed = entry.restoreStream === true || pool.length === 0 ? null : neededElsewhere(state, entry);
+  let best: SpareRank | null = null;
+  for (const userId of pool) {
+    if (needed?.(userId)) continue;
+    const rank = {
       userId,
       streams: !streamed && state.input.soloCasterIds.has(userId) ? 0 : 1,
       preferred: state.preferred(entry.key, userId, "CASTER") ? 0 : 1,
       week: state.weekLoad(userId, entry.key),
       history: state.historyOf(userId, entry.key),
-    }));
-  ranked.sort(
-    (a, b) =>
-      a.streams - b.streams || a.preferred - b.preferred || a.week - b.week || a.history - b.history || a.userId - b.userId,
-  );
-  return ranked[0]?.userId ?? null;
+    };
+    // Un seul parcours : le premier rang, sans trier ni ranger tous les candidats.
+    if (best === null || spareBefore(rank, best)) best = rank;
+  }
+  return best?.userId ?? null;
+}
+
+type SpareRank = { userId: number; streams: number; preferred: number; week: number; history: number };
+
+/** `a` passe avant `b` (diffusion, préférence, charge de la semaine, historique, identifiant). */
+function spareBefore(a: SpareRank, b: SpareRank): boolean {
+  return (a.streams - b.streams || a.preferred - b.preferred || a.week - b.week || a.history - b.history || a.userId - b.userId) < 0;
 }
 
 /**

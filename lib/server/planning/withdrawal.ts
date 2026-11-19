@@ -122,13 +122,16 @@ export function pickReplacement(
   // proposition de caster restée sur l'entrée ne la tient pas : écartée de ce seul calcul, elle reste en base.
   const spare = casters.some((row) => !row.provisional);
   const proposals = new Set(spare ? [] : casters.filter((row) => row.provisional).map((row) => row.userId));
+  // Ce qui ne change pas d'un essai à l'autre se prépare une fois (les deux essais d'une diffusion perdue le partagent).
+  const locked = base.locked.filter((row) => !(row.entryKey === entry.key && row.role === "CASTER" && proposals.has(row.userId)));
+  const excludedWithProposals = proposals.size === 0 ? base.excluded : new Set([...base.excluded, ...[...proposals].map((userId) => exclusionKey(entry.key, userId, "CASTER"))]);
   const plan = (restoreStream: boolean): PlannedAssignment | null => {
     const input: PlannerInput = {
       ...base,
       // Un renfort se cherche seul : rien d'autre n'est posé sur l'entrée (aucun prod d'essai qui écarterait un candidat).
       entries: base.entries.map((item) => (item.key === entry.key ? { ...item, open: true, spareOnly: spare, restoreStream } : item)),
-      locked: base.locked.filter((row) => !(row.entryKey === entry.key && row.role === "CASTER" && proposals.has(row.userId))),
-      excluded: new Set([...base.excluded, ...[...proposals].map((userId) => exclusionKey(entry.key, userId, "CASTER"))]),
+      locked,
+      excluded: excludedWithProposals,
       spareCasters: spare,
     };
     return planAssignments(input).find((row) => row.entryKey === entry.key && row.role === role) ?? null;
@@ -155,6 +158,12 @@ async function findReplacement(
   // Jugé sur la relecture : une inscription de cast (hors verrou du planning) faite ou défaite entre-temps y compte.
   const hold = casterHold(entry ?? before, data, withdrawn);
   if (!entry?.open || !entry.editable) return { data, entry, hold, pick: null };
+  // Personne d'autre n'a répondu « disponible » pour ce rôle : aucun remplaçant possible, on s'épargne l'historique,
+  // les exclusions et le calcul (le cas courant d'un renfort quitté).
+  const offered = data.availability.some(
+    (row) => row.entryKey === entryKey && row.role === role && row.status === "AVAILABLE" && row.userId !== withdrawn.userId,
+  );
+  if (!offered) return { data, entry, hold, pick: null };
   const anchor = Math.max(now, entry.startAt);
   const history = await loadPlanningHistory(connection, anchor);
   const excluded = await loadExclusions(connection, data, [entry]);

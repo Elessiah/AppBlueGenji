@@ -634,6 +634,43 @@ describe("planAssignments — second caster", () => {
     expect(planAssignments(input)).toEqual([]);
   });
 
+  it("planAssignments_spareCandidatesTie_lowestIdTaken", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20)],
+      availability: [1, 2, 3].map((userId) => available("m:1", userId, "CASTER")),
+      members: new Map([[1, CASTER], [2, CASTER], [3, CASTER]]),
+      soloCasterIds: new Set([1, 2, 3]),
+      locked: [{ entryKey: "m:1", userId: 3, role: "CASTER", reason: "MANUAL" }],
+    });
+
+    const result = planAssignments(input);
+
+    expect(picks(result)).toEqual([{ entryKey: "m:1", userId: 1, role: "CASTER" }]);
+  });
+
+  it("planAssignments_spareCandidateNeededElsewhereAmongSeveral_otherOneTaken", () => {
+    // Le caster 1 (premier par identifiant) est attendu sur m:2, qui n'a que lui : le renfort de m:1 est le 2.
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20), plannerEntry("m:2", 20)],
+      availability: [
+        available("m:1", 1, "CASTER"),
+        available("m:1", 2, "CASTER"),
+        available("m:1", 3, "CASTER"),
+        available("m:2", 1, "CASTER"),
+      ],
+      members: new Map([[1, CASTER], [2, CASTER], [3, CASTER]]),
+      soloCasterIds: new Set([1, 2, 3]),
+      locked: [{ entryKey: "m:1", userId: 3, role: "CASTER", reason: "MANUAL" }],
+    });
+
+    const result = planAssignments(input);
+
+    expect(picks(result)).toEqual([
+      { entryKey: "m:1", userId: 2, role: "CASTER" },
+      { entryKey: "m:2", userId: 1, role: "CASTER" },
+    ]);
+  });
+
   it("planAssignments_spareCasterPrefersEntry_placedThere", () => {
     // Deux entrées qui se chevauchent, chacune avec son caster : le renfort va à celle qu'il préfère.
     const input = plannerInput({
