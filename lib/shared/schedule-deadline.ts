@@ -26,15 +26,20 @@ const MINUTE_MS = 60 * 1000;
 export const SCHEDULE_DEADLINE_DEFAULT_HOUR = 21;
 /** Jours calendaires (Paris) entre l'ouverture de la planification et la date butoir par défaut. */
 export const SCHEDULE_DEADLINE_DEFAULT_DAYS = 2;
-/** Une date butoir se pose au moins une heure devant (le temps d'en prévenir les engagées). */
-export const SCHEDULE_DEADLINE_MIN_AHEAD_MS = HOUR_MS;
+/**
+ * Une date butoir se pose au moins 24 heures devant — le préavis minimal d'un
+ * match : les engagées doivent avoir le temps de s'accorder, et l'arbitrage
+ * celui de poser l'horaire. Une saisie hâtive (ou malveillante) ne peut pas
+ * forfaiter une manche entière dans l'heure.
+ */
+export const SCHEDULE_DEADLINE_MIN_AHEAD_MS = 24 * HOUR_MS;
 /**
  * Préavis minimal d'une paire : une date butoir ne frappe que si son premier
- * avis est parti au moins trente minutes avant elle (`deadlineArmed`) — la
- * moitié du préavis minimal de la pose, pour laisser au balayage le temps
- * d'annoncer une date butoir posée une heure devant.
+ * avis **remis** (message privé ou push parti) l'a été au moins douze heures
+ * avant elle (`deadlineArmed`) — la moitié du préavis minimal de la pose : une
+ * paire complétée ou prévenue plus tard n'a plus le temps de s'accorder.
  */
-export const SCHEDULE_DEADLINE_ARM_MIN_MS = 30 * MINUTE_MS;
+export const SCHEDULE_DEADLINE_ARM_MIN_MS = 12 * HOUR_MS;
 /** …et au plus soixante jours devant : au-delà, c'est une faute de saisie. */
 export const SCHEDULE_DEADLINE_MAX_AHEAD_MS = 60 * DAY_MS;
 
@@ -270,7 +275,7 @@ function entryAccepted(day: string, hour: number, now: number): boolean {
   return at !== null && at >= now + SCHEDULE_DEADLINE_MIN_AHEAD_MS && at <= now + SCHEDULE_DEADLINE_MAX_AHEAD_MS;
 }
 
-/** Les heures pile d'un jour (Paris) que la saisie peut encore poser : aujourd'hui, celles d'au moins une heure devant. */
+/** Les heures pile d'un jour (Paris) que la saisie peut encore poser : celles d'au moins 24 heures devant. */
 export function deadlineEntryHours(day: string, now: number): number[] {
   return Array.from({ length: 24 }, (_, hour) => hour).filter((hour) => entryAccepted(day, hour, now));
 }
@@ -289,8 +294,8 @@ export function deadlineEntryChoices(now: number, keep: string | null = null): s
 
 /**
  * Où la saisie s'ouvre : la date butoir en place si elle serait encore
- * acceptée, sinon la date proposée (une date butoir passée ou à moins d'une
- * heure ne se rejoue pas telle quelle).
+ * acceptée, sinon la date proposée (une date butoir passée ou à moins de 24
+ * heures ne se rejoue pas telle quelle).
  */
 export function deadlineEntryStart(current: number | null, suggested: number, now: number): { day: string; hour: number; fromCurrent: boolean } {
   const usable = current !== null && current >= now + SCHEDULE_DEADLINE_MIN_AHEAD_MS && current <= now + SCHEDULE_DEADLINE_MAX_AHEAD_MS;

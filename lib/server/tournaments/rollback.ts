@@ -230,9 +230,31 @@ async function clearMatchResults(
        WHERE id IN (${sqlPlaceholders(ids.length)})`,
       ids,
     );
+    await clearPastScheduleDeadlines(connection, ids);
     // Le résultat défait emporte son détail map par map, retenu comme proposé.
     await clearMapSets(connection, ids, ALL_MAP_SOURCES);
   }
+}
+
+/**
+ * Une rencontre rendue « à jouer » perd sa date butoir de planification déjà
+ * passée, et ses traces d'avis (`./schedule-deadline`) : celle qui l'a close en
+ * double forfait la referait aussitôt — le retour en arrière ne tiendrait
+ * qu'une minute. Une date butoir encore devant reste (annoncée, elle vaut
+ * toujours pour la rencontre rejouée).
+ */
+async function clearPastScheduleDeadlines(connection: PoolConnection, ids: readonly number[]): Promise<void> {
+  const now = new Date();
+  // Les traces d'abord : l'effacement de la date butoir ferait perdre la condition qui les désigne.
+  await connection.execute(
+    `DELETE FROM bg_schedule_deadline_notices
+      WHERE match_id IN (SELECT id FROM bg_matches WHERE id IN (${sqlPlaceholders(ids.length)}) AND schedule_deadline_at <= ?)`,
+    [...ids, now],
+  );
+  await connection.execute(
+    `UPDATE bg_matches SET schedule_deadline_at = NULL WHERE id IN (${sqlPlaceholders(ids.length)}) AND schedule_deadline_at <= ?`,
+    [...ids, now],
+  );
 }
 
 /**

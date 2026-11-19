@@ -21,10 +21,11 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { getDatabase, withConnection } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
-import { loadEntrantMatchLeaderIds, loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
+import { loadEntrantMatchLeaderIds, loadNotificationRecipients, notifyUsers, type NotificationReport } from "@/lib/server/notify";
 import { toIso } from "@/lib/server/serialization";
 import { siteCanonicalBase } from "@/lib/server/site-url";
-import { auditStaffAction } from "@/lib/server/staff-audit";
+import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
+import { formatScheduleDeadlineLog } from "@/lib/shared/bot-logs";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
 import { nullableId } from "@/lib/shared/nullable-id";
@@ -44,6 +45,7 @@ import { formatScheduleDeadlineDm, type DeadlineNotice, type DeadlineNoticeKey }
 import type { MatchStatus } from "@/lib/shared/types";
 import { visibleText } from "@/lib/shared/visible-text";
 import { adminResolveMatch } from "./admin";
+import { markDeadlineForfeit } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { lockTournamentRow } from "./registration";
@@ -115,14 +117,24 @@ const MATCH_COLUMNS = `id, tournament_id, status, team1_id, team2_id, start_at, 
 async function lockDeadlineTournament(
   connection: PoolConnection,
   tournamentId: number,
-): Promise<{ refereeScheduling: boolean; state: string | null } | null> {
+): Promise<DeadlineTournament | null> {
   await lockTournamentRow(connection, tournamentId);
-  const [rows] = await connection.execute<(RowDataPacket & { referee_scheduling: number | null; state: string })[]>(
-    `SELECT referee_scheduling, state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+  return readDeadlineTournament(connection, tournamentId);
+}
+
+type DeadlineTournament = { refereeScheduling: boolean; state: string | null; name: string };
+
+/** Le tournoi d'une date butoir (sans verrou : à l'appelant d'en prendre un s'il écrit). */
+async function readDeadlineTournament(
+  executor: Pick<PoolConnection, "execute">,
+  tournamentId: number,
+): Promise<DeadlineTournament | null> {
+  const [rows] = await executor.execute<(RowDataPacket & { referee_scheduling: number | null; state: string; name: string | null })[]>(
+    `SELECT referee_scheduling, state, name FROM bg_tournaments WHERE id = ? LIMIT 1`,
     [tournamentId],
   );
   if (!rows[0]) return null;
-  return { refereeScheduling: Number(rows[0].referee_scheduling ?? 0) === 1, state: rows[0].state };
+  return { refereeScheduling: Number(rows[0].referee_scheduling ?? 0) === 1, state: rows[0].state, name: String(rows[0].name ?? "") };
 }
 
 async function matchTournamentId(connection: PoolConnection, matchId: number): Promise<number | null> {
@@ -204,7 +216,7 @@ export async function setMatchScheduleDeadline(
   const input = readScheduleDeadline(raw, now);
   if (input.kind === "invalid") throw new Error(input.code);
   const deadlineAt = input.kind === "set" ? input.at : null;
-  const tournamentId = await retryOnDeadlock(() =>
+  const { tournamentId, tournamentName } = await retryOnDeadlock(() =>
     withConnection(async (connection) => {
       const id = await matchTournamentId(connection, matchId);
       if (id === null) throw new Error("MATCH_NOT_FOUND");
@@ -226,12 +238,17 @@ export async function setMatchScheduleDeadline(
           throw new Error("SCHEDULE_DEADLINE_NOT_ALLOWED");
         }
         await writeDeadline(connection, matchId, row.schedule_deadline_at, deadlineAt);
-        return id;
+        return { tournamentId: id, tournamentName: tournament.name };
       });
     }),
   );
   const written = deadlineAt === null ? null : new Date(deadlineAt).toISOString();
-  auditStaffAction(`[schedule-deadline] match ${matchId} : date butoir ${written ?? "effacée"}`, actor);
+  // Anonyme sur Discord (« le staff »), nominatif dans pm2 : la trace d'un geste qui peut finir en double forfait.
+  publishStaffAction(
+    formatScheduleDeadlineLog({ tournament: { id: tournamentId, name: tournamentName }, matchId, matches: 1, deadlineAt: written }),
+    actor,
+    { category: "schedule", tournamentId, auditLine: `[schedule-deadline] match ${matchId} : date butoir ${written ?? "effacée"}` },
+  );
   publishMatchUpdatedEvent(tournamentId);
   if (written !== null) wakeSweep();
   return written;
@@ -258,7 +275,7 @@ export async function setTournamentScheduleDeadlines(
   const input = readScheduleDeadline(raw, now);
   if (input.kind === "invalid") throw new Error(input.code);
   const deadlineAt = input.kind === "set" ? input.at : null;
-  const { count, changed } = await retryOnDeadlock(() =>
+  const { count, changed, tournamentName } = await retryOnDeadlock(() =>
     withConnection((connection) =>
       transact(connection, async () => {
         const tournament = await lockDeadlineTournament(connection, tournamentId);
@@ -279,12 +296,22 @@ export async function setTournamentScheduleDeadlines(
         const targets = rows.filter((row) => matchLaunchPhase(deadlineMatchOf(row, tournament.refereeScheduling), now) === "TO_PLAN");
         const changing = targets.filter((row) => !sameDeadline(row.schedule_deadline_at, deadlineAt)).map((row) => Number(row.id));
         await writeDeadlines(connection, changing, deadlineAt);
-        return { count: targets.length, changed: changing.length };
+        return { count: targets.length, changed: changing.length, tournamentName: tournament.name };
       }),
     ),
   );
-  const written = deadlineAt === null ? "effacée" : new Date(deadlineAt).toISOString();
-  auditStaffAction(`[schedule-deadline] tournoi ${tournamentId} : date butoir ${written} sur ${count} match(s) (${changed} changée(s))`, actor);
+  const written = deadlineAt === null ? null : new Date(deadlineAt).toISOString();
+  const auditLine = `[schedule-deadline] tournoi ${tournamentId} : date butoir ${written ?? "effacée"} sur ${count} match(s) (${changed} changée(s))`;
+  if (changed === 0) {
+    // Rien de changé : la trace pm2 seule (un geste relancé ne remplit pas le journal Discord).
+    auditStaffAction(auditLine, actor);
+  } else {
+    publishStaffAction(
+      formatScheduleDeadlineLog({ tournament: { id: tournamentId, name: tournamentName }, matchId: null, matches: changed, deadlineAt: written }),
+      actor,
+      { category: "schedule", tournamentId, auditLine },
+    );
+  }
   if (changed > 0) {
     publishMatchUpdatedEvent(tournamentId);
     if (deadlineAt !== null) wakeSweep();
@@ -310,9 +337,31 @@ export async function forfeitMissedScheduleDeadline(
   now: number,
 ): Promise<boolean> {
   const tournament = await lockDeadlineTournament(connection, tournamentId);
-  if (!tournament || tournament.state !== "RUNNING") return false;
-  const [rows] = await connection.execute<DeadlineRow[]>(
-    `SELECT ${MATCH_COLUMNS} FROM bg_matches WHERE id = ? AND tournament_id = ? LIMIT 1 FOR UPDATE`,
+  if (!(await forfeitStillDue(connection, tournament, tournamentId, matchId, expectedDeadlineAt, now, true))) return false;
+  await adminResolveMatch(connection, matchId, { doubleForfeit: true });
+  // La ligne « Match terminé » en dit la raison : aucun arbitre ne l'a prononcé.
+  markDeadlineForfeit(connection, matchId);
+  return true;
+}
+
+/**
+ * Le double forfait est-il toujours dû : tournoi `RUNNING`, même date butoir,
+ * échue sur un match toujours à planifier, armée à temps pour la paire
+ * actuelle et pas retirée. Sous verrou (`locked`) avant le forfait ; sans,
+ * pour écarter d'avance un forfait que le verrou refuserait.
+ */
+async function forfeitStillDue(
+  executor: Pick<PoolConnection, "execute">,
+  tournament: DeadlineTournament | null,
+  tournamentId: number,
+  matchId: number,
+  expectedDeadlineAt: number,
+  now: number,
+  locked: boolean,
+): Promise<boolean> {
+  if (tournament?.state !== "RUNNING") return false;
+  const [rows] = await executor.execute<DeadlineRow[]>(
+    `SELECT ${MATCH_COLUMNS} FROM bg_matches WHERE id = ? AND tournament_id = ? LIMIT 1${locked ? " FOR UPDATE" : ""}`,
     [matchId, tournamentId],
   );
   const row = rows[0];
@@ -321,10 +370,25 @@ export async function forfeitMissedScheduleDeadline(
   if (deadlineAt !== expectedDeadlineAt) return false;
   const match = deadlineMatchOf(row, tournament.refereeScheduling);
   if (deadlineOutcome(match, deadlineAt, now) !== "FORFEIT") return false;
-  const guard = await readForfeitGuard(connection, matchId, launchPairingKey(match.team1Id, match.team2Id));
-  if (guard.retired || !deadlineArmed(guard.armedAt, deadlineAt)) return false;
-  await adminResolveMatch(connection, matchId, { doubleForfeit: true });
-  return true;
+  const guard = await readForfeitGuard(executor, matchId, launchPairingKey(match.team1Id, match.team2Id));
+  return !guard.retired && deadlineArmed(guard.armedAt, deadlineAt);
+}
+
+/**
+ * Le même contrôle, **sans verrou**, avant d'entrer dans la chaîne d'un
+ * forfait (`forfeitMissedScheduleDeadlinePublic`) : un forfait que le verrou
+ * refuserait (horaire posé, date butoir changée, tournoi arrêté) n'y lance ni
+ * réconciliations ni clôture. Le verrou relit tout.
+ */
+export async function scheduleDeadlineForfeitDue(
+  tournamentId: number,
+  matchId: number,
+  expectedDeadlineAt: number,
+  now: number,
+): Promise<boolean> {
+  const db = await getDatabase();
+  const tournament = await readDeadlineTournament(db, tournamentId);
+  return forfeitStillDue(db, tournament, tournamentId, matchId, expectedDeadlineAt, now, false);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -341,7 +405,13 @@ type SweepRow = DeadlineRow & {
   team2_solo: number | null;
 };
 
-type NoticeRow = RowDataPacket & { match_id: number; notice_key: string; pairing: string | null; sent_at: Date | string };
+type NoticeRow = RowDataPacket & {
+  match_id: number;
+  notice_key: string;
+  pairing: string | null;
+  sent_at: Date | string;
+  delivered: number | null;
+};
 
 /**
  * Les avis d'un match **pour sa paire actuelle** : paliers déjà partis, et
@@ -398,7 +468,12 @@ export function sweepAction(row: SweepRow, sent: SentNotices, now: number): Swee
  * Réserve des paliers d'avis, **seulement** si la date butoir et la paire sont
  * toujours celles lues (insertion conditionnelle) : un avis ne part jamais
  * pour une date butoir que l'arbitrage vient de changer, ni pour une paire
- * remplacée. Rend vrai si le palier `key` est à nous.
+ * remplacée. Un rappel (`toPlan`) exige en plus un match **toujours à
+ * planifier** — ni horaire, ni lancement de cette paire, ni résultat — : la
+ * lecture du balayage précède ce verrou, et un horaire posé entre les deux ne
+ * doit pas recevoir « toujours sans horaire ». `mine` : le palier `key` est à
+ * nous ; `inserted` : les paliers que **cette** réservation a posés (les seuls
+ * à rendre si l'envoi échoue).
  */
 async function claimNotices(
   executor: Pick<PoolConnection, "execute">,
@@ -407,23 +482,45 @@ async function claimNotices(
   keys: readonly DeadlineNoticeKey[],
   key: DeadlineNoticeKey,
   now: number,
-): Promise<boolean> {
+  toPlan: boolean,
+): Promise<{ mine: boolean; inserted: DeadlineNoticeKey[] }> {
   let mine = false;
+  const inserted: DeadlineNoticeKey[] = [];
+  const pairing = rowPairing(row);
+  const stillToPlan = toPlan
+    ? ` AND start_at IS NULL AND status NOT IN ('COMPLETED', 'AWAITING_CONFIRMATION')
+        AND NOT (launched_at IS NOT NULL AND launch_pairing <=> ?)`
+    : "";
   for (const each of keys) {
     const [result] = await executor.execute<ResultSetHeader>(
       `INSERT IGNORE INTO bg_schedule_deadline_notices (match_id, notice_key, pairing, deadline_at, sent_at)
        SELECT id, ?, ?, schedule_deadline_at, ? FROM bg_matches
-        WHERE id = ? AND schedule_deadline_at = ? AND team1_id <=> ? AND team2_id <=> ?`,
-      [each, rowPairing(row), new Date(now), Number(row.id), new Date(deadlineAt), nullableId(row.team1_id), nullableId(row.team2_id)],
+        WHERE id = ? AND schedule_deadline_at = ? AND team1_id <=> ? AND team2_id <=> ?${stillToPlan}`,
+      [
+        each,
+        pairing,
+        new Date(now),
+        Number(row.id),
+        new Date(deadlineAt),
+        nullableId(row.team1_id),
+        nullableId(row.team2_id),
+        ...(toPlan ? [pairing] : []),
+      ],
     );
-    if (each === key) mine = Number(result.affectedRows ?? 0) > 0;
+    const claimed = Number(result.affectedRows ?? 0) > 0;
+    if (claimed) inserted.push(each);
+    if (each === key) mine = claimed;
   }
-  return mine;
+  return { mine, inserted };
 }
 
-/** Un avis réellement parti aux engagées avant l'échéance (ni l'avis de forfait, ni la marque de retrait). */
-function armsDeadline(key: string): boolean {
-  return key !== SCHEDULE_DEADLINE_FORFEIT_KEY && key !== SCHEDULE_DEADLINE_RETIRED_KEY;
+/**
+ * Un avis réellement **remis** aux engagées avant l'échéance (ni l'avis de
+ * forfait, ni la marque de retrait) : une réservation dont rien n'est parti
+ * (bot injoignable, personne de joignable, sujet coupé par tous) n'arme pas.
+ */
+function armsDeadline(key: string, delivered: number | boolean | null | undefined): boolean {
+  return key !== SCHEDULE_DEADLINE_FORFEIT_KEY && key !== SCHEDULE_DEADLINE_RETIRED_KEY && Number(delivered ?? 0) === 1;
 }
 
 /**
@@ -436,15 +533,14 @@ async function readForfeitGuard(
   matchId: number,
   pairing: string | null,
 ): Promise<{ armedAt: number | null; retired: boolean }> {
-  const [rows] = await executor.execute<(RowDataPacket & { notice_key: string; pairing: string | null; sent_at: SqlDateTime })[]>(
-    `SELECT notice_key, pairing, sent_at FROM bg_schedule_deadline_notices WHERE match_id = ?`,
-    [matchId],
-  );
+  const [rows] = await executor.execute<
+    (RowDataPacket & { notice_key: string; pairing: string | null; sent_at: SqlDateTime; delivered: number | null })[]
+  >(`SELECT notice_key, pairing, sent_at, delivered FROM bg_schedule_deadline_notices WHERE match_id = ?`, [matchId]);
   let armedAt: number | null = null;
   let retired = false;
   for (const row of rows) {
     if (row.notice_key === SCHEDULE_DEADLINE_RETIRED_KEY) retired = true;
-    if (pairing === null || row.pairing !== pairing || !armsDeadline(row.notice_key) || row.sent_at === null) continue;
+    if (pairing === null || row.pairing !== pairing || !armsDeadline(row.notice_key, row.delivered) || row.sent_at === null) continue;
     const at = new Date(row.sent_at).getTime();
     armedAt = armedAt === null ? at : Math.min(armedAt, at);
   }
@@ -478,7 +574,7 @@ export async function sendDeadlineNotices(
   row: SweepRow,
   key: DeadlineNoticeKey,
   deadlineAt: number,
-  progress?: { delivered: number },
+  progress?: SendProgress,
 ): Promise<number> {
   const sides = deadlineNoticesFor(row, key, deadlineAt);
   if (sides.length === 0) return 0;
@@ -490,16 +586,33 @@ export async function sendDeadlineNotices(
     if (ids.length === 0) continue;
     const recipients = await loadNotificationRecipients(ids, "proven", { matchDm: true });
     if (recipients.length === 0) continue;
-    await notifyUsers(recipients, {
+    const report = await notifyUsers(recipients, {
       topic: "SCHEDULE_DEADLINE",
       push: (locale) => scheduleDeadlinePush(side.notice, locale),
       discord: { message: (locale) => formatScheduleDeadlineDm(side.notice, base, locale), context: "schedule-deadline" },
       dmFollowsTopic: true,
     });
     sent += 1;
-    if (progress) progress.delivered = sent;
+    if (progress) {
+      progress.delivered = sent;
+      if (reachedSomeone(report)) progress.reached += 1;
+    }
   }
   return sent;
+}
+
+/**
+ * Où en est un envoi : `delivered`, les engagées dont l'envoi a été tenté
+ * (rendre le palier les préviendrait deux fois) ; `reached`, celles dont au
+ * moins un message privé ou un push est **réellement parti** — seul un avis
+ * qui a joint quelqu'un arme le double forfait (`markDelivered`).
+ */
+export type SendProgress = { delivered: number; reached: number };
+
+/** Un message privé ou un push au moins est parti (bot injoignable, sujet coupé, aucun appareil : non). */
+export function reachedSomeone(report: Pick<NotificationReport, "discord" | "pushed"> | null | undefined): boolean {
+  if (!report) return false;
+  return (report.discord?.sent ?? 0) > 0 || Number(report.pushed ?? 0) > 0;
 }
 
 /** Un passage du balayage, sous le verrou nommé : rend ce qu'il a fait. */
@@ -564,7 +677,7 @@ async function readSweepRows(
 /** Les avis de chaque match lu, rapportés à sa paire actuelle (pur, testé sans base). */
 export function sentNoticesByMatch(
   rows: readonly DeadlineRow[],
-  notices: readonly Pick<NoticeRow, "match_id" | "notice_key" | "pairing" | "sent_at">[],
+  notices: readonly Pick<NoticeRow, "match_id" | "notice_key" | "pairing" | "sent_at" | "delivered">[],
 ): Map<number, SentNotices> {
   const pairings = new Map(rows.map((row) => [Number(row.id), rowPairing(row)]));
   const sent = new Map<number, SentNotices>();
@@ -583,7 +696,7 @@ export function sentNoticesByMatch(
     const keys = new Set(current.keys);
     keys.add(notice.notice_key);
     let armedAt = current.armedAt;
-    if (armsDeadline(notice.notice_key)) {
+    if (armsDeadline(notice.notice_key, notice.delivered)) {
       const at = new Date(notice.sent_at).getTime();
       armedAt = armedAt === null ? at : Math.min(armedAt, at);
     }
@@ -595,7 +708,7 @@ export function sentNoticesByMatch(
 async function readSentNotices(connection: PoolConnection, rows: readonly SweepRow[]): Promise<Map<number, SentNotices>> {
   if (rows.length === 0) return new Map();
   const [notices] = await connection.execute<NoticeRow[]>(
-    `SELECT match_id, notice_key, pairing, sent_at FROM bg_schedule_deadline_notices
+    `SELECT match_id, notice_key, pairing, sent_at, delivered FROM bg_schedule_deadline_notices
       WHERE match_id IN (${rows.map(() => "?").join(", ")})`,
     rows.map((row) => Number(row.id)),
   );
@@ -652,7 +765,7 @@ async function applySweepAction(
     if (!(await forfeitMissedScheduleDeadlinePublic(Number(row.tournament_id), matchId, action.deadlineAt, now))) return null;
     console.info(`[schedule-deadline] match ${matchId} : date butoir passée sans horaire, double forfait`);
     const key = SCHEDULE_DEADLINE_FORFEIT_KEY;
-    if (await claimNotices(connection, row, action.deadlineAt, [key], key, now)) {
+    if ((await claimNotices(connection, row, action.deadlineAt, [key], key, now, false)).mine) {
       outbox.push({ row, key, deadlineAt: action.deadlineAt, release: null });
     }
     return "forfeited";
@@ -672,20 +785,36 @@ async function applySweepAction(
         [matchId, rowPairing(row), SCHEDULE_DEADLINE_RETIRED_KEY],
       );
     }
-    return claimNotices(connection, row, action.deadlineAt, action.consumes, action.key, now);
+    return claimNotices(connection, row, action.deadlineAt, action.consumes, action.key, now, true);
   });
-  if (!claimed) return null;
-  outbox.push({ row, key: action.key, deadlineAt: action.deadlineAt, release: action.consumes });
+  if (!claimed.mine) return null;
+  outbox.push({ row, key: action.key, deadlineAt: action.deadlineAt, release: claimed.inserted });
   return "reminded";
 }
 
 /**
  * Un avis réservé (`claimNotices`), à envoyer une fois le verrou rendu.
- * `release` : les paliers à rendre si l'envoi échoue avant toute remise (le
+ * `release` : les paliers posés par **cette** réservation — ceux qu'une remise
+ * arme (`markDelivered`), et ceux à rendre si l'envoi échoue avant toute
+ * remise (un palier parti à un passage antérieur garde sa date d'envoi ; le
  * passage suivant les renvoie) ; `null` pour l'avis de forfait, que rien ne
  * relira (le match est joué).
  */
 export type PendingSend = { row: SweepRow; key: DeadlineNoticeKey; deadlineAt: number; release: readonly DeadlineNoticeKey[] | null };
+
+/**
+ * Note les paliers d'un avis comme **remis** (un message privé ou un push est
+ * parti) : eux seuls arment le double forfait (`armsDeadline`).
+ */
+async function markDelivered(send: PendingSend): Promise<void> {
+  if (send.release === null || send.release.length === 0) return;
+  const db = await getDatabase();
+  await db.execute(
+    `UPDATE bg_schedule_deadline_notices SET delivered = 1
+      WHERE match_id = ? AND pairing <=> ? AND notice_key IN (${send.release.map(() => "?").join(", ")})`,
+    [Number(send.row.id), rowPairing(send.row), ...send.release],
+  );
+}
 
 /** Rend les paliers réservés d'un avis qui n'a pu partir (la même paire, la même date butoir). */
 async function releaseNotices(send: PendingSend): Promise<void> {
@@ -710,22 +839,46 @@ export async function flushSends(outbox: readonly PendingSend[], now: number): P
   for (let from = 0; from < outbox.length; from += SEND_CONCURRENCY) {
     await Promise.all(
       outbox.slice(from, from + SEND_CONCURRENCY).map(async (send) => {
-        const progress = { delivered: 0 };
+        const progress: SendProgress = { delivered: 0, reached: 0 };
+        const matchId = Number(send.row.id);
         try {
           await sendDeadlineNotices(send.row, send.key, send.deadlineAt, progress);
         } catch (error) {
-          const matchId = Number(send.row.id);
           if (send.release === null) {
             console.error(`[schedule-deadline] match ${matchId} : avis de forfait non envoyé`, failureReason(error));
             return;
           }
+          await settleReached(send, progress);
           // Une partie des responsables déjà prévenue : rendre le palier les préviendrait deux fois.
           if (progress.delivered === 0) await releaseNotices(send).catch(() => undefined);
           recordFailure(send.row, error, now);
+          return;
         }
+        if (send.release === null) return;
+        await settleReached(send, progress);
+        // L'échec ne compte qu'une fois l'avis parti : une série d'envois en échec n'est pas remise à zéro par
+        // la réservation qui les précède (`sweepPage`).
+        failureCounts().delete(matchId);
       }),
     );
   }
+}
+
+/**
+ * Arme la date butoir si l'avis a joint quelqu'un ; sinon le dit au journal :
+ * personne de joint (bot injoignable, aucun responsable joignable, sujet coupé
+ * par tous), la réservation reste — pas de renvoi chaque minute — mais
+ * n'arme rien, et sans avis remis à temps la date butoir s'éteindra.
+ */
+async function settleReached(send: PendingSend, progress: SendProgress): Promise<void> {
+  const matchId = Number(send.row.id);
+  if (progress.reached === 0) {
+    console.warn(`[schedule-deadline] match ${matchId} : avis ${send.key} remis à personne, date butoir non armée par lui`);
+    return;
+  }
+  await markDelivered(send).catch((error) => {
+    console.error(`[schedule-deadline] match ${matchId} : remise de l'avis ${send.key} non notée`, failureReason(error));
+  });
 }
 
 /** Échecs d'affilée d'un match, pour une date butoir (une autre date repart de zéro). */
@@ -846,7 +999,8 @@ async function sweepPage(
     const notices = sent.get(matchId) ?? NO_NOTICES;
     try {
       const done = await applySweepAction(connection, row, sweepAction(row, notices, now), notices, now, outbox);
-      failureCounts().delete(matchId);
+      // Un rappel réservé n'est réussi qu'une fois parti : `flushSends` efface (ou compte) l'échec.
+      if (done !== "reminded") failureCounts().delete(matchId);
       if (done !== null) report[done] += 1;
     } catch (error) {
       recordFailure(row, error, now);

@@ -2272,7 +2272,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Ce qui est envoyé, en message privé Discord et en notification push, à ceux qui mènent chaque engagée en match (propriétaire, managers, capitaine — ou au joueur d'une entrée individuelle) : l'annonce de la date butoir, un rappel 24 h et 3 h avant, et l'avis du double forfait si elle passe sans horaire. Noms d'équipe seulement, aucun pseudo ; base : intérêt légitime (bon déroulement des tournois).",
       "Le nouveau sujet « Date butoir de planification » se coupe dans les réglages de notifications de « Mon profil », et l'interrupteur des messages privés de match y coupe aussi ces messages privés (droit d'opposition, art. 21).",
-      "Ce qui est gardé : la date butoir avec le match, et la trace de chaque avis envoyé (match, palier, date butoir annoncée, date d'envoi, sans le texte), effacée quand la date butoir change ou part, sinon avec le tournoi.",
+      "Ce qui est gardé : la date butoir avec le match, et la trace de chaque avis envoyé (match, palier, date butoir annoncée, date d'envoi, remis ou non, sans le texte), effacée quand la date butoir change ou part, sinon avec le tournoi.",
       "Planning des casts et arbitres (T20) : chaque créneau de match s'y confirme désormais d'office au plus tôt entre sa date butoir et son début moins un délai réglé par le staff (24 h au moins) ; les affectés en sont prévenus comme d'une confirmation par le staff, et le planning note, sans personne, quels créneaux ont été confirmés d'office (mêmes durées que le reste du planning).",
     ],
   },

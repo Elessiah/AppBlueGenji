@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 
 /** Délai le plus long que `setTimeout` accepte sans se déclencher aussitôt. */
 export const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -23,19 +24,24 @@ export function nextInstantBoundary(now: number, at: number | null, leadMs: numb
  * écran en déduit ne change qu'à ces frontières. Rien n'est posé quand `at`
  * est absent ou déjà passé, et l'horloge n'est même pas lue sans `at`.
  *
+ * Soumise au régime de charge comme `useClock` (`useClientPower().clocks`) :
+ * onglet caché, aucun minuteur ne reste posé ; au retour, l'heure est relue
+ * **aussitôt** (une frontière franchie pendant l'absence se voit tout de suite).
+ *
  * `null` avant le montage (ou sans `at`) : l'heure du serveur n'est pas celle
  * du lecteur, et la rendre au premier passage ferait diverger l'hydratation.
  */
 export function useInstantClock(at: number | null, leadMs: number = 0): number | null {
+  const { clocks } = useClientPower();
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
     if (at === null) return;
     setNow(Date.now());
-  }, [at]);
+  }, [at, clocks]);
 
   useEffect(() => {
-    if (now === null) return;
+    if (now === null || !clocks) return;
     const boundary = nextInstantBoundary(now, at, leadMs);
     if (boundary === null) return;
     // `setTimeout` sature au-delà de ~24,8 jours (déclenchement immédiat) : délai plafonné. Un réveil
@@ -44,7 +50,7 @@ export function useInstantClock(at: number | null, leadMs: number = 0): number |
     const delay = Math.min(Math.max(0, boundary - Date.now()), MAX_TIMEOUT_MS);
     const timer = setTimeout(() => setNow(Date.now()), delay);
     return () => clearTimeout(timer);
-  }, [at, leadMs, now]);
+  }, [at, clocks, leadMs, now]);
 
   return now;
 }

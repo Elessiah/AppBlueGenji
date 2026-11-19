@@ -104,19 +104,20 @@ describe("ScheduleDeadlineDialog rendu", () => {
     const html = dialog("fr", matchTarget("2026-12-30T17:00:00.000Z"));
     const days = [...html.matchAll(/<option value="(\d{4}-\d{2}-\d{2})"/g)].map((found) => found[1]);
 
-    expect(days[0]).toBe("2026-11-18");
+    expect(days[0]).toBe("2026-11-19");
     expect(days.at(-1)).toBe("2026-12-30");
     expect([...days].sort()).toEqual(days);
   });
 
-  it("scheduleDeadlineDialog_todayChosen_offersNoHourUnderOneHourAhead", () => {
-    // Échéance posée aujourd'hui 18:00 : le jour courant est choisi, les heures passées ne sont pas offertes.
-    const html = dialog("fr", matchTarget("2026-11-18T17:00:00.000Z"));
+  it("scheduleDeadlineDialog_tomorrowChosen_offersNoHourUnderTwentyFourHoursAhead", () => {
+    // Échéance posée demain 18:00 : ce jour est choisi, les heures à moins de 24 heures ne sont pas offertes.
+    const html = dialog("fr", matchTarget("2026-11-19T17:00:00.000Z"));
     const hours = hourOptions(html);
 
-    expect(hours[0]).toBe(17);
-    expect(hours).not.toContain(16);
+    expect(hours[0]).toBe(16);
+    expect(hours).not.toContain(15);
     expect(html).toContain('<option value="18" selected="">');
+    expect(html).not.toContain('<option value="2026-11-18"');
   });
 
   it("scheduleDeadlineDialog_bulk_hintWarnsAboutReplacement", () => {

@@ -1611,7 +1611,10 @@ export async function forfeitMissedScheduleDeadlinePublic(
   deadlineAt: number,
   now: number = Date.now(),
 ): Promise<boolean> {
-  const { forfeitMissedScheduleDeadline } = await import("./schedule-deadline");
+  const { forfeitMissedScheduleDeadline, scheduleDeadlineForfeitDue } = await import("./schedule-deadline");
+  // Contrôle sans verrou d'abord : un forfait que le verrou refuserait ne lance pas la chaîne (rapports
+  // échus, exemptions, réconciliations, clôture) sur tout le tournoi sans que rien ne l'ait demandé.
+  if (!(await scheduleDeadlineForfeitDue(tournamentId, matchId, deadlineAt, now))) return false;
   let forfeited = false;
   await retryOnDeadlock(() =>
     runPlayerMatchWrite(

@@ -33,22 +33,28 @@ Code : `lib/shared/schedule-deadline.ts` (règle pure),
 - Acceptée sur un match non joué, sans horaire ni lancement, dans un tournoi
   `referee_scheduling` (`acceptsScheduleDeadline`) ; ses engagées peuvent être
   encore inconnues (date butoir d'une manche posée d'avance). Sinon
-  409 `SCHEDULE_DEADLINE_NOT_ALLOWED`. Une heure devant au moins, 60 jours au
-  plus (`SCHEDULE_DEADLINE_TOO_SOON` / `_TOO_FAR`), arrondie à la minute.
+  409 `SCHEDULE_DEADLINE_NOT_ALLOWED`. **24 heures** devant au moins (le
+  préavis minimal d'un match : une saisie hâtive ou malveillante ne peut pas
+  forfaiter une manche dans l'heure), 60 jours au plus
+  (`SCHEDULE_DEADLINE_TOO_SOON` / `_TOO_FAR`), arrondie à la minute.
 - Transaction : `lockTournamentRow` en **première** instruction, puis les
   matchs `FOR UPDATE` ; changer ou retirer la date butoir efface les traces
   d'avis (les paliers repartent pour la nouvelle). Reposer la **même** date
   (geste commun relancé pour de nouveaux matchs) ne réécrit rien : aucun avis
   renvoyé ; le compte rendu (`count`) dit les matchs visés, qui portent
-  désormais cette date, changés ou non. Geste audité
-  (`auditStaffAction`, staff anonymisé sur Discord), flux SSE réveillé.
+  désormais cette date, changés ou non. Geste publié au journal
+  (`publishStaffAction`, catégorie `schedule`, lot du tournoi :
+  « ⏳ Date butoir de planification — … : match #N, fixée au … (heure de
+  Paris), par le staff », ou « N match(s) à planifier » ; aucun nom
+  d'engagée, l'auteur nommé dans pm2 seulement) ; un geste en masse qui ne
+  change rien n'a que sa trace pm2 (`auditStaffAction`). Flux SSE réveillé.
 - Saisie : un jour et une heure pile, **heure de Paris** ; préremplie par la
   date butoir en place, sinon par celle d'usage comptée depuis l'**ouverture**
   de la planification : la fin du dernier match joué qui alimente ce match
   (vainqueur ou perdant ; à défaut, du tournoi), sur les 7 derniers jours
   (`scheduleOpenedAt`, `updatedAt` du match — la base ne garde pas d'instant
   de clôture : une retouche ultérieure du match le décale), sinon
-  l'instant de la saisie ; si cette date est déjà à moins d'une heure, celle
+  l'instant de la saisie ; si cette date est déjà à moins de 24 heures, celle
   d'usage depuis maintenant (`suggestedScheduleDeadline`). Les équipes la voient sur la
   carte du match (« À planifier · avant le … », `MatchLaunchStrip`).
 
@@ -82,20 +88,41 @@ pure `sweepAction` :
 | Match à l'échéance | Effet |
 | --- | --- |
 | Toujours **à planifier** (deux engagées, ni horaire ni lancement), tournoi `RUNNING`, date butoir **armée** à temps pour cette paire | **Double forfait** |
-| Engagée manquante, option éteinte, tournoi pas `RUNNING` ou `FINISHED`, paire jamais prévenue ou prévenue moins de 30 min avant | La date butoir **s'éteint** (effacée, traces comprises) |
+| Engagée manquante, option éteinte, tournoi pas `RUNNING` ou `FINISHED`, paire jamais prévenue, prévenue moins de 12 h avant, ou dont aucun avis n'a joint personne | La date butoir **s'éteint** (effacée, traces comprises) |
 | Horaire posé ou match lancé | La date butoir est **retirée** (marque `RETIRED` dans `bg_schedule_deadline_notices`, jamais envoyée, posée seulement si le match est toujours programmé ou lancé à l'écriture, et gardée par précaution quand les avis d'une paire précédente s'effacent — aucun état atteignable ne les réunit aujourd'hui, une date butoir changée effaçant tous les avis) : elle reste sur le match, où le planning la lit encore (confirmation d'office à la date butoir), mais ne frappera plus — un match qui repasse à planifier (horaire retiré, lancement défait) voit alors sa date butoir s'éteindre, sans forfait |
 | Match joué | Rien |
 
-**Armée** (`deadlineArmed`) : le premier avis de la paire **actuelle** est
-parti au moins 30 minutes avant l'échéance (`SCHEDULE_DEADLINE_ARM_MIN_MS`).
-Une paire complétée trop tard (match d'origine fini juste avant) ou changée
-après l'annonce n'est donc jamais forfaitée. Un match dont le passage échoue
+**Armée** (`deadlineArmed`) : le premier avis **remis** de la paire
+**actuelle** l'a été au moins 12 heures avant l'échéance
+(`SCHEDULE_DEADLINE_ARM_MIN_MS`). Remis = un message privé ou un push au
+moins est réellement parti (`reachedSomeone`, colonne `delivered` de
+`bg_schedule_deadline_notices`, notée après l'envoi) : un palier réservé dont
+rien n'est parti (bot injoignable, aucun responsable joignable, sujet coupé
+par tous) n'arme rien — il n'est pas renvoyé chaque minute, le palier suivant
+peut armer, sinon la date butoir s'éteint. Une paire complétée trop tard
+(match d'origine fini juste avant) ou changée après l'annonce n'est donc
+jamais forfaitée. Un rappel ne se réserve que si le match est **toujours à
+planifier** au moment de la réservation (ni horaire, ni lancement de la
+paire, ni résultat) : un horaire posé entre la lecture et la réservation ne
+reçoit pas « toujours sans horaire ». Un envoi en échec ne rend que les
+paliers posés par **sa** réservation (un palier parti avant garde sa date). Le
+double forfait passe par un contrôle sans verrou (`scheduleDeadlineForfeitDue`)
+avant d'entrer dans la chaîne d'écriture, puis tout se relit sous verrou ; sa
+ligne « Match terminé » dit « date butoir de planification passée sans
+horaire » (`markDeadlineForfeit`).
+
+**Retour en arrière** : un résultat défait (`rollback.ts`, `clearMatchResults`)
+efface la date butoir **déjà passée** de la rencontre rendue à jouer, et ses
+traces d'avis — sinon le balayage referait le double forfait dans la minute ;
+une date butoir encore devant reste. Retirer l'horaire d'un match après une
+date butoir passée l'efface de même, traces comprises (`setMatchStartAt`). Un match dont le passage échoue
 5 fois d'affilée pour la même date butoir (`SWEEP_MAX_FAILURES`, forfait
-refusé à chaque fois, ou verrou tenu longtemps) est **mis de côté** 15 minutes
+refusé à chaque fois, avis qui n'arrive jamais à partir — la réservation qui
+le précède ne remet pas la série à zéro —, ou verrou tenu longtemps) est **mis de côté** 15 minutes
 (`SWEEP_FAILURE_BACKOFF_MS`, sauté par la lecture), avec une erreur dans le
 journal pour l'arbitrage ; repris, il repart d'une série neuve (compte
 borné). Sa date butoir **reste** : une panne passagère ne la fait jamais
-perdre. La pastille « à planifier » n'affiche qu'une date butoir à venir (un minuteur posé sur la date butoir, un autre 24 h avant pour la teinte d'avertissement, `useInstantClock` ; aucun sans date butoir). Les échecs d'un match que la lecture ne rend plus sont
+perdre. La pastille « à planifier » n'affiche qu'une date butoir à venir (un minuteur posé sur la date butoir, un autre 24 h avant pour la teinte d'avertissement, `useInstantClock` ; aucun sans date butoir, ni onglet caché — `useClientPower().clocks`, heure relue au retour). Les échecs d'un match que la lecture ne rend plus sont
 oubliés.
 
 Le double forfait passe par la chaîne existante, rien de neuf par format :
@@ -185,8 +212,8 @@ réessaie ; la ligne « à venir » reste un texte discret.
 ## Écrans (revue UI/UX)
 
 - **Fenêtre de saisie** (`ScheduleDeadlineDialog`) : jour et heure de Paris.
-  Les jours et heures **refusés d'avance ne sont pas proposés** (aujourd'hui,
-  les heures à moins d'une heure ; plus de jour passé) — `deadlineEntryChoices`,
+  Les jours et heures **refusés d'avance ne sont pas proposés** (les heures à
+  moins de 24 heures ; ni aujourd'hui, ni jour passé) — `deadlineEntryChoices`,
   `deadlineEntryHours` ; une date butoir en place **déjà passée** n'est pas
   rejouée (`deadlineEntryStart` repart de la date proposée) ; une plus lointaine
   est **triée** dans la liste. Un refus « trop proche » se rattache à l'**heure**,

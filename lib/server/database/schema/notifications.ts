@@ -59,6 +59,10 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
         pairing VARCHAR(48) NULL,
         deadline_at DATETIME NOT NULL,
         sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        -- Remis (un message privé ou un push au moins est parti) : seul un avis
+        -- remis arme le double forfait ; une réservation sans remise (bot
+        -- injoignable, personne de joignable) ne le fait pas.
+        delivered TINYINT(1) NOT NULL DEFAULT 0,
         PRIMARY KEY (match_id, notice_key),
         CONSTRAINT fk_bg_schedule_deadline_notices_match FOREIGN KEY (match_id)
           REFERENCES bg_matches(id) ON DELETE CASCADE

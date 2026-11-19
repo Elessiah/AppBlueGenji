@@ -68,3 +68,14 @@ describe("nextInstantBoundary", () => {
     expect(nextInstantBoundary(0, 5000, -10)).toBe(5000);
   });
 });
+
+describe("useInstantClock — régime de charge", () => {
+  it("useInstantClock_source_gatesTimerOnClientPowerClocks", () => {
+    const source = readFileSync(SOURCE, "utf8");
+
+    expect(source).toContain("const { clocks } = useClientPower();");
+    expect(source).toContain("if (now === null || !clocks) return;");
+    // Retour au premier plan : l'heure relue aussitôt.
+    expect(source).toMatch(/setNow\(Date\.now\(\)\);\r?\n\s+\}, \[at, clocks\]\);/);
+  });
+});

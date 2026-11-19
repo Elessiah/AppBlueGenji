@@ -188,7 +188,7 @@ Données
 Pseudo et identifiant Discord
 BattleTag (présenté dans les seuls tournois Overwatch, où sa présence et sa provenance d'un compte Battle.net rattaché — un BattleTag saisi à la main n'y suffit pas — sont aussi vérifiées pour caster ou arbitrer un match)
 Date et adversaire du match
-Date butoir de planification d'un match, et traces de ses avis (match, palier — annonce, rappel 24 h ou 3 h, double forfait —, date butoir annoncée et date d'envoi, sans le texte du message)
+Date butoir de planification d'un match, et traces de ses avis (match, palier — annonce, rappel 24 h ou 3 h, double forfait —, date butoir annoncée, date d'envoi et remise ou non, sans le texte du message)
 Annonces d'un nouveau match : place du match dans le tournoi, numéros des deux engagées, horaire annoncé et date de la trace, ou marque d'un match non annoncé
 Heure à laquelle chaque partie s'est déclarée prête (chaque caster pour lui-même), casters inscrits avec l'heure d'inscription de chacun, et stream que chacun a rejoint (co-cast) ou ouvert à part
 BattleTag qu'un caster donne pour un cast précis (facultatif, jamais vérifié ni recopié sur son profil, présenté dans les seuls tournois Overwatch, à la place de celui de son compte et aux mêmes lecteurs et moments — le réglage de visibilité du profil ne le masque pas, le caster le donnant pour ce match)

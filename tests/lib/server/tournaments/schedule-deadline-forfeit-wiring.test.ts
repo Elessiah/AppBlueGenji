@@ -40,9 +40,49 @@ describe("forfeitMissedScheduleDeadlinePublic", () => {
     expect(write).toContain("finalizeTournamentIfDone(connection, tournamentId)");
   });
 
+  it("forfeitMissedScheduleDeadlinePublic_preCheckRefuses_noWriteChain", () => {
+    const wrapper = body(index, "export async function forfeitMissedScheduleDeadlinePublic(");
+
+    // Contrôle sans verrou avant la chaîne : refusé, ni réconciliations ni clôture.
+    expect(wrapper).toContain("if (!(await scheduleDeadlineForfeitDue(tournamentId, matchId, deadlineAt, now))) return false;");
+    expect(wrapper.indexOf("scheduleDeadlineForfeitDue(tournamentId")).toBeLessThan(wrapper.indexOf("runPlayerMatchWrite("));
+  });
+
+  it("forfeitMissedScheduleDeadline_decision_marksDeadlineForfeitAfterResolve", () => {
+    const decision = body(service, "export async function forfeitMissedScheduleDeadline(");
+
+    expect(decision.indexOf("adminResolveMatch(")).toBeLessThan(decision.indexOf("markDeadlineForfeit(connection, matchId)"));
+  });
+
+  it("rollback_clearedMatches_pastDeadlineAndNoticesCleared", () => {
+    const rollback = readSource("lib/server/tournaments/rollback.ts");
+    const clear = body(rollback, "async function clearPastScheduleDeadlines(");
+
+    expect(body(rollback, "async function clearMatchResults(")).toContain("await clearPastScheduleDeadlines(connection, ids);");
+    expect(clear).toContain("schedule_deadline_at <= ?");
+    expect(clear).toContain("UPDATE bg_matches SET schedule_deadline_at = NULL");
+    expect(clear).toContain("DELETE FROM bg_schedule_deadline_notices");
+  });
+
   it("forfeitMissedScheduleDeadline_decision_usesAdminDoubleForfeit", () => {
     expect(body(service, "export async function forfeitMissedScheduleDeadline(")).toContain(
       "adminResolveMatch(connection, matchId, { doubleForfeit: true })",
     );
+  });
+});
+
+describe("markDeadlineForfeit", () => {
+  const logs = readSource("lib/server/tournaments/bot-logs.ts");
+
+  it("flushBotLogs_markedDeadlineForfeit_entryCarriesFlagToTheLine", () => {
+    const flush = body(logs, "export function flushBotLogs(");
+
+    expect(flush).toContain("deadlineForfeitMatches.take(connection)");
+    expect(flush).toContain("deadlineForfeit: true");
+    expect(logs).toContain("deadlineForfeit: entry.deadlineForfeit === true");
+  });
+
+  it("discardBotLogs_failedTransaction_dropsDeadlineForfeitMarks", () => {
+    expect(body(logs, "export function discardBotLogs(")).toContain("deadlineForfeitMatches.discard(connection)");
   });
 });

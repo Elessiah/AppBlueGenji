@@ -88,15 +88,20 @@ describe("readScheduleDeadline", () => {
     expect(readScheduleDeadline("2026-11-17T20:00:42.500Z", now)).toEqual({ kind: "set", at: at("2026-11-17T20:00:00Z") });
   });
 
-  it("readScheduleDeadline_justUnderOneHourAhead_returnsTooSoon", () => {
-    expect(readScheduleDeadline(new Date(now + HOUR - MINUTE).toISOString(), now)).toEqual({
+  it("readScheduleDeadline_justUnderTwentyFourHoursAhead_returnsTooSoon", () => {
+    expect(readScheduleDeadline(new Date(now + 24 * HOUR - MINUTE).toISOString(), now)).toEqual({
       kind: "invalid",
       code: "SCHEDULE_DEADLINE_TOO_SOON",
     });
   });
 
-  it("readScheduleDeadline_exactlyOneHourAhead_returnsSet", () => {
-    expect(readScheduleDeadline(new Date(now + HOUR).toISOString(), now)).toEqual({ kind: "set", at: now + HOUR });
+  it("readScheduleDeadline_exactlyTwentyFourHoursAhead_returnsSet", () => {
+    expect(readScheduleDeadline(new Date(now + 24 * HOUR).toISOString(), now)).toEqual({ kind: "set", at: now + 24 * HOUR });
+  });
+
+  it("readScheduleDeadline_oneHourAhead_returnsTooSoon", () => {
+    // Une saisie hâtive ne peut plus forfaiter une manche dans l'heure.
+    expect(readScheduleDeadline(new Date(now + HOUR).toISOString(), now)).toEqual({ kind: "invalid", code: "SCHEDULE_DEADLINE_TOO_SOON" });
   });
 
   it("readScheduleDeadline_exactlySixtyDaysAhead_returnsSet", () => {
@@ -180,12 +185,13 @@ describe("deadlineArmed", () => {
     expect(deadlineArmed(null, deadline)).toBe(false);
   });
 
-  it("deadlineArmed_exactlyThirtyMinutesBefore_true", () => {
-    expect(deadlineArmed(deadline - 30 * MINUTE, deadline)).toBe(true);
+  it("deadlineArmed_exactlyTwelveHoursBefore_true", () => {
+    expect(deadlineArmed(deadline - 12 * HOUR, deadline)).toBe(true);
   });
 
-  it("deadlineArmed_lessThanThirtyMinutesBefore_false", () => {
-    expect(deadlineArmed(deadline - 30 * MINUTE + 1, deadline)).toBe(false);
+  it("deadlineArmed_lessThanTwelveHoursBefore_false", () => {
+    expect(deadlineArmed(deadline - 12 * HOUR + 1, deadline)).toBe(false);
+    expect(deadlineArmed(deadline - 30 * MINUTE, deadline)).toBe(false);
   });
 });
 
@@ -377,17 +383,21 @@ describe("saisie : heures et jours permis", () => {
   // Mercredi 18 novembre 2026, 15:40 à Paris (14:40 UTC).
   const NOW = at("2026-11-18T14:40:00Z");
 
-  it("deadlineEntryHours_today_skipsHoursUnderOneHourAhead", () => {
-    const hours = deadlineEntryHours("2026-11-18", NOW);
-
-    expect(hours[0]).toBe(17);
-    expect(hours).toContain(21);
-    expect(hours).not.toContain(16);
+  it("deadlineEntryHours_today_none", () => {
+    expect(deadlineEntryHours("2026-11-18", NOW)).toEqual([]);
   });
 
-  it("deadlineEntryHours_exactlyOneHourAhead_isOffered", () => {
-    // 15:00 pile : 16:00 est à une heure exacte.
-    expect(deadlineEntryHours("2026-11-18", at("2026-11-18T14:00:00Z"))[0]).toBe(16);
+  it("deadlineEntryHours_tomorrow_skipsHoursUnderTwentyFourHoursAhead", () => {
+    const hours = deadlineEntryHours("2026-11-19", NOW);
+
+    expect(hours[0]).toBe(16);
+    expect(hours).toContain(21);
+    expect(hours).not.toContain(15);
+  });
+
+  it("deadlineEntryHours_exactlyTwentyFourHoursAhead_isOffered", () => {
+    // 15:00 pile : demain 15:00 est à 24 heures exactes.
+    expect(deadlineEntryHours("2026-11-19", at("2026-11-18T14:00:00Z"))[0]).toBe(15);
   });
 
   it("deadlineEntryHours_laterDay_offersAll24", () => {
@@ -400,16 +410,16 @@ describe("saisie : heures et jours permis", () => {
   });
 
   it("deadlineEntryChoices_lateEvening_dropsToday", () => {
-    // 23:30 à Paris : plus aucune heure pile n'est à une heure d'ici aujourd'hui.
+    // 23:30 à Paris : ni aujourd'hui ni demain n'ont plus d'heure pile à 24 heures d'ici.
     const days = deadlineEntryChoices(at("2026-11-18T22:30:00Z"));
 
-    expect(days[0]).toBe("2026-11-19");
+    expect(days[0]).toBe("2026-11-20");
   });
 
   it("deadlineEntryChoices_farKeptDay_isSortedIn", () => {
     const days = deadlineEntryChoices(NOW, "2026-12-30");
 
-    expect(days[0]).toBe("2026-11-18");
+    expect(days[0]).toBe("2026-11-19");
     expect(days.at(-1)).toBe("2026-12-30");
     expect([...days].sort()).toEqual(days);
   });

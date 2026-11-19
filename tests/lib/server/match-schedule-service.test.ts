@@ -95,6 +95,8 @@ function world(
     staffStartAt?: Date | null;
     /** Tournoi clos. */
     finished?: boolean;
+    /** Date butoir encore devant : l'effacement de l'horaire ne l'éteint pas (0 ligne). */
+    deadlineAhead?: boolean;
   } = {},
 ) {
   const connection = connectionMock();
@@ -131,6 +133,7 @@ function world(
       throw new Error("base injoignable");
     }
     writes.push({ sql, params: (params as unknown[]) ?? [] });
+    if (options.deadlineAhead && sql.startsWith("UPDATE bg_matches SET schedule_deadline_at = NULL")) return [{ affectedRows: 0 }];
     return [{ affectedRows: 1 }];
   });
   jest.mocked(withConnection).mockImplementation(async (run) => run(fakeConnection(connection)));
@@ -225,6 +228,23 @@ describe("setMatchStartAt", () => {
     const clear = writes.find((w) => w.sql.startsWith("UPDATE bg_matches SET schedule_deadline_at = NULL"));
     expect(clear?.sql).toContain("schedule_deadline_at <= ?");
     expect(clear?.params[0]).toBe(42);
+  });
+
+  it("setMatchStartAt_clearAfterPastDeadline_noticesDeleted", async () => {
+    const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }) });
+
+    await setMatchStartAt(42, null);
+
+    const deleted = writes.find((w) => w.sql.startsWith("DELETE FROM bg_schedule_deadline_notices"));
+    expect(deleted?.params).toEqual([42]);
+  });
+
+  it("setMatchStartAt_clearWithFutureDeadline_noticesKept", async () => {
+    const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }), deadlineAhead: true });
+
+    await setMatchStartAt(42, null);
+
+    expect(writes.some((w) => w.sql.startsWith("DELETE FROM bg_schedule_deadline_notices"))).toBe(false);
   });
 
   it("setMatchStartAt_startSet_deadlineUntouched", async () => {

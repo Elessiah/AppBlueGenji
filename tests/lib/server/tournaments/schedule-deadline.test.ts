@@ -10,7 +10,11 @@ jest.mock("@/lib/server/notify", () => ({
   loadNotificationRecipients: jest.fn(),
   notifyUsers: jest.fn(),
 }));
-jest.mock("@/lib/server/staff-audit", () => ({ auditStaffAction: jest.fn() }));
+jest.mock("@/lib/server/staff-audit", () => ({ auditStaffAction: jest.fn(), publishStaffAction: jest.fn() }));
+jest.mock("@/lib/server/tournaments/bot-logs", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/bot-logs")>("@/lib/server/tournaments/bot-logs"),
+  markDeadlineForfeit: jest.fn(),
+}));
 jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://bluegenji.test" }));
 jest.mock("@/lib/server/tournaments/notifications", () => ({ publishMatchUpdatedEvent: jest.fn() }));
 jest.mock("@/lib/server/tournaments/admin", () => ({ adminResolveMatch: jest.fn() }));
@@ -23,7 +27,8 @@ jest.mock("@/lib/server/tournaments/index", () => ({ forfeitMissedScheduleDeadli
 import { getDatabase, withConnection } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { loadEntrantMatchLeaderIds, loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
-import { auditStaffAction } from "@/lib/server/staff-audit";
+import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
+import { markDeadlineForfeit } from "@/lib/server/tournaments/bot-logs";
 import { adminResolveMatch } from "@/lib/server/tournaments/admin";
 import { forfeitMissedScheduleDeadlinePublic } from "@/lib/server/tournaments/index";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
@@ -32,6 +37,8 @@ import {
   deadlineNoticesFor,
   forfeitMissedScheduleDeadline,
   NO_NOTICES,
+  reachedSomeone,
+  scheduleDeadlineForfeitDue,
   SCHEDULE_DEADLINES_LOCK,
   sentNoticesByMatch,
   SWEEP_BATCH,
@@ -141,7 +148,7 @@ describe("sweepAction", () => {
   });
 
   it("sweepAction_dueArmedInTime_forfeit", () => {
-    expect(sweepAction(row(), sentFor(["SET"], DEADLINE - 30 * MINUTE), DEADLINE)).toEqual({ kind: "forfeit", deadlineAt: DEADLINE });
+    expect(sweepAction(row(), sentFor(["SET"], DEADLINE - 12 * HOUR), DEADLINE)).toEqual({ kind: "forfeit", deadlineAt: DEADLINE });
   });
 
   it("sweepAction_dueNeverArmed_lapse", () => {
@@ -149,8 +156,8 @@ describe("sweepAction", () => {
   });
 
   it("sweepAction_dueArmedTooLate_lapse", () => {
-    // Paire complétée 29 min avant l'échéance : les équipes n'ont pas eu le temps.
-    expect(sweepAction(row(), sentFor(["DL3"], DEADLINE - 29 * MINUTE), DEADLINE)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
+    // Paire prévenue moins de 12 h avant l'échéance : les équipes n'ont pas eu le temps.
+    expect(sweepAction(row(), sentFor(["DL3"], DEADLINE - 12 * HOUR + MINUTE), DEADLINE)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
   });
 
   it("sweepAction_scheduledPastDeadline_retire", () => {
@@ -206,7 +213,13 @@ describe("sweepAction", () => {
 });
 
 describe("sentNoticesByMatch", () => {
-  const notice = (notice_key: string, pairing: string | null, sentAt: number) => ({ match_id: 40, notice_key, pairing, sent_at: new Date(sentAt) });
+  const notice = (notice_key: string, pairing: string | null, sentAt: number, delivered = 1) => ({
+    match_id: 40,
+    notice_key,
+    pairing,
+    sent_at: new Date(sentAt),
+    delivered,
+  });
 
   it("sentNoticesByMatch_currentPairing_keysAndEarliestArmedAt", () => {
     const sent = sentNoticesByMatch([row()], [notice("DL24", PAIRING, NOW + HOUR), notice("SET", PAIRING, NOW)]);
@@ -261,7 +274,7 @@ describe("forfeitMissedScheduleDeadline", () => {
     routeSql(connection, [
       [/FROM bg_tournaments/, () => tournament("RUNNING")],
       [/FROM bg_matches/, () => [[row()]]],
-      [/SELECT notice_key, pairing, sent_at/, () => [[{ notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW) }]]],
+      [/SELECT notice_key, pairing, sent_at/, () => [[{ notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW), delivered: 1 }]]],
     ]);
 
     await expect(run()).resolves.toBe(true);
@@ -290,8 +303,8 @@ describe("forfeitMissedScheduleDeadline", () => {
         /SELECT notice_key, pairing, sent_at/,
         () => [
           [
-            { notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW) },
-            { notice_key: "RETIRED", pairing: PAIRING, sent_at: new Date(DEADLINE) },
+            { notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW), delivered: 1 },
+            { notice_key: "RETIRED", pairing: PAIRING, sent_at: new Date(DEADLINE), delivered: 0 },
           ],
         ],
       ],
@@ -305,7 +318,7 @@ describe("forfeitMissedScheduleDeadline", () => {
     routeSql(connection, [
       [/FROM bg_tournaments/, () => tournament("RUNNING")],
       [/FROM bg_matches/, () => [[row()]]],
-      [/SELECT notice_key, pairing, sent_at/, () => [[{ notice_key: "SET", pairing: "100:300", sent_at: new Date(NOW) }]]],
+      [/SELECT notice_key, pairing, sent_at/, () => [[{ notice_key: "SET", pairing: "100:300", sent_at: new Date(NOW), delivered: 1 }]]],
     ]);
 
     await expect(run()).resolves.toBe(false);
@@ -388,7 +401,7 @@ describe("sweepScheduleDeadlines", () => {
   it("sweepScheduleDeadlines_stepAlreadySent_claimsNothing", async () => {
     routeSql(connection, [
       [/FROM bg_matches m/, () => [[row()]]],
-      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW) }]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW), delivered: 1 }]]],
     ]);
 
     await sweepScheduleDeadlines(NOW);
@@ -413,7 +426,7 @@ describe("sweepScheduleDeadlines", () => {
     jest.mocked(forfeitMissedScheduleDeadlinePublic).mockResolvedValue(true);
     routeSql(connection, [
       [/FROM bg_matches m/, () => [[row()]]],
-      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW) }]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW), delivered: 1 }]]],
       [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
     ]);
     jest.spyOn(console, "info").mockImplementation(() => undefined);
@@ -429,7 +442,7 @@ describe("sweepScheduleDeadlines", () => {
     jest.mocked(forfeitMissedScheduleDeadlinePublic).mockResolvedValue(false);
     routeSql(connection, [
       [/FROM bg_matches m/, () => [[row()]]],
-      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW) }]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW), delivered: 1 }]]],
     ]);
 
     await expect(sweepScheduleDeadlines(DEADLINE + HOUR)).resolves.toEqual({ forfeited: 0, lapsed: 0, retired: 0, reminded: 0 });
@@ -508,7 +521,7 @@ describe("sweepScheduleDeadlines", () => {
     const [deleteSql, deleteParams] = executed(connection, /DELETE FROM bg_schedule_deadline_notices WHERE match_id = \? AND NOT/)[0];
     expect(deleteSql).toContain("notice_key <> ?");
     expect(deleteParams).toEqual([40, PAIRING, "RETIRED"]);
-    expect(executed(connection, /INSERT IGNORE/)[0][1]).toEqual(["SET", PAIRING, new Date(NOW), 40, new Date(DEADLINE), 100, 200]);
+    expect(executed(connection, /INSERT IGNORE/)[0][1]).toEqual(["SET", PAIRING, new Date(NOW), 40, new Date(DEADLINE), 100, 200, PAIRING]);
   });
 
   it("sweepScheduleDeadlines_fourFailures_keepsDeadline", async () => {
@@ -726,7 +739,13 @@ describe("setMatchScheduleDeadline", () => {
     expect(executed(connection, /UPDATE bg_matches SET schedule_deadline_at/)[0][1]).toEqual([new Date(DEADLINE), 40]);
     expect(executed(connection, /DELETE FROM bg_schedule_deadline_notices/)[0][1]).toEqual([40]);
     expect(connection.commit).toHaveBeenCalled();
-    expect(auditStaffAction).toHaveBeenCalledWith(expect.stringContaining("match 40"), ACTOR);
+    expect(publishStaffAction).toHaveBeenCalledWith(
+      expect.stringContaining("match #40"),
+      ACTOR,
+      expect.objectContaining({ category: "schedule", tournamentId: 10, auditLine: expect.stringContaining("match 40") }),
+    );
+    expect(jest.mocked(publishStaffAction).mock.calls[0][0]).toContain("par le staff");
+    expect(jest.mocked(publishStaffAction).mock.calls[0][0]).not.toContain("Arbitre");
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(10);
   });
 
@@ -937,7 +956,7 @@ describe("sweepScheduleDeadlines : coût du passage", () => {
     jest.mocked(loadEntrantMatchLeaderIds).mockRejectedValue(new Error("bot"));
     routeSql(connection, [
       [/FROM bg_matches m/, () => [[row()]]],
-      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(DEADLINE - HOUR) }]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(DEADLINE - 13 * HOUR), delivered: 1 }]]],
       [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
     ]);
 
@@ -1014,5 +1033,270 @@ describe("setTournamentScheduleDeadlines : écritures groupées", () => {
     expect(deletes).toHaveLength(3);
     expect(updates.flatMap(([, params]) => (params as unknown[]).slice(1))).toHaveLength(rows.length);
     expect(updates[0][0]).toContain("WHERE id IN (");
+  });
+});
+
+describe("revue sécurité 1 : avis remis, réservations, traces", () => {
+  const claimed = (affectedRows: number) => [{ affectedRows }];
+  const reached = { discord: null, discordUnreachedUserIds: [], pushed: 1 };
+  const nobody = { discord: null, discordUnreachedUserIds: [], pushed: 0 };
+
+  function poolMock() {
+    const pool = { execute: jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]) };
+    jest.mocked(getDatabase).mockResolvedValue(fakePool(pool));
+    return pool;
+  }
+  const poolCalls = (pool: ReturnType<typeof poolMock>, pattern: RegExp) =>
+    pool.execute.mock.calls.filter(([sql]) => pattern.test(String(sql)));
+
+  it("sweepScheduleDeadlines_reminderClaim_insertRequiresStillToPlan", async () => {
+    poolMock();
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    const [sql, params] = executed(connection, /INSERT IGNORE/)[0];
+    expect(sql).toContain("start_at IS NULL");
+    expect(sql).toContain("status NOT IN ('COMPLETED', 'AWAITING_CONFIRMATION')");
+    expect(sql).toContain("launch_pairing <=> ?");
+    expect((params as unknown[]).at(-1)).toBe(PAIRING);
+  });
+
+  it("sweepScheduleDeadlines_scheduledBetweenReadAndClaim_noReminderSent", async () => {
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(0)],
+    ]);
+
+    await expect(sweepScheduleDeadlines(NOW)).resolves.toMatchObject({ reminded: 0 });
+
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("sweepScheduleDeadlines_forfeitNoticeClaim_noToPlanGuard", async () => {
+    jest.spyOn(console, "info").mockImplementation(() => undefined);
+    poolMock();
+    jest.mocked(forfeitMissedScheduleDeadlinePublic).mockResolvedValue(true);
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW), delivered: 1 }]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await sweepScheduleDeadlines(DEADLINE + HOUR);
+
+    const [sql, params] = executed(connection, /INSERT IGNORE/)[0];
+    expect(sql).not.toContain("start_at IS NULL");
+    expect(params).toEqual(["FORFEIT", PAIRING, new Date(DEADLINE + HOUR), 40, new Date(DEADLINE), 100, 200]);
+  });
+
+  it("sweepScheduleDeadlines_noticeReachedSomeone_markedDelivered", async () => {
+    const pool = poolMock();
+    jest.mocked(notifyUsers).mockResolvedValue(reached);
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    const marked = poolCalls(pool, /SET delivered = 1/);
+    expect(marked).toHaveLength(1);
+    expect(marked[0][1]).toEqual([40, PAIRING, "SET"]);
+  });
+
+  it("sweepScheduleDeadlines_noticeReachedNobody_notArmedClaimKept", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const pool = poolMock();
+    jest.mocked(notifyUsers).mockResolvedValue(nobody);
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(poolCalls(pool, /SET delivered = 1/)).toHaveLength(0);
+    expect(poolCalls(pool, /DELETE/)).toHaveLength(0);
+    expect(warn.mock.calls.some(([message]) => String(message).includes("non armée"))).toBe(true);
+  });
+
+  it("sweepScheduleDeadlines_lateClaimSendFails_releasesOnlyKeysInsertedNow", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const pool = poolMock();
+    jest.mocked(loadEntrantMatchLeaderIds).mockRejectedValue(new Error("db"));
+    // 20 h avant l'échéance : SET et DL24 réservés ensemble ; SET l'était déjà.
+    const now = DEADLINE - 20 * HOUR;
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(0)],
+    ]);
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      if (/FROM bg_matches m/.test(sql)) return [[row()]];
+      if (/INSERT IGNORE/.test(sql)) return claimed((params as unknown[])[0] === "DL24" ? 1 : 0);
+      return [[]];
+    });
+
+    await sweepScheduleDeadlines(now);
+
+    const released = poolCalls(pool, /DELETE FROM bg_schedule_deadline_notices/);
+    expect(released).toHaveLength(1);
+    expect(released[0][1]).toEqual([40, PAIRING, "DL24"]);
+  });
+
+  it("sweepScheduleDeadlines_repeatedSendFailures_countBuildsUpToParking", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    poolMock();
+    jest.mocked(loadEntrantMatchLeaderIds).mockRejectedValue(new Error("db"));
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    for (let pass = 0; pass < SWEEP_MAX_FAILURES; pass += 1) await sweepScheduleDeadlines(NOW + pass * MINUTE);
+
+    expect(failureCounts().get(40)?.failures).toBe(SWEEP_MAX_FAILURES);
+    expect(failureCounts().get(40)?.retryAt).toBeGreaterThan(0);
+  });
+
+  it("sweepScheduleDeadlines_reminderSentAfterFailure_countCleared", async () => {
+    poolMock();
+    jest.mocked(notifyUsers).mockResolvedValue(reached);
+    failureCounts().set(40, { deadlineAt: DEADLINE, failures: 2, retryAt: 0 });
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await sweepScheduleDeadlines(NOW);
+
+    expect(failureCounts().has(40)).toBe(false);
+  });
+
+  it("sentNoticesByMatch_undeliveredNotice_doesNotArm", () => {
+    const sent = sentNoticesByMatch([row()], [{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW), delivered: 0 }]);
+
+    expect(sent.get(40)).toEqual({ keys: new Set(["SET"]), armedAt: null, stale: false, retired: false });
+  });
+
+  it("forfeitMissedScheduleDeadline_onlyUndeliveredNotices_noForfeit", async () => {
+    routeSql(connection, [
+      [/FROM bg_tournaments/, () => [[{ referee_scheduling: 1, state: "RUNNING" }]]],
+      [/FROM bg_matches/, () => [[row()]]],
+      [/SELECT notice_key, pairing, sent_at/, () => [[{ notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW), delivered: 0 }]]],
+    ]);
+
+    await expect(forfeitMissedScheduleDeadline(fakeConnection(connection), 10, 40, DEADLINE, DEADLINE + HOUR)).resolves.toBe(false);
+
+    expect(adminResolveMatch).not.toHaveBeenCalled();
+  });
+
+  it("forfeitMissedScheduleDeadline_due_marksDeadlineForfeitForLog", async () => {
+    routeSql(connection, [
+      [/FROM bg_tournaments/, () => [[{ referee_scheduling: 1, state: "RUNNING" }]]],
+      [/FROM bg_matches/, () => [[row()]]],
+      [/SELECT notice_key, pairing, sent_at/, () => [[{ notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW), delivered: 1 }]]],
+    ]);
+
+    await forfeitMissedScheduleDeadline(fakeConnection(connection), 10, 40, DEADLINE, DEADLINE + HOUR);
+
+    expect(markDeadlineForfeit).toHaveBeenCalledWith(expect.anything(), 40);
+  });
+
+  describe("scheduleDeadlineForfeitDue", () => {
+    function poolRoutes(match: SweepRow, state = "RUNNING") {
+      const pool = { execute: jest.fn<SqlQuery>() };
+      pool.execute.mockImplementation(async (sql: string) => {
+        if (/FROM bg_tournaments/.test(sql)) return [[{ referee_scheduling: 1, state, name: "Coupe" }]];
+        if (/FROM bg_matches/.test(sql)) return [[match]];
+        if (/bg_schedule_deadline_notices/.test(sql)) return [[{ notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW), delivered: 1 }]];
+        return [[]];
+      });
+      jest.mocked(getDatabase).mockResolvedValue(fakePool(pool));
+      return pool;
+    }
+
+    it("scheduleDeadlineForfeitDue_dueArmed_trueWithoutLock", async () => {
+      const pool = poolRoutes(row());
+
+      await expect(scheduleDeadlineForfeitDue(10, 40, DEADLINE, DEADLINE + HOUR)).resolves.toBe(true);
+
+      expect(poolCalls(pool, /FOR UPDATE/)).toHaveLength(0);
+      expect(lockTournamentRow).not.toHaveBeenCalled();
+    });
+
+    it("scheduleDeadlineForfeitDue_timeSetMeanwhile_false", async () => {
+      poolRoutes(row({ start_at: new Date(DEADLINE + 24 * HOUR) }));
+
+      await expect(scheduleDeadlineForfeitDue(10, 40, DEADLINE, DEADLINE + HOUR)).resolves.toBe(false);
+    });
+
+    it("scheduleDeadlineForfeitDue_tournamentNotRunning_falseWithoutMatchRead", async () => {
+      const pool = poolRoutes(row(), "FINISHED");
+
+      await expect(scheduleDeadlineForfeitDue(10, 40, DEADLINE, DEADLINE + HOUR)).resolves.toBe(false);
+
+      expect(poolCalls(pool, /FROM bg_matches/)).toHaveLength(0);
+    });
+  });
+
+  it("reachedSomeone_dmSentOrPushed_true", () => {
+    expect(reachedSomeone({ discord: { sent: 1, unresolved: [], failed: [] }, pushed: 0 })).toBe(true);
+    expect(reachedSomeone({ discord: null, pushed: 1 })).toBe(true);
+  });
+
+  it("reachedSomeone_nothingOrNull_false", () => {
+    expect(reachedSomeone({ discord: null, pushed: 0 })).toBe(false);
+    expect(reachedSomeone({ discord: { sent: 0, unresolved: [], failed: [] }, pushed: 0 })).toBe(false);
+    expect(reachedSomeone(undefined)).toBe(false);
+  });
+
+  describe("journal du staff", () => {
+    beforeEach(() => {
+      jest.mocked(withNamedLock).mockRejectedValue(new NamedLockUnavailableError(SCHEDULE_DEADLINES_LOCK, 0));
+    });
+
+    it("setMatchScheduleDeadline_clear_publishesAnonymousRemovalLog", async () => {
+      routeSql(connection, [
+        [/SELECT tournament_id FROM bg_matches/, () => [[{ tournament_id: 10 }]]],
+        [/FROM bg_tournaments/, () => [[{ referee_scheduling: 1, state: "RUNNING", name: "Coupe" }]]],
+        [/FROM bg_matches WHERE id = \?/, () => [[row()]]],
+      ]);
+
+      await setMatchScheduleDeadline(40, null, ACTOR, NOW);
+
+      const [line, actor, options] = jest.mocked(publishStaffAction).mock.calls[0];
+      expect(line).toContain("retirée");
+      expect(line).toContain("par le staff");
+      expect(actor).toEqual(ACTOR);
+      expect(options).toMatchObject({ category: "schedule", tournamentId: 10 });
+    });
+
+    it("setTournamentScheduleDeadlines_changed_publishesCountLog", async () => {
+      routeSql(connection, [
+        [/FROM bg_tournaments/, () => [[{ referee_scheduling: 1, state: "RUNNING", name: "Coupe" }]]],
+        [/FROM bg_matches\s+WHERE tournament_id/, () => [[row({ id: 40, schedule_deadline_at: null }), row({ id: 41, schedule_deadline_at: null })]]],
+      ]);
+
+      await setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, NOW);
+
+      expect(jest.mocked(publishStaffAction).mock.calls[0][0]).toContain("2 match(s) à planifier");
+      expect(auditStaffAction).not.toHaveBeenCalled();
+    });
+
+    it("setTournamentScheduleDeadlines_unchanged_auditOnly", async () => {
+      routeSql(connection, [
+        [/FROM bg_tournaments/, () => [[{ referee_scheduling: 1, state: "RUNNING", name: "Coupe" }]]],
+        [/FROM bg_matches\s+WHERE tournament_id/, () => [[row({ id: 40 })]]],
+      ]);
+
+      await setTournamentScheduleDeadlines(10, new Date(DEADLINE).toISOString(), ACTOR, NOW);
+
+      expect(publishStaffAction).not.toHaveBeenCalled();
+      expect(auditStaffAction).toHaveBeenCalledWith(expect.stringContaining("(0 changée(s))"), ACTOR);
+    });
   });
 });

@@ -233,7 +233,7 @@
     "NOT_MAP_PICKER": "Only the referees and, when the match is self-managed, its teams choose the map.",
     "ROUND_MAPS_SET": "This tournament round has its maps set for the whole round: reset the round to enter the map match by match.",
     "INVALID_SCHEDULE_DEADLINE": "Deadline not recognised.",
-    "SCHEDULE_DEADLINE_TOO_SOON": "The deadline must be at least one hour ahead.",
+    "SCHEDULE_DEADLINE_TOO_SOON": "The deadline must be at least 24 hours ahead.",
     "SCHEDULE_DEADLINE_TOO_FAR": "The deadline cannot be more than sixty days ahead.",
     "SCHEDULE_DEADLINE_NOT_ALLOWED": "Deadline not possible: the match already has a time, is launched or played, or the tournament does not have referees schedule its matches.",
     "SCHEDULE_DEADLINE_UPDATE_FAILED": "The deadline could not be saved. Try again in a moment."

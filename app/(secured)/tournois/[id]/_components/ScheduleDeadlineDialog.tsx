@@ -68,7 +68,7 @@ export function ScheduleDeadlineDialog({
   const [now] = useState(() => Date.now());
   const current = target.kind === "match" && target.deadlineAt !== null ? Date.parse(target.deadlineAt) : null;
   const [suggested] = useState(() => suggestedScheduleDeadline(scheduleOpenedAt(matches, now, target.kind === "match" ? target.matchId : null), now));
-  // Une date butoir en place déjà passée (ou à moins d'une heure) ne se rejoue pas : on repart de la proposée.
+  // Une date butoir en place déjà passée (ou à moins de 24 heures) ne se rejoue pas : on repart de la proposée.
   const initial = deadlineEntryStart(current, suggested, now);
   const days = useMemo(() => deadlineEntryChoices(now, initial.fromCurrent ? initial.day : null), [now, initial.day, initial.fromCurrent]);
   const [day, setDay] = useState<string>(days.includes(initial.day) ? initial.day : (days[0] ?? NONE));
