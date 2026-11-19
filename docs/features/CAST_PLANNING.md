@@ -95,7 +95,9 @@ compte les **rôles**, pas les personnes.
   manque un rôle qu'il pourrait prendre — caster, prod (seulement auprès d'un
   caster qui l'attend : entrée avec caster, pas encore diffusée) ou place
   d'arbitre (un caster qui est aussi prod ou arbitre n'y est pas pris) —, ouverte au lot
-  ou non (jamais pris à une autre entrée). Ordre :
+  ou non (jamais pris à une autre entrée). Les exclusions (joueur, tournoi
+  caché, condition d'arbitrage, suspension) se lisent aussi pour ces entrées
+  voisines (`loadExclusions`) : n'y est attendu que qui pourrait les tenir. Ordre :
   ceux qui préfèrent l'entrée (sur tout le lot) d'abord, puis les autres
   entrée par entrée dans l'ordre du calendrier ; parmi les candidats, ce qui
   rend l'entrée diffusée (un autonome auprès d'un caster qui attend son prod),
@@ -342,6 +344,16 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   provisoire sinon (sans message). Aucun candidat : la place est **« à
   pourvoir »** (pastille sur la carte, `unfilled` de la vue) et le staff est
   prévenu (`PLANNING_UNFILLED`) si la ligne était confirmée.
+- **Caster restant suspendu** (`casterHolds`) : deux lectures. Celle des
+  membres (`shown` : annonces aux co-affectés, message rendu au désisté —
+  « Désistement enregistré : la diffusion est perdue » pour `streamLost`)
+  compte le compte suspendu comme le tableau le montre, sans rien trahir de
+  la suspension. Celle du calcul et du staff (`staff`) ne le compte pas : le
+  remplaçant se cherche comme pour une première place (le suspendu est écarté
+  de ce seul calcul et ne prend aucune des deux places), et sans remplaçant le
+  staff est prévenu (`staffUnfilled`) même si les membres lisent « un autre
+  caster reste affecté ». Un désisté encore **inscrit sur le match** (`CAST`)
+  cast toujours : sa ligne d'inscription compte comme caster restant.
 - Arbitre **d'un match** confirmé : le retrait passe par
   `assignMatchReferee` (le match perd son arbitre, ligne anonyme au journal),
   puis le remplaçant y est posé par la même porte — un refus métier compte

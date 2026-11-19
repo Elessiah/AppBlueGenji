@@ -9,12 +9,13 @@ import {
   planningDayStart,
   planningNextWeekStart,
   planningWeekStart,
+  PLANNING_MAX_CASTERS,
   type AvailabilityStatus,
   type CoverageLevel,
   type PlanningRole,
 } from "@/lib/shared/planning";
 import { rolesConflict } from "@/lib/shared/planning-planner";
-import type { PlanningAvailabilityView, PlanningEntryView, PlanningMember, PlanningView } from "@/lib/shared/planning-view";
+import type { PlanningAvailabilityView, PlanningEntryView, PlanningMember, PlanningView, WithdrawalResponse } from "@/lib/shared/planning-view";
 
 export type PlanningDay = { dayStart: number; entries: PlanningEntryView[] };
 export type PlanningWeek = { weekStart: number; entries: PlanningEntryView[]; days: PlanningDay[] };
@@ -212,12 +213,26 @@ export function roleChoices(
 /**
  * Le texte du plafond atteint : ce que le staff peut faire. Un caster retirable
  * ici (ligne du planning) : le retirer ; s'il n'y a que des propositions du
- * calcul, le dire ; si tous sont inscrits sur le match, il faut passer par le match.
+ * calcul, le dire ; si tous sont inscrits sur le match, ou si les inscrits y
+ * suffisent à atteindre le plafond, il faut passer par le match.
  */
 export function castersFullKind(entry: PlanningEntryView): "castersFull" | "castersFullProvisional" | "castersFullMatch" {
-  const removable = entry.assignments.filter((row) => row.role === "CASTER" && row.source !== "CAST");
-  if (removable.length === 0) return "castersFullMatch";
+  const casters = entry.assignments.filter((row) => row.role === "CASTER");
+  const removable = casters.filter((row) => row.source !== "CAST");
+  // Les inscrits sur le match atteignent seuls le plafond (inscriptions non plafonnées) : retirer une ligne du
+  // planning ne rouvrirait pas la liste, il faut passer par le match.
+  if (removable.length === 0 || casters.length - removable.length >= PLANNING_MAX_CASTERS) return "castersFullMatch";
   return removable.every((row) => row.provisional) ? "castersFullProvisional" : "castersFull";
+}
+
+/** Le message de succès d'un désistement, selon son issue. */
+export function withdrawDoneKey(
+  result: WithdrawalResponse,
+): "withdraw.doneReplaced" | "withdraw.doneStreamLost" | "withdraw.doneUnfilled" | "withdraw.done" {
+  if (result.replaced) return "withdraw.doneReplaced";
+  if (!result.unfilled) return "withdraw.done";
+  // Diffusion perdue : le caster restant est toujours affiché, rien n'est montré « à pourvoir ».
+  return result.streamLost ? "withdraw.doneStreamLost" : "withdraw.doneUnfilled";
 }
 
 /** Clé du texte d'un refus : un code connu de `errors`, sinon `generic`. */

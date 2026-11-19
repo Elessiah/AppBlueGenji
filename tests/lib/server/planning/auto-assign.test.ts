@@ -32,6 +32,7 @@ import {
   excludeFromHidden,
   excludeSuspended,
   holdingRefusal,
+  loadExclusions,
   lockedHolding,
   preparePlanner,
   runAutoAssign,
@@ -384,6 +385,30 @@ describe("excludeFromHidden", () => {
     excludeFromHidden({ members: [loadedMember({ userId: 4, roles: ["CASTER"] })] }, [loadedEntry()], excluded);
 
     expect(excluded.size).toBe(0);
+  });
+});
+
+describe("loadExclusions", () => {
+  const batch = loadedEntry({ key: "m:1" });
+  const overlapping = loadedEntry({ key: "m:2", matchId: 2 });
+  const later = loadedEntry({ key: "m:3", matchId: 3, startAt: MONDAY + 10 * HOUR_MS, endAt: MONDAY + 11 * HOUR_MS });
+
+  it("loadExclusions_suspendedMember_excludedOnOverlappingEntryOutsideBatch", async () => {
+    const data = planningData({ entries: [batch, overlapping, later], members: [loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })] });
+
+    const excluded = await loadExclusions(fakeConnection(connection), data, [batch]);
+
+    expect(excluded.has("m:2|4|CASTER")).toBe(true);
+    expect(excluded.has("m:3|4|CASTER")).toBe(false);
+  });
+
+  it("loadExclusions_hiddenOverlappingEntry_excludedForNonViewer", async () => {
+    const hidden = loadedEntry({ key: "m:2", matchId: 2, hidden: true });
+    const data = planningData({ entries: [batch, hidden], members: [loadedMember({ userId: 4, roles: ["CASTER"] })] });
+
+    const excluded = await loadExclusions(fakeConnection(connection), data, [batch]);
+
+    expect(excluded.has("m:2|4|CASTER")).toBe(true);
   });
 });
 

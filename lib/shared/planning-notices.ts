@@ -171,10 +171,10 @@ export function formatPlanningAssignedDm(
   return [head, ...lines, `Heure de Paris. Empêché ? Désiste-toi sur le planning : ${url}`].join("\n");
 }
 
-type WithdrawalOutcome = "replaced" | "selfHeld" | "stillHeld" | "streamLost" | "open";
+export type WithdrawalOutcome = "replaced" | "selfHeld" | "stillHeld" | "streamLost" | "open";
 
-/** L'issue d'un désistement, telle que la lit le destinataire. */
-function withdrawalOutcome(notice: PlanningWithdrawalNotice): WithdrawalOutcome {
+/** L'issue d'un désistement, telle que la lit le destinataire (message privé et push la lisent ici). */
+export function withdrawalOutcome(notice: PlanningWithdrawalNotice): WithdrawalOutcome {
   if (notice.replaced) return "replaced";
   if (notice.stillHeld === true && notice.role === "CASTER") return notice.selfHeld === true ? "selfHeld" : "stillHeld";
   return notice.streamLost === true ? "streamLost" : "open";

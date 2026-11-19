@@ -55,6 +55,8 @@ import {
   type PlanningNoticeAssignment,
   type PlanningNoticeEntry,
   type PlanningWithdrawalNotice,
+  type WithdrawalOutcome,
+  withdrawalOutcome,
 } from "./planning-notices";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
@@ -1243,18 +1245,18 @@ export function planningWithdrawalPush(notice: PlanningWithdrawalNotice, locale:
   };
 }
 
+/** Clé du texte de chaque issue d'un désistement ({@link withdrawalOutcome}, partagée avec le message privé). */
+const WITHDRAWAL_BODY_KEYS = {
+  replaced: "planning.withdrawal.bodyReplaced",
+  selfHeld: "planning.withdrawal.bodySelfHeld",
+  stillHeld: "planning.withdrawal.bodyStillHeld",
+  streamLost: "planning.withdrawal.bodyStreamLost",
+  open: "planning.withdrawal.bodyOpen",
+} as const satisfies Record<WithdrawalOutcome, string>;
+
 /** Texte d'un désistement : remplaçant affecté, autre caster encore affecté (ou le destinataire lui-même), ou place à pourvoir. */
-function withdrawalBody(
-  notice: PlanningWithdrawalNotice,
-):
-  | "planning.withdrawal.bodyReplaced"
-  | "planning.withdrawal.bodyStillHeld"
-  | "planning.withdrawal.bodySelfHeld"
-  | "planning.withdrawal.bodyStreamLost"
-  | "planning.withdrawal.bodyOpen" {
-  if (notice.replaced) return "planning.withdrawal.bodyReplaced";
-  if (notice.stillHeld !== true || notice.role !== "CASTER") return notice.streamLost === true ? "planning.withdrawal.bodyStreamLost" : "planning.withdrawal.bodyOpen";
-  return notice.selfHeld === true ? "planning.withdrawal.bodySelfHeld" : "planning.withdrawal.bodyStillHeld";
+function withdrawalBody(notice: PlanningWithdrawalNotice): (typeof WITHDRAWAL_BODY_KEYS)[WithdrawalOutcome] {
+  return WITHDRAWAL_BODY_KEYS[withdrawalOutcome(notice)];
 }
 
 /** Texte d'une place à pourvoir : tardive ou non, diffusion perdue (départ d'un caster autonome) ou non. */

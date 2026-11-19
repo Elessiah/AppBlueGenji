@@ -143,6 +143,26 @@ describe("announceWithdrawal", () => {
     expect(calls[1][1].discord?.message("fr")).toContain("diffusion perdue");
   });
 
+  it("announceWithdrawal_staffUnfilledWhileStillHeld_staffNotifiedOthersStillHeld", async () => {
+    // Le caster restant (6) est suspendu : les membres lisent « un autre caster reste », le staff est prévenu.
+    await announceWithdrawal(withdrawal({ unfilled: false, stillHeldBy: [6], staffUnfilled: { streamLost: false }, coAssignedIds: [5] }));
+
+    const calls = jest.mocked(notifyUsers).mock.calls;
+    expect(sent()).toEqual([
+      [[5], "PLANNING_WITHDRAWAL"],
+      [[1, 2], "PLANNING_UNFILLED"],
+    ]);
+    expect(calls[0][1].discord?.message("fr")).toContain("Un autre caster reste affecté.");
+    expect(calls[1][1].discord?.message("fr")).toContain("place à pourvoir");
+  });
+
+  it("announceWithdrawal_staffUnfilledNull_noStaffAlert", async () => {
+    await announceWithdrawal(withdrawal({ unfilled: true, staffUnfilled: null, coAssignedIds: [5] }));
+
+    expect(sent()).toEqual([[[5], "PLANNING_WITHDRAWAL"]]);
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
   it("announceWithdrawal_notUnfilledStreamLostFlag_ignored", async () => {
     await announceWithdrawal(withdrawal({ replacementId: 6, unfilled: false, streamLost: true, coAssignedIds: [5] }));
 

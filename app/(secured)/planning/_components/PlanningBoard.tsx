@@ -50,6 +50,7 @@ import {
   mergeView,
   tournamentChoices,
   weekWindow,
+  withdrawDoneKey,
   type PlanningFilters,
 } from "../_lib/planning-board";
 import styles from "../planning.module.css";
@@ -463,12 +464,6 @@ type WithdrawTarget = { key: string; role: PlanningRole; slot: string; late: boo
 
 /** Le champ du motif d'un désistement (refus rattaché, `useFieldErrors`). */
 const WITHDRAWAL_FIELD_IDS = { reason: "planning-withdraw-reason" } as const;
-
-/** Le message de succès d'un désistement, selon son issue. */
-function withdrawDoneKey(result: WithdrawalResponse): "withdraw.doneReplaced" | "withdraw.doneUnfilled" | "withdraw.done" {
-  if (result.replaced) return "withdraw.doneReplaced";
-  return result.unfilled ? "withdraw.doneUnfilled" : "withdraw.done";
-}
 
 /** Relue chaque minute : le bouton disparaît quand l'entrée commence, sans attendre une relecture de la page. */
 const WITHDRAW_CLOCK_MS = 60_000;

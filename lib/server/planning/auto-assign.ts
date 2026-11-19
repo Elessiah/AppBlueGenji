@@ -71,12 +71,17 @@ export async function loadExclusions(
   data: PlanningData,
   entries: readonly LoadedEntry[],
 ): Promise<Set<string>> {
+  // Les entrées qui chevauchent le lot aussi : le second caster ne se prend pas à qui y est attendu
+  // (`neededElsewhere`), et n'y est attendu que qui pourrait vraiment les tenir (ni joueur, ni tournoi caché
+  // qu'il ne voit pas, ni arbitre hors condition, ni suspendu). Le calcul ne pose rien sur elles.
+  const scope = data.entries.filter((other) => entries.some((entry) => other.key === entry.key || slotsOverlap(other, entry)));
+  for (const entry of entries) if (!scope.includes(entry)) scope.push(entry);
   const excluded = new Set<string>();
-  await excludePlayers(executor, data, entries, excluded);
-  await excludeIneligibleReferees(executor, data, entries, excluded);
+  await excludePlayers(executor, data, scope, excluded);
+  await excludeIneligibleReferees(executor, data, scope, excluded);
   for (const removal of data.removals) excluded.add(exclusionKey(removal.entryKey, removal.userId, removal.role));
-  excludeFromHidden(data, entries, excluded);
-  excludeSuspended(data, entries, excluded);
+  excludeFromHidden(data, scope, excluded);
+  excludeSuspended(data, scope, excluded);
   return excluded;
 }
 

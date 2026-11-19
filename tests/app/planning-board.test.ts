@@ -17,6 +17,7 @@ import {
   needsCover,
   NO_FILTERS,
   castersFullKind,
+  withdrawDoneKey,
   roleChoices,
   tournamentChoices,
   weekWindow,
@@ -592,10 +593,39 @@ describe("castersFullKind", () => {
     expect(castersFullKind(entryView({ assignments: [caster(1, "MANUAL", false), caster(2, "AUTO", true)] }))).toBe("castersFull");
   });
 
+  it("castersFullKind_twoSignupsPlusManual_returnsMatch", () => {
+    const assignments = [caster(1, "CAST", false), caster(2, "CAST", false), caster(3, "MANUAL", false)];
+
+    expect(castersFullKind(entryView({ assignments }))).toBe("castersFullMatch");
+  });
+
   it("castersFullKind_everyKind_hasFrAndEnText", () => {
     for (const kind of ["castersFull", "castersFullProvisional", "castersFullMatch"] as const) {
       expect(frPlanning.assignment[kind]).toBeTruthy();
       expect(enPlanning.assignment[kind]).toBeTruthy();
     }
+  });
+});
+
+describe("withdrawDoneKey", () => {
+  it("withdrawDoneKey_replaced_returnsReplaced", () => {
+    expect(withdrawDoneKey({ late: false, replaced: true, unfilled: false, streamLost: false })).toBe("withdraw.doneReplaced");
+  });
+
+  it("withdrawDoneKey_unfilledStreamLost_returnsStreamLost", () => {
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: true, streamLost: true })).toBe("withdraw.doneStreamLost");
+  });
+
+  it("withdrawDoneKey_unfilled_returnsUnfilled", () => {
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: true, streamLost: false })).toBe("withdraw.doneUnfilled");
+  });
+
+  it("withdrawDoneKey_held_returnsDone", () => {
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: false, streamLost: false })).toBe("withdraw.done");
+  });
+
+  it("withdrawDoneKey_streamLostText_hasFrAndEn", () => {
+    expect(frPlanning.withdraw.doneStreamLost).toBeTruthy();
+    expect(enPlanning.withdraw.doneStreamLost).toBeTruthy();
   });
 });

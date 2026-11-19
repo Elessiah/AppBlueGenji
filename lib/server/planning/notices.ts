@@ -126,6 +126,13 @@ export type WithdrawalAnnouncement = {
    * diffusion (le caster restant attend un prod ou un caster autonome). Absent : faux.
    */
   streamLost?: boolean;
+  /**
+   * La place vue du staff des tournois, qui seule déclenche son alerte : un
+   * compte suspendu n'y tient rien, ce que les autres membres n'apprennent
+   * pas (`unfilled`, `stillHeldBy` restent leur lecture). `null` : rien à
+   * pourvoir. Absent : la lecture des membres (`unfilled`, `streamLost`).
+   */
+  staffUnfilled?: { streamLost: boolean } | null;
   /** Les autres affectés de l'entrée (tenus, ni le désisté ni le remplaçant). */
   coAssignedIds: readonly number[];
 };
@@ -174,7 +181,13 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
     await announceAssignments([{ userId: input.replacementId, entry: input.entry, role: input.role }], { replacement: true });
     return;
   }
-  if (input.unfilled) await announceUnfilled(notice, input.withdrawnUserId);
+  const staff = input.staffUnfilled === undefined ? membersUnfilled(input) : input.staffUnfilled;
+  if (staff !== null) await announceUnfilled({ ...notice, replaced: false, stillHeld: false, streamLost: staff.streamLost }, input.withdrawnUserId);
+}
+
+/** La place telle que la lisent les membres, quand aucune lecture du staff n'est donnée. */
+function membersUnfilled(input: WithdrawalAnnouncement): { streamLost: boolean } | null {
+  return input.unfilled ? { streamLost: input.streamLost === true } : null;
 }
 
 /**

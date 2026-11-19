@@ -164,14 +164,15 @@
     "action": "Me désister",
     "actionLabel": "Me désister : {role}, {slot}",
     "title": "Te désister de ce créneau ?",
-    "body": "Un remplaçant disponible est cherché aussitôt. S'il n'y en a pas et que ton affectation était confirmée, la place est « à pourvoir » et le staff des tournois est prévenu.",
+    "body": "Un remplaçant disponible est cherché aussitôt. S'il n'y en a pas et que ton affectation était confirmée, la place est « à pourvoir » et le staff des tournois est prévenu — sauf si un autre caster confirmé reste et garde la diffusion.",
     "late": "Désistement tardif : le créneau commence dans moins de 24 h.",
     "reasonLabel": "Motif (facultatif, lu du seul staff des tournois)",
     "confirm": "Me désister",
     "pending": "Désistement…",
     "done": "Désistement enregistré.",
     "doneReplaced": "Désistement enregistré : un remplaçant a été affecté.",
-    "doneUnfilled": "Désistement enregistré : la place est à pourvoir, le staff est prévenu."
+    "doneUnfilled": "Désistement enregistré : la place est à pourvoir, le staff est prévenu.",
+    "doneStreamLost": "Désistement enregistré : la diffusion est perdue, le staff est prévenu."
   },
   "withdrawals": {
     "title": "Désistements",

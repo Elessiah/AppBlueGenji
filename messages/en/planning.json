@@ -164,14 +164,15 @@
     "action": "Withdraw",
     "actionLabel": "Withdraw: {role}, {slot}",
     "title": "Withdraw from this slot?",
-    "body": "An available replacement is looked for right away. If there is none and your assignment was confirmed, the slot is open and the tournament staff is told.",
+    "body": "An available replacement is looked for right away. If there is none and your assignment was confirmed, the slot is open and the tournament staff is told — unless another confirmed caster stays and keeps the stream.",
     "late": "Late withdrawal: the slot starts in less than 24 hours.",
     "reasonLabel": "Reason (optional, read by the tournament staff only)",
     "confirm": "Withdraw",
     "pending": "Withdrawing…",
     "done": "Withdrawal saved.",
     "doneReplaced": "Withdrawal saved: a replacement has been assigned.",
-    "doneUnfilled": "Withdrawal saved: the slot is open, the staff has been told."
+    "doneUnfilled": "Withdrawal saved: the slot is open, the staff has been told.",
+    "doneStreamLost": "Withdrawal saved: the stream is lost, the staff has been told."
   },
   "withdrawals": {
     "title": "Withdrawals",
