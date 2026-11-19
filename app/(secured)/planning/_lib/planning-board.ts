@@ -124,6 +124,7 @@ export function mergeView(previous: PlanningView | null, next: PlanningView): Pl
     entries: entries.length === previous.entries.length && entries.every((entry, i) => entry === previous.entries[i]) ? previous.entries : entries,
     members: same(previous.members, next.members) ? previous.members : next.members,
     myRoles: same(previous.myRoles, next.myRoles) ? previous.myRoles : next.myRoles,
+    withdrawRoles: same(previous.withdrawRoles, next.withdrawRoles) ? previous.withdrawRoles : next.withdrawRoles,
     // Noms des non-membres : absents s'il n'y en a pas (la clé reste alors absente).
     ...(next.names ? { names: same(previous.names, next.names) ? previous.names : next.names } : {}),
     // `durations` n'existe que pour un administrateur : la clé reste absente sinon.

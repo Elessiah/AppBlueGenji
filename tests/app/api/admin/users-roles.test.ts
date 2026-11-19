@@ -9,6 +9,7 @@ import * as service from "@/lib/server/users/roles";
 import type { RolesSaveResult } from "@/lib/server/users/roles";
 import type { PlatformRole } from "@/lib/shared/permissions";
 import { authUser } from "../../../helpers/auth-user";
+import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
 
 const admin = authUser({ id: 1, isAdmin: true });
 const normalUser = authUser({ id: 2, isAdmin: false });
@@ -177,6 +178,69 @@ describe("POST /api/admin/users/[id]/roles", () => {
     );
   });
 
+  it("post_demotionClearedImpersonation_auditsForcedReturnInPm2", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue({ roles: [], previous: ["ADMIN"], impersonationsCleared: 2 });
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await POST(jsonReq({ roles: [] }), params("7"));
+
+    const lines = info.mock.calls.map(([line]) => String(line));
+    expect(lines.some((line) => line.includes(PLAYER_VIEW_OFF_AUDIT) && line.includes("#7") && line.includes("2 session(s)"))).toBe(true);
+    expect(lines.some((line) => line.includes(PLAYER_VIEW_OFF_AUDIT) && line.includes(admin.pseudo))).toBe(true);
+  });
+
+  it("post_publishRolesChangeThrows_stillLogsForcedReturn", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue({ roles: [], previous: ["ADMIN"], impersonationsCleared: 2 });
+    jest.mocked(service.publishRolesChange).mockImplementation(() => {
+      throw new Error("journal en panne");
+    });
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    const res = await POST(jsonReq({ roles: [] }), params("7"));
+
+    expect(res.status).toBe(200);
+    expect(info.mock.calls.some(([line]) => String(line).includes(PLAYER_VIEW_OFF_AUDIT))).toBe(true);
+  });
+
+  it("post_forcedReturnAuditThrows_rolesChangeStillPublished", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue({ roles: [], previous: ["ADMIN"], impersonationsCleared: 1 });
+    jest.spyOn(console, "info").mockImplementation(() => {
+      throw new Error("sortie fermée");
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const res = await POST(jsonReq({ roles: [] }), params("7"));
+
+    expect(res.status).toBe(200);
+    expect(service.publishRolesChange).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls.some(([line]) => String(line).includes("ligne du retour imposé non publiée"))).toBe(true);
+  });
+
+  it("post_promotionLiftedStrayImpersonation_logsAnonymousLine", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue({ roles: ["ADMIN"], previous: [], strayImpersonationsLifted: 2 });
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await POST(jsonReq({ roles: ["ADMIN"] }), params("7"));
+
+    const lines = info.mock.calls.map(([line]) => String(line)).filter((line) => line.includes(PLAYER_VIEW_OFF_AUDIT));
+    expect(lines).toEqual([`${PLAYER_VIEW_OFF_AUDIT} : restée sans administration, levée à la promotion du compte (2 session(s))`]);
+  });
+
+  it("post_nothingCleared_writesNoForcedReturnLine", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue(saved([], ["ADMIN"]));
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await POST(jsonReq({ roles: [] }), params("7"));
+
+    expect(info.mock.calls.some(([line]) => String(line).includes(PLAYER_VIEW_OFF_AUDIT))).toBe(false);
+  });
+
   it("post_serviceThrowsUnknownError_returns500WithGenericCode", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.setUserRoles).mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.3:3306"));
@@ -320,7 +384,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
   });
 });
 
-describe("POST /api/admin/users/[id]/roles — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+describe("POST /api/admin/users/[id]/roles — vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

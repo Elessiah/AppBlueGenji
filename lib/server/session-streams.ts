@@ -73,10 +73,12 @@ export const REVOCATION_MEMORY_MS = 60_000;
  * façon). Par compte, et non global : les bascules d'un compte ne chassent
  * jamais le changement en attente d'un autre, qui servirait alors l'ancien
  * contexte (droits de staff) au flux qui s'ouvrait pendant sa bascule. Le
- * double du débit permis (`PLAYER_VIEW_TOGGLE_RULE`) : un compte n'y atteint
- * pas ses propres changements de la minute.
+ * double du débit permis à toutes les bascules du compte
+ * (`PLAYER_VIEW_EXIT_RULE`, 30 par fenêtre fixe, entrées comprises) : deux
+ * fenêtres jointives tiennent dans une minute, un compte n'y atteint donc pas
+ * ses propres changements de la minute.
  */
-export const RECONNECT_MEMORY_PER_USER = 20;
+export const RECONNECT_MEMORY_PER_USER = 60;
 
 /**
  * Filet de mémoire, tous comptes confondus : seuls les comptes du staff
@@ -234,7 +236,7 @@ export function closeSessionStreams(tokenHash: string): number {
 
 /**
  * Fait reconnecter les flux d'**une** session, sans la révoquer (`RECONNECT`) :
- * son contexte de lecteur a changé (vue joueur, `ADMIN_PLAYER_VIEW.md`) et la
+ * son contexte de lecteur a changé (vue joueur, `ADMIN_ROLE_IMPERSONATION.md`) et la
  * route doit le relire. `tokenHash` `null` : tous les flux du compte — le
  * contournement de développement, dont les flux portent l'empreinte d'un
  * éventuel cookie resté posé, ou aucune.

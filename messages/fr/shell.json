@@ -40,17 +40,43 @@
     "logout": "Déconnexion",
     "loggingOut": "Déconnexion…",
     "logoutFailed": "La déconnexion a échoué. Réessaie dans un instant.",
-    "playerView": "Passer en vue joueur",
-    "playerViewPending": "Passage en vue joueur…",
-    "playerViewFailed": "Impossible de passer en vue joueur. Réessaie dans un instant."
+    "impersonate": "Incarner un rôle",
+    "impersonateFailed": "Impossible d'incarner ce rôle. Réessaie dans un instant.",
+    "impersonateConflict": "Une autre incarnation est déjà en cours sur cette session : reviens en vue admin avant d'en choisir une autre."
   },
   "playerView": {
-    "label": "Vue joueur",
+    "label": "Incarnation",
     "active": "Vue joueur active",
+    "activeRole": "Rôle incarné : {roles}",
+    "activeRoles": "Rôles incarnés : {roles}",
     "back": "Revenir en vue admin",
     "backPending": "Retour en vue admin…",
     "backFailed": "Impossible de revenir en vue admin. Réessaie dans un instant.",
-    "hint": "Sur cet appareil seulement, le site te traite comme un joueur : tes droits de staff sont suspendus jusqu'à ton retour, au plus {hours} heures. Les notifications push du staff, liées au compte, continuent d'arriver."
+    "inProgress": "Une bascule est déjà en cours.",
+    "throttled": "Trop de bascules en une minute. Réessaie dans un instant.",
+    "hint": "Sur cet appareil seulement, le site ne te donne que les droits du rôle incarné (aucun en vue joueur) jusqu'à ton retour, au plus {hours} heures. Les notifications push du staff, liées au compte, continuent d'arriver."
+  },
+  "impersonate": {
+    "roles": {
+      "ARBITRE": {
+        "label": "Arbitre"
+      },
+      "CASTER": {
+        "label": "Caster"
+      },
+      "PROD": {
+        "label": "Prod"
+      },
+      "COMMUNITY_MANAGER": {
+        "label": "Community Manager"
+      },
+      "RECRUTEUR": {
+        "label": "Recruteur"
+      },
+      "DEV": {
+        "label": "Développeur"
+      }
+    }
   },
   "footer": {
     "brandName": "BlueGenji",

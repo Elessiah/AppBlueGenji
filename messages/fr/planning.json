@@ -126,6 +126,7 @@
     "UNAUTHORIZED": "Ta session a expiré : reconnecte-toi.",
     "FORBIDDEN": "Ce geste est réservé au staff des tournois.",
     "PLANNING_ADMIN_ONLY": "Ce geste est réservé aux administrateurs.",
+    "PLAYER_VIEW_ACTIVE": "Le rôle que tu incarnes ne tient pas cette place : reviens en vue admin pour t'en désister.",
     "PLANNING_MEMBERS_ONLY": "Ce geste est réservé aux arbitres, casters et prods du planning.",
     "NETWORK_ERROR": "Connexion impossible. Vérifie ton réseau puis réessaie.",
     "PLANNING_ENTRY_NOT_FOUND": "Ce créneau n'existe plus. La page est rechargée.",

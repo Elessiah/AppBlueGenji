@@ -642,7 +642,7 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // seuls octets.
     `ALTER TABLE bg_blocked_image_hashes ADD COLUMN phash BIGINT UNSIGNED NULL AFTER sha256`,
     `ALTER TABLE bg_logo_quarantines ADD COLUMN image_phash BIGINT UNSIGNED NULL AFTER image_sha256`,
-    // « Vue joueur » du staff, par session (`docs/features/ADMIN_PLAYER_VIEW.md`).
+    // « Vue joueur » du staff, par session (`docs/features/ADMIN_ROLE_IMPERSONATION.md`).
     `ALTER TABLE bg_user_sessions ADD COLUMN player_view_until DATETIME NULL`,
     // Désistements du planning (`docs/features/CAST_PLANNING.md` § Désistement).
     {
@@ -657,6 +657,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Date butoir de planification d'un match (`docs/features/SCHEDULE_DEADLINE.md`).
     `ALTER TABLE bg_matches ADD COLUMN schedule_deadline_at DATETIME NULL AFTER start_at`,
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_schedule_deadline (schedule_deadline_at)`,
+    // Rôles incarnés par une session d'administrateur (`docs/features/ADMIN_ROLE_IMPERSONATION.md`).
+    `ALTER TABLE bg_user_sessions ADD COLUMN impersonated_roles_json VARCHAR(255) NULL AFTER player_view_until`,
+    // Balayage des incarnations au démarrage (`liftStrayImpersonations`) : lit les seules sessions en incarnation.
+    `ALTER TABLE bg_user_sessions ADD INDEX idx_bg_sessions_player_view (player_view_until)`,
     // Casters et prods invités, hors du planning (`docs/features/CAST_PLANNING.md` § Invités).
     `ALTER TABLE bg_users ADD COLUMN is_guest_staff TINYINT(1) NOT NULL DEFAULT 0 AFTER platform_roles_json`,
     // Sortie d'un invité marquée sur son désistement : ne dépend pas de l'auteur, que sa suppression efface.

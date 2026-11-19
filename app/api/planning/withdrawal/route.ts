@@ -5,13 +5,19 @@ import { planningFailure, readEntryKey } from "@/lib/server/planning/routes";
 import { cleanWithdrawalReason, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
 import { can } from "@/lib/shared/permissions";
-import { isPlanningRole } from "@/lib/shared/planning";
+import { isPlanningRole, withdrawableRoles } from "@/lib/shared/planning";
 
 /**
  * Le lecteur se désiste de **sa** attribution sur une entrée
  * (`CAST_PLANNING.md` § Désistement). Corps : `{ entryKey, role, reason? }`
  * (`reason` : motif facultatif, 300 caractères au plus, lu du seul staff des
  * tournois). Aucun identifiant de compte n'est lu : on ne désiste que soi.
+ *
+ * Pendant une incarnation (`ADMIN_ROLE_IMPERSONATION.md`), seule une place
+ * que les rôles incarnés tiendraient se quitte (`withdrawableRoles` :
+ * `403 PLAYER_VIEW_ACTIVE`, jugé ici avant le motif pour que ce refus vienne
+ * en premier, et de nouveau par `withdrawFromEntry`) — la route du match
+ * refuserait de même le retrait d'un arbitre.
  */
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -26,6 +32,8 @@ export async function POST(req: Request) {
   const entryKey = readEntryKey(rawKey);
   if (entryKey === null) return fail("INVALID_ENTRY", 400);
   if (!isPlanningRole(role)) return fail("INVALID_ROLE", 400);
+  // Incarnation : avant le motif, sinon un motif trop long cacherait ce refus.
+  if (!withdrawableRoles(user).includes(role)) return fail("PLAYER_VIEW_ACTIVE", 403);
   const reason = cleanWithdrawalReason(rawReason);
   if (reason === undefined) return fail("PLANNING_REASON_TOO_LONG", 400);
 

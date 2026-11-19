@@ -407,7 +407,7 @@ describe("GET /api/tournaments/[id]/stream — révocation de la session", () =>
     expect(tournamentAudience(5)).toBe(0);
   });
 
-  it("GET_playerViewSwitchDuringSessionRead_answersReconnectOnlyWithoutStaffContext (ADMIN_PLAYER_VIEW.md)", async () => {
+  it("GET_playerViewSwitchDuringSessionRead_answersReconnectOnlyWithoutStaffContext (ADMIN_ROLE_IMPERSONATION.md)", async () => {
     // Bascule commitée pendant la lecture de la session : aucun flux encore
     // inscrit — seule la trace de la reconnexion le rattrape, sans 401, et
     // rien n'est lu ni servi avec les droits de staff périmés.
@@ -460,7 +460,7 @@ describe("GET /api/tournaments/[id]/stream — révocation de la session", () =>
 `)).toBe(true);
   });
 
-  it("GET_playerViewUntilReached_sendsReconnectFrameAndEnds (ADMIN_PLAYER_VIEW.md)", async () => {
+  it("GET_playerViewUntilReached_sendsReconnectFrameAndEnds (ADMIN_ROLE_IMPERSONATION.md)", async () => {
     jest.useFakeTimers({ now: Date.parse("2026-11-18T10:00:00.000Z"), doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
     jest
       .mocked(getCurrentUser)
@@ -924,7 +924,7 @@ describe("GET /api/tournaments/[id]/stream — invitation à certifier poussée 
   });
 });
 
-describe("GET /api/tournaments/[id]/stream — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+describe("GET /api/tournaments/[id]/stream — vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () => {
   it("GET_adminInPlayerView_getsStandardTierAndNoStaffRight", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(
       authUser({ id: 1, isAdmin: false, roles: [], playerView: true, playerViewAvailable: true }),
@@ -937,6 +937,38 @@ describe("GET /api/tournaments/[id]/stream — vue joueur (ADMIN_PLAYER_VIEW.md)
       canManage: false,
       canPreview: false,
       canManageLive: false,
+      canDelete: false,
+      canCancelForfeit: false,
+    });
+  });
+
+  it("GET_adminImpersonatingCaster_getsOnlyCastRights", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["CASTER"], playerView: true, playerViewAvailable: true }),
+    );
+
+    await firstMessage(await GET(new Request("http://t/"), params("5")));
+
+    expect(rightsPassedToViewerContext()).toEqual({
+      canManage: false,
+      canPreview: true,
+      canManageLive: true,
+      canDelete: false,
+      canCancelForfeit: false,
+    });
+  });
+
+  it("GET_adminImpersonatingArbitre_managesButNeverDeletes", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["ARBITRE"], playerView: true, playerViewAvailable: true }),
+    );
+
+    await firstMessage(await GET(new Request("http://t/"), params("5")));
+
+    expect(rightsPassedToViewerContext()).toEqual({
+      canManage: true,
+      canPreview: true,
+      canManageLive: true,
       canDelete: false,
       canCancelForfeit: false,
     });

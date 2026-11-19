@@ -162,7 +162,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
   });
 });
 
-describe("GET /api/tournaments/[id] — vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+describe("GET /api/tournaments/[id] — vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(service.getTournamentDetail).mockResolvedValue(tournamentDetail());
@@ -179,6 +179,34 @@ describe("GET /api/tournaments/[id] — vue joueur (ADMIN_PLAYER_VIEW.md)", () =
       7,
       1,
       { canManage: false, canPreview: false, canManageLive: false, canDelete: false, canCancelForfeit: false },
+    ]);
+  });
+
+  it("GET_adminImpersonatingCaster_getsOnlyCastRights", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["CASTER"], playerView: true, playerViewAvailable: true }),
+    );
+
+    await get("7");
+
+    expect(detailCall()).toEqual([
+      7,
+      1,
+      { canManage: false, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false },
+    ]);
+  });
+
+  it("GET_adminImpersonatingArbitre_managesButNeverDeletes", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["ARBITRE"], playerView: true, playerViewAvailable: true }),
+    );
+
+    await get("7");
+
+    expect(detailCall()).toEqual([
+      7,
+      1,
+      { canManage: true, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false },
     ]);
   });
 });

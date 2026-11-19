@@ -119,14 +119,17 @@ Invités).
   retirés et enregistrés (`rolesChangeAuditLine`, écart aux rôles lus sous le
   verrou). Un refus ou un enregistrement sans écart ne laisse aucune trace.
 
-## Vue joueur
+## Incarner un rôle
 
-Un compte qui porte un rôle de plateforme peut, pour **une** session, les
-suspendre tous (« Passer en vue joueur », menu du compte) : `getCurrentUser()`
-rend alors `isAdmin: false` et `roles: []`, si bien que `can()`, `canAny()` et
-`isStaffMember()` n'y voient plus rien — le seul geste qui reste est le retour,
-ouvert par `playerViewAvailable` (les droits **réels**). Les rôles d'équipe ne
-sont pas touchés. Voir `ADMIN_PLAYER_VIEW.md`.
+Un **administrateur** peut, pour **une** session, réduire ses droits à
+exactement les rôles qu'il coche (« Incarner un rôle », menu du compte ;
+aucun rôle : vue joueur) : `getCurrentUser()` rend alors `isAdmin: false` et
+`roles` = les rôles incarnés, si bien que `can()`, `canAny()`,
+`isStaffMember()` et `canComputePlanning()` ne voient que ceux-là — le retour
+reste ouvert par `playerViewAvailable` (administrateur **réel**). Casts et
+arbitrages désignés suivent `sessionHolds` (`live`, `tournaments`). La modale
+reprend le tableau des rôles avec un « i » par rôle (motif #601). Les rôles
+d'équipe ne sont pas touchés. Voir `ADMIN_ROLE_IMPERSONATION.md`.
 
 ## Un administrateur règle ses propres rôles
 

@@ -9,6 +9,7 @@ import {
   planningNextWeekStart,
   planningRolesOf,
   planningWeekStart,
+  withdrawableRoles,
 } from "@/lib/shared/planning";
 import { authUser } from "../../helpers/auth-user";
 import { MONDAY } from "../../helpers/planning";
@@ -76,6 +77,28 @@ describe("planningRolesOf", () => {
 
   it("planningRolesOf_null_returnsEmpty", () => {
     expect(planningRolesOf(null)).toEqual([]);
+  });
+});
+
+describe("withdrawableRoles", () => {
+  it("withdrawableRoles_nullUser_returnsEmpty", () => {
+    expect(withdrawableRoles(null)).toEqual([]);
+  });
+
+  it("withdrawableRoles_notImpersonatingWithoutRole_returnsEveryPlanningRole", () => {
+    expect(withdrawableRoles(authUser({ roles: [] }))).toEqual(["REFEREE", "CASTER", "PROD"]);
+  });
+
+  it("withdrawableRoles_impersonatingCaster_returnsCasterOnly", () => {
+    expect(withdrawableRoles(authUser({ roles: ["CASTER"], isAdmin: false, playerView: true }))).toEqual(["CASTER"]);
+  });
+
+  it("withdrawableRoles_impersonatingArbitre_returnsReferee", () => {
+    expect(withdrawableRoles(authUser({ roles: ["ARBITRE"], isAdmin: false, playerView: true }))).toEqual(["REFEREE"]);
+  });
+
+  it("withdrawableRoles_playerView_returnsEmpty", () => {
+    expect(withdrawableRoles(authUser({ roles: [], isAdmin: false, playerView: true }))).toEqual([]);
   });
 });
 

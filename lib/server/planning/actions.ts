@@ -46,6 +46,8 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   PLANNING_CONFIRM_PARTIAL: 409,
   PLANNING_WITHDRAWAL_CLOSED: 409,
   PLANNING_REASON_TOO_LONG: 400,
+  // Incarnation d'un rôle qui ne tient pas la place visée (`withdrawableRoles`).
+  PLAYER_VIEW_ACTIVE: 403,
   NOT_CASTER: 409,
   // Refus de la désignation d'un arbitre de match (`assignMatchReferee`) : la liste unique.
   ...Object.fromEntries(MATCH_REFEREE_REFUSAL_CODES.map((code) => [code, code === "MATCH_NOT_FOUND" ? 404 : 409])),

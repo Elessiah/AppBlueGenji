@@ -258,7 +258,7 @@ describe("PUT autogestion et première carte", () => {
   });
 });
 
-describe("vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
+describe("vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () => {
   it("refereeDelete_playerView_returns403WithoutReleasing", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3, roles: [], playerView: true, playerViewAvailable: true }));
 
@@ -266,5 +266,28 @@ describe("vue joueur (ADMIN_PLAYER_VIEW.md)", () => {
 
     expect(res.status).toBe(403);
     expect(releaseMatchReferee).not.toHaveBeenCalled();
+  });
+
+  it("refereeDelete_impersonatingCaster_returns403WithoutReleasing", async () => {
+    jest
+      .mocked(getCurrentUser)
+      .mockResolvedValue(authUser({ id: 3, roles: ["CASTER"], playerView: true, playerViewAvailable: true }));
+
+    const res = await refereeDelete(jsonRequest("DELETE"), params("42"));
+
+    expect(res.status).toBe(403);
+    expect(releaseMatchReferee).not.toHaveBeenCalled();
+  });
+
+  it("refereeDelete_impersonatingArbitre_releases", async () => {
+    jest
+      .mocked(getCurrentUser)
+      .mockResolvedValue(authUser({ id: 3, roles: ["ARBITRE"], playerView: true, playerViewAvailable: true }));
+    jest.mocked(releaseMatchReferee).mockResolvedValue();
+
+    const res = await refereeDelete(jsonRequest("DELETE"), params("42"));
+
+    expect(res.status).toBe(200);
+    expect(releaseMatchReferee).toHaveBeenCalledWith(42, expect.objectContaining({ id: 3, playerView: true }), false);
   });
 });

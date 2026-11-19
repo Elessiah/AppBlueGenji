@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { releaseMatchReferee, takeMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { can } from "@/lib/shared/permissions";
+import { sessionHolds } from "@/lib/shared/player-view";
 
 const STATUSES: Readonly<Record<string, number>> = {
   NOT_REFEREE: 403,
@@ -44,8 +45,8 @@ export async function POST(_req: Request, context: { params: Promise<{ matchId: 
 export async function DELETE(_req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  // Vue joueur (`ADMIN_PLAYER_VIEW.md`) : aucun geste d'arbitrage sur cette session.
-  if (user.playerView) return fail("FORBIDDEN", 403);
+  // Incarnation sans `tournaments` (`ADMIN_ROLE_IMPERSONATION.md`) : aucun geste d'arbitrage sur cette session.
+  if (!sessionHolds(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);

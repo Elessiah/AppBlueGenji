@@ -31,7 +31,7 @@ type SiteNavProps = {
   devDocs?: boolean;
   /** Lien « Planning » du menu du compte (permission `planning`). */
   planning?: boolean;
-  /** Entrée de la vue joueur du menu du compte (`ADMIN_PLAYER_VIEW.md`). */
+  /** Entrée de la vue joueur du menu du compte (`ADMIN_ROLE_IMPERSONATION.md`). */
   playerViewEntry?: PlayerViewMenuMode | null;
 };
 

@@ -340,9 +340,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           {/* Deuxième arrêt : le lien d'évitement, qui mène au contenu sans
               traverser la bannière de recrutement ni la navigation. */}
           <SkipLink />
-          {/* Vue joueur du staff (`ADMIN_PLAYER_VIEW.md`) : sur toutes les
+          {/* Vue joueur du staff (`ADMIN_ROLE_IMPERSONATION.md`) : sur toutes les
               pages, tant qu'elle dure, avec le retour en un clic. */}
-          {user?.playerView && <PlayerViewBanner until={user.playerViewUntil} />}
+          {user?.playerView && <PlayerViewBanner until={user.playerViewUntil} roles={user.roles} />}
           <VisitTracker />
           <AudienceBeacon />
           <ServiceWorkerRegistration />

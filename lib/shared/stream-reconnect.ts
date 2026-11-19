@@ -1,6 +1,6 @@
 /**
  * Trame « relis ta session » du flux d'un tournoi
- * (`docs/features/ADMIN_PLAYER_VIEW.md`, `REALTIME_REFRESH.md`).
+ * (`docs/features/ADMIN_ROLE_IMPERSONATION.md`, `REALTIME_REFRESH.md`).
  *
  * Le serveur l'envoie juste avant de fermer un flux dont le contexte du
  * lecteur a changé (vue joueur basculée, équipe quittée, rôle changé), ou

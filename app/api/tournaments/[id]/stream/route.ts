@@ -85,7 +85,7 @@ function wantsQuietStream(req: Request): boolean {
 /**
  * Session périmée avant la première trame : révoquée → `401` ; contexte du
  * lecteur changé (équipe quittée, rôle changé, vue joueur basculée —
- * `ADMIN_PLAYER_VIEW.md`) → un `200` qui ne porte que la demande de
+ * `ADMIN_ROLE_IMPERSONATION.md`) → un `200` qui ne porte que la demande de
  * reconnexion (`lib/shared/stream-reconnect.ts`), sans la trame d'ouverture et
  * son contexte périmé (les droits de staff d'une session passée en vue
  * joueur) : le client le rouvre sur-le-champ (`live-connection.ts`), sans
@@ -444,7 +444,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           }, HEARTBEAT_MS);
           heartbeat.unref?.();
 
-          // Vue joueur (`ADMIN_PLAYER_VIEW.md`) : à l'échéance, les droits
+          // Vue joueur (`ADMIN_ROLE_IMPERSONATION.md`) : à l'échéance, les droits
           // reviennent sans aucune écriture — le flux se reconnecte pour relire
           // le contexte du lecteur (palier, droits de staff).
           const expiryDelay = playerViewExpiryDelayMs(user.playerViewUntil, Date.now());

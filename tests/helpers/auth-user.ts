@@ -28,8 +28,8 @@ export function authUser(overrides: Partial<AuthUser> = {}): AuthUser {
     planningGuest: false,
     playerView: false,
     playerViewUntil: null,
-    // Le compte porte réellement des droits dès qu'il a un rôle de plateforme.
-    playerViewAvailable: isAdmin || (overrides.roles ?? []).length > 0,
+    // Seul un administrateur réel peut incarner un rôle (ADMIN_ROLE_IMPERSONATION.md).
+    playerViewAvailable: isAdmin,
     ...overrides,
   };
 }

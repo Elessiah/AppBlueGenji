@@ -100,6 +100,9 @@ function json(method: string, body: unknown): RequestInit {
   return { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
 }
 
+/** Aucun rôle à quitter : repli stable d'une vue sans `withdrawRoles`. */
+const NO_WITHDRAW_ROLES: PlanningView["withdrawRoles"] = [];
+
 /**
  * L'écran « Planning » (permission `planning`) : chaque créneau à venir, sa
  * couverture et qui le tient ; sa disponibilité par rôle tenu ; pour le staff
@@ -216,14 +219,19 @@ export function PlanningBoard({
   const namesRef = useRef(builtNames);
   if (namesRef.current !== builtNames && !sameNames(namesRef.current, builtNames)) namesRef.current = builtNames;
   const names = namesRef.current;
-  // Ce que les cartes lisent du lecteur : stable tant que ces quatre valeurs le sont.
+  // Ce que les cartes lisent du lecteur : stable tant que ces valeurs le sont.
   const me = view?.me;
   const myRoles = view?.myRoles;
+  // Absente d'une vue (relecture servie par une version antérieure) : le seul bouton « Se désister » se cache.
+  const withdrawRoles = view?.withdrawRoles ?? NO_WITHDRAW_ROLES;
   const canManage = view?.canManage;
   const canCompute = view?.canCompute;
   const context = useMemo(
-    () => (me === undefined || !myRoles || canManage === undefined || canCompute === undefined || !members ? null : { me, myRoles, canManage, canCompute, members }),
-    [me, myRoles, canManage, canCompute, members],
+    () =>
+      me === undefined || !myRoles || canManage === undefined || canCompute === undefined || !members
+        ? null
+        : { me, myRoles, withdrawRoles, canManage, canCompute, members },
+    [me, myRoles, withdrawRoles, canManage, canCompute, members],
   );
   const shown = useMemo(() => filterEntries(view?.entries ?? [], filters, view?.me ?? 0), [view, filters]);
   // Un match passe dans « Matchs passés » une fois joué (relecture de la page), jamais sur la seule horloge.
@@ -507,7 +515,7 @@ type ConfirmTarget = { kind: "entry"; key: string; slot: string } | { kind: "lea
 type Act = <T>(gesture: string, task: () => Promise<T>, success: (result: T) => string, patch?: () => void) => Promise<boolean>;
 
 /** Ce que les cartes lisent du lecteur (et non toute la page : une relecture sans effet sur elles ne les redessine pas). */
-type Reader = Pick<PlanningView, "me" | "myRoles" | "canManage" | "canCompute" | "members">;
+type Reader = Pick<PlanningView, "me" | "myRoles" | "withdrawRoles" | "canManage" | "canCompute" | "members">;
 
 /**
  * Le geste en cours, vu d'une carte : le sien, ou `"other"` pour celui d'une
@@ -759,7 +767,7 @@ function CapStatus({ text }: { text: string | null }) {
   );
 }
 
-const RoleRow = memo(function RoleRow({
+export const RoleRow = memo(function RoleRow({
   role,
   entry,
   view,
@@ -810,7 +818,7 @@ const RoleRow = memo(function RoleRow({
                 {t(`assignment.reason.${row.reason}`)}
                 {row.provisional ? ` · ${t("assignment.provisional")}` : ""}
               </span>
-              {row.userId === view.me && row.source !== "CAST" && (
+              {row.userId === view.me && row.source !== "CAST" && view.withdrawRoles.includes(role) && (
                 <WithdrawButton entry={entry} role={role} slot={slot} roleName={roleName} pending={pending !== null} onWithdraw={onWithdraw} text={text} />
               )}
               {manage && row.source !== "CAST" && (

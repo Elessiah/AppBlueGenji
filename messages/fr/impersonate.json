@@ -1,0 +1,40 @@
+{
+  "title": "Incarner un rôle",
+  "lead": "Coche les rôles à incarner",
+  "hint": "Sur cet appareil seulement, tes droits se réduisent exactement aux rôles cochés jusqu'à ton retour, au plus {hours} heures. Aucun rôle coché : vue joueur.",
+  "bodyLabel": "Rôles à incarner",
+  "tableLabel": "Rôles à incarner et ce qu'ils ouvrent",
+  "columnRole": "Rôle",
+  "columnOpens": "Ouvre",
+  "player": "Joueur (aucun rôle)",
+  "playerHint": "Aucun rôle de plateforme : le site te traite comme un joueur. Tes rôles d'équipe restent les tiens.",
+  "cancel": "Annuler",
+  "confirm": "Incarner",
+  "pending": "Incarnation…",
+  "roles": {
+    "ARBITRE": {
+      "opens": "Tournois et matchs, aperçu du plateau, antenne, planning",
+      "hint": "Crée et gère les tournois, saisit et tranche les scores, prend l'arbitrage d'un match, lit l'aperçu du plateau, ouvre l'antenne et donne ses disponibilités au planning. Ni signalements, ni rôles, ni calcul du planning."
+    },
+    "CASTER": {
+      "opens": "Aperçu du plateau, antenne de ses casts, planning",
+      "hint": "S'inscrit pour caster un match, règle son cast, ouvre l'antenne et lit l'aperçu du plateau avant le lancement ; donne ses disponibilités au planning. Aucune gestion de tournoi."
+    },
+    "PROD": {
+      "opens": "Planning",
+      "hint": "Lit la page « Planning » et y donne ses disponibilités et préférences. Ni antenne, ni aperçu du plateau."
+    },
+    "COMMUNITY_MANAGER": {
+      "opens": "Site vitrine et association",
+      "hint": "Gère les partenaires de la vitrine, les pages de l'association et les bénévoles. Aucun droit sur les tournois."
+    },
+    "RECRUTEUR": {
+      "opens": "Page recrutement",
+      "hint": "Gère les annonces de la page recrutement, et rien d'autre."
+    },
+    "DEV": {
+      "opens": "Documentation dev",
+      "hint": "Lit la documentation technique du site et du bot, en lecture seule. Pas du staff : ni commandes ni sections staff du bot."
+    }
+  }
+}

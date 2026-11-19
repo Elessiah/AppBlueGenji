@@ -2278,6 +2278,26 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
   },
   {
+    // ROLE-IMPERSONATE — « Incarner un rôle » (`docs/features/ADMIN_ROLE_IMPERSONATION.md`)
+    // remplace la vue joueur : réservée aux administrateurs, rôles incarnés
+    // notés sur la session et dans la ligne pm2. Registre T01, T05 et T20
+    // (mesure de sécurité du planning), `REGISTER_UPDATED_AT`, /rgpd (FR et EN). Pour tous les comptes, comme l'entrée de la vue joueur.
+    // Datée du lendemain de la mise en ligne prévue, comme
+    // `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
+    id: "2026-11-incarner-un-role",
+    publishedAt: "2026-11-21",
+    title: "Vue joueur : remplacée par « Incarner un rôle », réservé aux administrateurs",
+    links: [
+      { href: "/rgpd/registre#t01", label: "Lire la fiche T01 du registre" },
+      { href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" },
+    ],
+    summary: `Seul un administrateur peut désormais réduire ses droits sur une de ses sessions, aux rôles de plateforme qu'il choisit (aucun : vue joueur), ${PLAYER_VIEW_MAX_HOURS} heures au plus. Chaque bascule est notée à son nom dans les journaux du serveur, l'entrée avec les rôles incarnés ; un retour imposé par le retrait de son administration peut l'être au nom de l'administrateur qui l'a retirée.`,
+    details: [
+      "Ce qui est gardé en plus : les rôles incarnés, sur la session de connexion avec l'échéance, sans effet après le retour, l'échéance ou le retrait de l'administration, effacés au retour fait avant l'échéance, sinon au plus tard avec la session (déconnexion, fin de la session ou suppression du compte), et dans la ligne des journaux du serveur, selon leur rotation ; un retour imposé par le retrait de l'administration peut nommer l'administrateur qui l'a retirée, avec l'identifiant du compte et le nombre de sessions ; base : l'intérêt légitime (administration de la plateforme), auquel la personne concernée peut s'opposer. Rien n'en est dit sur Discord.",
+      "Ce qui ne change pas : pour un compte qui n'a jamais été administrateur, rien de nouveau n'est collecté ; les bascules en vue joueur faites jusqu'ici par les autres titulaires d'un rôle de plateforme restent dans les journaux du serveur, selon leur rotation.",
+    ],
+  },
+  {
     // PLANNING-GUESTS — casters et prods invités, hors du planning
     // (`docs/features/CAST_PLANNING.md` § Invités) : une marque posée sur le
     // compte par le staff des rôles. Registre T20, /rgpd (FR et EN). Pour tous

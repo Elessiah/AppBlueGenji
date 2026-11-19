@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 /**
- * `usePlayerViewToggle` (`docs/features/ADMIN_PLAYER_VIEW.md`), joué sans DOM :
+ * `usePlayerViewToggle` (`docs/features/ADMIN_ROLE_IMPERSONATION.md`), joué sans DOM :
  * le crochet est appelé comme une fonction, `useState` et `useRef` lus dans
  * des cases. Un échec se dit en notification avec le bon texte, la page n'est
  * relue qu'après une réussite, et un double clic n'envoie qu'une requête.
@@ -31,8 +31,9 @@ jest.mock("react", () => {
 });
 
 const showError = jest.fn<(message: string) => void>();
+const showInfo = jest.fn<(message: string) => void>();
 const refresh = jest.fn<() => void>();
-jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError }) }));
+jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showInfo }) }));
 jest.mock("@/components/i18n/locale-navigation", () => ({ useLocaleRouter: () => ({ refresh }) }));
 jest.mock("@/components/i18n/shell-text", () => ({ useShellText: () => ({ t: (key: string) => key }) }));
 
@@ -70,6 +71,19 @@ describe("usePlayerViewToggle", () => {
     expect(showError).not.toHaveBeenCalled();
   });
 
+  it("toggle_enterWithRoles_postsTheRolesAndResolvesTrue", async () => {
+    const done = await ToggleProbe().toggle(true, ["CASTER"]);
+
+    expect(done).toBe(true);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ active: true, roles: ["CASTER"] });
+  });
+
+  it("toggle_failure_resolvesFalse", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 500 }));
+
+    await expect(ToggleProbe().toggle(true, ["ARBITRE"])).resolves.toBe(false);
+  });
+
   it("toggle_enteringSucceeds_handsFocusToTheBannerOnce", async () => {
     await ToggleProbe().toggle(true);
 
@@ -94,18 +108,47 @@ describe("usePlayerViewToggle", () => {
   });
 
   it("toggle_twoInstancesAtOnce_sendOnePost", async () => {
-    await Promise.all([ToggleProbe().toggle(true), ToggleProbe().toggle(false)]);
+    const results = await Promise.all([ToggleProbe().toggle(true), ToggleProbe().toggle(false)]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Le second geste n'est pas muet : il dit qu'une bascule est en cours.
+    expect(results).toEqual([true, false]);
+    expect(showInfo).toHaveBeenCalledTimes(1);
+    expect(showInfo).toHaveBeenCalledWith("playerView.inProgress");
+    expect(showError).not.toHaveBeenCalled();
   });
 
-  it("toggle_failureEntering_showsPlayerViewFailedWithoutRefresh", async () => {
+  it("toggle_failureEntering_showsImpersonateFailedWithoutRefresh", async () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 403 }));
     const onDone = jest.fn();
 
     await ToggleProbe(onDone).toggle(true);
 
-    expect(showError).toHaveBeenCalledWith("account.playerViewFailed");
+    expect(showError).toHaveBeenCalledWith("account.impersonateFailed");
+    expect(refresh).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("toggle_entryConflict_saysItThenClosesAndRefreshes", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 409 }));
+    const onDone = jest.fn();
+
+    const done = await ToggleProbe(onDone).toggle(true, ["CASTER"]);
+
+    expect(done).toBe(true);
+    expect(showError).toHaveBeenCalledWith("account.impersonateConflict");
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([true, false])("toggle_429_saysThrottledWithoutRefresh (active=%s)", async (active) => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 429 }));
+    const onDone = jest.fn();
+
+    const done = await ToggleProbe(onDone).toggle(active);
+
+    expect(done).toBe(false);
+    expect(showError).toHaveBeenCalledWith("playerView.throttled");
     expect(refresh).not.toHaveBeenCalled();
     expect(onDone).not.toHaveBeenCalled();
   });
@@ -126,6 +169,7 @@ describe("usePlayerViewToggle", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenCalledTimes(1);
+    expect(showInfo).toHaveBeenCalledWith("playerView.inProgress");
   });
 
   it("toggle_pending_isTrueWhileTheRequestRuns", async () => {

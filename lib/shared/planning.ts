@@ -9,7 +9,7 @@
  * un caster « autonome » (`soloCaster`) diffuse seul, les autres ont besoin
  * d'un prod ; un match diffusé sans arbitre est « à arbitrer en priorité ».
  */
-import { can, type PermissionSubject } from "@/lib/shared/permissions";
+import { can, type PermissionSubject, type PlatformRole } from "@/lib/shared/permissions";
 
 /** Adresse de la page « Planning » (sans préfixe de langue). */
 export const PLANNING_PATH = "/planning";
@@ -112,6 +112,21 @@ export function planningRolesOf(user: PermissionSubject | null | undefined): Pla
   if (roles.includes("CASTER")) held.push("CASTER");
   if (roles.includes("PROD")) held.push("PROD");
   return held;
+}
+
+/**
+ * Les rôles du planning dont le lecteur peut quitter une place : tous hors
+ * incarnation (une place se quitte même si le rôle a été retiré depuis) ;
+ * pendant une incarnation (`ADMIN_ROLE_IMPERSONATION.md`), ceux seuls que les
+ * rôles incarnés tiendraient ({@link planningRolesOf}). Serveur
+ * (`withdrawFromEntry`, `PLAYER_VIEW_ACTIVE`) et page (bouton « Se désister »)
+ * jugent par cette même règle.
+ */
+export function withdrawableRoles(
+  user: { playerView?: boolean; roles?: readonly PlatformRole[]; isAdmin?: boolean } | null | undefined,
+): PlanningRole[] {
+  if (!user) return [];
+  return user.playerView ? planningRolesOf(user) : [...PLANNING_ROLES];
 }
 
 /**
