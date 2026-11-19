@@ -1308,12 +1308,11 @@ export function RgpdEn({
             that organises the production of a live stream) have a “Schedule” page: for each slot (a
             scheduled match, or a whole tournament when its matches are not scheduled) and each role they
             hold, they give their availability (available, away, maybe) and their preference there; a caster
-            also says whether they stream alone (“solo caster”), which the tournament staff can set for
+            also says whether they stream alone (“solo caster”), which an administrator can set for
             them. A calculation proposes the assignments from these answers and everyone&apos;s load (current
-            week and the {PLANNING_HISTORY_WEEKS} previous weeks); its proposals stay provisional until the
-            tournament staff confirms them, who can also assign or remove someone by hand. The site keeps,
+            week and the {PLANNING_HISTORY_WEEKS} previous weeks); its proposals stay provisional until confirmed, by an administrator or automatically by the site; the tournament staff can still assign or remove someone by hand, an assignment by hand being firm at once. The site keeps,
             with each assignment, who set it and its history (set, confirmed, removed, with the account that
-            acted through the schedule, none when the site aligns the schedule with the match). Assignments and the “solo caster” setting are read by logged-in referees, casters,
+            acted through the schedule, none when the site acts on its own). Assignments and the “solo caster” setting are read by logged-in referees, casters,
             prods and administrators, the reason for a calculated proposal (preference, load) only
             appearing there as “Calculation”, except to the tournament staff and the person concerned;
             everyone&apos;s availability and preferences by the tournament staff only (referees and
@@ -1331,7 +1330,7 @@ export function RgpdEn({
             starts, with an optional reason read by the tournament staff only; the site keeps the withdrawal
             (role, date, reason, whether it is late — less than 24 h before) with the history, and looks for
             a replacement automatically (a slot has two casters at most: when one of them leaves and the other
-            stays, the slot is not necessarily open). Each schedule slot is confirmed automatically as its start draws near (a lead time set by the tournament staff, 24 h at least), or earlier at its match&apos;s scheduling deadline; its assignees are notified as for a confirmation by the staff, and the site records, with no person, which slots were confirmed automatically. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
+            stays, the slot is not necessarily open). Each schedule slot is confirmed automatically as its start draws near (a lead time set by an administrator, 24 h at least), or earlier at its match&apos;s scheduling deadline; its assignees are notified as for a confirmation by an administrator, and the site records, with no person, which slots were confirmed automatically. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
             of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds the
             caster role; deleting the account removes everything about it (the actions it took as staff
             remain, without naming it), and the export of your data contains it, actions taken as staff

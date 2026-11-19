@@ -5,7 +5,7 @@
  */
 import type { AuthUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
-import { can } from "@/lib/shared/permissions";
+import { can, canComputePlanning } from "@/lib/shared/permissions";
 import { PLANNING_ROLES, planningRolesOf, type PlanningRole } from "@/lib/shared/planning";
 import { planningConfirmAt } from "@/lib/shared/schedule-deadline";
 import type { PlanningAssignmentShown, PlanningAssignmentView, PlanningEntryView, PlanningView } from "@/lib/shared/planning-view";
@@ -130,6 +130,7 @@ export function entriesNeedingMark(
 
 export async function loadPlanningView(user: AuthUser, now: number = Date.now()): Promise<PlanningView> {
   const canManage = can(user, "tournaments");
+  const canCompute = canComputePlanning(user);
   const { data, pending, marks, rounds } = await withConnection(async (connection) => {
     const loaded = await loadPlanningData(connection, {
       now,
@@ -213,11 +214,13 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
     me: user.id,
     myRoles: planningRolesOf(user),
     canManage,
+    canCompute,
     entries,
     // Champs nommés : ce que la page montre, rien de plus (`seesHidden` au staff seul, qui choisit les candidats).
     members: data.members.map(({ userId, pseudo, roles, soloCaster, seesHidden }) =>
       canManage ? { userId, pseudo, roles, soloCaster, seesHidden } : { userId, pseudo, roles, soloCaster },
     ),
-    durations: data.durations,
+    // Réglages du calcul : à l'administrateur seul, les autres n'en reçoivent rien.
+    ...(canCompute ? { durations: data.durations } : {}),
   };
 }

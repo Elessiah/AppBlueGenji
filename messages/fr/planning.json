@@ -67,7 +67,7 @@
       "MATCH": "Désigné sur le match",
       "AUTO": "Calcul"
     },
-    "reasonHint": "Préférence (créneau marqué par la personne), Charge (elle a le moins servi ces dernières semaines) ou Calcul (motif visible du staff et de la personne seuls) : pourquoi le calcul l'a choisie. Provisoire : proposé par le calcul, pas encore confirmé.",
+    "reasonHint": "Préférence (créneau marqué par la personne), Charge (elle a le moins servi ces dernières semaines) ou Calcul (motif visible du staff et de la personne seuls) : pourquoi le calcul l'a choisie. Provisoire : proposé par le calcul, pas encore ferme (confirmé par un administrateur ou d'office avant le créneau, ou repris à la main par le staff).",
     "reasonSubject": "Raisons d'attribution",
     "nobody": "Personne",
     "remove": "Retirer {name} ({role})",
@@ -124,6 +124,8 @@
     "TOO_MANY_REQUESTS": "Trop de gestes coup sur coup. Patiente quelques minutes avant de réessayer.",
     "UNAUTHORIZED": "Ta session a expiré : reconnecte-toi.",
     "FORBIDDEN": "Ce geste est réservé au staff des tournois.",
+    "PLANNING_ADMIN_ONLY": "Ce geste est réservé aux administrateurs.",
+    "PLANNING_MEMBERS_ONLY": "Ce geste est réservé aux arbitres, casters et prods du planning.",
     "NETWORK_ERROR": "Connexion impossible. Vérifie ton réseau puis réessaie.",
     "PLANNING_ENTRY_NOT_FOUND": "Ce créneau n'existe plus. La page est rechargée.",
     "PLANNING_ENTRY_CLOSED": "Ce créneau est fermé : il a commencé ou il est joué.",

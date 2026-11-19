@@ -64,9 +64,9 @@ const VIEW: PlanningView = {
   me: 4,
   myRoles: ["CASTER"],
   canManage: false,
+  canCompute: false,
   entries: [],
   members: [],
-  durations: DEFAULT_PLANNING_DURATIONS,
 };
 
 function request(method: string, body?: unknown): Request {
@@ -96,8 +96,16 @@ const ROUTES: Record<string, Call> = {
   "POST /api/admin/planning/confirm": () => confirmPost(request("POST", CONFIRM)),
   "PUT /api/admin/planning/settings": () => settingsPut(request("PUT", DEFAULT_PLANNING_DURATIONS)),
 };
-const STAFF_ROUTES = [
-  "PUT /api/admin/planning/assignment",
+const STAFF_ROUTES = ["PUT /api/admin/planning/assignment"];
+/** Routes des membres du planning (`planning`, refus `PLANNING_MEMBERS_ONLY`). */
+const MEMBER_ROUTES = [
+  "GET /api/planning",
+  "PUT /api/planning/availability",
+  "PUT /api/planning/solo-caster",
+  "POST /api/planning/withdrawal",
+];
+/** Calcul, confirmation, réglages : administrateur seul (`canComputePlanning`, refus `PLANNING_ADMIN_ONLY`). */
+const COMPUTE_ROUTES = [
   "POST /api/admin/planning/auto-assign",
   "POST /api/admin/planning/confirm",
   "PUT /api/admin/planning/settings",
@@ -162,6 +170,44 @@ describe("toutes les routes du planning", () => {
   }
 });
 
+describe("routes des membres du planning (permission planning)", () => {
+  for (const name of MEMBER_ROUTES) {
+    it(`${name}_plainPlayer_returns403MembersOnly`, async () => {
+      jest.mocked(getCurrentUser).mockResolvedValue(player);
+
+      const response = await ROUTES[name]();
+
+      expect(response.status).toBe(403);
+      expect(await errorOf(response)).toBe("PLANNING_MEMBERS_ONLY");
+    });
+
+    it(`${name}_playerView_returns403MembersOnly`, async () => {
+      jest.mocked(getCurrentUser).mockResolvedValue(playerView);
+
+      const response = await ROUTES[name]();
+
+      expect(response.status).toBe(403);
+      expect(await errorOf(response)).toBe("PLANNING_MEMBERS_ONLY");
+    });
+  }
+});
+
+describe("routes de calcul du planning (administrateur seul)", () => {
+  for (const name of COMPUTE_ROUTES) {
+    for (const [label, who] of [["caster", caster], ["prod", prod], ["arbitre", arbitre]] as const) {
+      it(`${name}_${label}_returns403AdminOnly`, async () => {
+        jest.mocked(getCurrentUser).mockResolvedValue(who);
+        const response = await ROUTES[name]();
+        expect(response.status).toBe(403);
+        expect(await errorOf(response)).toBe("PLANNING_ADMIN_ONLY");
+        expect(runAutoAssign).not.toHaveBeenCalled();
+        expect(confirmAssignments).not.toHaveBeenCalled();
+        expect(writeDurationSettings).not.toHaveBeenCalled();
+      });
+    }
+  }
+});
+
 describe("GET /api/planning", () => {
   it("planningGet_caster_returnsView", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
@@ -178,6 +224,28 @@ describe("GET /api/planning", () => {
   it("planningGet_arbitre_returns200", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     expect((await planningGet()).status).toBe(200);
+  });
+
+  // Le filtrage des durées (administrateur seul) se teste dans
+  // `tests/lib/server/planning/view.test.ts` ; ici, seulement que la route
+  // renvoie la vue telle quelle, sans y ajouter de durées.
+  it("planningGet_viewWithoutDurations_routeAddsNone", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(loadPlanningView).mockResolvedValue({ ...VIEW, me: 9, myRoles: ["REFEREE"], canManage: true });
+
+    const body = (await (await planningGet()).json()) as { planning: Record<string, unknown> };
+
+    expect(body.planning.canCompute).toBe(false);
+    expect(body.planning).not.toHaveProperty("durations");
+  });
+
+  it("planningGet_viewWithDurations_routePassesThemThrough", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(loadPlanningView).mockResolvedValue({ ...VIEW, me: 1, canManage: true, canCompute: true, durations: DEFAULT_PLANNING_DURATIONS });
+
+    const body = (await (await planningGet()).json()) as { planning: Record<string, unknown> };
+
+    expect(body.planning.durations).toEqual(DEFAULT_PLANNING_DURATIONS);
   });
 
   it("planningGet_loadFails_returns500", async () => {
@@ -244,8 +312,16 @@ describe("PUT /api/planning/solo-caster", () => {
     expect(setSoloCaster).not.toHaveBeenCalled();
   });
 
-  it("soloPut_arbitreForAnother_saves", async () => {
+  it("soloPut_arbitreForAnother_returns403AdminOnly", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const response = await soloPut(request("PUT", { solo: false, userId: 5 }));
+    expect(response.status).toBe(403);
+    expect(await errorOf(response)).toBe("PLANNING_ADMIN_ONLY");
+    expect(setSoloCaster).not.toHaveBeenCalled();
+  });
+
+  it("soloPut_adminForAnother_saves", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     expect((await soloPut(request("PUT", { solo: false, userId: 5 }))).status).toBe(200);
     expect(setSoloCaster).toHaveBeenCalledWith(5, false);
   });
@@ -256,12 +332,12 @@ describe("PUT /api/planning/solo-caster", () => {
   });
 
   it("soloPut_badUserId_returns400", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     expect(await errorOf(await soloPut(request("PUT", { solo: true, userId: -1 })))).toBe("INVALID_USER_ID");
   });
 
   it("soloPut_notCaster_returns409", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(setSoloCaster).mockRejectedValue(new Error("NOT_CASTER"));
     expect((await soloPut(request("PUT", { solo: true, userId: 5 }))).status).toBe(409);
   });
@@ -303,13 +379,13 @@ describe("PUT /api/admin/planning/assignment", () => {
 
 describe("POST /api/admin/planning/auto-assign", () => {
   beforeEach(() => {
-    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
   });
 
   it("autoAssignPost_valid_returnsReport", async () => {
     const response = await autoAssignPost(request("POST", WINDOW));
     expect(await response.json()).toEqual({ report: { entries: 1, proposed: 2, replaced: 0 } });
-    expect(runAutoAssign).toHaveBeenCalledWith(9, { from: Date.parse(WINDOW.from), to: Date.parse(WINDOW.to) });
+    expect(runAutoAssign).toHaveBeenCalledWith(1, { from: Date.parse(WINDOW.from), to: Date.parse(WINDOW.to) });
   });
 
   it("autoAssignPost_badWindow_returns400", async () => {
@@ -331,13 +407,13 @@ describe("POST /api/admin/planning/auto-assign", () => {
 
 describe("POST /api/admin/planning/confirm", () => {
   beforeEach(() => {
-    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
   });
 
   it("confirmPost_subset_passesScope", async () => {
     const response = await confirmPost(request("POST", CONFIRM));
     expect(await response.json()).toEqual({ report: { confirmed: 1, refused: 0 } });
-    expect(confirmAssignments).toHaveBeenCalledWith(9, { entryKeys: ["m:1"] });
+    expect(confirmAssignments).toHaveBeenCalledWith(1, { entryKeys: ["m:1"] });
   });
 
   it("confirmPost_emptyScope_returns400", async () => {
@@ -354,7 +430,7 @@ describe("POST /api/admin/planning/confirm", () => {
 
 describe("PUT /api/admin/planning/settings", () => {
   beforeEach(() => {
-    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
   });
 
   it("settingsPut_valid_writesAndReturnsDurations", async () => {
@@ -419,7 +495,7 @@ describe("plafonds des routes du planning", () => {
   });
 
   it("autoAssignPost_overBatchLimit_returns429", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     for (let call = 0; call < PLANNING_BATCH_RULE.limit; call += 1) await autoAssignPost(request("POST", WINDOW));
 
     expect((await confirmPost(request("POST", CONFIRM))).status).toBe(429);
@@ -427,7 +503,7 @@ describe("plafonds des routes du planning", () => {
   });
 
   it("autoAssignPost_invalidWindowsAtLimit_quotaNotConsumed", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const invalid = { from: WINDOW.to, to: WINDOW.from };
     for (let call = 0; call < PLANNING_BATCH_RULE.limit; call += 1) {
       expect(await errorOf(await autoAssignPost(request("POST", invalid)))).toBe("INVALID_WINDOW");
@@ -438,7 +514,7 @@ describe("plafonds des routes du planning", () => {
   });
 
   it("confirmPost_invalidScopesAtLimit_quotaNotConsumed", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     for (let call = 0; call < PLANNING_BATCH_RULE.limit; call += 1) {
       expect(await errorOf(await confirmPost(request("POST", {})))).toBe("INVALID_CONFIRM_SCOPE");
     }

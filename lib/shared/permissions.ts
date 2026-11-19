@@ -35,8 +35,9 @@ export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "PROD" | "COMMUNITY_
  *   blanche, tels que sur le serveur — jamais de note privée dans ces dossiers).
  * - `planning` — page « Planning » des casts, prods et arbitres
  *   (`docs/features/CAST_PLANNING.md`) : lire le planning et y donner ses
- *   propres disponibilités. Attribuer à la main, lancer l'attribution
- *   automatique et régler les minimums restent à `tournaments`.
+ *   propres disponibilités. Attribuer à la main reste à `tournaments` ;
+ *   lancer le calcul, confirmer et régler les durées sont réservés aux
+ *   administrateurs ({@link canComputePlanning}).
  */
 export type Permission =
   | "tournaments"
@@ -177,6 +178,16 @@ export function canAny(
   permissions: readonly Permission[],
 ): boolean {
   return permissions.some((permission) => can(user, permission));
+}
+
+/**
+ * Calcul, confirmation et réglages du planning (`docs/features/CAST_PLANNING.md`) :
+ * aux administrateurs seuls — décision explicite, exception à la règle des
+ * permissions scopées (`PERMISSION_ROLES.md`) ; l'attribution à la main reste
+ * à `tournaments`.
+ */
+export function canComputePlanning(user: { isAdmin?: boolean } | null | undefined): boolean {
+  return user?.isAdmin === true;
 }
 
 /**

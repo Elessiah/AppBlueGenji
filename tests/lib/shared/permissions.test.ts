@@ -4,6 +4,7 @@ import {
   ROLE_LABELS,
   can,
   canAny,
+  canComputePlanning,
   hasPermission,
   isPlatformRole,
   isStaffMember,
@@ -170,6 +171,29 @@ describe("canAny", () => {
     expect(canAny({ roles: ["RECRUTEUR"] }, ["tournaments", "casting"])).toBe(false);
     expect(canAny({ roles: ["ADMIN"] }, [])).toBe(false);
     expect(canAny(null, ["casting"])).toBe(false);
+  });
+});
+
+/** Calcul, confirmation et réglages du planning : administrateurs seuls (`CAST_PLANNING.md`). */
+describe("canComputePlanning", () => {
+  it("canComputePlanning_admin_returnsTrue", () => {
+    expect(canComputePlanning({ isAdmin: true })).toBe(true);
+  });
+
+  it("canComputePlanning_tournamentsStaffNotAdmin_returnsFalse", () => {
+    const arbitre = { roles: ["ARBITRE"] as PlatformRole[], isAdmin: false };
+
+    expect(can(arbitre, "tournaments")).toBe(true);
+    expect(canComputePlanning(arbitre)).toBe(false);
+  });
+
+  it("canComputePlanning_noAdminFlag_returnsFalse", () => {
+    expect(canComputePlanning({})).toBe(false);
+  });
+
+  it("canComputePlanning_noUser_returnsFalse", () => {
+    expect(canComputePlanning(null)).toBe(false);
+    expect(canComputePlanning(undefined)).toBe(false);
   });
 });
 

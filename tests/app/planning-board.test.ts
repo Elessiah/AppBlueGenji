@@ -2,7 +2,10 @@ import { describe, expect, it } from "@jest/globals";
 import {
   applyAvailability,
   candidatesFor,
+  canConfirmEntry,
+  canRunWeek,
   canWithdraw,
+  resyncDurations,
   COVERAGE_PILL,
   errorKey,
   filterEntries,
@@ -14,6 +17,7 @@ import {
   planningOpenKey,
   newestFirst,
   splitPast,
+  staffPanelDurations,
   heldBy,
   isThrottled,
   leadUntil,
@@ -36,6 +40,7 @@ import type { PlanningMember, PlanningView } from "@/lib/shared/planning-view";
 import { fieldForError } from "@/lib/shared/field-errors";
 import { planningCoverage, WITHDRAWAL_FIELD_ERRORS } from "@/lib/shared/planning";
 import { entryView, HOUR_MS, MONDAY } from "../helpers/planning";
+import { readSource } from "../helpers/read-source";
 
 /** Logique pure de l'écran « Planning » et ses textes de refus (`CAST_PLANNING.md` § Interface). */
 
@@ -363,9 +368,9 @@ function viewOf(overrides: Partial<PlanningView> = {}): PlanningView {
     me: 1,
     myRoles: ["CASTER"],
     canManage: false,
+    canCompute: false,
     entries: [entryView({ key: "m:1" }), entryView({ key: "m:2", matchId: 2 })],
     members: [member()],
-    durations: DEFAULT_PLANNING_DURATIONS,
     ...overrides,
   };
 }
@@ -428,7 +433,7 @@ describe("mergeView", () => {
   });
 
   it("mergeView_identicalReread_keepsEveryObject", () => {
-    const previous = viewOf();
+    const previous = viewOf({ canManage: true, canCompute: true, durations: DEFAULT_PLANNING_DURATIONS });
     const next = structuredClone(previous);
 
     const merged = mergeView(previous, next);
@@ -437,6 +442,21 @@ describe("mergeView", () => {
     expect(merged.members).toBe(previous.members);
     expect(merged.myRoles).toBe(previous.myRoles);
     expect(merged.durations).toBe(previous.durations);
+  });
+
+  it("mergeView_withoutDurations_keyStaysAbsent", () => {
+    const previous = viewOf({ canManage: true, canCompute: false });
+    const merged = mergeView(previous, structuredClone(previous));
+
+    expect("durations" in merged).toBe(false);
+  });
+
+  it("mergeView_adminDemoted_dropsStaleDurations", () => {
+    const previous = viewOf({ canManage: true, canCompute: true, durations: DEFAULT_PLANNING_DURATIONS });
+    const merged = mergeView(previous, viewOf({ canManage: true, canCompute: false }));
+
+    expect("durations" in merged).toBe(false);
+    expect(staffPanelDurations(merged)).toBeNull();
   });
 
   it("mergeView_oneEntryChanged_onlyThatOneIsNew", () => {
@@ -727,5 +747,139 @@ describe("planningOpenKey", () => {
   it("planningOpenKey_otherSection_differs", () => {
     expect(planningOpenKey("staff", 42)).toMatch(/^planning:staff-open:[0-9a-z]+$/);
     expect(planningOpenKey("past", 42)).toMatch(/^planning:past-open:[0-9a-z]+$/);
+  });
+});
+
+/** Ce que l'écran montre selon les droits : jamais un contrôle que le serveur refuse (`CAST_PLANNING.md`). */
+describe("staffPanelDurations", () => {
+  it("staffPanelDurations_adminWithDurations_returnsThem", () => {
+    const view = viewOf({ canManage: true, canCompute: true, durations: DEFAULT_PLANNING_DURATIONS });
+
+    expect(staffPanelDurations(view)).toBe(DEFAULT_PLANNING_DURATIONS);
+  });
+
+  it("staffPanelDurations_adminWithoutDurations_returnsNull", () => {
+    const view = viewOf({ canManage: true, canCompute: true });
+
+    expect(staffPanelDurations(view)).toBeNull();
+  });
+
+  it("staffPanelDurations_tournamentsStaffNotCompute_returnsNull", () => {
+    const view = viewOf({ canManage: true, canCompute: false, durations: DEFAULT_PLANNING_DURATIONS });
+
+    expect(staffPanelDurations(view)).toBeNull();
+  });
+});
+
+describe("resyncDurations", () => {
+  const saved = DEFAULT_PLANNING_DURATIONS;
+
+  it("resyncDurations_sameSavedObject_returnsForm", () => {
+    const form = { ...saved, bufferMinutes: 30 };
+
+    expect(resyncDurations(form, saved, saved)).toBe(form);
+  });
+
+  it("resyncDurations_untouchedField_takesReread", () => {
+    const next = { ...saved, eventHours: saved.eventHours + 2 };
+
+    expect(resyncDurations(saved, saved, next)).toEqual(next);
+  });
+
+  it("resyncDurations_fieldBeingEdited_keepsTyping", () => {
+    const form = { ...saved, mapMinutes: { ...saved.mapMinutes, OW: 40 } };
+    const next = { ...saved, mapMinutes: { ...saved.mapMinutes, OW: 20 }, bufferMinutes: saved.bufferMinutes + 5 };
+
+    const merged = resyncDurations(form, saved, next);
+
+    expect(merged.mapMinutes.OW).toBe(40);
+    expect(merged.bufferMinutes).toBe(next.bufferMinutes);
+  });
+});
+
+describe("canRunWeek", () => {
+  it("canRunWeek_adminWithOpenEntry_true", () => {
+    expect(canRunWeek(true, [entryView({ open: false }), entryView({ key: "m:2", open: true })])).toBe(true);
+  });
+
+  it("canRunWeek_adminAllClosed_false", () => {
+    expect(canRunWeek(true, [entryView({ open: false })])).toBe(false);
+  });
+
+  it("canRunWeek_notCompute_false", () => {
+    expect(canRunWeek(false, [entryView({ open: true })])).toBe(false);
+  });
+});
+
+describe("canConfirmEntry", () => {
+  const provisional = [{ userId: 1, role: "CASTER" as const, source: "AUTO" as const, reason: "LOAD" as const, provisional: true }];
+
+  it("canConfirmEntry_adminOpenProvisional_true", () => {
+    expect(canConfirmEntry(true, entryView({ open: true, assignments: provisional }))).toBe(true);
+  });
+
+  it("canConfirmEntry_adminNoProvisional_false", () => {
+    expect(canConfirmEntry(true, entryView({ open: true, assignments: [] }))).toBe(false);
+  });
+
+  it("canConfirmEntry_adminClosedEntry_false", () => {
+    expect(canConfirmEntry(true, entryView({ open: false, assignments: provisional }))).toBe(false);
+  });
+
+  it("canConfirmEntry_notCompute_false", () => {
+    expect(canConfirmEntry(false, entryView({ open: true, assignments: provisional }))).toBe(false);
+  });
+});
+
+describe("PlanningBoard : branchement des gardes de calcul", () => {
+  const source = readSource("app/(secured)/planning/_components/PlanningBoard.tsx");
+
+  it("planningBoard_computeControls_useTheTestedGates", () => {
+    expect(source).toContain("staffPanelDurations(view)");
+    expect(source).toContain("resyncDurations(durations, seenSaved, savedDurations)");
+    expect(source).not.toContain("key={durationsKey(");
+    expect(source).toContain("canRunWeek(canCompute, week.entries)");
+    expect(source).toContain("canConfirmEntry(view.canCompute, entry)");
+    expect(source).not.toContain("DEFAULT_PLANNING_DURATIONS");
+  });
+
+  it("planningBoard_manualAssignment_staysOnCanManage", () => {
+    expect(source).toContain("roleChoices(entry, role, view.members, view.canManage)");
+  });
+});
+
+describe("textes du refus réservé aux administrateurs", () => {
+  it("planningErrors_adminOnly_frAndEnPresentAndDistinctFromForbidden", () => {
+    expect(frPlanning.errors.PLANNING_ADMIN_ONLY).toBe("Ce geste est réservé aux administrateurs.");
+    expect(enPlanning.errors.PLANNING_ADMIN_ONLY).toBe("This action is reserved for administrators.");
+    expect(frPlanning.errors.PLANNING_ADMIN_ONLY).not.toBe(frPlanning.errors.FORBIDDEN);
+  });
+
+  it("planningErrors_membersOnly_frAndEnPresent", () => {
+    expect(frPlanning.errors.PLANNING_MEMBERS_ONLY).toBe("Ce geste est réservé aux arbitres, casters et prods du planning.");
+    expect(enPlanning.errors.PLANNING_MEMBERS_ONLY).toBe("This action is reserved for the schedule's referees, casters and prods.");
+  });
+
+  it("errorKey_membersOnly_resolvesToItsOwnKey", () => {
+    expect(errorKey("PLANNING_MEMBERS_ONLY", frPlanning.errors)).toBe("PLANNING_MEMBERS_ONLY");
+  });
+
+  it("errorKey_adminOnly_resolvesToItsOwnKey", () => {
+    expect(errorKey("PLANNING_ADMIN_ONLY", frPlanning.errors)).toBe("PLANNING_ADMIN_ONLY");
+  });
+});
+
+/** Une proposition devient ferme par un administrateur, d'office ou reprise à la main : l'aide le dit dans les deux langues. */
+describe("assignment.reasonHint", () => {
+  it("reasonHint_fr_namesEveryFirmingPath", () => {
+    expect(frPlanning.assignment.reasonHint).toContain("par un administrateur");
+    expect(frPlanning.assignment.reasonHint).toContain("d'office avant le créneau");
+    expect(frPlanning.assignment.reasonHint).toContain("repris à la main par le staff");
+  });
+
+  it("reasonHint_en_namesEveryFirmingPath", () => {
+    expect(enPlanning.assignment.reasonHint).toContain("by an administrator");
+    expect(enPlanning.assignment.reasonHint).toContain("automatically before the slot");
+    expect(enPlanning.assignment.reasonHint).toContain("picked by hand by the staff");
   });
 });

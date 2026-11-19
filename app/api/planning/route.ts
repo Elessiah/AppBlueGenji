@@ -13,7 +13,7 @@ import { can } from "@/lib/shared/permissions";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "planning")) return fail("FORBIDDEN", 403);
+  if (!can(user, "planning")) return fail("PLANNING_MEMBERS_ONLY", 403);
   // La rafale d'abord : une lecture qu'elle refuse ne compte pas dans la fenêtre de cinq minutes.
   const throttled = enforceRateLimit(PLANNING_READ_BURST_RULE, user.id) ?? enforceRateLimit(PLANNING_READ_RULE, user.id);
   if (throttled) return throttled;

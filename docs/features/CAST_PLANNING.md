@@ -2,7 +2,8 @@
 
 Page `/planning` (FR) et `/en/planning` (EN) : les arbitres, casters et prods
 disent, créneau par créneau et rôle par rôle, s'ils sont disponibles ; le staff
-des tournois attribue, à la main ou par un calcul, qui couvre chaque créneau.
+des tournois attribue à la main qui couvre chaque créneau, un administrateur
+lance le calcul qui le propose et le confirme.
 Remplace le tableur partagé tenu jusqu'ici.
 
 ## Accès
@@ -12,16 +13,40 @@ Remplace le tableur partagé tenu jusqu'ici.
 | Voir le planning (attributions de tous, ses propres réponses) | `planning` | `GET /api/planning` |
 | Donner sa disponibilité / sa préférence | `planning` + le rôle concerné | `PUT /api/planning/availability` |
 | Se dire caster autonome | `planning` + rôle `CASTER` | `PUT /api/planning/solo-caster` |
-| Régler le caster autonome d'un autre | `tournaments` | `PUT /api/planning/solo-caster` (`userId`) |
+| Régler le caster autonome d'un autre | **administrateur** | `PUT /api/planning/solo-caster` (`userId`) |
 | Attribuer / retirer à la main | `tournaments` | `PUT /api/admin/planning/assignment` |
-| Calculer un lot | `tournaments` | `POST /api/admin/planning/auto-assign` |
-| Confirmer des propositions | `tournaments` | `POST /api/admin/planning/confirm` |
-| Durées estimées | `tournaments` | `PUT /api/admin/planning/settings` |
+| Calculer un lot | **administrateur** (`canComputePlanning`) | `POST /api/admin/planning/auto-assign` |
+| Confirmer des propositions | **administrateur** | `POST /api/admin/planning/confirm` |
+| Durées estimées | **administrateur** | `PUT /api/admin/planning/settings` |
+
+**Calcul réservé aux administrateurs** (décision explicite, exception à la
+règle des permissions scopées) : `canComputePlanning(user)` (`user.isAdmin`).
+Le panneau « Calcul et confirmation » (confirmation à l'avance, caster
+autonome d'un autre, durées), le bouton « Calculer la semaine » et le bouton
+de confirmation d'un créneau n'existent que pour eux : la vue (`GET
+/api/planning`, seule porte, le planning n'a pas de flux) porte `canCompute`
+et `durations` seulement pour un administrateur ; sinon rien n'est rendu (ni
+coquille vide ni indice). Les routes de calcul, de confirmation, de réglages
+et le caster autonome d'un autre rendent `403 PLANNING_ADMIN_ONLY` (« réservé
+aux administrateurs ») à tout autre compte, `tournaments` compris ; le panneau
+n'est rendu que si la vue porte aussi les durées (jamais de valeurs par défaut
+qu'un enregistrement écrirait). L'attribution à la main reste à `tournaments`
+(`canManage`) : choisir à la main une personne déjà proposée remplace la
+proposition par un choix du staff (`MANUAL`, ferme par nature), ce n'est pas
+confirmer le calcul ; la confirmation d'office (`auto-confirm`) n'est pas un geste
+d'utilisateur et ne change pas ; le remplaçant cherché à un désistement
+(`replaceWithdrawn`) non plus : il comble une place que le désisté libère, sans
+calculer la semaine. La route d'attribution à la main refuse par `403 FORBIDDEN`
+(« réservé au staff des tournois », exact : elle exige `tournaments`). Les heures
+de fin et de confirmation de chaque créneau (`endAt`, `confirmAt`) restent
+rendues à tous les membres : elles laissent déduire les durées, qui ne sont pas
+un secret — seul leur formulaire est réservé.
 
 `planning` : rôles `ARBITRE`, `CASTER`, `PROD` (nouveau rôle de plateforme,
 production d'un direct) et `ADMIN` (`PERMISSION_ROLES.md`). Rôles du planning
 tenus (`planningRolesOf`) : arbitre = `tournaments`, caster = `CASTER`, prod =
-`PROD`. Vue joueur : aucun rôle, page 404, routes 403. Sans session : carte
+`PROD`. Vue joueur : aucun rôle, page 404, routes `403 PLANNING_MEMBERS_ONLY`
+(« réservé aux arbitres, casters et prods du planning »). Sans session : carte
 « Connexion requise » (page), 401 (routes). Le lien « Planning » du menu du
 compte suit `can(user, "planning")`. Les disponibilités des autres ne sont
 lues que par `tournaments` : sans elle, la lecture ne rend de la base que les
@@ -81,7 +106,7 @@ la requête : une requête mal formée n'use pas ce quota). Le refus `429`
   défaut**, la semaine la plus récente en tête (`newestFirst`). Le choix du lecteur est gardé
   sur son appareil, par compte (`planning:past-open:<empreinte du compte>`, jamais le numéro en clair, `localStorage`,
   `try/catch` : sans stockage, l'état par défaut vaut).
-- **Calcul et confirmation** (staff) : même bouton repliable, **replié par
+- **Calcul et confirmation** (administrateurs seuls) : même bouton repliable, **replié par
   défaut** ; le contenu reste monté (les durées en cours de saisie ne se
   perdent pas au repli).
 - **Nom du tour** : une carte de match porte le nom de la fiche du tournoi
@@ -229,7 +254,7 @@ compte les **rôles**, pas les personnes.
   jamais ; la confirmation s'inscrit sans auteur : le site aligne le planning
   sur le match, sans savoir qui l'a désigné — une confirmation joue cette
   réconciliation **après** ses propres lignes, si bien qu'un arbitre qu'elle
-  vient de désigner s'inscrit au compte du staff qui confirme, y compris
+  vient de désigner s'inscrit au compte de l'administrateur qui confirme, y compris
   quand une panne survient après que le match l'a pris (match relu) ; un
   arbitre que le match portait déjà avant le geste (posé depuis le match, ou
   confirmation interrompue d'un autre geste) ne passe pas par le match et se
@@ -385,7 +410,7 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   et l'alerte se jugent sur les rôles **confirmés** seuls, à la relecture qui
   suit le retrait (une inscription de cast faite ou défaite entre-temps compte) ;
   un remplaçant non autonome posé auprès d'un prod proposé ne déclenche pas
-  d'alerte : le staff confirme ce prod depuis le tableau. Une **proposition** de caster autonome quittée n'ôtait
+  d'alerte : un administrateur confirme ce prod depuis le tableau. Une **proposition** de caster autonome quittée n'ôtait
   aucune diffusion confirmée : jamais `streamLost`. Sans remplaçant, la diffusion est perdue : la place est à pourvoir, le
   staff prévenu, et tous lisent « diffusion perdue, il manque un prod ou un
   caster autonome » (`bodyStreamLost`, push et message privé ; pas de
@@ -595,7 +620,8 @@ il manque un caster, un prod ou un arbitre, hors autogestion voulue ; un
 tournoi) avec compteur, aides « i » (filtres, couverture, raisons) pour tous les
 membres, créneau du lecteur surligné (« Mon créneau »), cartes d'entrée (couverture en pastilles,
 `warning` réservé à « à arbitrer en priorité »), sa réponse par rôle (contrôle
-segmenté + étoile de préférence), panneau du staff (calcul de la semaine par
+segmenté + étoile de préférence), panneau « Calcul et confirmation » des
+administrateurs seuls (calcul de la semaine par
 `ConfirmActionDialog`, confirmation par délai ou par entrée, elle aussi derrière
 `ConfirmActionDialog` (elle pose l'arbitre sur le match), casters autonomes,
 durées), bouton « Me désister » sur ses propres lignes (sauf cast, jusqu'au

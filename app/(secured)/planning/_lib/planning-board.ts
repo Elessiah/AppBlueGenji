@@ -14,6 +14,7 @@ import {
   type CoverageLevel,
   type PlanningRole,
 } from "@/lib/shared/planning";
+import type { PlanningDurationSettings } from "@/lib/shared/planning-durations";
 import { rolesConflict } from "@/lib/shared/planning-planner";
 import type { PlanningAvailabilityView, PlanningEntryView, PlanningMember, PlanningView, WithdrawalResponse } from "@/lib/shared/planning-view";
 
@@ -123,7 +124,8 @@ export function mergeView(previous: PlanningView | null, next: PlanningView): Pl
     entries: entries.length === previous.entries.length && entries.every((entry, i) => entry === previous.entries[i]) ? previous.entries : entries,
     members: same(previous.members, next.members) ? previous.members : next.members,
     myRoles: same(previous.myRoles, next.myRoles) ? previous.myRoles : next.myRoles,
-    durations: same(previous.durations, next.durations) ? previous.durations : next.durations,
+    // `durations` n'existe que pour un administrateur : la clé reste absente sinon.
+    ...(next.durations ? { durations: same(previous.durations, next.durations) ? previous.durations : next.durations } : {}),
   };
 }
 
@@ -206,6 +208,51 @@ export const COVERAGE_PILL: Readonly<Record<CoverageLevel, PillVariant>> = {
 /** Une entrée porte-t-elle des propositions encore provisoires ? */
 export function hasProvisional(entry: PlanningEntryView): boolean {
   return entry.assignments.some((row) => row.provisional);
+}
+
+/**
+ * Durées que le panneau « Calcul et confirmation » édite, ou `null` s'il ne se
+ * rend pas : administrateur seul (`canCompute`, jamais `canManage`), et
+ * seulement avec les durées reçues — un formulaire prérempli de valeurs par
+ * défaut écraserait les réglages au premier enregistrement.
+ */
+export function staffPanelDurations(view: Pick<PlanningView, "canCompute" | "durations">): PlanningDurationSettings | null {
+  return view.canCompute && view.durations ? view.durations : null;
+}
+
+/**
+ * Le formulaire des durées après une relecture : un champ que l'administrateur
+ * n'a pas touché (encore égal à l'ancienne valeur enregistrée) prend la valeur
+ * relue — un autre administrateur a pu la changer — et un champ qu'il est en
+ * train de modifier garde sa saisie. Sans relecture changée, le même objet.
+ */
+export function resyncDurations(
+  form: PlanningDurationSettings,
+  previousSaved: PlanningDurationSettings,
+  nextSaved: PlanningDurationSettings,
+): PlanningDurationSettings {
+  if (previousSaved === nextSaved) return form;
+  const pick = (current: number, before: number, after: number) => (current === before ? after : current);
+  return {
+    mapMinutes: {
+      OW: pick(form.mapMinutes.OW, previousSaved.mapMinutes.OW, nextSaved.mapMinutes.OW),
+      MR: pick(form.mapMinutes.MR, previousSaved.mapMinutes.MR, nextSaved.mapMinutes.MR),
+    },
+    bufferMinutes: pick(form.bufferMinutes, previousSaved.bufferMinutes, nextSaved.bufferMinutes),
+    defaultMaps: pick(form.defaultMaps, previousSaved.defaultMaps, nextSaved.defaultMaps),
+    eventHours: pick(form.eventHours, previousSaved.eventHours, nextSaved.eventHours),
+    confirmLeadHours: pick(form.confirmLeadHours, previousSaved.confirmLeadHours, nextSaved.confirmLeadHours),
+  };
+}
+
+/** Bouton « Calculer la semaine » : administrateur seul, semaine ayant au moins un créneau ouvert. */
+export function canRunWeek(canCompute: boolean, entries: readonly PlanningEntryView[]): boolean {
+  return canCompute && entries.some((entry) => entry.open);
+}
+
+/** Confirmation d'un créneau : administrateur seul, créneau ouvert portant une proposition provisoire. */
+export function canConfirmEntry(canCompute: boolean, entry: PlanningEntryView): boolean {
+  return canCompute && entry.open && hasProvisional(entry);
 }
 
 /**
