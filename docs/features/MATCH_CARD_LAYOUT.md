@@ -63,8 +63,8 @@ lire les drapeaux déjà calculés (`launchStripControls`, `canToggleOnAir`,
 | Caster ce match | `live`, match castable hors du sien, pas déjà caster | fenêtre d'inscription (`aria-disabled` + motif si identité manquante) |
 | Configurer ma diffusion | **caster inscrit** de ce match (`offersCastSettings`) | `CastSettingsDialog` — lien, antenne, rediff, BattleTag du cast, « Ne plus caster » → `CAST_SETTINGS.md` |
 | Retirer le caster | `tournaments`, et un **autre** caster que le lecteur | `DELETE …/caster` |
-| Diffuser ce match / Diffusion officielle | `tournaments` **et** `live` | configuration du direct de l'organisation (antenne et rediff comprises) |
-| Ajouter / Modifier la rediff | `tournaments` **et** `live`, match joué (`canEditReplay` ; « Modifier » aussi sur un lien stocké d'un match rouvert ou forfait) — toujours dans « Plus d'actions », diffusion marquée ou non | `MatchReplayDialog` → `MATCH_REPLAYS.md` |
+| Diffuser ce match / Diffusion officielle | `tournaments` **et** `live`, ou arbitre désigné du match | configuration du direct de l'organisation (antenne et rediff comprises) |
+| Ajouter / Modifier / Retirer la rediff | `tournaments` **et** `live`, match joué (`mayEditReplay` + `canEditReplay` ; « Retirer la rediff » sur un lien stocké d'un match rouvert ou forfait) — toujours dans « Plus d'actions », diffusion marquée ou non | `MatchReplayDialog` → `MATCH_REPLAYS.md` |
 | Page du match | tous, sauf sous la page elle-même et sur une exemption | **lien** vers la page du match (`MATCH_PAGE.md`) — la seule action qui navigue |
 | Signaler un problème | engagé inscrit, sur **son** match | signalement |
 

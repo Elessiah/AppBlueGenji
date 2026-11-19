@@ -928,6 +928,15 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(render("fr", ui())).not.toBe(html);
   });
 
+  it("MatchReplayDialog_bidiTeamName_subtitleStripsInvisiblesAndTranslates", () => {
+    const played = { ...versus, team1Name: "Al‮pha​", status: "COMPLETED" as const, team1Score: 2, team2Score: 0, winnerTeamId: 10 };
+    const fr = render("fr", <MatchReplayDialog match={played} onClose={noop} onSaved={noop} />);
+    const en = render("en", <MatchReplayDialog match={played} onClose={noop} onSaved={noop} />);
+    expect(fr).toContain("Alpha contre Bravo");
+    expect(en).toContain("Alpha vs Bravo");
+    expect(fr).not.toContain("‮");
+  });
+
   it("équipes fantômes d'un tournoi individuel : joueurs invités", () => {
     const html = render("en", <GhostRegistrationDialog tournamentId={1} remainingSlots={4} onClose={noop} onRegistered={noop} />, "SOLO");
     expect(html).toContain("Register a guest player");

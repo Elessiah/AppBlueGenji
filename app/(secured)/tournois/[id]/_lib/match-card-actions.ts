@@ -75,12 +75,17 @@ export type MatchCardActionInput = {
   liveConfigured: boolean;
   /**
    * « Ajouter / Modifier la rediff » dans le menu de la carte : toujours offert
-   * sur un match joué, diffusion marquée ou non, au staff que la route admet
-   * (permissions `tournaments` et `live`). Le caster garde en plus son accès
-   * dans sa fenêtre de diffusion.
+   * sur un match joué, diffusion marquée ou non, au staff `tournaments` et
+   * `live` (plus étroit que la route, qui admet aussi le caster pour son cast :
+   * il garde son accès dans sa fenêtre de diffusion).
    */
   showReplay: boolean;
   hasReplay: boolean;
+  /**
+   * Match qui ne peut plus porter de rediff (rouvert, forfait) : l'entrée ne
+   * fait que retirer le lien stocké — « Retirer la rediff », jamais « Modifier ».
+   */
+  replayRemovableOnly?: boolean;
   canReport: boolean;
   /**
    * « Page du match » offerte : pas sur la page elle-même, pas sur une
@@ -138,7 +143,14 @@ export function matchCardActionList(
       either(input.liveConfigured, t("cardActions.configureStream"), t("cardActions.streamMatch")),
       "neutral",
     ],
-    [input.showReplay, "replay", either(input.hasReplay, t("cardActions.editReplay"), t("cardActions.addReplay")), "neutral"],
+    [
+      input.showReplay,
+      "replay",
+      input.replayRemovableOnly === true && input.hasReplay
+        ? t("cardActions.removeReplay")
+        : either(input.hasReplay, t("cardActions.editReplay"), t("cardActions.addReplay")),
+      "neutral",
+    ],
     [input.canReport, "report", t("header.reportIssue"), "neutral"],
   ];
   return rows

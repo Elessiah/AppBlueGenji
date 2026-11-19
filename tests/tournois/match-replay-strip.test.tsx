@@ -117,3 +117,11 @@ describe("canEditReplay — logique pure", () => {
     expect(source).not.toContain("_components/");
   });
 });
+
+describe("MatchReplayStrip — noms non fiables", () => {
+  it("MatchReplayStrip_bidiTeamName_ariaLabelStripsInvisibles", () => {
+    const html = render({ ...played, team1Name: "Drag‮ons​", replayUrl: VIDEO });
+    expect(html).toMatch(/aria-label="Rediff disponible — revoir Dragons contre Lions sur YouTube/);
+    expect(html).not.toContain("‮");
+  });
+});

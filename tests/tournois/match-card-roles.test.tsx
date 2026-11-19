@@ -192,10 +192,6 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
     expect(html).toContain(REPLAY_ADD);
   });
 
-  it("matchCard_liveWithoutTournaments_noReplay", () => {
-    expect(card(played, { canManage: true })).not.toContain('data-action="replay"');
-  });
-
   it("matchCard_tournamentsWithoutLive_noReplay", () => {
     expect(card(played, { canSchedule: true })).not.toContain('data-action="replay"');
   });
@@ -213,9 +209,17 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
     expect(card(forfeit, staff)).not.toContain('data-action="replay"');
   });
 
-  it("matchCard_reopenedWithExistingLink_staffKeepsEditEntry", () => {
+  it("matchCard_reopenedWithExistingLink_staffSeesRemoveEntry", () => {
+    // Le match rouvert ne peut plus porter de rediff : seul le retrait reste.
     const reopened = launched({ replayUrl: "https://www.youtube.com/watch?v=abcdefghijk" });
-    expect(card(reopened, staff)).toContain("Modifier la rediff : Alpha contre Bravo");
+    const html = card(reopened, staff);
+    expect(html).toContain("Retirer la rediff : Alpha contre Bravo");
+    expect(html).not.toContain("Modifier la rediff");
+  });
+
+  it("matchCard_completedWithLink_staffSeesEditEntry", () => {
+    const linked = bracketMatch({ ...played, replayUrl: "https://www.youtube.com/watch?v=abcdefghijk" });
+    expect(card(linked, staff)).toContain("Modifier la rediff : Alpha contre Bravo");
   });
 
   it("matchCard_completedForStaff_replayStaysInMenu", () => {
@@ -246,15 +250,14 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
     expect(card(doubleForfeit, staff)).not.toContain('data-action="replay"');
   });
 
-  it("matchCard_forfeitWithStoredLink_staffKeepsEditEntry", () => {
+  it("matchCard_forfeitWithStoredLink_staffSeesRemoveEntry", () => {
     const forfeit = bracketMatch({
       ...played,
       forfeitTeamId: 20,
       replayUrl: "https://www.youtube.com/watch?v=abcdefghijk",
     });
-    expect(card(forfeit, staff)).toContain("Modifier la rediff : Alpha contre Bravo");
+    expect(card(forfeit, staff)).toContain("Retirer la rediff : Alpha contre Bravo");
   });
-
 
   it("matchCard_completedWithOfficialLive_staffSeesLiveConfigAndReplay", () => {
     const html = card(bracketMatch({ ...played, casters: casterNamed(77), liveTrigger: "MANUAL" }), staff);
@@ -266,12 +269,13 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
 
 });
 
-describe("MatchRow — la carte et la fenêtre de rediff s'accordent", () => {
-  it("matchCard_staffWithBothPermissions_mayEditReplayAgreesWithMenu", async () => {
-    const { mayEditReplay } = await import("@/app/(secured)/tournois/[id]/_components/MatchLiveDialog");
-    const controls = { canManage: true, canSchedule: true, viewerUserId: 1 };
-    expect(mayEditReplay({ casters: [] }, controls)).toBe(true);
-    expect(mayEditReplay({ casters: [] }, { ...controls, canSchedule: false })).toBe(false);
-    expect(mayEditReplay({ casters: [{ userId: 1 }] }, { ...controls, canSchedule: false })).toBe(true);
+describe("MatchRow — la carte ne s'ouvre jamais plus large que la route", () => {
+  it("matchCard_liveOnlyCasterOfPlayedMatch_noMenuReplay", () => {
+    // `mayEditReplay` admet ce caster (`live` seule, son cast) ; la carte, elle,
+    // exige aussi `tournaments` : son entrée est sa fenêtre de diffusion.
+    const mine = bracketMatch({ ...played, casters: [{ userId: 1, pseudo: "Moi", streamId: 1, ready: false }] });
+    const html = card(mine, { canManage: true });
+    expect(html).toContain('data-action="castConfig"');
+    expect(html).not.toContain('data-action="replay"');
   });
 });

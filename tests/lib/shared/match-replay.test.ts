@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   canHaveReplay,
   isValidReplayUrl,
+  mayEditReplay,
   normalizeReplayUrl,
   visibleReplayUrl,
 } from "@/lib/shared/match-replay";
@@ -105,5 +106,29 @@ describe("visibleReplayUrl", () => {
 
   it("revalide le lien à la lecture — une ligne éditée à la main ne devient pas un href", () => {
     expect(visibleReplayUrl({ ...played, replayUrl: "https://exemple.invalid/x" })).toBeNull();
+  });
+});
+
+describe("mayEditReplay — miroir de la route PUT /api/admin/matches/[id]/replay", () => {
+  const staff = { canManage: true, canSchedule: true, viewerUserId: 1 };
+
+  it("mayEditReplay_withoutLive_returnsFalse", () => {
+    expect(mayEditReplay({ casters: [] }, { ...staff, canManage: false })).toBe(false);
+  });
+
+  it("mayEditReplay_tournamentsAndLive_returnsTrue", () => {
+    expect(mayEditReplay({ casters: [] }, staff)).toBe(true);
+  });
+
+  it("mayEditReplay_liveOnlyCasterOfMatch_returnsTrue", () => {
+    expect(mayEditReplay({ casters: [{ userId: 1 }] }, { ...staff, canSchedule: false })).toBe(true);
+  });
+
+  it("mayEditReplay_liveOnlyNotCaster_returnsFalse", () => {
+    expect(mayEditReplay({ casters: [{ userId: 2 }] }, { ...staff, canSchedule: false })).toBe(false);
+  });
+
+  it("mayEditReplay_nullViewer_ignoresCasters", () => {
+    expect(mayEditReplay({ casters: [{ userId: 1 }] }, { canManage: true, canSchedule: false, viewerUserId: null })).toBe(false);
   });
 });

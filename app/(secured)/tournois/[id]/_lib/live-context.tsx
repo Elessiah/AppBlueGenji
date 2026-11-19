@@ -37,8 +37,8 @@ type LiveControls = {
   castBlock: CastBlock | null;
   /**
    * Ouvre le lien de rediff d'un match terminé. L'entrée de la carte demande
-   * `tournaments` **et** `live` (`canSchedule && canEditReplay`, porte de la
-   * route) ; le caster garde la sienne dans sa fenêtre de diffusion.
+   * `tournaments` **et** `live` (déduite de `mayEditReplay`, plus étroite que
+   * la route) ; le caster garde la sienne dans sa fenêtre de diffusion.
    */
   openReplay: (match: BracketMatch) => void;
   /**

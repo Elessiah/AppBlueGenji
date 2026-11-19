@@ -2,7 +2,8 @@
  * Rediffusion d'un match terminé.
  *
  * Une fois une rencontre jouée, le staff de diffusion (permission `live` : admin,
- * arbitre, caster ; l'entrée de la carte demande aussi `tournaments`) y pose le lien YouTube de sa rediff. Le match
+ * arbitre, caster — la seule `live` pour son propre cast, voir
+ * {@link mayEditReplay}) y pose le lien YouTube de sa rediff. Le match
  * l'annonce alors à tout le monde par un bandeau « Rediff disponible » sous sa
  * carte — c'est la seule façon, pour un spectateur arrivé après coup, de savoir
  * qu'une rencontre se revoit.
@@ -116,11 +117,26 @@ export function visibleReplayUrl(
 }
 
 /**
- * Le lecteur peut-il poser, modifier ou retirer la rediff ? `canManage` dit
- * la permission `live` ; la carte (`match-card-model.ts`) y ajoute `tournaments`
- * (`canSchedule`), porte de la route, et la fenêtre de diffusion admet aussi le
- * caster du match. Logique pure, hors du composant du bandeau.
+ * Ce match offre-t-il la rediff à un lecteur admis (`canManage`, déduit de
+ * {@link mayEditReplay}) ? Sur un match joué, ou pour retirer un lien stocké.
+ * Logique pure, hors du composant du bandeau.
  */
 export function canEditReplay(match: MatchReplayInput & { replayUrl: string | null }, canManage: boolean): boolean {
   return canManage && (canHaveReplay(match) || match.replayUrl !== null);
+}
+
+/**
+ * Miroir **unique** de la route `PUT /api/admin/matches/[id]/replay` : il faut
+ * `live` (`canManage`), et la seule `live` ne règle que la rediff de **son**
+ * cast (`NOT_MATCH_CASTER`), le staff `tournaments` (`canSchedule`) toutes.
+ * Chaque entrée du client s'en déduit, jamais plus large : la fenêtre de
+ * diffusion telle quelle, la carte sans le caster (`viewerUserId: null` et
+ * `canSchedule` exigé — le caster a sa fenêtre).
+ */
+export function mayEditReplay(
+  match: { casters: readonly { userId: number }[] },
+  controls: { canManage: boolean; canSchedule: boolean; viewerUserId: number | null },
+): boolean {
+  if (!controls.canManage) return false;
+  return controls.canSchedule || match.casters.some((caster) => caster.userId === controls.viewerUserId);
 }

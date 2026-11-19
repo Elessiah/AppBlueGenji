@@ -1,7 +1,7 @@
 import type { BracketMatch } from "@/lib/shared/types";
 import { SCORE_ENTRY_CLOSED_PHASES, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { canConfigureLive, type MatchLiveState } from "@/lib/shared/live-streams";
-import { canEditReplay } from "@/lib/shared/match-replay";
+import { canEditReplay, canHaveReplay, mayEditReplay } from "@/lib/shared/match-replay";
 import { offersCastSettings } from "@/lib/shared/cast-settings";
 import { canReportOwnMatch } from "@/lib/shared/match-card-viewer";
 import {
@@ -171,9 +171,12 @@ export function useMatchCardModel(
       showLiveConfig,
       liveConfigured: match.liveTrigger !== null,
       // La rediff d'un match joué a toujours son entrée dans le menu de la
-      // carte, diffusion marquée ou non, quel que soit le caster : porte de
-      // la route (`tournaments` et `live`, `canEditReplay`) et rien de plus.
-      showReplay: canSchedule && canEditReplay(match, canManage),
+      // carte, diffusion marquée ou non : déduite du miroir de la route
+      // (`mayEditReplay`), sans le caster (sa fenêtre) — `tournaments` et `live`.
+      showReplay:
+        canSchedule && canEditReplay(match, mayEditReplay(match, { canManage, canSchedule, viewerUserId: null })),
+      // Match rouvert ou forfait avec un lien stocké : seul le retrait reste.
+      replayRemovableOnly: !canHaveReplay(match),
       hasReplay: match.replayUrl !== null,
       canReport: canReportMatch,
       showMatchPage,

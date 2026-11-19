@@ -31,12 +31,15 @@ Quatre conséquences voulues :
   **deux** fenêtres de diffusion (celle du caster et celle du staff).
 - « Ajouter / Modifier la rediff » **reste dans le menu « Plus d'actions »**
   de la carte, pour tout match joué (`canEditReplay`), diffusion marquée ou
-  non, association ou invité : elle ouvre `MatchReplayDialog`. Porte du
-  client = celle de la route (`tournaments` **et** `live` : admin, arbitre,
-  arbitre désigné) ; pas avant la fin du match, sauf « Modifier la rediff »
-  sur un match rouvert ou tranché par forfait qui garde un lien stocké (seul
-  moyen de le retirer). Le caster garde en plus son
-  accès dans sa fenêtre de diffusion (`showReplay` : `match-card-model.ts`).
+  non, association ou invité : elle ouvre `MatchReplayDialog`. Porte de la
+  carte **plus étroite** que la route : celle-ci admet tout porteur de `live`
+  pour son propre cast (`NOT_MATCH_CASTER` sinon), la carte exige
+  `tournaments` **et** `live` (admin, arbitre ; un arbitre désigné seulement
+  s'il porte les deux), déduite de `mayEditReplay` (`lib/shared/match-replay.ts`,
+  miroir unique de la route). Pas avant la fin du match ; sur un match rouvert
+  ou tranché par forfait qui garde un lien stocké, l'entrée devient « Retirer
+  la rediff » (seul geste possible). Le caster règle la sienne dans
+  `CastSettingsDialog`, l'arbitre désigné qui caste dans `MatchLiveDialog`.
 
 ## S'inscrire : « Caster ce match »
 

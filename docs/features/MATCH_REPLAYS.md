@@ -44,8 +44,13 @@ disparaître sans écriture — et le rejouer le fait revenir.
 ## Interface
 
 - `MatchReplayStrip` (sous `MatchLiveStrip`, dans `MatchRow` — passage unique de
-  toutes les vues du plateau) : bandeau bleu glacier pour tous, bouton
-  « Ajouter la rediff » / « Modifier la rediff » (menu « Plus d'actions », toujours offert sur un match joué) pour le staff `tournaments` et `live`. Le rouge reste réservé à ce qui
+  toutes les vues du plateau) : bandeau bleu glacier pour tous (le lien seul,
+  noms nettoyés par `useShownEntrantName`). Le bouton « Ajouter / Modifier la
+  rediff » vit dans le menu « Plus d'actions » de la carte (`MatchCardActions`),
+  toujours offert sur un match joué au staff `tournaments` et `live` (« Retirer
+  la rediff » sur un match rouvert ou forfait) ; le caster du match règle la
+  sienne dans `CastSettingsDialog`, l'arbitre désigné qui caste dans
+  `MatchLiveDialog` — toutes déduites de `mayEditReplay`, miroir de la route. Le rouge reste réservé à ce qui
   est réellement à l'antenne. Le nom accessible du lien **commence par son texte
   visible** (WCAG 2.5.3) et nomme le match.
 - Sur un match rouvert qui porte encore un lien, le staff garde son bouton, pour
