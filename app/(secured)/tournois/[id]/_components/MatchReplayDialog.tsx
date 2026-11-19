@@ -12,6 +12,9 @@ import { canHaveReplay, isValidReplayUrl } from "@/lib/shared/match-replay";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
 import { useDialogsText } from "../_lib/dialogs-text";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { versusText } from "@/lib/shared/tournament-page-text";
+import { useShownEntrantName } from "./EntrantName";
 
 interface MatchReplayDialogProps {
   match: BracketMatch;
@@ -31,6 +34,10 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const { t } = useDialogsText();
+  const pageText = useTournamentPageText();
+  // Noms nettoyés comme sur la carte (`useShownEntrantName`, `UNTRUSTED_NAMES.md`).
+  const team1 = useShownEntrantName(match.team1Id, match.team1Name) ?? pageText.t("match.tbd");
+  const team2 = useShownEntrantName(match.team2Id, match.team2Name) ?? pageText.t("match.tbd");
   const [replayUrl, setReplayUrl] = useState(match.replayUrl ?? "");
   // Garde synchrone (Entrée dans le champ, double clic) : un second envoi
   // partirait avant que `busy` soit rendu. Les boutons restent focalisables
@@ -108,7 +115,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
             {t("replay.title")}
           </h3>
           <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
-            {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
+            {versusText(pageText, team1, team2)}
           </p>
 
           {!replayable && (

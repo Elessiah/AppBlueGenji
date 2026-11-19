@@ -226,6 +226,7 @@
     "streamMatch": "Stream this match",
     "editReplay": "Edit the replay",
     "addReplay": "Add the replay",
+    "removeReplay": "Remove the replay",
     "playerScore": {
       "forfeit": "Declare forfeit",
       "confirm": "Confirm the score",

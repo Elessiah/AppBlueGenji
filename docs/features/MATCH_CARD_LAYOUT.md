@@ -35,7 +35,7 @@ De haut en bas, par ordre d'importance :
    page du match (`MatchKeyFacts` : hôte, premier ban, arbitrage, maps, format,
    côtés, casters, lancement), à laquelle chaque carte mène. Seuls restent sur
    la carte l'horaire, l'état de diffusion avec **les liens des chaînes**, la
-   phase, la rediff et le pied d'action.
+   phase, la rediff (le lien) et le pied d'action (dont le menu porte la rediff, doublée à dessein dans les fenêtres de diffusion pour le caster).
 4. Bandeau « Rediff disponible » (lien seul) et proposition de score en attente.
 5. **Pied d'action** (`MatchCardActions`) — une action principale pleine
    largeur et, s'il reste des actions, un bouton « Plus d'actions » (⋯).
@@ -63,7 +63,8 @@ lire les drapeaux déjà calculés (`launchStripControls`, `canToggleOnAir`,
 | Caster ce match | `live`, match castable hors du sien, pas déjà caster | fenêtre d'inscription (`aria-disabled` + motif si identité manquante) |
 | Configurer ma diffusion | **caster inscrit** de ce match (`offersCastSettings`) | `CastSettingsDialog` — lien, antenne, rediff, BattleTag du cast, « Ne plus caster » → `CAST_SETTINGS.md` |
 | Retirer le caster | `tournaments`, et un **autre** caster que le lecteur | `DELETE …/caster` |
-| Diffuser ce match / Diffusion officielle | `tournaments` | configuration du direct de l'organisation (antenne et rediff comprises) |
+| Diffuser ce match / Diffusion officielle | `tournaments` **et** `live`, ou arbitre désigné du match | configuration du direct de l'organisation (antenne et rediff comprises) |
+| Ajouter / Modifier / Retirer la rediff | `tournaments` **et** `live`, match joué (`mayEditReplay` + `canEditReplay` ; « Retirer la rediff » sur un lien stocké d'un match rouvert ou forfait) — toujours dans « Plus d'actions », diffusion marquée ou non | `MatchReplayDialog` → `MATCH_REPLAYS.md` |
 | Page du match | tous, sauf sous la page elle-même et sur une exemption | **lien** vers la page du match (`MATCH_PAGE.md`) — la seule action qui navigue |
 | Signaler un problème | engagé inscrit, sur **son** match | signalement |
 

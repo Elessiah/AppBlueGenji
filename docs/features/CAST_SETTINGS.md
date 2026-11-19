@@ -20,20 +20,26 @@ Code : `lib/shared/cast-settings.ts` (règles pures),
 | **Retirer le caster** | permission `tournaments`, et un **autre** caster que le lecteur | confirmation existante (avis au caster, `CAST_NOTICES.md`) |
 | **Diffuser ce match / Diffusion officielle** | permissions `tournaments` **et** `live` (ses routes, `/api/admin/matches/[id]/live` et la rediff, demandent `live`) | `MatchLiveDialog` (diffusion de l'organisation) |
 
-Trois conséquences voulues :
+Quatre conséquences voulues :
 
 - un porteur de `live` qui **ne caste pas** n'a plus aucune configuration de
   diffusion : elle appartient soit au caster (la sienne), soit au staff
   `tournaments` (celle de l'organisation) ;
 - « Ne plus caster » quitte la carte : il vit dans « Configurer ma diffusion »,
   d'où il fait revenir « Caster ce match » ;
-- « Lancer / Couper le direct » et « Ajouter / Modifier la rediff » quittent la
-  carte aussi : ils vivent dans les **deux** fenêtres de diffusion (celle du
-  caster et celle du staff), la rediff gardant sa propre fenêtre
-  (`MatchReplayDialog`), ouverte depuis elles. Seule exception : un match
-  joué **sans diffusion marquée** n'ouvre aucune des deux fenêtres
-  (`canConfigureLive` faux, aucun caster) ; « Ajouter / Modifier la rediff »
-  reste alors sur la carte pour ce même staff (`tournaments` et `live`).
+- « Lancer / Couper le direct » quitte la carte aussi : il vit dans les
+  **deux** fenêtres de diffusion (celle du caster et celle du staff).
+- « Ajouter / Modifier la rediff » **reste dans le menu « Plus d'actions »**
+  de la carte, pour tout match joué (`canEditReplay`), diffusion marquée ou
+  non, association ou invité : elle ouvre `MatchReplayDialog`. Porte de la
+  carte **plus étroite** que la route : celle-ci admet tout porteur de `live`
+  pour son propre cast (`NOT_MATCH_CASTER` sinon), la carte exige
+  `tournaments` **et** `live` (admin, arbitre ; un arbitre désigné seulement
+  s'il porte les deux), déduite de `mayEditReplay` (`lib/shared/match-replay.ts`,
+  miroir unique de la route). Pas avant la fin du match ; sur un match rouvert
+  ou tranché par forfait qui garde un lien stocké, l'entrée devient « Retirer
+  la rediff » (seul geste possible). Le caster règle la sienne dans
+  `CastSettingsDialog`, l'arbitre désigné qui caste dans `MatchLiveDialog`.
 
 ## S'inscrire : « Caster ce match »
 
