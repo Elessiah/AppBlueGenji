@@ -34,7 +34,13 @@ qu'un enregistrement écrirait). L'attribution à la main reste à `tournaments`
 (`canManage`) : choisir à la main une personne déjà proposée remplace la
 proposition par un choix du staff (`MANUAL`, ferme par nature), ce n'est pas
 confirmer le calcul ; la confirmation d'office (`auto-confirm`) n'est pas un geste
-d'utilisateur et ne change pas.
+d'utilisateur et ne change pas ; le remplaçant cherché à un désistement
+(`replaceWithdrawn`) non plus : il comble une place que le désisté libère, sans
+calculer la semaine. La route d'attribution à la main refuse par `403 FORBIDDEN`
+(« réservé au staff des tournois », exact : elle exige `tournaments`). Les heures
+de fin et de confirmation de chaque créneau (`endAt`, `confirmAt`) restent
+rendues à tous les membres : elles laissent déduire les durées, qui ne sont pas
+un secret — seul leur formulaire est réservé.
 
 `planning` : rôles `ARBITRE`, `CASTER`, `PROD` (nouveau rôle de plateforme,
 production d'un direct) et `ADMIN` (`PERMISSION_ROLES.md`). Rôles du planning

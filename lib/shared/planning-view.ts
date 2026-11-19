@@ -127,7 +127,7 @@ export type PlanningMember = {
 export type PlanningView = {
   me: number;
   myRoles: PlanningRole[];
-  /** Attribution manuelle et calcul automatique (permission `tournaments`). */
+  /** Attribution manuelle (permission `tournaments`) ; le calcul relève de `canCompute`. */
   canManage: boolean;
   /** Calcul, confirmation et réglages (administrateur seul) : sans lui, la page ne montre rien de ce panneau. */
   canCompute: boolean;

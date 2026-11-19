@@ -868,3 +868,16 @@ describe("textes du refus réservé aux administrateurs", () => {
     expect(errorKey("PLANNING_ADMIN_ONLY", frPlanning.errors)).toBe("PLANNING_ADMIN_ONLY");
   });
 });
+
+/** Une proposition se confirme par un administrateur ou d'office : l'aide le dit dans les deux langues. */
+describe("assignment.reasonHint", () => {
+  it("reasonHint_fr_namesAdministratorAndAutomaticConfirmation", () => {
+    expect(frPlanning.assignment.reasonHint).toContain("par un administrateur");
+    expect(frPlanning.assignment.reasonHint).toContain("d'office avant le créneau");
+  });
+
+  it("reasonHint_en_namesAdministratorAndAutomaticConfirmation", () => {
+    expect(enPlanning.assignment.reasonHint).toContain("by an administrator");
+    expect(enPlanning.assignment.reasonHint).toContain("automatically before the slot");
+  });
+});
