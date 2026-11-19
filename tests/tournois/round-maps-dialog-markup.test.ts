@@ -105,6 +105,53 @@ describe("compact controls and chips", () => {
 
     expect(css).toContain(".option:has(input:checked)");
     expect(css).not.toContain(":has(input:focus-visible)");
-    expect(globals).not.toContain(".radio-segment:has(input:focus-visible)");
+    // Un seul repère de focus : le contour de la pastille, pas l'anneau de la radio en plus.
+    expect(globals).toContain(".radio-segment:has(input:focus-visible)");
+    expect(globals).toMatch(/\.radio-segment input\[type="radio"\]:focus-visible \{\s*box-shadow: none;/);
+  });
+
+  it("globals_radioSegments_busyCheckedPillIsDimmed", () => {
+    const globals = readSource("app/globals.css");
+
+    expect(globals).toContain('.radio-segment:has(input[aria-disabled="true"]:checked)');
+  });
+});
+
+describe("lighter dialog details", () => {
+  it("dialog_slotHead_noDuplicateNumberBadge", () => {
+    expect(readSource(DIALOG)).not.toContain("slotNumber");
+    expect(readSource(STYLES)).not.toContain(".slotNumber");
+  });
+
+  it("styles_iconButton_beatsCompactPaddingAndHasNoDeadSegmentsRule", () => {
+    const css = readSource(STYLES);
+
+    expect(css).toMatch(/\.slotHead button\.iconButton \{\s*min-width: 32px;\s*padding: 4px 8px;/);
+    expect(css).not.toContain(".segments");
+  });
+
+  it("styles_separators_oneRulePerBarAndNoRuleOnLoneCustomRow", () => {
+    const css = readSource(STYLES);
+
+    expect(css).toMatch(/\.customRow:not\(:first-child\),\s*\.actionsBar \{/);
+    expect(css).not.toMatch(/\.copyRow,\s*\.actionsBar/);
+  });
+
+  it("dialog_saveButtons_allSolidAndEachBarSeparated", () => {
+    const source = readSource(DIALOG);
+
+    expect(source.match(/type="submit" className="btn compact"/g)).toHaveLength(4);
+    expect(source.match(/styles\.actionsBar/g)).toHaveLength(4);
+  });
+
+  it("styles_mapList_shortScreensKeepMinimumHeightAndNarrowDropsBox", () => {
+    const css = readSource(STYLES);
+
+    expect(css).toContain("max-height: max(180px, min(280px, 40dvh));");
+    expect(css).toMatch(/@media \(max-width: 480px\) \{[\s\S]*\.mapList \{\s*padding: 0;\s*border: 0;/);
+  });
+
+  it("dialog_staleTiebreaks_titleIsARealLegend", () => {
+    expect(readSource(DIALOG)).toMatch(/<legend className={styles\.legend}>\s*<span id={`\${ids}-title`}>/);
   });
 });

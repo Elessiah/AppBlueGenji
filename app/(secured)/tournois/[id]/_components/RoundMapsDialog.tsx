@@ -375,9 +375,6 @@ function SlotEditor({
   return (
     <li className={styles.slot} data-state={state}>
       <div className={styles.slotHead}>
-        <span className={styles.slotNumber} aria-hidden="true">
-          {number}
-        </span>
         <span className={styles.slotTitle}>{t("dialog.slot", { number })}</span>
         <span className={`pill ${SLOT_STATE_PILL[state]}`}>{kind}</span>
         {removable && (
@@ -573,7 +570,7 @@ function TiebreakForm({
           </output>
           {overwatch && <MapNamesDatalist id={listId} />}
         </div>
-        <div className={styles.actions}>
+        <div className={`${styles.actions} ${styles.actionsBar}`}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
           {/* Toujours monté : après un retrait réussi il n'y a plus rien à retirer, mais un
               bouton démonté laisserait tomber le focus sur le <body> (WCAG 2.4.3). */}
@@ -590,7 +587,7 @@ function TiebreakForm({
           >
             {t("dialog.tiebreakRemove")}
           </BusyButton>
-          <BusyButton busy={busy} blocked={!dirty || !allowed} type="submit" className="btn ghost compact">
+          <BusyButton busy={busy} blocked={!dirty || !allowed} type="submit" className="btn compact">
             {t("dialog.tiebreakSave")}
           </BusyButton>
         </div>
@@ -855,7 +852,7 @@ function RoundPointsForm({
             </ol>
           </fieldset>
         )}
-        <div className={styles.actions}>
+        <div className={`${styles.actions} ${styles.actionsBar}`}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
           <BusyButton
             busy={busy}
@@ -869,7 +866,7 @@ function RoundPointsForm({
           >
             {t("dialog.pointsRemove")}
           </BusyButton>
-          <BusyButton busy={busy} blocked={locked || !dirty} type="submit" className="btn ghost compact">
+          <BusyButton busy={busy} blocked={locked || !dirty} type="submit" className="btn compact">
             {t("dialog.pointsSave")}
           </BusyButton>
         </div>
@@ -937,14 +934,12 @@ function StaleTiebreaks({
   if (items.length === 0) return null;
   return (
     <fieldset className={styles.section} aria-labelledby={`${ids}-title`}>
-      <div className={styles.labelRow}>
-        <span id={`${ids}-title`} className={styles.legend}>
-          {t("dialog.staleTiebreakTitle")}
-        </span>
+      <legend className={styles.legend}>
+        <span id={`${ids}-title`}>{t("dialog.staleTiebreakTitle")}</span>
         <InfoHint id={`${ids}-hint`} subject={t("dialog.staleTiebreakTitle")}>
           {t("dialog.staleTiebreakHint")}
         </InfoHint>
-      </div>
+      </legend>
       <ul className={styles.stale}>
         {items.map((item, index) => {
           const label = roundLabel(item);
@@ -1390,7 +1385,7 @@ export function RoundMapsDialog({
               labelOf={(rule) => t(`dialog.nextBanOptions.${rule}`)}
               onChange={setNextBan}
             />
-            <div className={styles.actions}>
+            <div className={`${styles.actions} ${styles.actionsBar}`}>
               <UnsavedNote dirty={rulesDirty} text={t("dialog.unsaved")} />
               <BusyButton busy={busy} blocked={!rulesDirty} type="submit" className="btn compact">
                 {t("dialog.saveRules")}

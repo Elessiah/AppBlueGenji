@@ -876,6 +876,23 @@ textarea,
   cursor: progress;
 }
 
+.radio-segment:has(input:focus-visible) {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+/* Un seul repère de focus : le contour de la pastille remplace l'anneau de la radio. */
+.radio-segment input[type="radio"]:focus-visible {
+  box-shadow: none;
+}
+
+/* Figée pendant un envoi : la pastille retenue s'éteint aussi, comme sa radio. */
+.radio-segment:has(input[aria-disabled="true"]:checked) {
+  border-color: rgba(var(--blue-500-rgb), 0.3);
+  background: rgba(var(--blue-500-rgb), 0.05);
+  color: var(--ink-soft);
+}
+
 @media (pointer: coarse) {
   .radio-segments {
     gap: 8px;
