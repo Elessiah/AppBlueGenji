@@ -52,6 +52,7 @@
     "back": "Revenir en vue admin",
     "backPending": "Retour en vue admin…",
     "backFailed": "Impossible de revenir en vue admin. Réessaie dans un instant.",
+    "throttled": "Trop de bascules en une minute. Réessaie dans un instant.",
     "hint": "Sur cet appareil seulement, le site ne te donne que les droits du rôle incarné (aucun en vue joueur) jusqu'à ton retour, au plus {hours} heures. Les notifications push du staff, liées au compte, continuent d'arriver."
   },
   "impersonate": {

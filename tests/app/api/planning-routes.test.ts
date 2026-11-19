@@ -577,8 +577,46 @@ describe("POST /api/planning/withdrawal", () => {
     expect(jest.mocked(withdrawFromEntry).mock.calls[0].slice(0, 2)).toEqual([caster, { entryKey: "m:1", role: "CASTER", reason: "Malade" }]);
   });
 
-  it("withdrawalPost_serviceRefusesImpersonation_returns403PlayerViewActive", async () => {
+  it("withdrawalPost_impersonatedRolesCannotHoldSeat_returns403BeforeTheService", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(impersonating(["CASTER"]));
+
+    const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, role: "REFEREE" }));
+
+    expect(response.status).toBe(403);
+    expect(await errorOf(response)).toBe("PLAYER_VIEW_ACTIVE");
+    expect(withdrawFromEntry).not.toHaveBeenCalled();
+  });
+
+  it("withdrawalPost_impersonatingWithTooLongReason_saysPlayerViewFirst", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(impersonating(["CASTER"]));
+
+    const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, role: "REFEREE", reason: "a".repeat(WITHDRAWAL_REASON_MAX + 1) }));
+
+    expect(response.status).toBe(403);
+    expect(await errorOf(response)).toBe("PLAYER_VIEW_ACTIVE");
+  });
+
+  it("withdrawalPost_impersonatingHeldRoleWithTooLongReason_returns400ReasonTooLong", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(impersonating(["ARBITRE"]));
+
+    const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, role: "REFEREE", reason: "a".repeat(WITHDRAWAL_REASON_MAX + 1) }));
+
+    expect(response.status).toBe(400);
+    expect(await errorOf(response)).toBe("PLANNING_REASON_TOO_LONG");
+    expect(withdrawFromEntry).not.toHaveBeenCalled();
+  });
+
+  it("withdrawalPost_impersonatingHeldRoleWithReasonAtMax_passesToService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(impersonating(["ARBITRE"]));
+
+    const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, role: "REFEREE", reason: "a".repeat(WITHDRAWAL_REASON_MAX) }));
+
+    expect(response.status).toBe(200);
+    expect(withdrawFromEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it("withdrawalPost_serviceRefusesImpersonation_returns403PlayerViewActive", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(impersonating(["ARBITRE"]));
     jest.mocked(withdrawFromEntry).mockRejectedValue(new Error("PLAYER_VIEW_ACTIVE"));
 
     const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, role: "REFEREE" }));
@@ -587,7 +625,7 @@ describe("POST /api/planning/withdrawal", () => {
     expect(await errorOf(response)).toBe("PLAYER_VIEW_ACTIVE");
   });
 
-  it("withdrawalPost_impersonating_delegatesTheRoleCheckToTheService", async () => {
+  it("withdrawalPost_impersonatingRoleThatHoldsSeat_passesToTheService", async () => {
     const user = impersonating(["ARBITRE"]);
     jest.mocked(getCurrentUser).mockResolvedValue(user);
 

@@ -100,6 +100,9 @@ function json(method: string, body: unknown): RequestInit {
   return { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
 }
 
+/** Aucun rôle à quitter : repli stable d'une vue sans `withdrawRoles`. */
+const NO_WITHDRAW_ROLES: PlanningView["withdrawRoles"] = [];
+
 /**
  * L'écran « Planning » (permission `planning`) : chaque créneau à venir, sa
  * couverture et qui le tient ; sa disponibilité par rôle tenu ; pour le staff
@@ -211,12 +214,13 @@ export function PlanningBoard({
   // Ce que les cartes lisent du lecteur : stable tant que ces valeurs le sont.
   const me = view?.me;
   const myRoles = view?.myRoles;
-  const withdrawRoles = view?.withdrawRoles;
+  // Absente d'une vue (relecture servie par une version antérieure) : le seul bouton « Se désister » se cache.
+  const withdrawRoles = view?.withdrawRoles ?? NO_WITHDRAW_ROLES;
   const canManage = view?.canManage;
   const canCompute = view?.canCompute;
   const context = useMemo(
     () =>
-      me === undefined || !myRoles || !withdrawRoles || canManage === undefined || canCompute === undefined || !members
+      me === undefined || !myRoles || canManage === undefined || canCompute === undefined || !members
         ? null
         : { me, myRoles, withdrawRoles, canManage, canCompute, members },
     [me, myRoles, withdrawRoles, canManage, canCompute, members],
@@ -755,7 +759,7 @@ function CapStatus({ text }: { text: string | null }) {
   );
 }
 
-const RoleRow = memo(function RoleRow({
+export const RoleRow = memo(function RoleRow({
   role,
   entry,
   view,

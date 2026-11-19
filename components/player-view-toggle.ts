@@ -8,15 +8,17 @@ import type { PlatformRole } from "@/lib/shared/permissions";
 
 /**
  * Issue d'une bascule : faite, refusée parce que la session incarne déjà
- * d'autres rôles (`409`, posés depuis un autre onglet), ou échouée.
+ * d'autres rôles (`409`, posés depuis un autre onglet), freinée (`429` : trop
+ * de bascules dans la minute, il suffit d'attendre), ou échouée.
  */
-export type PlayerViewOutcome = "done" | "conflict" | "failed";
+export type PlayerViewOutcome = "done" | "conflict" | "throttled" | "failed";
 
 /**
  * Pose (rôles à incarner, vides : vue joueur) ou retire l'incarnation de
  * **cette session** (`docs/features/ADMIN_ROLE_IMPERSONATION.md`).
  * Rend `"failed"` si la requête échoue ou est refusée, `"conflict"` si une
- * autre incarnation tient déjà la session : l'appelant le dit (toast).
+ * autre incarnation tient déjà la session, `"throttled"` sur un `429` :
+ * l'appelant le dit (toast).
  */
 export async function requestPlayerView(
   active: boolean,
@@ -30,6 +32,7 @@ export async function requestPlayerView(
       body: JSON.stringify(active ? { active, roles } : { active }),
     });
     if (res.ok) return "done";
+    if (res.status === 429) return "throttled";
     return active && res.status === 409 ? "conflict" : "failed";
   } catch {
     return "failed";
@@ -77,6 +80,10 @@ export function usePlayerViewToggle(onDone?: () => void): {
     const outcome = await requestPlayerView(active, roles);
     inFlight = false;
     setPending(false);
+    if (outcome === "throttled") {
+      showError(t("playerView.throttled"));
+      return false;
+    }
     if (outcome === "failed") {
       showError(t(active ? "account.impersonateFailed" : "playerView.backFailed"));
       return false;

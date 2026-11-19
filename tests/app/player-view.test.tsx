@@ -184,6 +184,13 @@ describe("requestPlayerView", () => {
     await expect(requestPlayerView(false, [], fetchImpl)).resolves.toBe("failed");
   });
 
+  it("requestPlayerView_rateLimited_returnsThrottledBothWays", async () => {
+    const fetchImpl = jest.fn<typeof fetch>().mockImplementation(async () => new Response("{}", { status: 429 }));
+
+    await expect(requestPlayerView(true, ["CASTER"], fetchImpl)).resolves.toBe("throttled");
+    await expect(requestPlayerView(false, [], fetchImpl)).resolves.toBe("throttled");
+  });
+
   it("requestPlayerView_networkFailure_returnsFailedWithoutThrowing", async () => {
     const fetchImpl = jest.fn<typeof fetch>().mockRejectedValue(new TypeError("offline"));
 

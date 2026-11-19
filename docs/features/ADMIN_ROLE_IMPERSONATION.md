@@ -77,9 +77,11 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
   et le retrait d'arbitrage répondent `403 FORBIDDEN` ; le désistement du
   planning (`POST /api/planning/withdrawal`) d'une place que les rôles
   incarnés ne tiendraient pas (`withdrawableRoles`, sur `planningRolesOf` :
-  arbitre = `tournaments`, caster = `CASTER`, prod = `PROD` ; jugé par
-  `withdrawFromEntry`) répond `403 PLAYER_VIEW_ACTIVE`, et la page du planning
-  n'y montre pas « Se désister » (`PlanningView.withdrawRoles`). La résolution de la
+  arbitre = `tournaments`, caster = `CASTER`, prod = `PROD` ; jugé par la
+  route avant le motif, puis de nouveau par `withdrawFromEntry`) répond
+  `403 PLAYER_VIEW_ACTIVE`, et la page du planning n'y montre pas « Se
+  désister » (`PlanningView.withdrawRoles` ; une vue qui n'en porte pas cache
+  ce seul bouton). La résolution de la
   partie du match (`resolveMatchParty`, qui lit l'éligibilité en base) prend
   **obligatoirement** l'état de la session (`PartySession` = `SessionRights`,
   `{ playerView, roles }`, requis aussi par `setMatchReady` ; et `LaunchViewer`
@@ -138,8 +140,10 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
   `impersonationAuditLine`) — rien sur Discord, où la bascule ne dirait rien
   d'utile au staff.
 - Côté client : `usePlayerViewToggle` (`components/player-view-toggle.ts`, séparé de la bannière `components/player-view.tsx` chargée à la demande par la mise en page) — un
-  second clic n'envoie rien, un échec en notification (`showError`), une
-  réussite par `router.refresh()` (la barre et les menus changent).
+  second clic n'envoie rien, un échec en notification (`showError`), un `429`
+  (entrée ou retour) par sa propre notification (`playerView.throttled` :
+  attendre un instant), une réussite par `router.refresh()` (la barre et les
+  menus changent).
 
 - **Échéance** : `getCurrentUser` relit aussi `player_view_until`
   (`user.playerViewUntil`). À cette heure (plus une seconde,
@@ -232,15 +236,16 @@ compris) pouvait passer en vue joueur : ses lignes pm2 restent jusqu'à leur rot
   quand la demande a écrit).
 - `tests/lib/shared/planning.test.ts` (`withdrawableRoles`),
   `tests/lib/server/planning/withdrawal.test.ts` (refus avant tout verrou) et
-  `tests/app/api/planning-routes.test.ts` (403) : désistement d'une place que
-  les rôles incarnés ne tiennent pas ; `tests/app/planning-board.test.ts` :
-  bouton masqué hors `withdrawRoles`.
+  `tests/app/api/planning-routes.test.ts` (403, avant un motif trop long) :
+  désistement d'une place que les rôles incarnés ne tiennent pas ;
+  `tests/app/planning-withdraw-render.test.tsx` : bouton rendu, masqué hors
+  `withdrawRoles`, FR et EN.
 - `tests/app/impersonate-role-dialog.test.tsx` (modale rendue, FR et EN) et
   `tests/app/impersonate-role-dialog-behaviour.test.tsx` (choix « Joueur »,
   rôles cochés, envoi unique, refus).
 - `tests/app/player-view.test.tsx` (bannière avec les rôles, menu, textes
   FR = EN, schéma aux deux endroits), `tests/app/player-view-toggle.test.tsx`
-  (geste, toast, relecture après réussite seulement).
+  (geste, toast, `429` dit à part, relecture après réussite seulement).
 - `tests/lib/shared/player-view-legal.test.ts` : historique, registre (T01,
   T05) et `/rgpd`, FR et EN.
 - Cas d'incarnation dans `match-launch` (prêt, cast, arbitrage selon `live` /

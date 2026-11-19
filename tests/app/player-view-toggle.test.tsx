@@ -135,6 +135,18 @@ describe("usePlayerViewToggle", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it.each([true, false])("toggle_429_saysThrottledWithoutRefresh (active=%s)", async (active) => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 429 }));
+    const onDone = jest.fn();
+
+    const done = await ToggleProbe(onDone).toggle(active);
+
+    expect(done).toBe(false);
+    expect(showError).toHaveBeenCalledWith("playerView.throttled");
+    expect(refresh).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
   it("toggle_failureReturning_showsBackFailed", async () => {
     fetchMock.mockRejectedValue(new TypeError("offline"));
 

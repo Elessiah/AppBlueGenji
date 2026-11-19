@@ -52,6 +52,7 @@
     "back": "Back to admin view",
     "backPending": "Returning to admin view…",
     "backFailed": "Couldn't return to admin view. Try again in a moment.",
+    "throttled": "Too many switches in a minute. Try again in a moment.",
     "hint": "On this device only, the site gives you only the rights of the impersonated role (none in player view) until you switch back, for {hours} hours at most. Staff push notifications follow the account and keep arriving."
   },
   "impersonate": {

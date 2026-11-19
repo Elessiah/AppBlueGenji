@@ -47,7 +47,7 @@ describe("POST /api/auth/player-view", () => {
     expect(setPlayerView).not.toHaveBeenCalled();
   });
 
-  it("POST_exitAfterEntryLimitReached_isNeverThrottled", async () => {
+  it("POST_exitAfterEntryLimitReached_notThrottledByEntryRule", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     for (let i = 0; i < PLAYER_VIEW_TOGGLE_RULE.limit; i += 1) await toggle({ active: true });
     jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);

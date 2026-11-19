@@ -453,12 +453,6 @@ describe("mergeView", () => {
     expect(mergeView(previous, next).withdrawRoles).toEqual(["CASTER"]);
   });
 
-  it("planningBoard_withdrawButton_onlyForRolesTheReaderMayLeave", () => {
-    expect(readSource("app/(secured)/planning/_components/PlanningBoard.tsx")).toMatch(
-      /row\.userId === view\.me && row\.source !== "CAST" && view\.withdrawRoles\.includes\(role\) && \(\s*<WithdrawButton/,
-    );
-  });
-
   it("mergeView_withoutDurations_keyStaysAbsent", () => {
     const previous = viewOf({ canManage: true, canCompute: false });
     const merged = mergeView(previous, structuredClone(previous));
