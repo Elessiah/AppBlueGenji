@@ -51,14 +51,15 @@ type SessionViewRow = RowDataPacket & {
  * contexte du lecteur lu à l'ouverture (palier, aperçu, droits staff).
  *
  * @returns l'échéance et les rôles **relus en base** (`toIso`), `null` et
- *   `[]` hors incarnation.
+ *   `[]` hors incarnation ; `changed` : cette demande a écrit (une bascule
+ *   croisée a pu changer l'état relu depuis).
  * @throws `Error(PLAYER_VIEW_NO_SESSION)` sans session ni contournement.
  */
 export async function setPlayerView(
   user: AuthUser,
   active: boolean,
   roles: readonly PlatformRole[] = [],
-): Promise<{ until: string | null; roles: PlatformRole[] }> {
+): Promise<{ until: string | null; roles: PlatformRole[]; changed: boolean }> {
   const key = await playerViewSessionKey(user);
   if (!key) throw new Error(PLAYER_VIEW_NO_SESSION);
   const db = await getDatabase();
@@ -90,8 +91,8 @@ export async function setPlayerView(
   // Une session à cookie disparue entre-temps (déconnexion croisée) : refus.
   // La ligne du contournement, elle, n'existe qu'en vue joueur.
   if (!row && !key.devBypass) throw new Error(PLAYER_VIEW_NO_SESSION);
-  if (!row || Number(row.active ?? 0) !== 1) return { until: null, roles: [] };
-  return { until: toIso(row.player_view_until), roles: parseImpersonatedRoles(row.impersonated_roles_json) };
+  if (!row || Number(row.active ?? 0) !== 1) return { until: null, roles: [], changed };
+  return { until: toIso(row.player_view_until), roles: parseImpersonatedRoles(row.impersonated_roles_json), changed };
 }
 
 /**

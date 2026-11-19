@@ -42,7 +42,11 @@
   flex: 1 1 auto;
   min-height: 0;
   gap: 12px;
-  margin-top: 14px;
+  /* Zone défilante : son défilement vertical rogne aussi à l'horizontale. Les
+     4 px de marge intérieure (rendus par la marge négative) laissent entier le
+     contour de focus (2 px, décalé de 2 px) du choix « Joueur » et des cases. */
+  margin: 10px -4px 0;
+  padding: 4px;
   font-size: 13px;
   color: var(--ink-soft);
 }

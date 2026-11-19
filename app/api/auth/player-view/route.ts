@@ -1,4 +1,4 @@
-import { enforceRateLimit, PLAYER_VIEW_TOGGLE_RULE } from "@/lib/server/api-guard";
+import { enforceRateLimit, PLAYER_VIEW_EXIT_RULE, PLAYER_VIEW_TOGGLE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
@@ -16,14 +16,17 @@ import { parsePlayerViewBody } from "@/lib/shared/player-view";
  * Ouverte aux seuls administrateurs **réels** (`playerViewAvailable`, lu sur
  * le compte et non sur la session) : c'est ce qui laisse revenir une session
  * qui incarne un rôle, dont `can()` ne voit plus que ce rôle. Tout autre
- * compte reçoit `403 FORBIDDEN`. Débit des **entrées** borné par compte
- * (`PLAYER_VIEW_TOGGLE_RULE`, `429`) ; le retour, qui ne fait que rendre des
- * droits et n'écrit que si une incarnation est posée, n'est jamais retenu.
+ * compte reçoit `403 FORBIDDEN`. Débit borné par compte (`429`) : les
+ * **entrées** par `PLAYER_VIEW_TOGGLE_RULE`, le retour, qui ne fait que rendre
+ * des droits, par une règle à part et plus large (`PLAYER_VIEW_EXIT_RULE`) :
+ * des entrées répétées ne le bloquent jamais.
  *
  * Une entrée alors que la session incarne déjà **d'autres** rôles (un autre
  * onglet l'a posée) ne change rien et répond `409 IMPERSONATION_ALREADY_ACTIVE`
  * (la page se relit et montre la bannière) : jamais un `200` qui laisserait
- * croire au rôle choisi.
+ * croire au rôle choisi. Une entrée qui a bien écrit (`changed`) n'est jamais
+ * refusée, même si un geste croisé a changé l'état relu depuis : elle rend
+ * l'état relu, comme tout `200`.
  */
 export async function POST(req: Request) {
   const crossSite = rejectCrossSiteRequest(req, { requireJson: true });
@@ -37,14 +40,12 @@ export async function POST(req: Request) {
   if ("refusal" in read) return fail(read.refusal, 400);
   const parsed = parsePlayerViewBody(read.body);
   if (parsed === null) return fail("INVALID_PLAYER_VIEW", 400);
-  if (parsed.active) {
-    const throttled = enforceRateLimit(PLAYER_VIEW_TOGGLE_RULE, user.id);
-    if (throttled) return throttled;
-  }
+  const throttled = enforceRateLimit(parsed.active ? PLAYER_VIEW_TOGGLE_RULE : PLAYER_VIEW_EXIT_RULE, user.id);
+  if (throttled) return throttled;
 
   try {
-    const { until, roles } = await setPlayerView(user, parsed.active, parsed.roles);
-    if (parsed.active && until !== null && !sameRoles(roles, parsed.roles)) {
+    const { until, roles, changed } = await setPlayerView(user, parsed.active, parsed.roles);
+    if (parsed.active && !changed && until !== null && !sameRoles(roles, parsed.roles)) {
       return fail("IMPERSONATION_ALREADY_ACTIVE", 409);
     }
     // L'état relu en base, pas celui demandé : deux bascules croisées ne

@@ -77,7 +77,7 @@ describe("setPlayerView — session à cookie", () => {
 
     const result = await setPlayerView(admin, true, ["ARBITRE"]);
 
-    expect(result).toEqual({ until: "2026-11-18T22:00:00.000Z", roles: ["ARBITRE"] });
+    expect(result).toEqual({ until: "2026-11-18T22:00:00.000Z", roles: ["ARBITRE"], changed: true });
   });
 
   it("setPlayerView_activate_returnsDeadlineReadFromDb", async () => {
@@ -105,7 +105,7 @@ describe("setPlayerView — session à cookie", () => {
     expect(sql).toContain("SET player_view_until = NULL, impersonated_roles_json = NULL");
     expect(sql).toContain("AND player_view_until > NOW()");
     expect(params).toEqual([HASH, 7]);
-    expect(result).toEqual({ until: null, roles: [] });
+    expect(result).toEqual({ until: null, roles: [], changed: true });
   });
 
   it("setPlayerView_deactivateWhenInactive_writesNoAudit", async () => {
@@ -115,6 +115,14 @@ describe("setPlayerView — session à cookie", () => {
 
     expect(auditStaffAction).not.toHaveBeenCalled();
     expect(reconnectSessionStreams).not.toHaveBeenCalled();
+  });
+
+  it("setPlayerView_deactivateWhenInactive_reportsNothingChanged", async () => {
+    database(0, { player_view_until: null, active: null });
+
+    const result = await setPlayerView(admin, false);
+
+    expect(result).toEqual({ until: null, roles: [], changed: false });
   });
 
   it("setPlayerView_sessionVanished_throwsNoSession", async () => {

@@ -9,7 +9,7 @@ jest.mock("@/lib/server/player-view", () => ({
 import { POST } from "@/app/api/auth/player-view/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { setPlayerView } from "@/lib/server/player-view";
-import { PLAYER_VIEW_TOGGLE_RULE } from "@/lib/server/api-guard";
+import { PLAYER_VIEW_EXIT_RULE, PLAYER_VIEW_TOGGLE_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { authUser } from "../../../../helpers/auth-user";
 
@@ -32,7 +32,7 @@ function toggle(body: unknown, headers: Record<string, string> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit();
-  jest.mocked(setPlayerView).mockResolvedValue({ until: null, roles: [] });
+  jest.mocked(setPlayerView).mockResolvedValue({ until: null, roles: [], changed: true });
 });
 
 describe("POST /api/auth/player-view", () => {
@@ -60,7 +60,7 @@ describe("POST /api/auth/player-view", () => {
 
   it("POST_enterWhileOtherRolesImpersonated_returns409", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
-    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["ARBITRE"] });
+    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["ARBITRE"], changed: false });
 
     const res = await toggle({ active: true, roles: ["CASTER"] });
 
@@ -68,9 +68,59 @@ describe("POST /api/auth/player-view", () => {
     await expect(res.json()).resolves.toMatchObject({ error: "IMPERSONATION_ALREADY_ACTIVE" });
   });
 
+  it("POST_moreExitsThanExitRuleLimit_returns429", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
+    for (let i = 0; i < PLAYER_VIEW_EXIT_RULE.limit; i += 1) await toggle({ active: false });
+    jest.mocked(setPlayerView).mockClear();
+
+    const res = await toggle({ active: false });
+
+    expect(res.status).toBe(429);
+    expect(setPlayerView).not.toHaveBeenCalled();
+  });
+
+  it("POST_exitsUpToTheirLimit_neverConsumeTheEntryRule", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
+    for (let i = 0; i < PLAYER_VIEW_EXIT_RULE.limit; i += 1) await toggle({ active: false });
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await toggle({ active: true });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("POST_entryWrittenButCrossedGestureChangedRoles_returns200WithRereadState", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["ARBITRE"], changed: true });
+
+    const res = await toggle({ active: true, roles: ["CASTER"] });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ playerView: true, until: "2026-11-20T12:00:00.000Z", roles: ["ARBITRE"] });
+  });
+
+  it("POST_enterWhileOtherRolesImpersonated_passesTheRequestedRolesNormalized", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
+    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["ARBITRE"], changed: false });
+
+    await toggle({ active: true, roles: ["PROD", "CASTER"] });
+
+    expect(setPlayerView).toHaveBeenCalledWith(adminInPlayerView, true, ["CASTER", "PROD"]);
+  });
+
+  it("POST_exitWithNothingImpersonated_returns200Inactive", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(setPlayerView).mockResolvedValue({ until: null, roles: [], changed: false });
+
+    const res = await toggle({ active: false });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ playerView: false, until: null, roles: [] });
+  });
+
   it("POST_enterSameRolesAlreadyImpersonated_returns200", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
-    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["ARBITRE", "CASTER"] });
+    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["ARBITRE", "CASTER"], changed: false });
 
     const res = await toggle({ active: true, roles: ["CASTER", "ARBITRE"] });
 
@@ -115,7 +165,7 @@ describe("POST /api/auth/player-view", () => {
 
   it("POST_enterWithRoles_passesThemAndReturnsStoredRoles", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["CASTER"] });
+    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["CASTER"], changed: true });
 
     const res = await toggle({ active: true, roles: ["CASTER"] });
 
@@ -146,7 +196,7 @@ describe("POST /api/auth/player-view", () => {
 
   it("POST_enterPlayerView_returns200WithDeadline", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: [] });
+    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: [], changed: true });
 
     const res = await toggle({ active: true });
 
@@ -157,7 +207,7 @@ describe("POST /api/auth/player-view", () => {
   it("POST_enterPlayerViewButNothingActiveInDb_returnsPlayerViewFalse", async () => {
     // L'état relu, pas celui demandé : jamais « vue joueur » sans échéance.
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(setPlayerView).mockResolvedValue({ until: null, roles: [] });
+    jest.mocked(setPlayerView).mockResolvedValue({ until: null, roles: [], changed: true });
 
     const res = await toggle({ active: true });
 

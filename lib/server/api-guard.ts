@@ -143,6 +143,19 @@ export const PLAYER_VIEW_TOGGLE_RULE: RateLimitRule = {
   windowMs: 60_000,
 };
 
+/**
+ * Retour en vue admin (`POST /api/auth/player-view`, `active: false`), par
+ * compte, compté à part des entrées : il ne fait que rendre des droits et ne
+ * doit jamais être bloqué par les entrées de la minute ; trente par minute ne
+ * se touchent pas en usage normal (un retour n'écrit que si une incarnation
+ * est posée), mais une boucle ne martèle plus la base sans fin.
+ */
+export const PLAYER_VIEW_EXIT_RULE: RateLimitRule = {
+  name: "player-view-exit",
+  limit: 30,
+  windowMs: 60_000,
+};
+
 /** Bascule de la planification des matchs par l'arbitrage d'un tournoi, par compte (même plafond). */
 export const REFEREE_SCHEDULING_TOGGLE_RULE: RateLimitRule = {
   name: "referee-scheduling-toggle",

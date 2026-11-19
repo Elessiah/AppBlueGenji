@@ -96,6 +96,28 @@ describe("ImpersonateRoleDialog — français", () => {
     expect(readSource("components/impersonate-role-dialog.module.css")).not.toMatch(/overflow(-y)?:\s*auto/);
   });
 
+  it("render_french_scrollAreaWrapsTheBodyOnly", () => {
+    const html = render("fr");
+    const scroll = scrollAreaMarkup(html);
+
+    expect(scroll).toContain("Joueur (aucun rôle)");
+    expect(count(scroll, 'type="checkbox"')).toBe(6);
+    expect(scroll).not.toContain("<h3");
+    expect(scroll).not.toContain(`>${frShell.impersonate.cancel}<`);
+    expect(scroll).not.toContain(`>${frShell.impersonate.confirm}<`);
+    expect(html).toContain(`>${frShell.impersonate.cancel}<`);
+  });
+
+  it("source_scrollAreaNamedByTheBodyLabel_inFrenchAndEnglish", () => {
+    expect(readSource("components/impersonate-role-dialog.tsx")).toContain('ariaLabel={t("impersonate.bodyLabel")}');
+    expect(frShell.impersonate.bodyLabel).toBe("Rôles à incarner");
+    expect(enShell.impersonate.bodyLabel).toBe("Roles to impersonate");
+  });
+
+  it("css_scrollBody_keepsRoomForFocusOutlines", () => {
+    expect(readSource("components/impersonate-role-dialog.module.css")).toMatch(/\.body \{[^}]*padding: 4px;/);
+  });
+
   it("render_french_tapZoneOnTheRoleRows", () => {
     expect(render("fr")).toContain("data-tap-zone");
   });
@@ -123,3 +145,16 @@ describe("textes FR = EN", () => {
     expect(Object.keys(enShell.impersonate.roles).sort()).toEqual(Object.keys(frShell.impersonate.roles).sort());
   });
 });
+
+/** Le balisage de la zone défilante (`<ScrollArea>`, un `div`), balise fermante comprise. */
+function scrollAreaMarkup(html: string): string {
+  const start = html.lastIndexOf("<div", html.indexOf("scroll-area"));
+  let depth = 0;
+  const tags = /<div[\s>]|<\/div>/g;
+  tags.lastIndex = start;
+  for (let match = tags.exec(html); match; match = tags.exec(html)) {
+    depth += match[0] === "</div>" ? -1 : 1;
+    if (depth === 0) return html.slice(start, tags.lastIndex);
+  }
+  return html.slice(start);
+}

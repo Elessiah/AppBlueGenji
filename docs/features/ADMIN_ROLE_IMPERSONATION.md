@@ -76,8 +76,10 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
   caster ou d'un arbitre est refusé (`NOT_MATCH_PARTY`), et les routes de cast
   et le retrait d'arbitrage répondent `403 FORBIDDEN` ; le désistement du
   planning (`POST /api/planning/withdrawal`) d'une place que les rôles
-  incarnés ne tiendraient pas (`planningRolesOf` : arbitre = `tournaments`,
-  caster = `CASTER`, prod = `PROD`) répond `403 PLAYER_VIEW_ACTIVE`. La résolution de la
+  incarnés ne tiendraient pas (`withdrawableRoles`, sur `planningRolesOf` :
+  arbitre = `tournaments`, caster = `CASTER`, prod = `PROD` ; jugé par
+  `withdrawFromEntry`) répond `403 PLAYER_VIEW_ACTIVE`, et la page du planning
+  n'y montre pas « Se désister » (`PlanningView.withdrawRoles`). La résolution de la
   partie du match (`resolveMatchParty`, qui lit l'éligibilité en base) prend
   **obligatoirement** l'état de la session (`PartySession` = `SessionRights`,
   `{ playerView, roles }`, requis aussi par `setMatchReady` ; et `LaunchViewer`
@@ -96,11 +98,13 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
   pas réellement administrateur ; `400 INVALID_PLAYER_VIEW` pour un corps sans
   booléen, un rôle inconnu, `ADMIN`, plus de seize entrées ou `roles` au
   retour (`parsePlayerViewBody`, refus jamais ignoré) ; `429` au-delà de dix
-  **entrées** par minute et par compte (`PLAYER_VIEW_TOGGLE_RULE`) — le retour
-  n'est jamais retenu : il ne fait que rendre des droits ;
-  `409 IMPERSONATION_ALREADY_ACTIVE` pour une entrée alors que la session
-  incarne déjà **d'autres** rôles (posés depuis un autre onglet : rien ne
-  change, le client le dit et relit la page) ; `500 PLAYER_VIEW_FAILED` sur une panne. Réponse `{ playerView, until, roles }`,
+  **entrées** par minute et par compte (`PLAYER_VIEW_TOGGLE_RULE`) — le retour,
+  qui ne fait que rendre des droits, est compté à part (`PLAYER_VIEW_EXIT_RULE`,
+  trente par minute) : des entrées répétées ne le bloquent jamais ;
+  `409 IMPERSONATION_ALREADY_ACTIVE` pour une entrée qui n'a rien écrit alors
+  que la session incarne déjà **d'autres** rôles (posés depuis un autre
+  onglet : le client le dit et relit la page — une entrée qui a écrit rend
+  l'état relu, même changé depuis par un geste croisé) ; `500 PLAYER_VIEW_FAILED` sur une panne. Réponse `{ playerView, until, roles }`,
   tirés de l'état **relu** (`playerView` = `until !== null`).
 - `setPlayerView` (`lib/server/player-view.ts`) écrit l'échéance et les rôles
   (ou `NULL`) sur la ligne de **cette** session, **seulement si l'état
@@ -188,14 +192,15 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
 Les colonnes ne servent qu'à réduire des droits, à la demande de
 l'administrateur lui-même, et partent avec la session (déconnexion, purge des
 sessions échues, suppression du compte) ; une échéance passée reste sur la
-ligne, sans effet, avec ses rôles, jusque-là. Jusqu'au 2026-11-19, tout
-titulaire d'un rôle de plateforme (développeur compris) pouvait passer en vue
-joueur : ses lignes pm2 restent jusqu'à leur rotation, d'où les mentions
+ligne, sans effet, avec ses rôles, jusque-là. Jusqu'au déploiement de cette
+version (novembre 2026), tout titulaire d'un rôle de plateforme (développeur
+compris) pouvait passer en vue joueur : ses lignes pm2 restent jusqu'à leur rotation, d'où les mentions
 « jusqu'en novembre 2026 » du registre.
 
 - Registre : T01 décrit l'échéance parmi les données de la session ; T05 décrit
   la bascule (sous-finalité « Vue joueur »), la ligne pm2 (pseudo, identifiant,
-  sens), la mémoire du plafond (`PLAYER_VIEW_TOGGLE_RULE`) et des reconnexions
+  sens), la mémoire du plafond (`PLAYER_VIEW_TOGGLE_RULE` pour les entrées,
+  `PLAYER_VIEW_EXIT_RULE` pour les retours) et des reconnexions
   (`session-streams`), la base (intérêt légitime) et les développeurs parmi les
   personnes concernées.
 - `/rgpd` (FR et EN) : paragraphe des journaux du staff (base, opposition),
@@ -222,10 +227,14 @@ joueur : ses lignes pm2 restent jusqu'à leur rotation, d'où les mentions
 - `tests/lib/server/player-view.test.ts` : écriture des rôles normalisés,
   plafond de 12 h, retour, ligne pm2 avec les rôles.
 - `tests/app/api/auth/player-view/route.test.ts` : non-administrateur refusé
-  (403), rôles transmis, `ADMIN` dans le corps refusé (400), débit des seules
-  entrées (429, retour jamais retenu), autre incarnation en cours (409).
-- `tests/app/api/planning-routes.test.ts` : désistement d'une place que les
-  rôles incarnés ne tiennent pas refusé (403).
+  (403), rôles transmis, `ADMIN` dans le corps refusé (400), débit des entrées
+  et des retours comptés à part (429), autre incarnation en cours (409, jamais
+  quand la demande a écrit).
+- `tests/lib/shared/planning.test.ts` (`withdrawableRoles`),
+  `tests/lib/server/planning/withdrawal.test.ts` (refus avant tout verrou) et
+  `tests/app/api/planning-routes.test.ts` (403) : désistement d'une place que
+  les rôles incarnés ne tiennent pas ; `tests/app/planning-board.test.ts` :
+  bouton masqué hors `withdrawRoles`.
 - `tests/app/impersonate-role-dialog.test.tsx` (modale rendue, FR et EN) et
   `tests/app/impersonate-role-dialog-behaviour.test.tsx` (choix « Joueur »,
   rôles cochés, envoi unique, refus).

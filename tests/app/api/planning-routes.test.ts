@@ -66,6 +66,7 @@ const impersonating = (roles: ("ARBITRE" | "CASTER" | "PROD")[]) =>
 const VIEW: PlanningView = {
   me: 4,
   myRoles: ["CASTER"],
+  withdrawRoles: ["REFEREE", "CASTER", "PROD"],
   canManage: false,
   canCompute: false,
   entries: [],
@@ -576,51 +577,24 @@ describe("POST /api/planning/withdrawal", () => {
     expect(jest.mocked(withdrawFromEntry).mock.calls[0].slice(0, 2)).toEqual([caster, { entryKey: "m:1", role: "CASTER", reason: "Malade" }]);
   });
 
-  it("withdrawalPost_impersonatingCasterWithdrawsReferee_returns403", async () => {
+  it("withdrawalPost_serviceRefusesImpersonation_returns403PlayerViewActive", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(impersonating(["CASTER"]));
+    jest.mocked(withdrawFromEntry).mockRejectedValue(new Error("PLAYER_VIEW_ACTIVE"));
 
     const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, role: "REFEREE" }));
 
     expect(response.status).toBe(403);
     expect(await errorOf(response)).toBe("PLAYER_VIEW_ACTIVE");
-    expect(withdrawFromEntry).not.toHaveBeenCalled();
   });
 
-  it("withdrawalPost_impersonatingArbitreWithdrawsReferee_withdraws", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(impersonating(["ARBITRE"]));
+  it("withdrawalPost_impersonating_delegatesTheRoleCheckToTheService", async () => {
+    const user = impersonating(["ARBITRE"]);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
 
     const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, role: "REFEREE" }));
 
     expect(response.status).toBe(200);
-    expect(withdrawFromEntry).toHaveBeenCalledTimes(1);
-  });
-
-  it("withdrawalPost_impersonatingProdWithdrawsCaster_returns403", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(impersonating(["PROD"]));
-
-    const response = await withdrawalPost(request("POST", WITHDRAWAL));
-
-    expect(response.status).toBe(403);
-    expect(await errorOf(response)).toBe("PLAYER_VIEW_ACTIVE");
-    expect(withdrawFromEntry).not.toHaveBeenCalled();
-  });
-
-  it("withdrawalPost_impersonatingArbitreWithdrawsCaster_returns403", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(impersonating(["ARBITRE"]));
-
-    const response = await withdrawalPost(request("POST", WITHDRAWAL));
-
-    expect(response.status).toBe(403);
-    expect(withdrawFromEntry).not.toHaveBeenCalled();
-  });
-
-  it("withdrawalPost_impersonatingProdWithdrawsProd_withdraws", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(impersonating(["PROD"]));
-
-    const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, role: "PROD" }));
-
-    expect(response.status).toBe(200);
-    expect(withdrawFromEntry).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(withdrawFromEntry).mock.calls[0].slice(0, 2)).toEqual([user, { entryKey: "m:1", role: "REFEREE", reason: null }]);
   });
 
   it("withdrawalPost_invalidEntryKey_returns400", async () => {

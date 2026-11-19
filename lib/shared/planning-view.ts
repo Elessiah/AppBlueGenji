@@ -127,6 +127,8 @@ export type PlanningMember = {
 export type PlanningView = {
   me: number;
   myRoles: PlanningRole[];
+  /** Rôles dont le lecteur peut quitter une place (`withdrawableRoles` : tous hors incarnation). */
+  withdrawRoles: PlanningRole[];
   /** Attribution manuelle (permission `tournaments`) ; le calcul relève de `canCompute`. */
   canManage: boolean;
   /** Calcul, confirmation et réglages (administrateur seul) : sans lui, la page ne montre rien de ce panneau. */

@@ -116,6 +116,21 @@ export function planningRolesOf(
 }
 
 /**
+ * Les rôles du planning dont le lecteur peut quitter une place : tous hors
+ * incarnation (une place se quitte même si le rôle a été retiré depuis) ;
+ * pendant une incarnation (`ADMIN_ROLE_IMPERSONATION.md`), ceux seuls que les
+ * rôles incarnés tiendraient ({@link planningRolesOf}). Serveur
+ * (`withdrawFromEntry`, `PLAYER_VIEW_ACTIVE`) et page (bouton « Se désister »)
+ * jugent par cette même règle.
+ */
+export function withdrawableRoles(
+  user: { playerView?: boolean; roles?: readonly PlatformRole[]; isAdmin?: boolean } | null | undefined,
+): PlanningRole[] {
+  if (!user) return [];
+  return user.playerView ? planningRolesOf(user) : [...PLANNING_ROLES];
+}
+
+/**
  * Le plafond de casters d'une entrée ({@link PLANNING_MAX_CASTERS}) est-il
  * atteint pour poser `userId` ? Comptent les casters affichés de l'entrée —
  * lignes du planning (propositions provisoires comprises, que le staff retire
