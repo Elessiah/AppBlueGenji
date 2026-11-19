@@ -41,7 +41,10 @@ import {
   applyAvailability,
   castersFullKind,
   roleChoices,
+  canConfirmEntry,
+  canRunWeek,
   canWithdraw,
+  durationsKey,
   errorKey,
   filterEntries,
   filtersActive,
@@ -54,6 +57,7 @@ import {
   newestFirst,
   planningOpenKey,
   splitPast,
+  staffPanelDurations,
   tournamentChoices,
   weekWindow,
   withdrawBodyKey,
@@ -235,6 +239,7 @@ export function PlanningBoard({
 
   const isCaster = view.myRoles.includes("CASTER");
   const meSolo = view.members.find((member) => member.userId === view.me)?.soloCaster ?? false;
+  const panelDurations = staffPanelDurations(view);
 
   const weekProps: Omit<WeekListProps, "weeks" | "zone"> = { view: context, canCompute: view.canCompute, text, format, names, roundText, pending, act, onRunWeek: setRunWeek, onConfirm: confirmEntry, onAvailability: saveAvailability, onWithdraw: askWithdraw };
   const active = filtersActive({ ...filters, tournamentId });
@@ -325,9 +330,8 @@ export function PlanningBoard({
         <output className={styles.count}>{t("filters.count", { shown: shown.length, total: view.entries.length })}</output>
       </section>
 
-      {/* Sans durées reçues, pas de panneau : un formulaire prérempli de valeurs par défaut écraserait les réglages. */}
-      {view.canCompute && view.durations && (
-        <StaffPanel text={text} view={view} durations={view.durations} pending={pending} act={act} onConfirmLead={(hours) => setConfirming({ kind: "lead", hours })} />
+      {panelDurations && (
+        <StaffPanel key={durationsKey(panelDurations)} text={text} view={view} durations={panelDurations} pending={pending} act={act} onConfirmLead={(hours) => setConfirming({ kind: "lead", hours })} />
       )}
 
       {shown.length > 0 && split.upcoming.length === 0 && (
@@ -562,7 +566,7 @@ const WeekList = memo(function WeekList({
         <WeekTitle id={`planning-${zone}-week-${week.weekStart}`} className={styles.weekTitle}>
           {t("week", { date: format.day.format(week.weekStart) })}
         </WeekTitle>
-        {canCompute && week.entries.some((entry) => entry.open) && (
+        {canRunWeek(canCompute, week.entries) && (
           <BusyButton
             busy={pending === `run:${week.weekStart}`}
             blocked={pending !== null}
@@ -714,7 +718,7 @@ const EntryCard = memo(function EntryCard({
         <MyAvailability entry={entry} view={view} text={text} pending={pending} act={act} onSaved={onAvailability} />
       )}
 
-      {view.canCompute && entry.open && hasProvisional(entry) && (
+      {canConfirmEntry(view.canCompute, entry) && (
         <BusyButton
           busy={pending === `confirm:${entry.key}`}
           blocked={pending !== null}
@@ -952,7 +956,7 @@ function StaffPanel({
   pending,
   act,
   onConfirmLead,
-}: Readonly<{ text: Text; view: PlanningView; durations: PlanningDurationSettings; pending: string | null; act: Act; onConfirmLead: (hours: number) => void }>) {
+}: Readonly<{ text: Text; view: Omit<PlanningView, "durations">; durations: PlanningDurationSettings; pending: string | null; act: Act; onConfirmLead: (hours: number) => void }>) {
   const { t } = text;
   const [hours, setHours] = useState(48);
   const [durations, setDurations] = useState<PlanningDurationSettings>(savedDurations);

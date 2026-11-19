@@ -97,6 +97,13 @@ const ROUTES: Record<string, Call> = {
   "PUT /api/admin/planning/settings": () => settingsPut(request("PUT", DEFAULT_PLANNING_DURATIONS)),
 };
 const STAFF_ROUTES = ["PUT /api/admin/planning/assignment"];
+/** Routes des membres du planning (`planning`, refus `PLANNING_MEMBERS_ONLY`). */
+const MEMBER_ROUTES = [
+  "GET /api/planning",
+  "PUT /api/planning/availability",
+  "PUT /api/planning/solo-caster",
+  "POST /api/planning/withdrawal",
+];
 /** Calcul, confirmation, réglages : administrateur seul (`canComputePlanning`, refus `PLANNING_ADMIN_ONLY`). */
 const COMPUTE_ROUTES = [
   "POST /api/admin/planning/auto-assign",
@@ -163,6 +170,28 @@ describe("toutes les routes du planning", () => {
   }
 });
 
+describe("routes des membres du planning (permission planning)", () => {
+  for (const name of MEMBER_ROUTES) {
+    it(`${name}_plainPlayer_returns403MembersOnly`, async () => {
+      jest.mocked(getCurrentUser).mockResolvedValue(player);
+
+      const response = await ROUTES[name]();
+
+      expect(response.status).toBe(403);
+      expect(await errorOf(response)).toBe("PLANNING_MEMBERS_ONLY");
+    });
+
+    it(`${name}_playerView_returns403MembersOnly`, async () => {
+      jest.mocked(getCurrentUser).mockResolvedValue(playerView);
+
+      const response = await ROUTES[name]();
+
+      expect(response.status).toBe(403);
+      expect(await errorOf(response)).toBe("PLANNING_MEMBERS_ONLY");
+    });
+  }
+});
+
 describe("routes de calcul du planning (administrateur seul)", () => {
   for (const name of COMPUTE_ROUTES) {
     for (const [label, who] of [["caster", caster], ["prod", prod], ["arbitre", arbitre]] as const) {
@@ -197,7 +226,10 @@ describe("GET /api/planning", () => {
     expect((await planningGet()).status).toBe(200);
   });
 
-  it("planningGet_tournamentsStaffView_payloadHasNoDurations", async () => {
+  // Le filtrage des durées (administrateur seul) se teste dans
+  // `tests/lib/server/planning/view.test.ts` ; ici, seulement que la route
+  // renvoie la vue telle quelle, sans y ajouter de durées.
+  it("planningGet_viewWithoutDurations_routeAddsNone", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(loadPlanningView).mockResolvedValue({ ...VIEW, me: 9, myRoles: ["REFEREE"], canManage: true });
 
@@ -207,7 +239,7 @@ describe("GET /api/planning", () => {
     expect(body.planning).not.toHaveProperty("durations");
   });
 
-  it("planningGet_adminView_payloadCarriesDurations", async () => {
+  it("planningGet_viewWithDurations_routePassesThemThrough", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(loadPlanningView).mockResolvedValue({ ...VIEW, me: 1, canManage: true, canCompute: true, durations: DEFAULT_PLANNING_DURATIONS });
 

@@ -174,7 +174,7 @@ describe("canAny", () => {
   });
 });
 
-/** Revue de sécurité, cycle 1 : `DEV` lit `/devdoc`, il n'est pas du staff. */
+/** Calcul, confirmation et réglages du planning : administrateurs seuls (`CAST_PLANNING.md`). */
 describe("canComputePlanning", () => {
   it("canComputePlanning_admin_returnsTrue", () => {
     expect(canComputePlanning({ isAdmin: true })).toBe(true);
@@ -197,6 +197,7 @@ describe("canComputePlanning", () => {
   });
 });
 
+/** Revue de sécurité, cycle 1 : `DEV` lit `/devdoc`, il n'est pas du staff. */
 describe("isStaffMember", () => {
   it("isStaffMember_devOnly_false", () => {
     expect(isStaffMember({ roles: ["DEV"] })).toBe(false);

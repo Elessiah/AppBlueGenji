@@ -2,7 +2,8 @@
 
 Page `/planning` (FR) et `/en/planning` (EN) : les arbitres, casters et prods
 disent, créneau par créneau et rôle par rôle, s'ils sont disponibles ; le staff
-des tournois attribue, à la main ou par un calcul, qui couvre chaque créneau.
+des tournois attribue à la main qui couvre chaque créneau, un administrateur
+lance le calcul qui le propose et le confirme.
 Remplace le tableur partagé tenu jusqu'ici.
 
 ## Accès
@@ -38,7 +39,8 @@ d'utilisateur et ne change pas.
 `planning` : rôles `ARBITRE`, `CASTER`, `PROD` (nouveau rôle de plateforme,
 production d'un direct) et `ADMIN` (`PERMISSION_ROLES.md`). Rôles du planning
 tenus (`planningRolesOf`) : arbitre = `tournaments`, caster = `CASTER`, prod =
-`PROD`. Vue joueur : aucun rôle, page 404, routes 403. Sans session : carte
+`PROD`. Vue joueur : aucun rôle, page 404, routes `403 PLANNING_MEMBERS_ONLY`
+(« réservé aux arbitres, casters et prods du planning »). Sans session : carte
 « Connexion requise » (page), 401 (routes). Le lien « Planning » du menu du
 compte suit `can(user, "planning")`. Les disponibilités des autres ne sont
 lues que par `tournaments` : sans elle, la lecture ne rend de la base que les
@@ -246,7 +248,7 @@ compte les **rôles**, pas les personnes.
   jamais ; la confirmation s'inscrit sans auteur : le site aligne le planning
   sur le match, sans savoir qui l'a désigné — une confirmation joue cette
   réconciliation **après** ses propres lignes, si bien qu'un arbitre qu'elle
-  vient de désigner s'inscrit au compte du staff qui confirme, y compris
+  vient de désigner s'inscrit au compte de l'administrateur qui confirme, y compris
   quand une panne survient après que le match l'a pris (match relu) ; un
   arbitre que le match portait déjà avant le geste (posé depuis le match, ou
   confirmation interrompue d'un autre geste) ne passe pas par le match et se
@@ -612,7 +614,8 @@ il manque un caster, un prod ou un arbitre, hors autogestion voulue ; un
 tournoi) avec compteur, aides « i » (filtres, couverture, raisons) pour tous les
 membres, créneau du lecteur surligné (« Mon créneau »), cartes d'entrée (couverture en pastilles,
 `warning` réservé à « à arbitrer en priorité »), sa réponse par rôle (contrôle
-segmenté + étoile de préférence), panneau du staff (calcul de la semaine par
+segmenté + étoile de préférence), panneau « Calcul et confirmation » des
+administrateurs seuls (calcul de la semaine par
 `ConfirmActionDialog`, confirmation par délai ou par entrée, elle aussi derrière
 `ConfirmActionDialog` (elle pose l'arbitre sur le match), casters autonomes,
 durées), bouton « Me désister » sur ses propres lignes (sauf cast, jusqu'au

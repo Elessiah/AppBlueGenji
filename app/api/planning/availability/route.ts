@@ -15,7 +15,7 @@ import { isAvailabilityStatus, isPlanningRole } from "@/lib/shared/planning";
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "planning")) return fail("FORBIDDEN", 403);
+  if (!can(user, "planning")) return fail("PLANNING_MEMBERS_ONLY", 403);
   const throttled = enforceRateLimit(PLANNING_WRITE_RULE, user.id);
   if (throttled) return throttled;
 

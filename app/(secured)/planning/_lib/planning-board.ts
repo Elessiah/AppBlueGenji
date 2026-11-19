@@ -14,6 +14,7 @@ import {
   type CoverageLevel,
   type PlanningRole,
 } from "@/lib/shared/planning";
+import type { PlanningDurationSettings } from "@/lib/shared/planning-durations";
 import { rolesConflict } from "@/lib/shared/planning-planner";
 import type { PlanningAvailabilityView, PlanningEntryView, PlanningMember, PlanningView, WithdrawalResponse } from "@/lib/shared/planning-view";
 
@@ -206,6 +207,35 @@ export const COVERAGE_PILL: Readonly<Record<CoverageLevel, PillVariant>> = {
 /** Une entrée porte-t-elle des propositions encore provisoires ? */
 export function hasProvisional(entry: PlanningEntryView): boolean {
   return entry.assignments.some((row) => row.provisional);
+}
+
+/**
+ * Durées que le panneau « Calcul et confirmation » édite, ou `null` s'il ne se
+ * rend pas : administrateur seul (`canCompute`, jamais `canManage`), et
+ * seulement avec les durées reçues — un formulaire prérempli de valeurs par
+ * défaut écraserait les réglages au premier enregistrement.
+ */
+export function staffPanelDurations(view: Pick<PlanningView, "canCompute" | "durations">): PlanningDurationSettings | null {
+  return view.canCompute && view.durations ? view.durations : null;
+}
+
+/**
+ * Clé du panneau des durées : elle change avec les réglages relus, si bien
+ * que le formulaire repart des valeurs enregistrées (un autre administrateur
+ * a pu les changer) au lieu de renvoyer une copie périmée.
+ */
+export function durationsKey(durations: PlanningDurationSettings): string {
+  return JSON.stringify(durations);
+}
+
+/** Bouton « Calculer la semaine » : administrateur seul, semaine ayant au moins un créneau ouvert. */
+export function canRunWeek(canCompute: boolean, entries: readonly PlanningEntryView[]): boolean {
+  return canCompute && entries.some((entry) => entry.open);
+}
+
+/** Confirmation d'un créneau : administrateur seul, créneau ouvert portant une proposition provisoire. */
+export function canConfirmEntry(canCompute: boolean, entry: PlanningEntryView): boolean {
+  return canCompute && entry.open && hasProvisional(entry);
 }
 
 /**

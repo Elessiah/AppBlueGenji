@@ -2,7 +2,10 @@ import { describe, expect, it } from "@jest/globals";
 import {
   applyAvailability,
   candidatesFor,
+  canConfirmEntry,
+  canRunWeek,
   canWithdraw,
+  durationsKey,
   COVERAGE_PILL,
   errorKey,
   filterEntries,
@@ -14,6 +17,7 @@ import {
   planningOpenKey,
   newestFirst,
   splitPast,
+  staffPanelDurations,
   heldBy,
   isThrottled,
   leadUntil,
@@ -732,26 +736,81 @@ describe("planningOpenKey", () => {
 });
 
 /** Ce que l'écran montre selon les droits : jamais un contrôle que le serveur refuse (`CAST_PLANNING.md`). */
-describe("PlanningBoard : calcul réservé aux administrateurs", () => {
+describe("staffPanelDurations", () => {
+  it("staffPanelDurations_adminWithDurations_returnsThem", () => {
+    const view = viewOf({ canManage: true, canCompute: true, durations: DEFAULT_PLANNING_DURATIONS });
+
+    expect(staffPanelDurations(view)).toBe(DEFAULT_PLANNING_DURATIONS);
+  });
+
+  it("staffPanelDurations_adminWithoutDurations_returnsNull", () => {
+    const view = viewOf({ canManage: true, canCompute: true });
+
+    expect(staffPanelDurations(view)).toBeNull();
+  });
+
+  it("staffPanelDurations_tournamentsStaffNotCompute_returnsNull", () => {
+    const view = viewOf({ canManage: true, canCompute: false, durations: DEFAULT_PLANNING_DURATIONS });
+
+    expect(staffPanelDurations(view)).toBeNull();
+  });
+});
+
+describe("durationsKey", () => {
+  it("durationsKey_sameValues_sameKey", () => {
+    expect(durationsKey(structuredClone(DEFAULT_PLANNING_DURATIONS))).toBe(durationsKey(DEFAULT_PLANNING_DURATIONS));
+  });
+
+  it("durationsKey_oneValueChanged_differentKey", () => {
+    const changed = { ...DEFAULT_PLANNING_DURATIONS, bufferMinutes: DEFAULT_PLANNING_DURATIONS.bufferMinutes + 5 };
+
+    expect(durationsKey(changed)).not.toBe(durationsKey(DEFAULT_PLANNING_DURATIONS));
+  });
+});
+
+describe("canRunWeek", () => {
+  it("canRunWeek_adminWithOpenEntry_true", () => {
+    expect(canRunWeek(true, [entryView({ open: false }), entryView({ key: "m:2", open: true })])).toBe(true);
+  });
+
+  it("canRunWeek_adminAllClosed_false", () => {
+    expect(canRunWeek(true, [entryView({ open: false })])).toBe(false);
+  });
+
+  it("canRunWeek_notCompute_false", () => {
+    expect(canRunWeek(false, [entryView({ open: true })])).toBe(false);
+  });
+});
+
+describe("canConfirmEntry", () => {
+  const provisional = [{ userId: 1, role: "CASTER" as const, source: "AUTO" as const, reason: "LOAD" as const, provisional: true }];
+
+  it("canConfirmEntry_adminOpenProvisional_true", () => {
+    expect(canConfirmEntry(true, entryView({ open: true, assignments: provisional }))).toBe(true);
+  });
+
+  it("canConfirmEntry_adminNoProvisional_false", () => {
+    expect(canConfirmEntry(true, entryView({ open: true, assignments: [] }))).toBe(false);
+  });
+
+  it("canConfirmEntry_adminClosedEntry_false", () => {
+    expect(canConfirmEntry(true, entryView({ open: false, assignments: provisional }))).toBe(false);
+  });
+
+  it("canConfirmEntry_notCompute_false", () => {
+    expect(canConfirmEntry(false, entryView({ open: true, assignments: provisional }))).toBe(false);
+  });
+});
+
+describe("PlanningBoard : branchement des gardes de calcul", () => {
   const source = readSource("app/(secured)/planning/_components/PlanningBoard.tsx");
 
-  it("planningBoard_staffPanel_onlyWithCanComputeAndDurations", () => {
-    expect(source).toMatch(/\{view\.canCompute && view\.durations && \(\s*<StaffPanel[^>]*durations=\{view\.durations\}/);
+  it("planningBoard_computeControls_useTheTestedGates", () => {
+    expect(source).toContain("staffPanelDurations(view)");
+    expect(source).toContain("key={durationsKey(panelDurations)}");
+    expect(source).toContain("canRunWeek(canCompute, week.entries)");
+    expect(source).toContain("canConfirmEntry(view.canCompute, entry)");
     expect(source).not.toContain("DEFAULT_PLANNING_DURATIONS");
-  });
-
-  it("planningBoard_runWeek_gatedOnCanCompute", () => {
-    expect(source).toMatch(/\{canCompute && week\.entries\.some\(\(entry\) => entry\.open\) && \(\s*<BusyButton/);
-  });
-
-  it("planningBoard_confirmEntry_gatedOnCanCompute", () => {
-    expect(source).toContain("{view.canCompute && entry.open && hasProvisional(entry) && (");
-  });
-
-  it("planningBoard_computeControls_neverGatedOnCanManage", () => {
-    expect(source).not.toMatch(/canManage && \(\s*<StaffPanel/);
-    expect(source).not.toContain("canManage && week.entries");
-    expect(source).not.toContain("canManage && entry.open && hasProvisional");
   });
 
   it("planningBoard_manualAssignment_staysOnCanManage", () => {
@@ -764,6 +823,15 @@ describe("textes du refus réservé aux administrateurs", () => {
     expect(frPlanning.errors.PLANNING_ADMIN_ONLY).toBe("Ce geste est réservé aux administrateurs.");
     expect(enPlanning.errors.PLANNING_ADMIN_ONLY).toBe("This action is reserved for administrators.");
     expect(frPlanning.errors.PLANNING_ADMIN_ONLY).not.toBe(frPlanning.errors.FORBIDDEN);
+  });
+
+  it("planningErrors_membersOnly_frAndEnPresent", () => {
+    expect(frPlanning.errors.PLANNING_MEMBERS_ONLY).toBe("Ce geste est réservé aux arbitres, casters et prods du planning.");
+    expect(enPlanning.errors.PLANNING_MEMBERS_ONLY).toBe("This action is reserved for the schedule's referees, casters and prods.");
+  });
+
+  it("errorKey_membersOnly_resolvesToItsOwnKey", () => {
+    expect(errorKey("PLANNING_MEMBERS_ONLY", frPlanning.errors)).toBe("PLANNING_MEMBERS_ONLY");
   });
 
   it("errorKey_adminOnly_resolvesToItsOwnKey", () => {
