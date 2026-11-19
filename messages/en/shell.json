@@ -52,52 +52,29 @@
     "back": "Back to admin view",
     "backPending": "Returning to admin view…",
     "backFailed": "Couldn't return to admin view. Try again in a moment.",
+    "inProgress": "A switch is already in progress.",
     "throttled": "Too many switches in a minute. Try again in a moment.",
     "hint": "On this device only, the site gives you only the rights of the impersonated role (none in player view) until you switch back, for {hours} hours at most. Staff push notifications follow the account and keep arriving."
   },
   "impersonate": {
-    "title": "Impersonate a role",
-    "lead": "Tick the roles to impersonate",
-    "hint": "On this device only, your rights narrow to exactly the ticked roles until you switch back, for {hours} hours at most. No role ticked: player view.",
-    "bodyLabel": "Roles to impersonate",
-    "tableLabel": "Roles to impersonate and what they open",
-    "columnRole": "Role",
-    "columnOpens": "Opens",
-    "player": "Player (no role)",
-    "playerHint": "No platform role: the site treats you as a player. Your team roles stay yours.",
-    "cancel": "Cancel",
-    "confirm": "Impersonate",
-    "pending": "Impersonating…",
     "roles": {
       "ARBITRE": {
-        "label": "Referee",
-        "opens": "Tournaments and matches, board preview, live, schedule",
-        "hint": "Creates and manages tournaments, enters and settles scores, takes a match as referee, reads the board preview, opens the live and gives availability on the schedule. No reports, no roles, no schedule computing."
+        "label": "Referee"
       },
       "CASTER": {
-        "label": "Caster",
-        "opens": "Board preview, live of own casts, schedule",
-        "hint": "Signs up to cast a match, sets up the cast, opens the live and reads the board preview before launch; gives availability on the schedule. No tournament management."
+        "label": "Caster"
       },
       "PROD": {
-        "label": "Prod",
-        "opens": "Schedule",
-        "hint": "Reads the “Schedule” page and gives availability and preferences there. No live, no board preview."
+        "label": "Prod"
       },
       "COMMUNITY_MANAGER": {
-        "label": "Community Manager",
-        "opens": "Showcase site and association",
-        "hint": "Manages the showcase partners, the association pages and the volunteers. No rights on tournaments."
+        "label": "Community Manager"
       },
       "RECRUTEUR": {
-        "label": "Recruiter",
-        "opens": "Recruitment page",
-        "hint": "Manages the posts of the recruitment page, and nothing else."
+        "label": "Recruiter"
       },
       "DEV": {
-        "label": "Developer",
-        "opens": "Developer docs",
-        "hint": "Reads the technical documentation of the site and the bot, read-only. Not staff: no bot commands nor staff sections."
+        "label": "Developer"
       }
     }
   },

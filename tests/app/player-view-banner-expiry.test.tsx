@@ -16,6 +16,7 @@ jest.mock("react", () => {
       effects.push(effect);
     },
     useRef: <T,>(initial: T) => ({ current: initial }),
+    useMemo: <T,>(compute: () => T) => compute(),
   };
 });
 

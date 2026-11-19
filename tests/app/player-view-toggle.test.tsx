@@ -31,8 +31,9 @@ jest.mock("react", () => {
 });
 
 const showError = jest.fn<(message: string) => void>();
+const showInfo = jest.fn<(message: string) => void>();
 const refresh = jest.fn<() => void>();
-jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError }) }));
+jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showInfo }) }));
 jest.mock("@/components/i18n/locale-navigation", () => ({ useLocaleRouter: () => ({ refresh }) }));
 jest.mock("@/components/i18n/shell-text", () => ({ useShellText: () => ({ t: (key: string) => key }) }));
 
@@ -107,9 +108,14 @@ describe("usePlayerViewToggle", () => {
   });
 
   it("toggle_twoInstancesAtOnce_sendOnePost", async () => {
-    await Promise.all([ToggleProbe().toggle(true), ToggleProbe().toggle(false)]);
+    const results = await Promise.all([ToggleProbe().toggle(true), ToggleProbe().toggle(false)]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Le second geste n'est pas muet : il dit qu'une bascule est en cours.
+    expect(results).toEqual([true, false]);
+    expect(showInfo).toHaveBeenCalledTimes(1);
+    expect(showInfo).toHaveBeenCalledWith("playerView.inProgress");
+    expect(showError).not.toHaveBeenCalled();
   });
 
   it("toggle_failureEntering_showsImpersonateFailedWithoutRefresh", async () => {
@@ -163,6 +169,7 @@ describe("usePlayerViewToggle", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenCalledTimes(1);
+    expect(showInfo).toHaveBeenCalledWith("playerView.inProgress");
   });
 
   it("toggle_pending_isTrueWhileTheRequestRuns", async () => {

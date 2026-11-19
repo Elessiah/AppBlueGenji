@@ -440,13 +440,22 @@ async function ensureFreshTestUser(): Promise<number> {
  * **Un repli par colonne** : la plus récente (`certify_prompt_due`, sur la
  * table des sessions) tombe seule d'abord, sans emporter
  * `recruitment_modal_off` — un « Ne plus afficher » posé ne doit pas se perdre
- * parce qu'un autre `ALTER` a échoué. `player_view_until` et
- * `impersonated_roles_json`, plus récentes encore, tombent ensemble avant
- * elles : sans l'une d'elles, aucune session n'incarne de rôle, les droits
- * restent entiers.
+ * parce qu'un autre `ALTER` a échoué. `impersonated_roles_json`, puis
+ * `player_view_until`, plus récentes encore, tombent avant elles : sans les
+ * rôles, une session qui incarne retombe en **vue joueur** (jamais en droits
+ * entiers) ; sans l'échéance, aucune session n'incarne, les droits restent
+ * entiers.
  */
+/**
+ * Colonnes d'incarnation que la lecture porte : toutes (`roles`), l'échéance
+ * sans les rôles (`until`, **vue joueur** : un `ALTER` des rôles échoué
+ * restreint, il ne rend jamais les droits d'administrateur), aucune (`none`).
+ */
+type PlayerViewColumns = "roles" | "until" | "none";
+const PLAYER_VIEW_COLUMN_LEVELS: readonly PlayerViewColumns[] = ["roles", "until", "none"];
+
 async function selectUserRows(
-  sql: (withModalOff: boolean, withCertifyPrompt: boolean, withPlayerView: boolean) => string,
+  sql: (withModalOff: boolean, withCertifyPrompt: boolean, playerView: PlayerViewColumns) => string,
   params: (string | number)[],
 ): Promise<UserRow[]> {
   const db = await getDatabase();
@@ -455,7 +464,7 @@ async function selectUserRows(
   const variants: string[] = [];
   for (const modalOff of [true, false]) {
     for (const certifyPrompt of [true, false]) {
-      for (const playerView of [true, false]) variants.push(sql(modalOff, certifyPrompt, playerView));
+      for (const playerView of PLAYER_VIEW_COLUMN_LEVELS) variants.push(sql(modalOff, certifyPrompt, playerView));
     }
   }
   const all = [...new Set(variants)];
@@ -493,15 +502,18 @@ export function devBypassSessionKey(userId: number): string {
 }
 
 
-const DEV_BYPASS_PLAYER_VIEW_SQL = `EXISTS(SELECT 1 FROM bg_user_sessions dv
-       WHERE dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', bg_users.id)
-         AND dv.player_view_until > NOW()) AS player_view,
-       (SELECT dv.player_view_until FROM bg_user_sessions dv
-       WHERE dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', bg_users.id)
-         AND dv.player_view_until > NOW()) AS player_view_until,
-       (SELECT dv.impersonated_roles_json FROM bg_user_sessions dv
-       WHERE dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', bg_users.id)
-         AND dv.player_view_until > NOW()) AS impersonated_roles_json`;
+/**
+ * Jointure de la ligne d'incarnation du contournement de développement : une
+ * seule lecture de la ligne pour ses trois colonnes.
+ */
+const DEV_BYPASS_VIEW_JOIN = `LEFT JOIN bg_user_sessions dv
+       ON dv.token_hash = CONCAT('${DEV_BYPASS_SESSION_PREFIX}', u.id)
+      AND dv.player_view_until > NOW()`;
+
+function devBypassViewColumns(playerView: PlayerViewColumns): string {
+  if (playerView === "none") return "";
+  return `, dv.player_view_until IS NOT NULL AS player_view, dv.player_view_until${playerView === "roles" ? ", dv.impersonated_roles_json" : ""}`;
+}
 
 /**
  * Les utilisateurs résolus par le contournement de développement, tels que
@@ -530,10 +542,11 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
   }
 
   const rows = await selectUserRows(
-    (modalOff, _certifyPrompt, playerView) => `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json${modalOff ? ", recruitment_modal_off" : ""}${playerView ? ", " + DEV_BYPASS_PLAYER_VIEW_SQL : ""}
-     FROM bg_users
-     WHERE id = ?
-       AND is_deleted = 0
+    (modalOff, _certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${devBypassViewColumns(playerView)}
+     FROM bg_users u
+     ${playerView === "none" ? "" : DEV_BYPASS_VIEW_JOIN}
+     WHERE u.id = ?
+       AND u.is_deleted = 0
      LIMIT 1`,
     [userId],
   );
@@ -560,7 +573,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
   if (!token) return null;
 
   const rows = await selectUserRows(
-    (modalOff, certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}${playerView ? ", s.player_view_until > NOW() AS player_view, s.player_view_until, s.impersonated_roles_json" : ""}
+    (modalOff, certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}${playerView === "none" ? "" : ", s.player_view_until > NOW() AS player_view, s.player_view_until"}${playerView === "roles" ? ", s.impersonated_roles_json" : ""}
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?

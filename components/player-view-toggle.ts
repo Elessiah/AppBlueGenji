@@ -70,11 +70,15 @@ export function usePlayerViewToggle(onDone?: () => void): {
   toggle: (active: boolean, roles?: readonly PlatformRole[]) => Promise<boolean>;
 } {
   const router = useLocaleRouter();
-  const { showError } = useToast();
+  const { showError, showInfo } = useToast();
   const { t } = useShellText();
   const [pending, setPending] = useState(false);
   const toggle = async (active: boolean, roles: readonly PlatformRole[] = []) => {
-    if (inFlight) return false;
+    if (inFlight) {
+      // Un autre geste (bannière, menu, modale) tient la bascule : le dire, jamais un clic muet.
+      showInfo(t("playerView.inProgress"));
+      return false;
+    }
     inFlight = true;
     setPending(true);
     const outcome = await requestPlayerView(active, roles);

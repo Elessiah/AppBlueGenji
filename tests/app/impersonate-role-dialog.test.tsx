@@ -33,6 +33,9 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import frShell from "@/messages/fr/shell.json";
 import enShell from "@/messages/en/shell.json";
+import frImpersonate from "@/messages/fr/impersonate.json";
+import enImpersonate from "@/messages/en/impersonate.json";
+import { IMPERSONABLE_ROLES } from "@/lib/shared/player-view";
 import { readSource } from "../helpers/read-source";
 
 const globals = globalThis as { document?: unknown };
@@ -128,15 +131,15 @@ describe("ImpersonateRoleDialog — français", () => {
     expect(scroll).toContain("Joueur (aucun rôle)");
     expect(count(scroll, 'type="checkbox"')).toBe(6);
     expect(scroll).not.toContain("<h3");
-    expect(scroll).not.toContain(`>${frShell.impersonate.cancel}<`);
-    expect(scroll).not.toContain(`>${frShell.impersonate.confirm}<`);
-    expect(html).toContain(`>${frShell.impersonate.cancel}<`);
+    expect(scroll).not.toContain(`>${frImpersonate.cancel}<`);
+    expect(scroll).not.toContain(`>${frImpersonate.confirm}<`);
+    expect(html).toContain(`>${frImpersonate.cancel}<`);
   });
 
   it("source_scrollAreaNamedByTheBodyLabel_inFrenchAndEnglish", () => {
-    expect(readSource("components/impersonate-role-dialog.tsx")).toContain('ariaLabel={t("impersonate.bodyLabel")}');
-    expect(frShell.impersonate.bodyLabel).toBe("Rôles à incarner");
-    expect(enShell.impersonate.bodyLabel).toBe("Roles to impersonate");
+    expect(readSource("components/impersonate-role-dialog.tsx")).toContain('ariaLabel={t("bodyLabel")}');
+    expect(frImpersonate.bodyLabel).toBe("Rôles à incarner");
+    expect(enImpersonate.bodyLabel).toBe("Roles to impersonate");
   });
 
   it("css_scrollBody_keepsRoomForFocusOutlines", () => {
@@ -165,9 +168,48 @@ describe("ImpersonateRoleDialog — anglais", () => {
 });
 
 describe("textes FR = EN", () => {
-  it("shell_impersonateSection_hasSameKeysInBothLanguages", () => {
-    expect(Object.keys(enShell.impersonate).sort()).toEqual(Object.keys(frShell.impersonate).sort());
-    expect(Object.keys(enShell.impersonate.roles).sort()).toEqual(Object.keys(frShell.impersonate.roles).sort());
+  it("impersonateDialogTexts_haveSameKeysInBothLanguages", () => {
+    expect(Object.keys(enImpersonate).sort()).toEqual(Object.keys(frImpersonate).sort());
+    expect(Object.keys(enImpersonate.roles).sort()).toEqual(Object.keys(frImpersonate.roles).sort());
+  });
+
+  it("impersonateDialogTexts_describeEveryImpersonableRole_andNoOther", () => {
+    for (const messages of [frImpersonate, enImpersonate]) {
+      expect(Object.keys(messages.roles).sort()).toEqual([...IMPERSONABLE_ROLES].sort());
+      for (const role of IMPERSONABLE_ROLES) {
+        const entry = messages.roles[role as keyof typeof messages.roles];
+        expect(entry.opens.length).toBeGreaterThan(0);
+        expect(entry.hint.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("shellBannerRoleLabels_existForEveryImpersonableRole_inBothLanguages", () => {
+    // La bannière (mise en page racine, toutes les pages) nomme chaque rôle
+    // par la coquille : un rôle sans nom y afficherait la clé brute.
+    for (const messages of [frShell, enShell]) {
+      expect(Object.keys(messages.impersonate.roles).sort()).toEqual([...IMPERSONABLE_ROLES].sort());
+      for (const role of IMPERSONABLE_ROLES) {
+        expect(messages.impersonate.roles[role as keyof typeof messages.impersonate.roles].label.length).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe("poids de la coquille", () => {
+  it("shellMessages_carryOnlyTheBannerRoleLabels_notTheDialogTexts", () => {
+    // Les textes de la modale partent avec son morceau (chargé à l'ouverture),
+    // ni dans le paquet commun ni dans la charge utile des pages `/en`.
+    for (const messages of [frShell, enShell]) {
+      expect(Object.keys(messages.impersonate)).toEqual(["roles"]);
+      for (const entry of Object.values(messages.impersonate.roles)) expect(Object.keys(entry)).toEqual(["label"]);
+    }
+  });
+
+  it("shellText_neverImportsTheDialogTexts", () => {
+    expect(readSource("lib/shared/shell-text.ts")).not.toContain("impersonate");
+    expect(readSource("components/player-view.tsx")).not.toContain("impersonate-role-text");
+    expect(readSource("components/impersonate-role-text.ts")).toContain("@/messages/fr/impersonate.json");
   });
 });
 

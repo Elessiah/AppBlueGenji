@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, memo, useCallback, useEffect, useId, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, memo, useCallback, useMemo, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Coche } from "@/components/Coche";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { useShellText } from "@/components/i18n/shell-text";
+import { impersonateText } from "@/components/impersonate-role-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -12,7 +13,7 @@ import type { PlatformRole } from "@/lib/shared/permissions";
 import { IMPERSONABLE_ROLES, PLAYER_VIEW_MAX_HOURS, toggleImpersonatedRole } from "@/lib/shared/player-view";
 import s from "./impersonate-role-dialog.module.css";
 
-type ImpersonateRoleDialogProps = {
+export type ImpersonateRoleDialogProps = {
   /** Fermeture sans geste (Échap, voile, « Annuler »). */
   onClose: () => void;
   /**
@@ -33,8 +34,9 @@ type RowProps = {
 
 /** Une ligne : la case du rôle, son « i » (ce qu'il change) et ce qu'il ouvre. */
 const ImpersonateRoleRow = memo(function ImpersonateRoleRow({ role, hintId, checked, busy, onToggle }: Readonly<RowProps>) {
-  const { t } = useShellText();
-  const label = t(`impersonate.roles.${role as ImpersonableRole}.label`);
+  const { t: shell, locale } = useShellText();
+  const t = useMemo(() => impersonateText(locale).t, [locale]);
+  const label = shell(`impersonate.roles.${role as ImpersonableRole}.label`);
   return (
     <div role="row" className={s.row}>
       <span role="rowheader" className={s.roleCell}>
@@ -48,12 +50,12 @@ const ImpersonateRoleRow = memo(function ImpersonateRoleRow({ role, hintId, chec
             aria-readonly={busy || undefined}
           />
           <InfoHint id={hintId} subject={label}>
-            <p>{t(`impersonate.roles.${role as ImpersonableRole}.hint`)}</p>
+            <p>{t(`roles.${role as ImpersonableRole}.hint`)}</p>
           </InfoHint>
         </InfoHintRow>
       </span>
-      <span role="cell" className={s.opensCell} data-label={t("impersonate.columnOpens")}>
-        {t(`impersonate.roles.${role as ImpersonableRole}.opens`)}
+      <span role="cell" className={s.opensCell} data-label={t("columnOpens")}>
+        {t(`roles.${role as ImpersonableRole}.opens`)}
       </span>
     </div>
   );
@@ -73,14 +75,13 @@ type ImpersonableRole = Exclude<PlatformRole, "ADMIN">;
  * bascule est en vol.
  */
 export function ImpersonateRoleDialog({ onClose, onConfirm }: Readonly<ImpersonateRoleDialogProps>) {
-  const { t } = useShellText();
+  const { locale } = useShellText();
+  const { t } = useMemo(() => impersonateText(locale), [locale]);
   const titleId = useId();
   const baseId = useId();
   const [selected, setSelected] = useState<PlatformRole[]>([]);
   const [busy, setBusy] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy, initialFocus: "container" });
+  const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy, initialFocus: "container" });
   const backdrop = useBackdropDismiss(onClose, busy);
   // Garde synchrone : un double clic n'envoie qu'une bascule.
   const inFlight = useRef(false);
@@ -110,8 +111,6 @@ export function ImpersonateRoleDialog({ onClose, onConfirm }: Readonly<Impersona
     void send(selected);
   };
 
-  if (!mounted) return null;
-
   return createPortal(
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ role="presentation" className={s.backdrop} {...backdrop}>
       <form /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
@@ -129,9 +128,9 @@ export function ImpersonateRoleDialog({ onClose, onConfirm }: Readonly<Impersona
         }}
       >
         <h3 id={titleId} className={s.title}>
-          {t("impersonate.title")}
+          {t("title")}
         </h3>
-        <ScrollArea orientation="y" className={s.body} ariaLabel={t("impersonate.bodyLabel")}>
+        <ScrollArea orientation="y" className={s.body} ariaLabel={t("bodyLabel")}>
           <InfoHintRow>
             <button
               type="button"
@@ -140,24 +139,24 @@ export function ImpersonateRoleDialog({ onClose, onConfirm }: Readonly<Impersona
               aria-disabled={busy || undefined}
               aria-describedby={`${baseId}-player`}
             >
-              {t("impersonate.player")}
+              {t("player")}
             </button>
-            <InfoHint id={`${baseId}-player`} subject={t("impersonate.player")}>
-              <p>{t("impersonate.playerHint")}</p>
+            <InfoHint id={`${baseId}-player`} subject={t("player")}>
+              <p>{t("playerHint")}</p>
             </InfoHint>
           </InfoHintRow>
           <InfoHintRow>
-            <span className={s.lead}>{t("impersonate.lead")}</span>
-            <InfoHint id={`${baseId}-lead`} subject={t("impersonate.title")}>
-              <p>{t("impersonate.hint", { hours: PLAYER_VIEW_MAX_HOURS })}</p>
+            <span className={s.lead}>{t("lead")}</span>
+            <InfoHint id={`${baseId}-lead`} subject={t("title")}>
+              <p>{t("hint", { hours: PLAYER_VIEW_MAX_HOURS })}</p>
             </InfoHint>
           </InfoHintRow>
           <div className={s.tableWrap}>
-            <div className={s.table} role="table" aria-label={t("impersonate.tableLabel")}>
+            <div className={s.table} role="table" aria-label={t("tableLabel")}>
               <div role="rowgroup">
                 <div role="row" className={`${s.row} ${s.header}`}>
-                  <span role="columnheader">{t("impersonate.columnRole")}</span>
-                  <span role="columnheader">{t("impersonate.columnOpens")}</span>
+                  <span role="columnheader">{t("columnRole")}</span>
+                  <span role="columnheader">{t("columnOpens")}</span>
                 </div>
               </div>
               <div role="rowgroup" className={s.tableBody} data-tap-zone>
@@ -177,14 +176,14 @@ export function ImpersonateRoleDialog({ onClose, onConfirm }: Readonly<Impersona
         </ScrollArea>
         <div className={s.actions}>
           <button type="button" className="btn ghost" onClick={() => !busy && onClose()} aria-disabled={busy || undefined}>
-            {t("impersonate.cancel")}
+            {t("cancel")}
           </button>
           <button type="submit" className="btn" aria-describedby={`${baseId}-lead`} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
-            {busy ? t("impersonate.pending") : t("impersonate.confirm")}
+            {busy ? t("pending") : t("confirm")}
           </button>
           {/* Le libellé d'un bouton focalisé qui change n'est pas annoncé. */}
           <output className="sr-only" aria-live="polite">
-            {busy ? t("impersonate.pending") : ""}
+            {busy ? t("pending") : ""}
           </output>
         </div>
       </form>

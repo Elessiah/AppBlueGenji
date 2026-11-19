@@ -255,7 +255,30 @@ describe("getCurrentUser — vue joueur", () => {
     const user = await getCurrentUser();
 
     expect(user).toMatchObject({ isAdmin: true, playerView: false });
+    // Toutes les colonnes, puis l'échéance seule, puis aucune.
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("getCurrentUser_rolesColumnMissing_failsClosedToPlayerView", async () => {
+    // Le `ALTER` des rôles a échoué, celui de l'échéance a réussi : une session
+    // qui incarne ne retrouve jamais les droits d'administrateur.
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      if (sql.includes("impersonated_roles_json")) {
+        throw Object.assign(new Error("Unknown column 's.impersonated_roles_json'"), {
+          code: "ER_BAD_FIELD_ERROR",
+          errno: 1054,
+        });
+      }
+      return [[{ ...baseRow, is_admin: 1, player_view: 1, player_view_until: new Date("2026-11-20T12:00:00.000Z") }], []];
+    });
+    await withExecute(execute);
+
+    const user = await getCurrentUser();
+
+    expect(user).toMatchObject({ isAdmin: false, roles: [], playerView: true });
     expect(execute).toHaveBeenCalledTimes(2);
+    expect(String(execute.mock.calls[1][0])).toContain("s.player_view_until > NOW() AS player_view");
+    expect(String(execute.mock.calls[1][0])).not.toContain("impersonated_roles_json");
   });
 
   it("getCurrentUser_devBypassInPlayerView_seesNoPermission", async () => {
@@ -267,7 +290,10 @@ describe("getCurrentUser — vue joueur", () => {
     const user = await getCurrentUser();
 
     expect(user).toMatchObject({ isAdmin: false, roles: [], playerView: true });
-    expect(String(execute.mock.calls[0][0])).toContain("CONCAT('dev-auth-bypass:', bg_users.id)");
+    expect(String(execute.mock.calls[0][0])).toContain("CONCAT('dev-auth-bypass:', u.id)");
+    // Une seule jointure pour les trois colonnes (pas de sous-requêtes répétées).
+    expect(String(execute.mock.calls[0][0])).toContain("LEFT JOIN bg_user_sessions dv");
+    expect(String(execute.mock.calls[0][0]).match(/FROM bg_user_sessions/g)).toBeNull();
   });
 
   it("getCurrentUser_devBypassImpersonatingCaster_readsRolesOfTheBypassRow", async () => {
@@ -354,8 +380,11 @@ describe("autres appareils — ligne du contournement écartée", () => {
 });
 
 describe("requête du contournement de développement", () => {
-  it("devBypassSql_usesExistsNotACount", () => {
-    expect(readSource("lib/server/auth.ts")).toContain("EXISTS(SELECT 1 FROM bg_user_sessions dv");
-    expect(readSource("lib/server/auth.ts")).not.toContain("(SELECT COUNT(*) FROM bg_user_sessions dv");
+  it("devBypassSql_readsTheBypassRowOnceByJoin", () => {
+    const source = readSource("lib/server/auth.ts");
+
+    expect(source).toContain("LEFT JOIN bg_user_sessions dv");
+    expect(source).not.toContain("(SELECT dv.");
+    expect(source).not.toContain("(SELECT COUNT(*) FROM bg_user_sessions dv");
   });
 });

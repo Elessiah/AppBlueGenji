@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Eye } from "lucide-react";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
@@ -19,9 +19,14 @@ import s from "./player-view.module.css";
  */
 export function PlayerViewBanner({ until, roles = [] }: Readonly<{ until: string | null; roles?: readonly PlatformRole[] }>) {
   const { t } = useShellText();
-  const roleNames = roles.map((role) => t(`impersonate.roles.${role as Exclude<PlatformRole, "ADMIN">}.label`)).join(", ");
-  const roleKey = roles.length > 1 ? "playerView.activeRoles" : "playerView.activeRole";
-  const state = roles.length > 0 ? t(roleKey, { roles: roleNames }) : t("playerView.active");
+  // Les rôles viennent de la mise en page racine (`parseImpersonatedRoles` :
+  // seuls des rôles incarnables, tous nommés dans la coquille — test de
+  // parité) : le texte ne se refait qu'au changement des rôles ou de langue.
+  const state = useMemo(() => {
+    if (roles.length === 0) return t("playerView.active");
+    const names = roles.map((role) => t(`impersonate.roles.${role as Exclude<PlatformRole, "ADMIN">}.label`)).join(", ");
+    return t(roles.length > 1 ? "playerView.activeRoles" : "playerView.activeRole", { roles: names });
+  }, [roles, t]);
   const router = useLocaleRouter();
   const { pending, toggle } = usePlayerViewToggle();
   const backRef = useRef<HTMLButtonElement>(null);

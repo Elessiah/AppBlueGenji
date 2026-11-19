@@ -19,6 +19,7 @@ jest.mock("react", () => {
     ...actual,
     useId: () => "id",
     useCallback: <T,>(fn: T) => fn,
+    useMemo: <T,>(compute: () => T) => compute(),
     useEffect: (effect: () => unknown) => void effect(),
     useRef: <T,>(initial: T) => {
       const index = refCursor++;
@@ -39,12 +40,13 @@ jest.mock("react-dom", () => {
   const actual = jest.requireActual<typeof import("react-dom")>("react-dom");
   return { ...actual, createPortal: (node: unknown) => node };
 });
-jest.mock("@/components/i18n/shell-text", () => ({ useShellText: () => ({ t: (key: string) => key }) }));
+jest.mock("@/components/i18n/shell-text", () => ({ useShellText: () => ({ locale: "fr", t: (key: string) => key }) }));
 jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: () => ({ current: null }) }));
 jest.mock("@/lib/shared/hooks/useBackdropDismiss", () => ({ useBackdropDismiss: () => ({}) }));
 
 import { ImpersonateRoleDialog } from "@/components/impersonate-role-dialog";
 import type { PlatformRole } from "@/lib/shared/permissions";
+import frImpersonate from "@/messages/fr/impersonate.json";
 
 type Props = Record<string, unknown> & { children?: ReactNode };
 type Element = ReactElement<Props>;
@@ -75,9 +77,9 @@ const find = (tree: Element, match: (props: Props) => boolean) => {
   if (!found) throw new Error("élément introuvable");
   return found.props;
 };
-const playerButton = (tree: Element) => find(tree, (props) => props.children === "impersonate.player");
+const playerButton = (tree: Element) => find(tree, (props) => props.children === frImpersonate.player);
 const form = (tree: Element) => find(tree, (props) => props.role === "dialog");
-const cancelButton = (tree: Element) => find(tree, (props) => props.children === "impersonate.cancel");
+const cancelButton = (tree: Element) => find(tree, (props) => props.children === frImpersonate.cancel);
 const rows = (tree: Element) => elements(tree).filter((element) => typeof element.props.role === "string" && "onToggle" in element.props);
 const toggleRow = (tree: Element, role: PlatformRole) => {
   const row = rows(tree).find((element) => element.props.role === role);

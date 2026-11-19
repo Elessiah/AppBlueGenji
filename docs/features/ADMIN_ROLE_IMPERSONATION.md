@@ -102,9 +102,11 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
   retour (`parsePlayerViewBody`, refus jamais ignoré) ; `429` au-delà de dix
   **entrées** par minute et par compte (`PLAYER_VIEW_TOGGLE_RULE`) — le retour,
   qui ne fait que rendre des droits, est compté à part (`PLAYER_VIEW_EXIT_RULE`,
-  trente par minute) : des entrées répétées ne le bloquent jamais ;
+  trente par minute) ; cette règle large garde aussi **avant** la lecture du
+  corps (un corps refusé se compte), si bien que dix entrées par minute au plus
+  n'en épuisent jamais la moitié ;
   `409 IMPERSONATION_ALREADY_ACTIVE` pour une entrée qui n'a rien écrit alors
-  que la session incarne déjà **d'autres** rôles (posés depuis un autre
+  que la session incarne déjà **d'autres** rôles (ou qu'une sortie croisée vient de la lever) (posés depuis un autre
   onglet : le client le dit et relit la page — une entrée qui a écrit rend
   l'état relu, même changé depuis par un geste croisé) ; `500 PLAYER_VIEW_FAILED` sur une panne. Réponse `{ playerView, until, roles }`,
   tirés de l'état **relu** (`playerView` = `until !== null`).
@@ -166,7 +168,7 @@ entiers ; la bascule, elle, échoue (`500 PLAYER_VIEW_FAILED`).
   admin » pendant l'incarnation — la bannière défile avec la page, le menu,
   sous la barre fixe, reste à portée.
 - Modale `ImpersonateRoleDialog` (`components/impersonate-role-dialog.tsx`,
-  chargée par `next/dynamic` à l'ouverture : son code ne pèse pas sur la barre
+  chargée à l'ouverture du menu du compte (`impersonate-role-loader.ts`, `onceLoader` : préchargée à l'ouverture du menu, un échec se dit par notification, jamais par l'écran d'erreur ; ses textes vivent dans `messages/<langue>/impersonate.json`, lus par le seul morceau de la modale — la coquille ne garde que les noms de rôles de la bannière) : son code ne pèse pas sur la barre
   des autres comptes) : portail sur `document.body`, `useDialogBehavior`,
   `useBackdropDismiss` (`MODAL_DIALOGS.md`). En tête, « Joueur (aucun rôle) »
   (focus d'ouverture, un clic suffit) avec son « i » ; puis le tableau des
@@ -258,3 +260,8 @@ compris) pouvait passer en vue joueur : ses lignes pm2 restent jusqu'à leur rot
 - Le drapeau est lu dans la requête de session existante (`s.player_view_until > NOW()`), sans requête de plus ni index nouveau ; l'échéance est une simple comparaison.
 - La bannière est chargée par `next/dynamic` (rendue côté serveur, code absent du morceau des pages publiques) ; le hook et le focus vivent dans `player-view-toggle.ts`, que le menu du compte importe sans la bannière.
 - Les changements de contexte (reconnexion) sont gardés à part des révocations (une minute, `RECONNECT_MEMORY_PER_USER` = 20 par compte, filet global `RECONNECT_MEMORY_MAX` = 1024) : une bascule répétée ne ralentit pas `revokedSince`. La reconnexion des flux porte déjà une gigue (`reconnectDelayMs`).
+
+## Coût par requête (revue de performance)
+
+- La lecture de la session rend `impersonated_roles_json` dans la **même** requête que le reste (aucune lecture de plus) ; le contournement de développement lit sa ligne d'incarnation par une seule jointure. Si l'`ALTER` des rôles a échoué, la lecture retombe en **vue joueur** (jamais en droits entiers) ; sans l'échéance, aucune incarnation.
+- Une bascule relit la page (`router.refresh()`) et reconnecte les flux SSE de la session : coût voulu (les droits changent), borné par les règles de débit. Un geste refusé parce qu'un autre est en vol le dit (`playerView.inProgress`).

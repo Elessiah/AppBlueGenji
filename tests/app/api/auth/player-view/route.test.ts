@@ -81,12 +81,46 @@ describe("POST /api/auth/player-view", () => {
 
   it("POST_exitsUpToTheirLimit_neverConsumeTheEntryRule", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
-    for (let i = 0; i < PLAYER_VIEW_EXIT_RULE.limit; i += 1) await toggle({ active: false });
+    // Les sorties ne consomment pas la règle des entrées : de quoi en épuiser
+    // la fenêtre entière (10) sans que la règle large (30) s'en mêle.
+    for (let i = 0; i < PLAYER_VIEW_TOGGLE_RULE.limit + 5; i += 1) await toggle({ active: false });
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
     const res = await toggle({ active: true });
 
     expect(res.status).toBe(200);
+  });
+
+  it("POST_invalidBodies_countAgainstTheBroadRuleBeforeBeingRead", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    for (let i = 0; i < PLAYER_VIEW_EXIT_RULE.limit; i += 1) {
+      expect((await toggle({ active: true, roles: ["NOPE"] })).status).toBe(400);
+    }
+
+    const res = await toggle({ active: true, roles: ["NOPE"] });
+
+    expect(res.status).toBe(429);
+    expect(setPlayerView).not.toHaveBeenCalled();
+  });
+
+  it("POST_entriesAndExits_shareTheBroadRuleButEntriesAreCappedFirst", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    for (let i = 0; i < PLAYER_VIEW_TOGGLE_RULE.limit; i += 1) expect((await toggle({ active: true })).status).toBe(200);
+    expect((await toggle({ active: true })).status).toBe(429);
+
+    // Dix entrées n'ont pas vidé la règle large : le retour passe encore.
+    expect((await toggle({ active: false })).status).toBe(200);
+  });
+
+  it("POST_enterNothingWrittenAndReadBackInactive_returns409", async () => {
+    // Une sortie croisée a levé l'incarnation qui avait refusé l'entrée.
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(setPlayerView).mockResolvedValue({ until: null, roles: [], changed: false });
+
+    const res = await toggle({ active: true, roles: ["CASTER"] });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: "IMPERSONATION_ALREADY_ACTIVE" });
   });
 
   it("POST_entryWrittenButCrossedGestureChangedRoles_returns200WithRereadState", async () => {

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import dynamic from "next/dynamic";
+import { useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import { BookOpen, CalendarClock, Drama, Eye, LogOut, Shield, UserRound } from "lucide-react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { entrantHref } from "@/lib/shared/participants";
@@ -11,6 +10,13 @@ import { UserAvatar } from "./user-avatar";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";
 import { useLogout } from "./use-logout";
+import { useToast } from "@/components/ui/toast";
+import {
+  loadedImpersonateRoleDialog,
+  loadImpersonateRoleDialog,
+  preloadImpersonateRoleDialog,
+  type ImpersonateRoleDialogComponent,
+} from "./impersonate-role-loader";
 import { takePlayerViewFocus, usePlayerViewToggle } from "./player-view-toggle";
 import type { PlayerViewMenuMode } from "@/lib/shared/player-view";
 import s from "./account-menu.module.css";
@@ -19,15 +25,6 @@ const PLAYER_VIEW_MENU_KEYS = {
   enter: { idle: "account.impersonate", pending: "account.impersonate" },
   back: { idle: "playerView.back", pending: "playerView.backPending" },
 } as const;
-
-/**
- * La modale « Incarner un rôle », chargée à l'ouverture : elle ne sert qu'aux
- * administrateurs, son code reste hors du morceau commun de la barre.
- */
-const ImpersonateRoleDialog = dynamic(
-  () => import("./impersonate-role-dialog").then((module) => module.ImpersonateRoleDialog),
-  { ssr: false },
-);
 
 export type AccountMenuTeam = { teamId: number; teamName: string };
 
@@ -105,6 +102,12 @@ export function AccountMenu({
   const close = () => setOpen(false);
   // Modale « Incarner un rôle » ouverte. Une bascule réussie la ferme avec le menu.
   const [choosing, setChoosing] = useState(false);
+  const [loadingDialog, setLoadingDialog] = useState(false);
+  const { showError } = useToast();
+  // Le code de la modale part dès l'ouverture du menu : le clic la trouve prête.
+  useEffect(() => {
+    if (open && playerViewEntry === "enter") preloadImpersonateRoleDialog();
+  }, [open, playerViewEntry]);
   const { pending: switching, toggle } = usePlayerViewToggle(() => {
     setOpen(false);
     setChoosing(false);
@@ -116,8 +119,26 @@ export function AccountMenu({
   };
   const onEntry = () => {
     if (playerViewEntry === "enter") {
-      setOpen(false);
-      setChoosing(true);
+      if (loadedImpersonateRoleDialog()) {
+        setOpen(false);
+        setChoosing(true);
+        return;
+      }
+      if (loadingDialog) return;
+      // Pas encore arrivée : le menu reste ouvert (son entrée « occupée »)
+      // jusqu'à la modale ; un échec se dit, le geste suivant retente.
+      setLoadingDialog(true);
+      loadImpersonateRoleDialog().then(
+        () => {
+          setLoadingDialog(false);
+          setOpen(false);
+          setChoosing(true);
+        },
+        () => {
+          setLoadingDialog(false);
+          showError(t("account.impersonateFailed"));
+        },
+      );
       return;
     }
     void toggle(false);
@@ -154,15 +175,21 @@ export function AccountMenu({
           activeTeam={activeTeam}
           devDocs={devDocs}
           planning={planning}
-          playerView={playerViewEntry ? { mode: playerViewEntry, pending: switching && playerViewEntry === "back", toggle: onEntry } : null}
+          playerView={playerViewEntry ? { mode: playerViewEntry, pending: playerViewEntry === "back" ? switching : loadingDialog, toggle: onEntry } : null}
           leaving={leaving}
           onNavigate={close}
           onLogout={onLogout}
         />
       )}
-      {choosing && <ImpersonateRoleDialog onClose={closeChoice} onConfirm={(roles) => toggle(true, roles)} />}
+      {choosing && <ChoiceDialog onClose={closeChoice} onConfirm={(roles) => toggle(true, roles)} />}
     </div>
   );
+}
+
+/** La modale du choix, une fois chargée (`impersonate-role-loader.ts`) ; rien d'ici là. */
+function ChoiceDialog(props: Readonly<ComponentProps<ImpersonateRoleDialogComponent>>) {
+  const Dialog = loadedImpersonateRoleDialog();
+  return Dialog ? <Dialog {...props} /> : null;
 }
 
 /** Le panneau ouvert, séparé pour être rendu (et testé) sans état. */
