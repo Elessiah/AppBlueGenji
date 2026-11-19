@@ -40,9 +40,9 @@ const STAFF = 1;
 
 type Target = { isAdmin?: number; roles?: string[] | null; flagged?: number };
 
-/** Le compte existe (lecture sans verrou), puis les deux lignes verrouillées : l'auteur (administrateur) et la cible. */
+/** L'auteur administrateur et le compte existent (lecture sans verrou), puis les deux lignes verrouillées : l'auteur (administrateur) et la cible. */
 function locked(target: Target | null, actorIsAdmin = 1) {
-  execute.mockResolvedValueOnce([[{ id: 7 }], []]);
+  execute.mockResolvedValueOnce([[{ id: STAFF, is_admin: 1 }, { id: 7, is_admin: 0 }], []]);
   const rows: { id: number; is_admin: number; platform_roles_json: string | null; is_guest_staff: number }[] = [
     { id: STAFF, is_admin: actorIsAdmin, platform_roles_json: null, is_guest_staff: 0 },
   ];
@@ -170,10 +170,24 @@ describe("setPlanningGuest", () => {
   });
 
   it("setPlanningGuest_missingUser_throwsUserNotFoundWithoutTransaction", async () => {
-    execute.mockResolvedValueOnce([[], []]);
+    execute.mockResolvedValueOnce([[{ id: STAFF, is_admin: 1 }], []]);
 
     await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("USER_NOT_FOUND");
     expect(tx.beginTransaction).not.toHaveBeenCalled();
+  });
+
+  it("setPlanningGuest_demotedActorUnknownTarget_throwsNotAdminWithoutTransaction", async () => {
+    execute.mockResolvedValueOnce([[{ id: STAFF, is_admin: 0 }], []]);
+
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("NOT_ADMIN");
+    expect(tx.beginTransaction).not.toHaveBeenCalled();
+  });
+
+  it("setPlanningGuest_preRead_readsActorAndTargetTogether", async () => {
+    execute.mockResolvedValueOnce([[], []]);
+
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("NOT_ADMIN");
+    expect(execute.mock.calls[0]).toEqual([expect.stringContaining("WHERE id IN (?, ?) AND is_deleted = 0"), [STAFF, 7]]);
   });
 });
 

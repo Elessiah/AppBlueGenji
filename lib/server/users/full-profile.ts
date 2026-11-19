@@ -127,11 +127,11 @@ function onlyForSelf<T>(isSelf: boolean, value: T): T | undefined {
 async function planningGuestOf(
   viewer: Parameters<typeof can>[0],
   targetUserId: number,
-  options: { excluded: boolean; targetIsAdmin: boolean; targetRolesJson: unknown },
+  options: { excluded: boolean; targetIsAdmin: boolean; targetRoles: readonly PlatformRole[] },
 ): Promise<{ planningGuest?: boolean | null }> {
   if (options.excluded || !can(viewer, "roles")) return {};
   const planningGuest = await readPlanningGuest(targetUserId);
-  const eligible = !options.targetIsAdmin && holdsGuestEligibleRole(options.targetRolesJson);
+  const eligible = !options.targetIsAdmin && holdsGuestEligibleRole(options.targetRoles);
   if (!eligible && planningGuest !== true) return {};
   return { planningGuest };
 }
@@ -305,7 +305,7 @@ export async function getFullProfile(
     ...(await planningGuestOf(viewer, targetUserId, {
       excluded: isSelf || isDeleted,
       targetIsAdmin,
-      targetRolesJson: userRows[0].platform_roles_json,
+      targetRoles,
     })),
     // La langue du compte ne regarde que son titulaire (lot 9-3) : « Mon
     // profil » l'affiche et la change, aucune autre fiche ne la porte.

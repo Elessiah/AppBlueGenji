@@ -1,6 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { isMissingTableError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import type { PersonalDataExport } from "@/lib/shared/types";
 
@@ -9,6 +9,9 @@ type AvailabilityRow = SlotRow & { status: string; preferred: number; updated_at
 type AssignmentRow = SlotRow & { source: string; confirmed: number; created_at: Date | null };
 type EventRow = SlotRow & { kind: string; source: string; created_at: Date | null };
 type Planning = PersonalDataExport["planning"];
+
+/** La colonne récente des événements (`RECENT_SCHEMA_CHANGES`), retirée de la lecture si elle manque. */
+const STAFF_RELEASE_COLUMN = ", staff_release";
 
 /** Le créneau et le rôle d'une ligne, commun à toutes les tables du planning. */
 function slotOf(row: SlotRow): { tournamentId: number; matchId: number | null; role: string } {
@@ -43,6 +46,9 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
       return rows;
     } catch (error) {
       if (isMissingTableError(error)) return [];
+      // `staff_release` (changement récent) absent : son `ALTER` a échoué ; l'export se fait sans la marque
+      // plutôt que d'échouer pour tous les comptes.
+      if (isUnknownColumnError(error) && sql.includes(STAFF_RELEASE_COLUMN)) return tolerant<T>(sql.replace(STAFF_RELEASE_COLUMN, ""));
       throw error;
     }
   };

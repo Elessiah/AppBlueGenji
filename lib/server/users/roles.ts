@@ -1,6 +1,7 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { resolveRoles } from "@/lib/server/auth";
 import { getDatabase } from "@/lib/server/database";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { clearAccountImpersonation } from "@/lib/server/player-view";
 import { normalizePseudo, parseRoles } from "@/lib/server/serialization";
 import { closeUserStreams } from "@/lib/server/session-streams";
@@ -45,6 +46,19 @@ export interface RolesSaveResult {
  */
 function storedRoles(row: { is_admin: unknown; platform_roles_json: unknown }): PlatformRole[] {
   return resolveRoles(Number(row.is_admin) === 1, row.platform_roles_json);
+}
+
+/**
+ * Retire le drapeau « invité » d'un compte promu administrateur (`CAST_PLANNING.md`
+ * § Invités), dans la transaction de la promotion. Une colonne absente (son
+ * `ALTER` en échec) n'empêche pas la promotion : il n'y a alors aucun drapeau.
+ */
+async function clearGuestFlag(connection: PoolConnection, userId: number): Promise<void> {
+  try {
+    await connection.execute(`UPDATE bg_users SET is_guest_staff = 0 WHERE id = ? AND is_deleted = 0 AND is_guest_staff = 1`, [userId]);
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+  }
 }
 
 /**
@@ -192,6 +206,10 @@ export async function setUserRoles(
       // (`setPlayerView`) ; le balayage du démarrage lit sans verrou puis
       // n'écrit que les sessions (`liftStrayImpersonations`).
       lifted = await clearOnAdminChange(connection, targetUserId, wasAdmin, isAdmin);
+      // Promotion : un drapeau « invité » resté posé (`CAST_PLANNING.md` § Invités)
+      // tombe — il ne vise pas un administrateur (`PLANNING_GUEST_ADMIN`), et
+      // reprendrait effet, sans geste, à une rétrogradation ou à une incarnation.
+      if (isAdmin && !wasAdmin) await clearGuestFlag(connection, targetUserId);
     }
     await connection.commit();
   } catch (error) {

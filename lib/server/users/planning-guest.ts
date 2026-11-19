@@ -81,12 +81,16 @@ export async function setPlanningGuest(
   now: number = Date.now(),
 ): Promise<PlanningGuestSaveResult> {
   const db = await getDatabase();
-  // Lu d'abord, sans verrou ni transaction : un identifiant inconnu ne pose aucun verrou d'intervalle.
-  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
-    [targetUserId],
+  // Lus d'abord, sans verrou ni transaction : un identifiant inconnu ne pose aucun verrou d'intervalle.
+  // L'auteur est jugé avant la cible : un compte qui n'est plus administrateur
+  // reçoit `NOT_ADMIN` pour tout identifiant, sans apprendre lequel existe.
+  const [rows] = await db.execute<(RowDataPacket & { id: number; is_admin: number | null })[]>(
+    `SELECT id, is_admin FROM bg_users WHERE id IN (?, ?) AND is_deleted = 0`,
+    [actorId, targetUserId],
   );
-  if (rows.length === 0) throw new Error("USER_NOT_FOUND");
+  const actorRow = rows.find((row) => Number(row.id) === actorId);
+  if (!actorRow || Number(actorRow.is_admin ?? 0) !== 1) throw new Error("NOT_ADMIN");
+  if (!rows.some((row) => Number(row.id) === targetUserId)) throw new Error("USER_NOT_FOUND");
   const flag = guest ? 1 : 0;
   const connection = await db.getConnection();
   let changed = false;

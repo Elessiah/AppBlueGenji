@@ -117,7 +117,16 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
   registre ; un drapeau déjà posé se rejoue ou se retire toujours). L'écriture
   verrouille l'auteur et la cible ensemble (`FOR UPDATE`, comme `setUserRoles`) :
   un auteur qui a perdu l'administration entre-temps est refusé (`403
-  FORBIDDEN`), une promotion concurrente attend ou est refusée. Reposer
+  FORBIDDEN`, jugé avant l'existence de la cible : il n'apprend pas quel
+  identifiant existe), une promotion concurrente attend ou est refusée. Une
+  promotion en administrateur (`setUserRoles`) retire le drapeau dans sa
+  transaction : il ne reprendrait pas effet à une rétrogradation ou une
+  incarnation. Une disponibilité enregistrée en même temps que le drapeau
+  s'écrit sous condition (`is_guest_staff = 0`, relu par l'écriture) : elle ne
+  revient pas après l'effacement de la sortie. Les avis « place à pourvoir »
+  (message privé, push) partent encore, un par place, au seul staff des
+  tournois, qui voit de toute façon le tableau ; seule la ligne publique du
+  journal du staff est retirée pour une sortie. Reposer
   `guest: true` rejoue la sortie (reprise d'une sortie incomplète) ; une
   attribution déjà partie (sortie concurrente) est passée sans bruit. La liste
   des places à quitter se lit **sous le verrou du planning** (un calcul en cours,

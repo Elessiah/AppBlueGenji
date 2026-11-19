@@ -433,6 +433,52 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
     expect(connection.commit).not.toHaveBeenCalled();
   });
 
+  it("setUserRoles_promotion_clearsGuestFlagBeforeCommit", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    await setUserRoles(7, ["ADMIN"], 3);
+
+    const [guestSql, guestParams] = connection.execute.mock.calls[3] as [string, unknown[]];
+    expect(guestSql).toBe("UPDATE bg_users SET is_guest_staff = 0 WHERE id = ? AND is_deleted = 0 AND is_guest_staff = 1");
+    expect(guestParams).toEqual([7]);
+    expect(connection.execute.mock.invocationCallOrder[3]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  it("setUserRoles_promotionWithoutGuestColumn_stillCommits", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockRejectedValueOnce(Object.assign(new Error("Unknown column 'is_guest_staff'"), { code: "ER_BAD_FIELD_ERROR" }));
+
+    const result = await setUserRoles(7, ["ADMIN"], 3);
+
+    expect(result).toEqual({ roles: ["ADMIN"], previous: [] });
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("setUserRoles_promotionGuestClearFails_rollsBackAndRethrows", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]).mockRejectedValueOnce(new Error("lock wait timeout"));
+
+    await expect(setUserRoles(7, ["ADMIN"], 3)).rejects.toThrow("lock wait timeout");
+
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("setUserRoles_nonAdminRoleGranted_leavesGuestFlag", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+
+    await setUserRoles(7, ["CASTER"], 3);
+
+    expect(connection.execute.mock.calls.some(([sql]) => String(sql).includes("is_guest_staff"))).toBe(false);
+  });
+
   it("setUserRoles_nonAdminRoleGranted_doesNotTouchSessions", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
