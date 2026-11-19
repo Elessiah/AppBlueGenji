@@ -617,9 +617,9 @@ export type MatchLaunchInfo = {
   /** Arbitre désigné, `null` sans arbitre (ou arbitre devenu inéligible, tu). */
   referee: LaunchReferee | null;
   /**
-   * Un arbitre désigné et éligible crée la partie (`BracketMatch.refereeAssigned`, même
-   * source que les faits clés de la page) : l'hôte ne fait alors que jouer à gauche.
-   * Les modales (`SideCard`) la lisent ici, jamais dans `referee`.
+   * Un arbitre désigné et éligible crée la partie (`BracketMatch.refereeAssigned`, même règle sur les
+   * matchs que la lecture couvre : jamais `COMPLETED`) ; l'hôte ne fait alors que jouer à gauche.
+   * La fiche de connexion et les modales (`SideCard`) la lisent ici, avec leurs propres données.
    */
   refereeAssigned: boolean;
   /** Match en autogestion (aucun arbitre : les équipes créent et règlent la partie). */

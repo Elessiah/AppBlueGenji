@@ -199,8 +199,9 @@ l'équipe hôte, qui reste à gauche (règlement §14), lit « Côté gauche en 
 (`facts.hostRefereedDetail`) et « Équipe hôte — côté gauche en jeu » sur sa fiche
 (`launchModal.hostRefereed` : la modale garde l'ordre équipe 1 / équipe 2, la
 fiche de l'hôte peut être à droite). La page du match tire « arbitré » de
-l'instantané (`refereeAssigned`) pour les faits clés **et** la fiche de
-connexion. Un match en autogestion ou sans décision garde « Crée la partie »
+l'instantané (`refereeAssigned`) pour les faits clés, et de la lecture du lancement
+(`MatchLaunchInfo.refereeAssigned`) pour la fiche de connexion et les modales : chaque
+bloc suit ses propres données. Un match en autogestion ou sans décision garde « Crée la partie »
 sous l'hôte — y compris un match dont l'arbitre est retiré, même lancé
 (opposition retenue) : sans arbitre, l'hôte reprend la main.
 Un match arbitré **déjà joué** (`COMPLETED`) n'affirme aucun premier ban

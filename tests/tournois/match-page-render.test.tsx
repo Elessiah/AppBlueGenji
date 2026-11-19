@@ -840,20 +840,20 @@ describe("page d'un match — infos de connexion", () => {
     expect(visible(html)).toContain("Infos de connexion");
   });
 
-  it("render_connectionSectionRefereedSnapshot_hostBadgeLeftSideInGame", () => {
-    // Source unique : l'instantané (`refereeAssigned`), même si la lecture du lancement n'a pas (encore) l'arbitre.
-    mockLaunch = launch({ referee: null });
+  it("render_connectionSectionRefereedLaunch_hostBadgeLeftSideInGame", () => {
+    // La fiche lit sa propre lecture : elle ne contredit pas les cartes voisines si l'instantané la devance.
+    mockLaunch = launch({ referee: null, refereeAssigned: true });
 
-    const html = visible(render(match({ refereeAssigned: true }), "player"));
+    const html = visible(render(match({ refereeAssigned: false }), "player"));
 
     expect(html).toContain("Équipe hôte — côté gauche en jeu");
     expect(html).not.toContain("Héberge la partie — crée le salon");
   });
 
-  it("render_connectionSectionUnrefereedSnapshotWithLaunchReferee_hostBadgeCreatesLobby", () => {
-    mockLaunch = launch({ referee: null });
+  it("render_connectionSectionUnrefereedLaunchRefereedSnapshot_hostBadgeCreatesLobby", () => {
+    mockLaunch = launch({ referee: null, refereeAssigned: false });
 
-    const html = visible(render(match({ refereeAssigned: false }), "player"));
+    const html = visible(render(match({ refereeAssigned: true }), "player"));
 
     expect(html).toContain("Héberge la partie — crée le salon");
     expect(html).not.toContain("côté gauche en jeu");
