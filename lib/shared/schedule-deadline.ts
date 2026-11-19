@@ -94,24 +94,25 @@ export function acceptsScheduleDeadline(match: DeadlineMatch): boolean {
   );
 }
 
-/** Ce que fait le balayage d'une date butoir échue : double forfait, ou elle s'éteint. */
-export type DeadlineOutcome = "FORFEIT" | "LAPSE" | null;
+/** Ce que fait le balayage d'une date butoir échue : double forfait, retrait, ou elle s'éteint. */
+export type DeadlineOutcome = "FORFEIT" | "RETIRE" | "LAPSE" | null;
 
 /**
  * L'issue d'une date butoir (`null` : pas encore échue, ou le match est joué).
  *
  * - toujours **à planifier** (deux engagées connues, ni date ni lancement,
  *   option allumée) → **double forfait** ;
- * - sans horaire mais une engagée manquante, option éteinte, ou match déjà
- *   programmé ou lancé → la date butoir **s'éteint** (effacée) : rien à
- *   forfaiter, et elle ne doit pas frapper plus tard un match qui repasserait
- *   à planifier (horaire retiré, lancement défait) sans que personne l'ait vu
- *   venir.
+ * - match déjà programmé ou lancé → la date butoir est **retirée**
+ *   (`SCHEDULE_DEADLINE_RETIRED_KEY`) : elle ne frappera plus, même si le
+ *   match repasse à planifier (horaire retiré, lancement défait), mais reste
+ *   lue par le planning (confirmation d'office à la date butoir) ;
+ * - sans horaire mais une engagée manquante, ou option éteinte → elle
+ *   **s'éteint** (effacée) : rien à forfaiter.
  */
 export function deadlineOutcome(match: DeadlineMatch, deadlineAt: number | null, now: number): DeadlineOutcome {
   if (deadlineAt === null || deadlineAt > now) return null;
   if (match.status === "COMPLETED" || match.status === "AWAITING_CONFIRMATION") return null;
-  if (match.startAt !== null || match.launchedAt !== null) return "LAPSE";
+  if (match.startAt !== null || match.launchedAt !== null) return "RETIRE";
   return matchLaunchPhase(match, now) === "TO_PLAN" ? "FORFEIT" : "LAPSE";
 }
 
@@ -128,17 +129,34 @@ export function deadlineArmed(armedAt: number | null, deadlineAt: number): boole
 }
 
 /** Ce que lit {@link scheduleOpenedAt} d'un match du tournoi. */
-export type OpenedAtMatch = { status: string; updatedAt: string };
+export type OpenedAtMatch = {
+  status: string;
+  updatedAt: string;
+  nextWinnerMatchId?: number | null;
+  nextLoserMatchId?: number | null;
+};
 
 /** Une ouverture plus ancienne que ce délai n'est plus celle de la manche en cours. */
 export const SCHEDULE_OPENED_LOOKBACK_MS = 7 * DAY_MS;
 
 /**
- * Quand la planification s'est ouverte : la fin du dernier match joué du
- * tournoi (dimanche 23:00 pour une manche finie dimanche soir), sinon `now`
- * (rien de joué depuis une semaine, ou horloge incohérente).
+ * Quand la planification s'est ouverte : la fin du dernier match joué (dimanche
+ * 23:00 pour une manche finie dimanche soir) — pour un match visé
+ * (`targetMatchId`), celle des matchs qui l'alimentent (vainqueur ou perdant),
+ * sinon du tournoi —, et `now` si rien n'a été joué depuis une semaine (ou
+ * horloge incohérente). La fin d'un match se lit à sa dernière écriture
+ * (`updatedAt`) : la base ne garde pas d'instant de clôture.
  */
-export function scheduleOpenedAt(matches: readonly OpenedAtMatch[], now: number): number {
+export function scheduleOpenedAt(matches: readonly OpenedAtMatch[], now: number, targetMatchId: number | null = null): number {
+  if (targetMatchId !== null) {
+    const feeders = matches.filter((match) => match.nextWinnerMatchId === targetMatchId || match.nextLoserMatchId === targetMatchId);
+    const fromFeeders = latestCompletion(feeders, now);
+    if (fromFeeders !== null) return fromFeeders;
+  }
+  return latestCompletion(matches, now) ?? now;
+}
+
+function latestCompletion(matches: readonly OpenedAtMatch[], now: number): number | null {
   let latest: number | null = null;
   for (const match of matches) {
     if (match.status !== "COMPLETED") continue;
@@ -146,7 +164,7 @@ export function scheduleOpenedAt(matches: readonly OpenedAtMatch[], now: number)
     if (!Number.isFinite(at) || at > now || at < now - SCHEDULE_OPENED_LOOKBACK_MS) continue;
     if (latest === null || at > latest) latest = at;
   }
-  return latest ?? now;
+  return latest;
 }
 
 /**
@@ -178,6 +196,14 @@ export type DeadlineReminderKey = (typeof SCHEDULE_DEADLINE_REMINDERS)[number]["
 
 /** Clé de l'avis du double forfait prononcé (une fois par match). */
 export const SCHEDULE_DEADLINE_FORFEIT_KEY = "FORFEIT";
+
+/**
+ * Marque (jamais envoyée) d'une date butoir **échue sur un match programmé ou
+ * lancé** : elle ne frappera plus — même si l'horaire est retiré ou le
+ * lancement défait —, mais reste sur le match, où le planning la lit encore
+ * (`planningConfirmAt`). Effacée avec les avis quand la date butoir change.
+ */
+export const SCHEDULE_DEADLINE_RETIRED_KEY = "RETIRED";
 
 /**
  * Le palier à envoyer maintenant (`null` : aucun) et ceux qu'il consomme.

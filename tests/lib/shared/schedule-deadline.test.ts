@@ -156,16 +156,16 @@ describe("deadlineOutcome", () => {
     expect(deadlineOutcome(toPlan({ refereeScheduling: false }), deadline, deadline + HOUR)).toBe("LAPSE");
   });
 
-  it("deadlineOutcome_dueButScheduled_returnsLapse", () => {
-    expect(deadlineOutcome(toPlan({ startAt: "2026-11-18T19:00:00.000Z" }), deadline, deadline + HOUR)).toBe("LAPSE");
+  it("deadlineOutcome_dueButScheduled_returnsRetire", () => {
+    expect(deadlineOutcome(toPlan({ startAt: "2026-11-18T19:00:00.000Z" }), deadline, deadline + HOUR)).toBe("RETIRE");
   });
 
   it("deadlineOutcome_dueButCompleted_returnsNull", () => {
     expect(deadlineOutcome(toPlan({ status: "COMPLETED" }), deadline, deadline + HOUR)).toBeNull();
   });
 
-  it("deadlineOutcome_dueButLaunched_returnsLapse", () => {
-    expect(deadlineOutcome(toPlan({ launchedAt: "2026-11-17T19:00:00.000Z" }), deadline, deadline + HOUR)).toBe("LAPSE");
+  it("deadlineOutcome_dueButLaunched_returnsRetire", () => {
+    expect(deadlineOutcome(toPlan({ launchedAt: "2026-11-17T19:00:00.000Z" }), deadline, deadline + HOUR)).toBe("RETIRE");
   });
 });
 
@@ -205,6 +205,31 @@ describe("scheduleOpenedAt", () => {
 
   it("scheduleOpenedAt_completedInTheFuture_ignored", () => {
     expect(scheduleOpenedAt([completed("2026-11-16T09:00:00Z")], now)).toBe(now);
+  });
+
+  it("scheduleOpenedAt_targetWithCompletedFeeder_usesFeederNotLaterMatch", () => {
+    // Le match 9 alimente le match 20 ; un autre match, retouché lundi, n'y change rien.
+    const matches = [
+      { ...completed("2026-11-15T22:00:00Z"), nextWinnerMatchId: 20 },
+      { ...completed("2026-11-16T07:00:00Z"), nextWinnerMatchId: 21 },
+    ];
+
+    expect(scheduleOpenedAt(matches, now, 20)).toBe(at("2026-11-15T22:00:00Z"));
+  });
+
+  it("scheduleOpenedAt_targetFedByLoserSide_usesIt", () => {
+    const matches = [
+      { ...completed("2026-11-15T21:00:00Z"), nextWinnerMatchId: 30, nextLoserMatchId: 20 },
+      completed("2026-11-16T07:00:00Z"),
+    ];
+
+    expect(scheduleOpenedAt(matches, now, 20)).toBe(at("2026-11-15T21:00:00Z"));
+  });
+
+  it("scheduleOpenedAt_targetWithoutCompletedFeeder_fallsBackToTournament", () => {
+    const matches = [{ status: "READY", updatedAt: "2026-11-15T20:00:00Z", nextWinnerMatchId: 20 }, completed("2026-11-15T22:00:00Z")];
+
+    expect(scheduleOpenedAt(matches, now, 20)).toBe(at("2026-11-15T22:00:00Z"));
   });
 });
 

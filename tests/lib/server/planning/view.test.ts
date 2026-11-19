@@ -16,7 +16,7 @@ import {
   PLANNING_MEMBERS_TTL_MS,
   resetPlanningMembersCache,
   unfilledRoles,
-  upcomingConfirmAt,
+  entryConfirmState,
   visibleAssignment,
 } from "@/lib/server/planning/view";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
@@ -41,20 +41,31 @@ beforeEach(() => {
   );
 });
 
-describe("upcomingConfirmAt", () => {
+describe("entryConfirmState", () => {
   const HOUR = 60 * 60 * 1000;
   const startAt = MONDAY + 48 * HOUR;
+  const confirmIso = new Date(startAt - 24 * HOUR).toISOString();
 
-  it("upcomingConfirmAt_openEntryBeforeConfirm_returnsIso", () => {
-    expect(upcomingConfirmAt({ open: true, startAt, deadlineAt: null }, 24, MONDAY)).toBe(new Date(startAt - 24 * HOUR).toISOString());
+  it("entryConfirmState_openEntryBeforeConfirm_returnsIsoNotPending", () => {
+    expect(entryConfirmState({ open: true, startAt, deadlineAt: null }, 24, MONDAY, true)).toEqual({ confirmAt: confirmIso, confirmPending: false });
   });
 
-  it("upcomingConfirmAt_confirmTimeReached_returnsNull", () => {
-    expect(upcomingConfirmAt({ open: true, startAt, deadlineAt: null }, 24, startAt - 24 * HOUR)).toBeNull();
+  it("entryConfirmState_confirmTimeReachedNothingProvisional_returnsNull", () => {
+    expect(entryConfirmState({ open: true, startAt, deadlineAt: null }, 24, startAt - 24 * HOUR, false)).toEqual({
+      confirmAt: null,
+      confirmPending: false,
+    });
   });
 
-  it("upcomingConfirmAt_closedEntry_returnsNull", () => {
-    expect(upcomingConfirmAt({ open: false, startAt, deadlineAt: null }, 24, MONDAY)).toBeNull();
+  it("entryConfirmState_confirmTimeReachedStillProvisional_pending", () => {
+    expect(entryConfirmState({ open: true, startAt, deadlineAt: null }, 24, startAt - 24 * HOUR, true)).toEqual({
+      confirmAt: confirmIso,
+      confirmPending: true,
+    });
+  });
+
+  it("entryConfirmState_closedEntry_returnsNull", () => {
+    expect(entryConfirmState({ open: false, startAt, deadlineAt: null }, 24, MONDAY, true)).toEqual({ confirmAt: null, confirmPending: false });
   });
 });
 

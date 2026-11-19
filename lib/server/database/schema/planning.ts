@@ -155,6 +155,9 @@ export async function createPlanningTables(db: Pool): Promise<void> {
       match_id BIGINT NULL,
       -- Début de l'entrée confirmée : reprogrammée, elle se confirme de nouveau.
       start_at DATETIME NULL,
+      -- Propositions laissées provisoires par la confirmation, comptées par
+      -- rôle (JSON \`{"CASTER":1}\`, aucun compte nommé) : une de plus rouvre l'entrée.
+      pending_roles VARCHAR(64) NULL,
       confirmed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_bg_planning_auto_confirms_tournament (tournament_id),
       INDEX idx_bg_planning_auto_confirms_match (match_id),

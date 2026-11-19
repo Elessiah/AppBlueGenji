@@ -187,6 +187,7 @@
   "unfilled": "Open slot",
   "autoConfirm": {
     "at": "Automatic confirmation: {time}",
-    "atWithDeadline": "Automatic confirmation: {time} (match scheduling deadline: {deadline})"
+    "atWithDeadline": "Automatic confirmation: {time} (match scheduling deadline: {deadline})",
+    "pending": "Automatic confirmation pending (due: {time})"
   }
 }

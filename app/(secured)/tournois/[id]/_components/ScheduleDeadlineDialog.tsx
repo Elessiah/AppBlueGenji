@@ -42,7 +42,7 @@ function dayLabel(day: string, locale: "fr" | "en"): string {
  * Date butoir de planification (`docs/features/SCHEDULE_DEADLINE.md`) : un
  * jour et une heure pile, **heure de Paris**. Préremplie par la date butoir en
  * place, sinon par celle d'usage : 21:00, deux jours après l'**ouverture** de
- * la planification — la fin du dernier match joué du tournoi
+ * la planification — la fin du dernier match joué qui alimente ce match (sinon du tournoi)
  * (`scheduleOpenedAt`), pas l'instant où la fenêtre s'ouvre. « Aucune »
  * l'efface. Portée et piège de focus : `ConfirmActionDialog`.
  */
@@ -63,7 +63,7 @@ export function ScheduleDeadlineDialog({
   const fieldErrors = useFieldErrors(SCHEDULE_DEADLINE_FIELD_ERRORS, FIELD_IDS);
   const [now] = useState(() => Date.now());
   const current = target.kind === "match" && target.deadlineAt !== null ? Date.parse(target.deadlineAt) : null;
-  const [suggested] = useState(() => suggestedScheduleDeadline(scheduleOpenedAt(matches, now), now));
+  const [suggested] = useState(() => suggestedScheduleDeadline(scheduleOpenedAt(matches, now, target.kind === "match" ? target.matchId : null), now));
   const initial = deadlineEntryOf(current ?? suggested);
   const [day, setDay] = useState<string>(initial.day);
   const [hour, setHour] = useState<number>(current === null ? SCHEDULE_DEADLINE_DEFAULT_HOUR : initial.hour);

@@ -533,6 +533,12 @@ function Entrant({ entrant, text }: Readonly<{ entrant: PlanningEntrant | null; 
   );
 }
 
+/** La ligne de confirmation d'office : à venir, ou en attente (instant passé, propositions encore provisoires). */
+function confirmText(t: Text["t"], pending: boolean, time: string, deadline: string | null): string {
+  if (pending) return t("autoConfirm.pending", { time });
+  return deadline === null ? t("autoConfirm.at", { time }) : t("autoConfirm.atWithDeadline", { time, deadline });
+}
+
 const EntryCard = memo(function EntryCard({
   entry,
   view,
@@ -600,9 +606,7 @@ const EntryCard = memo(function EntryCard({
       )}
       {confirmAt !== null && (
         <p className={styles.confirmAt} data-testid="planning-confirm-at">
-          {deadline === null
-            ? t("autoConfirm.at", { time: confirmAt })
-            : t("autoConfirm.atWithDeadline", { time: confirmAt, deadline })}
+          {confirmText(t, entry.confirmPending, confirmAt, deadline)}
         </p>
       )}
 

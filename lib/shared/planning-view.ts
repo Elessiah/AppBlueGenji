@@ -87,9 +87,11 @@ export type PlanningEntryView = {
   /**
    * Confirmation d'office des propositions de l'entrée (ISO) : au plus tôt de
    * la date butoir et du début moins le délai de confirmation. `null` : entrée
-   * close, ou instant passé (confirmée, ou sur le point de l'être).
+   * close, ou instant passé sans proposition provisoire restante.
    */
   confirmAt: string | null;
+  /** Instant passé, propositions encore provisoires : la confirmation d'office est en attente. */
+  confirmPending: boolean;
   assignments: PlanningAssignmentShown[];
   coverage: Coverage;
   /** Disponibilités du lecteur sur cette entrée, par rôle tenu. */

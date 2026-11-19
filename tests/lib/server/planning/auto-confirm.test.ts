@@ -15,6 +15,8 @@ import {
   dueAutoConfirms,
   FAILED_WEEK_RETRY_MS,
   groupByWeek,
+  parsePendingRoles,
+  reopenedEntries,
   sweepAutoConfirms,
   type AutoConfirmMarks,
 } from "@/lib/server/planning/auto-confirm";
@@ -111,6 +113,46 @@ describe("dueAutoConfirms", () => {
   });
 });
 
+describe("parsePendingRoles", () => {
+  it("parsePendingRoles_null_empty", () => {
+    expect(parsePendingRoles(null)).toEqual({});
+  });
+
+  it("parsePendingRoles_unreadable_empty", () => {
+    expect(parsePendingRoles("{pas du json")).toEqual({});
+  });
+
+  it("parsePendingRoles_array_empty", () => {
+    expect(parsePendingRoles("[1]")).toEqual({});
+  });
+
+  it("parsePendingRoles_counts_keepsPositiveIntegersOnly", () => {
+    expect(parsePendingRoles('{"CASTER":2,"REFEREE":0,"PROD":1.5,"X":"1"}')).toEqual({ CASTER: 2 });
+  });
+});
+
+describe("reopenedEntries", () => {
+  it("reopenedEntries_moreProvisionalThanAtMark_reopened", () => {
+    const stored = new Map([["m:1", { CASTER: 1 }]]);
+
+    expect(reopenedEntries(stored, new Map([["m:1", { CASTER: 2 }]]))).toEqual(new Set(["m:1"]));
+  });
+
+  it("reopenedEntries_newRole_reopened", () => {
+    expect(reopenedEntries(new Map([["m:1", {}]]), new Map([["m:1", { REFEREE: 1 }]]))).toEqual(new Set(["m:1"]));
+  });
+
+  it("reopenedEntries_leftoverRecreatedSameCount_notReopened", () => {
+    const stored = new Map([["m:1", { REFEREE: 1 }]]);
+
+    expect(reopenedEntries(stored, new Map([["m:1", { REFEREE: 1 }]]))).toEqual(new Set());
+  });
+
+  it("reopenedEntries_unmarkedEntry_ignored", () => {
+    expect(reopenedEntries(new Map(), new Map([["m:1", { CASTER: 1 }]]))).toEqual(new Set());
+  });
+});
+
 describe("groupByWeek", () => {
   it("groupByWeek_twoWeeks_groupsInOrderWithBounds", () => {
     const later = loadedEntry({ key: "m:3", startAt: MONDAY + WEEK_MS + HOUR_MS });
@@ -155,7 +197,45 @@ describe("sweepAutoConfirms", () => {
 
     const [sql, params] = connection.execute.mock.calls.filter(([text]) => text.startsWith("INSERT INTO bg_planning_auto_confirms"))[0];
     expect(sql).toContain("ON DUPLICATE KEY UPDATE start_at = VALUES(start_at)");
-    expect(params).toEqual(["m:1", 10, 1, new Date(WEDNESDAY_21)]);
+    expect(params).toEqual(["m:1", 10, 1, new Date(WEDNESDAY_21), "{}"]);
+  });
+
+  it("sweepAutoConfirms_dueEntry_marksProvisionalCountsReadBeforeConfirm", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ key: "m:1", matchId: 1, tournamentId: 10, startAt: WEDNESDAY_21 })]);
+    connection.execute.mockImplementation(async (sql) =>
+      sql.startsWith("SELECT entry_key, role, COUNT(*)") ? [[{ entry_key: "m:1", role: "REFEREE", n: 1 }], []] : sql.startsWith("SELECT") ? [[], []] : [{ affectedRows: 1 }, []],
+    );
+
+    await sweepAutoConfirms(NOW);
+
+    const countIndex = connection.execute.mock.calls.findIndex(([sql]) => sql.startsWith("SELECT entry_key, role, COUNT(*)"));
+    expect(connection.execute.mock.invocationCallOrder[countIndex]).toBeLessThan(jest.mocked(confirmAssignments).mock.invocationCallOrder[0]);
+    const mark = connection.execute.mock.calls.find(([sql]) => sql.startsWith("INSERT INTO bg_planning_auto_confirms"));
+    expect(mark?.[1]).toEqual(["m:1", 10, 1, new Date(WEDNESDAY_21), '{"REFEREE":1}']);
+  });
+
+  it("sweepAutoConfirms_markedWithMoreProvisionalSince_confirmedAgain", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ key: "m:1", startAt: WEDNESDAY_21 })]);
+    connection.execute.mockImplementation(async (sql) => {
+      if (sql.startsWith("SELECT entry_key, start_at")) return [[{ entry_key: "m:1", start_at: new Date(WEDNESDAY_21), pending_roles: '{"REFEREE":1}' }], []];
+      if (sql.startsWith("SELECT entry_key, role, COUNT(*)")) return [[{ entry_key: "m:1", role: "REFEREE", n: 1 }, { entry_key: "m:1", role: "CASTER", n: 1 }], []];
+      return sql.startsWith("SELECT") ? [[], []] : [{ affectedRows: 1 }, []];
+    });
+
+    expect(await sweepAutoConfirms(NOW)).toBe(1);
+    expect(jest.mocked(confirmAssignments)).toHaveBeenCalledWith(null, { entryKeys: ["m:1"] }, NOW);
+  });
+
+  it("sweepAutoConfirms_markedLeftoverOnly_notConfirmedAgain", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ key: "m:1", startAt: WEDNESDAY_21 })]);
+    connection.execute.mockImplementation(async (sql) => {
+      if (sql.startsWith("SELECT entry_key, start_at")) return [[{ entry_key: "m:1", start_at: new Date(WEDNESDAY_21), pending_roles: '{"REFEREE":1}' }], []];
+      if (sql.startsWith("SELECT entry_key, role, COUNT(*)")) return [[{ entry_key: "m:1", role: "REFEREE", n: 1 }], []];
+      return sql.startsWith("SELECT") ? [[], []] : [{ affectedRows: 1 }, []];
+    });
+
+    expect(await sweepAutoConfirms(NOW)).toBe(0);
+    expect(jest.mocked(runAutoAssign)).not.toHaveBeenCalled();
   });
 
   it("sweepAutoConfirms_weekFailed_skippedUntilRetryDelay", async () => {

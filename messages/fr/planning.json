@@ -187,6 +187,7 @@
   "unfilled": "À pourvoir",
   "autoConfirm": {
     "at": "Confirmation d'office : {time}",
-    "atWithDeadline": "Confirmation d'office : {time} (date butoir du match : {deadline})"
+    "atWithDeadline": "Confirmation d'office : {time} (date butoir du match : {deadline})",
+    "pending": "Confirmation d'office en attente (prévue : {time})"
   }
 }

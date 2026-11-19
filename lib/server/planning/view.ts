@@ -90,18 +90,21 @@ function groupByEntry<T extends { entryKey: string }>(rows: readonly T[]): Map<s
 }
 
 /**
- * Confirmation d'office **à venir** d'une entrée ouverte (ISO) ; `null` une
- * fois l'instant passé — l'entrée est alors confirmée, ou sur le point de
- * l'être — ou pour une entrée close.
+ * Confirmation d'office d'une entrée ouverte : l'instant (ISO) tant qu'il est
+ * à venir, ou passé alors que des propositions restent provisoires
+ * (`confirmPending` : en attente — semaine en échec, reprise plus tard) ;
+ * `null` pour une entrée close, ou passée sans rien de provisoire.
  */
-export function upcomingConfirmAt(
+export function entryConfirmState(
   entry: Pick<LoadedEntry, "open" | "startAt" | "deadlineAt">,
   leadHours: number,
   now: number,
-): string | null {
-  if (!entry.open) return null;
+  provisional: boolean,
+): { confirmAt: string | null; confirmPending: boolean } {
+  if (!entry.open) return { confirmAt: null, confirmPending: false };
   const at = planningConfirmAt(entry.startAt, entry.deadlineAt, leadHours);
-  return at > now ? new Date(at).toISOString() : null;
+  if (at > now) return { confirmAt: new Date(at).toISOString(), confirmPending: false };
+  return provisional ? { confirmAt: new Date(at).toISOString(), confirmPending: true } : { confirmAt: null, confirmPending: false };
 }
 
 export async function loadPlanningView(user: AuthUser, now: number = Date.now()): Promise<PlanningView> {
@@ -143,7 +146,7 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       channelUrl: entry.channelUrl,
       selfManaged: entry.selfManaged,
       deadlineAt: entry.deadlineAt === null ? null : new Date(entry.deadlineAt).toISOString(),
-      confirmAt: upcomingConfirmAt(entry, data.durations.confirmLeadHours, now),
+      ...entryConfirmState(entry, data.durations.confirmLeadHours, now, assignments.some((row) => row.provisional)),
       assignments: assignments.map((row) => visibleAssignment(row, user.id, canManage)),
       // Pour le staff, un compte suspendu ne tient rien (comme pour le calcul, `preparePlanner`, et l'alerte) ;
       // les autres lecteurs gardent la couverture d'avant.

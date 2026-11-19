@@ -14,9 +14,13 @@
  *
  * Une entrée n'est confirmée d'office qu'une fois **par horaire**
  * (`bg_planning_auto_confirms`, marque posée après la confirmation avec le
- * début confirmé) : reprogrammée, elle se confirme de nouveau ; une
- * proposition faite **après** la marque (un caster libéré, un nouveau calcul)
- * l'est aussi au passage suivant. Une semaine en échec attend
+ * début confirmé) : reprogrammée, elle se confirme de nouveau. La marque
+ * compte aussi, par rôle, les propositions provisoires lues juste **avant**
+ * la confirmation (`pending_roles`, celles qu'elle n'a pas pu confirmer y
+ * restent) : une proposition de plus par la suite (un caster libéré, un
+ * nouveau calcul, même entre la confirmation et la marque) rouvre l'entrée au
+ * passage suivant, alors qu'un reste recréé à l'identique par un nouveau
+ * calcul ne la rouvre pas. Une semaine en échec attend
  * {@link FAILED_WEEK_RETRY_MS} avant d'être relancée. Un seul
  * processus à la fois (verrou nommé `bg_planning_confirms`, pris sans
  * attendre) ; les écritures du planning prennent en plus le verrou du planning
@@ -40,8 +44,8 @@ export const FAILED_WEEK_RETRY_MS = 10 * 60 * 1000;
 
 /**
  * Marques des confirmations d'office : entrée → début confirmé (`null` : marque
- * d'avant la colonne), et entrées marquées qui portent une proposition
- * provisoire née après leur marque.
+ * d'avant la colonne), et entrées marquées qui portent plus de propositions
+ * provisoires qu'à leur marque (`reopenedEntries`).
  */
 export type AutoConfirmMarks = { startAt: ReadonlyMap<string, number | null>; reopened: ReadonlySet<string> };
 
@@ -78,31 +82,80 @@ export function groupByWeek(entries: readonly LoadedEntry[]): { from: number; to
     .map(([from, keys]) => ({ from, to: planningNextWeekStart(from), keys }));
 }
 
+/** Propositions provisoires d'une entrée, comptées par rôle. */
+export type PendingRoles = Readonly<Record<string, number>>;
+
+/** Lit `pending_roles` (illisible ou absent : aucune). */
+export function parsePendingRoles(raw: string | null): PendingRoles {
+  if (raw === null) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const counts: Record<string, number> = {};
+    for (const [role, count] of Object.entries(parsed)) {
+      if (typeof count === "number" && Number.isInteger(count) && count > 0) counts[role] = count;
+    }
+    return counts;
+  } catch {
+    return {};
+  }
+}
+
+/** Les entrées marquées qui portent, pour un rôle, plus de propositions provisoires qu'à leur marque. */
+export function reopenedEntries(
+  stored: ReadonlyMap<string, PendingRoles>,
+  current: ReadonlyMap<string, PendingRoles>,
+): Set<string> {
+  const reopened = new Set<string>();
+  for (const [key, counts] of current) {
+    const before = stored.get(key);
+    if (before === undefined) continue;
+    if (Object.entries(counts).some(([role, count]) => count > (before[role] ?? 0))) reopened.add(key);
+  }
+  return reopened;
+}
+
+/** Propositions provisoires des entrées, comptées par rôle. */
+async function readPendingRoles(executor: Executor, keys: readonly string[]): Promise<Map<string, PendingRoles>> {
+  const pending = new Map<string, Record<string, number>>();
+  if (keys.length === 0) return pending;
+  const [rows] = await executor.execute<(RowDataPacket & { entry_key: string; role: string; n: number | string })[]>(
+    `SELECT entry_key, role, COUNT(*) AS n FROM bg_planning_assignments
+      WHERE confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})
+      GROUP BY entry_key, role`,
+    [...keys],
+  );
+  for (const row of rows) {
+    const counts = pending.get(row.entry_key) ?? {};
+    counts[row.role] = Number(row.n);
+    pending.set(row.entry_key, counts);
+  }
+  return pending;
+}
+
 async function readMarks(executor: Executor, keys: readonly string[]): Promise<AutoConfirmMarks> {
   if (keys.length === 0) return { startAt: new Map(), reopened: new Set() };
   const list = keys.map(() => "?").join(", ");
-  const [rows] = await executor.execute<(RowDataPacket & { entry_key: string; start_at: Date | string | null })[]>(
-    `SELECT entry_key, start_at FROM bg_planning_auto_confirms WHERE entry_key IN (${list})`,
-    [...keys],
-  );
+  const [rows] = await executor.execute<
+    (RowDataPacket & { entry_key: string; start_at: Date | string | null; pending_roles: string | null })[]
+  >(`SELECT entry_key, start_at, pending_roles FROM bg_planning_auto_confirms WHERE entry_key IN (${list})`, [...keys]);
   const startAt = new Map(rows.map((row) => [row.entry_key, row.start_at === null ? null : new Date(row.start_at).getTime()]));
   if (startAt.size === 0) return { startAt, reopened: new Set() };
-  const marked = [...startAt.keys()];
-  const [late] = await executor.execute<(RowDataPacket & { entry_key: string })[]>(
-    `SELECT DISTINCT a.entry_key FROM bg_planning_assignments a
-       JOIN bg_planning_auto_confirms c ON c.entry_key = a.entry_key
-      WHERE a.confirmed = 0 AND a.created_at > c.confirmed_at AND a.entry_key IN (${marked.map(() => "?").join(", ")})`,
-    marked,
-  );
-  return { startAt, reopened: new Set(late.map((row) => row.entry_key)) };
+  const stored = new Map(rows.map((row) => [row.entry_key, parsePendingRoles(row.pending_roles)]));
+  return { startAt, reopened: reopenedEntries(stored, await readPendingRoles(executor, [...startAt.keys()])) };
 }
 
-async function markConfirmed(executor: Executor, entries: readonly LoadedEntry[]): Promise<void> {
+async function markConfirmed(
+  executor: Executor,
+  entries: readonly LoadedEntry[],
+  pending: ReadonlyMap<string, PendingRoles>,
+): Promise<void> {
   for (const entry of entries) {
+    const counts = JSON.stringify(pending.get(entry.key) ?? {});
     await executor.execute(
-      `INSERT INTO bg_planning_auto_confirms (entry_key, tournament_id, match_id, start_at) VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE start_at = VALUES(start_at), confirmed_at = CURRENT_TIMESTAMP`,
-      [entry.key, entry.tournamentId, entry.matchId, new Date(entry.startAt)],
+      `INSERT INTO bg_planning_auto_confirms (entry_key, tournament_id, match_id, start_at, pending_roles) VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE start_at = VALUES(start_at), pending_roles = VALUES(pending_roles), confirmed_at = CURRENT_TIMESTAMP`,
+      [entry.key, entry.tournamentId, entry.matchId, new Date(entry.startAt), counts],
     );
   }
 }
@@ -134,9 +187,12 @@ export async function sweepAutoConfirms(now: number = Date.now()): Promise<numbe
         if ((retryAfter().get(week.from) ?? 0) > now) continue;
         try {
           await runAutoAssign(null, { from: week.from, to: week.to }, now);
+          // Lues **avant** la confirmation : ce qu'elle laisse provisoire y reste
+          // compté ; une proposition arrivée ensuite rouvrira l'entrée.
+          const attempted = await readPendingRoles(connection, week.keys);
           await confirmAssignments(null, { entryKeys: week.keys }, now);
           const keys = new Set(week.keys);
-          await markConfirmed(connection, due.filter((entry) => keys.has(entry.key)));
+          await markConfirmed(connection, due.filter((entry) => keys.has(entry.key)), attempted);
           confirmed += week.keys.length;
           retryAfter().delete(week.from);
         } catch (error) {

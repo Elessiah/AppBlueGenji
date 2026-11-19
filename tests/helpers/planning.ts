@@ -109,6 +109,7 @@ export function entryView(overrides: Partial<PlanningEntryView> = {}): PlanningE
     selfManaged: false,
     deadlineAt: null,
     confirmAt: null,
+    confirmPending: false,
     assignments: [],
     coverage: planningCoverage({ hasReferee: false, casterIds: [], prodIds: [], soloCasterIds: new Set() }),
     mine: [],
