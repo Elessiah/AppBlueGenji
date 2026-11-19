@@ -16,6 +16,8 @@ import {
   countPendingRoles,
   leftoverRoles,
   dueAutoConfirms,
+  exceedsMark,
+  loadedPendingRoles,
   FAILED_WEEK_RETRY_MS,
   groupByWeek,
   parsePendingRoles,
@@ -26,7 +28,7 @@ import {
 import { confirmAssignments, runAutoAssign } from "@/lib/server/planning/auto-assign";
 import { loadDurationSettings, loadPlanningEntries } from "@/lib/server/planning/load";
 import { DEFAULT_PLANNING_DURATIONS } from "@/lib/shared/planning-durations";
-import { HOUR_MS, MONDAY, loadedEntry } from "../../../helpers/planning";
+import { HOUR_MS, MONDAY, loadedAssignment, loadedEntry } from "../../../helpers/planning";
 import { connectionMock, fakeConnection, fakePool } from "../../../helpers/sql-double";
 
 /**
@@ -389,5 +391,28 @@ describe("autoConfirmAwaiting", () => {
 
   it("autoConfirmAwaiting_moreThanAtMark_true", () => {
     expect(autoConfirmAwaiting(START, { REFEREE: 1, CASTER: 1 }, { startAt: START, pending: { REFEREE: 1 } })).toBe(true);
+  });
+});
+
+describe("exceedsMark", () => {
+  it("exceedsMark_moreForARoleThanAtMark_true", () => {
+    expect(exceedsMark({ REFEREE: 2 }, { REFEREE: 1 })).toBe(true);
+  });
+
+  it("exceedsMark_equalOrFewer_false", () => {
+    expect(exceedsMark({ CASTER: 1 }, { CASTER: 1, REFEREE: 1 })).toBe(false);
+  });
+});
+
+describe("loadedPendingRoles", () => {
+  it("loadedPendingRoles_mixedRows_countsUnconfirmedOnly", () => {
+    const counts = loadedPendingRoles([
+      loadedAssignment({ userId: 1, role: "CASTER" }),
+      loadedAssignment({ userId: 2, role: "CASTER" }),
+      loadedAssignment({ userId: 3, role: "REFEREE", confirmed: true }),
+      loadedAssignment({ entryKey: "m:2", userId: 4, role: "PROD" }),
+    ]);
+
+    expect(counts).toEqual(new Map([["m:1", { CASTER: 2 }], ["m:2", { PROD: 1 }]]));
   });
 });

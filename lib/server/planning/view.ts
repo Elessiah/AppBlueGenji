@@ -19,7 +19,7 @@ import {
   type LoadedMember,
   type LoadedWithdrawal,
 } from "./load";
-import { autoConfirmAwaiting, readStoredAutoConfirms, type PendingRoles } from "./auto-confirm";
+import { autoConfirmAwaiting, loadedPendingRoles, readStoredAutoConfirms, type PendingRoles } from "./auto-confirm";
 import { entryAssignments, entryCoverage } from "./model";
 
 /**
@@ -110,24 +110,36 @@ export function entryConfirmState(
   return awaiting ? { confirmAt: new Date(at).toISOString(), confirmPending: true } : { confirmAt: null, confirmPending: false };
 }
 
-/** Propositions provisoires d'une entrée, comptées par rôle. */
-export function provisionalRoles(assignments: readonly { role: string; provisional: boolean }[]): PendingRoles {
-  const counts: Record<string, number> = {};
-  for (const row of assignments) if (row.provisional) counts[row.role] = (counts[row.role] ?? 0) + 1;
-  return counts;
+/**
+ * Les entrées dont la carte doit consulter la marque de confirmation
+ * d'office : ouvertes, instant de confirmation atteint, et des propositions
+ * provisoires en base. Les autres n'en ont pas besoin — la lecture des
+ * marques est le plus souvent évitée.
+ */
+export function entriesNeedingMark(
+  entries: readonly Pick<LoadedEntry, "key" | "open" | "startAt" | "deadlineAt">[],
+  pending: ReadonlyMap<string, PendingRoles>,
+  leadHours: number,
+  now: number,
+): string[] {
+  return entries
+    .filter((entry) => entry.open && pending.has(entry.key) && planningConfirmAt(entry.startAt, entry.deadlineAt, leadHours) <= now)
+    .map((entry) => entry.key);
 }
 
 export async function loadPlanningView(user: AuthUser, now: number = Date.now()): Promise<PlanningView> {
   const canManage = can(user, "tournaments");
-  const { data, marks } = await withConnection(async (connection) => {
+  const { data, pending, marks } = await withConnection(async (connection) => {
     const loaded = await loadPlanningData(connection, {
       now,
       includeHidden: canManage,
       members: await pageMembers(connection, now),
       ...(canManage ? {} : { availabilityOf: user.id }),
     });
-    const openKeys = loaded.entries.filter((entry) => entry.open).map((entry) => entry.key);
-    return { data: loaded, marks: await readStoredAutoConfirms(connection, openKeys) };
+    // Comptées sur les lignes en base, comme le balayage (`sweepAutoConfirms`) : la carte et la reprise s'accordent.
+    const pending = loadedPendingRoles(loaded.assignments);
+    const keys = entriesNeedingMark(loaded.entries, pending, loaded.durations.confirmLeadHours, now);
+    return { data: loaded, pending, marks: await readStoredAutoConfirms(connection, keys) };
   });
   // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul
   // (`preparePlanner`) ; les autres lecteurs gardent la couverture d'avant (rien n'y trahit la suspension).
@@ -162,7 +174,7 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
         entry,
         data.durations.confirmLeadHours,
         now,
-        autoConfirmAwaiting(entry.startAt, provisionalRoles(assignments), marks.get(entry.key)),
+        autoConfirmAwaiting(entry.startAt, pending.get(entry.key) ?? {}, marks.get(entry.key)),
       ),
       assignments: assignments.map((row) => visibleAssignment(row, user.id, canManage)),
       // Pour le staff, un compte suspendu ne tient rien (comme pour le calcul, `preparePlanner`, et l'alerte) ;

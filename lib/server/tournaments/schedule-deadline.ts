@@ -614,7 +614,8 @@ async function applySweepAction(
   if (action.kind === "retire") return (await retireDeadline(connection, row, action.deadlineAt, now)) ? "retired" : null;
   if (action.kind !== "remind") return null;
   // Avis d'une paire précédente : la nouvelle repart de l'annonce. La marque de retrait vaut pour
-  // toute paire : elle reste.
+  // toute paire : elle reste (précaution — un rappel suppose une date butoir à venir, un retrait une
+  // date échue, et une date changée efface tous les avis : aucun état atteignable ne les réunit).
   if (sent.stale) {
     await connection.execute(
       `DELETE FROM bg_schedule_deadline_notices WHERE match_id = ? AND NOT (pairing <=> ?) AND notice_key <> ?`,

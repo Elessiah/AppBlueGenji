@@ -602,6 +602,21 @@ describe("sweepScheduleDeadlines", () => {
     expect(executed(connection, /INSERT IGNORE/)[0][0]).toContain("(start_at IS NOT NULL OR (launched_at IS NOT NULL AND launch_pairing <=> ?))");
   });
 
+  it("sweepScheduleDeadlines_retireRefusedThenScheduleGone_nextPassLapses", async () => {
+    let scheduled = true;
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row({ start_at: scheduled ? new Date(DEADLINE + 24 * HOUR) : null })]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(0)],
+      [/UPDATE bg_matches SET schedule_deadline_at = NULL/, () => [{ affectedRows: 1 }]],
+    ]);
+    // Horaire retiré entre la lecture et l'écriture : la garde refuse la marque.
+    await expect(sweepScheduleDeadlines(DEADLINE + HOUR)).resolves.toEqual({ forfeited: 0, lapsed: 0, retired: 0, reminded: 0 });
+    scheduled = false;
+
+    // Relu à planifier, jamais prévenu : la date butoir s'éteint, sans forfait.
+    await expect(sweepScheduleDeadlines(DEADLINE + HOUR + MINUTE)).resolves.toEqual({ forfeited: 0, lapsed: 1, retired: 0, reminded: 0 });
+  });
+
   it("sweepScheduleDeadlines_actionCapReached_stopsPassWithoutForgettingFailures", async () => {
     failureCounts().set(9999, { deadlineAt: DEADLINE, failures: 2, retryAt: 0 });
     const page = Array.from({ length: SWEEP_MAX_ACTIONS + 5 }, (_, index) => row({ id: 1000 + index, team2_id: null }));

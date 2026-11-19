@@ -17,12 +17,12 @@ import {
   resetPlanningMembersCache,
   unfilledRoles,
   entryConfirmState,
-  provisionalRoles,
+  entriesNeedingMark,
   visibleAssignment,
 } from "@/lib/server/planning/view";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { authUser } from "../../../helpers/auth-user";
-import { loadedAssignment, loadedEntry, loadedMember, MONDAY, planningData } from "../../../helpers/planning";
+import { HOUR_MS, loadedAssignment, loadedEntry, loadedMember, MONDAY, planningData } from "../../../helpers/planning";
 import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 
 /** La page « Planning » : copie brève des comptes, réglage autonome relu, disponibilités regroupées (`CAST_PLANNING.md`). */
@@ -402,19 +402,68 @@ describe("loadPlanningView — place quittée tenue par un compte suspendu", () 
   });
 });
 
-describe("provisionalRoles", () => {
-  it("provisionalRoles_mixedAssignments_countsProvisionalOnly", () => {
-    expect(
-      provisionalRoles([
-        { role: "CASTER", provisional: true },
-        { role: "CASTER", provisional: true },
-        { role: "REFEREE", provisional: false },
-        { role: "PROD", provisional: true },
-      ]),
-    ).toEqual({ CASTER: 2, PROD: 1 });
+describe("entriesNeedingMark", () => {
+  const startAt = MONDAY + 48 * HOUR_MS;
+  const pending = new Map([["m:1", { REFEREE: 1 }]]);
+  const confirmTime = startAt - 24 * HOUR_MS;
+
+  it("entriesNeedingMark_openPastConfirmWithPending_included", () => {
+    expect(entriesNeedingMark([loadedEntry({ startAt })], pending, 24, confirmTime)).toEqual(["m:1"]);
   });
 
-  it("provisionalRoles_noneProvisional_empty", () => {
-    expect(provisionalRoles([{ role: "REFEREE", provisional: false }])).toEqual({});
+  it("entriesNeedingMark_confirmTimeAhead_excluded", () => {
+    expect(entriesNeedingMark([loadedEntry({ startAt })], pending, 24, confirmTime - 1)).toEqual([]);
+  });
+
+  it("entriesNeedingMark_noPendingRows_excluded", () => {
+    expect(entriesNeedingMark([loadedEntry({ startAt })], new Map(), 24, confirmTime)).toEqual([]);
+  });
+
+  it("entriesNeedingMark_closedEntry_excluded", () => {
+    expect(entriesNeedingMark([loadedEntry({ startAt, open: false })], pending, 24, confirmTime)).toEqual([]);
+  });
+});
+
+describe("loadPlanningView — confirmation d'office", () => {
+  const startAt = MONDAY + 48 * HOUR_MS;
+  const confirmTime = startAt - 24 * HOUR_MS;
+  const marksQuery = /FROM bg_planning_auto_confirms/;
+
+  function withProvisionalReferee(): void {
+    jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) =>
+      planningData({ entries: [loadedEntry({ startAt })], assignments: [loadedAssignment()], members: options.members ?? [] }),
+    );
+  }
+
+  function marksCalls() {
+    return connection.execute.mock.calls.filter(([sql]) => marksQuery.test(String(sql)));
+  }
+
+  it("loadPlanningView_noEntryNeedsMark_marksNotQueried", async () => {
+    withProvisionalReferee();
+
+    await loadPlanningView(staff, confirmTime - 1);
+
+    expect(marksCalls()).toHaveLength(0);
+  });
+
+  it("loadPlanningView_leftoverAlreadyAttempted_notPending", async () => {
+    withProvisionalReferee();
+    connection.execute.mockImplementation(async (sql: string) =>
+      marksQuery.test(sql) ? [[{ entry_key: "m:1", start_at: new Date(startAt), pending_roles: '{"REFEREE":1}' }], []] : [[], []],
+    );
+
+    const view = await loadPlanningView(staff, confirmTime);
+
+    expect(marksCalls()[0][1]).toEqual(["m:1"]);
+    expect(view.entries[0].confirmPending).toBe(false);
+  });
+
+  it("loadPlanningView_unconfirmedRowWithoutMark_pending", async () => {
+    withProvisionalReferee();
+
+    const view = await loadPlanningView(staff, confirmTime);
+
+    expect(view.entries[0].confirmPending).toBe(true);
   });
 });

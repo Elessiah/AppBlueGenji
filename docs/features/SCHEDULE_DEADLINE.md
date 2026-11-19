@@ -74,7 +74,7 @@ lancés pas encore retirées. Décision pure `sweepAction` :
 | --- | --- |
 | Toujours **à planifier** (deux engagées, ni horaire ni lancement), tournoi `RUNNING`, date butoir **armée** à temps pour cette paire | **Double forfait** |
 | Engagée manquante, option éteinte, tournoi pas `RUNNING` ou `FINISHED`, paire jamais prévenue ou prévenue moins de 30 min avant | La date butoir **s'éteint** (effacée, traces comprises) |
-| Horaire posé ou match lancé | La date butoir est **retirée** (marque `RETIRED` dans `bg_schedule_deadline_notices`, jamais envoyée, posée seulement si le match est toujours programmé ou lancé à l'écriture, et gardée quand les avis d'une paire précédente s'effacent) : elle reste sur le match, où le planning la lit encore (confirmation d'office à la date butoir), mais ne frappera plus — un match qui repasse à planifier (horaire retiré, lancement défait) voit alors sa date butoir s'éteindre, sans forfait |
+| Horaire posé ou match lancé | La date butoir est **retirée** (marque `RETIRED` dans `bg_schedule_deadline_notices`, jamais envoyée, posée seulement si le match est toujours programmé ou lancé à l'écriture, et gardée par précaution quand les avis d'une paire précédente s'effacent — aucun état atteignable ne les réunit aujourd'hui, une date butoir changée effaçant tous les avis) : elle reste sur le match, où le planning la lit encore (confirmation d'office à la date butoir), mais ne frappera plus — un match qui repasse à planifier (horaire retiré, lancement défait) voit alors sa date butoir s'éteindre, sans forfait |
 | Match joué | Rien |
 
 **Armée** (`deadlineArmed`) : le premier avis de la paire **actuelle** est
@@ -86,7 +86,7 @@ refusé à chaque fois, ou verrou tenu longtemps) est **mis de côté** 15 minut
 (`SWEEP_FAILURE_BACKOFF_MS`, sauté par la lecture), avec une erreur dans le
 journal pour l'arbitrage ; repris, il repart d'une série neuve (compte
 borné). Sa date butoir **reste** : une panne passagère ne la fait jamais
-perdre. La pastille « à planifier » n'affiche qu'une date butoir à venir. Les échecs d'un match que la lecture ne rend plus sont
+perdre. La pastille « à planifier » n'affiche qu'une date butoir à venir (un seul minuteur posé sur la date butoir, `useInstantClock`). Les échecs d'un match que la lecture ne rend plus sont
 oubliés.
 
 Le double forfait passe par la chaîne existante, rien de neuf par format :
@@ -152,7 +152,10 @@ confirmé `start_at`, propositions provisoires comptées par rôle
 après, `leftoverRoles` — ce qu'elle n'a pas pu confirmer —, date) est posée
 **après** la confirmation : une
 confirmation faite ne se refait pas pour le même début (un staff qui retire
-ensuite une affectation n'est pas contredit). Une entrée **reprogrammée** se
+ensuite une affectation n'est pas contredit : le membre retiré n'est plus
+proposé pour ce rôle ; un **autre** membre proposé ensuite pour la place
+vide compte comme une proposition de plus, et se confirme au passage
+suivant, comme le remplaçant d'un désistement). Une entrée **reprogrammée** se
 confirme de nouveau à son nouvel instant ; une proposition provisoire **de
 plus** qu'à la marque, pour un rôle (nouveau calcul, caster libéré, même
 entre la confirmation et la marque), rouvre l'entrée au passage suivant —
@@ -162,7 +165,8 @@ un nouveau calcul, ne la rouvre pas (aucun compte nommé n'est gardé). Une sema
 La carte d'une entrée montre « Confirmation d'office : … » (et la date butoir)
 tant que cet instant est à venir, puis « Confirmation d'office en attente »
 s'il est passé alors qu'une confirmation d'office reste à faire
-(`autoConfirmAwaiting` : propositions provisoires sans marque pour ce début,
+(`autoConfirmAwaiting`, même règle que le balayage, comptée sur les mêmes lignes
+en base, marques lues pour ces seules entrées : propositions provisoires sans marque pour ce début,
 ou plus nombreuses qu'à la marque — semaine en échec, reprise plus tard) ;
 rien sinon : un reste que la confirmation n'a pas pu confirmer se confirme à
 la main (`entryConfirmState`).

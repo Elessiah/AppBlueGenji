@@ -62,9 +62,7 @@ export function dueAutoConfirms(
 ): LoadedEntry[] {
   return entries.filter((entry) => {
     if (!entry.open || now < planningConfirmAt(entry.startAt, entry.deadlineAt, leadHours)) return false;
-    const marked = marks.startAt.get(entry.key);
-    if (marked === undefined) return true;
-    return marked !== entry.startAt || marks.reopened.has(entry.key);
+    return markDue(entry.startAt, marks.startAt.get(entry.key), marks.reopened.has(entry.key));
   });
 }
 
@@ -101,6 +99,15 @@ export function parsePendingRoles(raw: string | null): PendingRoles {
   }
 }
 
+/**
+ * Règle unique, lue par le balayage (`reopenedEntries`) comme par la carte
+ * (`autoConfirmAwaiting`) : pour un rôle, plus de propositions provisoires
+ * qu'à la marque.
+ */
+export function exceedsMark(current: PendingRoles, atMark: PendingRoles): boolean {
+  return Object.entries(current).some(([role, count]) => count > (atMark[role] ?? 0));
+}
+
 /** Les entrées marquées qui portent, pour un rôle, plus de propositions provisoires qu'à leur marque. */
 export function reopenedEntries(
   stored: ReadonlyMap<string, PendingRoles>,
@@ -109,8 +116,7 @@ export function reopenedEntries(
   const reopened = new Set<string>();
   for (const [key, counts] of current) {
     const before = stored.get(key);
-    if (before === undefined) continue;
-    if (Object.entries(counts).some(([role, count]) => count > (before[role] ?? 0))) reopened.add(key);
+    if (before !== undefined && exceedsMark(counts, before)) reopened.add(key);
   }
   return reopened;
 }
@@ -187,8 +193,22 @@ export async function readStoredAutoConfirms(executor: Executor, keys: readonly 
  */
 export function autoConfirmAwaiting(startAt: number, current: PendingRoles, mark: StoredAutoConfirm | undefined): boolean {
   if (Object.keys(current).length === 0) return false;
-  if (mark === undefined || mark.startAt !== startAt) return true;
-  return Object.entries(current).some(([role, count]) => count > (mark.pending[role] ?? 0));
+  return markDue(startAt, mark?.startAt, exceedsMark(current, mark?.pending ?? {}));
+}
+
+/**
+ * Règle unique de `dueAutoConfirms` et `autoConfirmAwaiting` : pas de marque,
+ * une marque d'un autre début, ou une entrée rouverte depuis la marque.
+ */
+function markDue(startAt: number, markedStart: number | null | undefined, reopened: boolean): boolean {
+  return markedStart === undefined || markedStart !== startAt || reopened;
+}
+
+/** Propositions provisoires (`confirmed` faux) des affectations chargées, comptées par entrée et par rôle. */
+export function loadedPendingRoles(
+  assignments: readonly { entryKey: string; userId: number; role: string; confirmed: boolean }[],
+): Map<string, PendingRoles> {
+  return countPendingRoles(assignments.filter((row) => !row.confirmed));
 }
 
 async function readMarks(executor: Executor, keys: readonly string[]): Promise<AutoConfirmMarks> {

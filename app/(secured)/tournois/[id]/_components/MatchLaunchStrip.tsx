@@ -3,7 +3,7 @@
 import { readyCount, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import { formatScheduleDeadline, upcomingScheduleDeadline } from "@/lib/shared/schedule-deadline";
-import { useClock } from "@/lib/shared/hooks/useClock";
+import { useInstantClock } from "@/lib/shared/hooks/useInstantClock";
 import type { BracketMatch } from "@/lib/shared/types";
 import { launchPhaseBadgeKind } from "../_lib/launch-strip";
 import styles from "./MatchLaunchStrip.module.css";
@@ -30,8 +30,10 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
   const { t, locale } = useTournamentPageText();
   const spectator = useSpectatorView();
   const kind = launchPhaseBadgeKind(match, phase);
-  // Une date butoir passée (retirée, ou au forfait d'ici la minute) ne s'annonce plus.
-  const now = useClock(60 * 1000, kind === "TO_PLAN" && match.scheduleDeadlineAt !== null);
+  // Une date butoir passée (retirée, ou au forfait d'ici la minute) ne s'annonce plus : un seul
+  // minuteur, posé sur la date butoir elle-même.
+  const deadlineMs = kind === "TO_PLAN" && match.scheduleDeadlineAt !== null ? new Date(match.scheduleDeadlineAt).getTime() : null;
+  const now = useInstantClock(deadlineMs);
   const deadlineAt = kind === "TO_PLAN" ? upcomingScheduleDeadline(match.scheduleDeadlineAt, now) : null;
   if (kind === "TO_PLAN") {
     return (
