@@ -41,7 +41,7 @@
     "needsProd": "Caster sans prod",
     "idleProds": "Prod sans caster",
     "label": "Couverture",
-    "hint": "Complet : arbitre, caster et prod. Diffusé : un caster autonome, ou un caster et un prod. Autogestion : personne, les équipes se gèrent. Deux casters au plus : sans caster autonome, il leur faut un prod."
+    "hint": "Complet : arbitre, caster et prod. Diffusé : un caster autonome, ou un caster et un prod. Autogestion : personne, les équipes se gèrent."
   },
   "status": {
     "AVAILABLE": "Dispo",
@@ -72,7 +72,11 @@
     "option": "{name} · {status}",
     "optionPreferred": "{name} · {status} ★",
     "unknown": "Pas répondu",
-    "castersFull": "Deux casters au plus"
+    "castersFull": "Deux casters au plus : retire-en un pour en choisir un autre.",
+    "castersFullProvisional": "Deux casters au plus : retire une proposition pour en choisir un autre.",
+    "castersFullMatch": "Deux casters au plus, inscrits sur le match : retire-en un depuis le match.",
+    "castersHint": "Deux casters au plus par créneau. Sans caster autonome, il leur faut un prod.",
+    "castersHintSubject": "Casters d'un créneau"
   },
   "solo": {
     "label": "Je diffuse seul (caster autonome)",

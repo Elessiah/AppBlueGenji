@@ -1253,7 +1253,7 @@ function withdrawalBody(
   | "planning.withdrawal.bodyStreamLost"
   | "planning.withdrawal.bodyOpen" {
   if (notice.replaced) return "planning.withdrawal.bodyReplaced";
-  if (notice.stillHeld !== true) return notice.streamLost === true ? "planning.withdrawal.bodyStreamLost" : "planning.withdrawal.bodyOpen";
+  if (notice.stillHeld !== true || notice.role !== "CASTER") return notice.streamLost === true ? "planning.withdrawal.bodyStreamLost" : "planning.withdrawal.bodyOpen";
   return notice.selfHeld === true ? "planning.withdrawal.bodySelfHeld" : "planning.withdrawal.bodyStillHeld";
 }
 

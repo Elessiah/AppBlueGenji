@@ -209,6 +209,17 @@ export function roleChoices(
   return { manage, full, candidates: manage && !full ? candidatesFor(entry, role, members) : [] };
 }
 
+/**
+ * Le texte du plafond atteint : ce que le staff peut faire. Un caster retirable
+ * ici (ligne du planning) : le retirer ; s'il n'y a que des propositions du
+ * calcul, le dire ; si tous sont inscrits sur le match, il faut passer par le match.
+ */
+export function castersFullKind(entry: PlanningEntryView): "castersFull" | "castersFullProvisional" | "castersFullMatch" {
+  const removable = entry.assignments.filter((row) => row.role === "CASTER" && row.source !== "CAST");
+  if (removable.length === 0) return "castersFullMatch";
+  return removable.every((row) => row.provisional) ? "castersFullProvisional" : "castersFull";
+}
+
 /** Clé du texte d'un refus : un code connu de `errors`, sinon `generic`. */
 export function errorKey(code: string | null | undefined, known: object): string {
   return code && Object.hasOwn(known, code) ? code : "generic";

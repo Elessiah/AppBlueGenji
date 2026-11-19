@@ -36,6 +36,7 @@ import {
   COVERAGE_PILL,
   NO_FILTERS,
   applyAvailability,
+  castersFullKind,
   roleChoices,
   canWithdraw,
   errorKey,
@@ -697,7 +698,12 @@ function RoleRow({
             </span>
           );
         })}
-        {full && <span className={styles.muted}>{t("assignment.castersFull")}</span>}
+        {role === "CASTER" && manage && (
+          // Zone d'état toujours montée : l'apparition du plafond est annoncée au lecteur d'écran.
+          <span /* NOSONAR S6819 — région live d'état : l'apparition du plafond est annoncée */ role="status" className={styles.muted}>
+            {full ? t(`assignment.${castersFullKind(entry)}`) : null}
+          </span>
+        )}
         {manage && candidates.length > 0 && (
           <>
             <label htmlFor={selectId} className="sr-only">
@@ -724,6 +730,13 @@ function RoleRow({
               ))}
             </select>
           </>
+        )}
+        {role === "CASTER" && manage && (
+          <InfoHintRow>
+            <InfoHint id={`${selectId}-casters`} subject={t("assignment.castersHintSubject")}>
+              {t("assignment.castersHint")}
+            </InfoHint>
+          </InfoHintRow>
         )}
       </dd>
     </div>

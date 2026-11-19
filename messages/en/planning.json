@@ -41,7 +41,7 @@
     "needsProd": "Caster without prod",
     "idleProds": "Prod without caster",
     "label": "Coverage",
-    "hint": "Complete: referee, caster and prod. Streamed: a solo caster, or a caster and a prod. Self-managed: nobody, teams manage themselves. Two casters at most: without a solo caster, they need a prod."
+    "hint": "Complete: referee, caster and prod. Streamed: a solo caster, or a caster and a prod. Self-managed: nobody, teams manage themselves."
   },
   "status": {
     "AVAILABLE": "Available",
@@ -72,7 +72,11 @@
     "option": "{name} · {status}",
     "optionPreferred": "{name} · {status} ★",
     "unknown": "No answer",
-    "castersFull": "Two casters at most"
+    "castersFull": "Two casters at most: remove one to pick another.",
+    "castersFullProvisional": "Two casters at most: remove a proposal to pick another.",
+    "castersFullMatch": "Two casters at most, signed up on the match: remove one from the match.",
+    "castersHint": "Two casters at most per slot. Without a solo caster, they need a prod.",
+    "castersHintSubject": "Casters of a slot"
   },
   "solo": {
     "label": "I stream alone (solo caster)",

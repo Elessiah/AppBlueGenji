@@ -126,6 +126,13 @@ describe("formatPlanningWithdrawalDm", () => {
     expect(message).toContain("Un remplaçant a été affecté.");
   });
 
+  it("formatPlanningWithdrawalDm_stillHeldNonCasterRole_saysSlotOpen", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ role: "REFEREE", stillHeld: true }), SITE, "fr");
+
+    expect(message).toContain("à pourvoir");
+    expect(message).not.toContain("Un autre");
+  });
+
   it("formatPlanningWithdrawalDm_stillHeldFr_saysAnotherCasterAssigned", () => {
     const message = formatPlanningWithdrawalDm(withdrawal({ stillHeld: true }), SITE, "fr");
 

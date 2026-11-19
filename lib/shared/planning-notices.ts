@@ -39,7 +39,7 @@ export type PlanningWithdrawalNotice = PlanningNoticeEntry & {
   replaced: boolean;
   /**
    * Pas de remplaçant, mais un autre caster (second caster de l'entrée) reste
-   * affecté : la place n'est pas à pourvoir. Absent : faux.
+   * affecté : la place n'est pas à pourvoir. Ne vaut que pour le rôle `CASTER` (les textes sont écrits pour lui). Absent : faux.
    */
   stillHeld?: boolean;
   /** Avec `stillHeld` : le destinataire est lui-même ce caster qui reste. Absent : faux. */
@@ -176,7 +176,7 @@ type WithdrawalOutcome = "replaced" | "selfHeld" | "stillHeld" | "streamLost" | 
 /** L'issue d'un désistement, telle que la lit le destinataire. */
 function withdrawalOutcome(notice: PlanningWithdrawalNotice): WithdrawalOutcome {
   if (notice.replaced) return "replaced";
-  if (notice.stillHeld === true) return notice.selfHeld === true ? "selfHeld" : "stillHeld";
+  if (notice.stillHeld === true && notice.role === "CASTER") return notice.selfHeld === true ? "selfHeld" : "stillHeld";
   return notice.streamLost === true ? "streamLost" : "open";
 }
 

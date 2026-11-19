@@ -16,6 +16,7 @@ import {
   mergeView,
   needsCover,
   NO_FILTERS,
+  castersFullKind,
   roleChoices,
   tournamentChoices,
   weekWindow,
@@ -567,5 +568,34 @@ describe("roleChoices", () => {
 
     expect(choices.full).toBe(false);
     expect(choices.candidates.map((row) => row.member.userId)).toEqual([4]);
+  });
+});
+
+describe("castersFullKind", () => {
+  const caster = (userId: number, source: "CAST" | "MANUAL" | "AUTO", provisional: boolean) => ({
+    userId,
+    role: "CASTER" as const,
+    source,
+    reason: "MANUAL" as const,
+    provisional,
+  });
+
+  it("castersFullKind_onlyMatchCasters_returnsMatch", () => {
+    expect(castersFullKind(entryView({ assignments: [caster(1, "CAST", false), caster(2, "CAST", false)] }))).toBe("castersFullMatch");
+  });
+
+  it("castersFullKind_onlyProvisionalRemovable_returnsProvisional", () => {
+    expect(castersFullKind(entryView({ assignments: [caster(1, "CAST", false), caster(2, "AUTO", true)] }))).toBe("castersFullProvisional");
+  });
+
+  it("castersFullKind_confirmedRemovable_returnsPlain", () => {
+    expect(castersFullKind(entryView({ assignments: [caster(1, "MANUAL", false), caster(2, "AUTO", true)] }))).toBe("castersFull");
+  });
+
+  it("castersFullKind_everyKind_hasFrAndEnText", () => {
+    for (const kind of ["castersFull", "castersFullProvisional", "castersFullMatch"] as const) {
+      expect(frPlanning.assignment[kind]).toBeTruthy();
+      expect(enPlanning.assignment[kind]).toBeTruthy();
+    }
   });
 });
