@@ -9,7 +9,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import type { PhaseFormat } from "@/lib/shared/types";
-import { buildShareRounds, type ShareRound, type ShareRoundSource } from "@/lib/shared/share-round";
+import { buildShareRounds, groupBy, type ShareRound, type ShareRoundSource } from "@/lib/shared/share-round";
 import type { Executor } from "./load";
 import { inList } from "./load";
 
@@ -31,39 +31,39 @@ type MatchRow = RowDataPacket & {
 
 type PhaseRow = RowDataPacket & { id: number; tournament_id: number; format: PhaseFormat };
 
-function groupBy<T>(rows: readonly T[], keyOf: (row: T) => number): Map<number, T[]> {
-  const groups = new Map<number, T[]>();
-  for (const row of rows) {
-    const key = keyOf(row);
-    const group = groups.get(key);
-    if (group) group.push(row);
-    else groups.set(key, [row]);
-  }
-  return groups;
-}
-
-/** Une entrée à nommer : un match et son tournoi. */
-export type RoundRequest = Readonly<{ tournamentId: number; matchId: number }>;
+/**
+ * Une entrée à nommer : un match, son tournoi, et si ce tournoi est terminé
+ * (lu par le planning à la même requête) — un tournoi qui vient de se terminer
+ * relit ses tours aussitôt (« Finale » d'un arbre clos).
+ */
+export type RoundRequest = Readonly<{ tournamentId: number; matchId: number; finished: boolean }>;
 
 /**
  * Mémoire courte des tours d'un tournoi (tous ses matchs) : la page se relit à
  * chaque rafraîchissement de chaque lecteur, et l'arbre d'un tournoi ne change
  * qu'à un tirage ou à un forfait. Un nom de tour peut donc retarder de
- * {@link ROUND_CACHE_TTL_MS} sur un bracket qui change ; un match absent de la
- * mémoire (tirage tout juste fait) relit son tournoi aussitôt.
+ * {@link ROUND_CACHE_TTL_MS} sur un bracket qui change en place ; un match
+ * absent de la mémoire (tirage tout juste fait) ou un tournoi qui vient de se
+ * terminer relit son tournoi aussitôt. Un tournoi terminé ne change plus : ses
+ * tours se gardent {@link ROUND_CACHE_FINISHED_TTL_MS}. Les noms ne dépendent
+ * d'aucun lecteur (la mémoire est commune) : chacun ne reçoit que ceux des
+ * matchs que son planning lui rend déjà.
  */
 export const ROUND_CACHE_TTL_MS = 10_000;
+export const ROUND_CACHE_FINISHED_TTL_MS = 10 * 60_000;
 export const ROUND_CACHE_MAX_TOURNAMENTS = 64;
-const roundCache = new Map<number, { at: number; rounds: Map<number, EntryRound> }>();
+type CachedRounds = { at: number; finished: boolean; rounds: Map<number, EntryRound> };
+/** Ordre d'insertion = ordre d'usage : un tournoi relu ou servi repasse en queue (LRU). */
+const roundCache = new Map<number, CachedRounds>();
 
 /** Vide la mémoire (tests). */
 export function clearEntryRoundCache(): void {
   roundCache.clear();
 }
 
-function remember(tournamentId: number, rounds: Map<number, EntryRound>, now: number): void {
+function remember(tournamentId: number, cached: CachedRounds): void {
   roundCache.delete(tournamentId);
-  roundCache.set(tournamentId, { at: now, rounds });
+  roundCache.set(tournamentId, cached);
   while (roundCache.size > ROUND_CACHE_MAX_TOURNAMENTS) {
     const oldest = roundCache.keys().next();
     if (oldest.done) break;
@@ -98,7 +98,7 @@ function tournamentRounds(own: readonly MatchRow[], phases: readonly PhaseRow[])
 }
 
 /** Une requête pour les matchs des tournois, une seconde pour les phases des seuls `MULTI`. */
-async function readTournaments(executor: Executor, ids: readonly number[]): Promise<Map<number, Map<number, EntryRound>>> {
+async function readTournaments(executor: Executor, ids: readonly number[]): Promise<Map<number, Omit<CachedRounds, "at">>> {
   const [matches] = await executor.execute<MatchRow[]>(
     `SELECT m.id, m.tournament_id, m.phase_id, m.bracket, m.round_number, m.match_number, m.status, m.double_forfeit,
             t.format, t.state
@@ -116,25 +116,25 @@ async function readTournaments(executor: Executor, ids: readonly number[]): Prom
     );
     phasesOf = groupBy(phases, (row) => Number(row.tournament_id));
   }
-  return new Map([...matchesOf].map(([id, own]) => [id, tournamentRounds(own, phasesOf.get(id) ?? [])]));
+  return new Map(
+    [...matchesOf].map(([id, own]) => [id, { finished: own[0].state === "FINISHED", rounds: tournamentRounds(own, phasesOf.get(id) ?? []) }]),
+  );
 }
 
-/** Les matchs demandés par tournoi. */
-function groupRequests(requests: readonly RoundRequest[]): Map<number, number[]> {
-  const wanted = new Map<number, number[]>();
-  for (const { tournamentId, matchId } of requests) {
-    const list = wanted.get(tournamentId);
-    if (list) list.push(matchId);
-    else wanted.set(tournamentId, [matchId]);
-  }
-  return wanted;
-}
-
-/** La mémoire courte rend-elle tous les matchs demandés de ce tournoi ? */
-function freshRounds(tournamentId: number, matchIds: readonly number[], now: number): Map<number, EntryRound> | null {
+/**
+ * La mémoire courte rend-elle tous les matchs demandés de ce tournoi, dans
+ * l'état (terminé ou non) que le planning vient de lire ? Servie, l'entrée
+ * repasse en queue de la mémoire.
+ */
+function freshRounds(tournamentId: number, own: readonly RoundRequest[], now: number): Map<number, EntryRound> | null {
   const cached = roundCache.get(tournamentId);
-  if (!cached || now - cached.at >= ROUND_CACHE_TTL_MS) return null;
-  return matchIds.every((id) => cached.rounds.has(id)) ? cached.rounds : null;
+  if (!cached) return null;
+  const finished = own.some((request) => request.finished);
+  const ttl = cached.finished ? ROUND_CACHE_FINISHED_TTL_MS : ROUND_CACHE_TTL_MS;
+  if (cached.finished !== finished || now - cached.at >= ttl) return null;
+  if (!own.every((request) => cached.rounds.has(request.matchId))) return null;
+  remember(tournamentId, cached);
+  return cached.rounds;
 }
 
 /**
@@ -149,19 +149,19 @@ export async function loadEntryRounds(
   now: number = Date.now(),
 ): Promise<Map<number, EntryRound>> {
   const result = new Map<number, EntryRound>();
-  const wanted = groupRequests(requests);
+  const wanted = groupBy(requests, (request) => request.tournamentId);
   const stale: number[] = [];
-  for (const [tournamentId, matchIds] of wanted) {
-    const rounds = freshRounds(tournamentId, matchIds, now);
+  for (const [tournamentId, own] of wanted) {
+    const rounds = freshRounds(tournamentId, own, now);
     if (rounds === null) stale.push(tournamentId);
-    else for (const id of matchIds) result.set(id, rounds.get(id) as EntryRound);
+    else for (const { matchId } of own) result.set(matchId, rounds.get(matchId) as EntryRound);
   }
   if (stale.length === 0) return result;
-  for (const [tournamentId, rounds] of await readTournaments(executor, stale)) {
-    remember(tournamentId, rounds, now);
-    for (const id of wanted.get(tournamentId) ?? []) {
-      const found = rounds.get(id);
-      if (found) result.set(id, found);
+  for (const [tournamentId, read] of await readTournaments(executor, stale)) {
+    remember(tournamentId, { at: now, ...read });
+    for (const { matchId } of wanted.get(tournamentId) ?? []) {
+      const found = read.rounds.get(matchId);
+      if (found) result.set(matchId, found);
     }
   }
   return result;

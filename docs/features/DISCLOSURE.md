@@ -11,7 +11,7 @@ la replie ou la déplie. Premier usage : le planning (`CAST_PLANNING.md` —
   existe dans le DOM (ouvert, ou `keepMounted`). Clavier natif (Entrée, Espace).
 - **Repliée par défaut** (`defaultOpen`). Avec `storageKey`, le choix du lecteur
   est gardé sur son appareil (`localStorage`, clé propre au lecteur quand
-  plusieurs comptes se relaient sur l'appareil : `planning:past-open:<id>` ; `"1"` / `"0"`, lecture et
+  plusieurs comptes se relaient sur l'appareil : `planning:past-open:<empreinte>` (`planningOpenKey`, numéro de compte jamais en clair) ; `"1"` / `"0"`, lecture et
   écriture sous `try/catch` : sans stockage, l'état par défaut vaut).
 - Le stockage se lit par `useSyncExternalStore` : le rendu serveur et
   l'hydratation voient l'état par défaut (aucun écart), le client relit la

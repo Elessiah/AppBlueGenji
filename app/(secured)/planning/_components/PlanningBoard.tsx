@@ -52,6 +52,7 @@ import {
   leadUntil,
   mergeView,
   newestFirst,
+  planningOpenKey,
   splitPast,
   tournamentChoices,
   weekWindow,
@@ -234,7 +235,7 @@ export function PlanningBoard({
   const isCaster = view.myRoles.includes("CASTER");
   const meSolo = view.members.find((member) => member.userId === view.me)?.soloCaster ?? false;
 
-  const weekProps = { view: context, canManage: view.canManage, text, format, names, roundText, pending, act, onRunWeek: setRunWeek, onConfirm: confirmEntry, onAvailability: saveAvailability, onWithdraw: askWithdraw };
+  const weekProps: Omit<WeekListProps, "weeks" | "zone"> = { view: context, canManage: view.canManage, text, format, names, roundText, pending, act, onRunWeek: setRunWeek, onConfirm: confirmEntry, onAvailability: saveAvailability, onWithdraw: askWithdraw };
   const active = filtersActive({ ...filters, tournamentId });
   const patch = (change: Partial<PlanningFilters>) => setFilters({ ...filters, tournamentId, ...change });
   return (
@@ -333,7 +334,7 @@ export function PlanningBoard({
       {shown.length === 0 && <p className={styles.empty}>{t(view.entries.length === 0 ? "empty" : "filters.empty")}</p>}
 
       {split.past.length > 0 && (
-        <Disclosure title={t("past.title")} count={split.past.length} storageKey={`planning:past-open:${view.me}`} className={styles.past}>
+        <Disclosure title={t("past.title")} count={split.past.length} storageKey={planningOpenKey("past", view.me)} className={styles.past}>
           <PastWeeks entries={split.past} {...weekProps} zone="past" />
         </Disclosure>
       )}
@@ -602,10 +603,10 @@ const WeekList = memo(function WeekList({
  * l'ouverture seulement** : sous un « Matchs passés » replié, ce composant
  * n'est pas monté et rien n'est calculé.
  */
-function PastWeeks({ entries, ...rest }: Omit<WeekListProps, "weeks"> & Readonly<{ entries: readonly PlanningEntryView[] }>) {
+const PastWeeks = memo(function PastWeeks({ entries, ...rest }: Omit<WeekListProps, "weeks"> & Readonly<{ entries: readonly PlanningEntryView[] }>) {
   const weeks = useMemo(() => newestFirst(groupByWeek(entries)), [entries]);
   return <WeekList weeks={weeks} {...rest} />;
-}
+});
 
 const EntryCard = memo(function EntryCard({
   entry,
@@ -969,7 +970,7 @@ function StaffPanel({
   return (
     <Disclosure
       title={t("staff.title")}
-      storageKey={`planning:staff-open:${view.me}`}
+      storageKey={planningOpenKey("staff", view.me)}
       keepMounted
       className={styles.staff}
       aside={

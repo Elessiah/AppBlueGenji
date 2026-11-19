@@ -44,6 +44,23 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 }
 
 /**
+ * Clé `localStorage` d'une section repliable du planning, propre au compte (un
+ * appareil partagé garde le choix de chacun) **sans son numéro en clair** :
+ * une empreinte courte (FNV-1a 32 bits, base 36). Ce n'est pas un secret — la
+ * clé ne quitte pas l'appareil et ne porte qu'un état ouvert/replié — mais
+ * l'outil de développement d'un poste partagé n'y lit plus quels comptes ont
+ * ouvert le planning.
+ */
+export function planningOpenKey(section: "past" | "staff", userId: number): string {
+  let hash = 0x811c9dc5;
+  for (const char of `bg-planning:${userId}`) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `planning:${section}-open:${(hash >>> 0).toString(36)}`;
+}
+
+/**
  * Une entrée passée : jouée — match clos, tournoi terminé, plus rien n'y est
  * modifiable. Une fin estimée écoulée n'y suffit pas : un match en retard ou
  * qui s'éternise se joue encore et reste « à venir », avec ses actions.

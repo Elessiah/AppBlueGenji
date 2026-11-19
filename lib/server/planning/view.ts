@@ -142,7 +142,7 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
     const keys = entriesNeedingMark(loaded.entries, pending, loaded.durations.confirmLeadHours, now);
     const requests: RoundRequest[] = [];
     for (const entry of loaded.entries) {
-      if (entry.matchId !== null) requests.push({ tournamentId: entry.tournamentId, matchId: entry.matchId });
+      if (entry.matchId !== null) requests.push({ tournamentId: entry.tournamentId, matchId: entry.matchId, finished: entry.tournamentFinished });
     }
     const rounds = await loadEntryRounds(connection, requests, now);
     return { data: loaded, pending, marks: await readStoredAutoConfirms(connection, keys), rounds };

@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
-import { clearEntryRoundCache, loadEntryRounds, ROUND_CACHE_MAX_TOURNAMENTS, ROUND_CACHE_TTL_MS } from "@/lib/server/planning/round-names";
+import {
+  clearEntryRoundCache,
+  loadEntryRounds,
+  ROUND_CACHE_FINISHED_TTL_MS,
+  ROUND_CACHE_MAX_TOURNAMENTS,
+  ROUND_CACHE_TTL_MS,
+} from "@/lib/server/planning/round-names";
 import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 
 /** Nom des tours d'un tournoi, depuis tous ses matchs (CAST_PLANNING.md). */
@@ -39,12 +45,14 @@ function executor(format: string, matches: Row[], phases: object[] = []) {
   return connection;
 }
 
-const run = (connection: ReturnType<typeof executor>, ids: number[], tournaments: number[] = [], now = 0) =>
+const run = (connection: ReturnType<typeof executor>, ids: number[], tournaments: number[] = [], now = 0, finished = false) =>
   loadEntryRounds(
     fakeConnection(connection),
-    ids.map((matchId, index) => ({ tournamentId: tournaments[index] ?? 1, matchId })),
+    ids.map((matchId, index) => ({ tournamentId: tournaments[index] ?? 1, matchId, finished })),
     now,
   );
+
+const finishedRow = (id: number, round: number, match = 1): Row => ({ ...row(id, round, match), status: "COMPLETED", state: "FINISHED" });
 
 describe("loadEntryRounds", () => {
   beforeEach(() => clearEntryRoundCache());
@@ -192,6 +200,50 @@ describe("loadEntryRounds", () => {
       connection.execute.mockClear();
       await run(connection, [total], [total], 1);
       expect(connection.execute).not.toHaveBeenCalled();
+    });
+
+    it("loadEntryRounds_finishedTournamentWithinLongTtl_runsNoQuery", async () => {
+      const connection = executor("SINGLE", [finishedRow(1, 1)]);
+      await run(connection, [1], [], 0, true);
+
+      await run(connection, [1], [], ROUND_CACHE_TTL_MS + 1, true);
+
+      expect(connection.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it("loadEntryRounds_finishedTournamentAfterLongTtl_readsAgain", async () => {
+      const connection = executor("SINGLE", [finishedRow(1, 1)]);
+      await run(connection, [1], [], 0, true);
+
+      await run(connection, [1], [], ROUND_CACHE_FINISHED_TTL_MS, true);
+
+      expect(connection.execute).toHaveBeenCalledTimes(2);
+    });
+
+    it("loadEntryRounds_tournamentJustFinished_readsAgainWithinShortTtl", async () => {
+      const connection = executor("SINGLE", [row(1, 1)]);
+      await run(connection, [1], [], 0, false);
+      connection.execute.mockImplementation(async () => [[finishedRow(1, 1)], []]);
+
+      await run(connection, [1], [], 1, true);
+
+      expect(connection.execute).toHaveBeenCalledTimes(2);
+    });
+
+    it("loadEntryRounds_cacheHit_bumpsRecencySoHitTournamentSurvivesEviction", async () => {
+      const rows = Array.from({ length: ROUND_CACHE_MAX_TOURNAMENTS + 1 }, (_, index) => row(index + 1, 1, 1, "UPPER", 0, index + 1));
+      const connection = executor("SINGLE", rows);
+      const first = rows.slice(0, ROUND_CACHE_MAX_TOURNAMENTS).map((r) => r.id);
+      await run(connection, first, first, 0);
+      await run(connection, [1], [1], 1);
+      const extra = ROUND_CACHE_MAX_TOURNAMENTS + 1;
+      await run(connection, [extra], [extra], 2);
+      connection.execute.mockClear();
+
+      await run(connection, [1], [1], 3);
+      expect(connection.execute).not.toHaveBeenCalled();
+      await run(connection, [2], [2], 3);
+      expect(connection.execute).toHaveBeenCalledTimes(1);
     });
   });
 });

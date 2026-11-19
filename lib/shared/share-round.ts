@@ -46,8 +46,9 @@ export type ShareRoundSource = {
 
 type RoundMatch = ShareRoundSource["matches"][number];
 
-function groupBy<T>(items: readonly T[], keyOf: (item: T) => string): Map<string, T[]> {
-  const groups = new Map<string, T[]>();
+/** Regroupe des éléments par clé, chaque groupe gardant l'ordre reçu. */
+export function groupBy<T, K>(items: readonly T[], keyOf: (item: T) => K): Map<K, T[]> {
+  const groups = new Map<K, T[]>();
   for (const item of items) {
     const key = keyOf(item);
     const group = groups.get(key);

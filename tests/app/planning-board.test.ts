@@ -11,6 +11,7 @@ import {
   groupByWeek,
   hasProvisional,
   isPastEntry,
+  planningOpenKey,
   newestFirst,
   splitPast,
   heldBy,
@@ -707,5 +708,24 @@ describe("matchs passés", () => {
     expect(enPlanning.past.noUpcoming).not.toBe("");
     expect("round" in frPlanning).toBe(false);
     expect("round" in enPlanning).toBe(false);
+  });
+});
+
+describe("planningOpenKey", () => {
+  it("planningOpenKey_account_neverHoldsRawId", () => {
+    expect(planningOpenKey("past", 357276)).not.toContain("357276");
+  });
+
+  it("planningOpenKey_sameAccountAndSection_isStable", () => {
+    expect(planningOpenKey("past", 42)).toBe(planningOpenKey("past", 42));
+  });
+
+  it("planningOpenKey_otherAccount_differs", () => {
+    expect(planningOpenKey("past", 42)).not.toBe(planningOpenKey("past", 43));
+  });
+
+  it("planningOpenKey_otherSection_differs", () => {
+    expect(planningOpenKey("staff", 42)).toMatch(/^planning:staff-open:[0-9a-z]+$/);
+    expect(planningOpenKey("past", 42)).toMatch(/^planning:past-open:[0-9a-z]+$/);
   });
 });

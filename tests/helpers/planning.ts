@@ -56,6 +56,7 @@ export function loadedEntry(overrides: Partial<LoadedEntry> = {}): LoadedEntry {
     endAt: MONDAY + HOUR_MS,
     open: true,
     editable: true,
+    tournamentFinished: false,
     hidden: false,
     channelUrl: null,
     selfManaged: false,
