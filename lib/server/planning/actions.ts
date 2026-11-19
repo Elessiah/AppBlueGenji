@@ -99,7 +99,11 @@ export async function setAvailability(
  * (relu en base). Qui peut le poser — lui-même ou le staff — est jugé par la route.
  * Un compte suspendu n'a plus de droit effectif : son réglage ne se change pas
  * (`PLANNING_ROLE_NOT_HELD`, le refus d'une désignation à la main), sans que le
- * refus nomme la suspension.
+ * refus nomme la suspension. Deux lectures en tout (le compte, puis l'écriture),
+ * sans transaction ni verrou : une suspension validée entre les deux laisse au
+ * pire un réglage posé sur un compte suspendu, sans effet (ses droits sont
+ * écartés à la lecture), et verrouiller coûterait quatre allers-retours de plus
+ * par clic.
  */
 export async function setSoloCaster(targetUserId: number, solo: boolean): Promise<void> {
   await withConnection(async (connection) => {

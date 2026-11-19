@@ -865,7 +865,7 @@ const RoleRow = memo(function RoleRow({
  * compte. Section à part, hors du panneau « Calcul et confirmation » qui, lui,
  * est réservé aux administrateurs (`canCompute`).
  */
-export function SoloCastersStaff({
+export const SoloCastersStaff = memo(function SoloCastersStaff({
   text,
   view,
   pending,
@@ -873,7 +873,9 @@ export function SoloCastersStaff({
 }: Readonly<{ text: Text; view: Pick<PlanningView, "me" | "members">; pending: string | null; act: Act }>) {
   const { t } = text;
   // Le lecteur caster règle déjà le sien dans la barre d'outils : il n'est pas listé deux fois.
-  const casters = view.members.filter((member) => member.roles.includes("CASTER") && member.userId !== view.me);
+  // Mémoïsée comme les lignes voisines : une frappe dans un filtre ne la re-rend pas et ne refiltre pas la liste.
+  const { me, members } = view;
+  const casters = useMemo(() => members.filter((member) => member.roles.includes("CASTER") && member.userId !== me), [members, me]);
   if (casters.length === 0) return null;
   return (
     <Disclosure
@@ -911,7 +913,7 @@ export function SoloCastersStaff({
       </div>
     </Disclosure>
   );
-}
+});
 
 /** Les désistements d'une entrée, au staff des tournois seul (la route ne les rend qu'à lui). */
 function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView; text: Text; names: ReadonlyMap<number, string> }>) {

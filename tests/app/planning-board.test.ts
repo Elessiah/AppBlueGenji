@@ -858,6 +858,11 @@ describe("PlanningBoard : branchement des gardes de calcul", () => {
     expect(soloLine).toBeLessThan(panelBlock);
   });
 
+  it("planningBoard_soloCasters_sectionIsMemoisedWithMemoisedList", () => {
+    expect(source).toContain("export const SoloCastersStaff = memo(function SoloCastersStaff(");
+    expect(source).toContain("const casters = useMemo(() => members.filter(");
+  });
+
   it("planningBoard_manualAssignment_staysOnCanManage", () => {
     expect(source).toContain("roleChoices(entry, role, view.members, view.canManage)");
   });
