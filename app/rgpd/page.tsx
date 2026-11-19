@@ -1550,18 +1550,14 @@ function RgpdFr({
             message privé Discord et en notification push des nouveaux créneaux où ils peuvent tenir un rôle
             (un récapitulatif par vague), de leurs affectations confirmées ou posées à la main, et du
             désistement d&apos;une attribution confirmée sur un créneau où leur propre attribution est
-            confirmée ; le staff des tournois, d&apos;une place restée à pourvoir (ligne sans nom au journal
+            confirmée ; le staff des tournois, d&apos;une place restée à pourvoir ou d&apos;une diffusion perdue faute de remplaçant (ligne sans nom au journal
             du staff sur Discord ; le rôle paraît aussi « à pourvoir » sur le planning quand plus personne n&apos;y est confirmé, sans le motif). Aucun de ces messages ne nomme un
             joueur ni un membre du staff ; chacun de ces sujets se coupe dans les réglages de notifications
             de « Mon profil », ce qui coupe aussi son message privé. Chacun peut se désister d&apos;une
             attribution jusqu&apos;au début du créneau, avec un motif facultatif lu par le seul staff des
             tournois ; le site garde le désistement (rôle, date, motif, s&apos;il est tardif — moins de 24 h
-            avant) avec l&apos;historique, et remplace automatiquement la personne (un créneau tient deux casters au
-            plus ; le second caster qui se désiste n&apos;est remplacé que par un caster attendu nulle part ailleurs ;
-            un caster autonome dont le départ fait perdre la diffusion est remplacé par un caster autonome, même
-            attendu ailleurs — si un prod est déjà proposé auprès de l&apos;autre caster, un caster attendu nulle part
-            ailleurs, même non autonome, est cherché d&apos;abord —, à défaut le staff des tournois en est prévenu ;
-            la place n&apos;est jamais montrée « à pourvoir » tant que l&apos;autre caster y reste confirmé). Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
+            avant) avec l&apos;historique, et cherche automatiquement un remplaçant (un créneau compte au plus deux
+            casters : quand l&apos;un d&apos;eux part et que l&apos;autre reste, la place n&apos;est pas forcément à pourvoir). Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
             créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
             le rôle caster ; la suppression du compte emporte tout ce qui le concerne (les gestes faits comme
             staff restent, sans le désigner), l&apos;export de vos données le contient, gestes faits comme staff

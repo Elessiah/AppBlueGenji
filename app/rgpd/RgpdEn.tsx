@@ -1322,18 +1322,14 @@ export function RgpdEn({
             and prods are notified by Discord direct message and push notification of new slots where they
             can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of the
             withdrawal from a confirmed assignment on a slot where their own assignment is confirmed; the
-            tournament staff, of a slot left open (a line naming no one in the staff log on Discord; the role
+            tournament staff, of a slot left open or a stream lost for want of a replacement (a line naming no one in the staff log on Discord; the role
             also appears “open” on the schedule when no one is confirmed in it any more, without the reason). None of these messages names a player or a staff
             member; each of these topics can be turned off in the notification settings of “My profile”,
             which also turns off its direct message. Everyone can withdraw from an assignment until the slot
             starts, with an optional reason read by the tournament staff only; the site keeps the withdrawal
-            (role, date, reason, whether it is late — less than 24 h before) with the history, and replaces
-            the person automatically (a slot holds two casters at most; a second caster who withdraws is only
-            replaced by a caster needed nowhere else; a solo caster whose departure loses the stream is replaced
-            by a solo caster, even one needed elsewhere — if a prod is already proposed next to the other caster,
-            a caster needed nowhere else, even one who is not solo, is looked for first —, failing which the
-            tournament staff is told; the slot is never shown as “open” while the other caster stays confirmed
-            there). Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
+            (role, date, reason, whether it is late — less than 24 h before) with the history, and looks for
+            a replacement automatically (a slot has two casters at most: when one of them leaves and the other
+            stays, the slot is not necessarily open). Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
             of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds the
             caster role; deleting the account removes everything about it (the actions it took as staff
             remain, without naming it), and the export of your data contains it, actions taken as staff

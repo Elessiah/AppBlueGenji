@@ -78,11 +78,11 @@
     },
     "PLANNING_WITHDRAWAL": {
       "label": "Planning withdrawals",
-      "description": "A member assigned and confirmed on the same slot as you (you being confirmed too) withdrew, without being named: their replacement, if any, or the open slot. Nothing for a mere proposal. Also turns off the Discord direct message."
+      "description": "A member assigned and confirmed on the same slot as you (you being confirmed too) withdrew, without being named: their replacement, if any, the other caster still assigned, the lost stream or the open slot. Nothing for a mere proposal. Also turns off the Discord direct message."
     },
     "PLANNING_UNFILLED": {
       "label": "Open slots",
-      "description": "After the withdrawal from a confirmed assignment, no replacement was found: the slot is open. Also turns off the Discord direct message."
+      "description": "After the withdrawal from a confirmed assignment, no replacement was found: the slot is open, or the slot's stream is lost. Also turns off the Discord direct message."
     },
     "STAFF_REPORT": {
       "label": "Incoming reports",

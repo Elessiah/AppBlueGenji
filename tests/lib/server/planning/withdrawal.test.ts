@@ -720,6 +720,72 @@ describe("withdrawFromEntry — inscriptions de cast entre les deux lectures", (
   });
 });
 
+describe("withdrawFromEntry — désisté encore inscrit sur le match", () => {
+  const withdrawn = loadedAssignment({ userId: 4, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true });
+  const prod = loadedAssignment({ userId: 7, role: "PROD", source: "MANUAL", reason: "MANUAL", confirmed: true });
+
+  it("withdrawFromEntry_withdrawerStillSignedUpAlone_noMemberAnnouncement", async () => {
+    const members = [loadedMember({ userId: 4, roles: ["CASTER"] }), loadedMember({ userId: 7, roles: ["PROD"] })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(
+        planningData({ entries: [loadedEntry()], assignments: [withdrawn, prod], matchCasters: new Map([["m:1", [4]]]), members }),
+      )
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry()],
+          assignments: [prod],
+          matchCasters: new Map([["m:1", [4]]]),
+          members,
+          removals: [{ entryKey: "m:1", userId: 4, role: "CASTER" }],
+        }),
+      );
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false, streamLost: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({
+      stillHeldBy: [],
+      coAssignedIds: [],
+      staffUnfilled: null,
+    });
+  });
+
+  it("withdrawFromEntry_withdrawerSignedUpWithOtherCaster_stillHeldByOthersOnly", async () => {
+    const second = loadedAssignment({ userId: 5, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true });
+    const members = [
+      loadedMember({ userId: 4, roles: ["CASTER"] }),
+      loadedMember({ userId: 5, roles: ["CASTER"] }),
+      loadedMember({ userId: 7, roles: ["PROD"] }),
+    ];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry()],
+          assignments: [withdrawn, second, prod],
+          matchCasters: new Map([["m:1", [4]]]),
+          members,
+        }),
+      )
+      .mockResolvedValueOnce(
+        planningData({
+          entries: [loadedEntry()],
+          assignments: [second, prod],
+          matchCasters: new Map([["m:1", [4]]]),
+          members,
+          removals: [{ entryKey: "m:1", userId: 4, role: "CASTER" }],
+        }),
+      );
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    const announced = jest.mocked(announceWithdrawal).mock.calls[0][0];
+    expect(announced.stillHeldBy).toEqual([5]);
+    expect(announced.coAssignedIds).toEqual(expect.arrayContaining([5, 7]));
+  });
+});
+
 describe("withdrawFromEntry — autre rôle du désisté", () => {
   it("withdrawFromEntry_casterAlsoRefereeSearchFails_otherRoleStillCoAssigned", async () => {
     // Tournoi entier : 4 y est caster et arbitre ; la recherche échoue, `data` (avant le retrait) porte encore ses deux lignes.

@@ -451,11 +451,15 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
       userId: user.id,
     });
     const open = confirmed && replacementId === null;
+    // Inscrit sur le match, le désisté le cast encore : il n'est pas « un autre caster » ; seul à tenir le rôle,
+    // rien ne change pour les autres membres (le planning le montre toujours caster), qui n'ont rien à apprendre.
+    const heldByOthers = hold.shown.casterIds.filter((id) => id !== user.id);
+    const selfKept = replacementId === null && hold.shown.casterIds.length > 0 && heldByOthers.length === 0;
     return {
       late,
       replaced: replacementId !== null,
       unfilled: open && hold.shown.casterIds.length === 0,
-      stillHeldBy: replacementId === null ? hold.shown.casterIds : [],
+      stillHeldBy: replacementId === null ? heldByOthers : [],
       streamLost: open && hold.shown.streamLost,
       // La lecture du staff ne retire que des comptes suspendus à celle des membres : une place à pourvoir pour eux
       // l'est aussi pour le staff, que le message rendu au désisté (« le staff est prévenu ») ne mente pas.
@@ -463,7 +467,7 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
       confirmed,
       entry: fresh,
       replacementId,
-      coAssignedIds,
+      coAssignedIds: selfKept ? [] : coAssignedIds,
     };
   });
   // Une simple proposition quittée n'avait été annoncée à personne : rien à dire.
