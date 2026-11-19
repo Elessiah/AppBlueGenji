@@ -1,8 +1,0 @@
-# PLANNING-COLLAPSE (notes)
-- Branch: feature/planning-collapse (pushed, no PR opened). Last sha: see `git log -1`.
-- PR spec for the last review cycle: title « Planning : matchs passés repliés », no release label (patch). Body: matches already played are collapsed under an accessible « Matchs passés (N) » disclosure, « Calcul et confirmation » collapsed by default, cards show the fiche's round name (shared buildShareRounds/shareRoundText) instead of « Manche {n brut} »; state remembered per viewer in localStorage (try/catch), default collapsed; FR + EN; docs + tests.
-- Done: components/ui/disclosure.tsx (new reusable disclosure, no existing one fit: aria-expanded, aria-controls only when body exists, keyboard native); lib/server/planning/round-names.ts (reads all tournament matches); lib/shared/planning-round.ts (text, subset of tournament messages passed by page.tsx); entry view gets `round` + `matchNumber`; `planning.round` key removed (fr+en), `planning.past.*` added.
-- Notifications: planning notices (new entries, assigned, withdrawal, push, DMs) print no round, so nothing to change (decision: obsolete part of the request). Referee digest/match pushes use pushRoundLabel, a different feature, untouched.
-- Legal: none (no stored/collected datum changed; localStorage holds only a UI open/closed flag, not personal data).
-- Browser check done on own port 3411 (FR, /en, 375 px); after-screenshots in scratchpad/planning-collapse-shots; no before shot (the old build was not served). Seed only has single-elimination planned matches: other formats covered by unit tests.
-- Local CI green: npm test (28492), lint, typecheck, seed, build, Playwright E2E (33 passed, 24 skipped).
