@@ -79,13 +79,20 @@ puis les sessions ; aucun autre écrivain ne tient une ligne de session avant
 rétrogradation, écrite après) relit `is_admin` après son écriture, sans
 verrou, et se défait (`403 FORBIDDEN`, sans seconde reconnexion des flux) —
 une condition sur `bg_users` dans l'`UPDATE` aurait pris l'ordre inverse. Si
-cette relecture échoue (panne passagère), l'entrée est défaite au mieux et
-l'erreur remonte. Ce qui resterait malgré tout (défaire en échec, vue joueur
-d'avant la fonctionnalité sur un non-administrateur) est levé au démarrage
-par `liftStrayImpersonations` (`catch-ups.ts`, rejoué à chaque démarrage) :
-lecture sans verrou des sessions concernées, puis `UPDATE` des seules
-sessions (échéance **et** rôles), avec une ligne pm2 sans nom qui donne le
-nombre de sessions levées.
+cette relecture échoue (panne passagère), l'entrée est défaite au mieux —
+avec reconnexion des flux, le compte pouvant être encore administrateur — et
+l'erreur remonte. Un défaire en échec n'efface jamais le refus d'origine
+(`403 FORBIDDEN` reste `403`). Ce qui resterait malgré tout (défaire en
+échec, vue joueur d'avant la fonctionnalité sur un non-administrateur) est
+levé au démarrage par `liftStrayImpersonations` (`catch-ups.ts`, rejoué à
+chaque démarrage) : lecture sans verrou des sessions concernées (index
+`idx_bg_sessions_player_view`), puis `UPDATE` des seules sessions (échéance
+**et** rôles) borné à chaque session **et à l'échéance lue** — une session
+redevenue légitime entre les deux (promotion puis nouvelle entrée depuis un
+autre processus) porte une autre échéance et n'est pas touchée —, avec une
+ligne pm2 sans nom qui donne le nombre de sessions levées. Le SQL de levée
+(`lib/server/impersonation-sql.ts`) est commun au retour, à la
+rétrogradation et au balayage.
 
 ## Ce qui reste au compte pendant l'incarnation
 

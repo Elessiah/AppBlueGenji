@@ -328,7 +328,7 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
 
     const [clearSql, clearParams] = connection.execute.mock.calls[2] as [string, unknown[]];
     expect(clearSql).toContain("UPDATE bg_user_sessions SET player_view_until = NULL, impersonated_roles_json = NULL");
-    expect(clearSql).toContain("WHERE user_id = ? AND player_view_until > NOW()");
+    expect(clearSql).toContain("WHERE (user_id = ?) AND player_view_until > NOW()");
     expect(clearParams).toEqual([7]);
     expect(connection.execute.mock.invocationCallOrder[2]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
   });

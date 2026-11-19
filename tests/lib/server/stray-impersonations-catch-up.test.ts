@@ -27,12 +27,17 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-/** Double : la lecture rend `ids`, la mise à jour rend `affected`. */
+/** Échéance lue pour chaque session du double (`CAST(… AS CHAR)`). */
+const UNTIL = "2026-11-19 22:00:00";
+
+/** Double : la lecture rend `ids` (échéance `UNTIL`), la mise à jour rend `affected`. */
 function pool(ids: number[], affected = ids.length) {
   const execute = jest
     .fn<SqlQuery>()
     .mockImplementation(async (sql) =>
-      String(sql).trimStart().startsWith("SELECT") ? [ids.map((id) => ({ id })), []] : [header(affected), []],
+      String(sql).trimStart().startsWith("SELECT")
+        ? [ids.map((id) => ({ id, until_key: UNTIL })), []]
+        : [header(affected), []],
     );
   return { execute, db: fakePool({ execute }) };
 }
@@ -53,19 +58,19 @@ describe("liftStrayImpersonations", () => {
     await liftStrayImpersonations(db);
 
     expect(oneLine(String(execute.mock.calls[0]?.[0]))).toBe(
-      "SELECT s.id FROM bg_user_sessions s JOIN bg_users u ON u.id = s.user_id WHERE s.player_view_until > NOW() AND (u.is_admin = 0 OR u.is_deleted = 1)",
+      "SELECT s.id, CAST(s.player_view_until AS CHAR) AS until_key FROM bg_user_sessions s JOIN bg_users u ON u.id = s.user_id WHERE s.player_view_until > NOW() AND (u.is_admin = 0 OR u.is_deleted = 1)",
     );
   });
 
-  it("liftStrayImpersonations_straySessions_clearsDeadlineAndRolesByIdsOnly", async () => {
+  it("liftStrayImpersonations_straySessions_clearsEachSessionAtTheDeadlineRead", async () => {
     const { execute, db } = pool([4, 9]);
 
     await liftStrayImpersonations(db);
 
     expect(oneLine(String(execute.mock.calls[1]?.[0]))).toBe(
-      "UPDATE bg_user_sessions SET player_view_until = NULL, impersonated_roles_json = NULL WHERE id IN (?, ?) AND player_view_until > NOW()",
+      "UPDATE bg_user_sessions SET player_view_until = NULL, impersonated_roles_json = NULL WHERE ((id = ? AND player_view_until = ?) OR (id = ? AND player_view_until = ?)) AND player_view_until > NOW()",
     );
-    expect(execute.mock.calls[1]?.[1]).toEqual([4, 9]);
+    expect(execute.mock.calls[1]?.[1]).toEqual([4, UNTIL, 9, UNTIL]);
   });
 
   it("liftStrayImpersonations_lifted_logsCountWithoutName", async () => {
@@ -86,12 +91,12 @@ describe("liftStrayImpersonations", () => {
 
   it("liftStrayImpersonations_rolesColumnMissing_clearsDeadlineOnly", async () => {
     const { execute, db } = pool([4]);
-    execute.mockImplementationOnce(async () => [[{ id: 4 }], []]).mockRejectedValueOnce(unknownColumn);
+    execute.mockImplementationOnce(async () => [[{ id: 4, until_key: UNTIL }], []]).mockRejectedValueOnce(unknownColumn);
 
     await liftStrayImpersonations(db);
 
     expect(oneLine(String(execute.mock.calls[2]?.[0]))).toBe(
-      "UPDATE bg_user_sessions SET player_view_until = NULL WHERE id IN (?) AND player_view_until > NOW()",
+      "UPDATE bg_user_sessions SET player_view_until = NULL WHERE ((id = ? AND player_view_until = ?)) AND player_view_until > NOW()",
     );
     expect(info).toHaveBeenCalledTimes(1);
   });
@@ -106,7 +111,7 @@ describe("liftStrayImpersonations", () => {
 
   it("liftStrayImpersonations_updateFails_swallowsError", async () => {
     const { execute, db } = pool([4]);
-    execute.mockImplementationOnce(async () => [[{ id: 4 }], []]).mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+    execute.mockImplementationOnce(async () => [[{ id: 4, until_key: UNTIL }], []]).mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
 
     await expect(liftStrayImpersonations(db)).resolves.toBeUndefined();
 
@@ -120,6 +125,6 @@ describe("RECENT_SCHEMA_CHANGES — plus de rattrapage des sessions", () => {
 
     await applyRecentSchemaChanges(fakePool({ execute }));
 
-    expect(execute.mock.calls.some(([sql]) => String(sql).startsWith("UPDATE bg_user_sessions"))).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => oneLine(String(sql)).startsWith("UPDATE bg_user_sessions"))).toBe(false);
   });
 });

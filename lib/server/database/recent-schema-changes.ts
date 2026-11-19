@@ -659,6 +659,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_schedule_deadline (schedule_deadline_at)`,
     // Rôles incarnés par une session d'administrateur (`docs/features/ADMIN_ROLE_IMPERSONATION.md`).
     `ALTER TABLE bg_user_sessions ADD COLUMN impersonated_roles_json VARCHAR(255) NULL AFTER player_view_until`,
+    // Balayage des incarnations au démarrage (`liftStrayImpersonations`) : lit les seules sessions en incarnation.
+    `ALTER TABLE bg_user_sessions ADD INDEX idx_bg_sessions_player_view (player_view_until)`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

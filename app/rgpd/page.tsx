@@ -1270,7 +1270,8 @@ function RgpdFr({
             retour) — un retour imposé par le retrait de son administration est noté au nom de l&apos;administrateur qui l&apos;a retirée, avec
             l&apos;identifiant du compte —, selon leur rotation, au titre de l&apos;intérêt légitime (administration de la plateforme), auquel il
             peut s&apos;opposer ; l&apos;échéance et les rôles incarnés sont notés sur la session et s&apos;effacent au retour, quand le compte
-            perd l&apos;administration pendant l&apos;incarnation, ou avec la session
+            perd l&apos;administration pendant l&apos;incarnation (au plus tard au démarrage suivant du serveur, par une ligne sans
+            nom qui donne le nombre de sessions, si cet effacement échoue), ou avec la session
             (<Link href="/rgpd/registre#t05">registre, T05</Link>).
             Un rôle de plateforme s&apos;affiche aussi comme un titre (administrateur, arbitre…) sur votre fiche de joueur,
             que lit tout membre connecté, quels que soient vos réglages de visibilité ; le rôle développeur, qui

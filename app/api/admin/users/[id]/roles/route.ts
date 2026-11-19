@@ -4,7 +4,7 @@ import { publishRolesChange, setOwnPlatformRoles, setUserRoles, type RolesSaveRe
 import { failureReason, unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { can, isPlatformRole, type PlatformRole } from "@/lib/shared/permissions";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
-import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view";
+import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
 import { auditStaffAction } from "@/lib/server/staff-audit";
 
 /** Refus du service rendus tels quels, avec leur statut. */

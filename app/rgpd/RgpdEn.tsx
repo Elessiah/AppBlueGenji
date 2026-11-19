@@ -1069,7 +1069,8 @@ export function RgpdEn({
             — a return forced by the removal of their administration is noted under the name of the administrator who removed it, with the
             identifier of the account —, according to their rotation, on the basis of legitimate interest (administration of the platform), to which
             they may object; the deadline and the roles impersonated are noted on the session and are erased on return, when the account
-            loses administration during the impersonation, or with the session
+            loses administration during the impersonation (at the latest at the server&apos;s next start, by a line naming no
+            one that gives the number of sessions, if that erasure fails), or with the session
             (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
             A platform role is also shown as a title (administrator, referee…) on your player page, which any logged-in
             member reads, whatever your visibility settings; the developer role, which only opens reading the technical

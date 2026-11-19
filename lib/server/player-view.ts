@@ -3,13 +3,11 @@ import { getDatabase } from "@/lib/server/database";
 import { playerViewSessionKey, type AuthUser } from "@/lib/server/auth";
 import { reconnectSessionStreams } from "@/lib/server/session-streams";
 import { auditStaffAction } from "@/lib/server/staff-audit";
-import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import { impersonationAuditLine, PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
+import { liftImpersonations, withRolesColumn } from "@/lib/server/impersonation-sql";
 import { parseImpersonatedRoles, PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import type { PlatformRole } from "@/lib/shared/permissions";
-
-export { PLAYER_VIEW_OFF_AUDIT, PLAYER_VIEW_ON_AUDIT, impersonationAuditLine } from "@/lib/server/player-view-audit";
 
 /** Refus de {@link setPlayerView} : aucune ligne de session à marquer. */
 export const PLAYER_VIEW_NO_SESSION = "NO_SESSION";
@@ -19,19 +17,6 @@ export const PLAYER_VIEW_NO_SESSION = "NO_SESSION";
  * la lecture de la session et l'écriture de l'entrée — l'entrée est défaite.
  */
 export const PLAYER_VIEW_NOT_ADMIN = "NOT_ADMIN";
-
-/**
- * Lance `run` avec la colonne `impersonated_roles_json` ; sans elle (`ALTER`
- * non joué), relance sans la nommer. Toute autre erreur remonte.
- */
-async function withRolesColumn<T>(run: (roles: boolean) => Promise<T>): Promise<T> {
-  try {
-    return await run(true);
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
-    return run(false);
-  }
-}
 
 /** Ligne de session relue après la bascule : son échéance telle que la base la compare. */
 type SessionViewRow = RowDataPacket & {
@@ -109,26 +94,36 @@ export async function setPlayerView(
   if (changed) announce(active ? impersonationAuditLine(kept) : PLAYER_VIEW_OFF_AUDIT);
 
   // Après la ligne pm2 de l'entrée (une écriture commitée se trace toujours) :
-  // l'entrée défaite laisse aussi celle de son retour. Sans reconnexion des
-  // flux : un compte qui n'est plus administrateur ignore l'incarnation, ses
-  // droits ne changent pas (une seule reconnexion par demande, celle de
-  // l'entrée — borne de `RECONNECT_MEMORY_PER_USER`).
+  // l'entrée défaite laisse aussi celle de son retour. Un défaire en échec
+  // n'efface jamais le refus qui l'a provoqué ; il est rattrapé par le
+  // balayage du démarrage (`liftStrayImpersonations`).
   if (changed && active) {
-    const undo = async () => {
-      if (await write(null)) auditStaffAction(PLAYER_VIEW_OFF_AUDIT, { id: user.id, pseudo: user.pseudo });
+    // `reconnect` : seulement si les droits de la session changent au retour.
+    const undo = async (reconnect: boolean) => {
+      try {
+        if (!(await write(null))) return;
+        if (reconnect) announce(PLAYER_VIEW_OFF_AUDIT);
+        else auditStaffAction(PLAYER_VIEW_OFF_AUDIT, { id: user.id, pseudo: user.pseudo });
+      } catch {
+        // Défaire au mieux : le refus d'origine reste la réponse.
+      }
     };
     let stillAdmin: boolean;
     try {
       stillAdmin = await isStillAdmin(db, user.id);
     } catch (error) {
       // Administration inconnue (panne passagère) : l'entrée est défaite au
-      // mieux plutôt que laissée dormante ; un défaire en échec, lui, est
-      // rattrapé par le balayage du démarrage (`liftStrayImpersonations`).
-      await undo().catch(() => undefined);
+      // mieux plutôt que laissée dormante. Le compte peut être encore
+      // administrateur : le retour lui rend ses droits, les flux rouverts
+      // sous l'incarnation sont reconnectés.
+      await undo(true);
       throw error;
     }
     if (!stillAdmin) {
-      await undo();
+      // Sans reconnexion des flux : un compte qui n'est plus administrateur
+      // ignore l'incarnation, ses droits ne changent pas (borne de
+      // `RECONNECT_MEMORY_PER_USER` : une reconnexion par demande).
+      await undo(false);
       throw new Error(PLAYER_VIEW_NOT_ADMIN);
     }
   }
@@ -165,14 +160,7 @@ async function isStillAdmin(db: Pool, userId: number): Promise<boolean> {
  *   l'appelant, après le commit).
  */
 export async function clearAccountImpersonation(connection: Pick<PoolConnection, "execute">, userId: number): Promise<number> {
-  const [result] = await withRolesColumn((roles) =>
-    connection.execute<ResultSetHeader>(
-      `UPDATE bg_user_sessions SET player_view_until = NULL${roles ? ", impersonated_roles_json = NULL" : ""}
-       WHERE user_id = ? AND player_view_until > NOW()`,
-      [userId],
-    ),
-  );
-  return Number(result.affectedRows ?? 0);
+  return liftImpersonations(connection, "user_id = ?", [userId]);
 }
 
 /**
@@ -211,14 +199,7 @@ async function writeSessionView(db: Pool, tokenHash: string, userId: number, rol
     );
     return Number(result.affectedRows ?? 0) > 0;
   }
-  const [result] = await withRolesColumn((roles) =>
-    db.execute<ResultSetHeader>(
-      `UPDATE bg_user_sessions SET player_view_until = NULL${roles ? ", impersonated_roles_json = NULL" : ""}
-       WHERE token_hash = ? AND user_id = ? AND expires_at > NOW() AND player_view_until > NOW()`,
-      [tokenHash, userId],
-    ),
-  );
-  return Number(result.affectedRows ?? 0) > 0;
+  return (await liftImpersonations(db, "token_hash = ? AND user_id = ? AND expires_at > NOW()", [tokenHash, userId])) > 0;
 }
 
 /**

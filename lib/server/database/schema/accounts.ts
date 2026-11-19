@@ -93,6 +93,7 @@ export async function createAccountTables(db: Pool): Promise<void> {
       impersonated_roles_json VARCHAR(255) NULL,
       INDEX idx_bg_sessions_user_id (user_id),
       INDEX idx_bg_sessions_expires_at (expires_at),
+      INDEX idx_bg_sessions_player_view (player_view_until),
       CONSTRAINT fk_bg_sessions_user FOREIGN KEY (user_id)
         REFERENCES bg_users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

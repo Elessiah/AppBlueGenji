@@ -10,15 +10,8 @@ import { getDatabase } from "@/lib/server/database";
 import { playerViewSessionKey } from "@/lib/server/auth";
 import { reconnectSessionStreams } from "@/lib/server/session-streams";
 import { auditStaffAction } from "@/lib/server/staff-audit";
-import {
-  clearAccountImpersonation,
-  impersonationAuditLine,
-  PLAYER_VIEW_NO_SESSION,
-  PLAYER_VIEW_NOT_ADMIN,
-  PLAYER_VIEW_OFF_AUDIT,
-  PLAYER_VIEW_ON_AUDIT,
-  setPlayerView,
-} from "@/lib/server/player-view";
+import { clearAccountImpersonation, PLAYER_VIEW_NO_SESSION, PLAYER_VIEW_NOT_ADMIN, setPlayerView } from "@/lib/server/player-view";
+import { impersonationAuditLine, PLAYER_VIEW_OFF_AUDIT, PLAYER_VIEW_ON_AUDIT } from "@/lib/server/player-view-audit";
 import { type SqlQuery, fakeConnection, fakePool } from "../../helpers/sql-double";
 import { authUser } from "../../helpers/auth-user";
 
@@ -234,6 +227,41 @@ describe("setPlayerView — administration retirée pendant l'entrée", () => {
     expect(jest.mocked(auditStaffAction).mock.calls.map(([line]) => line)).toEqual([impersonationAuditLine(["CASTER"])]);
   });
 
+  it("setPlayerView_entryAfterDemotion_undoWriteFails_stillThrowsNotAdmin", async () => {
+    let writes = 0;
+    execute.mockImplementation(async (sql) => {
+      if (isAdminRead(sql)) return [[{ is_admin: 0 }], []];
+      writes += 1;
+      if (writes > 1) throw new Error("ER_LOCK_WAIT_TIMEOUT");
+      return [header(1), []];
+    });
+
+    await expect(setPlayerView(admin, true, ["CASTER"])).rejects.toThrow(PLAYER_VIEW_NOT_ADMIN);
+  });
+
+  it("setPlayerView_entryAfterDemotion_undoAuditThrows_stillThrowsNotAdmin", async () => {
+    database(1, { player_view_until: DEADLINE, active: 1 }, 0);
+    jest
+      .mocked(auditStaffAction)
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => {
+        throw new Error("log failed");
+      });
+
+    await expect(setPlayerView(admin, true, ["CASTER"])).rejects.toThrow(PLAYER_VIEW_NOT_ADMIN);
+  });
+
+  it("setPlayerView_adminReadFails_undoReconnectsStreams", async () => {
+    execute.mockImplementation(async (sql) => {
+      if (isAdminRead(sql)) throw new Error("ER_LOCK_WAIT_TIMEOUT");
+      return [header(1), []];
+    });
+
+    await expect(setPlayerView(admin, true, ["CASTER"])).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+
+    expect(reconnectSessionStreams).toHaveBeenCalledTimes(2);
+  });
+
   it("setPlayerView_entryStillAdmin_keepsWrite", async () => {
     const result = await setPlayerView(admin, true, ["CASTER"]);
 
@@ -277,7 +305,7 @@ describe("clearAccountImpersonation", () => {
 
     expect(cleared).toBe(2);
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toContain("WHERE user_id = ? AND player_view_until > NOW()");
+    expect(sql).toContain("WHERE (user_id = ?) AND player_view_until > NOW()");
     expect(params).toEqual([7]);
   });
 

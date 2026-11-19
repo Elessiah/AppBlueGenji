@@ -9,7 +9,7 @@ import * as service from "@/lib/server/users/roles";
 import type { RolesSaveResult } from "@/lib/server/users/roles";
 import type { PlatformRole } from "@/lib/shared/permissions";
 import { authUser } from "../../../helpers/auth-user";
-import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view";
+import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
 
 const admin = authUser({ id: 1, isAdmin: true });
 const normalUser = authUser({ id: 2, isAdmin: false });

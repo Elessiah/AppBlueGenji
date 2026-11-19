@@ -1,6 +1,6 @@
-import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, RowDataPacket } from "mysql2/promise";
 import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
-import { isUnknownColumnError } from "@/lib/server/mysql-errors";
+import { liftImpersonations } from "@/lib/server/impersonation-sql";
 import { CONTACT_DISCORD_URL_KEY, CONTACT_EMAIL_KEY, SUPERSEDED_CONTACT_EMAILS } from "@/lib/shared/contact";
 import { DISCORD_INVITE_URL, SUPERSEDED_DISCORD_INVITE_URLS } from "@/lib/shared/discord";
 
@@ -89,31 +89,27 @@ export async function applyPermanentCatchUps(db: Pool): Promise<void> {
  *
  * En deux temps, sans verrou sur `bg_users` : une lecture cohérente (sans
  * verrou) trouve les sessions, puis un `UPDATE` sur leur seule table, borné à
- * leurs identifiants et à une échéance encore en cours — rien ne se prend dans
- * l'ordre inverse de la rétrogradation (`bg_users` puis sessions). Les rôles
+ * chaque session **et à l'échéance lue** — rien ne se prend dans l'ordre
+ * inverse de la rétrogradation (`bg_users` puis sessions). Une session
+ * redevenue légitime entre les deux (compte promu, retour puis nouvelle entrée
+ * depuis un autre processus) porte une autre échéance : elle n'est pas levée
+ * (l'échéance est à la seconde, une entrée la repousse de 12 h). Les rôles
  * incarnés partent avec l'échéance (sans leur colonne, l'échéance seule). Une
  * ligne pm2 sans nom donne le nombre de sessions levées (registre, T05).
  * Toute panne est remise au démarrage suivant.
  */
 export async function liftStrayImpersonations(db: Pool): Promise<void> {
   try {
-    const [rows] = await db.execute<(RowDataPacket & { id: number | string })[]>(
-      `SELECT s.id FROM bg_user_sessions s JOIN bg_users u ON u.id = s.user_id
+    // `idx_bg_sessions_player_view` : seules les sessions en incarnation sont lues.
+    const [rows] = await db.execute<(RowDataPacket & { id: number | string; until_key: string })[]>(
+      `SELECT s.id, CAST(s.player_view_until AS CHAR) AS until_key
+         FROM bg_user_sessions s JOIN bg_users u ON u.id = s.user_id
         WHERE s.player_view_until > NOW() AND (u.is_admin = 0 OR u.is_deleted = 1)`,
     );
     if (rows.length === 0) return;
-    const ids = rows.map((row) => Number(row.id));
-    const placeholders = ids.map(() => "?").join(", ");
-    const clear = (roles: boolean) =>
-      db.execute<ResultSetHeader>(
-        `UPDATE bg_user_sessions SET player_view_until = NULL${roles ? ", impersonated_roles_json = NULL" : ""}
-          WHERE id IN (${placeholders}) AND player_view_until > NOW()`,
-        ids,
-      );
-    const [result] = await clear(true).catch((error: unknown) =>
-      isUnknownColumnError(error) ? clear(false) : Promise.reject(error),
-    );
-    const lifted = Number(result.affectedRows ?? 0);
+    const where = rows.map(() => "(id = ? AND player_view_until = ?)").join(" OR ");
+    const params = rows.flatMap((row) => [Number(row.id), String(row.until_key)]);
+    const lifted = await liftImpersonations(db, where, params);
     if (lifted > 0) console.info(`${PLAYER_VIEW_OFF_AUDIT} : levée au démarrage, compte sans administration (${lifted} session(s))`);
   } catch {
     // Rattrapage remis au prochain démarrage.

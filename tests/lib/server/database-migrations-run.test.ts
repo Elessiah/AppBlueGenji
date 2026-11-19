@@ -701,6 +701,14 @@ describe("applyPermanentCatchUps", () => {
     expect(update).toContain("u.visible_avatar = 0");
   });
 
+  it("applyPermanentCatchUps_runsLiftStrayImpersonations", async () => {
+    await getDatabase();
+
+    expect(rank(/^SELECT s\.id, CAST\(s\.player_view_until AS CHAR\) AS until_key/)).toBeGreaterThan(
+      rank(/^UPDATE bg_teams t JOIN bg_users u/),
+    );
+  });
+
   it("avale chaque échec sans emporter le rattrapage suivant ni le filet", async () => {
     fail(/^UPDATE bg_settings/, "ER_LOCK_WAIT_TIMEOUT");
     fail(/^UPDATE bg_teams t JOIN bg_users u/, "ER_LOCK_WAIT_TIMEOUT");
