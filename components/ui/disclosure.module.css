@@ -1,0 +1,73 @@
+/* Section repliable — components/ui/disclosure.tsx. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 6px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 18px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px 6px 4px;
+  border: 0;
+  border-radius: var(--r-cy-md, 10px);
+  background: transparent;
+  color: var(--blue-100);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background: rgba(var(--blue-500-rgb), 0.08);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid rgba(var(--blue-500-rgb), 0.7);
+  outline-offset: 2px;
+}
+
+.caret {
+  flex: none;
+  color: var(--blue-300);
+  transition: transform 0.15s;
+}
+
+.root[data-open] .caret {
+  transform: rotate(90deg);
+}
+
+.count {
+  color: var(--blue-300);
+  font-size: 14px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.body[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    transition: none;
+  }
+}

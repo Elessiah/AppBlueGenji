@@ -43,6 +43,25 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   else map.set(key, [value]);
 }
 
+/**
+ * Une entrée passée : jouée (match clos, tournoi terminé : plus modifiable) ou
+ * dont la fin estimée est écoulée. Un match commencé, pas fini, reste « à venir ».
+ */
+export function isPastEntry(entry: Pick<PlanningEntryView, "editable" | "endAt">, now: number): boolean {
+  return !entry.editable || Date.parse(entry.endAt) <= now;
+}
+
+/** Sépare les entrées en (à venir, passées), l'ordre de chacune restant celui reçu. */
+export function splitPast<T extends Pick<PlanningEntryView, "editable" | "endAt">>(
+  entries: readonly T[],
+  now: number,
+): { upcoming: T[]; past: T[] } {
+  const upcoming: T[] = [];
+  const past: T[] = [];
+  for (const entry of entries) (isPastEntry(entry, now) ? past : upcoming).push(entry);
+  return { upcoming, past };
+}
+
 /** Les entrées par semaine (lundi, minuit à Paris), dans l'ordre chronologique. */
 export function groupByWeek(entries: readonly PlanningEntryView[]): PlanningWeek[] {
   const weeks = new Map<number, PlanningEntryView[]>();

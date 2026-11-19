@@ -69,6 +69,30 @@ la requête : une requête mal formée n'use pas ce quota). Le refus `429`
   restent bornés quand toute une saison est planifiée), tournois masqués
   compris pour le staff seulement.
 
+## Affichage : matchs passés repliés, nom du tour
+
+- **Matchs passés** : une entrée est passée quand elle n'est plus modifiable
+  (match joué, tournoi terminé) ou que sa fin estimée est écoulée
+  (`isPastEntry`, relue chaque minute). Elles sont rangées sous un bouton
+  « Matchs passés (N) » (`components/ui/disclosure.tsx` : `aria-expanded`,
+  `aria-controls`, clavier natif), **replié par défaut** ; un match commencé
+  mais pas fini reste dans la liste à venir. Le choix du lecteur est gardé
+  dans son navigateur (`localStorage`, `try/catch` : sans stockage, l'état par
+  défaut vaut).
+- **Calcul et confirmation** (staff) : même bouton repliable, **replié par
+  défaut** ; le contenu reste monté (les durées en cours de saisie ne se
+  perdent pas au repli).
+- **Nom du tour** : une carte de match porte le nom de la fiche du tournoi
+  (« Quart de finale 2 », « Finale », « Tableau perdants · Demi-finale »,
+  « Ronde 3 · Match 2 »), jamais le numéro brut du moteur (« Manche 1000 »).
+  Même assistant que les aperçus partagés (`buildShareRounds` /
+  `shareRoundText`, `SHARE_EMBEDS.md`) : le serveur (`round-names.ts`) lit tous
+  les matchs du tournoi (un tour se nomme depuis le dernier de son tableau) et
+  rend un descripteur sans texte (`round`, `matchNumber`) ; l'écran le rédige
+  dans la langue de l'adresse (`planning-round.ts`). Match inconnu du calcul :
+  « Manche n · Match m ». Les notifications du planning (récapitulatif,
+  affectation, désistement) ne citent aucun tour : rien à y changer.
+
 ## Couverture (du meilleur au pire)
 
 `planningCoverage` (`lib/shared/planning.ts`) : **complet** (arbitre + caster +

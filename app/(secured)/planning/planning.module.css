@@ -494,3 +494,9 @@
   color: var(--amber);
   font-weight: 600;
 }
+
+/* « Matchs passés » : repliés par défaut, en retrait par un filet plutôt que par une opacité. */
+.past {
+  padding-top: 4px;
+  border-top: 1px solid var(--line-soft);
+}

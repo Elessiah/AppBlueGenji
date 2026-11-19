@@ -98,6 +98,8 @@ export function entryView(overrides: Partial<PlanningEntryView> = {}): PlanningE
     game: "OW",
     matchId: 1,
     roundNumber: 1,
+    round: null,
+    matchNumber: 1,
     team1: null,
     team2: null,
     startAt: new Date(MONDAY).toISOString(),

@@ -10,6 +10,8 @@ import {
   groupByDay,
   groupByWeek,
   hasProvisional,
+  isPastEntry,
+  splitPast,
   heldBy,
   isThrottled,
   leadUntil,
@@ -652,5 +654,49 @@ describe("withdrawDoneKey", () => {
   it("withdrawDoneKey_streamLostText_hasFrAndEn", () => {
     expect(frPlanning.withdraw.doneStreamLost).toBeTruthy();
     expect(enPlanning.withdraw.doneStreamLost).toBeTruthy();
+  });
+});
+
+describe("matchs passés", () => {
+  const NOW = Date.parse("2026-11-19T12:00:00.000Z");
+  const hour = 60 * 60 * 1000;
+
+  it("isPastEntry_notEditable_isPast", () => {
+    expect(isPastEntry({ editable: false, endAt: new Date(NOW + hour).toISOString() }, NOW)).toBe(true);
+  });
+
+  it("isPastEntry_endedEditable_isPast", () => {
+    expect(isPastEntry({ editable: true, endAt: new Date(NOW).toISOString() }, NOW)).toBe(true);
+  });
+
+  it("isPastEntry_startedButNotEnded_isUpcoming", () => {
+    expect(isPastEntry({ editable: true, endAt: new Date(NOW + hour).toISOString() }, NOW)).toBe(false);
+  });
+
+  it("splitPast_mixed_keepsOrderInEachHalf", () => {
+    const entries = [
+      { key: "a", editable: true, endAt: new Date(NOW + hour).toISOString() },
+      { key: "b", editable: false, endAt: new Date(NOW - hour).toISOString() },
+      { key: "c", editable: true, endAt: new Date(NOW + 2 * hour).toISOString() },
+      { key: "d", editable: true, endAt: new Date(NOW - 2 * hour).toISOString() },
+    ];
+
+    const { upcoming, past } = splitPast(entries, NOW);
+
+    expect(upcoming.map((entry) => entry.key)).toEqual(["a", "c"]);
+    expect(past.map((entry) => entry.key)).toEqual(["b", "d"]);
+  });
+
+  it("splitPast_empty_returnsTwoEmptyLists", () => {
+    expect(splitPast([], NOW)).toEqual({ upcoming: [], past: [] });
+  });
+
+  it("planningMessages_pastKeys_presentInBothLanguagesAndOldRoundKeyGone", () => {
+    expect(frPlanning.past.title).toBe("Matchs passés");
+    expect(enPlanning.past.title).toBe("Past matches");
+    expect(frPlanning.past.noUpcoming).not.toBe("");
+    expect(enPlanning.past.noUpcoming).not.toBe("");
+    expect("round" in frPlanning).toBe(false);
+    expect("round" in enPlanning).toBe(false);
   });
 });

@@ -23,7 +23,10 @@
   "week": "Semaine du {date}",
   "hidden": "Non publié",
   "event": "Tournoi entier",
-  "round": "Manche {round}",
+  "past": {
+    "title": "Matchs passés",
+    "noUpcoming": "Aucun match à venir."
+  },
   "versus": "contre",
   "tbd": "À déterminer",
   "until": "jusqu'à {time}",

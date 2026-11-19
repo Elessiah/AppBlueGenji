@@ -12,6 +12,7 @@ import type {
   PlanningRole,
 } from "./planning";
 import type { PlanningDurationSettings } from "./planning-durations";
+import type { ShareRound } from "./share-round";
 
 /** Un engagé d'un match : équipe, ou entrée solo (fiche du joueur, jamais d'équipe). */
 export type PlanningEntrant = { teamId: number; name: string; soloUserId: number | null };
@@ -67,6 +68,13 @@ export type PlanningEntryView = {
   game: "OW" | "MR";
   matchId: number | null;
   roundNumber: number | null;
+  /**
+   * Nom du tour sans texte (`buildShareRounds` : « Quart de finale », « Ronde 3 »),
+   * à rédiger par `planningRoundText` ; `null` : tournoi entier, ou match inconnu du calcul.
+   */
+  round: ShareRound | null;
+  /** Numéro du match dans son tour (`null` : tournoi entier). */
+  matchNumber: number | null;
   team1: PlanningEntrant | null;
   team2: PlanningEntrant | null;
   startAt: string;
