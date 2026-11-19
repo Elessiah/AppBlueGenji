@@ -203,6 +203,11 @@ interface MatchScheduleDialogProps {
   launchPhase?: boolean;
   onClose: () => void;
   onSaved: () => void;
+  /**
+   * Ouvre la date butoir de planification du match (`SCHEDULE_DEADLINE.md`) à
+   * la place de cette fenêtre — offert sur un match à planifier seulement.
+   */
+  onEditDeadline?: () => void;
 }
 
 /**
@@ -230,6 +235,7 @@ export function MatchScheduleDialog({
   launchPhase = true,
   onClose,
   onSaved,
+  onEditDeadline,
 }: Readonly<MatchScheduleDialogProps>) {
   const text = useDialogsText();
   // Noms nettoyés (repli « Engagé #id ») ; `null` : place vide, dite « TBD ».
@@ -654,6 +660,14 @@ export function MatchScheduleDialog({
                 {t("schedule.clear")}
               </BusyButton>
             )}
+            <DeadlineButton
+              text={text}
+              busy={busy}
+              isBusy={isBusy}
+              hasDeadline={match.scheduleDeadlineAt !== null}
+              offered={planning}
+              onOpen={onEditDeadline}
+            />
             <BusyButton
               busy={busy}
               type="button"
@@ -693,5 +707,38 @@ export function MatchScheduleDialog({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** Ouvre la date butoir de planification du match (`SCHEDULE_DEADLINE.md`) à la place de cette fenêtre. */
+function DeadlineButton({
+  text,
+  busy,
+  isBusy,
+  hasDeadline,
+  offered,
+  onOpen,
+}: Readonly<{
+  text: TournamentDialogsText;
+  busy: boolean;
+  isBusy: () => boolean;
+  hasDeadline: boolean;
+  /** Match à planifier : seul cas où la date butoir s'offre. */
+  offered: boolean;
+  onOpen?: () => void;
+}>) {
+  if (!offered || !onOpen) return null;
+  return (
+    <BusyButton
+      busy={busy}
+      type="button"
+      className="btn ghost"
+      onClick={(event) => {
+        if (event.detail <= 1 && !isBusy()) onOpen();
+      }}
+      style={{ padding: "8px 14px", fontSize: 13 }}
+    >
+      {hasDeadline ? text.t("schedule.deadlineEdit") : text.t("schedule.deadlineSet")}
+    </BusyButton>
   );
 }

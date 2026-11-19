@@ -44,9 +44,9 @@ const PARIS_PARTS = new Intl.DateTimeFormat("en-GB", {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type ParisParts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
+export type ParisParts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
 
-function parisParts(instant: number): ParisParts {
+export function parisParts(instant: number): ParisParts {
   const parts: Record<string, number> = {};
   for (const part of PARIS_PARTS.formatToParts(new Date(instant))) {
     if (part.type !== "literal") parts[part.type] = Number(part.value);

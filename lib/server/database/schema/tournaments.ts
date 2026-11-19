@@ -169,6 +169,9 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       score_deadline_at DATETIME NULL,
       score_validation_paused_at DATETIME NULL,
       start_at DATETIME NULL,
+      -- Date butoir de planification (docs/features/SCHEDULE_DEADLINE.md) :
+      -- sans horaire à cette date, le match est clos en double forfait.
+      schedule_deadline_at DATETIME NULL,
       live_trigger ENUM('AUTO', 'START_TIME', 'MANUAL') NULL,
       -- Caster qui a posé le mode d'antenne (docs/features/CAST_SETTINGS.md) :
       -- lui seul, l'arbitre désigné ou un admin le changent ensuite.
@@ -204,6 +207,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       INDEX idx_bg_matches_tournament_referee (tournament_id, referee_user_id, status),
       INDEX idx_bg_matches_live_trigger_user (live_trigger_user_id),
       INDEX idx_bg_matches_start_at (start_at),
+      INDEX idx_bg_matches_schedule_deadline (schedule_deadline_at),
       CONSTRAINT fk_bg_matches_tournament FOREIGN KEY (tournament_id)
         REFERENCES bg_tournaments(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_matches_team1 FOREIGN KEY (team1_id)

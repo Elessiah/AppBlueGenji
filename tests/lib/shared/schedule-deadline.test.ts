@@ -1,0 +1,270 @@
+import { describe, expect, it } from "@jest/globals";
+import {
+  acceptsScheduleDeadline,
+  deadlineEntryDays,
+  deadlineEntryOf,
+  deadlineFromEntry,
+  deadlineOutcome,
+  defaultScheduleDeadline,
+  dueDeadlineReminder,
+  formatScheduleDeadline,
+  planningConfirmAt,
+  readScheduleDeadline,
+  type DeadlineMatch,
+} from "@/lib/shared/schedule-deadline";
+
+/** Date butoir de planification (`docs/features/SCHEDULE_DEADLINE.md`) : la règle pure. */
+
+const HOUR = 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
+const DAY = 24 * HOUR;
+const at = (iso: string) => Date.parse(iso);
+
+/** Un match à planifier : option allumée, deux engagées, ni horaire ni lancement. */
+function toPlan(overrides: Partial<DeadlineMatch> = {}): DeadlineMatch {
+  return { status: "READY", team1Id: 1, team2Id: 2, startAt: null, launchedAt: null, refereeScheduling: true, ...overrides };
+}
+
+describe("defaultScheduleDeadline", () => {
+  it("defaultScheduleDeadline_sundayLateEvening_returnsTuesday21Paris", () => {
+    // Dimanche 15 novembre 2026, 23:00 à Paris (UTC+1).
+    expect(defaultScheduleDeadline(at("2026-11-15T22:00:00Z"))).toBe(at("2026-11-17T20:00:00Z"));
+  });
+
+  it("defaultScheduleDeadline_mondayMorning_returnsWednesday21Paris", () => {
+    expect(defaultScheduleDeadline(at("2026-11-16T09:00:00Z"))).toBe(at("2026-11-18T20:00:00Z"));
+  });
+
+  it("defaultScheduleDeadline_acrossAutumnDstChange_keepsWallClock21", () => {
+    // Vendredi 23 octobre (CEST) → dimanche 25 octobre, passé à l'heure d'hiver (CET).
+    expect(defaultScheduleDeadline(at("2026-10-23T10:00:00Z"))).toBe(at("2026-10-25T20:00:00Z"));
+  });
+
+  it("defaultScheduleDeadline_acrossSpringDstChange_keepsWallClock21", () => {
+    // Vendredi 27 mars (CET) → dimanche 29 mars, passé à l'heure d'été (CEST).
+    expect(defaultScheduleDeadline(at("2026-03-27T11:00:00Z"))).toBe(at("2026-03-29T19:00:00Z"));
+  });
+
+  it("defaultScheduleDeadline_openedAfterParisMidnight_countsParisDay", () => {
+    // Samedi 23:30 UTC = dimanche 00:30 à Paris : on compte depuis dimanche.
+    expect(defaultScheduleDeadline(at("2026-11-14T23:30:00Z"))).toBe(at("2026-11-17T20:00:00Z"));
+  });
+
+  it("defaultScheduleDeadline_endOfMonth_rollsIntoNextMonth", () => {
+    expect(defaultScheduleDeadline(at("2026-11-30T11:00:00Z"))).toBe(at("2026-12-02T20:00:00Z"));
+  });
+});
+
+describe("readScheduleDeadline", () => {
+  const now = at("2026-11-16T12:00:00Z");
+
+  it("readScheduleDeadline_null_returnsClear", () => {
+    expect(readScheduleDeadline(null, now)).toEqual({ kind: "clear" });
+  });
+
+  it("readScheduleDeadline_nonString_returnsInvalid", () => {
+    expect(readScheduleDeadline(1763400000000, now)).toEqual({ kind: "invalid", code: "INVALID_SCHEDULE_DEADLINE" });
+  });
+
+  it("readScheduleDeadline_stringOver40Chars_returnsInvalid", () => {
+    expect(readScheduleDeadline(`2026-11-17T20:00:00.000Z${" ".repeat(17)}`, now)).toEqual({
+      kind: "invalid",
+      code: "INVALID_SCHEDULE_DEADLINE",
+    });
+  });
+
+  it("readScheduleDeadline_unparsable_returnsInvalid", () => {
+    expect(readScheduleDeadline("mardi soir", now)).toEqual({ kind: "invalid", code: "INVALID_SCHEDULE_DEADLINE" });
+  });
+
+  it("readScheduleDeadline_secondsPresent_roundsDownToMinute", () => {
+    expect(readScheduleDeadline("2026-11-17T20:00:42.500Z", now)).toEqual({ kind: "set", at: at("2026-11-17T20:00:00Z") });
+  });
+
+  it("readScheduleDeadline_justUnderOneHourAhead_returnsTooSoon", () => {
+    expect(readScheduleDeadline(new Date(now + HOUR - MINUTE).toISOString(), now)).toEqual({
+      kind: "invalid",
+      code: "SCHEDULE_DEADLINE_TOO_SOON",
+    });
+  });
+
+  it("readScheduleDeadline_exactlyOneHourAhead_returnsSet", () => {
+    expect(readScheduleDeadline(new Date(now + HOUR).toISOString(), now)).toEqual({ kind: "set", at: now + HOUR });
+  });
+
+  it("readScheduleDeadline_exactlySixtyDaysAhead_returnsSet", () => {
+    expect(readScheduleDeadline(new Date(now + 60 * DAY).toISOString(), now)).toEqual({ kind: "set", at: now + 60 * DAY });
+  });
+
+  it("readScheduleDeadline_oneMinuteOverSixtyDays_returnsTooFar", () => {
+    expect(readScheduleDeadline(new Date(now + 60 * DAY + MINUTE).toISOString(), now)).toEqual({
+      kind: "invalid",
+      code: "SCHEDULE_DEADLINE_TOO_FAR",
+    });
+  });
+});
+
+describe("acceptsScheduleDeadline", () => {
+  it("acceptsScheduleDeadline_unscheduledMatchEntrantsUnknown_true", () => {
+    expect(acceptsScheduleDeadline(toPlan({ status: "PENDING", team1Id: null, team2Id: null }))).toBe(true);
+  });
+
+  it("acceptsScheduleDeadline_optionOff_false", () => {
+    expect(acceptsScheduleDeadline(toPlan({ refereeScheduling: false }))).toBe(false);
+  });
+
+  it("acceptsScheduleDeadline_completed_false", () => {
+    expect(acceptsScheduleDeadline(toPlan({ status: "COMPLETED" }))).toBe(false);
+  });
+
+  it("acceptsScheduleDeadline_awaitingConfirmation_false", () => {
+    expect(acceptsScheduleDeadline(toPlan({ status: "AWAITING_CONFIRMATION" }))).toBe(false);
+  });
+
+  it("acceptsScheduleDeadline_startAtSet_false", () => {
+    expect(acceptsScheduleDeadline(toPlan({ startAt: "2026-11-17T19:00:00.000Z" }))).toBe(false);
+  });
+
+  it("acceptsScheduleDeadline_launched_false", () => {
+    expect(acceptsScheduleDeadline(toPlan({ launchedAt: "2026-11-16T19:00:00.000Z" }))).toBe(false);
+  });
+});
+
+describe("deadlineOutcome", () => {
+  const deadline = at("2026-11-17T20:00:00Z");
+
+  it("deadlineOutcome_notYetDue_returnsNull", () => {
+    expect(deadlineOutcome(toPlan(), deadline, deadline - 1)).toBeNull();
+  });
+
+  it("deadlineOutcome_noDeadline_returnsNull", () => {
+    expect(deadlineOutcome(toPlan(), null, deadline)).toBeNull();
+  });
+
+  it("deadlineOutcome_exactlyDueAndToPlan_returnsForfeit", () => {
+    expect(deadlineOutcome(toPlan(), deadline, deadline)).toBe("FORFEIT");
+  });
+
+  it("deadlineOutcome_dueButEntrantMissing_returnsLapse", () => {
+    expect(deadlineOutcome(toPlan({ team2Id: null }), deadline, deadline + HOUR)).toBe("LAPSE");
+  });
+
+  it("deadlineOutcome_dueButOptionOff_returnsLapse", () => {
+    expect(deadlineOutcome(toPlan({ refereeScheduling: false }), deadline, deadline + HOUR)).toBe("LAPSE");
+  });
+
+  it("deadlineOutcome_dueButScheduled_returnsNull", () => {
+    expect(deadlineOutcome(toPlan({ startAt: "2026-11-18T19:00:00.000Z" }), deadline, deadline + HOUR)).toBeNull();
+  });
+
+  it("deadlineOutcome_dueButCompleted_returnsNull", () => {
+    expect(deadlineOutcome(toPlan({ status: "COMPLETED" }), deadline, deadline + HOUR)).toBeNull();
+  });
+
+  it("deadlineOutcome_dueButLaunched_returnsNull", () => {
+    expect(deadlineOutcome(toPlan({ launchedAt: "2026-11-17T19:00:00.000Z" }), deadline, deadline + HOUR)).toBeNull();
+  });
+});
+
+describe("dueDeadlineReminder", () => {
+  const deadline = at("2026-11-19T20:00:00Z");
+
+  it("dueDeadlineReminder_nothingSent_returnsSet", () => {
+    expect(dueDeadlineReminder(deadline, deadline - 3 * DAY, new Set())).toEqual({ key: "SET", consumes: ["SET"] });
+  });
+
+  it("dueDeadlineReminder_setSentJustOver24hBefore_returnsNull", () => {
+    expect(dueDeadlineReminder(deadline, deadline - 24 * HOUR - 1, new Set(["SET"]))).toBeNull();
+  });
+
+  it("dueDeadlineReminder_setSentExactly24hBefore_returnsDl24ConsumingSetAndDl24", () => {
+    expect(dueDeadlineReminder(deadline, deadline - 24 * HOUR, new Set(["SET"]))).toEqual({
+      key: "DL24",
+      consumes: ["SET", "DL24"],
+    });
+  });
+
+  it("dueDeadlineReminder_within3hNothingSent_returnsDl3ConsumingAll", () => {
+    expect(dueDeadlineReminder(deadline, deadline - 2 * HOUR, new Set())).toEqual({
+      key: "DL3",
+      consumes: ["SET", "DL24", "DL3"],
+    });
+  });
+
+  it("dueDeadlineReminder_latestAlreadySent_returnsNull", () => {
+    expect(dueDeadlineReminder(deadline, deadline - 2 * HOUR, new Set(["SET", "DL24", "DL3"]))).toBeNull();
+  });
+
+  it("dueDeadlineReminder_atDeadline_returnsNull", () => {
+    expect(dueDeadlineReminder(deadline, deadline, new Set())).toBeNull();
+  });
+});
+
+describe("planningConfirmAt", () => {
+  it("planningConfirmAt_mondayEveningMatchBeforeTuesdayDeadline_returnsStartMinusLead", () => {
+    // Match mardi 22:00 (Paris), date butoir mardi 21:00, délai 24 h : confirmé lundi 22:00.
+    const start = at("2026-11-17T21:00:00Z");
+    const deadline = at("2026-11-17T20:00:00Z");
+
+    expect(planningConfirmAt(start, deadline, 24)).toBe(at("2026-11-16T21:00:00Z"));
+  });
+
+  it("planningConfirmAt_farMatch_returnsDeadline", () => {
+    const start = at("2026-11-20T20:00:00Z");
+    const deadline = at("2026-11-17T20:00:00Z");
+
+    expect(planningConfirmAt(start, deadline, 24)).toBe(deadline);
+  });
+
+  it("planningConfirmAt_noDeadline_returnsStartMinusLead", () => {
+    const start = at("2026-11-20T20:00:00Z");
+
+    expect(planningConfirmAt(start, null, 48)).toBe(start - 48 * HOUR);
+  });
+});
+
+describe("saisie", () => {
+  it("deadlineEntryDays_nearParisMidnight_startsFromParisDay", () => {
+    const days = deadlineEntryDays(at("2026-11-14T23:30:00Z"));
+
+    expect(days).toHaveLength(21);
+    expect(days[0]).toBe("2026-11-15");
+    expect(days[20]).toBe("2026-12-05");
+  });
+
+  it("deadlineEntryOf_instant_returnsParisDayAndHour", () => {
+    expect(deadlineEntryOf(at("2026-11-17T20:00:00Z"))).toEqual({ day: "2026-11-17", hour: 21 });
+  });
+
+  it("deadlineFromEntry_summerDay_usesCest", () => {
+    expect(deadlineFromEntry("2026-10-24", 21)).toBe(at("2026-10-24T19:00:00Z"));
+  });
+
+  it("deadlineFromEntry_winterDay_usesCet", () => {
+    expect(deadlineFromEntry("2026-10-25", 21)).toBe(at("2026-10-25T20:00:00Z"));
+  });
+
+  it("deadlineFromEntry_malformedDay_returnsNull", () => {
+    expect(deadlineFromEntry("17/11/2026", 21)).toBeNull();
+  });
+
+  it("deadlineFromEntry_hour24_returnsNull", () => {
+    expect(deadlineFromEntry("2026-11-17", 24)).toBeNull();
+  });
+
+  it("deadlineFromEntry_negativeHour_returnsNull", () => {
+    expect(deadlineFromEntry("2026-11-17", -1)).toBeNull();
+  });
+
+  it("deadlineFromEntry_fractionalHour_returnsNull", () => {
+    expect(deadlineFromEntry("2026-11-17", 1.5)).toBeNull();
+  });
+
+  it("formatScheduleDeadline_fr_showsParisTime", () => {
+    expect(formatScheduleDeadline("2026-11-17T20:00:00.000Z", "fr")).toMatch(/mar\.? 17 nov\.?.*21:00/);
+  });
+
+  it("formatScheduleDeadline_en_showsParisTime", () => {
+    expect(formatScheduleDeadline("2026-11-17T20:00:00.000Z", "en")).toMatch(/Tue.*Nov.*17.*21:00/);
+  });
+});

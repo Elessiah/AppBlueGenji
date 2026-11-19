@@ -70,6 +70,11 @@ export const PUSH_TOPICS = {
     description: "L'horaire d'un match quand il est posé, changé ou retiré (celui déjà posé quand l'adversaire est connu part avec « Nouveau match »), puis des rappels 24 h et 10 h avant le coup d'envoi (avec le lien du check-in) — seulement celui de 24 h si le tournoi n'a pas de check-in.",
     audience: null,
   },
+  SCHEDULE_DEADLINE: {
+    label: "Date butoir de planification",
+    description: "Ton équipe gère un match dont l'arbitrage a fixé une date butoir pour convenir d'un horaire : l'annonce, des rappels 24 h et 3 h avant s'il n'a toujours pas d'horaire, puis le double forfait s'il n'en a pas reçu. Coupe aussi le message privé Discord.",
+    audience: null,
+  },
   TEAM_JOIN_REQUEST: {
     label: "Demandes d'adhésion",
     description: "Un joueur demande à rejoindre une équipe que tu gères.",

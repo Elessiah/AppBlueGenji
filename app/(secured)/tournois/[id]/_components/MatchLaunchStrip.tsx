@@ -2,6 +2,7 @@
 
 import { readyCount, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
+import { formatScheduleDeadline } from "@/lib/shared/schedule-deadline";
 import type { BracketMatch } from "@/lib/shared/types";
 import { launchPhaseBadgeKind } from "../_lib/launch-strip";
 import styles from "./MatchLaunchStrip.module.css";
@@ -32,6 +33,12 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
     return (
       <span className={styles.toPlan} title={t("launch.toPlanTitle")}>
         <span aria-hidden="true">📅</span> {t("launch.toPlan")}
+        {match.scheduleDeadlineAt && (
+          <span data-testid="schedule-deadline">
+            {" · "}
+            {t("launch.toPlanDeadline", { date: formatScheduleDeadline(match.scheduleDeadlineAt, locale) })}
+          </span>
+        )}
         <span className="sr-only">{t("launch.toPlanSr")}</span>
       </span>
     );

@@ -143,6 +143,16 @@ async function purgeTournamentRows(
       [tournamentId],
     ),
   );
+  // Et pour les traces d'avis de date butoir de planification
+  // (`SCHEDULE_DEADLINE.md`), table tolérée aussi.
+  await ignoreMissingTable(
+    connection.execute(
+      `DELETE d FROM bg_schedule_deadline_notices d
+       JOIN bg_matches m ON m.id = d.match_id
+       WHERE m.tournament_id = ?`,
+      [tournamentId],
+    ),
+  );
   await connection.execute(`DELETE FROM bg_matches WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(

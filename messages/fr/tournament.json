@@ -348,7 +348,8 @@
     "missingDate": " sans date",
     "referee": "Arbitre désigné",
     "selfManaged": "Autogestion",
-    "selfManagedTitle": "Sans arbitre : les équipes créent et règlent la partie elles-mêmes"
+    "selfManagedTitle": "Sans arbitre : les équipes créent et règlent la partie elles-mêmes",
+    "toPlanDeadline": "avant le {date}"
   },
   "ranking": {
     "title": "Classement",

@@ -30,6 +30,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `STAFF_ACTION_LOGS.md` — Gestes du staff sans trace (résultat validé, lancement forcé, hôte, diffusion, rediffusion, édition, seeding, fantômes, image) : une ligne anonyme au journal Discord, rien dans pm2.
 - `CERTIFICATION_PROMPT.md` — Fiche tournoi : modale d'office invitant à certifier Discord et BattleTag (manager à qui il en manque un, joueur d'une équipe sans contact), tableau fait / ne fait pas, « Ne plus voir ».
 - `MATCH_PLANNING.md` — Planification des matchs par l'arbitrage (`TO_PLAN`).
+- `SCHEDULE_DEADLINE.md` — Date butoir de planification d'un match (défaut 21:00 Paris, deux jours après) : avis 24 h / 3 h aux meneurs, double forfait si passée sans horaire, confirmation d'office du planning à `min(date butoir, début − délai)`.
 - `SCORE_EDIT_LOCK.md` — Verrouillage d'un score dès que la manche suivante porte une saisie, **y compris pour un admin**.
 - `DOUBLE_FORFEIT.md` — Double forfait et ses cascades dans un arbre.
 - `FORFEIT_CANCELLATION.md` — Annuler l'abandon d'un engagé (administrateur strict) : remis en lice, le match perdu par forfait reste perdu.

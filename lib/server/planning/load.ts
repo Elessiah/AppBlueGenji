@@ -66,6 +66,12 @@ export type LoadedEntry = {
   selfManaged: boolean;
   /** Arbitre désigné du match (`bg_matches.referee_user_id`). */
   matchRefereeId: number | null;
+  /**
+   * Date butoir de planification du match (`bg_matches.schedule_deadline_at`,
+   * `docs/features/SCHEDULE_DEADLINE.md`) : l'entrée se confirme d'office au
+   * plus tôt d'elle et du délai de confirmation. `null` : aucune, ou tournoi entier.
+   */
+  deadlineAt: number | null;
 };
 
 export type LoadedAvailability = {
@@ -160,6 +166,7 @@ type MatchRow = RowDataPacket & {
   referee_user_id: number | null;
   self_managed: number;
   stream_url: string | null;
+  schedule_deadline_at?: Date | string | null;
 };
 
 function time(value: Date | string): number {
@@ -217,6 +224,7 @@ function eventEntry(row: TournamentRow, durations: PlanningDurationSettings, now
     channelUrl: row.live_url,
     selfManaged: false,
     matchRefereeId: null,
+    deadlineAt: null,
   };
 }
 
@@ -255,6 +263,7 @@ function matchEntry(match: MatchRow, tournament: TournamentRow, durations: Plann
     channelUrl: match.stream_url ?? tournament.live_url,
     selfManaged: Number(match.self_managed) === 1,
     matchRefereeId: nullableNumber(match.referee_user_id),
+    deadlineAt: match.schedule_deadline_at ? time(match.schedule_deadline_at) : null,
   };
 }
 
@@ -315,7 +324,7 @@ export async function loadPlanningEntries(executor: Executor, options: EntriesOp
     const [matches] = await executor.execute<MatchRow[]>(
       `SELECT m.id, m.tournament_id, m.start_at, m.status, m.round_number, m.team1_id, m.team2_id,
               t1.name AS team1_name, t2.name AS team2_name, t1.solo_user_id AS team1_solo, t2.solo_user_id AS team2_solo,
-              m.referee_user_id, m.self_managed, ${firstStreamUrlSql("m")} AS stream_url
+              m.referee_user_id, m.self_managed, m.schedule_deadline_at, ${firstStreamUrlSql("m")} AS stream_url
          FROM bg_matches m
          LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
          LEFT JOIN bg_teams t2 ON t2.id = m.team2_id

@@ -69,6 +69,7 @@ import { LiveIndicator } from "./LiveIndicator";
 import styles from "../page.module.css";
 import { orReload } from "@/lib/shared/lazy-component";
 import { buildSeedMap } from "@/lib/shared/match-sections";
+import type { ScheduleDeadlineTarget } from "./ScheduleDeadlineDialog";
 
 // Découpage du paquet : un spectateur ne voit qu'un format et n'ouvre presque
 // jamais un dialogue. Les vues propres à un format et les panneaux du staff
@@ -91,6 +92,7 @@ const PlayerScoreDialog = dynamic(() => orReload(withDialogsText(import("./Playe
 const GhostRegistrationDialog = dynamic(() => orReload(withDialogsText(import("./GhostRegistrationDialog").then((m) => m.GhostRegistrationDialog))), { ssr: false });
 const MatchLiveDialog = dynamic(() => orReload(withDialogsText(import("./MatchLiveDialog").then((m) => m.MatchLiveDialog))), { ssr: false });
 const MatchScheduleDialog = dynamic(() => orReload(withDialogsText(import("./MatchScheduleDialog").then((m) => m.MatchScheduleDialog))), { ssr: false });
+const ScheduleDeadlineDialog = dynamic(() => orReload(import("./ScheduleDeadlineDialog").then((m) => m.ScheduleDeadlineDialog)), { ssr: false });
 const MatchReplayDialog = dynamic(() => orReload(withDialogsText(import("./MatchReplayDialog").then((m) => m.MatchReplayDialog))), { ssr: false });
 const IssueReportDialog = dynamic(() => orReload(withDialogsText(import("./IssueReportDialog").then((m) => m.IssueReportDialog))), { ssr: false });
 const DeleteTournamentDialog = dynamic(() => orReload(withDialogsText(import("./DeleteTournamentDialog").then((m) => m.DeleteTournamentDialog))), { ssr: false });
@@ -564,6 +566,8 @@ function TournamentSheetView({
   const [matchForLiveId, setMatchForLiveId] = useState<number | null>(null);
   // Même raison que ci-dessus : on retient l'identifiant, pas l'objet.
   const [matchForScheduleId, setMatchForScheduleId] = useState<number | null>(null);
+  // Date butoir de planification ouverte : un match, ou tous les matchs à planifier (`SCHEDULE_DEADLINE.md`).
+  const [deadlineTarget, setDeadlineTarget] = useState<ScheduleDeadlineTarget | null>(null);
   // Même raison encore : identifiant, pas objet.
   const [matchForReplayId, setMatchForReplayId] = useState<number | null>(null);
   // Stables pour la vie de la page : les `setState` de React le sont déjà. Sans
@@ -1315,7 +1319,12 @@ function TournamentSheetView({
         {/* Sous la frise et avant le plateau : c'est là que l'arbitrage lit
             ce qui attend une date, et qu'un engagé apprend pourquoi son match
             est « À planifier ». */}
-        <MatchPlanningPanel detail={detail} onPlan={openMatchSchedule} frozen={frozen} />
+        <MatchPlanningPanel
+          detail={detail}
+          onPlan={openMatchSchedule}
+          onBulkDeadline={(count) => setDeadlineTarget({ kind: "tournament", tournamentId: detail.card.id, count })}
+          frozen={frozen}
+        />
 
         <div className={`ds-block ${styles.board}`}>
           {isMulti && detail.phases && (
@@ -1440,7 +1449,20 @@ function TournamentSheetView({
           launchPhase={detail.card.launchPhase}
           onClose={() => setMatchForScheduleId(null)}
           onSaved={() => void refresh()}
+          onEditDeadline={() => {
+            setMatchForScheduleId(null);
+            setDeadlineTarget({
+              kind: "match",
+              matchId: matchForSchedule.id,
+              label: `${matchForSchedule.team1Name ?? "TBD"} – ${matchForSchedule.team2Name ?? "TBD"}`,
+              deadlineAt: matchForSchedule.scheduleDeadlineAt,
+            });
+          }}
         />
+      )}
+
+      {deadlineTarget && (
+        <ScheduleDeadlineDialog target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
       )}
 
       {matchForReplay && detail.canManageLive && (

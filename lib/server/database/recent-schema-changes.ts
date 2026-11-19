@@ -654,6 +654,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     },
     `ALTER TABLE bg_planning_events ADD COLUMN reason VARCHAR(300) NULL AFTER actor_user_id`,
     `ALTER TABLE bg_planning_events ADD COLUMN late TINYINT(1) NOT NULL DEFAULT 0 AFTER reason`,
+    // Date butoir de planification d'un match (`docs/features/SCHEDULE_DEADLINE.md`).
+    `ALTER TABLE bg_matches ADD COLUMN schedule_deadline_at DATETIME NULL AFTER start_at`,
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_schedule_deadline (schedule_deadline_at)`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

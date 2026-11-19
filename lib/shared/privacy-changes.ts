@@ -2257,6 +2257,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : pour un joueur sans rôle de plateforme, rien de nouveau n'est collecté ni envoyé.",
     ],
   },
+  {
+    // SCHEDULE-DEADLINE — date butoir de planification des matchs
+    // (`docs/features/SCHEDULE_DEADLINE.md`) : annonce, rappels et avis de
+    // double forfait aux meneurs des engagées, confirmation d'office du
+    // planning. Registre T04, T08, T12 et T20, /rgpd (FR et EN). Datée du
+    // lendemain de la mise en ligne prévue, comme `REGISTER_UPDATED_AT` — tout
+    // avancer ensemble si elle glisse.
+    id: "2026-11-date-butoir-planification",
+    publishedAt: "2026-11-21",
+    title: "Matchs : date butoir de planification",
+    links: [{ href: "/rgpd/registre#t04", label: "Lire la fiche T04 du registre" }],
+    summary: "Le staff des tournois peut fixer à un match une date butoir avant laquelle ses équipes doivent convenir d'un horaire ; ceux qui les mènent en match en sont prévenus, puis rappelés, et, faute d'horaire, le match est clos en double forfait.",
+    details: [
+      "Ce qui est envoyé, en message privé Discord et en notification push, à ceux qui mènent chaque engagée en match (propriétaire, managers, capitaine — ou au joueur d'une entrée individuelle) : l'annonce de la date butoir, un rappel 24 h et 3 h avant, et l'avis du double forfait si elle passe sans horaire. Noms d'équipe seulement, aucun pseudo ; base : intérêt légitime (bon déroulement des tournois).",
+      "Le nouveau sujet « Date butoir de planification » se coupe dans les réglages de notifications de « Mon profil », et l'interrupteur des messages privés de match y coupe aussi ces messages privés (droit d'opposition, art. 21).",
+      "Ce qui est gardé : la date butoir avec le match, et la trace de chaque avis envoyé (match, palier, date butoir annoncée, date d'envoi, sans le texte), effacée quand la date butoir change ou part, sinon avec le tournoi.",
+      "Planning des casts et arbitres (T20) : chaque créneau de match s'y confirme désormais d'office au plus tôt entre sa date butoir et son début moins un délai réglé par le staff (24 h au moins) ; les affectés en sont prévenus comme d'une confirmation par le staff, et le planning note, sans personne, quels créneaux ont été confirmés d'office (mêmes durées que le reste du planning).",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

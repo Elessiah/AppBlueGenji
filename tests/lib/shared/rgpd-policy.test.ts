@@ -492,7 +492,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04");
     // Les messages vont à tous les membres actifs des équipes, pas aux seuls joueurs.
     expect(t04?.dataSubjects).toContain("Autres membres des équipes engagées (coachs, managers, propriétaires)");
-    expect(t04?.legalBasis).toMatch(/intérêt légitime \(bon déroulement des tournois\) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme, l'annonce d'un nouveau match \(adversaire, horaire et lien, première manche comprise\) et les rappels de match envoyés aux joueurs, le check-in d'un match en autogestion envoyé à ceux qui gèrent ses engagées \(ou au joueur d'une entrée individuelle\), et l'avis du retrait de son inscription envoyé à un caster, avec un droit d'opposition/);
+    expect(t04?.legalBasis).toMatch(/intérêt légitime \(bon déroulement des tournois\) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme, l'annonce d'un nouveau match \(adversaire, horaire et lien, première manche comprise\), l'annonce, les rappels et l'avis de double forfait de la date butoir de planification d'un match envoyés à ceux qui mènent ses engagées en match et les rappels de match envoyés aux joueurs, le check-in d'un match en autogestion envoyé à ceux qui gèrent ses engagées \(ou au joueur d'une entrée individuelle\), et l'avis du retrait de son inscription envoyé à un caster, avec un droit d'opposition/);
   });
 
   it("le droit d'opposition les nomme, en français et en anglais", () => {

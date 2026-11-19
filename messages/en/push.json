@@ -87,6 +87,10 @@
     "STAFF_REPORT": {
       "label": "Incoming reports",
       "description": "A new report, or an appeal, reaches moderation."
+    },
+    "SCHEDULE_DEADLINE": {
+      "label": "Scheduling deadline",
+      "description": "Your team manages a match for which the referees set a deadline to agree on a time: the announcement, reminders 24 h and 3 h before if it still has no time, then the double forfeit if it got none. Also turns off the Discord direct message."
     }
   },
   "panel": {

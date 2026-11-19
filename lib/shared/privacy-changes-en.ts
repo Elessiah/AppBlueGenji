@@ -1197,6 +1197,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: for a player without a platform role, nothing new is collected or sent.",
     ],
   },
+  "2026-11-date-butoir-planification": {
+    linkLabels: ["Read record T04 of the register"],
+    title: "Matches: scheduling deadline",
+    summary: "The tournament staff can give a match a deadline before which its teams must agree on a time; whoever leads them in matches is notified, then reminded, and, failing a time, the match is closed as a double forfeit.",
+    details: [
+      "What is sent, by Discord direct message and push notification, to whoever leads each entrant in matches (owner, managers, captain — or the player of a solo entry): the announcement of the deadline, a reminder 24 h and 3 h before, and the double-forfeit notice if it passes with no time. Team names only, no username; basis: legitimate interest (smooth running of tournaments).",
+      "The new “Scheduling deadline” topic can be turned off in the notification settings of “My profile”, and the match direct messages switch there also turns these direct messages off (right to object, art. 21).",
+      "What is kept: the deadline with the match, and the record of each notice sent (match, step, announced deadline, date sent, without the text), erased when the deadline changes or goes, otherwise with the tournament.",
+      "Cast and referee schedule (T20): each match slot is now confirmed automatically at the earliest of its deadline and its start minus a lead time set by the staff (24 h at least); the assignees are notified as for a confirmation by the staff, and the schedule records, with no person, which slots were confirmed automatically (same durations as the rest of the schedule).",
+    ],
+  },
 };
 
 /**

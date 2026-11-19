@@ -276,7 +276,7 @@ async function writeProposals(
   planned: readonly PlannedRow[],
   byKey: ReadonlyMap<string, LoadedEntry>,
   previous: ReadonlyMap<string, PreviousProposal>,
-  actorId: number,
+  actorId: number | null,
 ): Promise<number> {
   const rows = planned.flatMap((row) => {
     const entry = byKey.get(row.entryKey);
@@ -364,7 +364,7 @@ async function writeDroppedProposals(
   executor: Executor,
   provisional: readonly BatchRow[],
   kept: readonly PlannedRow[],
-  actorId: number,
+  actorId: number | null,
 ): Promise<void> {
   const keptKeys = new Set(kept.map((row) => planKey(row.entryKey, row.userId, row.role)));
   const dropped = provisional.filter((row) => !keptKeys.has(planKey(row.entry_key, Number(row.user_id), row.role)));
@@ -393,7 +393,7 @@ function affected(result: unknown): number {
  * lot à moitié effacé.
  */
 export async function runAutoAssign(
-  actorId: number,
+  actorId: number | null,
   window: PlanningWindow,
   now: number = Date.now(),
 ): Promise<AutoAssignReport> {
@@ -655,7 +655,7 @@ export async function confirmPendingReferees(executor: Executor): Promise<number
  * désignation est restée incertaine (`uncertain`) : le planning ne le confirme
  * pas, le match le porte jusqu'à son retrait.
  */
-async function designateReferees(steps: ConfirmStep[], actorId: number): Promise<unknown> {
+async function designateReferees(steps: ConfirmStep[], actorId: number | null): Promise<unknown> {
   for (const step of steps) {
     const { matchId } = step.entry;
     if (!isMatchReferee(step) || matchId === null || step.settled) continue;
@@ -782,7 +782,7 @@ function confirmStatement(step: ConfirmStep): [string, (string | number | null)[
 async function writeConfirmSteps(
   connection: PoolConnection,
   steps: readonly ConfirmStep[],
-  actorId: number,
+  actorId: number | null,
   written: ConfirmStep[] = [],
 ): Promise<ConfirmReport> {
   // Comptes et tournois verrouillés d'abord, avant les matchs (même ordre que `runAutoAssign`, sans interblocage).
@@ -831,7 +831,7 @@ async function writeConfirmSteps(
  * geste retrouve les arbitres déjà posés.
  */
 export async function confirmAssignments(
-  actorId: number,
+  actorId: number | null,
   scope: ConfirmScope,
   now: number = Date.now(),
 ): Promise<ConfirmReport> {
@@ -865,7 +865,7 @@ export async function confirmAssignments(
 async function confirmUnderLock(
   all: ConfirmStep[],
   failure: unknown,
-  actorId: number,
+  actorId: number | null,
   announced: ConfirmStep[],
 ): Promise<ConfirmReport> {
   return withPlanningLock(async (connection) => {

@@ -1600,6 +1600,33 @@ export async function forfeitDeletedEntryMatchPublic(
 }
 
 /**
+ * Double forfait d'un match dont la date butoir de planification est passée
+ * sans horaire (`./schedule-deadline`, `SCHEDULE_DEADLINE.md`), par la même
+ * chaîne qu'un forfait d'arbitrage : réconciliations, clôture, plateau publié.
+ * Tout se relit sous verrou ; rend vrai si le forfait est prononcé.
+ */
+export async function forfeitMissedScheduleDeadlinePublic(
+  tournamentId: number,
+  matchId: number,
+  deadlineAt: number,
+  now: number = Date.now(),
+): Promise<boolean> {
+  const { forfeitMissedScheduleDeadline } = await import("./schedule-deadline");
+  let forfeited = false;
+  await retryOnDeadlock(() =>
+    runPlayerMatchWrite(
+      tournamentId,
+      () => (forfeited ? matchId : null),
+      async (connection) => {
+        forfeited = await forfeitMissedScheduleDeadline(connection, tournamentId, matchId, deadlineAt, now);
+      },
+      "resolved",
+    ),
+  );
+  return forfeited;
+}
+
+/**
  * Transaction d'une écriture de résultat **par un engagé** (report de score,
  * forfait sur sa manche), suivie de la chaîne qui en tire les conséquences :
  * reports expirés, exemptions, réconciliation des modes à classement et des

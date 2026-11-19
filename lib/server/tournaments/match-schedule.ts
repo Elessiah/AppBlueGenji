@@ -381,6 +381,15 @@ export async function setMatchStartAt(
         startAt === null ? null : new Date(startAt),
         matchId,
       ]);
+      // Horaire retiré après une date butoir déjà passée (`./schedule-deadline`) :
+      // elle s'éteint, sans quoi le balayage prononcerait aussitôt un double
+      // forfait que personne n'a vu venir. Une date butoir encore devant reste.
+      if (startAt === null) {
+        await connection.execute(
+          `UPDATE bg_matches SET schedule_deadline_at = NULL WHERE id = ? AND schedule_deadline_at <= ?`,
+          [matchId, new Date()],
+        );
+      }
       // Lancement défait : la notification de départ réservée pour lui
       // (`./player-pushes`) part avec, pour que la nouvelle heure prévienne de
       // nouveau les joueurs. Le check-in (`LOBBY\_BRIEF%`, `./lobby-brief`)

@@ -152,6 +152,8 @@ export type MatchRow = RowDataPacket & {
   phase_position: number | null;
   /** NULL = pas d'horaire annoncé (cf. `lib/shared/match-schedule.ts`). */
   start_at: Date | null;
+  /** NULL = aucune date butoir (`docs/features/SCHEDULE_DEADLINE.md`) ; absente des lectures qui ne la demandent pas. */
+  schedule_deadline_at?: Date | null;
   /** NULL = match non casté (cf. `lib/shared/live-streams.ts`). */
   live_trigger: MatchLiveTrigger | null;
   /** Caster maître du mode d'antenne (`lib/shared/live-trigger-owner.ts`) — absent des lectures partielles. */
@@ -397,6 +399,7 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
     phaseId: Number(row.phase_id ?? 0),
     phasePosition: row.phase_position == null ? null : Number(row.phase_position),
     startAt: toIso(row.start_at ?? null),
+    scheduleDeadlineAt: toIso(row.schedule_deadline_at ?? null),
     liveTrigger: row.live_trigger ?? null,
     ...liveTriggerOwnerFields(row, extras.casters ?? [], game),
     // La même lecture que le serveur (`hasOrganisationLink`) : lien posé, case cochée.

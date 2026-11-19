@@ -6,6 +6,7 @@
  * entier (évènement aux matchs enchaînés) dure une soirée. Réglages du staff,
  * gardés dans `bg_settings` (`planning_durations`).
  */
+import { DEFAULT_PLANNING_CONFIRM_LEAD_HOURS, PLANNING_CONFIRM_LEAD_BOUNDS } from "./schedule-deadline";
 import type { TournamentGame } from "./types";
 
 export type PlanningDurationSettings = {
@@ -17,6 +18,13 @@ export type PlanningDurationSettings = {
   defaultMaps: number;
   /** Durée d'un tournoi entier (sans matchs planifiés). */
   eventHours: number;
+  /**
+   * Délai de confirmation d'office d'un match du planning, en heures avant
+   * son début (`docs/features/SCHEDULE_DEADLINE.md`) : au plus tôt de ce
+   * délai et de la date butoir du match. Jamais sous 24 h (le préavis d'un
+   * match). Absent d'un réglage enregistré avant lui : sa valeur par défaut.
+   */
+  confirmLeadHours: number;
 };
 
 export const DEFAULT_PLANNING_DURATIONS: PlanningDurationSettings = {
@@ -24,6 +32,7 @@ export const DEFAULT_PLANNING_DURATIONS: PlanningDurationSettings = {
   bufferMinutes: 10,
   defaultMaps: 3,
   eventHours: 4,
+  confirmLeadHours: DEFAULT_PLANNING_CONFIRM_LEAD_HOURS,
 };
 
 /** Bornes de chaque réglage (inclusives). */
@@ -32,6 +41,7 @@ export const PLANNING_DURATION_BOUNDS = {
   bufferMinutes: [0, 60],
   defaultMaps: [1, 9],
   eventHours: [1, 12],
+  confirmLeadHours: PLANNING_CONFIRM_LEAD_BOUNDS,
 } as const;
 
 function inBounds(value: unknown, [min, max]: readonly [number, number]): value is number {
@@ -49,11 +59,15 @@ export function validateDurationSettings(raw: unknown): PlanningDurationSettings
   if (!inBounds(value.bufferMinutes, b.bufferMinutes)) return null;
   if (!inBounds(value.defaultMaps, b.defaultMaps)) return null;
   if (!inBounds(value.eventHours, b.eventHours)) return null;
+  // Facultatif : un réglage enregistré avant le délai de confirmation le garde par défaut.
+  const confirmLeadHours = value.confirmLeadHours === undefined ? DEFAULT_PLANNING_CONFIRM_LEAD_HOURS : value.confirmLeadHours;
+  if (!inBounds(confirmLeadHours, b.confirmLeadHours)) return null;
   return {
     mapMinutes: { OW: maps.OW, MR: maps.MR },
     bufferMinutes: value.bufferMinutes,
     defaultMaps: value.defaultMaps,
     eventHours: value.eventHours,
+    confirmLeadHours,
   };
 }
 

@@ -1,5 +1,5 @@
 {
-  "count": 229,
+  "count": 234,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -230,6 +230,11 @@
     "MAP_POINTS_LOCKED": "Points par carte figés : un match concerné porte déjà un score ou a ouvert son lancement.",
     "MAP_POINTS_FINISHED": "Le tournoi est terminé : les points par carte d'un tour ne peuvent plus être posés.",
     "MAP_POINTS_DISABLED": "Le format Duel / Arcade n'est pas activé sur ce tournoi : active-le dans ses réglages avant de régler les points d'un tour.",
-    "INVALID_MAP_POINT_TARGET": "Points par carte invalides : un entier entre 1 et 99."
+    "INVALID_MAP_POINT_TARGET": "Points par carte invalides : un entier entre 1 et 99.",
+    "INVALID_SCHEDULE_DEADLINE": "Date butoir non reconnue.",
+    "SCHEDULE_DEADLINE_NOT_ALLOWED": "Date butoir impossible : le match a déjà un horaire, est lancé ou joué, ou le tournoi ne planifie pas ses matchs par l'arbitrage.",
+    "SCHEDULE_DEADLINE_TOO_FAR": "La date butoir ne peut pas dépasser soixante jours.",
+    "SCHEDULE_DEADLINE_TOO_SOON": "La date butoir doit être au moins une heure devant.",
+    "SCHEDULE_DEADLINE_UPDATE_FAILED": "La date butoir n'a pas pu être enregistrée. Réessaie dans un instant."
   }
 }

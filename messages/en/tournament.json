@@ -348,7 +348,8 @@
     "missingDate": " no date",
     "referee": "Referee assigned",
     "selfManaged": "Self-managed",
-    "selfManagedTitle": "No referee: the teams create and run the game themselves"
+    "selfManagedTitle": "No referee: the teams create and run the game themselves",
+    "toPlanDeadline": "before {date}"
   },
   "ranking": {
     "title": "Standings",

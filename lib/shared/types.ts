@@ -687,6 +687,12 @@ export type BracketMatch = {
    * castés en mode `START_TIME` (`lib/shared/match-schedule.ts`).
    */
   startAt: string | null;
+  /**
+   * Date butoir de planification (ISO) : les engagées doivent s'accorder sur
+   * un horaire avant elle, sans quoi le match est clos en double forfait
+   * (`docs/features/SCHEDULE_DEADLINE.md`). `null` = aucune.
+   */
+  scheduleDeadlineAt: string | null;
   /** Mode de passage à l'antenne ; `null` = match non casté. */
   liveTrigger: MatchLiveTrigger | null;
   /**

@@ -101,14 +101,15 @@
   },
   "settings": {
     "title": "Estimated durations",
-    "hint": "Nobody holds two overlapping slots. A match lasts its maximum number of maps times the map duration, plus the buffer.",
+    "hint": "Nobody holds two overlapping slots. A match lasts its maximum number of maps times the map duration, plus the buffer. A slot is confirmed automatically at its scheduling deadline, or earlier at this lead before the match (24 h at least).",
     "mapOW": "Minutes per map (Overwatch)",
     "mapMR": "Minutes per map (Marvel Rivals)",
     "buffer": "Buffer per match (minutes)",
     "defaultMaps": "Maps without a known format",
     "eventHours": "Whole tournament duration (hours)",
     "save": "Save durations",
-    "saved": "Durations saved."
+    "saved": "Durations saved.",
+    "confirmLeadHours": "Automatic confirmation (hours before the match)"
   },
   "saved": {
     "availability": "Availability saved.",
@@ -183,5 +184,9 @@
     "provisional": "Proposal",
     "hint": "Who withdrew from this slot, and their reason if they gave one. “Late”: less than 24 hours before the start. “Proposal”: they were only proposed by the calculation."
   },
-  "unfilled": "Open slot"
+  "unfilled": "Open slot",
+  "autoConfirm": {
+    "at": "Automatic confirmation: {time}",
+    "atWithDeadline": "Automatic confirmation: {time} (match scheduling deadline: {deadline})"
+  }
 }

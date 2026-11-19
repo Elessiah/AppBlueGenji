@@ -45,6 +45,22 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
     // Table déjà présente, ou création refusée : les rappels se taisent.
   }
 
+  // Avis de date butoir de planification aux engagées
+  // (`lib/server/tournaments/schedule-deadline.ts`) : un palier par match
+  // (annonce, 24 h, 3 h, double forfait), réservé avant l'envoi. Effacés quand
+  // la date butoir change ; suivent le match (`ON DELETE CASCADE`).
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_schedule_deadline_notices (
+        match_id BIGINT NOT NULL,
+        notice_key VARCHAR(8) NOT NULL,
+        deadline_at DATETIME NOT NULL,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (match_id, notice_key),
+        CONSTRAINT fk_bg_schedule_deadline_notices_match FOREIGN KEY (match_id)
+          REFERENCES bg_matches(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
   try {
     await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_referee_alerts (

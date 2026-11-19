@@ -186,6 +186,7 @@ function match(overrides: Partial<BracketMatch> = {}): BracketMatch {
     phaseId: 0,
     phasePosition: null,
     startAt: null,
+    scheduleDeadlineAt: null,
     liveTrigger: null,
     liveUrl: null,
     streams: [],

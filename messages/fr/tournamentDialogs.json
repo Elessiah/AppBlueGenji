@@ -236,7 +236,9 @@
     "warnPast": "Cette date est déjà passée : à l'enregistrement, le match entrera tout de suite en lancement. Vérifiez le jour et le mois.",
     "warnPastDirect": "Cette date est déjà passée : à l'enregistrement, le match sera lancé tout de suite. Vérifiez le jour et le mois.",
     "warnPastTbd": "Cette date est déjà passée : le match partira dès que ses deux adversaires seront connus. Vérifiez le jour et le mois.",
-    "clear": "Vider la date"
+    "clear": "Vider la date",
+    "deadlineSet": "Date butoir…",
+    "deadlineEdit": "Modifier la date butoir…"
   },
   "ghost": {
     "full": "Ce tournoi est complet : il n'y a plus de place à prendre.",

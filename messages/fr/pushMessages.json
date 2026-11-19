@@ -232,5 +232,13 @@
       "bodyStreamLost": "Un {role} s'est désisté de {entry} ({start}) : aucun remplaçant trouvé, diffusion perdue (il manque un prod ou un caster autonome).",
       "bodyStreamLostLate": "Un {role} s'est désisté de {entry} ({start}), moins de 24 h avant : aucun remplaçant trouvé, diffusion perdue (il manque un prod ou un caster autonome)."
     }
+  },
+  "scheduleDeadline": {
+    "titleSet": "Date butoir de planification",
+    "bodySet": "{pairing} ({tournament}) : à programmer avant le {deadline}, sinon double forfait.",
+    "titleReminder": "Match toujours à planifier",
+    "bodyReminder": "{pairing} ({tournament}) : date butoir le {deadline}, sinon double forfait.",
+    "titleForfeit": "Double forfait",
+    "bodyForfeit": "{pairing} ({tournament}) : aucun horaire convenu avant la date butoir ({deadline})."
   }
 }

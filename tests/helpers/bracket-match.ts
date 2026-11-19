@@ -38,6 +38,7 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     phaseId: 0,
     phasePosition: null,
     startAt: null,
+    scheduleDeadlineAt: null,
     liveTrigger: null,
     liveTriggerCasterId: null,
     officialBroadcastLink: false,

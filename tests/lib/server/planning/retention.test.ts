@@ -20,17 +20,19 @@ describe("purgeExpiredPlanning", () => {
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ affectedRows: 3 }])
       .mockResolvedValueOnce([{ affectedRows: 4 }])
+      .mockResolvedValueOnce([{ affectedRows: 2 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const removed = await purgeExpiredPlanning(fakeConnection({ execute }), NOW);
 
-    expect(removed).toBe(11);
+    expect(removed).toBe(13);
     expect(execute.mock.calls[0][1]).toEqual([new Date(NOW - PLANNING_RETENTION_DAYS * DAY_MS)]);
     expect(execute.mock.calls.map(([sql]) => /DELETE p FROM (\w+)/.exec(sql)?.[1])).toEqual([
       "bg_planning_availability",
       "bg_planning_assignments",
       "bg_planning_events",
       "bg_planning_entry_notices",
+      "bg_planning_auto_confirms",
       "bg_planning_profiles",
     ]);
   });
@@ -40,7 +42,7 @@ describe("purgeExpiredPlanning", () => {
 
     await purgeExpiredPlanning(fakeConnection({ execute }), NOW);
 
-    const profiles = execute.mock.calls[4][0];
+    const profiles = execute.mock.calls[5][0];
     expect(profiles).toContain("u.is_deleted = 1 OR NOT COALESCE(JSON_CONTAINS(u.platform_roles_json, '\"CASTER\"'), 0)");
   });
 
@@ -49,7 +51,7 @@ describe("purgeExpiredPlanning", () => {
 
     await purgeExpiredPlanning(fakeConnection({ execute }), NOW);
 
-    const profiles = execute.mock.calls[4][0];
+    const profiles = execute.mock.calls[5][0];
     expect(profiles).not.toContain("ARBITRE");
     expect(profiles).not.toContain("PROD");
     expect(profiles).not.toContain("is_admin");

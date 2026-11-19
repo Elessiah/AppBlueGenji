@@ -7,6 +7,7 @@ import type { AuthUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { can } from "@/lib/shared/permissions";
 import { PLANNING_ROLES, planningRolesOf, type PlanningRole } from "@/lib/shared/planning";
+import { planningConfirmAt } from "@/lib/shared/schedule-deadline";
 import type { PlanningAssignmentShown, PlanningAssignmentView, PlanningEntryView, PlanningView } from "@/lib/shared/planning-view";
 import {
   loadPlanningData,
@@ -126,6 +127,10 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       hidden: entry.hidden,
       channelUrl: entry.channelUrl,
       selfManaged: entry.selfManaged,
+      deadlineAt: entry.deadlineAt === null ? null : new Date(entry.deadlineAt).toISOString(),
+      confirmAt: entry.open
+        ? new Date(planningConfirmAt(entry.startAt, entry.deadlineAt, data.durations.confirmLeadHours)).toISOString()
+        : null,
       assignments: assignments.map((row) => visibleAssignment(row, user.id, canManage)),
       // Pour le staff, un compte suspendu ne tient rien (comme pour le calcul, `preparePlanner`, et l'alerte) ;
       // les autres lecteurs gardent la couverture d'avant.
