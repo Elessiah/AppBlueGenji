@@ -85,7 +85,8 @@
   "solo": {
     "label": "I stream alone (solo caster)",
     "hint": "A solo caster streams without a prod; other casters need a prod for a match to be streamed.",
-    "staffTitle": "Solo casters"
+    "staffTitle": "Solo casters",
+    "staffItem": "{pseudo}: solo caster"
   },
   "staff": {
     "title": "Calculation and confirmation",

@@ -32,7 +32,7 @@ n'est rendu que si la vue porte aussi les durées (jamais de valeurs par défaut
 qu'un enregistrement écrirait). **Caster autonome d'un autre** : hors de cette
 exception, il reste au staff des tournois (`tournaments`, `403 FORBIDDEN` sinon) ;
 son réglage vit dans la section « Casters autonomes » de `/planning`, rendue
-à tout `canManage` hors du panneau de calcul (`SoloCastersStaff`) ; le
+à tout `canManage` hors du panneau de calcul (`SoloCastersStaff` : compteur, `InfoHint`, un nom accessible par case, zone `data-tap-zone` ; le lecteur caster n'y figure pas, il règle le sien dans la barre d'outils) ; le
 réglage d'un compte suspendu est refusé (`409 PLANNING_ROLE_NOT_HELD`, comme
 une désignation à la main, sans nommer la suspension). L'attribution
 à la main reste à `tournaments` (`canManage`) : choisir à la main une personne déjà proposée remplace la

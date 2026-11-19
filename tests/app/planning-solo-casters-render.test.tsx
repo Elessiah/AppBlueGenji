@@ -31,9 +31,34 @@ describe("SoloCastersStaff", () => {
     ]);
 
     expect(html).toContain("Casters autonomes");
-    expect(html).toMatch(/<input type="checkbox" checked=""\/>Autonome/);
-    expect(html).toMatch(/<input type="checkbox"\/>Accompagne/);
+    expect(html).toMatch(/<input type="checkbox" aria-label="Autonome : caster autonome" checked=""\/>Autonome/);
+    expect(html).toMatch(/<input type="checkbox" aria-label="Accompagne : caster autonome"\/>Accompagne/);
+    expect(html).toContain("(2)");
     expect(html).not.toContain("ProdSeul");
+  });
+
+  it("soloCastersStaff_reader_isNotListedTwice", () => {
+    const html = render("fr", [member({ userId: 9, pseudo: "Moi" }), member({ userId: 2, pseudo: "Autre" })]);
+
+    expect(html).not.toContain("Moi");
+    expect(html).toContain("Autre");
+    expect(html).toContain("(1)");
+  });
+
+  it("soloCastersStaff_onlyTheReader_rendersNothing", () => {
+    expect(render("fr", [member({ userId: 9 })])).toBe("");
+  });
+
+  it("soloCastersStaff_group_isTapZoneWithHintAndNoDuplicateLegend", () => {
+    const html = render("fr", [member()]);
+
+    expect(html).toContain("data-tap-zone");
+    expect(html).toContain("planning-solo-staff-hint");
+    expect(html).not.toContain("<legend");
+  });
+
+  it("soloCastersStaff_english_itemLabelTranslated", () => {
+    expect(render("en", [member({ pseudo: "Ana" })])).toContain('aria-label="Ana: solo caster"');
   });
 
   it("soloCastersStaff_noCaster_rendersNothing", () => {

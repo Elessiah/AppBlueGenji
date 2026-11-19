@@ -872,17 +872,29 @@ export function SoloCastersStaff({
   act,
 }: Readonly<{ text: Text; view: Pick<PlanningView, "me" | "members">; pending: string | null; act: Act }>) {
   const { t } = text;
-  const casters = view.members.filter((member) => member.roles.includes("CASTER"));
+  // Le lecteur caster règle déjà le sien dans la barre d'outils : il n'est pas listé deux fois.
+  const casters = view.members.filter((member) => member.roles.includes("CASTER") && member.userId !== view.me);
   if (casters.length === 0) return null;
   return (
-    <Disclosure title={t("solo.staffTitle")} storageKey={planningOpenKey("solo", view.me)} keepMounted className={styles.soloStaff}>
-      <fieldset className={styles.solo}>
-        <legend className="sr-only">{t("solo.staffTitle")}</legend>
+    <Disclosure
+      title={t("solo.staffTitle")}
+      count={casters.length}
+      storageKey={planningOpenKey("solo", view.me)}
+      keepMounted
+      className={styles.soloStaff}
+      aside={
+        <InfoHint id="planning-solo-staff-hint" subject={t("solo.staffTitle")}>
+          {t("solo.hint")}
+        </InfoHint>
+      }
+    >
+      <div className={styles.solo} data-tap-zone>
         {casters.map((member) => (
           <label key={member.userId} className={styles.check}>
             <input
               type="checkbox"
               checked={member.soloCaster}
+              aria-label={t("solo.staffItem", { pseudo: member.pseudo })}
               aria-disabled={pending !== null || undefined}
               onChange={() =>
                 pending === null &&
@@ -896,7 +908,7 @@ export function SoloCastersStaff({
             {member.pseudo}
           </label>
         ))}
-      </fieldset>
+      </div>
     </Disclosure>
   );
 }

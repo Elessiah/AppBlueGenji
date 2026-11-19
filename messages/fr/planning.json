@@ -85,7 +85,8 @@
   "solo": {
     "label": "Je diffuse seul (caster autonome)",
     "hint": "Un caster autonome diffuse sans prod ; les autres ont besoin d'un prod pour qu'un match soit diffusé.",
-    "staffTitle": "Casters autonomes"
+    "staffTitle": "Casters autonomes",
+    "staffItem": "{pseudo} : caster autonome"
   },
   "staff": {
     "title": "Calcul et confirmation",
