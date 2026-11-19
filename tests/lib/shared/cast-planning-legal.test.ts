@@ -109,8 +109,8 @@ describe("planning — registre T20", () => {
   });
 
   it("t20_retention_exportListsStaffActions", () => {
-    expect(t20(PROCESSING_ACTIVITIES).retention.join(" ")).toContain("les gestes qu'il a faits comme staff (sans l'identifiant de la personne visée)");
-    expect(t20(PROCESSING_ACTIVITIES_EN).retention.join(" ")).toContain("the actions it took as staff (without the identifier of the person concerned)");
+    expect(t20(PROCESSING_ACTIVITIES).retention.join(" ")).toContain("les gestes qu'il a faits comme staff sur les attributions (sans l'identifiant de la personne visée)");
+    expect(t20(PROCESSING_ACTIVITIES_EN).retention.join(" ")).toContain("the actions it took as staff on assignments (without the identifier of the person concerned)");
   });
 
   it("t20_recipients_reasonMaskedAndStaffNamed", () => {
@@ -180,7 +180,7 @@ describe("planning — /rgpd", () => {
     expect(fr).toContain("par le seul staff des tournois (arbitres et administrateurs)");
     expect(fr).toContain("que comme « Calcul »");
     expect(fr).toContain("quand le compte ne tient plus le rôle caster");
-    expect(fr).toContain("gestes faits comme staff compris");
+    expect(fr).toContain("gestes faits comme staff sur les attributions compris");
     expect(fr).toContain("ou retirer son arbitre désigné, agit sur le match lui-même");
     expect(fr).toContain("note chaque changement d&apos;arbitre du match");
     expect(fr).toContain("retiré par un autre que lui en est prévenu");
@@ -193,7 +193,7 @@ describe("planning — /rgpd", () => {
     expect(en).toContain("by the tournament staff only (referees and administrators)");
     expect(en).toContain("as “Calculation”");
     expect(en).toContain("when the account no longer holds the caster role");
-    expect(en).toContain("actions taken as staff included");
+    expect(en).toContain("actions taken as staff on assignments included");
     expect(en).toContain("or removing its assigned referee, acts on the match itself");
     expect(en).toContain("notes each change of the match&apos;s referee");
     expect(en).toContain("a referee removed by someone else is notified by push");

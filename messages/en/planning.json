@@ -85,7 +85,8 @@
   "solo": {
     "label": "I stream alone (solo caster)",
     "hint": "A solo caster streams without a prod; other casters need a prod for a match to be streamed.",
-    "staffTitle": "Solo casters"
+    "staffTitle": "Solo casters",
+    "staffItem": "{pseudo}: solo caster"
   },
   "staff": {
     "title": "Calculation and confirmation",
@@ -142,7 +143,7 @@
     "PLANNING_CONFIRM_PARTIAL": "Partial confirmation: some proposals are confirmed, the others stayed provisional after a failure. Run the confirmation again.",
     "PLANNING_WITHDRAWAL_CLOSED": "This slot has started: you can no longer withdraw from it.",
     "PLANNING_REASON_TOO_LONG": "Reason too long: 300 characters at most.",
-    "NOT_CASTER": "This account does not have the caster role.",
+    "NOT_CASTER": "This account cannot be a solo caster.",
     "MATCH_NOT_FOUND": "This match no longer exists.",
     "MATCH_ALREADY_COMPLETED": "This match has already been played.",
     "MATCH_NOT_LAUNCHABLE": "This match can no longer receive a referee.",

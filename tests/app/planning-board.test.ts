@@ -843,6 +843,26 @@ describe("PlanningBoard : branchement des gardes de calcul", () => {
     expect(source).not.toContain("DEFAULT_PLANNING_DURATIONS");
   });
 
+  it("planningBoard_soloCasters_staffSectionOutsideAdminPanel", () => {
+    expect(source).toContain("{view.canManage && <SoloCastersStaff");
+    const panel = source.slice(source.indexOf("function StaffPanel("));
+    expect(panel).not.toContain("/api/planning/solo-caster");
+    expect(panel).not.toContain("solo.staffTitle");
+  });
+
+  it("planningBoard_soloCasters_renderedBeforeAndOutsidePanelDurations", () => {
+    const soloLine = source.indexOf("      {view.canManage && <SoloCastersStaff text={text} view={view} pending={pending} act={act} />}\n");
+    const panelBlock = source.indexOf("      {panelDurations && (");
+
+    expect(soloLine).toBeGreaterThan(-1);
+    expect(soloLine).toBeLessThan(panelBlock);
+  });
+
+  it("planningBoard_soloCasters_sectionIsMemoisedWithMemoisedList", () => {
+    expect(source).toContain("export const SoloCastersStaff = memo(function SoloCastersStaff(");
+    expect(source).toContain("const casters = useMemo(() => members.filter(");
+  });
+
   it("planningBoard_manualAssignment_staysOnCanManage", () => {
     expect(source).toContain("roleChoices(entry, role, view.members, view.canManage)");
   });

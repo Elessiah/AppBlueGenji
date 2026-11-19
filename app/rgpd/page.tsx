@@ -1122,7 +1122,7 @@ function RgpdFr({
             conditions d&apos;utilisation, pour une durée déterminée ou indéterminée : toutes ses
             sessions sont fermées et aucune connexion n&apos;est possible tant que la suspension court ;
             s&apos;il arbitre, caste ou produit, il est écarté des propositions, confirmations, désignations,
-            remplacements et avis du planning (nouveaux créneaux, affectations, désistements, places à pourvoir, diffusions perdues) ; ce
+            remplacements et avis du planning (nouveaux créneaux, affectations, désistements, places à pourvoir, diffusions perdues) et ne peut plus y être dit caster autonome ; ce
             qui lui était déjà confirmé ou désigné reste jusqu&apos;à son retrait ; le staff des tournois et les autres
             membres du planning peuvent seulement en déduire que le planning ne le retient plus, sans voir la suspension
             ni ses motifs (<Link href="/rgpd/registre#t20">registre, T20</Link>).
@@ -1534,8 +1534,8 @@ function RgpdFr({
             plateforme qui organise la production d&apos;un direct) ont une page « Planning » : pour chaque
             créneau (un match planifié, ou un tournoi entier quand ses matchs ne sont pas planifiés) et
             chaque rôle qu&apos;ils tiennent, ils y donnent leur disponibilité (disponible, absent, à voir) et
-            leur préférence ; un caster y dit aussi s&apos;il diffuse seul (« caster autonome »), ce qu&apos;un
-            administrateur peut régler pour lui. Un calcul propose les attributions selon ces réponses et
+            leur préférence ; un caster y dit aussi s&apos;il diffuse seul (« caster autonome »), ce que le staff
+            des tournois peut régler pour lui. Un calcul propose les attributions selon ces réponses et
             la charge de chacun (semaine en cours et {PLANNING_HISTORY_WEEKS} semaines précédentes) ; ses
             propositions restent provisoires jusqu&apos;à leur confirmation, par un administrateur ou d&apos;office par le site ; le staff des tournois peut, lui, désigner ou retirer quelqu&apos;un à la main, une désignation à la main étant ferme d&apos;emblée. Le site garde, avec chaque attribution, qui l&apos;a
             posée et son historique (pose, confirmation, retrait, avec le compte qui a agi par le planning, sans compte quand le site agit de lui-même). Les attributions et
@@ -1562,7 +1562,7 @@ function RgpdFr({
             créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
             le rôle caster ; la suppression du compte emporte tout ce qui le concerne (les gestes faits comme
             staff restent, sans le désigner), l&apos;export de vos données le contient, gestes faits comme staff
-            compris. Base : intérêt légitime de l&apos;association (organiser ses bénévoles),
+            sur les attributions compris. Base : intérêt légitime de l&apos;association (organiser ses bénévoles),
             avec droit d&apos;opposition (<Link href="/rgpd/registre#t20">registre, T20</Link>).
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>

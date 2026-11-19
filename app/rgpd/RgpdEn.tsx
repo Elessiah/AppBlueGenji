@@ -932,7 +932,7 @@ export function RgpdEn({
             A member of moderation can <strong>suspend an account</strong> contrary to the terms of use, for a fixed
             or indefinite period: all its sessions are closed and no login is possible while the suspension runs;
             if it referees, casts or produces, it is left out of the schedule&apos;s proposals, confirmations,
-            appointments, replacements and notices (new slots, assignments, withdrawals, open slots, lost streams); what was already
+            appointments, replacements and notices (new slots, assignments, withdrawals, open slots, lost streams) and can no longer be made a solo caster there; what was already
             confirmed or appointed for it stays until removed; the tournament staff and the other schedule members can
             only infer that the schedule no longer retains it, without seeing the suspension or its reasons (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
           </p>
@@ -1308,7 +1308,7 @@ export function RgpdEn({
             that organises the production of a live stream) have a “Schedule” page: for each slot (a
             scheduled match, or a whole tournament when its matches are not scheduled) and each role they
             hold, they give their availability (available, away, maybe) and their preference there; a caster
-            also says whether they stream alone (“solo caster”), which an administrator can set for
+            also says whether they stream alone (“solo caster”), which the tournament staff can set for
             them. A calculation proposes the assignments from these answers and everyone&apos;s load (current
             week and the {PLANNING_HISTORY_WEEKS} previous weeks); its proposals stay provisional until confirmed, by an administrator or automatically by the site; the tournament staff can still assign or remove someone by hand, an assignment by hand being firm at once. The site keeps,
             with each assignment, who set it and its history (set, confirmed, removed, with the account that
@@ -1334,7 +1334,7 @@ export function RgpdEn({
             of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds the
             caster role; deleting the account removes everything about it (the actions it took as staff
             remain, without naming it), and the export of your data contains it, actions taken as staff
-            included. Basis: the association&apos;s legitimate interest (organising its volunteers), with a
+            on assignments included. Basis: the association&apos;s legitimate interest (organising its volunteers), with a
             right to object (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
           </p>
           <p>The details, processing activity by processing activity, are given in the register below.</p>

@@ -306,17 +306,37 @@ describe("PUT /api/planning/solo-caster", () => {
     expect(setSoloCaster).toHaveBeenCalledWith(4, true);
   });
 
-  it("soloPut_casterForAnother_returns403", async () => {
+  it("soloPut_casterForAnother_returns403Forbidden", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const response = await soloPut(request("PUT", { solo: true, userId: 5 }));
+    expect(response.status).toBe(403);
+    expect(await errorOf(response)).toBe("FORBIDDEN");
+    expect(setSoloCaster).not.toHaveBeenCalled();
+  });
+
+  it("soloPut_playerViewForAnother_returns403MembersOnly", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(playerView);
+    const response = await soloPut(request("PUT", { solo: true, userId: 5 }));
+    expect(response.status).toBe(403);
+    expect(await errorOf(response)).toBe("PLANNING_MEMBERS_ONLY");
+    expect(setSoloCaster).not.toHaveBeenCalled();
+  });
+
+  it("soloPut_arbitreForAnother_savesWithoutAdmin", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    expect((await soloPut(request("PUT", { solo: false, userId: 5 }))).status).toBe(200);
+    expect(setSoloCaster).toHaveBeenCalledWith(5, false);
+  });
+
+  it("soloPut_prodForAnother_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(prod);
     expect((await soloPut(request("PUT", { solo: true, userId: 5 }))).status).toBe(403);
     expect(setSoloCaster).not.toHaveBeenCalled();
   });
 
-  it("soloPut_arbitreForAnother_returns403AdminOnly", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    const response = await soloPut(request("PUT", { solo: false, userId: 5 }));
-    expect(response.status).toBe(403);
-    expect(await errorOf(response)).toBe("PLANNING_ADMIN_ONLY");
+  it("soloPut_nonMemberForAnother_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    expect((await soloPut(request("PUT", { solo: true, userId: 5 }))).status).toBe(403);
     expect(setSoloCaster).not.toHaveBeenCalled();
   });
 
@@ -339,7 +359,9 @@ describe("PUT /api/planning/solo-caster", () => {
   it("soloPut_notCaster_returns409", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(setSoloCaster).mockRejectedValue(new Error("NOT_CASTER"));
-    expect((await soloPut(request("PUT", { solo: true, userId: 5 }))).status).toBe(409);
+    const response = await soloPut(request("PUT", { solo: true, userId: 5 }));
+    expect(response.status).toBe(409);
+    expect(await errorOf(response)).toBe("NOT_CASTER");
   });
 });
 
