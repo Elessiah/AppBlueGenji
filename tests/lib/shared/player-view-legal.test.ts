@@ -54,8 +54,8 @@ describe("historique des changements — vue joueur (2026-11-20)", () => {
 describe("historique des changements — incarner un rôle", () => {
   it("privacyChanges_impersonateEntry_isLastAndDated", () => {
     expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ENTRY_ID);
-    expect(entryFr(ENTRY_ID)?.publishedAt).toBe("2026-11-22");
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-22");
+    expect(entryFr(ENTRY_ID)?.publishedAt).toBe("2026-11-21");
+    expect(REGISTER_UPDATED_AT).toBe("2026-11-21");
     expect(entryFr(ENTRY_ID)?.audience).toBeUndefined();
     expect(entryFr(ENTRY_ID)?.asksTermsAcceptance).toBeUndefined();
   });

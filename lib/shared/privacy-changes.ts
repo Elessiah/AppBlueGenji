@@ -2285,7 +2285,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // Datée du lendemain de la mise en ligne prévue, comme
     // `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
     id: "2026-11-incarner-un-role",
-    publishedAt: "2026-11-22",
+    publishedAt: "2026-11-21",
     title: "Vue joueur : remplacée par « Incarner un rôle », réservé aux administrateurs",
     links: [
       { href: "/rgpd/registre#t01", label: "Lire la fiche T01 du registre" },

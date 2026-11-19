@@ -287,7 +287,7 @@ fausse si le déploiement glissait).
 - `PRIVACY_CHANGES` : entrée `2026-11-vue-joueur-du-staff` (FR et EN, tous les
   comptes, comme les traces des rôles de plateforme), datée du 2026-11-20 ;
   puis `2026-11-incarner-un-role` (incarnation réservée aux administrateurs,
-  rôles incarnés sur la session et dans la ligne pm2), datée du 2026-11-22
+  rôles incarnés sur la session et dans la ligne pm2), datée du 2026-11-21
   avec `REGISTER_UPDATED_AT`.
 - Registre : T01 dit aussi les rôles incarnés ; T05 la finalité « Incarner un
   rôle » (administrateurs, rôles dans la ligne pm2) et, pour l'historique, la
