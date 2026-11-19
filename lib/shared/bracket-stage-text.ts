@@ -5,7 +5,7 @@
  * part avaient déjà divergé.
  */
 import type { StageKey } from "./bracket-stage";
-import type { TournamentPageText } from "./tournament-page-text";
+import type { TournamentPageText } from "./tournament-page-text-core";
 
 /**
  * Stades à plusieurs matchs, où le nom seul est ambigu : un match s'y nomme

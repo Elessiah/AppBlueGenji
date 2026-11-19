@@ -20,7 +20,8 @@ export default async function PlanningPage() {
   if (!user) return null;
   if (!can(user, "planning")) notFound();
   const locale = await requestLocale();
-  const messages = messagesFor(locale).planning;
+  const all = messagesFor(locale);
+  const messages = all.planning;
   const { t } = scopedText(locale, messages);
   return (
     <section className={`container ${styles.page}`}>
@@ -29,7 +30,7 @@ export default async function PlanningPage() {
         <h1 className={`display text-gradient ${styles.title}`}>{t("title")}</h1>
         <p className={styles.lead}>{t("lead")}</p>
       </header>
-      <PlanningBoard locale={locale} messages={messages} roundMessages={planningRoundMessages(messagesFor(locale))} />
+      <PlanningBoard locale={locale} messages={messages} roundMessages={planningRoundMessages(all)} />
     </section>
   );
 }

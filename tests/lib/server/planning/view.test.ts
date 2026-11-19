@@ -10,6 +10,7 @@ jest.mock("@/lib/server/planning/load", () => ({
 
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
+import { clearEntryRoundCache } from "@/lib/server/planning/round-names";
 import { loadPlanningData, loadPlanningMembers, loadPlanningMembersByIds, type LoadedAvailability, type LoadedWithdrawal } from "@/lib/server/planning/load";
 import {
   loadPlanningView,
@@ -476,6 +477,8 @@ describe("loadPlanningView — nom du tour", () => {
     { id: 3, tournament_id: 10, phase_id: 0, bracket: "UPPER", round_number: 2, match_number: 1, status: "PENDING", double_forfeit: 0, format: "SINGLE", state: "RUNNING" },
   ];
 
+  beforeEach(() => clearEntryRoundCache());
+
   function withEntries(entries: ReturnType<typeof loadedEntry>[], rows: object[]): void {
     jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) => planningData({ entries, members: options.members ?? [] }));
     connection.execute.mockImplementation(async (sql: string) => (roundsQuery.test(sql) ? [rows, []] : [[], []]));
@@ -507,5 +510,15 @@ describe("loadPlanningView — nom du tour", () => {
 
     expect(view.entries[0].round).toBeNull();
     expect(view.entries[0].matchNumber).toBeNull();
+  });
+
+  it("loadPlanningView_twoLoadsWithinTtl_readTheRoundsOnce", async () => {
+    withEntries([loadedEntry({ key: "m:3", matchId: 3, roundNumber: 2 })], finalRows);
+
+    const first = await loadPlanningView(caster, MONDAY);
+    const second = await loadPlanningView(caster, MONDAY + 1000);
+
+    expect(second.entries[0].round).toEqual(first.entries[0].round);
+    expect(connection.execute.mock.calls.filter(([sql]) => roundsQuery.test(String(sql)))).toHaveLength(1);
   });
 });

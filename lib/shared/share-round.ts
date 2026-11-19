@@ -16,7 +16,7 @@ import { stageKey, type StageKey } from "./bracket-stage";
 import { isAmbiguousMatchStage, stageMatchLabel, stageRoundLabel } from "./bracket-stage-text";
 import type { Locale } from "./locales";
 import type { Messages } from "./i18n-messages";
-import { fallbackRoundLabel, tournamentPageMessages, tournamentPageText, type TournamentPageText } from "./tournament-page-text";
+import { fallbackRoundLabel, tournamentPageMessages, tournamentPageText, type TournamentPageText } from "./tournament-page-text-core";
 import type { BracketMatch, TournamentPhase, TournamentSnapshot } from "./types";
 
 /** Mot de manche d'un mode à classement : « Ronde » (suisse), « Manche » (Survie, qualification). */

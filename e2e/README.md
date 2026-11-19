@@ -20,9 +20,9 @@ npm run test:e2e:report   # ouvre le dernier rapport HTML
 Par défaut, Playwright démarre un serveur de test **neuf** sur un port dédié
 (`3100`, surchargeable via `E2E_PORT`) — il ne réutilise volontairement PAS un
 `npm run dev` déjà lancé, dont le `.env` (notamment `DEV_AUTH_USER_ID`)
-fausserait les assertions. Sur un port autre que `3000`, pose aussi
-`APP_URL=http://localhost:<port>` : les redirections absolues du middleware
-suivent `APP_URL`, et un `.env` qui vise `:3000` fait échouer
+fausserait les assertions. La configuration pose
+elle-même `APP_URL` sur ce port : les redirections absolues du middleware
+suivent `APP_URL`, et un `.env` qui vise `:3000` faisait échouer
 `i18n.spec.ts` en `ERR_CONNECTION_REFUSED`. Pour cibler une instance externe que tu gères
 toi-même :
 

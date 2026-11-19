@@ -15,9 +15,12 @@ la replie ou la déplie. Premier usage : le planning (`CAST_PLANNING.md` —
   écriture sous `try/catch` : sans stockage, l'état par défaut vaut).
 - Le stockage se lit par `useSyncExternalStore` : le rendu serveur et
   l'hydratation voient l'état par défaut (aucun écart), le client relit la
-  mémoire avant la première peinture — pas de saut de mise en page — et suit
-  l'évènement `storage` des autres onglets. Le choix fait pendant la visite
-  l'emporte sur la mémoire.
+  mémoire avant la première peinture — pas de saut de mise en page. Le magasin
+  est **par instance** : le stockage n'est lu qu'une fois (jamais à chaque
+  rendu, même quand la page se redessine à chaque rafraîchissement), puis à
+  chaque évènement `storage` d'un autre onglet — suivi aussi après un clic local ;
+  le choix de la visite y est posé aussi, si bien que sans stockage on replie et
+  déplie quand même.
 - Replié = **démonté** (sauf `keepMounted`) : la recherche dans la page ne
   trouve pas un match passé tant que la section est fermée — choix assumé, la
   liste est de l'historique et peut être longue.

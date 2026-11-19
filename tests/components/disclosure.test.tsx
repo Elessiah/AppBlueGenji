@@ -1,19 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 // Environnement Node, sans DOM : les crochets sont rejoués à la main (un état, un effet, un identifiant).
-const harness = { state: [] as unknown[], cursor: 0, server: false, subscribed: [] as (() => void)[] };
+const harness = { state: [] as unknown[], cursor: 0, server: false, subscribed: [] as (() => void)[], onChange: (() => undefined) as () => void };
 jest.mock("react", () => {
   const actual = jest.requireActual<typeof import("react")>("react");
   return {
     ...actual,
     useId: () => "body-id",
-    useState: (initial: unknown) => {
+    useRef: (initial: unknown) => {
       const index = harness.cursor++;
-      if (!(index in harness.state)) harness.state[index] = initial;
-      return [harness.state[index], (next: unknown) => (harness.state[index] = next)];
+      if (!(index in harness.state)) harness.state[index] = { current: initial };
+      return harness.state[index];
     },
+    useCallback: (callback: unknown) => callback,
     useSyncExternalStore: (subscribe: (onChange: () => void) => () => void, snapshot: () => unknown, serverSnapshot: () => unknown) => {
-      harness.subscribed.push(subscribe(() => undefined));
+      harness.subscribed.push(subscribe(harness.onChange));
       return harness.server ? serverSnapshot() : snapshot();
     },
   };
@@ -173,6 +174,44 @@ describe("Disclosure", () => {
 
     expect(add).toHaveBeenCalledWith("storage", expect.any(Function));
     expect(remove).toHaveBeenCalledWith("storage", add.mock.calls[0]?.[1]);
+  });
+
+  it("Disclosure_rerenders_readStorageOnlyOnce", () => {
+    const getItem = jest.fn(() => null);
+    globals.localStorage = { getItem, setItem: jest.fn() };
+
+    for (let index = 0; index < 5; index++) render({ ...base, storageKey: "k" });
+
+    expect(getItem).toHaveBeenCalledTimes(1);
+  });
+
+  it("Disclosure_storageEventOfAnotherTabAfterLocalToggle_isFollowed", () => {
+    let stored: string | null = null;
+    globals.localStorage = { getItem: jest.fn(() => stored), setItem: jest.fn() };
+    const listeners: ((event: { key: string | null }) => void)[] = [];
+    const target = globalThis as unknown as { addEventListener?: unknown; removeEventListener?: unknown };
+    const savedListeners = { add: target.addEventListener, remove: target.removeEventListener };
+    target.addEventListener = (_name: string, listener: (event: { key: string | null }) => void) => listeners.push(listener);
+    target.removeEventListener = jest.fn();
+    const onChange = jest.fn();
+    harness.onChange = onChange;
+    try {
+      click(render({ ...base, storageKey: "k" }));
+      expect(toggleOf(render({ ...base, storageKey: "k" })).props["aria-expanded"]).toBe(true);
+
+      onChange.mockClear();
+      stored = "0";
+      listeners.forEach((listener) => listener({ key: "other" }));
+      expect(onChange).not.toHaveBeenCalled();
+      listeners.forEach((listener) => listener({ key: "k" }));
+
+      expect(onChange).toHaveBeenCalledTimes(listeners.length);
+      expect(toggleOf(render({ ...base, storageKey: "k" })).props["aria-expanded"]).toBe(false);
+    } finally {
+      harness.onChange = () => undefined;
+      target.addEventListener = savedListeners.add;
+      target.removeEventListener = savedListeners.remove;
+    }
   });
 
   it("Disclosure_toggleWithStorage_writesChoice", () => {

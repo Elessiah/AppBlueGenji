@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "@jest/globals";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { planningRoundMessages, planningRoundText, planningRoundTextOf } from "@/lib/shared/planning-round";
@@ -83,5 +85,24 @@ describe("planningRoundText", () => {
     );
 
     expect(texts.filter((label) => label === null || /bracket\.|page\./.test(label))).toEqual([]);
+  });
+});
+
+/** Le planning n'embarque pas le français de la fiche (`tournament.json` en valeur) : il importe le noyau. */
+describe("planning client bundle", () => {
+  const importsOf = (file: string): string[] =>
+    [...readFileSync(path.join(process.cwd(), file), "utf8").matchAll(/from "([^"]+)"/g)].map((match) => match[1]);
+
+  it.each(["lib/shared/planning-round.ts", "lib/shared/share-round.ts", "lib/shared/bracket-stage-text.ts"])(
+    "planningRoundChain_%s_neverImportsTheFrenchSheetModule",
+    (file) => {
+      expect(importsOf(file).filter((source) => /tournament-page-text$/.test(source))).toEqual([]);
+    },
+  );
+
+  it("tournamentPageTextCore_never_importsTheFrenchJsonAsValue", () => {
+    const source = readFileSync(path.join(process.cwd(), "lib/shared/tournament-page-text-core.ts"), "utf8");
+
+    expect(source).not.toMatch(/^import frTournament /m);
   });
 });

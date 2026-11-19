@@ -21,7 +21,7 @@ import {
 } from "./load";
 import { autoConfirmAwaiting, loadedPendingRoles, readStoredAutoConfirms, type PendingRoles } from "./auto-confirm";
 import { entryAssignments, entryCoverage } from "./model";
-import { loadEntryRounds } from "./round-names";
+import { loadEntryRounds, type RoundRequest } from "./round-names";
 
 /**
  * Durée de la copie de la **liste** des comptes qui tiennent un rôle du
@@ -140,12 +140,11 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
     // Comptées sur les lignes en base, comme le balayage (`sweepAutoConfirms`) : la carte et la reprise s'accordent.
     const pending = loadedPendingRoles(loaded.assignments);
     const keys = entriesNeedingMark(loaded.entries, pending, loaded.durations.confirmLeadHours, now);
-    const matches = loaded.entries.filter((entry) => entry.matchId !== null);
-    const rounds = await loadEntryRounds(
-      connection,
-      matches.map((entry) => entry.tournamentId),
-      new Set(matches.map((entry) => entry.matchId as number)),
-    );
+    const requests: RoundRequest[] = [];
+    for (const entry of loaded.entries) {
+      if (entry.matchId !== null) requests.push({ tournamentId: entry.tournamentId, matchId: entry.matchId });
+    }
+    const rounds = await loadEntryRounds(connection, requests, now);
     return { data: loaded, pending, marks: await readStoredAutoConfirms(connection, keys), rounds };
   });
   // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul

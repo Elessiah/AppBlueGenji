@@ -90,7 +90,14 @@ la requête : une requête mal formée n'use pas ce quota). Le refus `429`
   les matchs du tournoi (un tour se nomme depuis le dernier de son tableau) et
   rend un descripteur sans texte (`round`, `matchNumber`) ; l'écran le rédige
   dans la langue de l'adresse (`planning-round.ts`) ; seuls les mots des tours
-  de `tournament.bracket` partent avec la page. Match inconnu du calcul :
+  de `tournament.bracket` partent avec la page (le planning importe le noyau
+  `tournament-page-text-core.ts`, pas le français de la fiche : `tournament.json`
+  n'entre pas dans son paquet). Mémoire courte côté serveur : l'arbre d'un tournoi
+  est gardé 10 s (64 tournois au plus), donc les relectures et le flux n'ajoutent
+  aucune requête ; un match absent de la mémoire (tirage tout juste fait) relit
+  son tournoi aussitôt. Les matchs passés ne sont regroupés qu'à l'ouverture
+  (`PastWeeks`), et la mise en forme des dates se fait dans la carte (mémorisée).
+  Match inconnu du calcul :
   « Manche n » seul (aucun numéro de match inventé). Les notifications du planning (récapitulatif,
   affectation, désistement) ne citent aucun tour : rien à y changer.
 

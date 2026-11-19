@@ -16,7 +16,7 @@ import {
   tournamentPageText,
   type TournamentPageText,
   type TournamentSheetMessages,
-} from "./tournament-page-text";
+} from "./tournament-page-text-core";
 
 type BracketMessages = TournamentSheetMessages["bracket"];
 

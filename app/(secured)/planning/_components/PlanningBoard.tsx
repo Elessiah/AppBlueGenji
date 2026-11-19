@@ -77,6 +77,8 @@ function formatters(locale: Locale) {
   };
 }
 
+type Formatters = ReturnType<typeof formatters>;
+
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -212,7 +214,6 @@ export function PlanningBoard({
   // Un match passe dans « Matchs passés » une fois joué (relecture de la page), jamais sur la seule horloge.
   const split = useMemo(() => splitPast(shown), [shown]);
   const weeks = useMemo(() => groupByWeek(split.upcoming), [split.upcoming]);
-  const pastWeeks = useMemo(() => newestFirst(groupByWeek(split.past)), [split.past]);
   const tournaments = useMemo(() => tournamentChoices(view?.entries ?? []), [view]);
   // Un tournoi choisi qui n'a plus de créneau (relecture) : le filtre retombe sur « tous ».
   const tournamentId = tournaments.some((choice) => choice.id === filters.tournamentId) ? filters.tournamentId : null;
@@ -233,60 +234,7 @@ export function PlanningBoard({
   const isCaster = view.myRoles.includes("CASTER");
   const meSolo = view.members.find((member) => member.userId === view.me)?.soloCaster ?? false;
 
-  const renderWeeks = (list: readonly PlanningWeek[], zone: "past" | "upcoming") => {
-    // Les matchs passés vivent sous le titre « Matchs passés » (h2) : leurs semaines et jours descendent d'un niveau.
-    const WeekTitle = zone === "past" ? "h3" : "h2";
-    const DayTitle = zone === "past" ? "h4" : "h3";
-    return list.map((week) => (
-      <section key={week.weekStart} className={styles.week} aria-labelledby={`planning-${zone}-week-${week.weekStart}`}>
-        <header className={styles.weekHead}>
-          <WeekTitle id={`planning-${zone}-week-${week.weekStart}`} className={styles.weekTitle}>
-            {t("week", { date: format.day.format(week.weekStart) })}
-          </WeekTitle>
-          {view.canManage && week.entries.some((entry) => entry.open) && (
-            <BusyButton
-              busy={pending === `run:${week.weekStart}`}
-              blocked={pending !== null}
-              className={styles.button}
-              onClick={() => setRunWeek(week.weekStart)}
-            >
-              {t("staff.runWeek")}
-            </BusyButton>
-          )}
-        </header>
-        {week.days.map((day) => (
-          <div key={day.dayStart} className={styles.day}>
-            <DayTitle className={styles.dayTitle}>{format.dayLong.format(day.dayStart)}</DayTitle>
-            <ul className={styles.entries}>
-              {day.entries.map((entry) => {
-                const slot = format.slot.format(Date.parse(entry.startAt));
-                return (
-                  <EntryCard
-                    key={entry.key}
-                    entry={entry}
-                    view={context}
-                    text={text}
-                    names={names}
-                    roundText={roundText}
-                    slot={slot}
-                    until={format.time.format(Date.parse(entry.endAt))}
-                    confirmAt={entry.confirmAt === null ? null : format.slot.format(Date.parse(entry.confirmAt))}
-                    deadline={entry.deadlineAt === null ? null : format.slot.format(Date.parse(entry.deadlineAt))}
-                    pending={pendingFor(pending, entry.key)}
-                    act={act}
-                    onConfirm={confirmEntry}
-                    onAvailability={saveAvailability}
-                    onWithdraw={askWithdraw}
-                  />
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </section>
-    ));
-  };
-
+  const weekProps = { view: context, canManage: view.canManage, text, format, names, roundText, pending, act, onRunWeek: setRunWeek, onConfirm: confirmEntry, onAvailability: saveAvailability, onWithdraw: askWithdraw };
   const active = filtersActive({ ...filters, tournamentId });
   const patch = (change: Partial<PlanningFilters>) => setFilters({ ...filters, tournamentId, ...change });
   return (
@@ -386,10 +334,10 @@ export function PlanningBoard({
 
       {split.past.length > 0 && (
         <Disclosure title={t("past.title")} count={split.past.length} storageKey={`planning:past-open:${view.me}`} className={styles.past}>
-          {renderWeeks(pastWeeks, "past")}
+          <PastWeeks entries={split.past} {...weekProps} zone="past" />
         </Disclosure>
       )}
-      {renderWeeks(weeks, "upcoming")}
+      <WeekList weeks={weeks} {...weekProps} zone="upcoming" />
 
       {confirming !== null && (
         <ConfirmActionDialog
@@ -566,16 +514,106 @@ function confirmText(t: Text["t"], time: string, deadline: string | null): strin
   return deadline === null ? t("autoConfirm.at", { time }) : t("autoConfirm.atWithDeadline", { time, deadline });
 }
 
+type WeekListProps = Readonly<{
+  weeks: readonly PlanningWeek[];
+  /** « Matchs passés » : semaines et jours descendent d'un niveau de titre. */
+  zone: "past" | "upcoming";
+  view: Reader | null;
+  canManage: boolean;
+  text: Text;
+  format: Formatters;
+  names: ReadonlyMap<number, string>;
+  roundText: TournamentPageText;
+  pending: string | null;
+  act: Act;
+  onRunWeek: (weekStart: number) => void;
+  onConfirm: (key: string, slot: string) => void;
+  onAvailability: (change: Parameters<typeof applyAvailability>[1]) => void;
+  onWithdraw: (target: WithdrawTarget) => void;
+}>;
+
+/** Les semaines et leurs jours : relues seulement quand leurs données ou l'action en cours changent. */
+const WeekList = memo(function WeekList({
+  weeks,
+  zone,
+  view,
+  canManage,
+  text,
+  format,
+  names,
+  roundText,
+  pending,
+  act,
+  onRunWeek,
+  onConfirm,
+  onAvailability,
+  onWithdraw,
+}: WeekListProps) {
+  const { t } = text;
+  const WeekTitle = zone === "past" ? "h3" : "h2";
+  const DayTitle = zone === "past" ? "h4" : "h3";
+  if (view === null) return null;
+  return weeks.map((week) => (
+    <section key={week.weekStart} className={styles.week} aria-labelledby={`planning-${zone}-week-${week.weekStart}`}>
+      <header className={styles.weekHead}>
+        <WeekTitle id={`planning-${zone}-week-${week.weekStart}`} className={styles.weekTitle}>
+          {t("week", { date: format.day.format(week.weekStart) })}
+        </WeekTitle>
+        {canManage && week.entries.some((entry) => entry.open) && (
+          <BusyButton
+            busy={pending === `run:${week.weekStart}`}
+            blocked={pending !== null}
+            className={styles.button}
+            onClick={() => onRunWeek(week.weekStart)}
+          >
+            {t("staff.runWeek")}
+          </BusyButton>
+        )}
+      </header>
+      {week.days.map((day) => (
+        <div key={day.dayStart} className={styles.day}>
+          <DayTitle className={styles.dayTitle}>{format.dayLong.format(day.dayStart)}</DayTitle>
+          <ul className={styles.entries}>
+            {day.entries.map((entry) => (
+              <EntryCard
+                key={entry.key}
+                entry={entry}
+                view={view}
+                text={text}
+                names={names}
+                roundText={roundText}
+                format={format}
+                pending={pendingFor(pending, entry.key)}
+                act={act}
+                onConfirm={onConfirm}
+                onAvailability={onAvailability}
+                onWithdraw={onWithdraw}
+              />
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  ));
+});
+
+/**
+ * Les matchs passés, regroupés et rangés (le plus récent en tête) **à
+ * l'ouverture seulement** : sous un « Matchs passés » replié, ce composant
+ * n'est pas monté et rien n'est calculé.
+ */
+function PastWeeks({ entries, ...rest }: Omit<WeekListProps, "weeks"> & Readonly<{ entries: readonly PlanningEntryView[] }>) {
+  const weeks = useMemo(() => newestFirst(groupByWeek(entries)), [entries]);
+  return <WeekList weeks={weeks} {...rest} />;
+}
+
 const EntryCard = memo(function EntryCard({
   entry,
   view,
   text,
   names,
   roundText,
-  slot,
-  until,
-  confirmAt,
-  deadline,
+  format,
   pending,
   act,
   onConfirm,
@@ -588,12 +626,8 @@ const EntryCard = memo(function EntryCard({
   names: ReadonlyMap<number, string>;
   /** Mots des tours (`planningRoundText`). */
   roundText: TournamentPageText;
-  slot: string;
-  until: string;
-  /** Confirmation d'office (date déjà mise en forme), `null` : entrée close. */
-  confirmAt: string | null;
-  /** Date butoir de planification du match (mise en forme), `null` : aucune. */
-  deadline: string | null;
+  /** Mises en forme des dates (stables par langue) : une carte non modifiée ne reformate rien. */
+  format: Formatters;
   pending: string | null;
   act: Act;
   onConfirm: (key: string, slot: string) => void;
@@ -602,6 +636,11 @@ const EntryCard = memo(function EntryCard({
 }>) {
   const { t } = text;
   const coverage = entry.coverage;
+  const slot = format.slot.format(Date.parse(entry.startAt));
+  const until = format.time.format(Date.parse(entry.endAt));
+  // Confirmation d'office (date mise en forme), `null` : entrée close ; date butoir de planification, `null` : aucune.
+  const confirmAt = entry.confirmAt === null ? null : format.slot.format(Date.parse(entry.confirmAt));
+  const deadline = entry.deadlineAt === null ? null : format.slot.format(Date.parse(entry.deadlineAt));
   const title = entry.kind === "TOURNAMENT" ? t("event") : (planningRoundText(roundText, entry) ?? "");
   const label = `${entry.tournamentName} · ${slot}`;
   const mine = heldBy(entry, view.me);

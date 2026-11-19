@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronRight } from "lucide-react";
-import { useId, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useId, useRef, useSyncExternalStore, type ReactNode } from "react";
 import styles from "./disclosure.module.css";
 
 type DisclosureProps = Readonly<{
@@ -44,12 +44,6 @@ function readStored(key: string): boolean | null {
   return null;
 }
 
-/** Écoute les autres onglets : le choix posé ailleurs se retrouve ici. */
-function subscribeStorage(onChange: () => void): () => void {
-  globalThis.addEventListener?.("storage", onChange);
-  return () => globalThis.removeEventListener?.("storage", onChange);
-}
-
 function writeStored(key: string, open: boolean): void {
   try {
     globalThis.localStorage?.setItem(key, open ? "1" : "0");
@@ -74,22 +68,48 @@ export function Disclosure({
   className,
   children,
 }: DisclosureProps) {
-  // Le choix fait dans cette visite l'emporte ; sinon la mémoire de l'appareil ; sinon le défaut.
-  const [chosen, setChosen] = useState<boolean | null>(null);
+  // L'état vit dans un magasin externe par instance : la mémoire de l'appareil n'est lue qu'une fois (puis à
+  // chaque événement `storage` d'un autre onglet), jamais à chaque rendu ; le choix de cette visite y est
+  // posé aussi, si bien que le stockage indisponible n'empêche pas de replier ou déplier.
+  const snapshot = useRef<{ key: string | undefined; value: boolean | null } | null>(null);
+  const notify = useRef<(() => void) | null>(null);
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      notify.current = onChange;
+      const onStorage = (event: StorageEvent) => {
+        if (storageKey === undefined || (event.key !== null && event.key !== storageKey)) return;
+        snapshot.current = { key: storageKey, value: readStored(storageKey) };
+        onChange();
+      };
+      globalThis.addEventListener?.("storage", onStorage);
+      return () => {
+        notify.current = null;
+        globalThis.removeEventListener?.("storage", onStorage);
+      };
+    },
+    [storageKey],
+  );
   // Le rendu serveur et l'hydratation lisent « rien » (l'état par défaut, sans écart) ;
   // le client relit la mémoire avant la première peinture, sans saut de mise en page.
-  const stored = useSyncExternalStore(
-    subscribeStorage,
-    () => (storageKey === undefined ? null : readStored(storageKey)),
+  const chosen = useSyncExternalStore(
+    subscribe,
+    () => {
+      const current = snapshot.current;
+      if (current !== null && current.key === storageKey) return current.value;
+      const read = { key: storageKey, value: storageKey === undefined ? null : readStored(storageKey) };
+      snapshot.current = read;
+      return read.value;
+    },
     () => null,
   );
-  const open = chosen ?? stored ?? defaultOpen;
+  const open = chosen ?? defaultOpen;
   const bodyId = useId();
 
   const toggle = () => {
     const next = !open;
-    setChosen(next);
+    snapshot.current = { key: storageKey, value: next };
     if (storageKey !== undefined) writeStored(storageKey, next);
+    notify.current?.();
   };
 
   return (
