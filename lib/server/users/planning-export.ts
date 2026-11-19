@@ -55,8 +55,8 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
       `SELECT tournament_id, match_id, role, source, reason, confirmed, created_at
          FROM bg_planning_assignments WHERE user_id = ? ORDER BY created_at, entry_key, role`,
     ),
-    tolerant<EventRow & { reason: string | null; late: number }>(
-      `SELECT tournament_id, match_id, role, kind, source, reason, late, created_at
+    tolerant<EventRow & { reason: string | null; late: number; staff_release: number | null }>(
+      `SELECT tournament_id, match_id, role, kind, source, reason, late, staff_release, created_at
          FROM bg_planning_events WHERE user_id = ? ORDER BY created_at, id`,
     ),
     tolerant<EventRow>(
@@ -78,7 +78,15 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
     })),
     assignments: assignments.map((row) => ({ ...mapAssignment(row), reason: row.reason })),
     history: events.map((row) =>
-      row.kind === "WITHDRAWN" ? { ...mapEvent(row), reason: row.reason, late: Boolean(row.late) } : mapEvent(row),
+      row.kind === "WITHDRAWN"
+        ? {
+            ...mapEvent(row),
+            reason: row.reason,
+            late: Boolean(row.late),
+            // Sortie du planning par le staff (compte passé invité) : pas un désistement de sa part.
+            ...(Number(row.staff_release ?? 0) === 1 ? { staffRelease: true } : {}),
+          }
+        : mapEvent(row),
     ),
     staffActions: acted.map(mapEvent),
     assignmentsSet: set.map(mapAssignment),

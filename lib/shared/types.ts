@@ -1339,6 +1339,8 @@ export type PersonalDataExport = {
       reason?: string | null;
       /** Désistement à moins de 24 h du début. */
       late?: boolean;
+      /** Désistement posé par le staff qui l'a sorti du planning (compte passé invité), pas par lui. */
+      staffRelease?: boolean;
     }[];
     /**
      * Ses gestes comme staff (attribution posée, confirmée, retirée) : la

@@ -920,7 +920,7 @@ export const SoloCastersStaff = memo(function SoloCastersStaff({
 });
 
 /** Les désistements d'une entrée, au staff des tournois seul (la route ne les rend qu'à lui). */
-function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView; text: Text; names: ReadonlyMap<number, string> }>) {
+export function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView; text: Text; names: ReadonlyMap<number, string> }>) {
   const { t } = text;
   const hintId = `planning-withdrawals-${entry.key.replaceAll(/[^A-Za-z0-9_-]/g, "-")}`;
   return (
@@ -939,6 +939,7 @@ function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView
               <span>
                 <PlayerLink userId={row.userId}>{name}</PlayerLink> · {t(`roles.${row.role}`)}
               </span>
+              {row.staffRelease === true && <span className="cy-tag cy-tag-info">{t("withdrawals.staffRelease")}</span>}
               {row.late && <Pill variant="warning">{t("withdrawals.late")}</Pill>}
               {!row.confirmed && <span className="cy-tag cy-tag-accent">{t("withdrawals.provisional")}</span>}
               {row.reason && <q className={styles.withdrawalReason}>{row.reason}</q>}

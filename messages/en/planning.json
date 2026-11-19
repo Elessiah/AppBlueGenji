@@ -188,7 +188,8 @@
     "title": "Withdrawals",
     "late": "Late",
     "provisional": "Proposal",
-    "hint": "Who withdrew from this slot, and their reason if they gave one. “Late”: less than 24 hours before the start. “Proposal”: they were only proposed by the calculation."
+    "staffRelease": "Removed by staff",
+    "hint": "Who withdrew from this slot, and their reason if they gave one. “Late”: less than 24 hours before the start. “Proposal”: they were only proposed by the calculation. “Removed by staff”: made a guest, they did not withdraw themselves."
   },
   "unfilled": "Open slot",
   "autoConfirm": {

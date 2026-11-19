@@ -2291,7 +2291,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Ce qui est gardé : la marque « invité » sur le compte, tant que le staff la laisse ; elle est dans l'export de tes données et part avec la suppression du compte. Base : intérêt légitime de l'association (organiser ses bénévoles), avec droit d'opposition.",
       "Ce qu'elle change : un invité n'est plus proposé, désigné ni prévenu par le planning, et n'en lit plus la page ; sa marque quitte ses attributions à venir comme un désistement (un remplaçant est cherché comme d'habitude) et efface ses disponibilités à venir ; ce qui est passé reste.",
-      "Qui la voit : le staff qui attribue les rôles ; les autres membres du planning peuvent seulement constater que l'invité n'y figure plus. Le geste est noté au journal du staff sur Discord sans nommer personne ; les journaux du serveur gardent son auteur (T05).",
+      "Qui la voit : le staff qui attribue les rôles ; les autres membres du planning peuvent seulement constater que l'invité n'y figure plus. Le geste est noté au journal du staff sur Discord sans nommer personne ; les journaux du serveur gardent son auteur (T05), et chaque attribution quittée reste dans l'historique du planning comme une sortie par le staff, avec le compte de son auteur, le temps de garde de cet historique (T20) ; elle figure dans l'export des données de l'invité, sans l'auteur, et dans celui de l'auteur.",
       "Ce qui ne change pas : pour un compte non marqué, rien de nouveau n'est collecté.",
     ],
   },

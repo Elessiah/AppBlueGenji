@@ -10,6 +10,7 @@ import { publishStaffAction } from "@/lib/server/staff-audit";
 import {
   PLANNING_GUEST_OFF_DISCORD_LINE,
   PLANNING_GUEST_ON_DISCORD_LINE,
+  PLANNING_GUEST_REPLAY_DISCORD_LINE,
   planningGuestAuditLine,
   publishPlanningGuestChange,
   readPlanningGuest,
@@ -58,6 +59,7 @@ describe("setPlanningGuest", () => {
 
   it("setPlanningGuest_alreadyGuest_replaysRelease", async () => {
     account(0);
+    execute.mockResolvedValueOnce([[{ is_admin: 0, is_deleted: 0 }], []]);
 
     const saved = await setPlanningGuest(7, true, STAFF, 1000);
 
@@ -90,6 +92,38 @@ describe("setPlanningGuest", () => {
     expect(releaseGuestPlanning).not.toHaveBeenCalled();
   });
 
+  it("setPlanningGuest_guestWrite_rechecksAdminInUpdate", async () => {
+    account(1);
+
+    await setPlanningGuest(7, true, STAFF, 1000);
+
+    expect(execute.mock.calls[1][0]).toContain("COALESCE(is_admin, 0) = 0");
+  });
+
+  it("setPlanningGuest_unflagWrite_noAdminCondition", async () => {
+    account(1);
+
+    await setPlanningGuest(7, false, STAFF, 1000);
+
+    expect(execute.mock.calls[1][0]).not.toContain("is_admin");
+  });
+
+  it("setPlanningGuest_promotedBetweenReadAndWrite_throwsPlanningGuestAdmin", async () => {
+    account(0);
+    execute.mockResolvedValueOnce([[{ is_admin: 1, is_deleted: 0 }], []]);
+
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("PLANNING_GUEST_ADMIN");
+    expect(releaseGuestPlanning).not.toHaveBeenCalled();
+  });
+
+  it("setPlanningGuest_deletedBetweenReadAndWrite_throwsUserNotFound", async () => {
+    account(0);
+    execute.mockResolvedValueOnce([[{ is_admin: 0, is_deleted: 1 }], []]);
+
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("USER_NOT_FOUND");
+    expect(releaseGuestPlanning).not.toHaveBeenCalled();
+  });
+
   it("setPlanningGuest_missingUser_throwsUserNotFound", async () => {
     execute.mockResolvedValueOnce([[], []]);
 
@@ -101,11 +135,24 @@ describe("setPlanningGuest", () => {
 describe("publishPlanningGuestChange", () => {
   const actor = { id: 1, pseudo: "Test_Admin" };
 
-  it("publishPlanningGuestChange_unchanged_publishesNothing", () => {
-    const published = publishPlanningGuestChange(actor, 7, { guest: true, changed: false, release });
+  it("publishPlanningGuestChange_replayWithoutEffect_publishesNothing", () => {
+    const idle = { withdrawn: 0, failed: 0, availabilityCleared: 0 };
+
+    const published = publishPlanningGuestChange(actor, 7, { guest: true, changed: false, release: idle });
 
     expect(published).toBe(false);
     expect(publishStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("publishPlanningGuestChange_replayWithEffect_publishesReplayLine", () => {
+    const published = publishPlanningGuestChange(actor, 7, { guest: true, changed: false, release });
+
+    expect(published).toBe(true);
+    expect(publishStaffAction).toHaveBeenCalledWith(PLANNING_GUEST_REPLAY_DISCORD_LINE, actor, {
+      auditLine: "🎙️ Compte #7 déjà invité : sortie du planning rejouée — attributions à venir quittées : 2, laissées en place : 1, disponibilités effacées : 3.",
+      category: "admin",
+    });
+    expect(PLANNING_GUEST_REPLAY_DISCORD_LINE).not.toMatch(/#\d|Test_/);
   });
 
   it("publishPlanningGuestChange_flagged_anonymousDiscordNamedPm2", () => {

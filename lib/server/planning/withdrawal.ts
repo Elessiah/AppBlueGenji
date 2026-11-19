@@ -93,9 +93,21 @@ async function writeWithdrawalEvent(
 ): Promise<number> {
   const [result] = await executor.execute(
     `INSERT INTO bg_planning_events
-       (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id, reason, late)
-     VALUES (?, ?, ?, ?, ?, 'WITHDRAWN', ?, ?, ?, ?)`,
-    [entry.key, userId, input.role, entry.tournamentId, entry.matchId, confirmed ? "MANUAL" : "AUTO", actorId, input.reason, late ? 1 : 0],
+       (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id, reason, late, staff_release)
+     VALUES (?, ?, ?, ?, ?, 'WITHDRAWN', ?, ?, ?, ?, ?)`,
+    [
+      entry.key,
+      userId,
+      input.role,
+      entry.tournamentId,
+      entry.matchId,
+      confirmed ? "MANUAL" : "AUTO",
+      actorId,
+      input.reason,
+      late ? 1 : 0,
+      // La marque de la sortie d'un invité ne dépend pas de l'auteur, que la suppression de son compte efface.
+      actorId === null ? 0 : 1,
+    ],
   );
   const id = Number((result as { insertId?: number } | undefined)?.insertId ?? 0);
   if (!Number.isInteger(id) || id <= 0) throw new Error("PLANNING_EVENT_ID_MISSING");
@@ -528,6 +540,8 @@ async function withdrawMember(
       role: input.role,
       late: outcome.late,
       withdrawnUserId: user.id,
+      // Sortie d'un invité par le staff : dite « retiré du planning », et son auteur n'apprend pas son propre geste.
+      ...(user.actorId === null ? {} : { released: true, actorId: user.actorId }),
       replacementId: outcome.replacementId,
       unfilled: outcome.unfilled,
       stillHeldBy: outcome.stillHeldBy,
@@ -555,8 +569,12 @@ export type GuestRelease = {
   availabilityCleared: number;
 };
 
-/** Refus qui disent que l'attribution est déjà partie (sortie concurrente, entrée commencée entre-temps) : rien à quitter. */
-const ALREADY_GONE = new Set(["PLANNING_NOT_ASSIGNED", "PLANNING_WITHDRAWAL_CLOSED", "PLANNING_ENTRY_NOT_FOUND"]);
+/**
+ * Refus qui disent que l'attribution est déjà partie (sortie concurrente) : rien à quitter. Une entrée devenue
+ * non modifiable entre la lecture et le retrait (`PLANNING_WITHDRAWAL_CLOSED`) n'en est pas : l'attribution
+ * reste, elle compte comme échec.
+ */
+const ALREADY_GONE = new Set(["PLANNING_NOT_ASSIGNED", "PLANNING_ENTRY_NOT_FOUND"]);
 
 /**
  * Un compte devenu **invité** (`bg_users.is_guest_staff`, `CAST_PLANNING.md`

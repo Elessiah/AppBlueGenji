@@ -223,14 +223,26 @@
       "bodyOpen": "Un {role} s'est désisté de {entry} ({start}) : la place est à pourvoir.",
       "bodyStillHeld": "Un {role} s'est désisté de {entry} ({start}) : un autre {role} reste affecté.",
       "bodySelfHeld": "Un {role} s'est désisté de {entry} ({start}) : tu restes affecté comme {role}.",
-      "bodyStreamLost": "Un {role} s'est désisté de {entry} ({start}) : la diffusion est perdue, il manque un prod ou un caster autonome."
+      "bodyStreamLost": "Un {role} s'est désisté de {entry} ({start}) : la diffusion est perdue, il manque un prod ou un caster autonome.",
+      "released": {
+        "title": "Retrait du planning sur ton match",
+        "bodyReplaced": "Un {role} a été retiré du planning pour {entry} ({start}) : un remplaçant a été affecté.",
+        "bodyOpen": "Un {role} a été retiré du planning pour {entry} ({start}) : la place est à pourvoir.",
+        "bodyStillHeld": "Un {role} a été retiré du planning pour {entry} ({start}) : un autre {role} reste affecté.",
+        "bodySelfHeld": "Un {role} a été retiré du planning pour {entry} ({start}) : tu restes affecté comme {role}.",
+        "bodyStreamLost": "Un {role} a été retiré du planning pour {entry} ({start}) : la diffusion est perdue, il manque un prod ou un caster autonome."
+      }
     },
     "unfilled": {
       "title": "Place à pourvoir",
       "body": "Un {role} s'est désisté de {entry} ({start}) : aucun remplaçant trouvé.",
       "bodyLate": "Un {role} s'est désisté de {entry} ({start}), moins de 24 h avant : aucun remplaçant trouvé.",
       "bodyStreamLost": "Un {role} s'est désisté de {entry} ({start}) : aucun remplaçant trouvé, diffusion perdue (il manque un prod ou un caster autonome).",
-      "bodyStreamLostLate": "Un {role} s'est désisté de {entry} ({start}), moins de 24 h avant : aucun remplaçant trouvé, diffusion perdue (il manque un prod ou un caster autonome)."
+      "bodyStreamLostLate": "Un {role} s'est désisté de {entry} ({start}), moins de 24 h avant : aucun remplaçant trouvé, diffusion perdue (il manque un prod ou un caster autonome).",
+      "released": {
+        "body": "Un {role} a été retiré du planning pour {entry} ({start}) : aucun remplaçant trouvé.",
+        "bodyStreamLost": "Un {role} a été retiré du planning pour {entry} ({start}) : aucun remplaçant trouvé, diffusion perdue (il manque un prod ou un caster autonome)."
+      }
     }
   },
   "scheduleDeadline": {

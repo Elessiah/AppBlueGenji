@@ -33,7 +33,8 @@ export function planningGuestAuditLine(targetUserId: number, saved: PlanningGues
   const detail = release
     ? ` — attributions à venir quittées : ${release.withdrawn}, laissées en place : ${release.failed}, disponibilités effacées : ${release.availabilityCleared}`
     : "";
-  return `🎙️ Compte #${targetUserId} passé invité (hors planning)${detail}.`;
+  const head = saved.changed ? "passé invité (hors planning)" : "déjà invité : sortie du planning rejouée";
+  return `🎙️ Compte #${targetUserId} ${head}${detail}.`;
 }
 
 /**
@@ -64,23 +65,56 @@ export async function setPlanningGuest(
   if (rows.length === 0) throw new Error("USER_NOT_FOUND");
   if (guest && Number(rows[0].is_admin ?? 0) === 1) throw new Error("PLANNING_GUEST_ADMIN");
   const flag = guest ? 1 : 0;
+  // Poser le drapeau revérifie l'administrateur dans l'écriture : une promotion concurrente, entre la lecture
+  // et l'écriture, ne laisse pas la sortie effacer les créneaux d'un administrateur.
   const [written] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_users SET is_guest_staff = ? WHERE id = ? AND is_deleted = 0 AND is_guest_staff <> ?`,
+    `UPDATE bg_users SET is_guest_staff = ? WHERE id = ? AND is_deleted = 0 AND is_guest_staff <> ?${guest ? " AND COALESCE(is_admin, 0) = 0" : ""}`,
     [flag, targetUserId, flag],
   );
   const changed = Number(written.affectedRows ?? 0) > 0;
+  if (guest && !changed) await refuseIfAdmin(db, targetUserId);
   const release = guest ? await releaseGuestPlanning(targetUserId, actorId, now) : null;
   return { guest, changed, release };
 }
 
 /**
+ * Rien n'a été écrit en posant le drapeau : déjà posé (sortie rejouée), compte
+ * disparu, ou devenu administrateur entre la lecture et l'écriture — refusé
+ * alors (`PLANNING_GUEST_ADMIN`) avant toute sortie.
+ */
+async function refuseIfAdmin(db: Awaited<ReturnType<typeof getDatabase>>, targetUserId: number): Promise<void> {
+  const [rows] = await db.execute<(RowDataPacket & { is_admin: number | null; is_deleted: number | null })[]>(
+    `SELECT is_admin, is_deleted FROM bg_users WHERE id = ? LIMIT 1`,
+    [targetUserId],
+  );
+  if (rows.length === 0 || Number(rows[0].is_deleted ?? 0) === 1) throw new Error("USER_NOT_FOUND");
+  if (Number(rows[0].is_admin ?? 0) === 1) throw new Error("PLANNING_GUEST_ADMIN");
+}
+
+/** Une sortie rejouée a encore quitté, laissé ou effacé quelque chose. */
+function releaseDidSomething(release: GuestRelease | null): boolean {
+  return release !== null && release.withdrawn + release.failed + release.availabilityCleared > 0;
+}
+
+/** Ligne Discord, anonyme, d'une sortie rejouée (drapeau déjà posé). */
+export const PLANNING_GUEST_REPLAY_DISCORD_LINE = "🎙️ Sortie du planning d'un compte invité rejouée par le staff.";
+
+/**
  * Publie le changement au journal du staff : anonyme sur Discord, nominatif
- * dans pm2 (`publishStaffAction`). Rien pour un enregistrement sans écart.
+ * dans pm2 (`publishStaffAction`). Un `guest: true` reposé à l'identique est
+ * publié s'il a encore quitté, laissé ou effacé quelque chose (sortie
+ * rejouée : les désistements ont un auteur à nommer) ; rien pour un
+ * enregistrement sans écart ni effet.
  */
 export function publishPlanningGuestChange(actor: StaffActor, targetUserId: number, saved: PlanningGuestSaveResult): boolean {
-  // Reposé à l'identique (sortie rejouée) : le drapeau n'a pas bougé, rien à publier ; les annonces du
-  // désistement ordinaire disent déjà ce qui a été quitté.
-  if (!saved.changed) return false;
+  if (!saved.changed) {
+    if (!saved.guest || !releaseDidSomething(saved.release)) return false;
+    publishStaffAction(PLANNING_GUEST_REPLAY_DISCORD_LINE, actor, {
+      auditLine: planningGuestAuditLine(targetUserId, saved),
+      category: "admin",
+    });
+    return true;
+  }
   publishStaffAction(saved.guest ? PLANNING_GUEST_ON_DISCORD_LINE : PLANNING_GUEST_OFF_DISCORD_LINE, actor, {
     auditLine: planningGuestAuditLine(targetUserId, saved),
     category: "admin",

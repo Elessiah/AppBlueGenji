@@ -451,6 +451,27 @@ describe("mergeView", () => {
     expect("durations" in merged).toBe(false);
   });
 
+  it("mergeView_sameNames_keepsPreviousIdentity", () => {
+    const previous = viewOf({ names: [{ userId: 9, pseudo: "Test_CasterInvite" }] });
+
+    const merged = mergeView(previous, structuredClone(previous));
+
+    expect(merged.names).toBe(previous.names);
+  });
+
+  it("mergeView_changedNames_takesNext", () => {
+    const previous = viewOf({ names: [{ userId: 9, pseudo: "Test_CasterInvite" }] });
+    const next = viewOf({ names: [{ userId: 9, pseudo: "Test_Renamed" }] });
+
+    expect(mergeView(previous, next).names).toBe(next.names);
+  });
+
+  it("mergeView_noNames_keyAbsent", () => {
+    const previous = viewOf({ names: [{ userId: 9, pseudo: "Test_CasterInvite" }] });
+
+    expect("names" in mergeView(previous, viewOf())).toBe(false);
+  });
+
   it("mergeView_adminDemoted_dropsStaleDurations", () => {
     const previous = viewOf({ canManage: true, canCompute: true, durations: DEFAULT_PLANNING_DURATIONS });
     const merged = mergeView(previous, viewOf({ canManage: true, canCompute: false }));

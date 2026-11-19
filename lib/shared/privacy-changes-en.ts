@@ -1216,7 +1216,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     details: [
       "What is kept: the “guest” mark on the account, as long as the staff leaves it; it is in the export of your data and goes with the account's deletion. Basis: the association's legitimate interest (organising its volunteers), with a right to object.",
       "What it changes: a guest is no longer proposed, assigned or notified by the schedule, and no longer reads its page; the mark leaves their upcoming assignments as a withdrawal would (a replacement is looked for as usual) and erases their upcoming availability; what is past stays.",
-      "Who sees it: the staff who assigns roles; the other schedule members can only notice that the guest no longer appears there. The action is noted in the staff log on Discord without naming anyone; the server logs keep its author (T05).",
+      "Who sees it: the staff who assigns roles; the other schedule members can only notice that the guest no longer appears there. The action is noted in the staff log on Discord without naming anyone; the server logs keep its author (T05), and each assignment left stays in the schedule history as a removal by staff, with its author's account, for as long as that history is kept (T20); it appears in the guest's data export, without the author, and in the author's.",
       "What does not change: for an account that is not marked, nothing new is collected.",
     ],
   },

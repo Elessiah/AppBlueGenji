@@ -141,12 +141,13 @@ export function entriesNeedingMark(
 async function loadOtherNames(
   executor: Executor,
   data: PlanningData,
+  assignmentsByEntry: ReadonlyMap<string, readonly { userId: number }[]>,
   canManage: boolean,
 ): Promise<PlanningName[]> {
   const members = new Set(data.members.map((member) => member.userId));
   const ids = new Set<number>();
-  for (const entry of data.entries) {
-    for (const row of entryAssignments(entry, data)) if (!members.has(row.userId)) ids.add(row.userId);
+  for (const rows of assignmentsByEntry.values()) {
+    for (const row of rows) if (!members.has(row.userId)) ids.add(row.userId);
   }
   if (canManage) for (const row of data.withdrawals) if (!members.has(row.userId)) ids.add(row.userId);
   if (ids.size === 0) return [];
@@ -161,7 +162,7 @@ async function loadOtherNames(
 export async function loadPlanningView(user: AuthUser, now: number = Date.now()): Promise<PlanningView> {
   const canManage = can(user, "tournaments");
   const canCompute = canComputePlanning(user);
-  const { data, pending, marks, rounds, names } = await withConnection(async (connection) => {
+  const { data, pending, marks, rounds, names, assignmentsByEntry } = await withConnection(async (connection) => {
     const loaded = await loadPlanningData(connection, {
       now,
       includeHidden: canManage,
@@ -175,9 +176,15 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
     for (const entry of loaded.entries) {
       if (entry.matchId !== null) requests.push({ tournamentId: entry.tournamentId, matchId: entry.matchId, finished: entry.tournamentFinished });
     }
-    const rounds = await loadEntryRounds(connection, requests, now);
-    const names = await loadOtherNames(connection, loaded, canManage);
-    return { data: loaded, pending, marks: await readStoredAutoConfirms(connection, keys), rounds, names };
+    // Calculées une fois : les noms des non-membres et les cartes les lisent toutes deux.
+    const assignmentsByEntry = new Map(loaded.entries.map((entry) => [entry.key, entryAssignments(entry, loaded)]));
+    // Trois lectures indépendantes, lancées ensemble.
+    const [rounds, names, marks] = await Promise.all([
+      loadEntryRounds(connection, requests, now),
+      loadOtherNames(connection, loaded, assignmentsByEntry, canManage),
+      readStoredAutoConfirms(connection, keys),
+    ]);
+    return { data: loaded, pending, marks, rounds, names, assignmentsByEntry };
   });
   // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul
   // (`preparePlanner`) ; les autres lecteurs gardent la couverture d'avant (rien n'y trahit la suspension).
@@ -188,7 +195,7 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
   const availabilityByEntry = groupByEntry(data.availability);
   const withdrawalsByEntry = groupByEntry(data.withdrawals);
   const entries: PlanningEntryView[] = data.entries.map((entry) => {
-    const assignments = entryAssignments(entry, data);
+    const assignments = assignmentsByEntry.get(entry.key) ?? entryAssignments(entry, data);
     const availability = availabilityByEntry.get(entry.key) ?? [];
     return {
       key: entry.key,
@@ -230,12 +237,14 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       unfilled: unfilledRoles(entry, canManage ? assignments.filter((row) => !suspended.has(row.userId)) : assignments, withdrawalsByEntry.get(entry.key) ?? []),
       // Motif et auteur d'un désistement : au staff des tournois seul.
       withdrawals: canManage
-        ? (withdrawalsByEntry.get(entry.key) ?? []).map(({ userId, role, late, reason, confirmed, createdAt }) => ({
+        ? (withdrawalsByEntry.get(entry.key) ?? []).map(({ userId, role, late, reason, confirmed, staffRelease, createdAt }) => ({
             userId,
             role,
             late,
             reason,
             confirmed,
+            // Sortie d'un invité par le staff : ce n'est pas lui qui s'est désisté.
+            ...(staffRelease ? { staffRelease: true as const } : {}),
             createdAt,
           }))
         : [],

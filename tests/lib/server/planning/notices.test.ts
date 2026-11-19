@@ -233,6 +233,25 @@ describe("announceWithdrawal — destinataires", () => {
     expect(loadStaffIds).toHaveBeenCalledWith("tournaments", [4]);
   });
 
+  it("announceWithdrawal_unfilledStaffRelease_actorExcludedFromStaff", async () => {
+    await announceWithdrawal(withdrawal({ released: true, actorId: 1 }));
+
+    expect(loadStaffIds).toHaveBeenCalledWith("tournaments", [4, 1]);
+  });
+
+  it("announceWithdrawal_actorCoAssigned_actorNotNotified", async () => {
+    await announceWithdrawal(withdrawal({ unfilled: false, released: true, actorId: 5, coAssignedIds: [3, 5] }));
+
+    expect(sent()).toEqual([[[3], "PLANNING_WITHDRAWAL"]]);
+  });
+
+  it("announceWithdrawal_released_noticeCarriesReleased", async () => {
+    await announceWithdrawal(withdrawal({ unfilled: false, released: true, actorId: 1, coAssignedIds: [3] }));
+
+    const push = jest.mocked(notifyUsers).mock.calls[0][1].push;
+    expect(push("fr").body).toContain("a été retiré du planning");
+  });
+
   it("announceWithdrawal_coAssigned_suspendedAccountsLeftOut", async () => {
     await announceWithdrawal(withdrawal({ unfilled: false, coAssignedIds: [3] }));
 

@@ -57,6 +57,8 @@ export type PlanningWithdrawalView = {
   late: boolean;
   reason: string | null;
   confirmed: boolean;
+  /** Pas un désistement : le staff a sorti du planning ce compte devenu invité. Absent : faux. */
+  staffRelease?: true;
   createdAt: string;
 };
 

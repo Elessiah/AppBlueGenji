@@ -111,7 +111,8 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
   n'est pas un réglage du titulaire), `404 USER_NOT_FOUND` pour un compte
   inconnu ou supprimé, `409 PLANNING_GUEST_ADMIN` pour poser le drapeau sur un
   administrateur (il garde tout, `planning` compris : la sortie n'effacerait que
-  ses créneaux). Écriture conditionnelle (`is_guest_staff <> ?`). Reposer
+  ses créneaux ; l'écriture le revérifie, `AND is_admin = 0`, contre une
+  promotion concurrente). Écriture conditionnelle (`is_guest_staff <> ?`). Reposer
   `guest: true` rejoue la sortie (reprise d'une sortie incomplète) ; une
   attribution déjà partie (sortie concurrente) est passée sans bruit.
 - **Tout le compte** : le drapeau retire le planning entier, rôle d'arbitre
@@ -133,25 +134,34 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
   rend le nom des comptes montrés sans être membres (`PlanningView.names` :
   invité, rôle retiré) au lieu de `#id`.
 - **Sortie du planning** (`releaseGuestPlanning`, `withdrawal.ts`) : au moment
-  où le drapeau est **posé** (pas à chaque enregistrement identique), chaque
+  où le drapeau est posé, et de nouveau à chaque `guest: true` reposé à
+  l'identique (reprise d'une sortie incomplète), chaque
   attribution du compte sur une entrée modifiable pas encore commencée
   (`AUTO` ou `MANUAL`) passe par le **désistement ordinaire**
   (`withdrawMember`, sans motif : remplaçant, place « à pourvoir », annonces,
   évènement `WITHDRAWN`), au nom du staff : l'évènement porte son auteur
-  (`actor_user_id`), n'est jamais tardif, n'écarte pas le compte des calculs
-  suivants s'il redevient membre (`removals` ignore un `WITHDRAWN` à auteur), et
-  le retrait d'un arbitre du match nomme le staff. Puis ses disponibilités des
+  (`actor_user_id`) et la marque `staff_release` (indépendante de l'auteur, que
+  la suppression du compte du staff efface), n'est jamais tardif, n'écarte pas
+  le compte des calculs suivants s'il redevient membre (`removals` ignore un
+  `WITHDRAWN` marqué), et le retrait d'un arbitre du match nomme le staff. Le
+  tableau du staff le montre « Sorti par le staff », l'export du compte le dit
+  (`staffRelease`), et les avis le disent « retiré du planning » plutôt que
+  « s'est désisté » (`released`) ; l'auteur du geste n'en reçoit aucun (ni
+  désistement, ni place à pourvoir). Puis ses disponibilités des
   entrées à venir sont effacées. Une lecture du planning en panne compte comme
   un échec (`failed`). Une inscription de cast sur un match (`CAST`) ou
   un arbitre désigné hors du planning (`MATCH`) restent : ils se gèrent depuis
   le match. Le passé (entrées commencées, historique) ne bouge pas. Une
   attribution refusée ou en panne est comptée (`failed`, notification « décoche
   puis recoche « Invité » pour réessayer, ou retire-les depuis le planning »)
-  sans défaire le drapeau. Décocher ne rend rien : le
+  sans défaire le drapeau ; une entrée devenue non modifiable entre la lecture
+  et le retrait compte aussi comme échec. Décocher ne rend rien : le
   compte redevient membre, sans attribution.
 - **Journal du staff** : `publishPlanningGuestChange` (`publishStaffAction`) —
   ligne anonyme sur Discord, auteur et compte visé (`#id`, bilan de la sortie)
-  dans pm2 ; rien pour un enregistrement sans écart.
+  dans pm2 ; un `guest: true` reposé qui quitte ou efface encore quelque chose
+  (sortie rejouée) est publié aussi (ligne « sortie rejouée »), un
+  enregistrement sans écart ni effet ne publie rien.
 - **Seed** : `Test_CasterInvite` (caster invité).
 - **RGPD** : registre T20 (sous-finalité, catégorie, conservation,
   destinataires), `/rgpd` § planning (FR, EN), entrée

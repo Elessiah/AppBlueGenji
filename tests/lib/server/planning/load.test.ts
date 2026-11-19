@@ -400,7 +400,7 @@ describe("loadPlanningData", () => {
     // Une seule lecture pour retraits et désistements ; les désistements sortent par date puis identifiant.
     expect(connection.execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_planning_events"))).toHaveLength(1);
     expect(data.withdrawals.map((row) => row.userId)).toEqual([4, 5]);
-    expect(data.withdrawals[0]).toEqual({ entryKey: "t:10", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, createdAt: "2026-11-20T10:00:00.000Z" });
+    expect(data.withdrawals[0]).toEqual({ entryKey: "t:10", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, staffRelease: false, createdAt: "2026-11-20T10:00:00.000Z" });
     expect(data.removals).toContainEqual({ entryKey: "t:10", userId: 4, role: "CASTER" });
     expect(data.removals).toContainEqual({ entryKey: "t:10", userId: 6, role: "PROD" });
   });
@@ -412,7 +412,7 @@ describe("loadPlanningData", () => {
       if (sql.includes("kind = 'WITHDRAWN'")) {
         return [
           [
-            { id: 8, entry_key: "t:10", user_id: 5, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: null, late: 0, actor_user_id: 1, created_at: new Date("2026-11-20T10:00:00Z") },
+            { id: 8, entry_key: "t:10", user_id: 5, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: null, late: 0, staff_release: 1, created_at: new Date("2026-11-20T10:00:00Z") },
           ],
           [],
         ];
@@ -424,6 +424,7 @@ describe("loadPlanningData", () => {
 
     // La sortie d'un invité par le staff reste un désistement montré, sans écarter le compte des calculs suivants.
     expect(data.withdrawals.map((row) => row.userId)).toEqual([5]);
+    expect(data.withdrawals[0].staffRelease).toBe(true);
     expect(data.removals).toEqual([]);
   });
 

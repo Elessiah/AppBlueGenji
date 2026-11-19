@@ -313,7 +313,7 @@ describe("loadPlanningView — raisons", () => {
 
 /** Un désistement tel que le relit `loadPlanningData`. */
 function withdrawalRow(overrides: Partial<LoadedWithdrawal> = {}): LoadedWithdrawal {
-  return { entryKey: "m:1", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, createdAt: "2026-11-20T10:00:00.000Z", ...overrides };
+  return { entryKey: "m:1", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, staffRelease: false, createdAt: "2026-11-20T10:00:00.000Z", ...overrides };
 }
 
 const heldBy = (userId: number, provisional: boolean): PlanningAssignmentView => ({
@@ -360,6 +360,16 @@ describe("loadPlanningView — désistements", () => {
       { userId: 4, role: "CASTER", late: true, reason: "Malade", confirmed: true, createdAt: "2026-11-20T10:00:00.000Z" },
     ]);
     expect(view.entries[0].unfilled).toEqual(["CASTER"]);
+  });
+
+  it("loadPlanningView_staffRelease_flaggedForStaff", async () => {
+    jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) =>
+      planningData({ entries: [loadedEntry()], members: options.members ?? [], withdrawals: [withdrawalRow({ staffRelease: true, late: false, reason: null })] }),
+    );
+
+    const view = await loadPlanningView(staff, MONDAY - 48 * 60 * 60 * 1000);
+
+    expect(view.entries[0].withdrawals[0]).toMatchObject({ userId: 4, staffRelease: true });
   });
 
   it("loadPlanningView_caster_seesOpenSlotButNoWithdrawals", async () => {

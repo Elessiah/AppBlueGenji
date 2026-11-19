@@ -44,6 +44,28 @@ describe("exportOwnPlanning", () => {
     ]);
   });
 
+  it("exportOwnPlanning_staffReleasedWithdrawal_flagged", async () => {
+    routeSql({
+      events: [
+        { tournament_id: 10, match_id: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: null, late: 0, staff_release: 1, created_at: new Date("2026-11-20T18:00:00.000Z") },
+      ],
+    });
+
+    const data = await exportOwnPlanning(4);
+
+    expect(data.history[0]).toEqual({
+      tournamentId: 10,
+      matchId: 1,
+      role: "CASTER",
+      kind: "WITHDRAWN",
+      source: "MANUAL",
+      createdAt: "2026-11-20T18:00:00.000Z",
+      reason: null,
+      late: false,
+      staffRelease: true,
+    });
+  });
+
   it("exportOwnPlanning_events_historyOfTheHolderWithoutActor", async () => {
     routeSql({
       events: [

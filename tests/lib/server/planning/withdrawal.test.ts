@@ -209,8 +209,18 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
       "INSERT INTO bg_planning_events (entry_ke",
       "INSERT INTO bg_planning_events (entry_ke",
     ]);
-    expect(execute.mock.calls[1][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "MANUAL", null, "Malade", 0]);
+    expect(execute.mock.calls[1][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "MANUAL", null, "Malade", 0, 0]);
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ role: "CASTER", late: false, replacementId: 6 });
+  });
+
+  it("withdrawFromEntry_memberWithdrawal_notReleasedNoActor", async () => {
+    casterData({ confirmed: true, candidates: [6] });
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    const announced = jest.mocked(announceWithdrawal).mock.calls[0][0];
+    expect(announced.released).toBeUndefined();
+    expect(announced.actorId).toBeUndefined();
   });
 
   it("withdrawFromEntry_confirmedNoCandidate_unfilledAndAnnounced", async () => {
@@ -264,7 +274,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, MONDAY - HOUR_MS);
 
     expect(result.late).toBe(true);
-    expect(execute.mock.calls[1][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "MANUAL", null, null, 1]);
+    expect(execute.mock.calls[1][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "MANUAL", null, null, 1, 0]);
   });
 
   it("withdrawFromEntry_provisionalRow_replacementProvisionalWithoutAnnouncement", async () => {
@@ -273,7 +283,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
     expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
-    expect(execute.mock.calls[1][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "AUTO", null, null, 0]);
+    expect(execute.mock.calls[1][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "AUTO", null, null, 0, 0]);
     expect(execute.mock.calls[2][1]).toEqual(["m:1", 6, "CASTER", 10, 1, "LOAD", 0]);
     expect(announceWithdrawal).not.toHaveBeenCalled();
   });
@@ -1236,8 +1246,33 @@ describe("releaseGuestPlanning (`CAST_PLANNING.md` § Invités)", () => {
     await releaseGuestPlanning(GUEST, STAFF, MONDAY - HOUR_MS);
 
     const event = execute.mock.calls.find(([sql]) => sql.includes("'WITHDRAWN'"));
-    expect(event?.[1]).toEqual(["m:1", GUEST, "CASTER", 10, 1, "MANUAL", STAFF, null, 0]);
+    expect(event?.[1]).toEqual(["m:1", GUEST, "CASTER", 10, 1, "MANUAL", STAFF, null, 0, 1]);
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ late: false });
+  });
+
+  it("releaseGuestPlanning_staffRelease_announcesReleasedWithActor", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(
+      planningData({ entries: [loadedEntry()], assignments: [loadedAssignment({ userId: GUEST, role: "CASTER" })] }),
+    );
+    casterData({ confirmed: true });
+
+    await releaseGuestPlanning(GUEST, STAFF, EARLY);
+
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ released: true, actorId: STAFF, withdrawnUserId: GUEST });
+  });
+
+  it("releaseGuestPlanning_entryClosedMeanwhile_countedFailed", async () => {
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(planningData({ entries: [loadedEntry()], assignments: [loadedAssignment({ userId: GUEST, role: "CASTER" })] }))
+      .mockResolvedValueOnce(
+        planningData({ entries: [loadedEntry({ editable: false })], assignments: [loadedAssignment({ userId: GUEST, role: "CASTER" })] }),
+      );
+
+    const release = await releaseGuestPlanning(GUEST, STAFF, EARLY);
+
+    expect(release.withdrawn).toBe(0);
+    expect(release.failed).toBe(1);
   });
 
   it("releaseGuestPlanning_confirmedReferee_matchNamesTheStaff", async () => {
