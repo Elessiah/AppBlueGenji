@@ -1,11 +1,13 @@
-import type { Pool } from "mysql2/promise";
+import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { CONTACT_DISCORD_URL_KEY, CONTACT_EMAIL_KEY, SUPERSEDED_CONTACT_EMAILS } from "@/lib/shared/contact";
 import { DISCORD_INVITE_URL, SUPERSEDED_DISCORD_INVITE_URLS } from "@/lib/shared/discord";
 
 /** Rattrapages permanents, rejoués à chaque démarrage. */
 export async function applyPermanentCatchUps(db: Pool): Promise<void> {
-  // Trois filets, et non des migrations à cocher : leur cause peut se reproduire,
-  // et ils sont donc **volontairement** rejoués à chaque démarrage. Tous trois
+  // Quatre filets, et non des migrations à cocher : leur cause peut se reproduire,
+  // et ils sont donc **volontairement** rejoués à chaque démarrage. Tous quatre
   // sont idempotents et ne trouvent rien à faire dans le cas nominal.
 
   // L'invitation Discord est une constante partout **sauf** en pied de page, où
@@ -70,6 +72,49 @@ export async function applyPermanentCatchUps(db: Pool): Promise<void> {
          AND u.visible_avatar = 0
          AND t.logo_url IS NOT NULL
     `);
+  } catch {
+    // Rattrapage remis au prochain démarrage.
+  }
+
+  await liftStrayImpersonations(db);
+}
+
+/**
+ * Lève l'incarnation **en cours** des sessions d'un compte qui n'est pas (ou
+ * plus) administrateur (`docs/features/ADMIN_ROLE_IMPERSONATION.md`) : ignorée
+ * tant qu'il ne l'est pas, elle revenait telle quelle s'il le redevenait dans
+ * les 12 h. Cause rare mais possible à tout moment — une entrée qui croise une
+ * rétrogradation et dont le retour échoue (`setPlayerView`) —, et reste
+ * d'avant la fonctionnalité (vue joueur ouverte aux non-administrateurs).
+ *
+ * En deux temps, sans verrou sur `bg_users` : une lecture cohérente (sans
+ * verrou) trouve les sessions, puis un `UPDATE` sur leur seule table, borné à
+ * leurs identifiants et à une échéance encore en cours — rien ne se prend dans
+ * l'ordre inverse de la rétrogradation (`bg_users` puis sessions). Les rôles
+ * incarnés partent avec l'échéance (sans leur colonne, l'échéance seule). Une
+ * ligne pm2 sans nom donne le nombre de sessions levées (registre, T05).
+ * Toute panne est remise au démarrage suivant.
+ */
+export async function liftStrayImpersonations(db: Pool): Promise<void> {
+  try {
+    const [rows] = await db.execute<(RowDataPacket & { id: number | string })[]>(
+      `SELECT s.id FROM bg_user_sessions s JOIN bg_users u ON u.id = s.user_id
+        WHERE s.player_view_until > NOW() AND (u.is_admin = 0 OR u.is_deleted = 1)`,
+    );
+    if (rows.length === 0) return;
+    const ids = rows.map((row) => Number(row.id));
+    const placeholders = ids.map(() => "?").join(", ");
+    const clear = (roles: boolean) =>
+      db.execute<ResultSetHeader>(
+        `UPDATE bg_user_sessions SET player_view_until = NULL${roles ? ", impersonated_roles_json = NULL" : ""}
+          WHERE id IN (${placeholders}) AND player_view_until > NOW()`,
+        ids,
+      );
+    const [result] = await clear(true).catch((error: unknown) =>
+      isUnknownColumnError(error) ? clear(false) : Promise.reject(error),
+    );
+    const lifted = Number(result.affectedRows ?? 0);
+    if (lifted > 0) console.info(`${PLAYER_VIEW_OFF_AUDIT} : levée au démarrage, compte sans administration (${lifted} session(s))`);
   } catch {
     // Rattrapage remis au prochain démarrage.
   }

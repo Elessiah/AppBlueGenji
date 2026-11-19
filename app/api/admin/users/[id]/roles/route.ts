@@ -20,14 +20,19 @@ const SERVICE_ERROR_STATUS: Readonly<Record<string, number>> = {
  */
 function publishAfterCommit(actor: { id: number; pseudo: string }, targetId: number, saved: RolesSaveResult): void {
   try {
-    // Retour imposé par la rétrogradation : la ligne pm2 du retour, comme
-    // toute bascule (registre, T18), au nom de l'administrateur qui l'a imposé.
-    if (saved.impersonationsCleared) {
-      auditStaffAction(`${PLAYER_VIEW_OFF_AUDIT} : administration retirée au compte #${targetId} (${saved.impersonationsCleared} session(s))`, actor);
-    }
     publishRolesChange(actor, targetId, saved);
   } catch (error) {
     console.error(`[roles] journal du staff non publié : ${failureReason(error)}`);
+  }
+  // À part, après la publication du changement de rôles (la trace principale,
+  // qu'une panne ici ne doit pas emporter) : retour imposé par la
+  // rétrogradation, la ligne pm2 du retour, comme toute bascule (registre,
+  // T05), au nom de l'administrateur qui l'a imposé — jamais sur Discord.
+  if (!saved.impersonationsCleared) return;
+  try {
+    auditStaffAction(`${PLAYER_VIEW_OFF_AUDIT} : administration retirée au compte #${targetId} (${saved.impersonationsCleared} session(s))`, actor);
+  } catch (error) {
+    console.error(`[roles] ligne du retour imposé non publiée : ${failureReason(error)}`);
   }
 }
 

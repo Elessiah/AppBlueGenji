@@ -190,6 +190,36 @@ describe("POST /api/admin/users/[id]/roles", () => {
     expect(lines.some((line) => line.includes(PLAYER_VIEW_OFF_AUDIT) && line.includes(admin.pseudo))).toBe(true);
   });
 
+  it("post_publishRolesChangeThrows_stillLogsForcedReturn", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue({ roles: [], previous: ["ADMIN"], impersonationsCleared: 2 });
+    jest.mocked(service.publishRolesChange).mockImplementation(() => {
+      throw new Error("journal en panne");
+    });
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    const res = await POST(jsonReq({ roles: [] }), params("7"));
+
+    expect(res.status).toBe(200);
+    expect(info.mock.calls.some(([line]) => String(line).includes(PLAYER_VIEW_OFF_AUDIT))).toBe(true);
+  });
+
+  it("post_forcedReturnAuditThrows_rolesChangeStillPublished", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue({ roles: [], previous: ["ADMIN"], impersonationsCleared: 1 });
+    jest.spyOn(console, "info").mockImplementation(() => {
+      throw new Error("sortie fermée");
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const res = await POST(jsonReq({ roles: [] }), params("7"));
+
+    expect(res.status).toBe(200);
+    expect(service.publishRolesChange).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls.some(([line]) => String(line).includes("ligne du retour imposé non publiée"))).toBe(true);
+  });
+
   it("post_nothingCleared_writesNoForcedReturnLine", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.setUserRoles).mockResolvedValue(saved([], ["ADMIN"]));

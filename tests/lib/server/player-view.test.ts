@@ -200,7 +200,38 @@ describe("setPlayerView — administration retirée pendant l'entrée", () => {
       impersonationAuditLine(["CASTER"]),
       PLAYER_VIEW_OFF_AUDIT,
     ]);
-    expect(reconnectSessionStreams).toHaveBeenCalledTimes(2);
+    expect(reconnectSessionStreams).toHaveBeenCalledTimes(1);
+  });
+
+  it("setPlayerView_adminReadFails_undoesEntryAndRethrows", async () => {
+    const outage = new Error("ER_LOCK_WAIT_TIMEOUT");
+    execute.mockImplementation(async (sql) => {
+      if (isAdminRead(sql)) throw outage;
+      return [header(1), []];
+    });
+
+    await expect(setPlayerView(admin, true, ["CASTER"])).rejects.toBe(outage);
+
+    expect(sqlCalls().at(-1)).toContain("UPDATE bg_user_sessions SET player_view_until = NULL, impersonated_roles_json = NULL");
+    expect(jest.mocked(auditStaffAction).mock.calls.map(([line]) => line)).toEqual([
+      impersonationAuditLine(["CASTER"]),
+      PLAYER_VIEW_OFF_AUDIT,
+    ]);
+  });
+
+  it("setPlayerView_adminReadAndUndoFail_rethrowsReadError", async () => {
+    const outage = new Error("connection lost");
+    let writes = 0;
+    execute.mockImplementation(async (sql) => {
+      if (isAdminRead(sql)) throw outage;
+      writes += 1;
+      if (writes > 1) throw new Error("undo failed");
+      return [header(1), []];
+    });
+
+    await expect(setPlayerView(admin, true, ["CASTER"])).rejects.toBe(outage);
+
+    expect(jest.mocked(auditStaffAction).mock.calls.map(([line]) => line)).toEqual([impersonationAuditLine(["CASTER"])]);
   });
 
   it("setPlayerView_entryStillAdmin_keepsWrite", async () => {

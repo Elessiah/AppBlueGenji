@@ -1267,7 +1267,8 @@ function RgpdFr({
             Un administrateur peut réduire ses droits sur une de ses sessions aux rôles de plateforme qu&apos;il choisit
             (« Incarner un rôle » ; aucun rôle : « vue joueur », le site vu comme un joueur), {PLAYER_VIEW_MAX_HOURS} heures au plus : rien n&apos;en est dit
             sur Discord ; les journaux du serveur gardent son pseudo, son identifiant, les rôles incarnés et le sens de la bascule (entrée ou
-            retour), selon leur rotation, au titre de l&apos;intérêt légitime (administration de la plateforme), auquel il
+            retour) — un retour imposé par le retrait de son administration est noté au nom de l&apos;administrateur qui l&apos;a retirée, avec
+            l&apos;identifiant du compte —, selon leur rotation, au titre de l&apos;intérêt légitime (administration de la plateforme), auquel il
             peut s&apos;opposer ; l&apos;échéance et les rôles incarnés sont notés sur la session et s&apos;effacent au retour, quand le compte
             perd l&apos;administration pendant l&apos;incarnation, ou avec la session
             (<Link href="/rgpd/registre#t05">registre, T05</Link>).

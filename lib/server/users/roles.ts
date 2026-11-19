@@ -136,10 +136,14 @@ export async function setUserRoles(
       // Rétrogradation : l'incarnation posée sur ses sessions tombe avec
       // l'administration (`ADMIN_ROLE_IMPERSONATION.md`), elle ne reviendrait
       // pas d'elle-même si l'administration était rendue.
-      // Seul ordre de verrouillage des deux tables : `bg_users` (ci-dessus)
-      // puis les sessions — tout autre écrivain des sessions tient en une
-      // instruction sans `bg_users` (l'entrée d'une incarnation relit
-      // l'administration après coup, `setPlayerView`).
+      // Ordre de verrouillage : `bg_users` (ci-dessus) puis les sessions.
+      // Les autres écrivains des sessions tiennent en une instruction et ne
+      // verrouillent pas de ligne de session avant `bg_users` : l'insertion
+      // d'une session pose un verrou partagé sur `bg_users` par sa clé
+      // étrangère, mais avant toute ligne de session existante ; l'entrée
+      // d'une incarnation relit l'administration après coup, sans verrou
+      // (`setPlayerView`) ; le balayage du démarrage lit sans verrou puis
+      // n'écrit que les sessions (`liftStrayImpersonations`).
       if (previous.includes("ADMIN") && !isAdmin) {
         impersonationsCleared = await clearAccountImpersonation(connection, targetUserId);
       }

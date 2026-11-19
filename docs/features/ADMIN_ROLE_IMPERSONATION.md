@@ -72,13 +72,20 @@ ignorés tant que le compte n'est plus administrateur, revenaient tels quels
 s'il le redevenait dans les 12 h. Une échéance déjà passée reste, sans effet.
 La route des rôles en laisse la ligne pm2 du retour (`PLAYER_VIEW_OFF_AUDIT`,
 au nom de l'administrateur qui rétrograde, avec le numéro du compte et le
-nombre de sessions). Ordre de verrouillage unique : `bg_users` puis les
-sessions. Une entrée **concurrente** (administration lue avant la
+nombre de sessions), à part de la publication du changement de rôles (une
+panne de l'une n'emporte pas l'autre). Ordre de verrouillage : `bg_users`
+puis les sessions ; aucun autre écrivain ne tient une ligne de session avant
+`bg_users`. Une entrée **concurrente** (administration lue avant la
 rétrogradation, écrite après) relit `is_admin` après son écriture, sans
-verrou, et se défait (`403 FORBIDDEN`) — une condition sur `bg_users` dans
-l'`UPDATE` aurait pris l'ordre inverse. Un rattrapage de
-`RECENT_SCHEMA_CHANGES` lève une fois les échéances en cours des comptes non
-administrateurs (vue joueur posée avant ce nettoyage).
+verrou, et se défait (`403 FORBIDDEN`, sans seconde reconnexion des flux) —
+une condition sur `bg_users` dans l'`UPDATE` aurait pris l'ordre inverse. Si
+cette relecture échoue (panne passagère), l'entrée est défaite au mieux et
+l'erreur remonte. Ce qui resterait malgré tout (défaire en échec, vue joueur
+d'avant la fonctionnalité sur un non-administrateur) est levé au démarrage
+par `liftStrayImpersonations` (`catch-ups.ts`, rejoué à chaque démarrage) :
+lecture sans verrou des sessions concernées, puis `UPDATE` des seules
+sessions (échéance **et** rôles), avec une ligne pm2 sans nom qui donne le
+nombre de sessions levées.
 
 ## Ce qui reste au compte pendant l'incarnation
 
@@ -231,7 +238,8 @@ compris) pouvait passer en vue joueur : ses lignes pm2 restent jusqu'à leur rot
 
 - Registre : T01 décrit l'échéance parmi les données de la session ; T05 décrit
   la bascule (sous-finalité « Vue joueur »), la ligne pm2 (pseudo, identifiant,
-  sens), la mémoire du plafond (`PLAYER_VIEW_TOGGLE_RULE` pour les entrées,
+  sens ; retour imposé : administrateur qui rétrograde, compte, nombre de
+  sessions ; levée au démarrage : nombre de sessions seul), la mémoire du plafond (`PLAYER_VIEW_TOGGLE_RULE` pour les entrées,
   `PLAYER_VIEW_EXIT_RULE` pour les retours) et des reconnexions
   (`session-streams`), la base (intérêt légitime) et les développeurs parmi les
   personnes concernées.

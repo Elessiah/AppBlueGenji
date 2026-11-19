@@ -5,17 +5,11 @@ import { reconnectSessionStreams } from "@/lib/server/session-streams";
 import { auditStaffAction } from "@/lib/server/staff-audit";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
+import { impersonationAuditLine, PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
 import { parseImpersonatedRoles, PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import type { PlatformRole } from "@/lib/shared/permissions";
 
-/** Lignes pm2 de la bascule (`auditStaffAction` : jamais sur Discord, où elles ne diraient rien d'utile). */
-export const PLAYER_VIEW_ON_AUDIT = "🎭 Rôle incarné sur une session";
-export const PLAYER_VIEW_OFF_AUDIT = "🎭 Incarnation quittée sur une session";
-
-/** La ligne pm2 de l'entrée : les rôles incarnés, ou la vue joueur (aucun). */
-export function impersonationAuditLine(roles: readonly PlatformRole[]): string {
-  return `${PLAYER_VIEW_ON_AUDIT} : ${roles.length > 0 ? roles.join(", ") : "joueur (aucun rôle)"}`;
-}
+export { PLAYER_VIEW_OFF_AUDIT, PLAYER_VIEW_ON_AUDIT, impersonationAuditLine } from "@/lib/server/player-view-audit";
 
 /** Refus de {@link setPlayerView} : aucune ligne de session à marquer. */
 export const PLAYER_VIEW_NO_SESSION = "NO_SESSION";
@@ -115,10 +109,28 @@ export async function setPlayerView(
   if (changed) announce(active ? impersonationAuditLine(kept) : PLAYER_VIEW_OFF_AUDIT);
 
   // Après la ligne pm2 de l'entrée (une écriture commitée se trace toujours) :
-  // l'entrée défaite laisse aussi celle de son retour.
-  if (changed && active && !(await isStillAdmin(db, user.id))) {
-    if (await write(null)) announce(PLAYER_VIEW_OFF_AUDIT);
-    throw new Error(PLAYER_VIEW_NOT_ADMIN);
+  // l'entrée défaite laisse aussi celle de son retour. Sans reconnexion des
+  // flux : un compte qui n'est plus administrateur ignore l'incarnation, ses
+  // droits ne changent pas (une seule reconnexion par demande, celle de
+  // l'entrée — borne de `RECONNECT_MEMORY_PER_USER`).
+  if (changed && active) {
+    const undo = async () => {
+      if (await write(null)) auditStaffAction(PLAYER_VIEW_OFF_AUDIT, { id: user.id, pseudo: user.pseudo });
+    };
+    let stillAdmin: boolean;
+    try {
+      stillAdmin = await isStillAdmin(db, user.id);
+    } catch (error) {
+      // Administration inconnue (panne passagère) : l'entrée est défaite au
+      // mieux plutôt que laissée dormante ; un défaire en échec, lui, est
+      // rattrapé par le balayage du démarrage (`liftStrayImpersonations`).
+      await undo().catch(() => undefined);
+      throw error;
+    }
+    if (!stillAdmin) {
+      await undo();
+      throw new Error(PLAYER_VIEW_NOT_ADMIN);
+    }
   }
 
   const row = await readSessionView(db, key.tokenHash, user.id);
