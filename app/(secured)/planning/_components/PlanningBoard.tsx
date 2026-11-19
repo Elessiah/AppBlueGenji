@@ -208,10 +208,14 @@ export function PlanningBoard({
 
   const members = view?.members;
   const others = view?.names;
-  const names = useMemo(
+  const builtNames = useMemo(
     () => new Map([...(others ?? []), ...(members ?? [])].map((member) => [member.userId, member.pseudo])),
     [members, others],
   );
+  // Même contenu, même Map : une relecture qui ne change aucun nom ne refait pas rendre les cartes.
+  const namesRef = useRef(builtNames);
+  if (namesRef.current !== builtNames && !sameNames(namesRef.current, builtNames)) namesRef.current = builtNames;
+  const names = namesRef.current;
   // Ce que les cartes lisent du lecteur : stable tant que ces quatre valeurs le sont.
   const me = view?.me;
   const myRoles = view?.myRoles;
@@ -1099,4 +1103,11 @@ function StaffPanel({
       </details>
     </Disclosure>
   );
+}
+
+/** Deux annuaires de pseudos disent la même chose. */
+function sameNames(a: ReadonlyMap<number, string>, b: ReadonlyMap<number, string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const [id, pseudo] of a) if (b.get(id) !== pseudo) return false;
+  return true;
 }

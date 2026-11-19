@@ -507,6 +507,22 @@ describe("destinataires", () => {
     expect(String(query.mock.calls.at(-1)?.[0])).not.toContain("is_guest_staff");
   });
 
+  it("loadNotificationRecipients_matchDmGuestColumnMissing_skipsEveryReadAskingForIt", async () => {
+    const query = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
+      if (String(sql).includes("is_guest_staff")) {
+        throw Object.assign(new Error("Unknown column 'is_guest_staff' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" });
+      }
+      return [[{ ...recipientRow({ id: 5 }), is_admin: 0, platform_roles_json: JSON.stringify(["CASTER"]) }]];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const recipients = await loadNotificationRecipients([5], "proven", { planningMembersOnly: true, matchDm: true });
+
+    expect(recipients.map((recipient) => recipient.userId)).toEqual([5]);
+    // Une seule lecture en échec : les trois autres qui réclament la colonne absente ne sont pas jouées.
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
   it("loadNotificationRecipients_withoutPlanningOption_readsNoRights", async () => {
     const query = jest.fn<SqlQuery>().mockResolvedValue([[row]]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));

@@ -406,7 +406,15 @@ export async function loadNotificationRecipients(
   const attempts = guestReads.flatMap((withGuest) =>
     pairs.map(([withMatchDm, withLocale]): [boolean, boolean, boolean] => [withMatchDm, withLocale, withGuest]),
   ) as [[boolean, boolean, boolean], ...[boolean, boolean, boolean][]];
-  const read = await firstReadable(attempts, ([withMatchDm, withLocale, withGuest]) => select(withMatchDm, withLocale, withGuest));
+  const read = await firstReadable(
+    attempts,
+    ([withMatchDm, withLocale, withGuest]) => select(withMatchDm, withLocale, withGuest),
+    ([withMatchDm, withLocale, withGuest]) => [
+      ...(withMatchDm ? ["match_dm_enabled"] : []),
+      ...(withLocale ? ["locale"] : []),
+      ...(planningOnly && withGuest ? ["is_guest_staff"] : []),
+    ],
+  );
   const rows = planningOnly ? read.filter(holdsPlanning) : read;
   return rows.map((row) => {
     const recipient = toNotificationRecipient(row, reach);
@@ -429,6 +437,12 @@ function holdsPlanning(row: PlanningRightsColumns): boolean {
   );
 }
 
+/** Nom de la colonne qu'une erreur « Unknown column » désigne (`'u.locale'` → `locale`), `null` s'il ne se lit pas. */
+function unknownColumnName(error: unknown): string | null {
+  const match = /Unknown column '(?:[^'.]*\.)?([^'.]+)'/.exec((error as { message?: unknown })?.message as string ?? "");
+  return match ? match[1] : null;
+}
+
 /**
  * Joue les lectures dans l'ordre (au moins une) jusqu'à la première dont les
  * colonnes existent ; toute autre erreur, ou l'échec de la dernière, est levée.
@@ -438,15 +452,22 @@ function holdsPlanning(row: PlanningRightsColumns): boolean {
 async function firstReadable<A, T>(
   attempts: readonly [A, ...A[]],
   read: (attempt: A) => Promise<[T, unknown]>,
+  /** Les colonnes récentes que la lecture réclame : une colonne dite absente écarte d'emblée les lectures qui la réclament. */
+  columnsOf: (attempt: A) => readonly string[] = () => [],
 ): Promise<T> {
   let lastError: unknown;
-  for (const attempt of attempts) {
+  const missing = new Set<string>();
+  for (const [index, attempt] of attempts.entries()) {
+    // Une colonne déjà dite absente n'est pas redemandée (sauf par la dernière lecture, la plus nue : son échec se lève).
+    if (index < attempts.length - 1 && columnsOf(attempt).some((column) => missing.has(column))) continue;
     try {
       const [rows] = await read(attempt);
       return rows;
     } catch (error) {
       if (!isUnknownColumnError(error)) throw error;
       lastError = error;
+      const column = unknownColumnName(error);
+      if (column !== null) missing.add(column);
     }
   }
   throw lastError;

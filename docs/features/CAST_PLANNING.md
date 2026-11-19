@@ -114,7 +114,10 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
   ses créneaux ; l'écriture le revérifie, `AND is_admin = 0`, contre une
   promotion concurrente). Écriture conditionnelle (`is_guest_staff <> ?`). Reposer
   `guest: true` rejoue la sortie (reprise d'une sortie incomplète) ; une
-  attribution déjà partie (sortie concurrente) est passée sans bruit.
+  attribution déjà partie (sortie concurrente) est passée sans bruit. Chaque
+  place quittée prend le verrou du planning à son tour (les autres écritures
+  s'intercalent) ; les annonces partent ensuite l'une après l'autre, jamais
+  toutes à la fois, et la requête attend la fin de la sortie pour en rendre le bilan.
 - **Tout le compte** : le drapeau retire le planning entier, rôle d'arbitre
   compris — un `ARBITRE` invité garde `tournaments` (arbitrage, scores) mais ni
   `/planning` ni ses gestes de staff.

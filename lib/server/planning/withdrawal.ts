@@ -467,6 +467,8 @@ async function withdrawMember(
   user: { id: number; includeHidden: boolean; actorId: number | null },
   input: WithdrawalInput,
   now: number,
+  /** Reçoit l'annonce au lieu de la lancer : la sortie d'un invité les enchaîne (une à la fois, après tous les retraits). */
+  deferAnnouncement?: (announce: () => Promise<void>) => void,
 ): Promise<WithdrawalResult> {
   const outcome = await withPlanningLock(async (connection): Promise<Outcome> => {
     const data = await loadPlanningData(connection, { now, includeHidden: user.includeHidden });
@@ -535,7 +537,7 @@ async function withdrawMember(
   // Une simple proposition quittée n'avait été annoncée à personne : rien à dire.
   // Les envois partent après le verrou, sans faire attendre la page (ils ne lèvent jamais).
   if (outcome.confirmed) {
-    void announceWithdrawal({
+    const announce = () => announceWithdrawal({
       entry: outcome.entry,
       role: input.role,
       late: outcome.late,
@@ -549,6 +551,8 @@ async function withdrawMember(
       staffUnfilled: outcome.staffUnfilled,
       coAssignedIds: outcome.coAssignedIds,
     });
+    if (deferAnnouncement) deferAnnouncement(announce);
+    else void announce();
   }
   return {
     late: outcome.late,
@@ -611,15 +615,34 @@ export async function releaseGuestPlanning(userId: number, actorId: number, now:
     // Rien n'a pu être quitté : le staff l'apprend (`failed`) au lieu d'un succès.
     return { ...result, failed: 1 };
   }
+  // Les annonces partent l'une après l'autre quand tous les retraits sont faits : une centaine de places ne lance
+  // pas autant de lectures de destinataires à la fois sur le pool.
+  const announcements: (() => Promise<void>)[] = [];
   for (const row of upcoming) {
     try {
-      await withdrawMember({ id: userId, includeHidden: true, actorId }, { entryKey: row.entryKey, role: row.role, reason: null }, now);
+      await withdrawMember(
+        { id: userId, includeHidden: true, actorId },
+        { entryKey: row.entryKey, role: row.role, reason: null },
+        now,
+        (announce) => announcements.push(announce),
+      );
       result.withdrawn += 1;
     } catch (error) {
       if (ALREADY_GONE.has((error as Error)?.message)) continue;
       result.failed += 1;
       console.error(`[planning] sortie d'un invité : attribution ${row.entryKey} (${row.role}) laissée en place.`, failureReason(error));
     }
+  }
+  if (announcements.length > 0) {
+    void (async () => {
+      for (const announce of announcements) {
+        try {
+          await announce();
+        } catch (error) {
+          console.error("[planning] sortie d'un invité : annonce impossible.", failureReason(error));
+        }
+      }
+    })();
   }
   if (futureKeys.length > 0) {
     try {

@@ -151,6 +151,7 @@ async function loadOtherNames(
   }
   if (canManage) for (const row of data.withdrawals) if (!members.has(row.userId)) ids.add(row.userId);
   if (ids.size === 0) return [];
+  // Borné par les attributions et désistements des entrées déjà lues (la fenêtre du planning), jamais par l'historique.
   const list = [...ids];
   const [rows] = await executor.execute<(RowDataPacket & { id: number; pseudo: string })[]>(
     `SELECT id, pseudo FROM bg_users WHERE is_deleted = 0 AND id IN (${list.map(() => "?").join(", ")})`,
@@ -178,12 +179,10 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
     }
     // Calculées une fois : les noms des non-membres et les cartes les lisent toutes deux.
     const assignmentsByEntry = new Map(loaded.entries.map((entry) => [entry.key, entryAssignments(entry, loaded)]));
-    // Trois lectures indépendantes, lancées ensemble.
-    const [rounds, names, marks] = await Promise.all([
-      loadEntryRounds(connection, requests, now),
-      loadOtherNames(connection, loaded, assignmentsByEntry, canManage),
-      readStoredAutoConfirms(connection, keys),
-    ]);
+    // Une seule connexion : ses requêtes se suivent de toute façon, les lancer « ensemble » n'y gagnerait rien.
+    const rounds = await loadEntryRounds(connection, requests, now);
+    const names = await loadOtherNames(connection, loaded, assignmentsByEntry, canManage);
+    const marks = await readStoredAutoConfirms(connection, keys);
     return { data: loaded, pending, marks, rounds, names, assignmentsByEntry };
   });
   // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul

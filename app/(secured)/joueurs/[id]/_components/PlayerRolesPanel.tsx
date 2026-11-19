@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BusyButton } from "@/components/ui/busy-button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
@@ -63,9 +63,10 @@ export function PlayerRolesPanel({
   // Clé de contenu : une relecture de la fiche qui rend les mêmes rôles (case « Invité »)
   // ne doit pas effacer les cases cochées et pas encore enregistrées.
   const rolesKey = roles ? [...roles].sort().join(",") : null;
+  const rolesRef = useRef(roles);
+  rolesRef.current = roles;
   useEffect(() => {
-    if (roles) setSelectedRoles(roles);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `rolesKey` porte le contenu de `roles`
+    if (rolesRef.current) setSelectedRoles(rolesRef.current);
   }, [rolesKey]);
 
   const toggleRole = (role: PlatformRole) => {
