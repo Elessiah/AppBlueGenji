@@ -170,10 +170,10 @@ export function useMatchCardModel(
       showCastConfig,
       showLiveConfig,
       liveConfigured: match.liveTrigger !== null,
-      // Un match joué sans diffusion marquée n'ouvre aucune des deux fenêtres :
-      // sa rediff garde son entrée sur la carte, pour le même staff que la
-      // diffusion de l'organisation (`tournaments` et `live`).
-      showReplay: !showCastConfig && !showLiveConfig && canSchedule && canEditReplay(match, canManage),
+      // La rediff d'un match joué a toujours son entrée dans le menu de la
+      // carte, diffusion marquée ou non, quel que soit le caster : porte de
+      // la route (`tournaments` et `live`, `canEditReplay`) et rien de plus.
+      showReplay: canSchedule && canEditReplay(match, canManage),
       hasReplay: match.replayUrl !== null,
       canReport: canReportMatch,
       showMatchPage,

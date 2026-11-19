@@ -27,13 +27,14 @@ Trois conséquences voulues :
   `tournaments` (celle de l'organisation) ;
 - « Ne plus caster » quitte la carte : il vit dans « Configurer ma diffusion »,
   d'où il fait revenir « Caster ce match » ;
-- « Lancer / Couper le direct » et « Ajouter / Modifier la rediff » quittent la
-  carte aussi : ils vivent dans les **deux** fenêtres de diffusion (celle du
-  caster et celle du staff), la rediff gardant sa propre fenêtre
-  (`MatchReplayDialog`), ouverte depuis elles. Seule exception : un match
-  joué **sans diffusion marquée** n'ouvre aucune des deux fenêtres
-  (`canConfigureLive` faux, aucun caster) ; « Ajouter / Modifier la rediff »
-  reste alors sur la carte pour ce même staff (`tournaments` et `live`).
+- « Lancer / Couper le direct » quitte la carte aussi : il vit dans les
+  **deux** fenêtres de diffusion (celle du caster et celle du staff).
+- « Ajouter / Modifier la rediff » **reste dans le menu « Plus d'actions »**
+  de la carte, pour tout match joué (`canEditReplay`), diffusion marquée ou
+  non, association ou invité : elle ouvre `MatchReplayDialog`. Porte du
+  client = celle de la route (`tournaments` **et** `live` : admin, arbitre,
+  arbitre désigné) ; jamais avant la fin du match. Le caster garde en plus son
+  accès dans sa fenêtre de diffusion (`showReplay` : `match-card-model.ts`).
 
 ## S'inscrire : « Caster ce match »
 

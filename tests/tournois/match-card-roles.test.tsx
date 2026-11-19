@@ -174,4 +174,45 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
     expect(html).toContain("Ajouter la rediff : Alpha contre Bravo");
     expect(html).not.toContain('data-action="liveConfig"');
   });
+
+  const REPLAY_ADD = "Ajouter la rediff : Alpha contre Bravo";
+  const staff = { canSchedule: true, canManage: true };
+  const casterNamed = (userId: number) => [{ userId, pseudo: "Caster", streamId: 1, ready: false }];
+
+  it("matchCard_completedWithCaster_staffStillSeesReplay", () => {
+    const html = card(bracketMatch({ ...played, casters: casterNamed(77) }), staff);
+    expect(html).toContain(REPLAY_ADD);
+  });
+
+  it("matchCard_completedViewerIsCaster_staffSeesCastConfigAndReplay", () => {
+    const html = card(bracketMatch({ ...played, casters: casterNamed(1) }), staff);
+    expect(html).toContain('data-action="castConfig"');
+    expect(html).toContain(REPLAY_ADD);
+  });
+
+  it("matchCard_liveWithoutTournaments_noReplay", () => {
+    expect(card(played, { canManage: true })).not.toContain('data-action="replay"');
+  });
+
+  it("matchCard_tournamentsWithoutLive_noReplay", () => {
+    expect(card(played, { canSchedule: true })).not.toContain('data-action="replay"');
+  });
+
+  it("matchCard_spectator_noReplay", () => {
+    expect(card(played)).not.toContain('data-action="replay"');
+  });
+
+  it("matchCard_notCompleted_noReplay", () => {
+    expect(card(launched(), staff)).not.toContain('data-action="replay"');
+  });
+
+  it("matchCard_forfeit_noReplay", () => {
+    const forfeit = bracketMatch({ ...played, forfeitTeamId: 20 });
+    expect(card(forfeit, staff)).not.toContain('data-action="replay"');
+  });
+
+  it("matchCard_reopenedWithExistingLink_staffKeepsEditEntry", () => {
+    const reopened = launched({ replayUrl: "https://www.youtube.com/watch?v=abcdefghijk" });
+    expect(card(reopened, staff)).toContain("Modifier la rediff : Alpha contre Bravo");
+  });
 });

@@ -74,10 +74,10 @@ export type MatchCardActionInput = {
   showLiveConfig: boolean;
   liveConfigured: boolean;
   /**
-   * « Ajouter / Modifier la rediff » sur la carte : seulement quand aucune des
-   * deux fenêtres de diffusion ne s'offre — un match joué sans diffusion
-   * marquée garde ainsi une entrée vers sa rediff (permissions `tournaments`
-   * et `live`, celles de la diffusion de l'organisation).
+   * « Ajouter / Modifier la rediff » dans le menu de la carte : toujours offert
+   * sur un match joué, diffusion marquée ou non, au staff que la route admet
+   * (permissions `tournaments` et `live`). Le caster garde en plus son accès
+   * dans sa fenêtre de diffusion.
    */
   showReplay: boolean;
   hasReplay: boolean;
