@@ -23,8 +23,7 @@
  *   prévenu ; **provisoire** : il reste une proposition, sans message. Personne :
  *   la place est « à pourvoir » et le staff des tournois est prévenu.
  */
-import type { PoolConnection, ResultSetHeader } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { AuthUser } from "@/lib/server/auth";
 import { failureReason } from "@/lib/server/failure-reason";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -471,6 +470,7 @@ async function withdrawMember(
   deferAnnouncement?: (announce: () => Promise<void>) => void,
 ): Promise<WithdrawalResult> {
   const outcome = await withPlanningLock(async (connection): Promise<Outcome> => {
+    await assertReleaseStillDue(connection, user);
     const data = await loadPlanningData(connection, { now, includeHidden: user.includeHidden });
     const { entry, current } = withdrawnAssignment(user, input, data, now);
     const confirmed = !current.provisional;
@@ -580,13 +580,57 @@ export type GuestRelease = {
  */
 const ALREADY_GONE = new Set(["PLANNING_NOT_ASSIGNED", "PLANNING_ENTRY_NOT_FOUND"]);
 
+/** Refus interne : le compte n'est plus un invité (drapeau retiré, compte promu administrateur ou supprimé). */
+const GUEST_REVOKED = "PLANNING_GUEST_REVOKED";
+
+/** Le compte est encore un invité qui peut quitter le planning, relu sur la connexion qui tient le verrou. */
+async function assertStillGuest(connection: PoolConnection, userId: number): Promise<void> {
+  const [rows] = await connection.execute<(RowDataPacket & { is_guest_staff: number | null; is_admin: number | null; is_deleted: number | null })[]>(
+    `SELECT is_guest_staff, is_admin, is_deleted FROM bg_users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
+  const row = rows[0];
+  if (!row || Number(row.is_guest_staff ?? 0) !== 1 || Number(row.is_admin ?? 0) === 1 || Number(row.is_deleted ?? 0) === 1) {
+    throw new Error(GUEST_REVOKED);
+  }
+}
+
+/**
+ * Sortie d'un invité (`actorId` posé) : le drapeau se relit sous le verrou, à chaque place — un drapeau retiré
+ * (ou un compte promu administrateur) pendant la boucle arrête la sortie au lieu de vider les créneaux d'un
+ * membre. Le désistement d'un membre (`actorId: null`) n'a rien à relire.
+ */
+async function assertReleaseStillDue(connection: PoolConnection, user: { id: number; actorId: number | null }): Promise<void> {
+  if (user.actorId !== null) await assertStillGuest(connection, user.id);
+}
+
+/**
+ * Efface les disponibilités à venir du compte, sur **toutes** ses entrées — pas les seules de la fenêtre du
+ * planning : un match reporté au-delà de l'horizon ou déprogrammé (sans heure), ou dont le match ou le tournoi a
+ * disparu, perd aussi la sienne. Une entrée commencée garde la sienne (le passé reste).
+ */
+async function clearUpcomingAvailability(connection: PoolConnection, userId: number, now: number): Promise<number> {
+  const start = "CASE WHEN a.match_id IS NULL THEN t.start_at ELSE m.start_at END";
+  const [deleted] = await connection.execute<ResultSetHeader>(
+    `DELETE a FROM bg_planning_availability a
+       LEFT JOIN bg_tournaments t ON t.id = a.tournament_id
+       LEFT JOIN bg_matches m ON m.id = a.match_id
+      WHERE a.user_id = ? AND (${start} IS NULL OR ${start} > ?)`,
+    [userId, new Date(now)],
+  );
+  return Number(deleted.affectedRows ?? 0);
+}
+
 /**
  * Un compte devenu **invité** (`bg_users.is_guest_staff`, `CAST_PLANNING.md`
  * § Invités) quitte le planning à venir, par le staff `actorId` : chacune de
  * ses attributions d'une entrée pas encore commencée passe par le désistement
  * ordinaire (remplaçant, place « à pourvoir », annonces — sans motif, jamais
  * tardif, auteur noté ; il n'écarte pas le compte des calculs suivants s'il
- * redevient membre), puis ses disponibilités de ces entrées sont effacées. Le
+ * redevient membre) ; ses disponibilités à venir, sur toutes ses entrées, sont
+ * effacées d'abord. La liste et l'effacement se font sous le verrou du
+ * planning, et chaque retrait relit le drapeau sous ce verrou : un drapeau
+ * retiré (ou un compte promu administrateur) arrête la sortie. Le
  * passé (entrées commencées, historique) ne bouge pas ; une inscription de
  * cast sur un match (`CAST`) ou un arbitre désigné hors du planning (`MATCH`)
  * restent : ils se gèrent depuis le match. Appelé **après** l'écriture du
@@ -598,19 +642,27 @@ const ALREADY_GONE = new Set(["PLANNING_NOT_ASSIGNED", "PLANNING_ENTRY_NOT_FOUND
 export async function releaseGuestPlanning(userId: number, actorId: number, now: number = Date.now()): Promise<GuestRelease> {
   const result: GuestRelease = { withdrawn: 0, failed: 0, availabilityCleared: 0 };
   let upcoming: { entryKey: string; role: PlanningRole }[];
-  let futureKeys: string[];
   try {
-    const db = await getDatabase();
-    // Ses seules disponibilités : celles des autres ne servent pas ici.
-    const data = await loadPlanningData(db, { now, includeHidden: true, availabilityOf: userId });
-    const future = data.entries.filter((entry) => entry.startAt > now);
-    futureKeys = future.map((entry) => entry.key);
-    upcoming = future.filter((entry) => entry.editable).flatMap((entry) =>
-      entryAssignments(entry, data)
-        .filter((row) => row.userId === userId && (row.source === "AUTO" || row.source === "MANUAL"))
-        .map((row) => ({ entryKey: entry.key, role: row.role })),
-    );
+    // Sous le verrou du planning : un calcul en cours, qui a lu les membres avant le drapeau, valide d'abord ses
+    // propositions, que cette lecture voit alors ; tout calcul suivant relit les membres sans l'invité.
+    const listed = await withPlanningLock(async (connection) => {
+      await assertStillGuest(connection, userId);
+      // Ses seules disponibilités : celles des autres ne servent pas ici.
+      const data = await loadPlanningData(connection, { now, includeHidden: true, availabilityOf: userId });
+      const rows = data.entries
+        .filter((entry) => entry.startAt > now && entry.editable)
+        .flatMap((entry) =>
+          entryAssignments(entry, data)
+            .filter((row) => row.userId === userId && (row.source === "AUTO" || row.source === "MANUAL"))
+            .map((row) => ({ entryKey: entry.key, role: row.role })),
+        );
+      return { rows, cleared: await clearUpcomingAvailability(connection, userId, now) };
+    });
+    upcoming = listed.rows;
+    result.availabilityCleared = listed.cleared;
   } catch (error) {
+    // Drapeau retiré entre l'écriture et la sortie : il n'y a plus rien à sortir.
+    if ((error as Error)?.message === GUEST_REVOKED) return result;
     console.error("[planning] sortie d'un invité : lecture du planning impossible.", failureReason(error));
     // Rien n'a pu être quitté : le staff l'apprend (`failed`) au lieu d'un succès.
     return { ...result, failed: 1 };
@@ -629,6 +681,8 @@ export async function releaseGuestPlanning(userId: number, actorId: number, now:
       result.withdrawn += 1;
     } catch (error) {
       if (ALREADY_GONE.has((error as Error)?.message)) continue;
+      // Drapeau retiré (ou compte promu) pendant la sortie : le compte est de nouveau membre, rien de plus ne part.
+      if ((error as Error)?.message === GUEST_REVOKED) break;
       result.failed += 1;
       console.error(`[planning] sortie d'un invité : attribution ${row.entryKey} (${row.role}) laissée en place.`, failureReason(error));
     }
@@ -643,18 +697,6 @@ export async function releaseGuestPlanning(userId: number, actorId: number, now:
         }
       }
     })();
-  }
-  if (futureKeys.length > 0) {
-    try {
-      const db = await getDatabase();
-      const [deleted] = await db.execute<ResultSetHeader>(
-        `DELETE FROM bg_planning_availability WHERE user_id = ? AND entry_key IN (${futureKeys.map(() => "?").join(", ")})`,
-        [userId, ...futureKeys],
-      );
-      result.availabilityCleared = Number(deleted.affectedRows ?? 0);
-    } catch (error) {
-      console.error("[planning] sortie d'un invité : disponibilités non effacées.", failureReason(error));
-    }
   }
   return result;
 }

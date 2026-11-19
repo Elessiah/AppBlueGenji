@@ -59,8 +59,8 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
       `SELECT tournament_id, match_id, role, kind, source, reason, late, staff_release, created_at
          FROM bg_planning_events WHERE user_id = ? ORDER BY created_at, id`,
     ),
-    tolerant<EventRow>(
-      `SELECT tournament_id, match_id, role, kind, source, created_at
+    tolerant<EventRow & { staff_release: number | null }>(
+      `SELECT tournament_id, match_id, role, kind, source, staff_release, created_at
          FROM bg_planning_events WHERE actor_user_id = ? ORDER BY created_at, id`,
     ),
     tolerant<AssignmentRow>(
@@ -88,7 +88,9 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
           }
         : mapEvent(row),
     ),
-    staffActions: acted.map(mapEvent),
+    // Ses gestes de staff : la sortie d'un invité qu'il a faite porte la même marque que dans l'historique de l'invité
+    // (ce n'est pas un désistement de sa part).
+    staffActions: acted.map((row) => (Number(row.staff_release ?? 0) === 1 ? { ...mapEvent(row), staffRelease: true } : mapEvent(row))),
     assignmentsSet: set.map(mapAssignment),
     soloCaster: profiles.length > 0 ? Boolean(profiles[0].solo_caster) : null,
   };

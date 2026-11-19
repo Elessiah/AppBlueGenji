@@ -99,6 +99,15 @@ describe("PlanningGuestField — anglais sous /en", () => {
     expect(html).not.toContain("Invité");
   });
 
+  it("planningGuestErrorMessage_notStaff_translatedFrAndEn", () => {
+    expect(planningGuestErrorMessage("PLANNING_GUEST_NOT_STAFF")).toBe(
+      "Seul un caster ou un prod peut être invité : attribue-lui d'abord l'un de ces rôles.",
+    );
+    expect(planningGuestErrorMessage("PLANNING_GUEST_NOT_STAFF", scopedText("en", EN.players))).toBe(
+      "Only a caster or a prod can be a guest: give them one of these roles first.",
+    );
+  });
+
   it("planningGuestErrorMessage_en_adminRefusalInEnglish", () => {
     expect(planningGuestErrorMessage("PLANNING_GUEST_ADMIN", scopedText("en", EN.players))).toBe(
       "An administrator keeps the schedule: they cannot be a guest.",

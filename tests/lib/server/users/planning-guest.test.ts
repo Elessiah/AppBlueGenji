@@ -8,6 +8,7 @@ import { getDatabase } from "@/lib/server/database";
 import { releaseGuestPlanning } from "@/lib/server/planning/withdrawal";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import {
+  holdsGuestEligibleRole,
   PLANNING_GUEST_OFF_DISCORD_LINE,
   PLANNING_GUEST_ON_DISCORD_LINE,
   PLANNING_GUEST_REPLAY_DISCORD_LINE,
@@ -16,75 +17,141 @@ import {
   readPlanningGuest,
   setPlanningGuest,
 } from "@/lib/server/users/planning-guest";
-import { connectionMock, fakePool } from "../../../helpers/sql-double";
+import { connectionMock, fakeConnection, fakePool } from "../../../helpers/sql-double";
 
 /** Drapeau « invité » du planning (`CAST_PLANNING.md` § Invités). */
 
 const { execute } = connectionMock();
+/** La transaction de l'écriture (auteur et cible verrouillés). */
+const tx = connectionMock();
 const release = { withdrawn: 2, failed: 1, availabilityCleared: 3 };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  // Une réponse prévue et pas consommée (écriture évitée) ne passe pas au test suivant.
+  execute.mockReset();
+  tx.execute.mockReset();
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, getConnection: async () => fakeConnection(tx) }));
   jest.mocked(releaseGuestPlanning).mockResolvedValue(release);
 });
-
-/** Le compte existe, puis l'écriture change `affectedRows` lignes. */
-function account(affectedRows: number, isAdmin = 0) {
-  execute.mockResolvedValueOnce([[{ id: 7, is_admin: isAdmin }], []]).mockResolvedValueOnce([{ affectedRows }, []]);
-}
 
 /** Le staff `roles` qui enregistre. */
 const STAFF = 1;
 
+type Target = { isAdmin?: number; roles?: string[] | null; flagged?: number };
+
+/** Le compte existe (lecture sans verrou), puis les deux lignes verrouillées : l'auteur (administrateur) et la cible. */
+function locked(target: Target | null, actorIsAdmin = 1) {
+  execute.mockResolvedValueOnce([[{ id: 7 }], []]);
+  const rows: { id: number; is_admin: number; platform_roles_json: string | null; is_guest_staff: number }[] = [
+    { id: STAFF, is_admin: actorIsAdmin, platform_roles_json: null, is_guest_staff: 0 },
+  ];
+  if (target) {
+    rows.push({
+      id: 7,
+      is_admin: target.isAdmin ?? 0,
+      platform_roles_json: target.roles === undefined ? JSON.stringify(["CASTER"]) : target.roles === null ? null : JSON.stringify(target.roles),
+      is_guest_staff: target.flagged ?? 0,
+    });
+  }
+  tx.execute.mockResolvedValueOnce([rows, []]).mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+}
+
+/** Les requêtes de la transaction, dans l'ordre. */
+function txSql(): string[] {
+  return tx.execute.mock.calls.map(([sql]) => sql);
+}
+
 describe("setPlanningGuest", () => {
-  it("setPlanningGuest_changedToGuest_releasesFuturePlanning", async () => {
-    account(1);
+  it("setPlanningGuest_casterTargetNotFlagged_writesFlagAndReleases", async () => {
+    locked({});
 
     const saved = await setPlanningGuest(7, true, STAFF, 1000);
 
     expect(saved).toEqual({ guest: true, changed: true, release });
+    expect(tx.execute.mock.calls[1]).toEqual([expect.stringContaining("UPDATE bg_users SET is_guest_staff = ?"), [1, 7]]);
+    expect(tx.commit).toHaveBeenCalledTimes(1);
     expect(releaseGuestPlanning).toHaveBeenCalledWith(7, STAFF, 1000);
   });
 
-  it("setPlanningGuest_write_isConditional", async () => {
-    account(1);
+  it("setPlanningGuest_locksActorAndTargetFirst", async () => {
+    locked({});
 
     await setPlanningGuest(7, true, STAFF, 1000);
 
-    const [sql, params] = execute.mock.calls[1];
-    expect(sql).toContain("is_guest_staff <> ?");
-    expect(params).toEqual([1, 7, 1]);
+    expect(tx.beginTransaction).toHaveBeenCalledTimes(1);
+    expect(tx.execute.mock.calls[0]).toEqual([expect.stringMatching(/WHERE id IN \(\?, \?\).*ORDER BY id FOR UPDATE/), [STAFF, 7]]);
+    expect(tx.release).toHaveBeenCalledTimes(1);
   });
 
-  it("setPlanningGuest_alreadyGuest_replaysRelease", async () => {
-    account(0);
-    execute.mockResolvedValueOnce([[{ is_admin: 0, is_deleted: 0 }], []]);
+  it("setPlanningGuest_actorNoLongerAdmin_throwsNotAdmin", async () => {
+    locked({}, 0);
+
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("NOT_ADMIN");
+    expect(txSql()).toHaveLength(1);
+    expect(tx.rollback).toHaveBeenCalledTimes(1);
+    expect(releaseGuestPlanning).not.toHaveBeenCalled();
+  });
+
+  it("setPlanningGuest_targetDeletedMeanwhile_throwsUserNotFound", async () => {
+    locked(null);
+
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("USER_NOT_FOUND");
+    expect(txSql()).toHaveLength(1);
+    expect(releaseGuestPlanning).not.toHaveBeenCalled();
+  });
+
+  it("setPlanningGuest_adminTarget_throwsPlanningGuestAdmin", async () => {
+    locked({ isAdmin: 1 });
+
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("PLANNING_GUEST_ADMIN");
+    expect(txSql()).toHaveLength(1);
+    expect(releaseGuestPlanning).not.toHaveBeenCalled();
+  });
+
+  it("setPlanningGuest_targetWithoutCasterOrProd_throwsNotStaff", async () => {
+    locked({ roles: ["ARBITRE"] });
+
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("PLANNING_GUEST_NOT_STAFF");
+    expect(txSql()).toHaveLength(1);
+    expect(releaseGuestPlanning).not.toHaveBeenCalled();
+  });
+
+  it("setPlanningGuest_targetWithoutRoles_throwsNotStaff", async () => {
+    locked({ roles: null });
+
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("PLANNING_GUEST_NOT_STAFF");
+  });
+
+  it("setPlanningGuest_prodTarget_accepted", async () => {
+    locked({ roles: ["PROD"] });
+
+    const saved = await setPlanningGuest(7, true, STAFF, 1000);
+
+    expect(saved.changed).toBe(true);
+  });
+
+  it("setPlanningGuest_alreadyFlaggedWithoutRole_replaysRelease", async () => {
+    locked({ roles: [], flagged: 1 });
 
     const saved = await setPlanningGuest(7, true, STAFF, 1000);
 
     expect(saved).toEqual({ guest: true, changed: false, release });
+    expect(txSql()).toHaveLength(1);
     expect(releaseGuestPlanning).toHaveBeenCalledWith(7, STAFF, 1000);
   });
 
-  it("setPlanningGuest_adminTarget_throwsPlanningGuestAdmin", async () => {
-    execute.mockResolvedValueOnce([[{ id: 7, is_admin: 1 }], []]);
-
-    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("PLANNING_GUEST_ADMIN");
-    expect(execute).toHaveBeenCalledTimes(1);
-    expect(releaseGuestPlanning).not.toHaveBeenCalled();
-  });
-
-  it("setPlanningGuest_adminTargetUnflag_written", async () => {
-    account(1, 1);
+  it("setPlanningGuest_unflagAdminTarget_written", async () => {
+    locked({ isAdmin: 1, flagged: 1 });
 
     const saved = await setPlanningGuest(7, false, STAFF, 1000);
 
     expect(saved).toEqual({ guest: false, changed: true, release: null });
+    expect(tx.execute.mock.calls[1][1]).toEqual([0, 7]);
   });
 
   it("setPlanningGuest_unflag_noRelease", async () => {
-    account(1);
+    locked({ flagged: 1 });
 
     const saved = await setPlanningGuest(7, false, STAFF, 1000);
 
@@ -92,43 +159,31 @@ describe("setPlanningGuest", () => {
     expect(releaseGuestPlanning).not.toHaveBeenCalled();
   });
 
-  it("setPlanningGuest_guestWrite_rechecksAdminInUpdate", async () => {
-    account(1);
+  it("setPlanningGuest_unflagNotFlagged_noWriteNoRelease", async () => {
+    locked({});
 
-    await setPlanningGuest(7, true, STAFF, 1000);
+    const saved = await setPlanningGuest(7, false, STAFF, 1000);
 
-    expect(execute.mock.calls[1][0]).toContain("COALESCE(is_admin, 0) = 0");
-  });
-
-  it("setPlanningGuest_unflagWrite_noAdminCondition", async () => {
-    account(1);
-
-    await setPlanningGuest(7, false, STAFF, 1000);
-
-    expect(execute.mock.calls[1][0]).not.toContain("is_admin");
-  });
-
-  it("setPlanningGuest_promotedBetweenReadAndWrite_throwsPlanningGuestAdmin", async () => {
-    account(0);
-    execute.mockResolvedValueOnce([[{ is_admin: 1, is_deleted: 0 }], []]);
-
-    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("PLANNING_GUEST_ADMIN");
+    expect(saved).toEqual({ guest: false, changed: false, release: null });
+    expect(txSql()).toHaveLength(1);
     expect(releaseGuestPlanning).not.toHaveBeenCalled();
   });
 
-  it("setPlanningGuest_deletedBetweenReadAndWrite_throwsUserNotFound", async () => {
-    account(0);
-    execute.mockResolvedValueOnce([[{ is_admin: 0, is_deleted: 1 }], []]);
-
-    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("USER_NOT_FOUND");
-    expect(releaseGuestPlanning).not.toHaveBeenCalled();
-  });
-
-  it("setPlanningGuest_missingUser_throwsUserNotFound", async () => {
+  it("setPlanningGuest_missingUser_throwsUserNotFoundWithoutTransaction", async () => {
     execute.mockResolvedValueOnce([[], []]);
 
     await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("USER_NOT_FOUND");
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(tx.beginTransaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("holdsGuestEligibleRole", () => {
+  it("holdsGuestEligibleRole_casterAmongRoles_true", () => {
+    expect(holdsGuestEligibleRole(JSON.stringify(["ARBITRE", "CASTER"]))).toBe(true);
+  });
+
+  it("holdsGuestEligibleRole_refereeOnly_false", () => {
+    expect(holdsGuestEligibleRole(JSON.stringify(["ARBITRE"]))).toBe(false);
   });
 });
 

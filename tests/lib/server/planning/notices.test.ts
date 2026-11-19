@@ -239,6 +239,13 @@ describe("announceWithdrawal — destinataires", () => {
     expect(loadStaffIds).toHaveBeenCalledWith("tournaments", [4, 1]);
   });
 
+  it("announceWithdrawal_releasedUnfilled_noDiscordLineButStaffNotified", async () => {
+    await announceWithdrawal(withdrawal({ released: true, actorId: 1 }));
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(sent()).toContainEqual([expect.any(Array), "PLANNING_UNFILLED"]);
+  });
+
   it("announceWithdrawal_actorCoAssigned_actorNotNotified", async () => {
     await announceWithdrawal(withdrawal({ unfilled: false, released: true, actorId: 5, coAssignedIds: [3, 5] }));
 

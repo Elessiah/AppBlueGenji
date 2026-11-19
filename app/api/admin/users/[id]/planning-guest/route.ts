@@ -27,7 +27,8 @@ function publishAfterCommit(actor: { id: number; pseudo: string }, targetId: num
  * @returns `200 { guest, changed, withdrawn, failed }`, ou `401`
  *   (`UNAUTHORIZED`), `403` (`FORBIDDEN`), `400` (`INVALID_ID` /
  *   `INVALID_PAYLOAD` / `CANNOT_MODIFY_SELF`), `404` (`USER_NOT_FOUND`), `409`
- *   (`PLANNING_GUEST_ADMIN` : un administrateur garde le planning). Reposer
+ *   (`PLANNING_GUEST_ADMIN` : un administrateur garde le planning ; `PLANNING_GUEST_NOT_STAFF` : ni
+ *   caster ni prod) ; `403` aussi quand l'auteur a perdu l'administration avant l'écriture. Reposer
  *   `guest: true` rejoue la sortie (reprise d'une sortie incomplète).
  */
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -49,8 +50,11 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
   try {
     saved = await setPlanningGuest(targetId, guest, user.id);
   } catch (error) {
-    if ((error as Error)?.message === "USER_NOT_FOUND") return fail("USER_NOT_FOUND", 404);
-    if ((error as Error)?.message === "PLANNING_GUEST_ADMIN") return fail("PLANNING_GUEST_ADMIN", 409);
+    const code = (error as Error)?.message;
+    if (code === "USER_NOT_FOUND") return fail("USER_NOT_FOUND", 404);
+    // Administration retirée par un autre entre la lecture de la session et l'écriture : refusé comme tel.
+    if (code === "NOT_ADMIN") return fail("FORBIDDEN", 403);
+    if (code === "PLANNING_GUEST_ADMIN" || code === "PLANNING_GUEST_NOT_STAFF") return fail(code, 409);
     return fail(unexpectedFailureCode(error, "PLANNING_GUEST_UPDATE_FAILED", "[planning-guest] enregistrement impossible"), 500);
   }
   publishAfterCommit({ id: user.id, pseudo: user.pseudo }, targetId, saved);

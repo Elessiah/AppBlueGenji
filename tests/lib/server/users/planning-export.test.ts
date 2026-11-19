@@ -132,6 +132,20 @@ describe("exportOwnPlanning", () => {
     ]);
   });
 
+  it("exportOwnPlanning_staffActionsStaffRelease_marked", async () => {
+    routeSql({
+      acted: [
+        { tournament_id: 10, match_id: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", staff_release: 1, created_at: new Date("2026-11-20T18:00:00.000Z") },
+      ],
+    });
+
+    const data = await exportOwnPlanning(4);
+
+    expect(data.staffActions).toEqual([
+      { tournamentId: 10, matchId: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", createdAt: "2026-11-20T18:00:00.000Z", staffRelease: true },
+    ]);
+  });
+
   it("exportOwnPlanning_assignmentsSet_mappedWithoutReasonOrSubject", async () => {
     routeSql({
       set: [

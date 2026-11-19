@@ -103,19 +103,28 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
   « Hors planning : garde ses droits de caster/prod mais n'apparaît pas au
   planning »). Ses textes (case, aide, confirmation, notifications, refus) sont
   traduits (`players.planningGuest`, FR et EN), à la différence du reste du
-  panneau des rôles, resté français (D4). La case n'est pas offerte sur la fiche
-  d'un administrateur (sauf pour retirer un drapeau resté posé).
+  panneau des rôles, resté français (D4). La case n'est offerte que sur la fiche
+  d'un compte qui tient `CASTER` ou `PROD` et n'est pas administrateur (sinon,
+  seulement pour retirer un drapeau resté posé).
 - **Qui le pose** : la permission `roles` seule, `PUT
   /api/admin/users/[id]/planning-guest` (`{ guest: boolean }`) — `403
   FORBIDDEN` sans elle, `400 CANNOT_MODIFY_SELF` sur son propre compte (ce
   n'est pas un réglage du titulaire), `404 USER_NOT_FOUND` pour un compte
   inconnu ou supprimé, `409 PLANNING_GUEST_ADMIN` pour poser le drapeau sur un
   administrateur (il garde tout, `planning` compris : la sortie n'effacerait que
-  ses créneaux ; l'écriture le revérifie, `AND is_admin = 0`, contre une
-  promotion concurrente). Écriture conditionnelle (`is_guest_staff <> ?`). Reposer
+  ses créneaux), `409 PLANNING_GUEST_NOT_STAFF` sur un compte qui ne tient ni
+  `CASTER` ni `PROD` (la marque ne vise qu'eux, comme le disent `/rgpd` et le
+  registre ; un drapeau déjà posé se rejoue ou se retire toujours). L'écriture
+  verrouille l'auteur et la cible ensemble (`FOR UPDATE`, comme `setUserRoles`) :
+  un auteur qui a perdu l'administration entre-temps est refusé (`403
+  FORBIDDEN`), une promotion concurrente attend ou est refusée. Reposer
   `guest: true` rejoue la sortie (reprise d'une sortie incomplète) ; une
-  attribution déjà partie (sortie concurrente) est passée sans bruit. Chaque
-  place quittée prend le verrou du planning à son tour (les autres écritures
+  attribution déjà partie (sortie concurrente) est passée sans bruit. La liste
+  des places à quitter se lit **sous le verrou du planning** (un calcul en cours,
+  qui a lu les membres avant le drapeau, valide d'abord ses propositions, que la
+  liste voit alors). Chaque place quittée prend le verrou à son tour et y relit
+  le drapeau : décoché (ou compte promu administrateur) pendant la sortie, elle
+  s'arrête au lieu de vider les créneaux d'un membre (les autres écritures
   s'intercalent) ; les annonces partent ensuite l'une après l'autre, jamais
   toutes à la fois, et la requête attend la fin de la sortie pour en rendre le bilan.
 - **Tout le compte** : le drapeau retire le planning entier, rôle d'arbitre
@@ -148,10 +157,13 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
   le compte des calculs suivants s'il redevient membre (`removals` ignore un
   `WITHDRAWN` marqué), et le retrait d'un arbitre du match nomme le staff. Le
   tableau du staff le montre « Sorti par le staff », l'export du compte le dit
-  (`staffRelease`), et les avis le disent « retiré du planning » plutôt que
+  (`staffRelease`, dans son historique comme dans les gestes de staff de
+  l'auteur), et les avis le disent « retiré du planning » plutôt que
   « s'est désisté » (`released`) ; l'auteur du geste n'en reçoit aucun (ni
-  désistement, ni place à pourvoir). Puis ses disponibilités des
-  entrées à venir sont effacées. Une lecture du planning en panne compte comme
+  désistement, ni place à pourvoir). Ses disponibilités à venir sont effacées
+  d'abord, sous le même verrou que la liste, sur **toutes** ses entrées (pas la
+  seule fenêtre du planning : un match reporté au-delà de l'horizon ou
+  déprogrammé perd aussi la sienne). Une lecture du planning en panne compte comme
   un échec (`failed`). Une inscription de cast sur un match (`CAST`) ou
   un arbitre désigné hors du planning (`MATCH`) restent : ils se gèrent depuis
   le match. Le passé (entrées commencées, historique) ne bouge pas. Une
@@ -162,7 +174,9 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
   compte redevient membre, sans attribution.
 - **Journal du staff** : `publishPlanningGuestChange` (`publishStaffAction`) —
   ligne anonyme sur Discord, auteur et compte visé (`#id`, bilan de la sortie)
-  dans pm2 ; un `guest: true` reposé qui quitte ou efface encore quelque chose
+  dans pm2 ; les places laissées à pourvoir par la sortie n'ont **pas** de ligne
+  au journal Discord (leur rafale, juste après la ligne anonyme, désignerait le
+  compte), le staff des tournois en reste prévenu (push, message privé) ; un `guest: true` reposé qui quitte ou efface encore quelque chose
   (sortie rejouée) est publié aussi (ligne « sortie rejouée »), un
   enregistrement sans écart ni effet ne publie rien.
 - **Seed** : `Test_CasterInvite` (caster invité).

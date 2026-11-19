@@ -11,7 +11,9 @@ import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { releaseGuestPlanning, type GuestRelease } from "@/lib/server/planning/withdrawal";
 import { publishStaffAction } from "@/lib/server/staff-audit";
+import { releaseWithServerLockWait, rollbackKeepingError } from "@/lib/server/tournaments/lock-wait";
 import type { StaffActor } from "@/lib/shared/log-privacy";
+import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 
 /** Ce que l'enregistrement a fait. */
 export type PlanningGuestSaveResult = {
@@ -37,18 +39,40 @@ export function planningGuestAuditLine(targetUserId: number, saved: PlanningGues
   return `🎙️ Compte #${targetUserId} ${head}${detail}.`;
 }
 
+/** Les rôles d'un compte qui peut être marqué invité : le drapeau sort un caster ou un prod du planning. */
+const GUEST_ELIGIBLE_ROLES: readonly PlatformRole[] = ["CASTER", "PROD"];
+
+/** Le compte tient un rôle de caster ou de prod (rôles cumulables enregistrés). */
+export function holdsGuestEligibleRole(rolesJson: unknown): boolean {
+  return sanitizePlatformRoles(rolesJson).some((role) => GUEST_ELIGIBLE_ROLES.includes(role));
+}
+
+type LockedUserRow = RowDataPacket & {
+  id: number;
+  is_admin: number | null;
+  platform_roles_json: unknown;
+  is_guest_staff: number | null;
+};
+
 /**
  * Pose (`guest = true`) ou retire le drapeau « invité » d'un compte vivant,
  * par le staff `actorId`. Erreurs par code : `USER_NOT_FOUND` (aucun compte,
- * ou compte supprimé), `PLANNING_GUEST_ADMIN` (poser le drapeau sur un
+ * ou compte supprimé), `NOT_ADMIN` (l'auteur n'est plus administrateur — seul
+ * `ADMIN` accorde `roles` — au moment d'écrire : la session lue par la route
+ * date d'avant l'`await`), `PLANNING_GUEST_ADMIN` (poser le drapeau sur un
  * administrateur : il garde tous les droits, `planning` compris — la sortie du
- * planning ne ferait qu'effacer ses créneaux). L'écriture est conditionnelle
- * (`is_guest_staff <> ?`) : deux enregistrements concurrents ne la font
- * qu'une fois. Un drapeau posé — ou reposé à l'identique : la sortie se
- * rejoue, pour reprendre une sortie restée incomplète — libère ensuite ses
- * attributions et disponibilités à venir (`releaseGuestPlanning`, désistement
- * ordinaire), après l'écriture : le remplaçant cherché ne le compte déjà plus
- * parmi les membres.
+ * planning ne ferait qu'effacer ses créneaux), `PLANNING_GUEST_NOT_STAFF`
+ * (poser le drapeau sur un compte qui ne tient ni `CASTER` ni `PROD` : la
+ * marque ne vise qu'eux, comme le disent `/rgpd` et le registre). Auteur et
+ * cible se verrouillent ensemble (`FOR UPDATE`, ordre de la clé primaire, comme
+ * `setUserRoles`) : une rétrogradation ou une promotion concurrente attend
+ * l'écriture ou la refuse. L'écriture est conditionnelle (`is_guest_staff <>
+ * ?`) : deux enregistrements concurrents ne la font qu'une fois. Un drapeau
+ * posé — ou reposé à l'identique : la sortie se rejoue, pour reprendre une
+ * sortie restée incomplète — libère ensuite ses attributions et
+ * disponibilités à venir (`releaseGuestPlanning`, désistement ordinaire),
+ * après l'écriture : le remplaçant cherché ne le compte déjà plus parmi les
+ * membres.
  */
 export async function setPlanningGuest(
   targetUserId: number,
@@ -58,37 +82,45 @@ export async function setPlanningGuest(
 ): Promise<PlanningGuestSaveResult> {
   const db = await getDatabase();
   // Lu d'abord, sans verrou ni transaction : un identifiant inconnu ne pose aucun verrou d'intervalle.
-  const [rows] = await db.execute<(RowDataPacket & { id: number; is_admin: number | null })[]>(
-    `SELECT id, is_admin FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
     [targetUserId],
   );
   if (rows.length === 0) throw new Error("USER_NOT_FOUND");
-  if (guest && Number(rows[0].is_admin ?? 0) === 1) throw new Error("PLANNING_GUEST_ADMIN");
   const flag = guest ? 1 : 0;
-  // Poser le drapeau revérifie l'administrateur dans l'écriture : une promotion concurrente, entre la lecture
-  // et l'écriture, ne laisse pas la sortie effacer les créneaux d'un administrateur.
-  const [written] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_users SET is_guest_staff = ? WHERE id = ? AND is_deleted = 0 AND is_guest_staff <> ?${guest ? " AND COALESCE(is_admin, 0) = 0" : ""}`,
-    [flag, targetUserId, flag],
-  );
-  const changed = Number(written.affectedRows ?? 0) > 0;
-  if (guest && !changed) await refuseIfAdmin(db, targetUserId);
+  const connection = await db.getConnection();
+  let changed = false;
+  try {
+    await connection.beginTransaction();
+    // Première instruction, sans jointure (MariaDB) : l'auteur et la cible, verrouillés ensemble.
+    const [locked] = await connection.execute<LockedUserRow[]>(
+      `SELECT id, is_admin, platform_roles_json, is_guest_staff FROM bg_users WHERE id IN (?, ?) AND is_deleted = 0 ORDER BY id FOR UPDATE`,
+      [actorId, targetUserId],
+    );
+    const actor = locked.find((row) => Number(row.id) === actorId);
+    if (!actor || Number(actor.is_admin ?? 0) !== 1) throw new Error("NOT_ADMIN");
+    const target = locked.find((row) => Number(row.id) === targetUserId);
+    if (!target) throw new Error("USER_NOT_FOUND");
+    const flagged = Number(target.is_guest_staff ?? 0) === 1;
+    if (guest && Number(target.is_admin ?? 0) === 1) throw new Error("PLANNING_GUEST_ADMIN");
+    // Un drapeau déjà posé se rejoue même si le compte a perdu depuis son rôle de caster ou de prod.
+    if (guest && !flagged && !holdsGuestEligibleRole(target.platform_roles_json)) throw new Error("PLANNING_GUEST_NOT_STAFF");
+    if (flagged !== guest) {
+      const [written] = await connection.execute<ResultSetHeader>(
+        `UPDATE bg_users SET is_guest_staff = ? WHERE id = ? AND is_deleted = 0`,
+        [flag, targetUserId],
+      );
+      changed = Number(written.affectedRows ?? 0) > 0;
+    }
+    await connection.commit();
+  } catch (error) {
+    await rollbackKeepingError(connection);
+    throw error;
+  } finally {
+    await releaseWithServerLockWait(connection);
+  }
   const release = guest ? await releaseGuestPlanning(targetUserId, actorId, now) : null;
   return { guest, changed, release };
-}
-
-/**
- * Rien n'a été écrit en posant le drapeau : déjà posé (sortie rejouée), compte
- * disparu, ou devenu administrateur entre la lecture et l'écriture — refusé
- * alors (`PLANNING_GUEST_ADMIN`) avant toute sortie.
- */
-async function refuseIfAdmin(db: Awaited<ReturnType<typeof getDatabase>>, targetUserId: number): Promise<void> {
-  const [rows] = await db.execute<(RowDataPacket & { is_admin: number | null; is_deleted: number | null })[]>(
-    `SELECT is_admin, is_deleted FROM bg_users WHERE id = ? LIMIT 1`,
-    [targetUserId],
-  );
-  if (rows.length === 0 || Number(rows[0].is_deleted ?? 0) === 1) throw new Error("USER_NOT_FOUND");
-  if (Number(rows[0].is_admin ?? 0) === 1) throw new Error("PLANNING_GUEST_ADMIN");
 }
 
 /** Une sortie rejouée a encore quitté, laissé ou effacé quelque chose. */

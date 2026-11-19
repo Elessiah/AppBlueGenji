@@ -1346,7 +1346,16 @@ export type PersonalDataExport = {
      * Ses gestes comme staff (attribution posée, confirmée, retirée) : la
      * trace qui le nomme comme auteur, sans l'identifiant de la personne visée (art. 15.4).
      */
-    staffActions: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
+    staffActions: {
+      tournamentId: number;
+      matchId: number | null;
+      role: string;
+      kind: string;
+      source: string;
+      createdAt: string | null;
+      /** Retrait (`WITHDRAWN`) d'un compte qu'il a sorti du planning (passé invité) : pas un désistement de sa part. */
+      staffRelease?: boolean;
+    }[];
     /** Attributions en cours qu'il a posées comme staff, sans l'identifiant de la personne visée. */
     assignmentsSet: { tournamentId: number; matchId: number | null; role: string; source: string; confirmed: boolean; createdAt: string | null }[];
     soloCaster: boolean | null;

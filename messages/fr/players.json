@@ -209,6 +209,7 @@
       "CANNOT_MODIFY_SELF": "Tu ne peux pas te déclarer invité toi-même.",
       "INVALID_PAYLOAD": "Le réglage envoyé est invalide.",
       "PLANNING_GUEST_ADMIN": "Un administrateur garde le planning : il ne peut pas être invité.",
+      "PLANNING_GUEST_NOT_STAFF": "Seul un caster ou un prod peut être invité : attribue-lui d'abord l'un de ces rôles.",
       "CONCURRENT_UPDATE_RETRY": "Une autre modification de ce compte est passée au même moment : rien n'a été enregistré. Réessaie.",
       "PROFILE_RELOAD_FAILED": "La fiche n'a pas pu être relue : recharge la page.",
       "fallback": "L'enregistrement du réglage « Invité » a échoué."

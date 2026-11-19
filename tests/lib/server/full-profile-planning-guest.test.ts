@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
-jest.mock("@/lib/server/users/planning-guest");
+jest.mock("@/lib/server/users/planning-guest", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/users/planning-guest")>("@/lib/server/users/planning-guest"),
+  readPlanningGuest: jest.fn(),
+}));
 
 import { getDatabase } from "@/lib/server/database";
 import { getFullProfile } from "@/lib/server/users/full-profile";
@@ -25,6 +28,7 @@ const userRow = {
   visible_marvel: 1,
   visible_major: 1,
   is_admin: 0,
+  platform_roles_json: JSON.stringify(["CASTER"]) as string | null,
   created_at: new Date("2026-01-01T00:00:00Z"),
 };
 
@@ -71,6 +75,32 @@ describe("getFullProfile — drapeau invité", () => {
 
   it("getFullProfile_adminTargetFlagged_offersUnflag", async () => {
     target({ ...userRow, is_admin: 1 });
+
+    const profile = await getFullProfile({ id: 1, isAdmin: true, roles: ["ADMIN"] }, 7);
+
+    expect(profile?.planningGuest).toBe(true);
+  });
+
+  it("getFullProfile_targetWithoutCasterOrProd_noGuestBox", async () => {
+    target({ ...userRow, platform_roles_json: JSON.stringify(["ARBITRE"]) });
+    jest.mocked(readPlanningGuest).mockResolvedValue(false);
+
+    const profile = await getFullProfile({ id: 1, isAdmin: true, roles: ["ADMIN"] }, 7);
+
+    expect(profile?.planningGuest).toBeUndefined();
+  });
+
+  it("getFullProfile_prodTarget_boxOffered", async () => {
+    target({ ...userRow, platform_roles_json: JSON.stringify(["PROD"]) });
+    jest.mocked(readPlanningGuest).mockResolvedValue(false);
+
+    const profile = await getFullProfile({ id: 1, isAdmin: true, roles: ["ADMIN"] }, 7);
+
+    expect(profile?.planningGuest).toBe(false);
+  });
+
+  it("getFullProfile_flaggedTargetWithoutRole_boxOfferedToUnflag", async () => {
+    target({ ...userRow, platform_roles_json: null });
 
     const profile = await getFullProfile({ id: 1, isAdmin: true, roles: ["ADMIN"] }, 7);
 

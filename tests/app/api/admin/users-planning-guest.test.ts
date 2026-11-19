@@ -69,21 +69,21 @@ describe("PUT /api/admin/users/[id]/planning-guest", () => {
     expect(await res.json()).toMatchObject({ error: "INVALID_PAYLOAD" });
   });
 
-  it("put_unknownUser_returns404", async () => {
-    jest.mocked(setPlanningGuest).mockRejectedValue(new Error("USER_NOT_FOUND"));
+  // Refus du service rendus par code, sans journal publié : compte inconnu, administrateur visé, ni caster ni prod,
+  // auteur qui a perdu l'administration avant l'écriture.
+  const refusals: { thrown: string; status: number; error: string }[] = [
+    { thrown: "USER_NOT_FOUND", status: 404, error: "USER_NOT_FOUND" },
+    { thrown: "PLANNING_GUEST_ADMIN", status: 409, error: "PLANNING_GUEST_ADMIN" },
+    { thrown: "PLANNING_GUEST_NOT_STAFF", status: 409, error: "PLANNING_GUEST_NOT_STAFF" },
+    { thrown: "NOT_ADMIN", status: 403, error: "FORBIDDEN" },
+  ];
+  it.each(refusals)("put_serviceRefuses$thrown_returns$status$error", async ({ thrown, status, error }) => {
+    jest.mocked(setPlanningGuest).mockRejectedValue(new Error(thrown));
 
     const res = await PUT(jsonReq({ guest: true }), params("7"));
 
-    expect(res.status).toBe(404);
-  });
-
-  it("put_adminTarget_returns409", async () => {
-    jest.mocked(setPlanningGuest).mockRejectedValue(new Error("PLANNING_GUEST_ADMIN"));
-
-    const res = await PUT(jsonReq({ guest: true }), params("7"));
-
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ error: "PLANNING_GUEST_ADMIN" });
+    expect(res.status).toBe(status);
+    expect(await res.json()).toMatchObject({ error });
     expect(publishPlanningGuestChange).not.toHaveBeenCalled();
   });
 

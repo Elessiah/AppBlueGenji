@@ -1160,14 +1160,76 @@ describe("releaseGuestPlanning (`CAST_PLANNING.md` § Invités)", () => {
   /** Le staff `roles` qui pose le drapeau. */
   const STAFF = 1;
 
+  /** Le compte relu sous le verrou, une ligne par relecture (la dernière se répète) : invité par défaut. */
+  let guestReads: { is_guest_staff: number; is_admin: number; is_deleted: number }[];
+  /** Disponibilités effacées par la sortie. */
+  let availabilityCleared: number;
+  const GUEST_ROW = { is_guest_staff: 1, is_admin: 0, is_deleted: 0 };
+
   beforeEach(() => {
+    guestReads = [GUEST_ROW];
+    availabilityCleared = 0;
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     jest.spyOn(console, "error").mockImplementation(() => undefined);
+    execute.mockImplementation(async (sql: string) => {
+      if (sql.includes("SELECT is_guest_staff")) return [[guestReads.length > 1 ? guestReads.shift() : guestReads[0]]];
+      if (sql.includes("DELETE a FROM bg_planning_availability")) return [{ affectedRows: availabilityCleared }];
+      return sql.includes("INSERT INTO bg_planning_events") ? [{ affectedRows: 1, insertId: 41 }] : [{ affectedRows: 1 }];
+    });
   });
 
   function availabilityDeletes() {
-    return execute.mock.calls.filter(([sql]) => sql.includes("DELETE FROM bg_planning_availability"));
+    return execute.mock.calls.filter(([sql]) => sql.includes("DELETE a FROM bg_planning_availability"));
   }
+
+  function assignmentDeletes() {
+    return execute.mock.calls.filter(([sql]) => sql.includes("DELETE FROM bg_planning_assignments"));
+  }
+
+  it("releaseGuestPlanning_listsUnderPlanningLock", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(planningData({ entries: [loadedEntry()] }));
+
+    await releaseGuestPlanning(GUEST, STAFF, EARLY);
+
+    expect(withNamedLock).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(loadPlanningData).mock.calls[0][0]).toBe(connection);
+    expect(execute.mock.calls[0][0]).toContain("SELECT is_guest_staff");
+  });
+
+  it("releaseGuestPlanning_flagRevokedBeforeListing_returnsZeroNoFailure", async () => {
+    guestReads = [{ ...GUEST_ROW, is_guest_staff: 0 }];
+
+    const release = await releaseGuestPlanning(GUEST, STAFF, EARLY);
+
+    expect(release).toEqual({ withdrawn: 0, failed: 0, availabilityCleared: 0 });
+    expect(loadPlanningData).not.toHaveBeenCalled();
+    expect(availabilityDeletes()).toHaveLength(0);
+  });
+
+  it("releaseGuestPlanning_promotedAdminBeforeListing_returnsZeroNoFailure", async () => {
+    guestReads = [{ ...GUEST_ROW, is_admin: 1 }];
+
+    const release = await releaseGuestPlanning(GUEST, STAFF, EARLY);
+
+    expect(release).toEqual({ withdrawn: 0, failed: 0, availabilityCleared: 0 });
+    expect(loadPlanningData).not.toHaveBeenCalled();
+  });
+
+  it("releaseGuestPlanning_flagRevokedMidLoop_stopsRemainingWithdrawals", async () => {
+    guestReads = [GUEST_ROW, { ...GUEST_ROW, is_guest_staff: 0 }];
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(
+      planningData({
+        entries: [loadedEntry(), loadedEntry({ key: "m:2", matchId: 2 })],
+        assignments: [loadedAssignment({ userId: GUEST, role: "CASTER" }), loadedAssignment({ entryKey: "m:2", userId: GUEST, role: "CASTER" })],
+      }),
+    );
+
+    const release = await releaseGuestPlanning(GUEST, STAFF, EARLY);
+
+    expect(release).toEqual({ withdrawn: 0, failed: 0, availabilityCleared: 0 });
+    expect(assignmentDeletes()).toHaveLength(0);
+    expect(execute.mock.calls.filter(([sql]) => sql.includes("SELECT is_guest_staff"))).toHaveLength(2);
+  });
 
   it("releaseGuestPlanning_futureAutoAssignment_withdrawn", async () => {
     jest.mocked(loadPlanningData).mockResolvedValueOnce(
@@ -1204,17 +1266,31 @@ describe("releaseGuestPlanning (`CAST_PLANNING.md` § Invités)", () => {
     const release = await releaseGuestPlanning(GUEST, STAFF, MONDAY + HOUR_MS);
 
     expect(release).toEqual({ withdrawn: 0, failed: 0, availabilityCleared: 0 });
-    expect(availabilityDeletes()).toHaveLength(0);
+    expect(assignmentDeletes()).toHaveLength(0);
   });
 
   it("releaseGuestPlanning_futureAvailability_cleared", async () => {
     jest.mocked(loadPlanningData).mockResolvedValueOnce(planningData({ entries: [loadedEntry()] }));
-    execute.mockResolvedValueOnce([{ affectedRows: 2 }]);
+    availabilityCleared = 2;
 
     const release = await releaseGuestPlanning(GUEST, STAFF, EARLY);
 
     expect(release.availabilityCleared).toBe(2);
-    expect(availabilityDeletes()[0][1]).toEqual([GUEST, "m:1"]);
+    expect(availabilityDeletes()[0][1]).toEqual([GUEST, new Date(EARLY)]);
+  });
+
+  it("releaseGuestPlanning_availability_deletedByDateForAllEntries", async () => {
+    // Aucune entrée dans la fenêtre : une disponibilité d'un match reporté au-delà de l'horizon part quand même.
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(planningData({ entries: [] }));
+    availabilityCleared = 1;
+
+    const release = await releaseGuestPlanning(GUEST, STAFF, EARLY);
+
+    expect(release.availabilityCleared).toBe(1);
+    const [sql] = availabilityDeletes()[0];
+    expect(sql).toContain("LEFT JOIN bg_matches m ON m.id = a.match_id");
+    expect(sql).toContain("IS NULL OR");
+    expect(sql).not.toContain("entry_key IN");
   });
 
   it("releaseGuestPlanning_withdrawalFails_countsFailure", async () => {
@@ -1297,7 +1373,7 @@ describe("releaseGuestPlanning (`CAST_PLANNING.md` § Invités)", () => {
 
     const release = await releaseGuestPlanning(GUEST, STAFF, EARLY);
 
-    expect(release).toEqual({ withdrawn: 0, failed: 0, availabilityCleared: 1 });
+    expect(release).toEqual({ withdrawn: 0, failed: 0, availabilityCleared: 0 });
   });
 
   it("releaseGuestPlanning_availabilityRead_onlyTheGuest", async () => {

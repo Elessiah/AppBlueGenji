@@ -32,7 +32,8 @@ s'additionnent.
 | `DEV` | Rien (lecture de `/devdoc`) | Aucun | Aucune |
 
 **Invité** (`bg_users.is_guest_staff`, case « Invité » du bloc « Rôles &
-permissions », permission `roles`) : ce n'est pas un rôle mais une marque, qui
+permissions », permission `roles`, posée seulement sur un compte non
+administrateur qui tient `CASTER` ou `PROD`) : ce n'est pas un rôle mais une marque, qui
 retire au compte la seule permission `planning` (sauf administrateur) — il
 garde ses droits de caster ou de prod hors du planning (`CAST_PLANNING.md` §
 Invités).

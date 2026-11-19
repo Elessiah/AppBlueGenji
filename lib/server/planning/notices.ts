@@ -205,7 +205,7 @@ function membersUnfilled(input: WithdrawalAnnouncement): { streamLost: boolean }
 }
 
 /**
- * Place à pourvoir : une ligne sans nom au journal du staff sur Discord, et
+ * Place à pourvoir : une ligne sans nom au journal du staff sur Discord (aucune pour la sortie d'un invité), et
  * le staff des tournois prévenu (push **et** message privé, dans sa langue),
  * choisi par la règle de `notifyStaff` (`loadStaffIds`).
  * Ce staff voit les tournois cachés : rien n'atteint qui ne peut pas voir
@@ -215,7 +215,12 @@ function membersUnfilled(input: WithdrawalAnnouncement): { streamLost: boolean }
 async function announceUnfilled(notice: PlanningWithdrawalNotice, silent: readonly number[]): Promise<void> {
   try {
     const base = siteCanonicalBase();
-    sendBotLog(formatPlanningUnfilledLine(notice, base), { tournamentId: notice.tournamentId, category: "staff-removal" });
+    // Sortie d'un invité : pas de ligne par place au journal du staff sur Discord — suivant de près la ligne
+    // anonyme « Un compte passe invité », leur rafale désignerait le compte (qui tenait ces matchs). Le staff des
+    // tournois reste prévenu ci-dessous, et la sortie est nominative dans pm2.
+    if (notice.released !== true) {
+      sendBotLog(formatPlanningUnfilledLine(notice, base), { tournamentId: notice.tournamentId, category: "staff-removal" });
+    }
     const recipients = await loadNotificationRecipients(await loadStaffIds("tournaments", [...silent]), "proven", { excludeSuspended: true, planningMembersOnly: true });
     if (recipients.length === 0) return;
     await notifyUsers(recipients, {

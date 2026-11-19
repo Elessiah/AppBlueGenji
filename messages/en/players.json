@@ -209,6 +209,7 @@
       "CANNOT_MODIFY_SELF": "You cannot make yourself a guest.",
       "INVALID_PAYLOAD": "The setting sent is invalid.",
       "PLANNING_GUEST_ADMIN": "An administrator keeps the schedule: they cannot be a guest.",
+      "PLANNING_GUEST_NOT_STAFF": "Only a caster or a prod can be a guest: give them one of these roles first.",
       "CONCURRENT_UPDATE_RETRY": "Another change to this account went through at the same time: nothing was saved. Try again.",
       "PROFILE_RELOAD_FAILED": "The profile could not be reloaded: refresh the page.",
       "fallback": "Saving the “Guest” setting failed."
