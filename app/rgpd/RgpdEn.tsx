@@ -314,7 +314,7 @@ export function RgpdEn({
           from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
           the #live announcements of a solo tournament, which keep your username in the Discord channel until they
           are deleted on request, and to the moderation alert for such an announcement blocked or flagged by AutoMod, which keeps your username — the staff is told of your request without you being named, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found (<a href="#retransmission">“Match streaming”</a>);
-          for a staff member, their refereeing actions and the platform roles they granted or removed, and, for an administrator, their impersonations of a role (and, until November 2026, for any holder of a platform role, developer included, their switches into and out of player view), remain named in the server logs, according to their
+          for a staff member, their refereeing actions and the platform roles they granted or removed, and, for an administrator, their impersonations of a role (and, before “Impersonate a role”, for any holder of a platform role, developer included, their switches into and out of player view), remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
           {WEB_ACCESS_LOG_FIELDS_EN}), for its security (<LocaleLink href="/rgpd/registre#t17">register, T17</LocaleLink>
@@ -504,7 +504,7 @@ export function RgpdEn({
               <strong>__Host-bg_session</strong> — httpOnly, sameSite=lax session cookie, lasting 30 days, set{" "}
               <strong>at login</strong>. It only contains a random token, which says nothing about you and allows
               you to be recognized on the platform; our servers only keep its hash (SHA-256), never the token
-              itself, with the session it opens (including, for an administrator impersonating a role, the deadline of the impersonation and the roles impersonated). It is deleted at logout. It replaces <strong>bg_session</strong>, which the site deletes if it
+              itself, with the session it opens (including, for an administrator impersonating a role, the deadline of the impersonation and the roles impersonated; a past deadline, even one of the former player view, may stay there, with no effect). It is deleted at logout. It replaces <strong>bg_session</strong>, which the site deletes if it
               still finds it.
             </li>
             <li>
@@ -1066,11 +1066,10 @@ export function RgpdEn({
             An administrator can narrow their rights on one of their sessions to the platform roles they choose
             (“Impersonate a role”; no role: “player view”, the site seen as a player), for {PLAYER_VIEW_MAX_HOURS} hours at most: nothing is said about it on
             Discord; the server logs keep their username, their identifier, the roles impersonated and the direction of the switch (in or back)
-            — a return forced by the removal of their administration is noted under the name of the administrator who removed it, with the
-            identifier of the account —, according to their rotation, on the basis of legitimate interest (administration of the platform), to which
-            they may object; the deadline and the roles impersonated are noted on the session and are erased on return, when the account
-            loses administration during the impersonation (at the latest at the server&apos;s next start, by a line naming no
-            one that gives the number of sessions, if that erasure fails), or with the session
+            — a return forced by the removal of their administration may name the administrator who removed it, with the
+            identifier of the account and the number of sessions —, according to their rotation, on the basis of legitimate interest (administration of the platform), to which
+            they may object; the deadline and the roles impersonated are noted on the session, stop having any effect after the return,
+            the deadline or the removal of administration, and are erased on return or at the latest with the session
             (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
             A platform role is also shown as a title (administrator, referee…) on your player page, which any logged-in
             member reads, whatever your visibility settings; the developer role, which only opens reading the technical

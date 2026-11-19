@@ -423,7 +423,7 @@ function RgpdFr({
           <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
           individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
           demande, et de l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod, qui garde votre pseudo — le staff est averti de votre demande sans que vous soyez nommé, et les modérateurs suppriment à la main les alertes qu&apos;ils parviennent à identifier, sans garantie de toutes les retrouver (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
-          d&apos;arbitrage et les rôles de plateforme qu&apos;il a attribués ou retirés, et, pour un administrateur, ses incarnations d&apos;un rôle (et, jusqu&apos;en novembre 2026, pour tout titulaire d&apos;un rôle de plateforme, développeur compris, ses bascules vers et depuis la vue joueur), restent nommés dans les journaux du serveur, selon leur rotation
+          d&apos;arbitrage et les rôles de plateforme qu&apos;il a attribués ou retirés, et, pour un administrateur, ses incarnations d&apos;un rôle (et, avant « Incarner un rôle », pour tout titulaire d&apos;un rôle de plateforme, développeur compris, ses bascules vers et depuis la vue joueur), restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
           chaque requête ({WEB_ACCESS_LOG_FIELDS}), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
@@ -640,7 +640,7 @@ function RgpdFr({
               uniquement un jeton aléatoire, qui ne dit rien de vous et permet de vous
               reconnaître sur la plateforme ; nos serveurs n&apos;en gardent que
               l&apos;empreinte (SHA-256), jamais le jeton lui-même, avec la session qu&apos;il ouvre (dont,
-              pour un administrateur qui incarne un rôle, l&apos;échéance de l&apos;incarnation et les rôles incarnés). Il est supprimé à la
+              pour un administrateur qui incarne un rôle, l&apos;échéance de l&apos;incarnation et les rôles incarnés ; une échéance passée, même d&apos;une ancienne vue joueur, peut y rester, sans effet). Il est supprimé à la
               déconnexion. Il remplace <strong>bg_session</strong>, que le site efface
               s&apos;il le trouve encore.
             </li>
@@ -1267,11 +1267,10 @@ function RgpdFr({
             Un administrateur peut réduire ses droits sur une de ses sessions aux rôles de plateforme qu&apos;il choisit
             (« Incarner un rôle » ; aucun rôle : « vue joueur », le site vu comme un joueur), {PLAYER_VIEW_MAX_HOURS} heures au plus : rien n&apos;en est dit
             sur Discord ; les journaux du serveur gardent son pseudo, son identifiant, les rôles incarnés et le sens de la bascule (entrée ou
-            retour) — un retour imposé par le retrait de son administration est noté au nom de l&apos;administrateur qui l&apos;a retirée, avec
-            l&apos;identifiant du compte —, selon leur rotation, au titre de l&apos;intérêt légitime (administration de la plateforme), auquel il
-            peut s&apos;opposer ; l&apos;échéance et les rôles incarnés sont notés sur la session et s&apos;effacent au retour, quand le compte
-            perd l&apos;administration pendant l&apos;incarnation (au plus tard au démarrage suivant du serveur, par une ligne sans
-            nom qui donne le nombre de sessions, si cet effacement échoue), ou avec la session
+            retour) — un retour imposé par le retrait de son administration peut nommer l&apos;administrateur qui l&apos;a retirée, avec
+            l&apos;identifiant du compte et le nombre de sessions —, selon leur rotation, au titre de l&apos;intérêt légitime (administration de la plateforme), auquel il
+            peut s&apos;opposer ; l&apos;échéance et les rôles incarnés sont notés sur la session, n&apos;agissent plus après le retour,
+            l&apos;échéance ou le retrait de l&apos;administration, et s&apos;effacent au retour ou au plus tard avec la session
             (<Link href="/rgpd/registre#t05">registre, T05</Link>).
             Un rôle de plateforme s&apos;affiche aussi comme un titre (administrateur, arbitre…) sur votre fiche de joueur,
             que lit tout membre connecté, quels que soient vos réglages de visibilité ; le rôle développeur, qui

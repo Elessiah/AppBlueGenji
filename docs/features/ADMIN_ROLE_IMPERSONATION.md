@@ -237,22 +237,30 @@ rétrogradation et au balayage.
 Les colonnes ne servent qu'à réduire des droits, à la demande de
 l'administrateur lui-même, et partent avec la session (déconnexion, purge des
 sessions échues, suppression du compte), ou plus tôt au retour ou quand le
-compte perd l'administration pendant l'incarnation ; une échéance passée reste sur la ligne, sans effet, avec
-ses rôles, jusque-là. Jusqu'au déploiement de cette
-version (novembre 2026), tout titulaire d'un rôle de plateforme (développeur
-compris) pouvait passer en vue joueur : ses lignes pm2 restent jusqu'à leur rotation, d'où les mentions
-« jusqu'en novembre 2026 » du registre.
+compte perd l'administration pendant l'incarnation ; une échéance passée (ou
+dont la remise à vide a échoué) peut rester sur la ligne, sans effet, avec ses
+rôles, jusque-là. Jusqu'au déploiement de cette version, tout titulaire d'un
+rôle de plateforme (développeur compris) pouvait passer en vue joueur : ses
+lignes pm2 restent jusqu'à leur rotation, d'où les mentions « avant l'arrivée
+d'« Incarner un rôle » » du registre et de `/rgpd` (sans date, qui deviendrait
+fausse si le déploiement glissait).
 
 - Registre : T01 décrit l'échéance parmi les données de la session ; T05 décrit
-  la bascule (sous-finalité « Vue joueur »), la ligne pm2 (pseudo, identifiant,
+  la bascule (sous-finalité « Incarner un rôle »), la ligne pm2 (pseudo, identifiant,
   sens ; retour imposé : administrateur qui rétrograde, compte, nombre de
-  sessions ; levée au démarrage : nombre de sessions seul), la mémoire du plafond (`PLAYER_VIEW_TOGGLE_RULE` pour les entrées,
+  sessions ; levée au démarrage : nombre de sessions seul), la mémoire du plafond
+  (chaque demande de bascule, corps invalide compris) (`PLAYER_VIEW_TOGGLE_RULE` pour les entrées,
   `PLAYER_VIEW_EXIT_RULE` pour les retours) et des reconnexions
   (`session-streams`), la base (intérêt légitime) et les développeurs parmi les
   personnes concernées.
-- `/rgpd` (FR et EN) : paragraphe des journaux du staff (base, opposition),
-  note sur ce qui survit à la suppression (bascules dans les deux sens),
-  paragraphe du cookie de session (l'échéance portée par la session).
+- `/rgpd` (FR et EN) et l'entrée `PRIVACY_CHANGES` restent **générales** : le
+  retour imposé « peut » nommer l'administrateur qui rétrograde (une entrée
+  annulée en course est notée au nom du compte lui-même), l'effacement est dit
+  « au retour ou au plus tard avec la session », sans décrire le balayage du
+  démarrage (détaillé dans T05 seul). Paragraphe des journaux du staff (base,
+  opposition), note sur ce qui survit à la suppression (bascules dans les deux
+  sens), paragraphe du cookie de session (échéance et rôles portés par la
+  session ; une échéance passée peut y rester, sans effet).
 - `PRIVACY_CHANGES` : entrée `2026-11-vue-joueur-du-staff` (FR et EN, tous les
   comptes, comme les traces des rôles de plateforme), datée du 2026-11-20 ;
   puis `2026-11-incarner-un-role` (incarnation réservée aux administrateurs,
@@ -298,7 +306,7 @@ compris) pouvait passer en vue joueur : ses lignes pm2 restent jusqu'à leur rot
 
 ## Performance
 
-- Le drapeau est lu dans la requête de session existante (`s.player_view_until > NOW()`), sans requête de plus ni index nouveau ; l'échéance est une simple comparaison.
+- Le drapeau est lu dans la requête de session existante (`s.player_view_until > NOW()`), sans requête de plus ; l'échéance est une simple comparaison. L'index `idx_bg_sessions_player_view` (`player_view_until`) sert au balayage du démarrage.
 - La bannière est chargée par `next/dynamic` (rendue côté serveur, code absent du morceau des pages publiques) ; le hook et le focus vivent dans `player-view-toggle.ts`, que le menu du compte importe sans la bannière.
 - Les changements de contexte (reconnexion) sont gardés à part des révocations (une minute, `RECONNECT_MEMORY_PER_USER` = 60 par compte, filet global `RECONNECT_MEMORY_MAX` = 1024) : une bascule répétée ne ralentit pas `revokedSince`. La reconnexion des flux porte déjà une gigue (`reconnectDelayMs`).
 
