@@ -20,6 +20,25 @@ export function impersonationAuditLine(roles: readonly PlatformRole[]): string {
 /** Refus de {@link setPlayerView} : aucune ligne de session à marquer. */
 export const PLAYER_VIEW_NO_SESSION = "NO_SESSION";
 
+/**
+ * Refus de {@link setPlayerView} : le compte a perdu l'administration entre
+ * la lecture de la session et l'écriture de l'entrée — l'entrée est défaite.
+ */
+export const PLAYER_VIEW_NOT_ADMIN = "NOT_ADMIN";
+
+/**
+ * Lance `run` avec la colonne `impersonated_roles_json` ; sans elle (`ALTER`
+ * non joué), relance sans la nommer. Toute autre erreur remonte.
+ */
+async function withRolesColumn<T>(run: (roles: boolean) => Promise<T>): Promise<T> {
+  try {
+    return await run(true);
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    return run(false);
+  }
+}
+
 /** Ligne de session relue après la bascule : son échéance telle que la base la compare. */
 type SessionViewRow = RowDataPacket & {
   player_view_until: Date | string | null;
@@ -51,10 +70,21 @@ type SessionViewRow = RowDataPacket & {
  * Un changement fait reconnecter les flux SSE de la session : ils gardaient le
  * contexte du lecteur lu à l'ouverture (palier, aperçu, droits staff).
  *
+ * Une entrée relit ensuite, sans verrou, l'administration du compte : une
+ * rétrogradation validée entre la lecture de la session et l'écriture
+ * (`setUserRoles`, dont le nettoyage des sessions n'avait alors rien trouvé)
+ * ne laisse pas une incarnation dormante qui reviendrait si l'administration
+ * était rendue — l'entrée est défaite. Relecture **après** l'écriture plutôt
+ * que condition sur `bg_users` dans l'`UPDATE` : la rétrogradation verrouille
+ * `bg_users` puis les sessions, une entrée qui verrouillerait la session puis
+ * `bg_users` prendrait l'ordre inverse (interblocage). Si la rétrogradation
+ * valide après la relecture, c'est son propre nettoyage qui lève l'entrée.
+ *
  * @returns l'échéance et les rôles **relus en base** (`toIso`), `null` et
  *   `[]` hors incarnation ; `changed` : cette demande a écrit (une bascule
  *   croisée a pu changer l'état relu depuis).
- * @throws `Error(PLAYER_VIEW_NO_SESSION)` sans session ni contournement.
+ * @throws `Error(PLAYER_VIEW_NO_SESSION)` sans session ni contournement ;
+ *   `Error(PLAYER_VIEW_NOT_ADMIN)` si l'entrée a été défaite.
  */
 export async function setPlayerView(
   user: AuthUser,
@@ -68,19 +98,27 @@ export async function setPlayerView(
   // ce que la lecture de la session rendra.
   const kept = parseImpersonatedRoles(roles);
   const rolesJson = active ? JSON.stringify(kept) : null;
-  const changed = key.devBypass
-    ? await writeDevBypassView(db, key.tokenHash, user.id, rolesJson)
-    : await writeSessionView(db, key.tokenHash, user.id, rolesJson);
-
-  if (changed) {
-    // Sitôt l'écriture faite, avant toute relecture qui pourrait échouer : un
-    // changement commité doit fermer les flux et laisser sa ligne pm2, même si
-    // la réponse finit en 500 (une nouvelle demande, sans effet, ne les
-    // rattraperait pas). `null` : tous les flux du compte — sous le
-    // contournement, toute requête du compte le passe (cookie compris), si
-    // bien que ses flux sont tous ceux de cette « session ».
+  const write = (json: string | null) =>
+    key.devBypass ? writeDevBypassView(db, key.tokenHash, user.id, json) : writeSessionView(db, key.tokenHash, user.id, json);
+  // Sitôt l'écriture faite, avant toute relecture qui pourrait échouer : un
+  // changement commité doit fermer les flux et laisser sa ligne pm2, même si
+  // la réponse finit en 500 (une nouvelle demande, sans effet, ne les
+  // rattraperait pas). `null` : tous les flux du compte — sous le
+  // contournement, toute requête du compte le passe (cookie compris), si
+  // bien que ses flux sont tous ceux de cette « session ».
+  const announce = (line: string) => {
     reconnectSessionStreams(user.id, key.devBypass ? null : key.tokenHash);
-    auditStaffAction(active ? impersonationAuditLine(kept) : PLAYER_VIEW_OFF_AUDIT, { id: user.id, pseudo: user.pseudo });
+    auditStaffAction(line, { id: user.id, pseudo: user.pseudo });
+  };
+
+  const changed = await write(rolesJson);
+  if (changed) announce(active ? impersonationAuditLine(kept) : PLAYER_VIEW_OFF_AUDIT);
+
+  // Après la ligne pm2 de l'entrée (une écriture commitée se trace toujours) :
+  // l'entrée défaite laisse aussi celle de son retour.
+  if (changed && active && !(await isStillAdmin(db, user.id))) {
+    if (await write(null)) announce(PLAYER_VIEW_OFF_AUDIT);
+    throw new Error(PLAYER_VIEW_NOT_ADMIN);
   }
 
   const row = await readSessionView(db, key.tokenHash, user.id);
@@ -91,28 +129,38 @@ export async function setPlayerView(
   return { until: toIso(row.player_view_until), roles: parseImpersonatedRoles(row.impersonated_roles_json), changed };
 }
 
+/** Administration du compte relue en base, hors de toute transaction (état validé). */
+async function isStillAdmin(db: Pool, userId: number): Promise<boolean> {
+  const [rows] = await db.execute<(RowDataPacket & { is_admin: number })[]>(
+    `SELECT is_admin FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+    [userId],
+  );
+  return Number(rows[0]?.is_admin ?? 0) === 1;
+}
+
 /**
- * Lève l'incarnation de **toutes** les sessions d'un compte qui perd
+ * Lève l'incarnation **en cours** de **toutes** les sessions d'un compte qui perd
  * l'administration (`setUserRoles`) : sans quoi l'échéance et les rôles
  * restaient sur la session, ignorés tant que le compte n'est plus
  * administrateur, puis relus tels quels s'il le redevenait dans les 12 h —
  * une incarnation revenue sans geste ni ligne pm2. Sur la connexion de la
- * transaction de l'appelant. Sans la colonne des rôles (`ALTER` non joué),
- * seule l'échéance est levée.
+ * transaction de l'appelant (qui a verrouillé `bg_users` d'abord : seul ordre
+ * de verrouillage des deux tables). Une échéance déjà passée reste, sans effet
+ * (registre, T05) : elle ne peut plus revenir. Sans la colonne des rôles
+ * (`ALTER` non joué), seule l'échéance est levée.
+ *
+ * @returns le nombre de sessions dont l'incarnation a été levée (ligne pm2 de
+ *   l'appelant, après le commit).
  */
-export async function clearAccountImpersonation(connection: Pick<PoolConnection, "execute">, userId: number): Promise<void> {
-  const clear = (roles: boolean) =>
+export async function clearAccountImpersonation(connection: Pick<PoolConnection, "execute">, userId: number): Promise<number> {
+  const [result] = await withRolesColumn((roles) =>
     connection.execute<ResultSetHeader>(
       `UPDATE bg_user_sessions SET player_view_until = NULL${roles ? ", impersonated_roles_json = NULL" : ""}
-       WHERE user_id = ? AND player_view_until IS NOT NULL`,
+       WHERE user_id = ? AND player_view_until > NOW()`,
       [userId],
-    );
-  try {
-    await clear(true);
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
-    await clear(false);
-  }
+    ),
+  );
+  return Number(result.affectedRows ?? 0);
 }
 
 /**
@@ -122,20 +170,14 @@ export async function clearAccountImpersonation(connection: Pick<PoolConnection,
  * rôles vides, plutôt que d'échouer.
  */
 async function readSessionView(db: Pool, tokenHash: string, userId: number): Promise<SessionViewRow | undefined> {
-  const select = (roles: boolean) =>
+  const [rows] = await withRolesColumn((roles) =>
     db.execute<SessionViewRow[]>(
       `SELECT player_view_until${roles ? ", impersonated_roles_json" : ", NULL AS impersonated_roles_json"}, player_view_until > NOW() AS active
        FROM bg_user_sessions WHERE token_hash = ? AND user_id = ? AND expires_at > NOW() LIMIT 1`,
       [tokenHash, userId],
-    );
-  try {
-    const [rows] = await select(true);
-    return rows[0];
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
-    const [rows] = await select(false);
-    return rows[0];
-  }
+    ),
+  );
+  return rows[0];
 }
 
 /**
@@ -157,20 +199,14 @@ async function writeSessionView(db: Pool, tokenHash: string, userId: number, rol
     );
     return Number(result.affectedRows ?? 0) > 0;
   }
-  const exit = (roles: boolean) =>
+  const [result] = await withRolesColumn((roles) =>
     db.execute<ResultSetHeader>(
       `UPDATE bg_user_sessions SET player_view_until = NULL${roles ? ", impersonated_roles_json = NULL" : ""}
        WHERE token_hash = ? AND user_id = ? AND expires_at > NOW() AND player_view_until > NOW()`,
       [tokenHash, userId],
-    );
-  try {
-    const [result] = await exit(true);
-    return Number(result.affectedRows ?? 0) > 0;
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
-    const [result] = await exit(false);
-    return Number(result.affectedRows ?? 0) > 0;
-  }
+    ),
+  );
+  return Number(result.affectedRows ?? 0) > 0;
 }
 
 /**

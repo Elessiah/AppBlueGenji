@@ -1067,7 +1067,8 @@ export function RgpdEn({
             (“Impersonate a role”; no role: “player view”, the site seen as a player), for {PLAYER_VIEW_MAX_HOURS} hours at most: nothing is said about it on
             Discord; the server logs keep their username, their identifier, the roles impersonated and the direction of the switch (in or back),
             according to their rotation, on the basis of legitimate interest (administration of the platform), to which
-            they may object; the deadline and the roles impersonated are noted on the session and are erased with it
+            they may object; the deadline and the roles impersonated are noted on the session and are erased on return, when the account
+            loses administration during the impersonation, or with the session
             (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
             A platform role is also shown as a title (administrator, referee…) on your player page, which any logged-in
             member reads, whatever your visibility settings; the developer role, which only opens reading the technical

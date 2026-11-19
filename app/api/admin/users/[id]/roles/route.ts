@@ -4,6 +4,8 @@ import { publishRolesChange, setOwnPlatformRoles, setUserRoles, type RolesSaveRe
 import { failureReason, unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { can, isPlatformRole, type PlatformRole } from "@/lib/shared/permissions";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
+import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view";
+import { auditStaffAction } from "@/lib/server/staff-audit";
 
 /** Refus du service rendus tels quels, avec leur statut. */
 const SERVICE_ERROR_STATUS: Readonly<Record<string, number>> = {
@@ -18,6 +20,11 @@ const SERVICE_ERROR_STATUS: Readonly<Record<string, number>> = {
  */
 function publishAfterCommit(actor: { id: number; pseudo: string }, targetId: number, saved: RolesSaveResult): void {
   try {
+    // Retour imposé par la rétrogradation : la ligne pm2 du retour, comme
+    // toute bascule (registre, T18), au nom de l'administrateur qui l'a imposé.
+    if (saved.impersonationsCleared) {
+      auditStaffAction(`${PLAYER_VIEW_OFF_AUDIT} : administration retirée au compte #${targetId} (${saved.impersonationsCleared} session(s))`, actor);
+    }
     publishRolesChange(actor, targetId, saved);
   } catch (error) {
     console.error(`[roles] journal du staff non publié : ${failureReason(error)}`);

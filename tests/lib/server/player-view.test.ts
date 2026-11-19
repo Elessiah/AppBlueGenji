@@ -11,13 +11,15 @@ import { playerViewSessionKey } from "@/lib/server/auth";
 import { reconnectSessionStreams } from "@/lib/server/session-streams";
 import { auditStaffAction } from "@/lib/server/staff-audit";
 import {
+  clearAccountImpersonation,
   impersonationAuditLine,
   PLAYER_VIEW_NO_SESSION,
+  PLAYER_VIEW_NOT_ADMIN,
   PLAYER_VIEW_OFF_AUDIT,
   PLAYER_VIEW_ON_AUDIT,
   setPlayerView,
 } from "@/lib/server/player-view";
-import { type SqlQuery, fakePool } from "../../helpers/sql-double";
+import { type SqlQuery, fakeConnection, fakePool } from "../../helpers/sql-double";
 import { authUser } from "../../helpers/auth-user";
 
 const admin = authUser({ id: 7, pseudo: "Chef", isAdmin: true });
@@ -37,13 +39,20 @@ type ReadBack = {
 
 let execute: jest.Mock<SqlQuery>;
 
-/** Double SQL : les écritures rendent `written` lignes touchées, la relecture rend `readBack`. */
-function database(written: number, readBack: ReadBack) {
-  execute = jest.fn<SqlQuery>().mockImplementation(async (sql) =>
-    String(sql).trimStart().startsWith("SELECT")
+/** Relecture de l'administration après une entrée (`SELECT is_admin FROM bg_users`). */
+const isAdminRead = (sql: unknown) => String(sql).includes("FROM bg_users");
+
+/**
+ * Double SQL : les écritures rendent `written` lignes touchées, la relecture
+ * rend `readBack`, l'administration relue vaut `isAdmin`.
+ */
+function database(written: number, readBack: ReadBack, isAdmin = 1) {
+  execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
+    if (isAdminRead(sql)) return [[{ is_admin: isAdmin }], []];
+    return String(sql).trimStart().startsWith("SELECT")
       ? [readBack === null ? [] : [readBack], []]
-      : [header(written), []],
-  );
+      : [header(written), []];
+  });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
@@ -170,6 +179,90 @@ describe("setPlayerView — session à cookie", () => {
   });
 });
 
+describe("setPlayerView — administration retirée pendant l'entrée", () => {
+  it("setPlayerView_entryAfterDemotion_undoesWriteAndThrowsNotAdmin", async () => {
+    database(1, { player_view_until: DEADLINE, active: 1 }, 0);
+
+    await expect(setPlayerView(admin, true, ["CASTER"])).rejects.toThrow(PLAYER_VIEW_NOT_ADMIN);
+
+    const undo = sqlCalls().at(-1);
+    expect(undo).toContain("UPDATE bg_user_sessions SET player_view_until = NULL, impersonated_roles_json = NULL");
+    expect(undo).toContain("player_view_until > NOW()");
+    expect(execute.mock.calls.at(-1)?.[1]).toEqual([HASH, 7]);
+  });
+
+  it("setPlayerView_entryAfterDemotion_auditsTheEntryThenItsUndo", async () => {
+    database(1, { player_view_until: DEADLINE, active: 1 }, 0);
+
+    await expect(setPlayerView(admin, true, ["CASTER"])).rejects.toThrow(PLAYER_VIEW_NOT_ADMIN);
+
+    expect(jest.mocked(auditStaffAction).mock.calls.map(([line]) => line)).toEqual([
+      impersonationAuditLine(["CASTER"]),
+      PLAYER_VIEW_OFF_AUDIT,
+    ]);
+    expect(reconnectSessionStreams).toHaveBeenCalledTimes(2);
+  });
+
+  it("setPlayerView_entryStillAdmin_keepsWrite", async () => {
+    const result = await setPlayerView(admin, true, ["CASTER"]);
+
+    expect(result.changed).toBe(true);
+    expect(sqlCalls().filter((sql) => sql.includes("SET player_view_until = NULL"))).toEqual([]);
+  });
+
+  it("setPlayerView_entryWithoutWrite_neverReadsAdmin", async () => {
+    database(0, { player_view_until: DEADLINE, active: 1 }, 0);
+
+    await setPlayerView(admin, true);
+
+    expect(sqlCalls().some(isAdminRead)).toBe(false);
+  });
+
+  it("setPlayerView_exit_neverReadsAdmin", async () => {
+    database(1, { player_view_until: null, active: 0 }, 0);
+
+    await setPlayerView(admin, false);
+
+    expect(sqlCalls().some(isAdminRead)).toBe(false);
+  });
+
+  it("setPlayerView_devBypassEntryAfterDemotion_deletesRowAndThrows", async () => {
+    jest.mocked(playerViewSessionKey).mockResolvedValue({ tokenHash: "dev-auth-bypass:7", devBypass: true });
+    database(1, { player_view_until: DEADLINE, active: 1 }, 0);
+
+    await expect(setPlayerView(admin, true)).rejects.toThrow(PLAYER_VIEW_NOT_ADMIN);
+
+    const undo = sqlCalls().at(-1);
+    expect(undo).toContain("DELETE FROM bg_user_sessions");
+    expect(undo).toContain("player_view_until > NOW()");
+  });
+});
+
+describe("clearAccountImpersonation", () => {
+  it("clearAccountImpersonation_activeOnly_returnsAffectedCount", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([header(2), []]);
+
+    const cleared = await clearAccountImpersonation(fakeConnection({ execute }), 7);
+
+    expect(cleared).toBe(2);
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("WHERE user_id = ? AND player_view_until > NOW()");
+    expect(params).toEqual([7]);
+  });
+
+  it("clearAccountImpersonation_withoutRolesColumn_clearsDeadlineOnly", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" }))
+      .mockResolvedValueOnce([header(1), []]);
+
+    const cleared = await clearAccountImpersonation(fakeConnection({ execute }), 7);
+
+    expect(cleared).toBe(1);
+    expect(String(execute.mock.calls[1][0])).not.toContain("impersonated_roles_json");
+  });
+});
+
 describe("setPlayerView — relecture en échec", () => {
   it("setPlayerView_readBackFails_stillReconnectsAndAudits", async () => {
     execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
@@ -191,6 +284,7 @@ describe("setPlayerView — colonne des rôles absente (ALTER non joué)", () =>
   function databaseWithoutRolesColumn(written: number, readBack: ReadBack) {
     execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
       const text = String(sql);
+      if (isAdminRead(text)) return [[{ is_admin: 1 }], []];
       if (text.replace("NULL AS impersonated_roles_json", "").includes("impersonated_roles_json")) throw unknownColumn();
       return text.trimStart().startsWith("SELECT") ? [readBack === null ? [] : [readBack], []] : [header(written), []];
     });

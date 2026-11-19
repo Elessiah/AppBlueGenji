@@ -66,10 +66,19 @@ l'échéance, et la relecture rend des rôles vides (`readSessionView`) — un
 administrateur n'est jamais enfermé hors de ses droits.
 
 **Perte de l'administration.** `setUserRoles` qui retire `ADMIN` lève, dans
-la même transaction, l'incarnation de toutes les sessions du compte
-(`clearAccountImpersonation`) : sans quoi l'échéance et les rôles, ignorés
-tant que le compte n'est plus administrateur, revenaient tels quels s'il le
-redevenait dans les 12 h.
+la même transaction, l'incarnation **en cours** de toutes les sessions du
+compte (`clearAccountImpersonation`) : sans quoi l'échéance et les rôles,
+ignorés tant que le compte n'est plus administrateur, revenaient tels quels
+s'il le redevenait dans les 12 h. Une échéance déjà passée reste, sans effet.
+La route des rôles en laisse la ligne pm2 du retour (`PLAYER_VIEW_OFF_AUDIT`,
+au nom de l'administrateur qui rétrograde, avec le numéro du compte et le
+nombre de sessions). Ordre de verrouillage unique : `bg_users` puis les
+sessions. Une entrée **concurrente** (administration lue avant la
+rétrogradation, écrite après) relit `is_admin` après son écriture, sans
+verrou, et se défait (`403 FORBIDDEN`) — une condition sur `bg_users` dans
+l'`UPDATE` aurait pris l'ordre inverse. Un rattrapage de
+`RECENT_SCHEMA_CHANGES` lève une fois les échéances en cours des comptes non
+administrateurs (vue joueur posée avant ce nettoyage).
 
 ## Ce qui reste au compte pendant l'incarnation
 
@@ -116,8 +125,11 @@ redevenait dans les 12 h.
   qui ne fait que rendre des droits, est compté à part (`PLAYER_VIEW_EXIT_RULE`,
   trente par minute) ; cette règle large garde aussi **avant** la lecture du
   corps (un corps refusé se compte) ; une entrée refusée par sa propre règle y
-  rend sa place (`reserveRateLimit`), si bien que seules les dix entrées
-  admises de la minute y comptent et n'épuisent jamais le retour ;
+  rend sa place (`reserveRateLimit`) ; les deux fenêtres fixes ne démarrant
+  pas ensemble, vingt entrées admises au plus pèsent sur une fenêtre large,
+  dix places au moins restent au retour (seule une boucle de corps refusés
+  l'épuise, le temps d'une fenêtre) ; `403 FORBIDDEN` aussi pour une entrée
+  défaite parce que l'administration a été retirée pendant son écriture ;
   `409 IMPERSONATION_ALREADY_ACTIVE` pour une entrée qui n'a rien écrit alors
   que la session incarne déjà **d'autres** rôles (ou qu'une sortie croisée vient de la lever) (posés depuis un autre
   onglet : le client le dit et relit la page — une entrée qui a écrit rend
@@ -210,8 +222,8 @@ redevenait dans les 12 h.
 
 Les colonnes ne servent qu'à réduire des droits, à la demande de
 l'administrateur lui-même, et partent avec la session (déconnexion, purge des
-sessions échues, suppression du compte), ou plus tôt quand le compte perd
-l'administration ; une échéance passée reste sur la ligne, sans effet, avec
+sessions échues, suppression du compte), ou plus tôt au retour ou quand le
+compte perd l'administration pendant l'incarnation ; une échéance passée reste sur la ligne, sans effet, avec
 ses rôles, jusque-là. Jusqu'au déploiement de cette
 version (novembre 2026), tout titulaire d'un rôle de plateforme (développeur
 compris) pouvait passer en vue joueur : ses lignes pm2 restent jusqu'à leur rotation, d'où les mentions

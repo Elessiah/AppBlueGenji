@@ -659,6 +659,13 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_schedule_deadline (schedule_deadline_at)`,
     // Rôles incarnés par une session d'administrateur (`docs/features/ADMIN_ROLE_IMPERSONATION.md`).
     `ALTER TABLE bg_user_sessions ADD COLUMN impersonated_roles_json VARCHAR(255) NULL AFTER player_view_until`,
+    // Rattrapage, une fois (puis no-op) : une vue joueur posée avant que la
+    // rétrogradation ne la lève (`clearAccountImpersonation`) — ou par un
+    // non-administrateur, quand elle leur était ouverte — revenait si le
+    // compte devenait administrateur dans les 12 h. Levée sur toute session
+    // d'un compte qui n'est pas administrateur.
+    `UPDATE bg_user_sessions SET player_view_until = NULL
+      WHERE player_view_until > NOW() AND user_id IN (SELECT id FROM bg_users WHERE is_admin = 0 OR is_deleted = 1)`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

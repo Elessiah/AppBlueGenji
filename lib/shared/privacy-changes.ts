@@ -2290,7 +2290,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     links: [{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }],
     summary: `Seul un administrateur peut désormais réduire ses droits sur une de ses sessions, aux rôles de plateforme qu'il choisit (aucun : vue joueur), ${PLAYER_VIEW_MAX_HOURS} heures au plus. Chaque bascule est notée, à son nom et avec les rôles incarnés, dans les journaux du serveur.`,
     details: [
-      "Ce qui est gardé en plus : les rôles incarnés, sur la session de connexion avec l'échéance, effacés avec la session (déconnexion, fin de la session ou suppression du compte), et dans la ligne des journaux du serveur, selon leur rotation ; base : l'intérêt légitime (administration de la plateforme), auquel la personne concernée peut s'opposer. Rien n'en est dit sur Discord.",
+      "Ce qui est gardé en plus : les rôles incarnés, sur la session de connexion avec l'échéance, effacés au retour, quand le compte perd l'administration pendant l'incarnation, ou avec la session (déconnexion, fin de la session ou suppression du compte), et dans la ligne des journaux du serveur, selon leur rotation ; base : l'intérêt légitime (administration de la plateforme), auquel la personne concernée peut s'opposer. Rien n'en est dit sur Discord.",
       "Ce qui ne change pas : pour un compte qui n'est pas administrateur, rien de nouveau n'est collecté ; les bascules en vue joueur faites jusqu'ici par les autres titulaires d'un rôle de plateforme restent dans les journaux du serveur, selon leur rotation.",
     ],
   },

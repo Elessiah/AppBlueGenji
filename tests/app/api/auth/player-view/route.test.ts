@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/player-view", () => ({
   PLAYER_VIEW_NO_SESSION: "NO_SESSION",
+  PLAYER_VIEW_NOT_ADMIN: "NOT_ADMIN",
   setPlayerView: jest.fn(),
 }));
 
@@ -289,6 +290,16 @@ describe("POST /api/auth/player-view", () => {
     const res = await toggle("{");
 
     expect(res.status).toBe(400);
+  });
+
+  it("POST_entryUndoneNotAdmin_returns403Forbidden", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(setPlayerView).mockRejectedValue(new Error("NOT_ADMIN"));
+
+    const res = await toggle({ active: true });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual(expect.objectContaining({ error: "FORBIDDEN" }));
   });
 
   it("POST_sessionRowGone_returns401", async () => {

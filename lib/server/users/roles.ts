@@ -23,6 +23,11 @@ export interface RolesSaveResult {
   roles: PlatformRole[];
   /** Les rôles du compte juste avant l'écriture, lus sous le verrou de la ligne. */
   previous: PlatformRole[];
+  /**
+   * Sessions dont une incarnation en cours a été levée par la rétrogradation
+   * (`clearAccountImpersonation`) : la route en laisse la ligne pm2 du retour.
+   */
+  impersonationsCleared?: number;
 }
 
 /**
@@ -82,6 +87,7 @@ export async function setUserRoles(
   const connection = await db.getConnection();
   let previous: PlatformRole[];
   let unchanged = false;
+  let impersonationsCleared = 0;
   try {
     await connection.beginTransaction();
     // L'**auteur** doit être encore administrateur au moment d'écrire : la
@@ -130,7 +136,13 @@ export async function setUserRoles(
       // Rétrogradation : l'incarnation posée sur ses sessions tombe avec
       // l'administration (`ADMIN_ROLE_IMPERSONATION.md`), elle ne reviendrait
       // pas d'elle-même si l'administration était rendue.
-      if (previous.includes("ADMIN") && !isAdmin) await clearAccountImpersonation(connection, targetUserId);
+      // Seul ordre de verrouillage des deux tables : `bg_users` (ci-dessus)
+      // puis les sessions — tout autre écrivain des sessions tient en une
+      // instruction sans `bg_users` (l'entrée d'une incarnation relit
+      // l'administration après coup, `setPlayerView`).
+      if (previous.includes("ADMIN") && !isAdmin) {
+        impersonationsCleared = await clearAccountImpersonation(connection, targetUserId);
+      }
     }
     await connection.commit();
   } catch (error) {
@@ -149,7 +161,7 @@ export async function setUserRoles(
   // enregistrés — retrait comme ajout (`session-streams.ts`).
   if (!unchanged) closeUserStreams(targetUserId);
 
-  return { roles: sanitized, previous };
+  return { roles: sanitized, previous, ...(impersonationsCleared > 0 ? { impersonationsCleared } : {}) };
 }
 
 /**

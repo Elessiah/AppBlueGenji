@@ -328,9 +328,29 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
 
     const [clearSql, clearParams] = connection.execute.mock.calls[2] as [string, unknown[]];
     expect(clearSql).toContain("UPDATE bg_user_sessions SET player_view_until = NULL, impersonated_roles_json = NULL");
-    expect(clearSql).toContain("WHERE user_id = ? AND player_view_until IS NOT NULL");
+    expect(clearSql).toContain("WHERE user_id = ? AND player_view_until > NOW()");
     expect(clearParams).toEqual([7]);
     expect(connection.execute.mock.invocationCallOrder[2]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  it("setUserRoles_adminDemoted_returnsImpersonationsCleared", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: "[]" }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 2 }]);
+
+    const result = await setUserRoles(7, ["ARBITRE"], 3);
+
+    expect(result).toEqual({ roles: ["ARBITRE"], previous: ["ADMIN"], impersonationsCleared: 2 });
+  });
+
+  it("setUserRoles_adminDemotedNoActiveImpersonation_omitsField", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: "[]" }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+    const result = await setUserRoles(7, ["ARBITRE"], 3);
+
+    expect(result).toEqual({ roles: ["ARBITRE"], previous: ["ADMIN"] });
   });
 
   it("setUserRoles_adminDemotedWithoutRolesColumn_clearsDeadlineOnly", async () => {
@@ -380,6 +400,7 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
   it("setUserRoles_storedRoles_returnsThemAsPrevious", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: '["CASTER"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const result = await setUserRoles(7, ["ARBITRE"], 3);
 
@@ -399,6 +420,7 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
   it("setUserRoles_expectedSameRolesInOtherOrder_writes", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 1, platform_roles_json: '["CASTER","ARBITRE"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     await setUserRoles(7, [], 3, ["ARBITRE", "CASTER", "ADMIN"]);
 

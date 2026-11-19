@@ -133,9 +133,8 @@ export const TEAM_VOICE_TOGGLE_RULE: RateLimitRule = {
  * compte. Chaque vrai changement écrit la session, laisse une ligne pm2
  * nommée et fait reconnecter les flux de la session : dix par minute couvrent
  * tous les allers-retours d'un membre du staff qui vérifie un écran ; au-delà,
- * c'est une boucle. Le plafond borne aussi les changements de contexte retenus
- * par compte (`RECONNECT_MEMORY_PER_USER`, son double : une fenêtre fixe laisse
- * passer deux salves de part et d'autre de sa limite).
+ * c'est une boucle. Les **entrées** seulement : toute requête de la route passe
+ * d'abord par {@link PLAYER_VIEW_EXIT_RULE}.
  */
 export const PLAYER_VIEW_TOGGLE_RULE: RateLimitRule = {
   name: "player-view-toggle",
@@ -144,11 +143,15 @@ export const PLAYER_VIEW_TOGGLE_RULE: RateLimitRule = {
 };
 
 /**
- * Retour en vue admin (`POST /api/auth/player-view`, `active: false`), par
- * compte, compté à part des entrées : il ne fait que rendre des droits et ne
- * doit jamais être bloqué par les entrées de la minute ; trente par minute ne
- * se touchent pas en usage normal (un retour n'écrit que si une incarnation
- * est posée), mais une boucle ne martèle plus la base sans fin.
+ * Règle large de `POST /api/auth/player-view`, par compte : **toute** requête
+ * y passe avant la lecture du corps (retours, entrées, corps refusés) ; une
+ * entrée refusée par {@link PLAYER_VIEW_TOGGLE_RULE} y rend sa place, si bien
+ * que les entrées n'en prennent jamais plus de vingt (deux fenêtres étroites)
+ * et que le retour, qui ne fait que rendre des droits, garde de la marge.
+ * Trente par minute ne se touchent pas en usage normal, mais une boucle ne
+ * martèle plus la base sans fin. Elle borne aussi les changements de contexte
+ * retenus par compte (`RECONNECT_MEMORY_PER_USER`, son double : une fenêtre
+ * fixe laisse passer deux salves de part et d'autre de sa limite).
  */
 export const PLAYER_VIEW_EXIT_RULE: RateLimitRule = {
   name: "player-view-exit",

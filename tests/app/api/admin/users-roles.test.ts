@@ -9,6 +9,7 @@ import * as service from "@/lib/server/users/roles";
 import type { RolesSaveResult } from "@/lib/server/users/roles";
 import type { PlatformRole } from "@/lib/shared/permissions";
 import { authUser } from "../../../helpers/auth-user";
+import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view";
 
 const admin = authUser({ id: 1, isAdmin: true });
 const normalUser = authUser({ id: 2, isAdmin: false });
@@ -175,6 +176,28 @@ describe("POST /api/admin/users/[id]/roles", () => {
       7,
       saved(["RECRUTEUR"], ["CASTER"]),
     );
+  });
+
+  it("post_demotionClearedImpersonation_auditsForcedReturnInPm2", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue({ roles: [], previous: ["ADMIN"], impersonationsCleared: 2 });
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await POST(jsonReq({ roles: [] }), params("7"));
+
+    const lines = info.mock.calls.map(([line]) => String(line));
+    expect(lines.some((line) => line.includes(PLAYER_VIEW_OFF_AUDIT) && line.includes("#7") && line.includes("2 session(s)"))).toBe(true);
+    expect(lines.some((line) => line.includes(PLAYER_VIEW_OFF_AUDIT) && line.includes(admin.pseudo))).toBe(true);
+  });
+
+  it("post_nothingCleared_writesNoForcedReturnLine", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue(saved([], ["ADMIN"]));
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await POST(jsonReq({ roles: [] }), params("7"));
+
+    expect(info.mock.calls.some(([line]) => String(line).includes(PLAYER_VIEW_OFF_AUDIT))).toBe(false);
   });
 
   it("post_serviceThrowsUnknownError_returns500WithGenericCode", async () => {

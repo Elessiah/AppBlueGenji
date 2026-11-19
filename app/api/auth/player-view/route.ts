@@ -2,7 +2,7 @@ import { enforceRateLimit, PLAYER_VIEW_EXIT_RULE, PLAYER_VIEW_TOGGLE_RULE, reser
 import { getCurrentUser } from "@/lib/server/auth";
 import { failureReason } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
-import { PLAYER_VIEW_NO_SESSION, setPlayerView } from "@/lib/server/player-view";
+import { PLAYER_VIEW_NO_SESSION, PLAYER_VIEW_NOT_ADMIN, setPlayerView } from "@/lib/server/player-view";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { parsePlayerViewBody } from "@/lib/shared/player-view";
@@ -21,8 +21,11 @@ import { parsePlayerViewBody } from "@/lib/shared/player-view";
  * des droits, par une règle à part et plus large (`PLAYER_VIEW_EXIT_RULE`),
  * qui borne aussi, avant la lecture du corps, toute requête du compte (corps
  * invalide compris). Une entrée refusée par sa propre règle y rend sa place :
- * seules les dix entrées admises de la minute y comptent, si bien que des
- * entrées répétées n'épuisent jamais le retour.
+ * les deux fenêtres, fixes, ne démarrent pas ensemble, si bien que vingt
+ * entrées admises au plus pèsent sur une même fenêtre large (dix de part et
+ * d'autre d'un renouvellement de la fenêtre étroite) — dix places au moins
+ * restent au retour. Seule une boucle de corps refusés (`400`) peut l'épuiser,
+ * le temps d'une fenêtre : elle se compte, c'est son but.
  *
  * Une entrée alors que la session incarne déjà **d'autres** rôles (un autre
  * onglet l'a posée) ne change rien et répond `409 IMPERSONATION_ALREADY_ACTIVE`
@@ -71,10 +74,18 @@ export async function POST(req: Request) {
     // peuvent rendre une incarnation sans échéance.
     return ok({ playerView: until !== null, until, roles });
   } catch (error) {
-    if (error instanceof Error && error.message === PLAYER_VIEW_NO_SESSION) return fail("UNAUTHORIZED", 401);
-    console.error("[player-view] bascule impossible :", failureReason(error));
-    return fail("PLAYER_VIEW_FAILED", 500);
+    return toggleFailure(error);
   }
+}
+
+/** Réponse d'une bascule en échec : refus du service, ou panne (`500`, code seul dans pm2). */
+function toggleFailure(error: unknown): Response {
+  const message = error instanceof Error ? error.message : null;
+  if (message === PLAYER_VIEW_NO_SESSION) return fail("UNAUTHORIZED", 401);
+  // Administration retirée pendant l'entrée : défaite, refusée comme telle.
+  if (message === PLAYER_VIEW_NOT_ADMIN) return fail("FORBIDDEN", 403);
+  console.error("[player-view] bascule impossible :", failureReason(error));
+  return fail("PLAYER_VIEW_FAILED", 500);
 }
 
 /** Mêmes rôles (listes normalisées, dans l'ordre de `IMPERSONABLE_ROLES`). */
