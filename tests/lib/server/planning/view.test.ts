@@ -73,6 +73,28 @@ describe("entryConfirmState", () => {
   });
 });
 
+describe("loadPlanningView — noms hors membres", () => {
+  it("loadPlanningView_nonMemberAssignee_nameReturned", async () => {
+    jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) =>
+      planningData({ entries: [loadedEntry()], members: options.members ?? [], assignments: [loadedAssignment({ userId: 12, role: "CASTER" })] }),
+    );
+    connection.execute.mockImplementation(async (sql: string) =>
+      sql.includes("SELECT id, pseudo FROM bg_users") ? [[{ id: 12, pseudo: "Test_CasterInvite" }], []] : [[], []],
+    );
+
+    const view = await loadPlanningView(staff, MONDAY);
+
+    expect(view.names).toEqual([{ userId: 12, pseudo: "Test_CasterInvite" }]);
+  });
+
+  it("loadPlanningView_onlyMembers_noNamesField", async () => {
+    const view = await loadPlanningView(caster, MONDAY);
+
+    expect(view).not.toHaveProperty("names");
+    expect(connection.execute.mock.calls.some(([sql]) => String(sql).includes("SELECT id, pseudo FROM bg_users"))).toBe(false);
+  });
+});
+
 describe("loadPlanningView — comptes", () => {
   it("loadPlanningView_twoLoadsWithinTtl_usersScannedOnce", async () => {
     await loadPlanningView(caster, MONDAY);

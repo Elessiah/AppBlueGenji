@@ -37,29 +37,39 @@ export function planningGuestAuditLine(targetUserId: number, saved: PlanningGues
 }
 
 /**
- * Pose (`guest = true`) ou retire le drapeau « invité » d'un compte vivant.
- * Erreur par code : `USER_NOT_FOUND` (aucun compte, ou compte supprimé).
- * L'écriture est conditionnelle (`is_guest_staff <> ?`) : deux enregistrements
- * concurrents ne sortent le compte du planning qu'une fois. Un drapeau posé
- * libère ensuite ses attributions et disponibilités à venir
- * (`releaseGuestPlanning`, désistement ordinaire), après l'écriture — le
- * remplaçant cherché ne le compte déjà plus parmi les membres.
+ * Pose (`guest = true`) ou retire le drapeau « invité » d'un compte vivant,
+ * par le staff `actorId`. Erreurs par code : `USER_NOT_FOUND` (aucun compte,
+ * ou compte supprimé), `PLANNING_GUEST_ADMIN` (poser le drapeau sur un
+ * administrateur : il garde tous les droits, `planning` compris — la sortie du
+ * planning ne ferait qu'effacer ses créneaux). L'écriture est conditionnelle
+ * (`is_guest_staff <> ?`) : deux enregistrements concurrents ne la font
+ * qu'une fois. Un drapeau posé — ou reposé à l'identique : la sortie se
+ * rejoue, pour reprendre une sortie restée incomplète — libère ensuite ses
+ * attributions et disponibilités à venir (`releaseGuestPlanning`, désistement
+ * ordinaire), après l'écriture : le remplaçant cherché ne le compte déjà plus
+ * parmi les membres.
  */
-export async function setPlanningGuest(targetUserId: number, guest: boolean, now: number = Date.now()): Promise<PlanningGuestSaveResult> {
+export async function setPlanningGuest(
+  targetUserId: number,
+  guest: boolean,
+  actorId: number,
+  now: number = Date.now(),
+): Promise<PlanningGuestSaveResult> {
   const db = await getDatabase();
   // Lu d'abord, sans verrou ni transaction : un identifiant inconnu ne pose aucun verrou d'intervalle.
-  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+  const [rows] = await db.execute<(RowDataPacket & { id: number; is_admin: number | null })[]>(
+    `SELECT id, is_admin FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
     [targetUserId],
   );
   if (rows.length === 0) throw new Error("USER_NOT_FOUND");
+  if (guest && Number(rows[0].is_admin ?? 0) === 1) throw new Error("PLANNING_GUEST_ADMIN");
   const flag = guest ? 1 : 0;
   const [written] = await db.execute<ResultSetHeader>(
     `UPDATE bg_users SET is_guest_staff = ? WHERE id = ? AND is_deleted = 0 AND is_guest_staff <> ?`,
     [flag, targetUserId, flag],
   );
   const changed = Number(written.affectedRows ?? 0) > 0;
-  const release = changed && guest ? await releaseGuestPlanning(targetUserId, now) : null;
+  const release = guest ? await releaseGuestPlanning(targetUserId, actorId, now) : null;
   return { guest, changed, release };
 }
 
@@ -68,6 +78,8 @@ export async function setPlanningGuest(targetUserId: number, guest: boolean, now
  * dans pm2 (`publishStaffAction`). Rien pour un enregistrement sans écart.
  */
 export function publishPlanningGuestChange(actor: StaffActor, targetUserId: number, saved: PlanningGuestSaveResult): boolean {
+  // Reposé à l'identique (sortie rejouée) : le drapeau n'a pas bougé, rien à publier ; les annonces du
+  // désistement ordinaire disent déjà ce qui a été quitté.
   if (!saved.changed) return false;
   publishStaffAction(saved.guest ? PLANNING_GUEST_ON_DISCORD_LINE : PLANNING_GUEST_OFF_DISCORD_LINE, actor, {
     auditLine: planningGuestAuditLine(targetUserId, saved),

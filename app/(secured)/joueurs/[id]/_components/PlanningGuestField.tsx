@@ -4,8 +4,7 @@ import { useState } from "react";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
-import { useStaffLang } from "@/components/i18n/staff-lang";
-import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
+import { usePlayersText } from "@/components/i18n/players-text";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { reloadSucceeded } from "@/lib/shared/reload-outcome";
 import { planningGuestErrorMessage } from "../_lib/planning-guest-errors";
@@ -15,7 +14,8 @@ import { planningGuestErrorMessage } from "../_lib/planning-guest-errors";
  * § Invités), dans le bloc « Rôles & permissions » : réservée au staff qui
  * tient `roles`, jamais sur sa propre fiche. Cocher passe par une
  * confirmation (le compte quitte ses créneaux à venir) ; décocher s'enregistre
- * aussitôt. Outil de l'administration : français sous `/en` (D4), comme le panneau.
+ * aussitôt. Ses textes sont traduits (`players.planningGuest`), à la
+ * différence du reste du panneau, resté français (D4).
  */
 export function PlanningGuestField({
   userId,
@@ -30,8 +30,7 @@ export function PlanningGuestField({
   onSaved: () => Promise<boolean | void> | void;
 }>) {
   const { showError, showInfo, showSuccess } = useToast();
-  const staffLang = useStaffLang();
-  const toastLang = staffLang ? { lang: staffLang } : undefined;
+  const text = usePlayersText();
   const { busy, isBusy, run } = useBusyGuard();
   const [confirming, setConfirming] = useState(false);
 
@@ -44,14 +43,13 @@ export function PlanningGuestField({
       });
       const payload = (await res.json().catch(() => ({}))) as { error?: string; failed?: number };
       if (!res.ok) throw new Error(payload.error || "PLANNING_GUEST_UPDATE_FAILED");
-      if (!next) showSuccess(`${pseudo} rejoint le planning.`, toastLang);
-      else if ((payload.failed ?? 0) > 0)
-        showInfo(`${pseudo} est invité ; des créneaux à venir n'ont pas pu être quittés : retire-les depuis le planning.`, toastLang);
-      else showSuccess(`${pseudo} est invité : hors planning.`, toastLang);
-      if (!(await reloadSucceeded(onSaved))) showError(planningGuestErrorMessage("PROFILE_RELOAD_FAILED"), toastLang);
+      if (!next) showSuccess(text.t("planningGuest.saved.member", { pseudo }));
+      else if ((payload.failed ?? 0) > 0) showInfo(text.t("planningGuest.saved.partial", { pseudo }));
+      else showSuccess(text.t("planningGuest.saved.guest", { pseudo }));
+      if (!(await reloadSucceeded(onSaved))) showError(planningGuestErrorMessage("PROFILE_RELOAD_FAILED", text));
       return true;
     } catch (error) {
-      showError(planningGuestErrorMessage((error as Error).message), toastLang);
+      showError(planningGuestErrorMessage((error as Error).message, text));
       return false;
     }
   };
@@ -59,7 +57,7 @@ export function PlanningGuestField({
   const save = async (next: boolean): Promise<boolean> => {
     const done = await run(() => send(next));
     if (done === undefined) {
-      showInfo(BUSY_REFUSED_MESSAGE, { ...toastLang, once: true });
+      showInfo(text.t("planningGuest.busy"), { once: true });
       return false;
     }
     return done;
@@ -67,7 +65,7 @@ export function PlanningGuestField({
 
   const onChange = () => {
     if (isBusy()) {
-      showInfo(BUSY_REFUSED_MESSAGE, { ...toastLang, once: true });
+      showInfo(text.t("planningGuest.busy"), { once: true });
       return;
     }
     if (guest) void save(false);
@@ -75,7 +73,8 @@ export function PlanningGuestField({
   };
 
   return (
-    <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid rgba(var(--violet-400-rgb), 0.2)" }}>
+    // Traduit dans un panneau resté français (`lang="fr"` sous `/en`) : la langue de la page, redite (WCAG 3.1.2).
+    <div lang={text.locale} style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid rgba(var(--violet-400-rgb), 0.2)" }}>
       <InfoHintRow>
         <label // NOSONAR S6853 — label englobant : la case et son libellé sont à l'intérieur
           style={{ display: "flex", alignItems: "center", gap: 12, cursor: busy ? "default" : "pointer" }}
@@ -87,27 +86,22 @@ export function PlanningGuestField({
             aria-describedby="player-planning-guest-help"
             onChange={onChange}
           />
-          <span style={{ fontSize: 14, color: "var(--ink)" }}>Invité</span>
+          <span style={{ fontSize: 14, color: "var(--ink)" }}>{text.t("planningGuest.label")}</span>
         </label>
-        <InfoHint id="player-planning-guest-help" subject="Invité">
-          <p>Hors planning : garde ses droits de caster/prod mais n&apos;apparaît pas au planning.</p>
+        <InfoHint id="player-planning-guest-help" subject={text.t("planningGuest.label")}>
+          <p>{text.t("planningGuest.hint")}</p>
         </InfoHint>
       </InfoHintRow>
       {confirming ? (
         <ConfirmActionDialog
-          contentLang={staffLang}
-          title={`Passer ${pseudo} en invité ?`}
-          confirmLabel="Passer en invité"
-          pendingLabel="Enregistrement…"
+          title={text.t("planningGuest.dialog.title", { pseudo })}
+          confirmLabel={text.t("planningGuest.dialog.confirm")}
+          pendingLabel={text.t("planningGuest.dialog.pending")}
           tone="danger"
           onClose={() => setConfirming(false)}
           onConfirm={() => save(true)}
         >
-          <p>
-            Il garde ses rôles et peut toujours caster un match, mais il sort du planning : il quitte ses créneaux
-            à venir (un remplaçant est cherché comme pour un désistement), ses disponibilités à venir sont effacées
-            et il n&apos;y est plus proposé ni prévenu. Son historique reste.
-          </p>
+          <p>{text.t("planningGuest.dialog.body")}</p>
         </ConfirmActionDialog>
       ) : null}
     </div>

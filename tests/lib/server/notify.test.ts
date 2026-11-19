@@ -335,10 +335,10 @@ describe("notifyUsers — sujet réservé à une permission", () => {
 describe("notifyStaff", () => {
   it("pousse aux seuls comptes qui détiennent la permission du sujet", async () => {
     jest.mocked(subscribedStaffCandidates).mockResolvedValue([
-      { userId: 1, isAdmin: true, rolesJson: null },
-      { userId: 2, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]) },
-      { userId: 3, isAdmin: false, rolesJson: JSON.stringify(["CASTER"]) },
-      { userId: 4, isAdmin: false, rolesJson: "illisible" },
+      { userId: 1, isAdmin: true, rolesJson: null, planningGuest: false },
+      { userId: 2, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]), planningGuest: false },
+      { userId: 3, isAdmin: false, rolesJson: JSON.stringify(["CASTER"]), planningGuest: false },
+      { userId: 4, isAdmin: false, rolesJson: "illisible", planningGuest: false },
     ]);
     const discord = jest.fn(async () => ({ sent: 3, unresolved: [], failed: [] }));
 
@@ -351,8 +351,8 @@ describe("notifyStaff", () => {
 
   it("ne donne la modération qu'aux administrateurs", async () => {
     jest.mocked(subscribedStaffCandidates).mockResolvedValue([
-      { userId: 1, isAdmin: true, rolesJson: null },
-      { userId: 2, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE", "COMMUNITY_MANAGER"]) },
+      { userId: 1, isAdmin: true, rolesJson: null, planningGuest: false },
+      { userId: 2, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE", "COMMUNITY_MANAGER"]), planningGuest: false },
     ]);
     await notifyStaff({ topic: "STAFF_REPORT", push: PUSH });
     expect(pushToUsers).toHaveBeenCalledWith([1], "STAFF_REPORT", PUSH, undefined);
@@ -360,10 +360,10 @@ describe("notifyStaff", () => {
 
   it("prévient les arbitres d'un match programmé, sauf l'auteur du geste", async () => {
     jest.mocked(subscribedStaffCandidates).mockResolvedValue([
-      { userId: 1, isAdmin: true, rolesJson: null },
-      { userId: 2, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]) },
-      { userId: 3, isAdmin: false, rolesJson: JSON.stringify(["CASTER"]) },
-      { userId: 5, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]) },
+      { userId: 1, isAdmin: true, rolesJson: null, planningGuest: false },
+      { userId: 2, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]), planningGuest: false },
+      { userId: 3, isAdmin: false, rolesJson: JSON.stringify(["CASTER"]), planningGuest: false },
+      { userId: 5, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]), planningGuest: false },
     ]);
     await notifyStaff({ topic: "MATCH_SCHEDULED", push: PUSH, excludeUserIds: [2] });
     expect(pushToUsers).toHaveBeenCalledWith([1, 5], "MATCH_SCHEDULED", PUSH, undefined);
@@ -387,14 +387,21 @@ describe("notifyStaff", () => {
 
 describe("staffHolding / loadStaffIds", () => {
   const CANDIDATES = [
-    { userId: 1, isAdmin: true, rolesJson: null },
-    { userId: 2, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]) },
-    { userId: 3, isAdmin: false, rolesJson: JSON.stringify(["CASTER"]) },
-    { userId: 4, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]) },
+    { userId: 1, isAdmin: true, rolesJson: null, planningGuest: false },
+    { userId: 2, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]), planningGuest: false },
+    { userId: 3, isAdmin: false, rolesJson: JSON.stringify(["CASTER"]), planningGuest: false },
+    { userId: 4, isAdmin: false, rolesJson: JSON.stringify(["ARBITRE"]), planningGuest: false },
   ];
 
   it("staffHolding_tournamentsPermission_keepsHoldersOnly", () => {
     expect(staffHolding(CANDIDATES, "tournaments", new Set())).toEqual([1, 2, 4]);
+  });
+
+  it("staffHolding_planningGuest_losesPlanningKeepsCasting", () => {
+    const guest = [{ userId: 9, isAdmin: false, rolesJson: JSON.stringify(["CASTER"]), planningGuest: true }];
+
+    expect(staffHolding(guest, "planning", new Set())).toEqual([]);
+    expect(staffHolding(guest, "casting", new Set())).toEqual([9]);
   });
 
   it("staffHolding_excludedAccounts_leftOut", () => {
@@ -465,6 +472,32 @@ describe("destinataires", () => {
     await loadNotificationRecipients([5], "proven", { excludeSuspended: true });
 
     expect(String(query.mock.calls[0][0])).toContain("NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus");
+  });
+
+  it("loadNotificationRecipients_planningMembersOnly_dropsGuestsAndNonMembers", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([
+      [
+        { ...recipientRow({ id: 5 }), is_admin: 0, platform_roles_json: JSON.stringify(["CASTER"]), is_guest_staff: 0 },
+        { ...recipientRow({ id: 6 }), is_admin: 0, platform_roles_json: JSON.stringify(["CASTER"]), is_guest_staff: 1 },
+        { ...recipientRow({ id: 7 }), is_admin: 0, platform_roles_json: null, is_guest_staff: 0 },
+        { ...recipientRow({ id: 8 }), is_admin: 1, platform_roles_json: null, is_guest_staff: 1 },
+      ],
+    ]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const recipients = await loadNotificationRecipients([5, 6, 7, 8], "proven", { planningMembersOnly: true });
+
+    expect(recipients.map((recipient) => recipient.userId)).toEqual([5, 8]);
+    expect(String(query.mock.calls[0][0])).toContain("is_guest_staff");
+  });
+
+  it("loadNotificationRecipients_withoutPlanningOption_readsNoRights", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[row]]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    await loadNotificationRecipients([5], "proven");
+
+    expect(String(query.mock.calls[0][0])).not.toContain("is_guest_staff");
   });
 
   it("loadNotificationRecipients_default_keepsSuspendedAccounts", async () => {

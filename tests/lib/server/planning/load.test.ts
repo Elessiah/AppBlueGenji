@@ -405,6 +405,28 @@ describe("loadPlanningData", () => {
     expect(data.removals).toContainEqual({ entryKey: "t:10", userId: 6, role: "PROD" });
   });
 
+  it("loadPlanningData_staffWithdrawal_notAnExclusion", async () => {
+    routeSql({ tournaments: [tournamentRow()] });
+    const plain = connection.execute.getMockImplementation();
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      if (sql.includes("kind = 'WITHDRAWN'")) {
+        return [
+          [
+            { id: 8, entry_key: "t:10", user_id: 5, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: null, late: 0, actor_user_id: 1, created_at: new Date("2026-11-20T10:00:00Z") },
+          ],
+          [],
+        ];
+      }
+      return plain ? plain(sql, params) : [[], []];
+    });
+
+    const data = await loadPlanningData(executor, { now: MONDAY, includeHidden: true, members: [] });
+
+    // La sortie d'un invité par le staff reste un désistement montré, sans écarter le compte des calculs suivants.
+    expect(data.withdrawals.map((row) => row.userId)).toEqual([5]);
+    expect(data.removals).toEqual([]);
+  });
+
   it("loadPlanningData_reads_settingsOnce_andCarriesThem", async () => {
     routeSql({ tournaments: [tournamentRow()] });
 

@@ -28,10 +28,14 @@ const userRow = {
   created_at: new Date("2026-01-01T00:00:00Z"),
 };
 
+function target(row: typeof userRow) {
+  const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[row]]).mockResolvedValue([[]]);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
-  const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[userRow]]).mockResolvedValue([[]]);
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  target(userRow);
   jest.mocked(readPlanningGuest).mockResolvedValue(true);
 });
 
@@ -54,5 +58,22 @@ describe("getFullProfile — drapeau invité", () => {
     const profile = await getFullProfile({ id: 7, isAdmin: true, roles: ["ADMIN"] }, 7);
 
     expect(profile?.planningGuest).toBeUndefined();
+  });
+
+  it("getFullProfile_adminTargetNotFlagged_hidesPlanningGuest", async () => {
+    target({ ...userRow, is_admin: 1 });
+    jest.mocked(readPlanningGuest).mockResolvedValue(false);
+
+    const profile = await getFullProfile({ id: 1, isAdmin: true, roles: ["ADMIN"] }, 7);
+
+    expect(profile?.planningGuest).toBeUndefined();
+  });
+
+  it("getFullProfile_adminTargetFlagged_offersUnflag", async () => {
+    target({ ...userRow, is_admin: 1 });
+
+    const profile = await getFullProfile({ id: 1, isAdmin: true, roles: ["ADMIN"] }, 7);
+
+    expect(profile?.planningGuest).toBe(true);
   });
 });

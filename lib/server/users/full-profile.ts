@@ -119,15 +119,18 @@ function onlyForSelf<T>(isSelf: boolean, value: T): T | undefined {
 /**
  * Le drapeau « invité » (hors planning, `CAST_PLANNING.md` § Invités) : au
  * seul staff des rôles, sur la fiche d'un autre compte vivant (`excluded` :
- * sa propre fiche, ou un compte supprimé).
+ * sa propre fiche, ou un compte supprimé). Un administrateur garde le
+ * planning : la case ne lui est offerte que pour retirer un drapeau resté posé.
  */
 async function planningGuestOf(
   viewer: Parameters<typeof can>[0],
   targetUserId: number,
-  excluded: boolean,
+  options: { excluded: boolean; targetIsAdmin: boolean },
 ): Promise<{ planningGuest?: boolean | null }> {
-  if (excluded || !can(viewer, "roles")) return {};
-  return { planningGuest: await readPlanningGuest(targetUserId) };
+  if (options.excluded || !can(viewer, "roles")) return {};
+  const planningGuest = await readPlanningGuest(targetUserId);
+  if (options.targetIsAdmin && planningGuest !== true) return {};
+  return { planningGuest };
 }
 
 export async function getFullProfile(
@@ -296,7 +299,7 @@ export async function getFullProfile(
     // compte soit suspendu, et pourquoi, ne regarde que lui et elle.
     moderationSuspension: canModerate && !isDeleted ? await getActiveSuspension(targetUserId) : null,
     moderationSuspendable: canModerate && !isDeleted && !isSelf && !targetIsAdmin,
-    ...(await planningGuestOf(viewer, targetUserId, isSelf || isDeleted)),
+    ...(await planningGuestOf(viewer, targetUserId, { excluded: isSelf || isDeleted, targetIsAdmin })),
     // La langue du compte ne regarde que son titulaire (lot 9-3) : « Mon
     // profil » l'affiche et la change, aucune autre fiche ne la porte.
     ...(isSelf ? { accountLocale: accountLocaleFromRow(userRows[0].locale) } : {}),

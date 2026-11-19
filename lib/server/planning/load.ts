@@ -491,6 +491,8 @@ type EventRow = RowDataPacket & {
   reason: string | null;
   late: number;
   source: AssignmentSource;
+  /** Désistement : `NULL` quand le membre l'a fait lui-même ; l'auteur quand le staff a sorti un invité du planning. */
+  actor_user_id?: number | null;
   created_at: Date | string;
 };
 
@@ -561,7 +563,7 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
     // un désistement, `source` dit si l'attribution quittée était confirmée
     // (`MANUAL`) ou une proposition provisoire (`AUTO`), `withdrawal.ts`.
     executor.execute<EventRow[]>(
-      `SELECT id, entry_key, user_id, role, kind, source, reason, late, created_at FROM bg_planning_events
+      `SELECT id, entry_key, user_id, role, kind, source, reason, late, actor_user_id, created_at FROM bg_planning_events
         WHERE ((kind = 'REMOVED' AND source = 'MANUAL') OR kind = 'WITHDRAWN') AND entry_key IN (${inList(keys.length)})`,
       keys,
     ),
@@ -589,7 +591,9 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
       reason: row.reason,
       confirmed: row.source === "MANUAL" || Number(row.confirmed) === 1,
     })),
-    removals: distinctRemovals(events),
+    // La sortie d'un invité (désistement posé par le staff, `releaseGuestPlanning`) n'écarte personne : redevenu
+    // membre, il peut être proposé de nouveau sur ces places.
+    removals: distinctRemovals(events.filter((row) => !(row.kind === "WITHDRAWN" && row.actor_user_id != null))),
     withdrawals: withdrawals.map((row) => ({
       entryKey: row.entry_key,
       userId: Number(row.user_id),

@@ -144,7 +144,7 @@ describe("reportTournamentIssue", () => {
   });
 
   it("dit « Ronde N » dans un tournoi suisse, en anglais \"Round N\"", async () => {
-    jest.mocked(subscribedStaffCandidates).mockResolvedValue([{ userId: 5, isAdmin: false, rolesJson: '["ARBITRE"]' }]);
+    jest.mocked(subscribedStaffCandidates).mockResolvedValue([{ userId: 5, isAdmin: false, rolesJson: '["ARBITRE"]', planningGuest: false }]);
     jest.mocked(pushToUsers).mockResolvedValue(1);
     await mockDb([[{ ...ENTRANT[0], tournament_format: "SWISS" }], [{ ...MATCH[0], swiss_round: 0 }]]);
 
@@ -240,7 +240,7 @@ describe("reportTournamentIssue", () => {
   it("ne se dit pas injoignable quand un arbitre a reçu la notification push", async () => {
     await mockDb([ENTRANT]);
     jest.mocked(pushRefereeAlert).mockResolvedValue(null);
-    jest.mocked(subscribedStaffCandidates).mockResolvedValue([{ userId: 5, isAdmin: false, rolesJson: '["ARBITRE"]' }]);
+    jest.mocked(subscribedStaffCandidates).mockResolvedValue([{ userId: 5, isAdmin: false, rolesJson: '["ARBITRE"]', planningGuest: false }]);
     jest.mocked(pushToUsers).mockResolvedValue(1);
 
     await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, null)).resolves.toEqual({ notifiedReferees: 0 });

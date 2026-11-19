@@ -77,6 +77,16 @@ describe("PUT /api/admin/users/[id]/planning-guest", () => {
     expect(res.status).toBe(404);
   });
 
+  it("put_adminTarget_returns409", async () => {
+    jest.mocked(setPlanningGuest).mockRejectedValue(new Error("PLANNING_GUEST_ADMIN"));
+
+    const res = await PUT(jsonReq({ guest: true }), params("7"));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: "PLANNING_GUEST_ADMIN" });
+    expect(publishPlanningGuestChange).not.toHaveBeenCalled();
+  });
+
   it("put_flagged_returnsCountsAndPublishes", async () => {
     const saved = { guest: true, changed: true, release: { withdrawn: 2, failed: 1, availabilityCleared: 0 } };
     jest.mocked(setPlanningGuest).mockResolvedValue(saved);
@@ -85,7 +95,7 @@ describe("PUT /api/admin/users/[id]/planning-guest", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ guest: true, changed: true, withdrawn: 2, failed: 1 });
-    expect(setPlanningGuest).toHaveBeenCalledWith(7, true);
+    expect(setPlanningGuest).toHaveBeenCalledWith(7, true, 1);
     expect(publishPlanningGuestChange).toHaveBeenCalledWith({ id: 1, pseudo: admin.pseudo }, 7, saved);
   });
 

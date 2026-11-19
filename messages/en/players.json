@@ -184,5 +184,33 @@
       "launch": "the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its team contacts (to the parties to the match alone), its casters and its assigned referee, to the same people at the same times as the “Contacts” window.",
       "footer": "To stop sharing it entirely, clear it from your profile (if it comes from Battle.net, unlink Battle.net first, after adding another way to log in if it is your only one)."
     }
+  },
+  "planningGuest": {
+    "label": "Guest",
+    "hint": "Off the schedule: keeps their caster/producer rights but does not appear on the schedule.",
+    "saved": {
+      "member": "{pseudo} joins the schedule.",
+      "guest": "{pseudo} is a guest: off the schedule.",
+      "partial": "{pseudo} is a guest, but some upcoming slots could not be released: untick then tick “Guest” again to retry, or remove them from the schedule."
+    },
+    "dialog": {
+      "title": "Make {pseudo} a guest?",
+      "confirm": "Make guest",
+      "pending": "Saving…",
+      "body": "They keep their roles and can still cast a match, but they leave the schedule: they drop their upcoming slots (a replacement is sought as for a withdrawal), their upcoming availability is cleared and they are no longer proposed or notified. Their history stays."
+    },
+    "busy": "Another submission is in progress, try again.",
+    "errors": {
+      "UNAUTHORIZED": "Your session has expired: log in again.",
+      "FORBIDDEN": "You do not have permission to manage guests.",
+      "INVALID_ID": "This account cannot be found.",
+      "USER_NOT_FOUND": "This account cannot be found.",
+      "CANNOT_MODIFY_SELF": "You cannot make yourself a guest.",
+      "INVALID_PAYLOAD": "The setting sent is invalid.",
+      "PLANNING_GUEST_ADMIN": "An administrator keeps the schedule: they cannot be a guest.",
+      "CONCURRENT_UPDATE_RETRY": "Another change to this account went through at the same time: nothing was saved. Try again.",
+      "PROFILE_RELOAD_FAILED": "The profile could not be reloaded: refresh the page.",
+      "fallback": "Saving the “Guest” setting failed."
+    }
   }
 }

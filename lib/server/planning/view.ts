@@ -3,12 +3,14 @@
  * couverture, disponibilités du lecteur — et, pour le staff des tournois,
  * celles de tous.
  */
+import type { RowDataPacket } from "mysql2/promise";
 import type { AuthUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { can, canComputePlanning } from "@/lib/shared/permissions";
 import { PLANNING_ROLES, planningRolesOf, type PlanningRole } from "@/lib/shared/planning";
 import { planningConfirmAt } from "@/lib/shared/schedule-deadline";
-import type { PlanningAssignmentShown, PlanningAssignmentView, PlanningEntryView, PlanningView } from "@/lib/shared/planning-view";
+import type { PlanningAssignmentShown, PlanningAssignmentView, PlanningEntryView, PlanningName, PlanningView } from "@/lib/shared/planning-view";
+import { visibleText } from "@/lib/shared/visible-text";
 import {
   loadPlanningData,
   loadPlanningMembers,
@@ -18,6 +20,7 @@ import {
   type LoadedEntry,
   type LoadedMember,
   type LoadedWithdrawal,
+  type PlanningData,
 } from "./load";
 import { autoConfirmAwaiting, loadedPendingRoles, readStoredAutoConfirms, type PendingRoles } from "./auto-confirm";
 import { entryAssignments, entryCoverage } from "./model";
@@ -128,10 +131,37 @@ export function entriesNeedingMark(
     .map((entry) => entry.key);
 }
 
+/**
+ * Le pseudo des comptes que la page montre sans qu'ils soient membres du
+ * planning : un invité (`CAST_PLANNING.md` § Invités) ou un compte qui a perdu
+ * son rôle, encore porté par une attribution (inscription de cast d'un match,
+ * historique) ou, pour le staff des tournois, par un désistement. Sans lui, la
+ * page les montrait en `#id`. Comptes supprimés exclus.
+ */
+async function loadOtherNames(
+  executor: Executor,
+  data: PlanningData,
+  canManage: boolean,
+): Promise<PlanningName[]> {
+  const members = new Set(data.members.map((member) => member.userId));
+  const ids = new Set<number>();
+  for (const entry of data.entries) {
+    for (const row of entryAssignments(entry, data)) if (!members.has(row.userId)) ids.add(row.userId);
+  }
+  if (canManage) for (const row of data.withdrawals) if (!members.has(row.userId)) ids.add(row.userId);
+  if (ids.size === 0) return [];
+  const list = [...ids];
+  const [rows] = await executor.execute<(RowDataPacket & { id: number; pseudo: string })[]>(
+    `SELECT id, pseudo FROM bg_users WHERE is_deleted = 0 AND id IN (${list.map(() => "?").join(", ")})`,
+    list,
+  );
+  return rows.map((row) => ({ userId: Number(row.id), pseudo: visibleText(row.pseudo) }));
+}
+
 export async function loadPlanningView(user: AuthUser, now: number = Date.now()): Promise<PlanningView> {
   const canManage = can(user, "tournaments");
   const canCompute = canComputePlanning(user);
-  const { data, pending, marks, rounds } = await withConnection(async (connection) => {
+  const { data, pending, marks, rounds, names } = await withConnection(async (connection) => {
     const loaded = await loadPlanningData(connection, {
       now,
       includeHidden: canManage,
@@ -146,7 +176,8 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       if (entry.matchId !== null) requests.push({ tournamentId: entry.tournamentId, matchId: entry.matchId, finished: entry.tournamentFinished });
     }
     const rounds = await loadEntryRounds(connection, requests, now);
-    return { data: loaded, pending, marks: await readStoredAutoConfirms(connection, keys), rounds };
+    const names = await loadOtherNames(connection, loaded, canManage);
+    return { data: loaded, pending, marks: await readStoredAutoConfirms(connection, keys), rounds, names };
   });
   // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul
   // (`preparePlanner`) ; les autres lecteurs gardent la couverture d'avant (rien n'y trahit la suspension).
@@ -220,6 +251,8 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
     members: data.members.map(({ userId, pseudo, roles, soloCaster, seesHidden }) =>
       canManage ? { userId, pseudo, roles, soloCaster, seesHidden } : { userId, pseudo, roles, soloCaster },
     ),
+    // Les comptes montrés sans être membres (invité, rôle retiré) : leur nom, rien de plus.
+    ...(names.length > 0 ? { names } : {}),
     // Réglages du calcul : à l'administrateur seul, les autres n'en reçoivent rien.
     ...(canCompute ? { durations: data.durations } : {}),
   };

@@ -101,13 +101,22 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
 - **Stockage** : `bg_users.is_guest_staff` (case « Invité » de la fiche du
   joueur, bloc « Rôles & permissions », `PlanningGuestField`, avec son `InfoHint`
   « Hors planning : garde ses droits de caster/prod mais n'apparaît pas au
-  planning »). Outil de l'administration resté français sous `/en` (D4).
+  planning »). Ses textes (case, aide, confirmation, notifications, refus) sont
+  traduits (`players.planningGuest`, FR et EN), à la différence du reste du
+  panneau des rôles, resté français (D4). La case n'est pas offerte sur la fiche
+  d'un administrateur (sauf pour retirer un drapeau resté posé).
 - **Qui le pose** : la permission `roles` seule, `PUT
   /api/admin/users/[id]/planning-guest` (`{ guest: boolean }`) — `403
   FORBIDDEN` sans elle, `400 CANNOT_MODIFY_SELF` sur son propre compte (ce
   n'est pas un réglage du titulaire), `404 USER_NOT_FOUND` pour un compte
-  inconnu ou supprimé. Écriture conditionnelle (`is_guest_staff <> ?`) : deux
-  enregistrements concurrents ne libèrent qu'une fois.
+  inconnu ou supprimé, `409 PLANNING_GUEST_ADMIN` pour poser le drapeau sur un
+  administrateur (il garde tout, `planning` compris : la sortie n'effacerait que
+  ses créneaux). Écriture conditionnelle (`is_guest_staff <> ?`). Reposer
+  `guest: true` rejoue la sortie (reprise d'une sortie incomplète) ; une
+  attribution déjà partie (sortie concurrente) est passée sans bruit.
+- **Tout le compte** : le drapeau retire le planning entier, rôle d'arbitre
+  compris — un `ARBITRE` invité garde `tournaments` (arbitrage, scores) mais ni
+  `/planning` ni ses gestes de staff.
 - **Effet, en un seul point** : `can(user, "planning")` est faux pour un invité
   non administrateur (`planningGuest`, lu avec la session, `AuthUser`) ; un
   administrateur garde tout (« admin = tous les droits »). En découlent : pas de
@@ -116,18 +125,29 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
   absent de `PLANNING_MEMBER_SQL` (listes de membres, calcul, remplaçants,
   récapitulatif des nouveaux créneaux, avis, caster autonome réglé par le staff
   refusé en `409 NOT_CASTER`) et des sujets push d'audience `planning`
-  (`withinTopicAudience`, la colonne n'est lue que pour eux).
+  (`withinTopicAudience`, la colonne n'est lue que pour eux). La sélection du
+  staff (`loadStaffCandidates` → `staffHolding`) lit aussi le drapeau. Les avis
+  du planning (affectation, désistement, place à pourvoir) ne joignent que ses
+  membres (`loadNotificationRecipients(…, { planningMembersOnly })`) : un invité
+  qui cast encore un match par son inscription n'en reçoit aucun. La page
+  rend le nom des comptes montrés sans être membres (`PlanningView.names` :
+  invité, rôle retiré) au lieu de `#id`.
 - **Sortie du planning** (`releaseGuestPlanning`, `withdrawal.ts`) : au moment
   où le drapeau est **posé** (pas à chaque enregistrement identique), chaque
   attribution du compte sur une entrée modifiable pas encore commencée
   (`AUTO` ou `MANUAL`) passe par le **désistement ordinaire**
   (`withdrawMember`, sans motif : remplaçant, place « à pourvoir », annonces,
-  évènement `WITHDRAWN`, tardif si moins de 24 h), puis ses disponibilités des
-  entrées à venir sont effacées. Une inscription de cast sur un match (`CAST`) ou
+  évènement `WITHDRAWN`), au nom du staff : l'évènement porte son auteur
+  (`actor_user_id`), n'est jamais tardif, n'écarte pas le compte des calculs
+  suivants s'il redevient membre (`removals` ignore un `WITHDRAWN` à auteur), et
+  le retrait d'un arbitre du match nomme le staff. Puis ses disponibilités des
+  entrées à venir sont effacées. Une lecture du planning en panne compte comme
+  un échec (`failed`). Une inscription de cast sur un match (`CAST`) ou
   un arbitre désigné hors du planning (`MATCH`) restent : ils se gèrent depuis
   le match. Le passé (entrées commencées, historique) ne bouge pas. Une
-  attribution refusée ou en panne est comptée (`failed`, toast « retire-les
-  depuis le planning ») sans défaire le drapeau. Décocher ne rend rien : le
+  attribution refusée ou en panne est comptée (`failed`, notification « décoche
+  puis recoche « Invité » pour réessayer, ou retire-les depuis le planning »)
+  sans défaire le drapeau. Décocher ne rend rien : le
   compte redevient membre, sans attribution.
 - **Journal du staff** : `publishPlanningGuestChange` (`publishStaffAction`) —
   ligne anonyme sur Discord, auteur et compte visé (`#id`, bilan de la sortie)

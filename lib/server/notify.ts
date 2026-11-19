@@ -283,7 +283,9 @@ export function staffHolding(
 ): number[] {
   return candidates
     .filter((candidate) => !excluded.has(candidate.userId))
-    .filter((candidate) => can({ isAdmin: candidate.isAdmin, roles: sanitizePlatformRoles(candidate.rolesJson) }, permission))
+    .filter((candidate) =>
+      can({ isAdmin: candidate.isAdmin, roles: sanitizePlatformRoles(candidate.rolesJson), planningGuest: candidate.planningGuest }, permission),
+    )
     .map((candidate) => candidate.userId);
 }
 
@@ -359,11 +361,17 @@ export function toNotificationRecipient(row: RecipientRow, reach: DiscordReach):
  * canal Discord** : il garde ses notifications push, qui ont leurs propres
  * réglages par sujet. Les envois au staff (`notifyStaff`) ne lisent jamais ce
  * réglage.
+ *
+ * `planningMembersOnly` : un avis du **planning** (affectation, désistement,
+ * place à pourvoir) ne joint que ses membres, par la règle de `can()` — un
+ * invité (`bg_users.is_guest_staff`, `CAST_PLANNING.md` § Invités) qui cast
+ * encore un match par son inscription n'est pas prévenu d'un planning qu'il ne
+ * lit plus.
  */
 export async function loadNotificationRecipients(
   userIds: readonly number[],
   reach: DiscordReach,
-  options: { matchDm?: boolean; excludeSuspended?: boolean } = {},
+  options: { matchDm?: boolean; excludeSuspended?: boolean; planningMembersOnly?: boolean } = {},
 ): Promise<NotificationRecipient[]> {
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return [];
@@ -373,9 +381,10 @@ export async function loadNotificationRecipients(
   const active = options.excludeSuspended
     ? ` AND NOT ${userSuspendedSql("bg_users.id")}`
     : "";
+  const planningOnly = options.planningMembersOnly === true;
   const select = (withMatchDm: boolean, withLocale: boolean) =>
-    db.query<(RecipientRow & { match_dm_enabled?: number | null })[]>(
-      `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at${withMatchDm ? ", match_dm_enabled" : ""}${withLocale ? ", locale" : ""}
+    db.query<(RecipientRow & { match_dm_enabled?: number | null } & PlanningRightsColumns)[]>(
+      `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at${withMatchDm ? ", match_dm_enabled" : ""}${withLocale ? ", locale" : ""}${planningOnly ? ", is_admin, platform_roles_json, is_guest_staff" : ""}
        FROM bg_users WHERE is_deleted = 0 AND id IN (${ids.map(() => "?").join(", ")})${active}`,
       ids,
     );
@@ -391,11 +400,27 @@ export async function loadNotificationRecipients(
   const attempts: readonly [[boolean, boolean], ...[boolean, boolean][]] = matchDm
     ? [[true, true], [true, false], [false, true], [false, false]]
     : [[false, true], [false, false]];
-  const rows = await firstReadable(attempts, ([withMatchDm, withLocale]) => select(withMatchDm, withLocale));
+  const read = await firstReadable(attempts, ([withMatchDm, withLocale]) => select(withMatchDm, withLocale));
+  const rows = planningOnly ? read.filter(holdsPlanning) : read;
   return rows.map((row) => {
     const recipient = toNotificationRecipient(row, reach);
     return options.matchDm && !matchDmEnabled(row.match_dm_enabled) ? { ...recipient, discord: null } : recipient;
   });
+}
+
+/** Droits d'un compte, lus avec lui pour un avis du planning (`planningMembersOnly`). */
+type PlanningRightsColumns = { is_admin?: number | null; platform_roles_json?: unknown; is_guest_staff?: number | null };
+
+/** Le compte est membre du planning : la permission `planning` de `can()`, invité exclu. */
+function holdsPlanning(row: PlanningRightsColumns): boolean {
+  return can(
+    {
+      isAdmin: Number(row.is_admin ?? 0) === 1,
+      roles: sanitizePlatformRoles(row.platform_roles_json),
+      planningGuest: Number(row.is_guest_staff ?? 0) === 1,
+    },
+    "planning",
+  );
 }
 
 /**

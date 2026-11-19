@@ -65,7 +65,7 @@ export async function announceAssignments(
       byUser.set(item.userId, list);
     }
     if (byUser.size === 0) return;
-    const recipients = await loadNotificationRecipients([...byUser.keys()], "proven", { excludeSuspended: true });
+    const recipients = await loadNotificationRecipients([...byUser.keys()], "proven", { excludeSuspended: true, planningMembersOnly: true });
     const base = siteCanonicalBase();
     const replacement = options.replacement === true;
     // Les personnes qui reçoivent la même liste partent en un envoi (une
@@ -162,7 +162,7 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
     ];
     const base = siteCanonicalBase();
     // Une seule lecture des destinataires, répartis ensuite entre les deux textes.
-    const loaded = others.length === 0 ? [] : await loadNotificationRecipients(others, "proven", { excludeSuspended: true });
+    const loaded = others.length === 0 ? [] : await loadNotificationRecipients(others, "proven", { excludeSuspended: true, planningMembersOnly: true });
     for (const [ids, text] of groups) {
       const wanted = new Set(ids);
       const recipients = loaded.filter((recipient) => wanted.has(recipient.userId));
@@ -202,7 +202,7 @@ async function announceUnfilled(notice: PlanningWithdrawalNotice, withdrawnUserI
   try {
     const base = siteCanonicalBase();
     sendBotLog(formatPlanningUnfilledLine(notice, base), { tournamentId: notice.tournamentId, category: "staff-removal" });
-    const recipients = await loadNotificationRecipients(await loadStaffIds("tournaments", [withdrawnUserId]), "proven", { excludeSuspended: true });
+    const recipients = await loadNotificationRecipients(await loadStaffIds("tournaments", [withdrawnUserId]), "proven", { excludeSuspended: true, planningMembersOnly: true });
     if (recipients.length === 0) return;
     await notifyUsers(recipients, {
       topic: "PLANNING_UNFILLED",

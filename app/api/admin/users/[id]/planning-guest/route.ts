@@ -26,7 +26,9 @@ function publishAfterCommit(actor: { id: number; pseudo: string }, targetId: num
  *
  * @returns `200 { guest, changed, withdrawn, failed }`, ou `401`
  *   (`UNAUTHORIZED`), `403` (`FORBIDDEN`), `400` (`INVALID_ID` /
- *   `INVALID_PAYLOAD` / `CANNOT_MODIFY_SELF`), `404` (`USER_NOT_FOUND`).
+ *   `INVALID_PAYLOAD` / `CANNOT_MODIFY_SELF`), `404` (`USER_NOT_FOUND`), `409`
+ *   (`PLANNING_GUEST_ADMIN` : un administrateur garde le planning). Reposer
+ *   `guest: true` rejoue la sortie (reprise d'une sortie incomplète).
  */
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -45,9 +47,10 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
   let saved: PlanningGuestSaveResult;
   try {
-    saved = await setPlanningGuest(targetId, guest);
+    saved = await setPlanningGuest(targetId, guest, user.id);
   } catch (error) {
     if ((error as Error)?.message === "USER_NOT_FOUND") return fail("USER_NOT_FOUND", 404);
+    if ((error as Error)?.message === "PLANNING_GUEST_ADMIN") return fail("PLANNING_GUEST_ADMIN", 409);
     return fail(unexpectedFailureCode(error, "PLANNING_GUEST_UPDATE_FAILED", "[planning-guest] enregistrement impossible"), 500);
   }
   publishAfterCommit({ id: user.id, pseudo: user.pseudo }, targetId, saved);

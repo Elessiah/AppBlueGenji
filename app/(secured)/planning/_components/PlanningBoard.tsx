@@ -207,7 +207,11 @@ export function PlanningBoard({
   );
 
   const members = view?.members;
-  const names = useMemo(() => new Map((members ?? []).map((member) => [member.userId, member.pseudo])), [members]);
+  const others = view?.names;
+  const names = useMemo(
+    () => new Map([...(others ?? []), ...(members ?? [])].map((member) => [member.userId, member.pseudo])),
+    [members, others],
+  );
   // Ce que les cartes lisent du lecteur : stable tant que ces quatre valeurs le sont.
   const me = view?.me;
   const myRoles = view?.myRoles;

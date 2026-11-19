@@ -29,43 +29,62 @@ beforeEach(() => {
 });
 
 /** Le compte existe, puis l'écriture change `affectedRows` lignes. */
-function account(affectedRows: number) {
-  execute.mockResolvedValueOnce([[{ id: 7 }], []]).mockResolvedValueOnce([{ affectedRows }, []]);
+function account(affectedRows: number, isAdmin = 0) {
+  execute.mockResolvedValueOnce([[{ id: 7, is_admin: isAdmin }], []]).mockResolvedValueOnce([{ affectedRows }, []]);
 }
+
+/** Le staff `roles` qui enregistre. */
+const STAFF = 1;
 
 describe("setPlanningGuest", () => {
   it("setPlanningGuest_changedToGuest_releasesFuturePlanning", async () => {
     account(1);
 
-    const saved = await setPlanningGuest(7, true, 1000);
+    const saved = await setPlanningGuest(7, true, STAFF, 1000);
 
     expect(saved).toEqual({ guest: true, changed: true, release });
-    expect(releaseGuestPlanning).toHaveBeenCalledWith(7, 1000);
+    expect(releaseGuestPlanning).toHaveBeenCalledWith(7, STAFF, 1000);
   });
 
   it("setPlanningGuest_write_isConditional", async () => {
     account(1);
 
-    await setPlanningGuest(7, true, 1000);
+    await setPlanningGuest(7, true, STAFF, 1000);
 
     const [sql, params] = execute.mock.calls[1];
     expect(sql).toContain("is_guest_staff <> ?");
     expect(params).toEqual([1, 7, 1]);
   });
 
-  it("setPlanningGuest_alreadyGuest_noRelease", async () => {
+  it("setPlanningGuest_alreadyGuest_replaysRelease", async () => {
     account(0);
 
-    const saved = await setPlanningGuest(7, true, 1000);
+    const saved = await setPlanningGuest(7, true, STAFF, 1000);
 
-    expect(saved).toEqual({ guest: true, changed: false, release: null });
+    expect(saved).toEqual({ guest: true, changed: false, release });
+    expect(releaseGuestPlanning).toHaveBeenCalledWith(7, STAFF, 1000);
+  });
+
+  it("setPlanningGuest_adminTarget_throwsPlanningGuestAdmin", async () => {
+    execute.mockResolvedValueOnce([[{ id: 7, is_admin: 1 }], []]);
+
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("PLANNING_GUEST_ADMIN");
+    expect(execute).toHaveBeenCalledTimes(1);
     expect(releaseGuestPlanning).not.toHaveBeenCalled();
+  });
+
+  it("setPlanningGuest_adminTargetUnflag_written", async () => {
+    account(1, 1);
+
+    const saved = await setPlanningGuest(7, false, STAFF, 1000);
+
+    expect(saved).toEqual({ guest: false, changed: true, release: null });
   });
 
   it("setPlanningGuest_unflag_noRelease", async () => {
     account(1);
 
-    const saved = await setPlanningGuest(7, false, 1000);
+    const saved = await setPlanningGuest(7, false, STAFF, 1000);
 
     expect(saved).toEqual({ guest: false, changed: true, release: null });
     expect(releaseGuestPlanning).not.toHaveBeenCalled();
@@ -74,7 +93,7 @@ describe("setPlanningGuest", () => {
   it("setPlanningGuest_missingUser_throwsUserNotFound", async () => {
     execute.mockResolvedValueOnce([[], []]);
 
-    await expect(setPlanningGuest(7, true, 1000)).rejects.toThrow("USER_NOT_FOUND");
+    await expect(setPlanningGuest(7, true, STAFF, 1000)).rejects.toThrow("USER_NOT_FOUND");
     expect(execute).toHaveBeenCalledTimes(1);
   });
 });
@@ -83,7 +102,7 @@ describe("publishPlanningGuestChange", () => {
   const actor = { id: 1, pseudo: "Test_Admin" };
 
   it("publishPlanningGuestChange_unchanged_publishesNothing", () => {
-    const published = publishPlanningGuestChange(actor, 7, { guest: true, changed: false, release: null });
+    const published = publishPlanningGuestChange(actor, 7, { guest: true, changed: false, release });
 
     expect(published).toBe(false);
     expect(publishStaffAction).not.toHaveBeenCalled();

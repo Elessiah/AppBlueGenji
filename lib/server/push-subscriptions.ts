@@ -357,7 +357,13 @@ async function recordDeliveries(sent: readonly number[], gone: readonly number[]
   }
 }
 
-export type StaffCandidate = { userId: number; isAdmin: boolean; rolesJson: unknown };
+export type StaffCandidate = {
+  userId: number;
+  isAdmin: boolean;
+  rolesJson: unknown;
+  /** Caster ou prod invité (`bg_users.is_guest_staff`) : `can()` lui refuse `planning`. */
+  planningGuest: boolean;
+};
 
 /**
  * Comptes de staff candidats (non supprimés, non suspendus, porteurs d'au
@@ -368,8 +374,8 @@ export type StaffCandidate = { userId: number; isAdmin: boolean; rolesJson: unkn
  */
 export async function loadStaffCandidates(options: { subscribedOnly: boolean }): Promise<StaffCandidate[]> {
   const db = await getDatabase();
-  const [rows] = await db.query<(RowDataPacket & { id: number; is_admin: number; platform_roles_json: unknown })[]>(
-    `SELECT u.id, u.is_admin, u.platform_roles_json FROM bg_users u
+  const [rows] = await db.query<(RowDataPacket & { id: number; is_admin: number; platform_roles_json: unknown; is_guest_staff?: number | null })[]>(
+    `SELECT u.id, u.is_admin, u.platform_roles_json, u.is_guest_staff FROM bg_users u
      WHERE u.is_deleted = 0
        AND (u.is_admin = 1 OR u.platform_roles_json IS NOT NULL)${
          options.subscribedOnly
@@ -383,6 +389,7 @@ export async function loadStaffCandidates(options: { subscribedOnly: boolean }):
     userId: Number(row.id),
     isAdmin: Number(row.is_admin) === 1,
     rolesJson: row.platform_roles_json,
+    planningGuest: Number(row.is_guest_staff ?? 0) === 1,
   }));
 }
 

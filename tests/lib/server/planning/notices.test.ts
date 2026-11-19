@@ -54,7 +54,7 @@ describe("announceAssignments", () => {
       { actorId: 9 },
     );
 
-    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4], "proven", { excludeSuspended: true }]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
     expect(notifyUsers).toHaveBeenCalledTimes(1);
     expect(jest.mocked(notifyUsers).mock.calls[0][1]).toMatchObject({ topic: "PLANNING_ASSIGNED", dmFollowsTopic: true });
   });
@@ -131,7 +131,7 @@ describe("announceWithdrawal", () => {
   it("announceWithdrawal_stillHeldAndOthers_recipientsLoadedOnce", async () => {
     await announceWithdrawal(withdrawal({ unfilled: false, stillHeldBy: [6], coAssignedIds: [5, 6] }));
 
-    expect(jest.mocked(loadNotificationRecipients).mock.calls).toEqual([[[5, 6], "proven", { excludeSuspended: true }]]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls).toEqual([[[5, 6], "proven", { excludeSuspended: true, planningMembersOnly: true }]]);
   });
 
   it("announceWithdrawal_unfilledStreamLost_everyoneToldStreamLost", async () => {
@@ -236,12 +236,12 @@ describe("announceWithdrawal — destinataires", () => {
   it("announceWithdrawal_coAssigned_suspendedAccountsLeftOut", async () => {
     await announceWithdrawal(withdrawal({ unfilled: false, coAssignedIds: [3] }));
 
-    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[3], "proven", { excludeSuspended: true }]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[3], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
   });
 
   it("announceWithdrawal_unfilled_suspendedStaffLeftOut", async () => {
     await announceWithdrawal(withdrawal());
 
-    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[1, 2], "proven", { excludeSuspended: true }]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[1, 2], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
   });
 });

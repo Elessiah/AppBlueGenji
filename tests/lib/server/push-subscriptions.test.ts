@@ -442,18 +442,26 @@ describe("staff, purge et export", () => {
   it("ne lit comme staff que des comptes abonnés et vivants", async () => {
     const query = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 3, is_admin: 1, platform_roles_json: null }]]);
     pool({ query });
-    expect(await subscribedStaffCandidates()).toEqual([{ userId: 3, isAdmin: true, rolesJson: null }]);
+    expect(await subscribedStaffCandidates()).toEqual([{ userId: 3, isAdmin: true, rolesJson: null, planningGuest: false }]);
     expect(query.mock.calls[0][0]).toMatch(/EXISTS \(SELECT 1 FROM bg_push_subscriptions/);
     expect(query.mock.calls[0][0]).toMatch(/is_deleted = 0/);
     // Un compte suspendu n'a plus aucun droit effectif : il ne reçoit rien du staff.
     expect(query.mock.calls[0][0]).toMatch(/NOT EXISTS \(SELECT 1 FROM bg_account_suspensions sus\s+WHERE sus\.user_id = u\.id AND sus\.lifted_at IS NULL/);
   });
 
+  it("loadStaffCandidates_guestColumn_mapsPlanningGuest", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 4, is_admin: 0, platform_roles_json: '["CASTER"]', is_guest_staff: 1 }]]);
+    pool({ query });
+
+    expect(await loadStaffCandidates({ subscribedOnly: false })).toEqual([{ userId: 4, isAdmin: false, rolesJson: '["CASTER"]', planningGuest: true }]);
+    expect(query.mock.calls[0][0]).toContain("u.is_guest_staff");
+  });
+
   it("loadStaffCandidates_allStaff_noSubscriptionClause", async () => {
     const query = jest.fn<SqlQuery>().mockResolvedValue([[{ id: 4, is_admin: 0, platform_roles_json: '["TOURNOIS"]' }]]);
     pool({ query });
 
-    expect(await loadStaffCandidates({ subscribedOnly: false })).toEqual([{ userId: 4, isAdmin: false, rolesJson: '["TOURNOIS"]' }]);
+    expect(await loadStaffCandidates({ subscribedOnly: false })).toEqual([{ userId: 4, isAdmin: false, rolesJson: '["TOURNOIS"]', planningGuest: false }]);
     expect(query.mock.calls[0][0]).not.toContain("bg_push_subscriptions");
     expect(query.mock.calls[0][0]).toContain("bg_account_suspensions");
   });

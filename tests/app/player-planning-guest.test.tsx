@@ -20,6 +20,12 @@ jest.mock("@/components/ui/toast", () => ({
 
 import { PlanningGuestField } from "@/app/(secured)/joueurs/[id]/_components/PlanningGuestField";
 import { planningGuestErrorMessage } from "@/app/(secured)/joueurs/[id]/_lib/planning-guest-errors";
+import { AppLocaleProvider } from "@/components/i18n/locale-context";
+import { PlayersTextProvider } from "@/components/i18n/players-text-provider";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { scopedText } from "@/lib/shared/scoped-text";
+
+const EN = messagesFor("en");
 
 function field(guest: boolean): string {
   return renderToStaticMarkup(<PlanningGuestField userId="7" pseudo="Test_Caster" guest={guest} onSaved={() => undefined} />);
@@ -53,6 +59,29 @@ describe("PlanningGuestField", () => {
   });
 });
 
+describe("PlanningGuestField — anglais sous /en", () => {
+  it("planningGuestField_en_rendersEnglishLabelAndHint", () => {
+    const html = renderToStaticMarkup(
+      <AppLocaleProvider locale="en">
+        <PlayersTextProvider locale="en" messages={EN.players}>
+          <PlanningGuestField userId="7" pseudo="Test_Caster" guest={false} onSaved={() => undefined} />
+        </PlayersTextProvider>
+      </AppLocaleProvider>,
+    );
+
+    expect(html).toContain(">Guest<");
+    expect(html).toContain("Off the schedule: keeps their caster/producer rights but does not appear on the schedule.");
+    expect(html).toContain('lang="en"');
+    expect(html).not.toContain("Invité");
+  });
+
+  it("planningGuestErrorMessage_en_adminRefusalInEnglish", () => {
+    expect(planningGuestErrorMessage("PLANNING_GUEST_ADMIN", scopedText("en", EN.players))).toBe(
+      "An administrator keeps the schedule: they cannot be a guest.",
+    );
+  });
+});
+
 describe("PlayerRolesPanel — câblage de la case", () => {
   it("playerRolesPanel_planningGuestBoolean_rendersField", () => {
     const panel = readSource("app/(secured)/joueurs/[id]/_components/PlayerRolesPanel.tsx");
@@ -66,6 +95,10 @@ describe("PlayerRolesPanel — câblage de la case", () => {
 describe("planningGuestErrorMessage", () => {
   it("planningGuestErrorMessage_knownCode_returnsSentence", () => {
     expect(planningGuestErrorMessage("CANNOT_MODIFY_SELF")).toBe("Tu ne peux pas te déclarer invité toi-même.");
+  });
+
+  it("planningGuestErrorMessage_adminCode_returnsFrenchSentence", () => {
+    expect(planningGuestErrorMessage("PLANNING_GUEST_ADMIN")).toBe("Un administrateur garde le planning : il ne peut pas être invité.");
   });
 
   it("planningGuestErrorMessage_unknownCode_returnsFallbackNeverRawCode", () => {
