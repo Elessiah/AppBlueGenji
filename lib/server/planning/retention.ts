@@ -26,6 +26,7 @@ const ENTRY_TABLES = [
   "bg_planning_assignments",
   "bg_planning_events",
   "bg_planning_entry_notices",
+  "bg_planning_auto_confirms",
 ] as const;
 
 /** Efface ce que le planning garde au-delà de sa durée de conservation ; rend le nombre de lignes effacées. */

@@ -12,7 +12,7 @@ import {
 
 /** Durées estimées du planning (`docs/features/CAST_PLANNING.md` § Calcul). */
 
-const SETTINGS: PlanningDurationSettings = { mapMinutes: { OW: 15, MR: 12 }, bufferMinutes: 10, defaultMaps: 3, eventHours: 4 };
+const SETTINGS: PlanningDurationSettings = { mapMinutes: { OW: 15, MR: 12 }, bufferMinutes: 10, defaultMaps: 3, eventHours: 4, confirmLeadHours: 24 };
 
 function format(overrides: Partial<MatchFormatForDuration> = {}): MatchFormatForDuration {
   return { game: "OW", type: null, value: null, maxMaps: null, ...overrides };
@@ -58,12 +58,12 @@ describe("maxMapsOf / estimateMatchMinutes / estimateEventMinutes", () => {
 
 describe("validateDurationSettings", () => {
   it("validateDurationSettings_allBoundsMin_returnsSettings", () => {
-    const min = { mapMinutes: { OW: 5, MR: 5 }, bufferMinutes: 0, defaultMaps: 1, eventHours: 1 };
+    const min = { mapMinutes: { OW: 5, MR: 5 }, bufferMinutes: 0, defaultMaps: 1, eventHours: 1, confirmLeadHours: 24 };
     expect(validateDurationSettings(min)).toEqual(min);
   });
 
   it("validateDurationSettings_allBoundsMax_returnsSettings", () => {
-    const max = { mapMinutes: { OW: 60, MR: 60 }, bufferMinutes: 60, defaultMaps: 9, eventHours: 12 };
+    const max = { mapMinutes: { OW: 60, MR: 60 }, bufferMinutes: 60, defaultMaps: 9, eventHours: 12, confirmLeadHours: 168 };
     expect(validateDurationSettings(max)).toEqual(max);
   });
 
@@ -117,6 +117,22 @@ describe("validateDurationSettings", () => {
 
   it("validateDurationSettings_nonObject_returnsNull", () => {
     expect(validateDurationSettings("15")).toBeNull();
+  });
+
+  it("validateDurationSettings_confirmLeadMissing_defaultsTo24", () => {
+    expect(validateDurationSettings(body())?.confirmLeadHours).toBe(24);
+  });
+
+  it("validateDurationSettings_confirmLeadBelow24_returnsNull", () => {
+    expect(validateDurationSettings(body({ confirmLeadHours: 23 }))).toBeNull();
+  });
+
+  it("validateDurationSettings_confirmLead168_keepsIt", () => {
+    expect(validateDurationSettings(body({ confirmLeadHours: 168 }))?.confirmLeadHours).toBe(168);
+  });
+
+  it("validateDurationSettings_confirmLeadAbove168_returnsNull", () => {
+    expect(validateDurationSettings(body({ confirmLeadHours: 169 }))).toBeNull();
   });
 });
 

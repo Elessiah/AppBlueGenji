@@ -1762,7 +1762,7 @@ export async function releaseMatchReferee(
  */
 async function releaseReferee(
   matchId: number,
-  userId: number,
+  userId: number | null,
   canManage: boolean,
   expected?: number | null,
 ): Promise<void> {
@@ -1807,7 +1807,7 @@ function assertExpectedReferee(current: number | null, expected: number | null |
  */
 export async function assignMatchReferee(
   matchId: number,
-  staffUserId: number,
+  staffUserId: number | null,
   refereeId: number | null,
   expected?: number | null,
   options: { refuseSuspended?: boolean } = {},
@@ -1827,7 +1827,7 @@ export async function assignMatchReferee(
       }
       assertExpectedReferee(current, expected);
       await writeReferee(connection, row, refereeId, options.refuseSuspended === true);
-      queueRefereeChange(connection, { kind: "ASSIGNED", matchId, replacedRefereeId: current, actorId: staffUserId });
+      queueRefereeChange(connection, { kind: "ASSIGNED", matchId, replacedRefereeId: current, actorId: staffUserId ?? undefined });
       return Number(row.tournament_id);
     }),
   );

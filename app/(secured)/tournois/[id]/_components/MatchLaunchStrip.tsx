@@ -2,6 +2,8 @@
 
 import { readyCount, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
+import { formatScheduleDeadline, upcomingScheduleDeadline } from "@/lib/shared/schedule-deadline";
+import { useInstantClock } from "@/lib/shared/hooks/useInstantClock";
 import type { BracketMatch } from "@/lib/shared/types";
 import { launchPhaseBadgeKind } from "../_lib/launch-strip";
 import styles from "./MatchLaunchStrip.module.css";
@@ -18,6 +20,9 @@ import { useSpectatorView } from "@/components/spectator-view";
  * (hôte, premier ban, carte de départ, arbitrage, casters) vivent sur la page
  * du match — voir `docs/features/MATCH_CARD_LAYOUT.md`.
  */
+/** En deçà, la date butoir est « proche » : elle reprend la teinte d'avertissement de la pastille. */
+const SOON_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Pastille de la phase de lancement : à planifier, en attente de départ, en
  * lancement (avec le décompte des « Prêt »), ou lancé — la phase vient de
@@ -28,11 +33,25 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
   const { t, locale } = useTournamentPageText();
   const spectator = useSpectatorView();
   const kind = launchPhaseBadgeKind(match, phase);
+  // Une date butoir passée (retirée, ou au forfait d'ici la minute) ne s'annonce plus : un seul
+  // minuteur posé sur la date butoir elle-même, un autre 24 h avant (la teinte d'avertissement).
+  const deadlineMs = kind === "TO_PLAN" && match.scheduleDeadlineAt !== null ? new Date(match.scheduleDeadlineAt).getTime() : null;
+  const now = useInstantClock(deadlineMs, SOON_MS);
+  // Rien avant que l'horloge soit connue : une date passée ne doit pas clignoter dans le HTML rendu.
+  const deadlineAt = kind === "TO_PLAN" && now !== null ? upcomingScheduleDeadline(match.scheduleDeadlineAt, now) : null;
+  // Ambre seulement quand l'échéance approche (moins de 24 h) : plus loin, la date se lit en teinte neutre.
+  const soon = deadlineAt !== null && now !== null && new Date(deadlineAt).getTime() - now <= SOON_MS;
   if (kind === "TO_PLAN") {
     return (
       <span className={styles.toPlan} title={t("launch.toPlanTitle")}>
         <span aria-hidden="true">📅</span> {t("launch.toPlan")}
         <span className="sr-only">{t("launch.toPlanSr")}</span>
+        {deadlineAt && (
+          <span className={styles.deadline} data-soon={soon || undefined} data-testid="schedule-deadline">
+            {" · "}
+            {t("launch.toPlanDeadline", { date: formatScheduleDeadline(deadlineAt, locale) })}
+          </span>
+        )}
       </span>
     );
   }

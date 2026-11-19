@@ -359,6 +359,7 @@ export async function getMatchRows(
       m.updated_at,
       m.phase_id,
       m.start_at,
+      m.schedule_deadline_at,
       m.live_trigger,
       m.live_trigger_user_id,
       m.live_started_at,

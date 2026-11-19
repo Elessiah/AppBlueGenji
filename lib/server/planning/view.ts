@@ -7,6 +7,7 @@ import type { AuthUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { can } from "@/lib/shared/permissions";
 import { PLANNING_ROLES, planningRolesOf, type PlanningRole } from "@/lib/shared/planning";
+import { planningConfirmAt } from "@/lib/shared/schedule-deadline";
 import type { PlanningAssignmentShown, PlanningAssignmentView, PlanningEntryView, PlanningView } from "@/lib/shared/planning-view";
 import {
   loadPlanningData,
@@ -18,6 +19,7 @@ import {
   type LoadedMember,
   type LoadedWithdrawal,
 } from "./load";
+import { autoConfirmAwaiting, loadedPendingRoles, readStoredAutoConfirms, type PendingRoles } from "./auto-confirm";
 import { entryAssignments, entryCoverage } from "./model";
 
 /**
@@ -88,16 +90,57 @@ function groupByEntry<T extends { entryKey: string }>(rows: readonly T[]): Map<s
   return byEntry;
 }
 
+/**
+ * Confirmation d'office d'une entrée ouverte : l'instant (ISO) tant qu'il est
+ * à venir, ou passé alors qu'une confirmation d'office reste à faire
+ * (`awaiting`, `autoConfirmAwaiting` ; `confirmPending` : en attente —
+ * semaine en échec, reprise plus tard) ; `null` pour une entrée close, ou
+ * passée sans rien que le balayage reprendra (un reste qu'il n'a pas pu
+ * confirmer se confirme à la main).
+ */
+export function entryConfirmState(
+  entry: Pick<LoadedEntry, "open" | "startAt" | "deadlineAt">,
+  leadHours: number,
+  now: number,
+  awaiting: boolean,
+): { confirmAt: string | null; confirmPending: boolean } {
+  if (!entry.open) return { confirmAt: null, confirmPending: false };
+  const at = planningConfirmAt(entry.startAt, entry.deadlineAt, leadHours);
+  if (at > now) return { confirmAt: new Date(at).toISOString(), confirmPending: false };
+  return awaiting ? { confirmAt: new Date(at).toISOString(), confirmPending: true } : { confirmAt: null, confirmPending: false };
+}
+
+/**
+ * Les entrées dont la carte doit consulter la marque de confirmation
+ * d'office : ouvertes, instant de confirmation atteint, et des propositions
+ * provisoires en base. Les autres n'en ont pas besoin — la lecture des
+ * marques est le plus souvent évitée.
+ */
+export function entriesNeedingMark(
+  entries: readonly Pick<LoadedEntry, "key" | "open" | "startAt" | "deadlineAt">[],
+  pending: ReadonlyMap<string, PendingRoles>,
+  leadHours: number,
+  now: number,
+): string[] {
+  return entries
+    .filter((entry) => entry.open && pending.has(entry.key) && planningConfirmAt(entry.startAt, entry.deadlineAt, leadHours) <= now)
+    .map((entry) => entry.key);
+}
+
 export async function loadPlanningView(user: AuthUser, now: number = Date.now()): Promise<PlanningView> {
   const canManage = can(user, "tournaments");
-  const data = await withConnection(async (connection) =>
-    loadPlanningData(connection, {
+  const { data, pending, marks } = await withConnection(async (connection) => {
+    const loaded = await loadPlanningData(connection, {
       now,
       includeHidden: canManage,
       members: await pageMembers(connection, now),
       ...(canManage ? {} : { availabilityOf: user.id }),
-    }),
-  );
+    });
+    // Comptées sur les lignes en base, comme le balayage (`sweepAutoConfirms`) : la carte et la reprise s'accordent.
+    const pending = loadedPendingRoles(loaded.assignments);
+    const keys = entriesNeedingMark(loaded.entries, pending, loaded.durations.confirmLeadHours, now);
+    return { data: loaded, pending, marks: await readStoredAutoConfirms(connection, keys) };
+  });
   // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul
   // (`preparePlanner`) ; les autres lecteurs gardent la couverture d'avant (rien n'y trahit la suspension).
   const solo = coveringSoloCasterIds(data.members, canManage);
@@ -126,6 +169,13 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       hidden: entry.hidden,
       channelUrl: entry.channelUrl,
       selfManaged: entry.selfManaged,
+      deadlineAt: entry.deadlineAt === null ? null : new Date(entry.deadlineAt).toISOString(),
+      ...entryConfirmState(
+        entry,
+        data.durations.confirmLeadHours,
+        now,
+        autoConfirmAwaiting(entry.startAt, pending.get(entry.key) ?? {}, marks.get(entry.key)),
+      ),
       assignments: assignments.map((row) => visibleAssignment(row, user.id, canManage)),
       // Pour le staff, un compte suspendu ne tient rien (comme pour le calcul, `preparePlanner`, et l'alerte) ;
       // les autres lecteurs gardent la couverture d'avant.

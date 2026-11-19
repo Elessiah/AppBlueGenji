@@ -338,3 +338,15 @@ export class CodedError extends Error {
 export function errorCode(error: unknown): string | null {
   return error instanceof CodedError ? error.code : null;
 }
+
+/** Champs de la date butoir de planification (`ScheduleDeadlineDialog`). */
+export type ScheduleDeadlineField = "day" | "hour";
+
+/** Refus de la date butoir : « trop proche » à l'heure, le reste au jour (`SCHEDULE_DEADLINE.md`). */
+export const SCHEDULE_DEADLINE_FIELD_ERRORS: FieldErrorMap<ScheduleDeadlineField> = {
+  INVALID_SCHEDULE_DEADLINE: "day",
+  SCHEDULE_DEADLINE_TOO_SOON: "hour",
+  SCHEDULE_DEADLINE_TOO_FAR: "day",
+  PAYLOAD_TOO_LARGE: "day",
+  UNSUPPORTED_CONTENT_TYPE: "day",
+};

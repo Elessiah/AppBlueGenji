@@ -95,7 +95,8 @@ export type PendingBotLog =
   | { kind: "registration"; tournamentId: number; teamId: number; byStaff: boolean }
   | { kind: "forfeit"; tournamentId: number; teamId: number }
   // `staffValidated` : tranché par « Valider le résultat » (`markResultValidatedByStaff`).
-  | { kind: "match_finished"; matchId: number; staffValidated?: boolean }
+  // `deadlineForfeit` : double forfait d'une date butoir passée (`markDeadlineForfeit`).
+  | { kind: "match_finished"; matchId: number; staffValidated?: boolean; deadlineForfeit?: boolean }
   | { kind: "score_conflict"; matchId: number; claimId?: number }
   | { kind: "score_report_stalled"; matchId: number; claimId?: number }
   // `pairing` : l'appariement lancé — une alerte par appariement, pas par match.
@@ -286,6 +287,13 @@ const resolvedMatches = createTransactionState<Set<number>>(() => new Set());
 const staffValidatedMatches = createTransactionState<Set<number>>(() => new Set());
 
 /**
+ * Manches closes en double forfait par le balayage des dates butoir dans la
+ * transaction en cours : leur ligne « Match terminé » en dit la raison
+ * (`markDeadlineForfeit`).
+ */
+const deadlineForfeitMatches = createTransactionState<Set<number>>(() => new Set());
+
+/**
  * Ordre des passages : chaque `flushBotLogs` range ses lignes de journal
  * **après** celles du passage précédent, c'est-à-dire dans l'ordre des commits.
  * Sans lui, deux transactions rapprochées (score de la finale, puis clôture par
@@ -377,6 +385,16 @@ export function markResultValidatedByStaff(connection: PoolConnection, matchId: 
   if (!queueBotLog(connection, entry)) pending.peek(connection)?.push(entry);
 }
 
+/**
+ * Note que la transaction en cours vient de clore une manche en double
+ * forfait faute d'horaire avant sa date butoir (`./schedule-deadline`) : sa
+ * ligne « Match terminé » le dit — la seule trace, sur Discord, d'un forfait
+ * qu'aucun arbitre n'a prononcé. En mémoire et synchrone.
+ */
+export function markDeadlineForfeit(connection: PoolConnection, matchId: number): void {
+  deadlineForfeitMatches.ensure(connection).add(matchId);
+}
+
 /** Jette les lignes réservées : la transaction n'a pas abouti. */
 export function discardBotLogs(connection: PoolConnection): void {
   pending.discard(connection);
@@ -390,6 +408,7 @@ export function discardBotLogs(connection: PoolConnection): void {
   // tout leur objet, et le prochain entretien les retrouvera telles quelles.
   resolvedMatches.discard(connection);
   staffValidatedMatches.discard(connection);
+  deadlineForfeitMatches.discard(connection);
   // Et toute autre file « après commit » (`./transaction-state`), branchée ici ou non.
   clearTransactionStates(connection);
 }
@@ -501,9 +520,14 @@ export function flushBotLogs(connection: PoolConnection): void {
   flushCastChanges(connection);
   flushRefereeChanges(connection);
   const validated = staffValidatedMatches.take(connection);
-  const queue = (pending.take(connection) ?? []).map((entry) =>
-    entry.kind === "match_finished" && validated?.has(entry.matchId) ? { ...entry, staffValidated: true } : entry,
-  );
+  const deadlineForfeits = deadlineForfeitMatches.take(connection);
+  const queue = (pending.take(connection) ?? []).map((entry) => {
+    if (entry.kind !== "match_finished") return entry;
+    let marked: PendingBotLog = entry;
+    if (validated?.has(entry.matchId)) marked = { ...marked, staffValidated: true };
+    if (deadlineForfeits?.has(entry.matchId)) marked = { ...marked, deadlineForfeit: true };
+    return marked;
+  });
   const settled = resolvedMatches.take(connection) ?? new Set<number>();
   // Chaque file a pris le sien : une file qui n'aurait pas été vidée ici ne
   // part pas avec une transaction suivante sur le même objet connexion
@@ -1581,6 +1605,7 @@ async function resolveMatchFinishedLog(
     forfeit,
     doubleForfeit,
     staffValidated: entry.staffValidated === true,
+    deadlineForfeit: entry.deadlineForfeit === true,
     mapPoints: forfeit || doubleForfeit ? null : parseLoggedMapPoints(match.final_map_points),
   });
   return { message, tournamentId: Number(match.tournament_id) };

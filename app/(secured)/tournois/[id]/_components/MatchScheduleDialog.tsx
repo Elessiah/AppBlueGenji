@@ -203,6 +203,11 @@ interface MatchScheduleDialogProps {
   launchPhase?: boolean;
   onClose: () => void;
   onSaved: () => void;
+  /**
+   * Ouvre la date butoir de planification du match (`SCHEDULE_DEADLINE.md`) à
+   * la place de cette fenêtre — offert sur un match à planifier seulement.
+   */
+  onEditDeadline?: () => void;
 }
 
 /**
@@ -230,6 +235,7 @@ export function MatchScheduleDialog({
   launchPhase = true,
   onClose,
   onSaved,
+  onEditDeadline,
 }: Readonly<MatchScheduleDialogProps>) {
   const text = useDialogsText();
   // Noms nettoyés (repli « Engagé #id ») ; `null` : place vide, dite « TBD ».
@@ -304,6 +310,8 @@ export function MatchScheduleDialog({
   const previousYear = shiftTarget(-1);
   const nextYear = shiftTarget(1);
   const cleared = entry.kind === "empty";
+  // Une saisie non enregistrée : jour, mois ou heure autres que ceux posés à l'ouverture.
+  const dirty = scheduleEntryDirty(initial, { day, month, time });
   // Les cartes de match affichent l'heure du navigateur : hors du fuseau de
   // Paris, l'aperçu donne aussi celle-là, pour que les deux se recoupent.
   const localTime = entry.kind === "ready" ? localMatchTimeIfDifferent(entry.instant, undefined, text.locale) : null;
@@ -654,6 +662,15 @@ export function MatchScheduleDialog({
                 {t("schedule.clear")}
               </BusyButton>
             )}
+            <DeadlineButton
+              text={text}
+              busy={busy}
+              isBusy={isBusy}
+              hasDeadline={match.scheduleDeadlineAt !== null}
+              dirty={dirty}
+              offered={planning}
+              onOpen={onEditDeadline}
+            />
             <BusyButton
               busy={busy}
               type="button"
@@ -693,5 +710,54 @@ export function MatchScheduleDialog({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** Une saisie non enregistrée : jour, mois ou heure autres que ceux posés à l'ouverture (sans date posée : un jour choisi). */
+function scheduleEntryDirty(
+  initial: ReturnType<typeof matchStartEntryOf>,
+  entered: { day: string; month: string; time: string },
+): boolean {
+  if (!initial) return entered.day !== "";
+  return entered.day !== String(initial.day) || entered.month !== String(initial.month) || entered.time !== matchEntryTimeValue(initial);
+}
+
+/** Ouvre la date butoir de planification du match (`SCHEDULE_DEADLINE.md`) à la place de cette fenêtre. */
+function DeadlineButton({
+  text,
+  busy,
+  isBusy,
+  hasDeadline,
+  dirty,
+  offered,
+  onOpen,
+}: Readonly<{
+  text: TournamentDialogsText;
+  busy: boolean;
+  isBusy: () => boolean;
+  hasDeadline: boolean;
+  /** Une date est saisie sans être enregistrée : ouvrir la date butoir la perdrait. */
+  dirty: boolean;
+  /** Match à planifier : seul cas où la date butoir s'offre. */
+  offered: boolean;
+  onOpen?: () => void;
+}>) {
+  const { showInfo } = useToast();
+  if (!offered || !onOpen) return null;
+  return (
+    <BusyButton
+      busy={busy}
+      blocked={dirty}
+      onBlockedClick={() => showInfo(text.t("schedule.deadlineDirty"))}
+      type="button"
+      className="btn ghost"
+      title={dirty ? text.t("schedule.deadlineDirty") : undefined}
+      onClick={(event) => {
+        if (event.detail <= 1 && !isBusy()) onOpen();
+      }}
+      style={{ padding: "8px 14px", fontSize: 13 }}
+    >
+      {hasDeadline ? text.t("schedule.deadlineEdit") : text.t("schedule.deadlineSet")}
+    </BusyButton>
   );
 }

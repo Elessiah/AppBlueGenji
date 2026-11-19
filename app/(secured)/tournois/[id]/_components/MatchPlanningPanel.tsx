@@ -18,6 +18,8 @@ interface MatchPlanningPanelProps {
   detail: TournamentDetail;
   /** Ouvre la date de début d'un match (dialogue de programmation). */
   onPlan: (match: BracketMatch) => void;
+  /** Ouvre la date butoir commune des matchs à planifier (`SCHEDULE_DEADLINE.md`). */
+  onBulkDeadline?: (count: number) => void;
   /** Le suivi est arrêté : aucune action n'est offerte sur un plateau figé. */
   frozen: boolean;
 }
@@ -36,7 +38,7 @@ interface MatchPlanningPanelProps {
  * L'allumage en cours de tournoi passe par une confirmation : il défait le
  * lancement des matchs non lancés et sans date, qui repassent à planifier.
  */
-export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPlanningPanelProps>) {
+export function MatchPlanningPanel({ detail, onPlan, onBulkDeadline, frozen }: Readonly<MatchPlanningPanelProps>) {
   const text = useTournamentPageText();
   // Ce que lit tout lecteur (titre, règle) vient de la consultation (lot 8a) ;
   // le décompte et les commandes du staff, des gestes (lot 8b).
@@ -150,6 +152,15 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
               aria-label={a("planning.planNextAria", { team1: first.team1Name ?? "TBD", team2: first.team2Name ?? "TBD" })}
             >
               🗓 {a("planning.planNext")}
+            </button>
+          )}
+          {enabled && pending.length > 0 && onBulkDeadline && (
+            <button
+              type="button"
+              className={`btn ghost tap-target ${styles.toggle}`}
+              onClick={() => onBulkDeadline(pending.length)}
+            >
+              ⏳ {a("scheduleDeadline.bulkOpen")}
             </button>
           )}
           {toggleable && (

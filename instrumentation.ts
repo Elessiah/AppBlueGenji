@@ -43,6 +43,18 @@ export async function register(): Promise<void> {
       } catch (error) {
         await logStartupFailure("[planning] Récapitulatif des nouvelles entrées non lancé.", error);
       }
+      try {
+        const { startScheduleDeadlineClock } = await import("@/lib/server/tournaments/schedule-deadline");
+        startScheduleDeadlineClock();
+      } catch (error) {
+        await logStartupFailure("[schedule-deadline] Balayage des dates butoir non lancé.", error);
+      }
+      try {
+        const { startPlanningAutoConfirmClock } = await import("@/lib/server/planning/auto-confirm");
+        startPlanningAutoConfirmClock();
+      } catch (error) {
+        await logStartupFailure("[planning] Confirmation d'office non lancée.", error);
+      }
     }
   }
 }

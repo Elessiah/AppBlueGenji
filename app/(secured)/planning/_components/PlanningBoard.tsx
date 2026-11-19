@@ -346,6 +346,8 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
                         names={names}
                         slot={slot}
                         until={format.time.format(Date.parse(entry.endAt))}
+                        confirmAt={entry.confirmAt === null ? null : format.slot.format(Date.parse(entry.confirmAt))}
+                        deadline={entry.deadlineAt === null ? null : format.slot.format(Date.parse(entry.deadlineAt))}
                         pending={pendingFor(pending, entry.key)}
                         act={act}
                         onConfirm={confirmEntry}
@@ -531,6 +533,11 @@ function Entrant({ entrant, text }: Readonly<{ entrant: PlanningEntrant | null; 
   );
 }
 
+/** La ligne de confirmation d'office à venir (avec la date butoir qui la fixe, s'il y en a une). */
+function confirmText(t: Text["t"], time: string, deadline: string | null): string {
+  return deadline === null ? t("autoConfirm.at", { time }) : t("autoConfirm.atWithDeadline", { time, deadline });
+}
+
 const EntryCard = memo(function EntryCard({
   entry,
   view,
@@ -538,6 +545,8 @@ const EntryCard = memo(function EntryCard({
   names,
   slot,
   until,
+  confirmAt,
+  deadline,
   pending,
   act,
   onConfirm,
@@ -550,6 +559,10 @@ const EntryCard = memo(function EntryCard({
   names: ReadonlyMap<number, string>;
   slot: string;
   until: string;
+  /** Confirmation d'office (date déjà mise en forme), `null` : entrée close. */
+  confirmAt: string | null;
+  /** Date butoir de planification du match (mise en forme), `null` : aucune. */
+  deadline: string | null;
   pending: string | null;
   act: Act;
   onConfirm: (key: string, slot: string) => void;
@@ -589,6 +602,22 @@ const EntryCard = memo(function EntryCard({
           <Entrant entrant={entry.team1} text={text} /> <span className={styles.muted}>{t("versus")}</span>{" "}
           <Entrant entrant={entry.team2} text={text} />
         </p>
+      )}
+      {confirmAt !== null && !entry.confirmPending && (
+        <p className={styles.confirmAt} data-testid="planning-confirm-at">
+          {confirmText(t, confirmAt, deadline)}
+        </p>
+      )}
+      {confirmAt !== null && entry.confirmPending && (
+        <div className={styles.confirmPending} data-testid="planning-confirm-at">
+          <InfoHintRow inline>
+            <Pill variant="waiting">{t("autoConfirm.pending")}</Pill>
+            <span className={styles.confirmAt}>{t("autoConfirm.pendingAt", { time: confirmAt })}</span>
+            <InfoHint id={`planning-confirm-pending-${entry.key}`} subject={t("autoConfirm.pending")}>
+              <p>{t("autoConfirm.pendingHint")}</p>
+            </InfoHint>
+          </InfoHintRow>
+        </div>
       )}
 
       <dl className={styles.roles}>
@@ -932,6 +961,7 @@ function StaffPanel({
           {field("planning-buffer", t("settings.buffer"), durations.bufferMinutes, b.bufferMinutes, (v) => ({ ...durations, bufferMinutes: v }))}
           {field("planning-maps", t("settings.defaultMaps"), durations.defaultMaps, b.defaultMaps, (v) => ({ ...durations, defaultMaps: v }))}
           {field("planning-event", t("settings.eventHours"), durations.eventHours, b.eventHours, (v) => ({ ...durations, eventHours: v }))}
+          {field("planning-confirm-lead", t("settings.confirmLeadHours"), durations.confirmLeadHours, b.confirmLeadHours, (v) => ({ ...durations, confirmLeadHours: v }))}
         </div>
         <BusyButton
           busy={pending === "settings"}

@@ -624,6 +624,12 @@ export function formatMatchResultLog(context: {
    */
   staffValidated?: boolean;
   /**
+   * Double forfait prononcé par le balayage des dates butoir
+   * (`SCHEDULE_DEADLINE.md`) : la ligne en dit la raison, sans quoi elle se
+   * lirait comme un forfait ordinaire.
+   */
+  deadlineForfeit?: boolean;
+  /**
    * Format Duel / Arcade : points de chaque carte, dans l'ordre du plateau
    * (« points : 5–3 · 2–5 ») — aucun nom de joueur, seulement des chiffres.
    */
@@ -639,8 +645,27 @@ export function formatMatchResultLog(context: {
       ? `${team1} vs ${team2}`
       : `${team1} ${context.team1Score}–${context.team2Score} ${team2}`;
   const validated = context.staffValidated ? ` — résultat validé par ${ANONYMOUS_STAFF_LABEL}` : "";
+  const deadline = context.deadlineForfeit ? " — date butoir de planification passée sans horaire" : "";
   const points = context.mapPoints && context.mapPoints.length > 0 ? ` (points : ${mapPointsLine(context.mapPoints)})` : "";
-  return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${points}${forfeitNote(context)}${validated}.`;
+  return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${points}${forfeitNote(context)}${validated}${deadline}.`;
+}
+
+/**
+ * Date butoir de planification fixée ou retirée par le staff
+ * (`SCHEDULE_DEADLINE.md`) : sur un match (`matchId`) ou d'un coup sur les
+ * `matches` matchs à planifier d'un tournoi. Aucun nom : ni d'engagée, ni de
+ * l'auteur (« le staff »), nommé dans pm2 seulement.
+ */
+export function formatScheduleDeadlineLog(context: {
+  tournament: BotLogTournament;
+  matchId: number | null;
+  matches: number;
+  deadlineAt: string | null;
+}): string {
+  const scope = context.matchId === null ? `${context.matches} match(s) à planifier` : `match #${context.matchId}`;
+  const change =
+    context.deadlineAt === null ? "retirée" : `fixée au ${formatMatchStart(context.deadlineAt)} (heure de Paris)`;
+  return `${lead("⏳", "Date butoir de planification", context.tournament)} : ${scope}, ${change}, par ${ANONYMOUS_STAFF_LABEL}.`;
 }
 
 /** Mention de forfait accolée au score d'une fin de match, vide sans forfait. */

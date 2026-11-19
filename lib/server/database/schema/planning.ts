@@ -144,6 +144,30 @@ export async function createPlanningTables(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Confirmation d'office d'une entrée (`lib/server/planning/auto-confirm.ts`,
+  // `docs/features/SCHEDULE_DEADLINE.md`) : l'entrée a été confirmée par le
+  // balayage, à sa date butoir ou à son délai de confirmation — une seule fois.
+  // Aucune donnée de personne ; purgée avec l'entrée (`retention.ts`).
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_planning_auto_confirms (
+      entry_key VARCHAR(24) NOT NULL PRIMARY KEY,
+      tournament_id BIGINT NOT NULL,
+      match_id BIGINT NULL,
+      -- Début de l'entrée confirmée : reprogrammée, elle se confirme de nouveau.
+      start_at DATETIME NULL,
+      -- Propositions laissées provisoires par la confirmation, comptées par
+      -- rôle (JSON \`{"CASTER":1}\`, aucun compte nommé) : une de plus rouvre l'entrée.
+      pending_roles VARCHAR(64) NULL,
+      confirmed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_bg_planning_auto_confirms_tournament (tournament_id),
+      INDEX idx_bg_planning_auto_confirms_match (match_id),
+      CONSTRAINT fk_bg_planning_auto_confirms_tournament FOREIGN KEY (tournament_id)
+        REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_planning_auto_confirms_match FOREIGN KEY (match_id)
+        REFERENCES bg_matches(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // Caster « autonome » : il diffuse seul, sans prod. Posé par le caster
   // lui-même ou par le staff ; une ligne absente vaut « non ».
   await createTable(db, `

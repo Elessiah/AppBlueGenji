@@ -101,14 +101,15 @@
   },
   "settings": {
     "title": "Durées estimées",
-    "hint": "Une personne ne tient pas deux créneaux qui se chevauchent. Un match dure son nombre maximal de cartes fois la durée d'une carte, plus la marge.",
+    "hint": "Une personne ne tient pas deux créneaux qui se chevauchent. Un match dure son nombre maximal de cartes fois la durée d'une carte, plus la marge. Un créneau se confirme d'office à sa date butoir, ou plus tôt à ce délai avant le match (24 h au moins).",
     "mapOW": "Minutes par carte (Overwatch)",
     "mapMR": "Minutes par carte (Marvel Rivals)",
     "buffer": "Marge par match (minutes)",
     "defaultMaps": "Cartes sans format connu",
     "eventHours": "Durée d'un tournoi entier (heures)",
     "save": "Enregistrer les durées",
-    "saved": "Durées enregistrées."
+    "saved": "Durées enregistrées.",
+    "confirmLeadHours": "Confirmation d'office (heures avant le match)"
   },
   "saved": {
     "availability": "Disponibilité enregistrée.",
@@ -183,5 +184,12 @@
     "provisional": "Proposition",
     "hint": "Qui s'est désisté de ce créneau, et son motif s'il en a donné un. « Tardif » : moins de 24 h avant le début. « Proposition » : il n'était que proposé par le calcul."
   },
-  "unfilled": "À pourvoir"
+  "unfilled": "À pourvoir",
+  "autoConfirm": {
+    "at": "Confirmation d'office : {time}",
+    "atWithDeadline": "Confirmation d'office : {time} (date butoir du match : {deadline})",
+    "pending": "Confirmation d'office en attente",
+    "pendingAt": "prévue : {time}",
+    "pendingHint": "L'heure de confirmation est passée mais des propositions sont encore provisoires : le calcul réessaie à chaque minute, sans rien à faire."
+  }
 }

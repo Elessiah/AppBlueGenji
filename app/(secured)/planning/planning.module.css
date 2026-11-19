@@ -139,6 +139,19 @@
   overflow-wrap: anywhere;
 }
 
+/* Instant de la confirmation d’office (SCHEDULE_DEADLINE.md § Planning). */
+.confirmAt {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-mute);
+  overflow-wrap: anywhere;
+}
+
+/* Confirmation d'office en attente : pastille + heure prévue + « i », sur une rangée qui passe à la ligne. */
+.confirmPending {
+  min-width: 0;
+}
+
 .tournament {
   color: var(--ink);
   font-weight: 600;

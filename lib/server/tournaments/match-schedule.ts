@@ -18,7 +18,7 @@
  * match **à planifier** (option `referee_scheduling`) passe « en attente de
  * départ », puis en lancement à l'heure dite.
  */
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
 import { MATCH_SEEN_KEY, MATCH_STAFF_KEY, MATCH_TOLD_KEY, REFEREE_DIGEST_KEY } from "@/lib/shared/discord-notifications";
@@ -381,6 +381,19 @@ export async function setMatchStartAt(
         startAt === null ? null : new Date(startAt),
         matchId,
       ]);
+      // Horaire retiré après une date butoir déjà passée (`./schedule-deadline`) :
+      // elle s'éteint, sans quoi le balayage prononcerait aussitôt un double
+      // forfait que personne n'a vu venir. Une date butoir encore devant reste.
+      if (startAt === null) {
+        const [lapsed] = await connection.execute<ResultSetHeader>(
+          `UPDATE bg_matches SET schedule_deadline_at = NULL WHERE id = ? AND schedule_deadline_at <= ?`,
+          [matchId, new Date()],
+        );
+        // Ses traces d'avis partent avec elle (`PRIVACY_CHANGES` : « effacée quand la date butoir change ou part »).
+        if (Number(lapsed.affectedRows ?? 0) > 0) {
+          await connection.execute(`DELETE FROM bg_schedule_deadline_notices WHERE match_id = ?`, [matchId]);
+        }
+      }
       // Lancement défait : la notification de départ réservée pour lui
       // (`./player-pushes`) part avec, pour que la nouvelle heure prévienne de
       // nouveau les joueurs. Le check-in (`LOBBY\_BRIEF%`, `./lobby-brief`)

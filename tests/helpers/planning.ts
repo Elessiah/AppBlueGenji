@@ -60,6 +60,7 @@ export function loadedEntry(overrides: Partial<LoadedEntry> = {}): LoadedEntry {
     channelUrl: null,
     selfManaged: false,
     matchRefereeId: null,
+    deadlineAt: null,
     ...overrides,
   };
 }
@@ -106,6 +107,9 @@ export function entryView(overrides: Partial<PlanningEntryView> = {}): PlanningE
     hidden: false,
     channelUrl: null,
     selfManaged: false,
+    deadlineAt: null,
+    confirmAt: null,
+    confirmPending: false,
     assignments: [],
     coverage: planningCoverage({ hasReferee: false, casterIds: [], prodIds: [], soloCasterIds: new Set() }),
     mine: [],

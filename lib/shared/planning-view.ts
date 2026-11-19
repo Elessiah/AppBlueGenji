@@ -82,6 +82,16 @@ export type PlanningEntryView = {
   channelUrl: string | null;
   /** Autogestion posée par le staff sur le match. */
   selfManaged: boolean;
+  /** Date butoir de planification du match (ISO), `null` : aucune (`SCHEDULE_DEADLINE.md`). */
+  deadlineAt: string | null;
+  /**
+   * Confirmation d'office des propositions de l'entrée (ISO) : au plus tôt de
+   * la date butoir et du début moins le délai de confirmation. `null` : entrée
+   * close, ou instant passé sans proposition provisoire restante.
+   */
+  confirmAt: string | null;
+  /** Instant passé, propositions encore provisoires : la confirmation d'office est en attente. */
+  confirmPending: boolean;
   assignments: PlanningAssignmentShown[];
   coverage: Coverage;
   /** Disponibilités du lecteur sur cette entrée, par rôle tenu. */

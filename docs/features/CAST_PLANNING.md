@@ -237,6 +237,10 @@ compte les **rôles**, pas les personnes.
   la route en dérivent.
 - Un geste à la fois : verrou nommé `bg_planning` (10 s) → `PLANNING_BUSY`.
 
+### Confirmation d'office
+
+Chaque entrée ouverte se confirme d'office à `min(date butoir, début − délai)` (réglage « délai de confirmation », 24–168 h) : le calcul refait d'abord la semaine autour des confirmées, puis ne confirme que les échues (`lib/server/planning/auto-confirm.ts`, `SCHEDULE_DEADLINE.md` § Planning).
+
 ## Notifications (`lib/server/planning/notices.ts`, `new-entries.ts`)
 
 Quatre sujets de `PUSH_TOPICS`, chacun push **et** message privé Discord

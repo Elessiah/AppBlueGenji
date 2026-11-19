@@ -25,7 +25,7 @@ jest.mock("@/lib/server/tournaments/departed-notices", () => ({
 }));
 
 import { getDatabase } from "@/lib/server/database";
-import { rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
+import { clearPastScheduleDeadlines, rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { flushBotLogs } from "@/lib/server/tournaments/bot-logs";
@@ -40,7 +40,7 @@ import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import type { PhaseFormat, TournamentFormat, TournamentState } from "@/lib/shared/types";
-import { fakePool } from "../../helpers/sql-double";
+import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { tournamentRow, phaseRow } from "../../helpers/tournament-rows";
 
 type MatchSeed = {
@@ -987,5 +987,56 @@ describe("rollbackCurrentRound — compte rendu", () => {
 
     expect(result.label).toBe("la manche 2");
     expect(result.clearedMatches).toBe(2);
+  });
+});
+
+describe("clearPastScheduleDeadlines", () => {
+  const NOW = new Date("2026-11-19T12:00:00Z");
+
+  it("clearPastScheduleDeadlines_ids_deletesNoticesThenClearsPastDeadlinesOfForfeitedOrUnscheduledMatches", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+
+    await clearPastScheduleDeadlines(fakeConnection({ execute }), [40, 41], NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    const [[deleteSql, deleteParams], [updateSql, updateParams]] = execute.mock.calls;
+    expect(String(deleteSql)).toContain("DELETE FROM bg_schedule_deadline_notices");
+    expect(String(updateSql)).toContain("UPDATE bg_matches SET schedule_deadline_at = NULL");
+    for (const sql of [deleteSql, updateSql]) {
+      // Double forfait, ou close sans horaire ni lancement (résultat d'office, forfait simple) : la date butoir armée
+      // la reclorait aussitôt ; celle d'une rencontre programmée ou lancée reste (lue par le planning).
+      expect(String(sql)).toContain("(double_forfeit = 1 OR (start_at IS NULL");
+      expect(String(sql)).toContain("schedule_deadline_at <= ?");
+    }
+    expect(deleteParams).toEqual([40, 41, NOW]);
+    expect(updateParams).toEqual([40, 41, NOW]);
+  });
+
+  it("clearPastScheduleDeadlines_ids_onlyCompletedMatchesTargeted", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+
+    await clearPastScheduleDeadlines(fakeConnection({ execute }), [40], NOW);
+
+    // Un match de la manche jamais joué garde sa date butoir passée : le balayage le clora.
+    for (const [sql] of execute.mock.calls) expect(String(sql)).toContain("status = 'COMPLETED'");
+  });
+
+  it("clearPastScheduleDeadlines_ids_launchCountedForCurrentPairingOnly", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+
+    await clearPastScheduleDeadlines(fakeConnection({ execute }), [40], NOW);
+
+    for (const [sql] of execute.mock.calls) {
+      expect(String(sql)).toContain("NOT (launched_at IS NOT NULL AND launch_pairing <=> CONCAT(team1_id, ':', team2_id))");
+      expect(String(sql)).not.toContain("launched_at IS NULL");
+    }
+  });
+
+  it("clearPastScheduleDeadlines_noIds_noQuery", async () => {
+    const execute = jest.fn<SqlQuery>();
+
+    await clearPastScheduleDeadlines(fakeConnection({ execute }), [], NOW);
+
+    expect(execute).not.toHaveBeenCalled();
   });
 });

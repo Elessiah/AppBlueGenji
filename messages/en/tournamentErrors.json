@@ -231,7 +231,12 @@
     "TIEBREAK_NOT_ALLOWED": "A tiebreak map can only be set on a playoff round with a set match format (BO or FT).",
     "INVALID_MAP_PICK": "This map is not in the tournament round's pool.",
     "NOT_MAP_PICKER": "Only the referees and, when the match is self-managed, its teams choose the map.",
-    "ROUND_MAPS_SET": "This tournament round has its maps set for the whole round: reset the round to enter the map match by match."
+    "ROUND_MAPS_SET": "This tournament round has its maps set for the whole round: reset the round to enter the map match by match.",
+    "INVALID_SCHEDULE_DEADLINE": "Deadline not recognised.",
+    "SCHEDULE_DEADLINE_TOO_SOON": "The deadline must be at least 24 hours ahead.",
+    "SCHEDULE_DEADLINE_TOO_FAR": "The deadline cannot be more than sixty days ahead.",
+    "SCHEDULE_DEADLINE_NOT_ALLOWED": "Deadline not possible: the match already has a time, is launched or played, or the tournament does not have referees schedule its matches.",
+    "SCHEDULE_DEADLINE_UPDATE_FAILED": "The deadline could not be saved. Try again in a moment."
   },
   "soloCodes": {
     "TEAM_NOT_FORFEITED": "This player hasn't withdrawn: there is nothing to cancel.",

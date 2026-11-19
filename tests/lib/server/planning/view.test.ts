@@ -11,10 +11,18 @@ jest.mock("@/lib/server/planning/load", () => ({
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { loadPlanningData, loadPlanningMembers, loadPlanningMembersByIds, type LoadedAvailability, type LoadedWithdrawal } from "@/lib/server/planning/load";
-import { loadPlanningView, PLANNING_MEMBERS_TTL_MS, resetPlanningMembersCache, unfilledRoles, visibleAssignment } from "@/lib/server/planning/view";
+import {
+  loadPlanningView,
+  PLANNING_MEMBERS_TTL_MS,
+  resetPlanningMembersCache,
+  unfilledRoles,
+  entryConfirmState,
+  entriesNeedingMark,
+  visibleAssignment,
+} from "@/lib/server/planning/view";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { authUser } from "../../../helpers/auth-user";
-import { loadedAssignment, loadedEntry, loadedMember, MONDAY, planningData } from "../../../helpers/planning";
+import { HOUR_MS, loadedAssignment, loadedEntry, loadedMember, MONDAY, planningData } from "../../../helpers/planning";
 import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 
 /** La page « Planning » : copie brève des comptes, réglage autonome relu, disponibilités regroupées (`CAST_PLANNING.md`). */
@@ -27,11 +35,40 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetPlanningMembersCache();
   jest.mocked(withConnection).mockImplementation(<T>(run: (c: PoolConnection) => Promise<T>) => run(fakeConnection(connection)));
+  connection.execute.mockResolvedValue([[], []]);
   jest.mocked(loadPlanningMembers).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
   jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
   jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) =>
     planningData({ entries: [loadedEntry()], members: options.members ?? [] }),
   );
+});
+
+describe("entryConfirmState", () => {
+  const HOUR = 60 * 60 * 1000;
+  const startAt = MONDAY + 48 * HOUR;
+  const confirmIso = new Date(startAt - 24 * HOUR).toISOString();
+
+  it("entryConfirmState_openEntryBeforeConfirm_returnsIsoNotPending", () => {
+    expect(entryConfirmState({ open: true, startAt, deadlineAt: null }, 24, MONDAY, true)).toEqual({ confirmAt: confirmIso, confirmPending: false });
+  });
+
+  it("entryConfirmState_confirmTimeReachedNothingProvisional_returnsNull", () => {
+    expect(entryConfirmState({ open: true, startAt, deadlineAt: null }, 24, startAt - 24 * HOUR, false)).toEqual({
+      confirmAt: null,
+      confirmPending: false,
+    });
+  });
+
+  it("entryConfirmState_confirmTimeReachedStillProvisional_pending", () => {
+    expect(entryConfirmState({ open: true, startAt, deadlineAt: null }, 24, startAt - 24 * HOUR, true)).toEqual({
+      confirmAt: confirmIso,
+      confirmPending: true,
+    });
+  });
+
+  it("entryConfirmState_closedEntry_returnsNull", () => {
+    expect(entryConfirmState({ open: false, startAt, deadlineAt: null }, 24, MONDAY, true)).toEqual({ confirmAt: null, confirmPending: false });
+  });
 });
 
 describe("loadPlanningView — comptes", () => {
@@ -362,5 +399,71 @@ describe("loadPlanningView — place quittée tenue par un compte suspendu", () 
     const view = await loadPlanningView(caster, MONDAY - 48 * 60 * 60 * 1000);
 
     expect(view.entries[0].unfilled).toEqual([]);
+  });
+});
+
+describe("entriesNeedingMark", () => {
+  const startAt = MONDAY + 48 * HOUR_MS;
+  const pending = new Map([["m:1", { REFEREE: 1 }]]);
+  const confirmTime = startAt - 24 * HOUR_MS;
+
+  it("entriesNeedingMark_openPastConfirmWithPending_included", () => {
+    expect(entriesNeedingMark([loadedEntry({ startAt })], pending, 24, confirmTime)).toEqual(["m:1"]);
+  });
+
+  it("entriesNeedingMark_confirmTimeAhead_excluded", () => {
+    expect(entriesNeedingMark([loadedEntry({ startAt })], pending, 24, confirmTime - 1)).toEqual([]);
+  });
+
+  it("entriesNeedingMark_noPendingRows_excluded", () => {
+    expect(entriesNeedingMark([loadedEntry({ startAt })], new Map(), 24, confirmTime)).toEqual([]);
+  });
+
+  it("entriesNeedingMark_closedEntry_excluded", () => {
+    expect(entriesNeedingMark([loadedEntry({ startAt, open: false })], pending, 24, confirmTime)).toEqual([]);
+  });
+});
+
+describe("loadPlanningView — confirmation d'office", () => {
+  const startAt = MONDAY + 48 * HOUR_MS;
+  const confirmTime = startAt - 24 * HOUR_MS;
+  const marksQuery = /FROM bg_planning_auto_confirms/;
+
+  function withProvisionalReferee(): void {
+    jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) =>
+      planningData({ entries: [loadedEntry({ startAt })], assignments: [loadedAssignment()], members: options.members ?? [] }),
+    );
+  }
+
+  function marksCalls() {
+    return connection.execute.mock.calls.filter(([sql]) => marksQuery.test(String(sql)));
+  }
+
+  it("loadPlanningView_noEntryNeedsMark_marksNotQueried", async () => {
+    withProvisionalReferee();
+
+    await loadPlanningView(staff, confirmTime - 1);
+
+    expect(marksCalls()).toHaveLength(0);
+  });
+
+  it("loadPlanningView_leftoverAlreadyAttempted_notPending", async () => {
+    withProvisionalReferee();
+    connection.execute.mockImplementation(async (sql: string) =>
+      marksQuery.test(sql) ? [[{ entry_key: "m:1", start_at: new Date(startAt), pending_roles: '{"REFEREE":1}' }], []] : [[], []],
+    );
+
+    const view = await loadPlanningView(staff, confirmTime);
+
+    expect(marksCalls()[0][1]).toEqual(["m:1"]);
+    expect(view.entries[0].confirmPending).toBe(false);
+  });
+
+  it("loadPlanningView_unconfirmedRowWithoutMark_pending", async () => {
+    withProvisionalReferee();
+
+    const view = await loadPlanningView(staff, confirmTime);
+
+    expect(view.entries[0].confirmPending).toBe(true);
   });
 });

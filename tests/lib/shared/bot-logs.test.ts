@@ -11,6 +11,7 @@ import {
   formatPlayerSignupLog,
   formatRegistrationLog,
   formatRoundRolledBackLog,
+  formatScheduleDeadlineLog,
   formatTournamentCreatedLog,
   formatTournamentDeletedLog,
   formatTournamentFinishedLog,
@@ -355,6 +356,37 @@ describe("formatMatchResultLog", () => {
     expect(line).toMatch(/Les Renards 2–1 Team Nova — résultat validé par le staff\.$/);
   });
 
+  it("formatMatchResultLog_deadlineForfeit_saysWhy", () => {
+    const line = formatMatchResultLog({
+      tournament: TOURNAMENT,
+      bracket: "UPPER",
+      roundNumber: 2,
+      team1: { name: "Les Renards", participantType: "TEAM" },
+      team2: { name: "Team Nova", participantType: "TEAM" },
+      team1Score: null,
+      team2Score: null,
+      doubleForfeit: true,
+      deadlineForfeit: true,
+    });
+
+    expect(line).toMatch(/\(double forfait, aucune qualifiée\) — date butoir de planification passée sans horaire\.$/);
+  });
+
+  it("formatMatchResultLog_doubleForfeitWithoutDeadline_noDeadlineMention", () => {
+    const line = formatMatchResultLog({
+      tournament: TOURNAMENT,
+      bracket: "UPPER",
+      roundNumber: 2,
+      team1: { name: "Les Renards", participantType: "TEAM" },
+      team2: { name: "Team Nova", participantType: "TEAM" },
+      team1Score: null,
+      team2Score: null,
+      doubleForfeit: true,
+    });
+
+    expect(line).not.toContain("date butoir");
+  });
+
   it("signale un forfait, que le score seul ne dirait pas", () => {
     const line = formatMatchResultLog({
       tournament: TOURNAMENT,
@@ -684,5 +716,23 @@ describe("formatMatchResultLog — format Duel / Arcade", () => {
     const line = formatMatchResultLog({ ...context, mapPoints: [] });
 
     expect(line).not.toContain("points");
+  });
+});
+
+describe("formatScheduleDeadlineLog", () => {
+  it("formatScheduleDeadlineLog_matchSet_parisTimeAndAnonymousStaff", () => {
+    const line = formatScheduleDeadlineLog({ tournament: TOURNAMENT, matchId: 40, matches: 1, deadlineAt: "2026-11-17T20:00:00.000Z" });
+
+    expect(line).toContain("⏳ Date butoir de planification");
+    expect(line).toContain("match #40, fixée au");
+    expect(line).toContain("21:00");
+    expect(line).toContain("(heure de Paris)");
+    expect(line).toMatch(/par le staff\.$/);
+  });
+
+  it("formatScheduleDeadlineLog_bulkClear_countAndRemoved", () => {
+    const line = formatScheduleDeadlineLog({ tournament: TOURNAMENT, matchId: null, matches: 3, deadlineAt: null });
+
+    expect(line).toContain("3 match(s) à planifier, retirée, par le staff.");
   });
 });

@@ -476,5 +476,24 @@
     "footnoteRound": "Sûres quel que soit le score des matchs restants, hors décision d'arbitrage (abandon, pénalité, double forfait). La manche n'est posée qu'une fois la précédente terminée.",
     "footnoteShort": "Rencontres sûres, hors décision d'arbitrage.",
     "footnoteSubject": "Rencontres sûres"
+  },
+  "scheduleDeadline": {
+    "title": "Date butoir de planification",
+    "bulkTitle": "Date butoir des matchs à planifier",
+    "bulkScope": "{count, plural, =1 {1 match à planifier} other {# matchs à planifier}} : la même date butoir pour tous.",
+    "bulkHint": "Remplace la date butoir déjà posée sur ces matchs ; « Aucune date butoir » les efface. Les matchs déjà programmés ne sont pas touchés.",
+    "hint": "Les deux équipes doivent convenir d'un horaire avant cette date (heure de Paris), sinon le match est clos en double forfait. Elles sont prévenues à la pose, puis 24 h et 3 h avant.",
+    "day": "Jour (heure de Paris)",
+    "hour": "Heure",
+    "none": "Aucune date butoir",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "saved": "Date butoir enregistrée.",
+    "cleared": "Date butoir retirée.",
+    "bulkSaved": "{count, plural, =0 {Aucun match à planifier.} =1 {Date butoir posée sur 1 match.} other {Date butoir posée sur # matchs.}}",
+    "bulkCleared": "{count, plural, =0 {Aucune date butoir à retirer.} =1 {Date butoir retirée d'1 match.} other {Date butoir retirée de # matchs.}}",
+    "matchLabel": "{team1} contre {team2}",
+    "tbd": "TBD",
+    "bulkOpen": "Date butoir des matchs à planifier"
   }
 }

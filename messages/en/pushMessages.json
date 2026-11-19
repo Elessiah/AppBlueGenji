@@ -232,5 +232,13 @@
       "bodyStreamLost": "A {role} withdrew from {entry} ({start}): no replacement found, the stream is lost (a prod or a solo caster is needed).",
       "bodyStreamLostLate": "A {role} withdrew from {entry} ({start}), less than 24 hours before: no replacement found, the stream is lost (a prod or a solo caster is needed)."
     }
+  },
+  "scheduleDeadline": {
+    "titleSet": "Scheduling deadline",
+    "bodySet": "{pairing} ({tournament}): schedule it before {deadline}, otherwise double forfeit.",
+    "titleReminder": "Match still to be scheduled",
+    "bodyReminder": "{pairing} ({tournament}): deadline {deadline}, otherwise double forfeit.",
+    "titleForfeit": "Double forfeit",
+    "bodyForfeit": "{pairing} ({tournament}): no time agreed before the deadline ({deadline})."
   }
 }

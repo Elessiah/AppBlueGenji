@@ -50,6 +50,7 @@ import { lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "./lobby-
 import { visibleText, withoutInvisibles } from "./visible-text";
 import { teamInviteNoticePath, type TeamInviteNoticeKind } from "./team-invite-notice";
 import { PLANNING_PATH } from "./planning";
+import type { DeadlineNotice } from "./schedule-deadline-notices";
 import {
   planningNoticeTime,
   type PlanningNoticeAssignment,
@@ -1294,4 +1295,34 @@ export function stripMarkdown(text: string): string {
     .replace(/[*_`~>]+/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Date butoir de planification (`SCHEDULE_DEADLINE`, `SCHEDULE_DEADLINE.md`) :
+ * l'annonce, un rappel (24 h, 3 h), ou le double forfait prononcé. Aucun pseudo
+ * (« Ton match » en individuel) ; même étiquette pour tous les avis d'un match,
+ * le plus récent remplace les autres sur l'appareil.
+ */
+export function scheduleDeadlinePush(notice: DeadlineNotice, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const values = {
+    pairing: pairing(notice, text),
+    tournament: shown(notice.tournamentName),
+    deadline: planningNoticeTime(notice.deadlineAt, locale),
+  };
+  let title = text.t("scheduleDeadline.titleReminder");
+  let body = text.t("scheduleDeadline.bodyReminder", values);
+  if (notice.key === "FORFEIT") {
+    title = text.t("scheduleDeadline.titleForfeit");
+    body = text.t("scheduleDeadline.bodyForfeit", values);
+  } else if (notice.key === "SET") {
+    title = text.t("scheduleDeadline.titleSet");
+    body = text.t("scheduleDeadline.bodySet", values);
+  }
+  return {
+    title,
+    body,
+    url: localeHref(tournamentMatchHref(notice.tournamentId, notice.matchId), locale),
+    tag: `${matchTag(notice.matchId)}-deadline`,
+  };
 }

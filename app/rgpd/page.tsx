@@ -1171,7 +1171,7 @@ function RgpdFr({
         <div className={styles.prose}>
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
-            score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de l&apos;horaire de vos matchs (posé,
+            score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de la date butoir de planification d&apos;un match que vous menez (capitaine, manager ou propriétaire, ou joueur d&apos;un tournoi individuel) — son annonce, ses rappels 24 h et 3 h avant et le double forfait qui peut la suivre si elle passe sans horaire —, de l&apos;horaire de vos matchs (posé,
             changé ou retiré) et de ses rappels (24 h avant ; aussi 10 h avant si le tournoi a un check-in), du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, dans un tournoi qui a un check-in, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
             alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage ; un arbitre, caster ou prod, du planning (nouveaux créneaux où il peut tenir un rôle, ses affectations, les désistements d&apos;attributions confirmées sur ses créneaux confirmés) et, staff des tournois, des places à pourvoir et des diffusions perdues. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
@@ -1218,7 +1218,7 @@ function RgpdFr({
           <p id="messages-de-match">
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, dans la
             langue de votre compte, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
-            rappels (24 h et 10 h avant ; 24 h seulement dans un tournoi sans check-in), quand vous êtes retiré d&apos;un match, quand un
+            rappels (24 h et 10 h avant ; 24 h seulement dans un tournoi sans check-in), si vous menez une engagée en match (capitaine, manager ou propriétaire) ou jouez un tournoi individuel, quand le staff des tournois fixe à son match une date butoir de planification, pour ses rappels (24 h et 3 h avant) et pour le double forfait qui peut être prononcé si elle passe sans horaire convenu — le site garde la date butoir avec le match et la trace de chaque avis (match et affiche, palier, date butoir annoncée, date d&apos;envoi, remis ou non, sans le texte), effacée quand la date butoir change ou part, sinon avec le tournoi ; le sujet push « Date butoir de planification » coupe aussi ces messages privés —, quand vous êtes retiré d&apos;un match, quand un
             nouveau match vous attend (les deux adversaires d&apos;un match de votre équipe ou de votre tournoi individuel
             viennent d&apos;être connus, première manche comprise : adversaire, horaire s&apos;il est déjà
             posé — sans « Match programmé » en plus — et lien de la page du match, une seule fois par match et par affiche) et, si vous castez, quand votre
@@ -1256,6 +1256,8 @@ function RgpdFr({
             « un caster » pour la diffusion) ; cette ligne n&apos;ajoute rien aux journaux du serveur, où un litige tranché,
             un résultat corrigé ou une validation suspendue garde sa trace nominative (<Link href="/rgpd/registre#t05">registre,
             T05</Link>), sauf, quand elle n&apos;a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
+            Une date butoir de planification posée, changée ou retirée par le staff est notée au journal du staff sur Discord
+            (le tournoi et le match) sans nommer son auteur ; les journaux du serveur gardent son auteur, comme pour un horaire de match (<Link href="/rgpd/registre#t05">registre, T05</Link>).
             Quand un administrateur attribue ou retire un rôle de plateforme (administrateur, arbitre, caster, prod, community
             manager, recruteur, développeur), y compris sur son propre compte, où il ne peut pas se retirer l&apos;administration, le
             journal du staff sur Discord le note sans nommer personne ; les journaux du serveur gardent son auteur,
@@ -1557,7 +1559,7 @@ function RgpdFr({
             attribution jusqu&apos;au début du créneau, avec un motif facultatif lu par le seul staff des
             tournois ; le site garde le désistement (rôle, date, motif, s&apos;il est tardif — moins de 24 h
             avant) avec l&apos;historique, et cherche automatiquement un remplaçant (un créneau compte au plus deux
-            casters : quand l&apos;un d&apos;eux part et que l&apos;autre reste, la place n&apos;est pas forcément à pourvoir). Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
+            casters : quand l&apos;un d&apos;eux part et que l&apos;autre reste, la place n&apos;est pas forcément à pourvoir). Chaque créneau du planning se confirme d&apos;office à l&apos;approche de son début (délai réglé par le staff des tournois, 24 h au moins), ou plus tôt à la date butoir de planification de son match ; ses affectés en sont prévenus comme d&apos;une confirmation par le staff, et le site note, sans personne, quels créneaux ont été confirmés d&apos;office. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
             créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
             le rôle caster ; la suppression du compte emporte tout ce qui le concerne (les gestes faits comme
             staff restent, sans le désigner), l&apos;export de vos données le contient, gestes faits comme staff

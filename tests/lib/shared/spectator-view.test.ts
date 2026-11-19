@@ -540,6 +540,7 @@ const MATCH_FIELDS = {
   scoreDeadlineAt: "public",
   scoreAutoValidationPaused: "public",
   startAt: "public",
+  scheduleDeadlineAt: "public",
   status: "public",
   team1Id: "public",
   team1Name: "public",
