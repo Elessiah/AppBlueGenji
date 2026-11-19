@@ -55,6 +55,8 @@ import {
   type PlanningNoticeAssignment,
   type PlanningNoticeEntry,
   type PlanningWithdrawalNotice,
+  type WithdrawalOutcome,
+  withdrawalOutcome,
 } from "./planning-notices";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
@@ -1237,10 +1239,36 @@ export function planningWithdrawalPush(notice: PlanningWithdrawalNotice, locale:
   };
   return {
     title: text.t("planning.withdrawal.title"),
-    body: text.t(notice.replaced ? "planning.withdrawal.bodyReplaced" : "planning.withdrawal.bodyOpen", values),
+    body: text.t(withdrawalBody(notice), values),
     url: localeHref(PLANNING_PATH, locale),
     tag: `planning-withdrawal-${notice.key}-${notice.role}`,
   };
+}
+
+/** Clé du texte de chaque issue d'un désistement ({@link withdrawalOutcome}, partagée avec le message privé). */
+const WITHDRAWAL_BODY_KEYS = {
+  replaced: "planning.withdrawal.bodyReplaced",
+  selfHeld: "planning.withdrawal.bodySelfHeld",
+  stillHeld: "planning.withdrawal.bodyStillHeld",
+  streamLost: "planning.withdrawal.bodyStreamLost",
+  open: "planning.withdrawal.bodyOpen",
+} as const satisfies Record<WithdrawalOutcome, string>;
+
+/** Texte d'un désistement : remplaçant affecté, autre caster encore affecté (ou le destinataire lui-même), ou place à pourvoir. */
+function withdrawalBody(notice: PlanningWithdrawalNotice): (typeof WITHDRAWAL_BODY_KEYS)[WithdrawalOutcome] {
+  return WITHDRAWAL_BODY_KEYS[withdrawalOutcome(notice)];
+}
+
+/** Texte d'une place à pourvoir : tardive ou non, diffusion perdue (départ d'un caster autonome) ou non. */
+function unfilledBody(
+  notice: PlanningWithdrawalNotice,
+):
+  | "planning.unfilled.body"
+  | "planning.unfilled.bodyLate"
+  | "planning.unfilled.bodyStreamLost"
+  | "planning.unfilled.bodyStreamLostLate" {
+  if (notice.streamLost === true) return notice.late ? "planning.unfilled.bodyStreamLostLate" : "planning.unfilled.bodyStreamLost";
+  return notice.late ? "planning.unfilled.bodyLate" : "planning.unfilled.body";
 }
 
 /** Place à pourvoir après un désistement sans remplaçant (`PLANNING_UNFILLED`, staff des tournois). */
@@ -1253,7 +1281,7 @@ export function planningUnfilledPush(notice: PlanningWithdrawalNotice, locale: L
   };
   return {
     title: text.t("planning.unfilled.title"),
-    body: text.t(notice.late ? "planning.unfilled.bodyLate" : "planning.unfilled.body", values),
+    body: text.t(unfilledBody(notice), values),
     url: localeHref(PLANNING_PATH, locale),
     tag: `planning-unfilled-${notice.key}-${notice.role}`,
   };

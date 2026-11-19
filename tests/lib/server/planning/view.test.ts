@@ -301,12 +301,66 @@ describe("loadPlanningView — caster autonome suspendu", () => {
   it("loadPlanningView_suspendedSoloCaster_staffCoverageNotStreamed", async () => {
     const view = await loadPlanningView(staff, MONDAY);
 
-    expect(view.entries[0].coverage).toMatchObject({ streamed: false, casterNeedsProd: true });
+    // Pour le staff, le compte suspendu ne tient rien : ni diffusion, ni caster qui attendrait son prod.
+    expect(view.entries[0].coverage).toMatchObject({ streamed: false, casterNeedsProd: false });
   });
 
   it("loadPlanningView_suspendedSoloCaster_memberCoverageUnchanged", async () => {
     const view = await loadPlanningView(caster, MONDAY);
 
     expect(view.entries[0].coverage).toMatchObject({ streamed: true, casterNeedsProd: false });
+  });
+});
+
+describe("loadPlanningView — caster non autonome suspendu", () => {
+  beforeEach(() => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        assignments: [
+          loadedAssignment({ userId: 4, role: "CASTER", confirmed: true }),
+          loadedAssignment({ userId: 7, role: "PROD", confirmed: true }),
+        ],
+        members: [loadedMember({ userId: 4, roles: ["CASTER"], suspended: true }), loadedMember({ userId: 7, roles: ["PROD"] })],
+      }),
+    );
+  });
+
+  it("loadPlanningView_suspendedCasterStaff_coverageIgnoresRow", async () => {
+    const view = await loadPlanningView(staff, MONDAY);
+
+    expect(view.entries[0].coverage).toMatchObject({ streamed: false });
+  });
+
+  it("loadPlanningView_suspendedCasterMember_coverageKeepsRow", async () => {
+    const view = await loadPlanningView(caster, MONDAY);
+
+    expect(view.entries[0].coverage).toMatchObject({ streamed: true });
+  });
+});
+
+describe("loadPlanningView — place quittée tenue par un compte suspendu", () => {
+  beforeEach(() => {
+    // 5 s'est désisté (confirmé) ; seul 4, suspendu, reste caster.
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        assignments: [loadedAssignment({ userId: 4, role: "CASTER", confirmed: true })],
+        members: [loadedMember({ userId: 4, roles: ["CASTER"], suspended: true })],
+        withdrawals: [withdrawalRow({ userId: 5 })],
+      }),
+    );
+  });
+
+  it("loadPlanningView_suspendedRemainingCaster_staffSeesUnfilled", async () => {
+    const view = await loadPlanningView(staff, MONDAY - 48 * 60 * 60 * 1000);
+
+    expect(view.entries[0].unfilled).toEqual(["CASTER"]);
+  });
+
+  it("loadPlanningView_suspendedRemainingCaster_memberSeesHeld", async () => {
+    const view = await loadPlanningView(caster, MONDAY - 48 * 60 * 60 * 1000);
+
+    expect(view.entries[0].unfilled).toEqual([]);
   });
 });

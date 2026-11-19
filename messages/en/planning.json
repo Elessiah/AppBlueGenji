@@ -71,7 +71,13 @@
     "add": "Add — {role}",
     "option": "{name} · {status}",
     "optionPreferred": "{name} · {status} ★",
-    "unknown": "No answer"
+    "unknown": "No answer",
+    "castersFull": "Two casters at most: remove one to pick another.",
+    "castersFullProvisional": "Two casters at most: remove a proposal to pick another.",
+    "castersFullMatch": "Two casters at most, signed up on the match: remove one from the match.",
+    "castersHint": "Two casters at most per slot. Without a solo caster, they need a prod.",
+    "castersHintSubject": "Casters of a slot",
+    "castersFullOver": "More than two casters, match sign-ups included: remove them until only one is left to pick another."
   },
   "solo": {
     "label": "I stream alone (solo caster)",
@@ -120,6 +126,7 @@
     "PLANNING_ROLE_NOT_HELD": "This account cannot hold this role here.",
     "PLANNING_HIDDEN_FOR_MEMBER": "This tournament is still hidden: this account cannot see it.",
     "PLANNING_ROLE_CONFLICT": "The same person cannot be caster and prod on one slot.",
+    "PLANNING_CASTERS_FULL": "This slot already has two casters: remove one before adding another.",
     "PLANNING_IS_PLAYER": "This person plays during this slot: they cannot cover it.",
     "PLANNING_OVERLAP": "This person already holds a slot that overlaps this one: remove them from the other one first.",
     "PLANNING_OVERLAP_MANAGED": "This person already holds an overlapping slot on the match itself (signed-up caster or appointed referee): remove them from that match first.",
@@ -159,13 +166,16 @@
     "actionLabel": "Withdraw: {role}, {slot}",
     "title": "Withdraw from this slot?",
     "body": "An available replacement is looked for right away. If there is none and your assignment was confirmed, the slot is open and the tournament staff is told.",
+    "bodyCaster": "An available replacement is looked for right away. If there is none and your assignment was confirmed, the slot is open and the tournament staff is told — unless another confirmed caster stays and keeps the stream.",
     "late": "Late withdrawal: the slot starts in less than 24 hours.",
     "reasonLabel": "Reason (optional, read by the tournament staff only)",
     "confirm": "Withdraw",
     "pending": "Withdrawing…",
     "done": "Withdrawal saved.",
     "doneReplaced": "Withdrawal saved: a replacement has been assigned.",
-    "doneUnfilled": "Withdrawal saved: the slot is open, the staff has been told."
+    "doneUnfilled": "Withdrawal saved: the slot is open, the staff has been told.",
+    "doneStreamLost": "Withdrawal saved: the stream is lost, the staff has been told.",
+    "doneStillSignedUp": "Removed from the planning, but you are still signed up on the match: withdraw from the match to stop casting it."
   },
   "withdrawals": {
     "title": "Withdrawals",

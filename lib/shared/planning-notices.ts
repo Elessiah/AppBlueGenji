@@ -37,6 +37,18 @@ export type PlanningWithdrawalNotice = PlanningNoticeEntry & {
   role: PlanningRole;
   /** Un remplaçant a été affecté (sans le nommer). */
   replaced: boolean;
+  /**
+   * Pas de remplaçant, mais un autre caster (second caster de l'entrée) reste
+   * affecté : la place n'est pas à pourvoir. Ne vaut que pour le rôle `CASTER` (les textes sont écrits pour lui). Absent : faux.
+   */
+  stillHeld?: boolean;
+  /** Avec `stillHeld` : le destinataire est lui-même ce caster qui reste. Absent : faux. */
+  selfHeld?: boolean;
+  /**
+   * Place à pourvoir parce que le départ d'un caster autonome a fait perdre
+   * la diffusion : le caster restant attend un prod ou un caster autonome. Absent : faux.
+   */
+  streamLost?: boolean;
   /** Désistement à moins de 24 h du début. */
   late: boolean;
 };
@@ -159,6 +171,32 @@ export function formatPlanningAssignedDm(
   return [head, ...lines, `Heure de Paris. Empêché ? Désiste-toi sur le planning : ${url}`].join("\n");
 }
 
+export type WithdrawalOutcome = "replaced" | "selfHeld" | "stillHeld" | "streamLost" | "open";
+
+/** L'issue d'un désistement, telle que la lit le destinataire (message privé et push la lisent ici). */
+export function withdrawalOutcome(notice: PlanningWithdrawalNotice): WithdrawalOutcome {
+  if (notice.replaced) return "replaced";
+  if (notice.stillHeld === true && notice.role === "CASTER") return notice.selfHeld === true ? "selfHeld" : "stillHeld";
+  return notice.streamLost === true ? "streamLost" : "open";
+}
+
+const WITHDRAWAL_OUTCOMES: Readonly<Record<Locale, (role: string) => Readonly<Record<WithdrawalOutcome, string>>>> = {
+  fr: (role) => ({
+    replaced: "Un remplaçant a été affecté.",
+    selfHeld: `Tu restes affecté comme ${role}.`,
+    stillHeld: `Un autre ${role} reste affecté.`,
+    streamLost: "La diffusion est perdue : il manque un prod ou un caster autonome.",
+    open: "La place est à pourvoir.",
+  }),
+  en: (role) => ({
+    replaced: "A replacement has been assigned.",
+    selfHeld: `You remain assigned as ${role}.`,
+    stillHeld: `Another ${role} is still assigned.`,
+    streamLost: "The stream is lost: a prod or a solo caster is needed.",
+    open: "The slot is open.",
+  }),
+};
+
 /**
  * Désistement (`PLANNING_WITHDRAWAL`), aux autres affectés de l'entrée : qui
  * s'est désisté reste anonyme (« un caster »), le remplaçant aussi.
@@ -168,11 +206,8 @@ export function formatPlanningWithdrawalDm(notice: PlanningWithdrawalNotice, sit
   const when = planningNoticeTime(notice.startAt, locale);
   const label = planningEntryLabel(notice, locale);
   const url = planningNoticeUrl(siteBase, locale);
-  if (locale === "en") {
-    const outcome = notice.replaced ? "A replacement has been assigned." : "The slot is open.";
-    return `↩️ BlueGenji — A ${role} withdrew from ${label} (${when}, Paris time). ${outcome} ${url}`;
-  }
-  const outcome = notice.replaced ? "Un remplaçant a été affecté." : "La place est à pourvoir.";
+  const outcome = WITHDRAWAL_OUTCOMES[locale](role)[withdrawalOutcome(notice)];
+  if (locale === "en") return `↩️ BlueGenji — A ${role} withdrew from ${label} (${when}, Paris time). ${outcome} ${url}`;
   return `↩️ BlueGenji — Un ${role} s'est désisté de ${label} (${when}, heure de Paris). ${outcome} ${url}`;
 }
 
@@ -195,8 +230,10 @@ export function formatPlanningUnfilledDm(notice: PlanningWithdrawalNotice, siteB
   const url = planningNoticeUrl(siteBase, locale);
   if (locale === "en") {
     const late = notice.late ? " (late withdrawal, less than 24 h before)" : "";
-    return `⚠️ Planning — a ${role} withdrew from ${label} (${when}, Paris time)${late}: no replacement found, the slot is open. ${url}`;
+    const open = notice.streamLost === true ? "the stream is lost (a prod or a solo caster is needed)" : "the slot is open";
+    return `⚠️ Planning — a ${role} withdrew from ${label} (${when}, Paris time)${late}: no replacement found, ${open}. ${url}`;
   }
   const late = notice.late ? " (désistement tardif, moins de 24 h avant)" : "";
-  return `⚠️ Planning — un ${role} s'est désisté de ${label} (${when}, heure de Paris)${late} : aucun remplaçant trouvé, place à pourvoir. ${url}`;
+  const open = notice.streamLost === true ? "diffusion perdue (il manque un prod ou un caster autonome)" : "place à pourvoir";
+  return `⚠️ Planning — un ${role} s'est désisté de ${label} (${when}, heure de Paris)${late} : aucun remplaçant trouvé, ${open}. ${url}`;
 }

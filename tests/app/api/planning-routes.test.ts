@@ -107,7 +107,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit();
   jest.mocked(loadPlanningView).mockResolvedValue(VIEW);
-  jest.mocked(withdrawFromEntry).mockResolvedValue({ late: false, replaced: true, unfilled: false });
+  jest.mocked(withdrawFromEntry).mockResolvedValue({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
   jest.mocked(setAvailability).mockResolvedValue(undefined);
   jest.mocked(setSoloCaster).mockResolvedValue(undefined);
   jest.mocked(setManualAssignment).mockResolvedValue(undefined);
@@ -471,7 +471,7 @@ describe("POST /api/planning/withdrawal", () => {
     const response = await withdrawalPost(request("POST", { ...WITHDRAWAL, reason: "  Malade  " }));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ late: false, replaced: true, unfilled: false });
+    expect(await response.json()).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
     expect(jest.mocked(withdrawFromEntry).mock.calls[0].slice(0, 2)).toEqual([caster, { entryKey: "m:1", role: "CASTER", reason: "Malade" }]);
   });
 

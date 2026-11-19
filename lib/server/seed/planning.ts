@@ -1,5 +1,6 @@
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { planningEntryKey, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
+import { writeAssignment } from "@/lib/server/planning/auto-assign";
 import { BOOTSTRAP_SETTING } from "@/lib/server/planning/new-entries";
 import { SEED_TOURNAMENT_PREFIX } from "./cases";
 
@@ -62,6 +63,11 @@ async function writeAnswers(db: Pool, entry: Entry, answers: Answer[], ids: Map<
   return written;
 }
 
+/** Un choix du staff, confirmé et verrouillé (le calcul le garde tel quel), et son évènement : l'écriture même du site. */
+async function writeManual(db: Pool, entry: Entry, userId: number, role: PlanningRole, admin: number | null): Promise<void> {
+  await writeAssignment(db, entry, { userId, role, source: "MANUAL", reason: "MANUAL" }, admin);
+}
+
 export async function applyPlanningCases(db: Pool, ids: Map<string, number>): Promise<void> {
   console.log("🗓️ Planning des casts et arbitres...");
   // Le seed vient de vider le planning (cascade des tournois Test_) : sans
@@ -99,18 +105,20 @@ export async function applyPlanningCases(db: Pool, ids: Map<string, number>): Pr
   const admin = ids.get("Admin") ?? null;
   const caster = ids.get("Caster");
   const first = entries[0];
+  let manual = 0;
   if (first && caster !== undefined) {
-    await db.execute(
-      `INSERT INTO bg_planning_assignments
-         (entry_key, user_id, role, tournament_id, match_id, source, reason, confirmed, assigned_by_user_id)
-       VALUES (?, ?, 'CASTER', ?, ?, 'MANUAL', 'MANUAL', 1, ?)`,
-      [first.key, caster, first.tournamentId, first.matchId, admin],
-    );
-    await db.execute(
-      `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
-       VALUES (?, ?, 'CASTER', ?, ?, 'ASSIGNED', 'MANUAL', ?)`,
-      [first.key, caster, first.tournamentId, first.matchId, admin],
-    );
+    await writeManual(db, first, caster, "CASTER", admin);
+    manual += 1;
   }
-  console.log(`  ✓ ${entries.length} matchs planifiés + 1 soirée · ${answers} réponses · 1 caster autonome · 1 attribution manuelle`);
+  // Deux casters et un prod (plafond `PLANNING_MAX_CASTERS`) sur le dernier match, seul à son heure : le
+  // plafond se voit (plus de liste « Ajouter — Caster »), et le désistement d'un des deux garde l'autre.
+  const last = entries.length > 4 ? entries.at(-1) : undefined;
+  const pair = ["Caster", "CasterProd"].map((pseudo) => ids.get(pseudo));
+  const prod = ids.get("Prod");
+  if (last && prod !== undefined && pair.every((id) => id !== undefined)) {
+    for (const id of pair as number[]) await writeManual(db, last, id, "CASTER", admin);
+    await writeManual(db, last, prod, "PROD", admin);
+    manual += 3;
+  }
+  console.log(`  ✓ ${entries.length} matchs planifiés + 1 soirée · ${answers} réponses · 1 caster autonome · ${manual} attributions manuelles`);
 }

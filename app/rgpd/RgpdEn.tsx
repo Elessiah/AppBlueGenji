@@ -932,7 +932,7 @@ export function RgpdEn({
             A member of moderation can <strong>suspend an account</strong> contrary to the terms of use, for a fixed
             or indefinite period: all its sessions are closed and no login is possible while the suspension runs;
             if it referees, casts or produces, it is left out of the schedule&apos;s proposals, confirmations,
-            appointments, replacements and notices (new slots, assignments, withdrawals, open slots); what was already
+            appointments, replacements and notices (new slots, assignments, withdrawals, open slots, lost streams); what was already
             confirmed or appointed for it stays until removed; the tournament staff and the other schedule members can
             only infer that the schedule no longer retains it, without seeing the suspension or its reasons (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
           </p>
@@ -980,7 +980,7 @@ export function RgpdEn({
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
             tournament&apos;s kickoff, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of your match times (set, changed or removed) and their reminders (24 h before; also 10 h before if the tournament has check-in), of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, in a tournament that has check-in, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
-            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission; a referee, caster or prod, of the schedule (new slots where they can hold a role, their assignments, withdrawals from confirmed assignments on their confirmed slots) and, tournament staff, of open slots.{" "}
+            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission; a referee, caster or prod, of the schedule (new slots where they can hold a role, their assignments, withdrawals from confirmed assignments on their confirmed slots) and, tournament staff, of open slots and lost streams.{" "}
             <strong>Nothing is sent to a device you have not subscribed</strong>: notifications are turned on device by device,
             from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics. A
             topic added since you subscribed (such as “New match”) is on by default on your devices already
@@ -1322,13 +1322,14 @@ export function RgpdEn({
             and prods are notified by Discord direct message and push notification of new slots where they
             can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of the
             withdrawal from a confirmed assignment on a slot where their own assignment is confirmed; the
-            tournament staff, of a slot left open (a line naming no one in the staff log on Discord; the role
+            tournament staff, of a slot left open or a stream lost for want of a replacement (a line naming no one in the staff log on Discord; the role
             also appears “open” on the schedule when no one is confirmed in it any more, without the reason). None of these messages names a player or a staff
             member; each of these topics can be turned off in the notification settings of “My profile”,
             which also turns off its direct message. Everyone can withdraw from an assignment until the slot
             starts, with an optional reason read by the tournament staff only; the site keeps the withdrawal
-            (role, date, reason, whether it is late — less than 24 h before) with the history, and replaces
-            the person automatically. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
+            (role, date, reason, whether it is late — less than 24 h before) with the history, and looks for
+            a replacement automatically (a slot has two casters at most: when one of them leaves and the other
+            stays, the slot is not necessarily open). Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
             of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds the
             caster role; deleting the account removes everything about it (the actions it took as staff
             remain, without naming it), and the export of your data contains it, actions taken as staff

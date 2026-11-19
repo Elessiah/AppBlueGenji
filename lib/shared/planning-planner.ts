@@ -20,6 +20,13 @@
  *    chevauchent, chacun posé sur celle que l'autre voulait). Jusqu'à ce que
  *    plus rien ne s'améliore. Chaque essai se juge sur la seule partie du
  *    planning qu'il touche : un lot d'un mois se calcule en un instant.
+ * 3. **Second caster** ({@link PLANNING_MAX_CASTERS}), en renfort seulement,
+ *    une fois chaque entrée à sa meilleure couverture : sur une entrée qui a
+ *    déjà son caster, à qui n'est attendu sur aucune entrée qui la chevauche,
+ *    peut encore être tenue et manque d'un rôle qu'il pourrait prendre
+ *    (caster, prod ou arbitre : jamais pris à une autre entrée), préférences
+ *    d'abord (sur tout le lot), puis ce qui rend l'entrée diffusée (un caster
+ *    autonome auprès d'un caster sans prod), puis la charge.
  *
  * Une personne ne tient pas deux entrées qui se **chevauchent** (durées
  * estimées, `planning-durations.ts`) mais enchaîne des entrées consécutives.
@@ -29,6 +36,7 @@
 import {
   planningCoverage,
   planningWeekStart,
+  PLANNING_MAX_CASTERS,
   PLANNING_ROLES,
   type AssignmentReason,
   type AvailabilityStatus,
@@ -42,6 +50,24 @@ export type PlannerEntry = {
   endAt: number;
   /** Entrée que le calcul remplit : à venir, non jouée, dans la fenêtre du lot. */
   open: boolean;
+  /**
+   * Rouverte pour son seul second caster (remplacement d'un renfort) : le
+   * calcul n'y pose rien d'autre. Absent : faux.
+   */
+  spareOnly?: boolean;
+  /**
+   * Avec `spareOnly` : le départ d'un caster autonome y a fait perdre la
+   * diffusion (le caster restant attend son prod). Le second caster cherché
+   * doit la rendre — un caster autonome seulement —, et c'est la place qui
+   * diffuse : il n'est pas écarté parce qu'une autre entrée l'attend. Absent : faux.
+   */
+  restoreStream?: boolean;
+  /**
+   * Peut encore recevoir quelqu'un, dans ce lot ou un autre (à venir, non
+   * jouée). Faux : commencée ou jouée, elle n'attend plus personne et ne
+   * retient aucun renfort. Absent : vrai.
+   */
+  fillable?: boolean;
   /** Arbitres que le calcul pose au plus (défaut 1 ; un tournoi entier : un groupe). */
   refereeSlots?: number;
 };
@@ -89,6 +115,11 @@ export type PlannerInput = {
   historyWeek?: number;
   /** `entryKey|userId|role` refusés (joueur du match, condition d'arbitrage, retrait par le staff). */
   excluded: ReadonlySet<string>;
+  /**
+   * Pose un second caster en renfort (défaut : oui). Le remplacement d'un
+   * caster seul sur son entrée l'éteint : sa place est la première, pas un renfort.
+   */
+  spareCasters?: boolean;
 };
 
 export type PlannedAssignment = {
@@ -205,6 +236,11 @@ class PlannerState {
     return this.entries.get(key);
   }
 
+  /** Les entrées dont le créneau chevauche celui de `key`. */
+  overlapsOf(key: string): readonly string[] {
+    return this.overlapping.get(key) ?? [];
+  }
+
   weekOf(key: string): number {
     return this.weeks.get(key) ?? 0;
   }
@@ -268,8 +304,11 @@ class PlannerState {
     });
   }
 
-  candidates(entry: PlannerEntry, role: PlanningRole): number[] {
-    return (this.offered.get(`${entry.key}|${role}`) ?? []).filter((userId) => this.eligible(entry, userId, role));
+  /** `preferredOnly` : seuls ceux qui préfèrent l'entrée, écartés **avant** la question d'éligibilité (la plus coûteuse). */
+  candidates(entry: PlannerEntry, role: PlanningRole, preferredOnly = false): number[] {
+    return (this.offered.get(`${entry.key}|${role}`) ?? []).filter(
+      (userId) => (!preferredOnly || this.preferred(entry.key, userId, role)) && this.eligible(entry, userId, role),
+    );
   }
 
   /** Une fois les places verrouillées posées : leur charge par semaine, pour l'historique (propositions provisoires exclues). */
@@ -469,6 +508,96 @@ function fillAll(state: PlannerState, open: readonly PlannerEntry[]): boolean {
   return changed;
 }
 
+/**
+ * Un candidat au renfort est-il attendu ailleurs : une entrée qui chevauche
+ * celle-ci, qui peut encore recevoir quelqu'un ({@link PlannerEntry.fillable}),
+ * et à qui il manque un rôle qu'il pourrait prendre — caster, prod (auprès
+ * d'un caster qui l'attend), ou une
+ * place d'arbitre (ouverte au calcul ou non : un lot ne prend jamais une
+ * personne à une entrée d'un autre lot, et un caster qui est aussi prod ou
+ * arbitre n'est pas pris à l'entrée qui l'attend dans cet autre rôle).
+ */
+function neededElsewhere(state: PlannerState, entry: PlannerEntry): (userId: number) => boolean {
+  // Les rôles qui manquent à chaque entrée voisine ne dépendent pas du candidat : établis une fois, puis seule
+  // l'éligibilité se juge par candidat.
+  const waiting: { other: PlannerEntry; missing: PlanningRole[] }[] = [];
+  for (const key of state.overlapsOf(entry.key)) {
+    const other = state.entry(key);
+    if (other === undefined || other.fillable === false) continue;
+    const missing: PlanningRole[] = [];
+    const casters = state.held(key, "CASTER");
+    if (casters.length === 0) missing.push("CASTER");
+    // Un prod n'y manque qu'auprès d'un caster qui l'attend (entrée pas encore diffusée) : sans caster, ou avec un
+    // caster autonome, il n'y servirait à rien.
+    // Sans prod tenu, « pas diffusée » (`planningCoverage`) revient à « aucun caster autonome » : même règle.
+    if (state.held(key, "PROD").length === 0 && casters.length > 0 && !casters.some((id) => state.input.soloCasterIds.has(id))) {
+      missing.push("PROD");
+    }
+    if (!state.input.refereeDecided.has(key) && state.held(key, "REFEREE").length < (other.refereeSlots ?? 1)) missing.push("REFEREE");
+    if (missing.length > 0) waiting.push({ other, missing });
+  }
+  return (userId) => waiting.some(({ other, missing }) => missing.some((role) => state.eligible(other, userId, role)));
+}
+
+/**
+ * Le second caster d'une entrée, en renfort : l'entrée a déjà son premier
+ * caster (jamais un second sans premier) et pas encore son plafond ; le
+ * candidat n'est pas déjà sur l'entrée (aucun cumul pour un renfort) ni
+ * attendu ailleurs ({@link neededElsewhere} ; une diffusion à rendre,
+ * {@link PlannerEntry.restoreStream}, veut un caster autonome et passe
+ * outre). `preferredOnly` : seuls
+ * ceux qui préfèrent l'entrée. Ordre : ce qui rend l'entrée diffusée (un
+ * caster autonome auprès d'un caster qui attend son prod), la préférence, la
+ * charge de la semaine, celle des semaines précédentes, l'identifiant.
+ */
+function spareCaster(state: PlannerState, entry: PlannerEntry, preferredOnly: boolean): number | null {
+  const held = state.held(entry.key, "CASTER").length;
+  if (held === 0 || held >= PLANNING_MAX_CASTERS) return null;
+  const streamed = state.coverage(entry.key).streamed;
+  const pool = state
+    .candidates(entry, "CASTER", preferredOnly)
+    .filter((userId) => state.rolesOn(entry.key, userId).length === 0)
+    .filter((userId) => entry.restoreStream !== true || state.input.soloCasterIds.has(userId));
+  // Les entrées voisines ne se parcourent que s'il reste un candidat à juger, et une seule fois.
+  const needed = entry.restoreStream === true || pool.length === 0 ? null : neededElsewhere(state, entry);
+  let best: SpareRank | null = null;
+  for (const userId of pool) {
+    if (needed?.(userId)) continue;
+    const rank = {
+      userId,
+      streams: !streamed && state.input.soloCasterIds.has(userId) ? 0 : 1,
+      preferred: state.preferred(entry.key, userId, "CASTER") ? 0 : 1,
+      week: state.weekLoad(userId, entry.key),
+      history: state.historyOf(userId, entry.key),
+    };
+    // Un seul parcours : le premier rang, sans trier ni ranger tous les candidats.
+    if (best === null || spareBefore(rank, best)) best = rank;
+  }
+  return best?.userId ?? null;
+}
+
+type SpareRank = { userId: number; streams: number; preferred: number; week: number; history: number };
+
+/** `a` passe avant `b` (diffusion, préférence, charge de la semaine, historique, identifiant). */
+function spareBefore(a: SpareRank, b: SpareRank): boolean {
+  return (a.streams - b.streams || a.preferred - b.preferred || a.week - b.week || a.history - b.history || a.userId - b.userId) < 0;
+}
+
+/**
+ * Les seconds casters, une fois le planning stable (chaque entrée à sa
+ * meilleure couverture) : d'abord ceux qui préfèrent l'entrée, sur tout le
+ * lot, puis les autres, entrée par entrée dans l'ordre du calendrier.
+ */
+function fillSpareCasters(state: PlannerState, open: readonly PlannerEntry[]): void {
+  const order = [...open].sort((a, b) => a.startAt - b.startAt || a.key.localeCompare(b.key));
+  for (const preferredOnly of [true, false]) {
+    for (const entry of order) {
+      const pick = spareCaster(state, entry, preferredOnly);
+      if (pick !== null) state.place(entry.key, pick, "CASTER", false);
+    }
+  }
+}
+
 /** Propositions remises en jeu, dans l'ordre du calendrier puis de la clé, du rôle et du membre. */
 function movablePlacements(state: PlannerState): Placement[] {
   return [...state.placements]
@@ -585,7 +714,7 @@ export function planAssignments(input: PlannerInput, stats?: PlannerStats): Plan
     }
   }
   state.freezeHistory();
-  const open = input.entries.filter((entry) => entry.open);
+  const open = input.entries.filter((entry) => entry.open && entry.spareOnly !== true);
   fillAll(state, open);
   let passes = 0;
   while (passes < PLANNER_MAX_PASSES) {
@@ -595,6 +724,7 @@ export function planAssignments(input: PlannerInput, stats?: PlannerStats): Plan
     const filled = fillAll(state, open);
     if (!moved && !swapped && !filled) break;
   }
+  if (input.spareCasters !== false) fillSpareCasters(state, input.entries.filter((entry) => entry.open));
   if (stats) {
     stats.passes = passes;
     stats.trials = state.trials;

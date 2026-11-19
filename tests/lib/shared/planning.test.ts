@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   parsePlanningEntryKey,
+  planningCastersFull,
   planningCoverage,
   planningDayStart,
   planningEntryKey,
@@ -185,5 +186,44 @@ describe("planningDayStart", () => {
     // 2026-03-29 : minuit est encore à l'heure d'hiver (23:00 UTC la veille), le soir déjà à l'heure d'été.
     expect(planningDayStart(Date.UTC(2026, 2, 29, 12))).toBe(Date.UTC(2026, 2, 28, 23));
     expect(planningDayStart(Date.UTC(2026, 2, 29, 21))).toBe(Date.UTC(2026, 2, 28, 23));
+  });
+});
+
+describe("planningCastersFull", () => {
+  it("planningCastersFull_oneCaster_false", () => {
+    expect(planningCastersFull([{ role: "CASTER", userId: 1 }])).toBe(false);
+  });
+
+  it("planningCastersFull_twoCasters_true", () => {
+    expect(planningCastersFull([{ role: "CASTER", userId: 1 }, { role: "CASTER", userId: 2 }])).toBe(true);
+  });
+
+  it("planningCastersFull_targetIsOneOfTwo_false", () => {
+    expect(planningCastersFull([{ role: "CASTER", userId: 1 }, { role: "CASTER", userId: 2 }], 2)).toBe(false);
+  });
+
+  it("planningCastersFull_prodsAndReferees_ignored", () => {
+    const rows = [
+      { role: "CASTER" as const, userId: 1 },
+      { role: "PROD" as const, userId: 2 },
+      { role: "PROD" as const, userId: 3 },
+      { role: "REFEREE" as const, userId: 4 },
+    ];
+
+    expect(planningCastersFull(rows)).toBe(false);
+  });
+});
+
+describe("planningCoverage — deux casters", () => {
+  it("planningCoverage_twoNonSoloCastersNoProd_notStreamed", () => {
+    const coverage = planningCoverage({ hasReferee: true, casterIds: [1, 2], prodIds: [], soloCasterIds: NO_SOLO });
+
+    expect(coverage).toMatchObject({ level: "REFEREED", streamed: false, casterNeedsProd: true });
+  });
+
+  it("planningCoverage_twoCastersOneSolo_streamed", () => {
+    const coverage = planningCoverage({ hasReferee: false, casterIds: [1, 2], prodIds: [], soloCasterIds: new Set([2]) });
+
+    expect(coverage).toMatchObject({ level: "STREAMED", streamed: true, refereePriority: true });
   });
 });

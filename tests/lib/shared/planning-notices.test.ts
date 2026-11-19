@@ -126,6 +126,39 @@ describe("formatPlanningWithdrawalDm", () => {
     expect(message).toContain("Un remplaçant a été affecté.");
   });
 
+  it("formatPlanningWithdrawalDm_stillHeldNonCasterRole_saysSlotOpen", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ role: "REFEREE", stillHeld: true }), SITE, "fr");
+
+    expect(message).toContain("à pourvoir");
+    expect(message).not.toContain("Un autre");
+  });
+
+  it("formatPlanningWithdrawalDm_stillHeldFr_saysAnotherCasterAssigned", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ stillHeld: true }), SITE, "fr");
+
+    expect(message).toContain("Un autre caster reste affecté.");
+    expect(message).not.toContain("à pourvoir");
+  });
+
+  it("formatPlanningWithdrawalDm_stillHeldEn_saysAnotherCasterAssigned", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ stillHeld: true }), SITE, "en");
+
+    expect(message).toContain("Another caster is still assigned.");
+  });
+
+  it("formatPlanningWithdrawalDm_selfHeldFr_saysRecipientStaysAssigned", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ stillHeld: true, selfHeld: true }), SITE, "fr");
+
+    expect(message).toContain("Tu restes affecté comme caster.");
+    expect(message).not.toContain("Un autre caster");
+  });
+
+  it("formatPlanningWithdrawalDm_selfHeldEn_saysRecipientStaysAssigned", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ stillHeld: true, selfHeld: true }), SITE, "en");
+
+    expect(message).toContain("You remain assigned as caster.");
+  });
+
   it("formatPlanningWithdrawalDm_open_saysSlotOpen", () => {
     const message = formatPlanningWithdrawalDm(withdrawal(), SITE, "en");
 
@@ -141,6 +174,54 @@ describe("formatPlanningUnfilledDm", () => {
     expect(dm).toContain("no replacement found, the slot is open.");
     expect(dm).toContain(`${SITE}/en/planning`);
     expect(dm).not.toContain("late withdrawal");
+  });
+});
+
+describe("diffusion perdue", () => {
+  it("formatPlanningWithdrawalDm_streamLostFr_saysProdOrSoloNeeded", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ streamLost: true }), SITE, "fr");
+
+    expect(message).toContain("La diffusion est perdue : il manque un prod ou un caster autonome.");
+    expect(message).not.toContain("La place est à pourvoir.");
+  });
+
+  it("formatPlanningWithdrawalDm_streamLostEn_saysProdOrSoloNeeded", () => {
+    expect(formatPlanningWithdrawalDm(withdrawal({ streamLost: true }), SITE, "en")).toContain(
+      "The stream is lost: a prod or a solo caster is needed.",
+    );
+  });
+
+  it("formatPlanningUnfilledDm_streamLostFr_saysStreamLost", () => {
+    expect(formatPlanningUnfilledDm(withdrawal({ streamLost: true }), SITE, "fr")).toContain(
+      "aucun remplaçant trouvé, diffusion perdue (il manque un prod ou un caster autonome).",
+    );
+  });
+
+  it("formatPlanningUnfilledDm_streamLostEn_saysStreamLost", () => {
+    expect(formatPlanningUnfilledDm(withdrawal({ streamLost: true }), SITE, "en")).toContain(
+      "no replacement found, the stream is lost (a prod or a solo caster is needed).",
+    );
+  });
+
+  it("planningWithdrawalPush_streamLost_bodyStreamLost", () => {
+    const notice = withdrawal({ streamLost: true });
+
+    expect(planningWithdrawalPush(notice, "fr").body).toContain("la diffusion est perdue");
+    expect(planningWithdrawalPush(notice, "en").body).toContain("the stream is lost");
+  });
+
+  it("planningUnfilledPush_streamLostNotLate_bodyStreamLost", () => {
+    const push = planningUnfilledPush(withdrawal({ streamLost: true }), "en");
+
+    expect(push.body).toContain("the stream is lost");
+    expect(push.body).not.toContain("less than 24 hours");
+  });
+
+  it("planningUnfilledPush_streamLostLate_bodyStreamLostLate", () => {
+    const push = planningUnfilledPush(withdrawal({ streamLost: true, late: true }), "fr");
+
+    expect(push.body).toContain("diffusion perdue");
+    expect(push.body).toContain("moins de 24 h avant");
   });
 });
 
@@ -179,6 +260,18 @@ describe("push du planning", () => {
 
     expect(replaced.body).not.toBe(open.body);
     expect(replaced.tag).toBe("planning-withdrawal-m:12-CASTER");
+  });
+
+  it("planningWithdrawalPush_stillHeld_bodyStillHeld", () => {
+    expect(planningWithdrawalPush(withdrawal({ stillHeld: true }), "fr").body).toContain("un autre caster reste affecté");
+    expect(planningWithdrawalPush(withdrawal({ stillHeld: true }), "en").body).toContain("another caster is still assigned");
+  });
+
+  it("planningWithdrawalPush_selfHeld_bodySelfHeld", () => {
+    const notice = withdrawal({ stillHeld: true, selfHeld: true });
+
+    expect(planningWithdrawalPush(notice, "fr").body).toContain("tu restes affecté comme caster");
+    expect(planningWithdrawalPush(notice, "en").body).toContain("you remain assigned as caster");
   });
 
   it("planningUnfilledPush_late_usesLateBody", () => {

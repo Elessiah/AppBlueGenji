@@ -36,7 +36,8 @@ import {
   COVERAGE_PILL,
   NO_FILTERS,
   applyAvailability,
-  candidatesFor,
+  castersFullKind,
+  roleChoices,
   canWithdraw,
   errorKey,
   filterEntries,
@@ -49,6 +50,8 @@ import {
   mergeView,
   tournamentChoices,
   weekWindow,
+  withdrawBodyKey,
+  withdrawDoneKey,
   type PlanningFilters,
 } from "../_lib/planning-board";
 import styles from "../planning.module.css";
@@ -409,7 +412,7 @@ export function PlanningBoard({ locale, messages }: Readonly<{ locale: Locale; m
           <p>
             {withdrawing.slot} · {t(`roles.${withdrawing.role}`)}
           </p>
-          <p>{t("withdraw.body")}</p>
+          <p>{t(withdrawBodyKey(withdrawing.role))}</p>
           {withdrawing.late && (
             <p className={styles.lateWarning}>
               <Pill variant="warning">{t("withdrawals.late")}</Pill> {t("withdraw.late")}
@@ -462,12 +465,6 @@ type WithdrawTarget = { key: string; role: PlanningRole; slot: string; late: boo
 
 /** Le champ du motif d'un désistement (refus rattaché, `useFieldErrors`). */
 const WITHDRAWAL_FIELD_IDS = { reason: "planning-withdraw-reason" } as const;
-
-/** Le message de succès d'un désistement, selon son issue. */
-function withdrawDoneKey(result: WithdrawalResponse): "withdraw.doneReplaced" | "withdraw.doneUnfilled" | "withdraw.done" {
-  if (result.replaced) return "withdraw.doneReplaced";
-  return result.unfilled ? "withdraw.doneUnfilled" : "withdraw.done";
-}
 
 /** Relue chaque minute : le bouton disparaît quand l'entrée commence, sans attendre une relecture de la page. */
 const WITHDRAW_CLOCK_MS = 60_000;
@@ -632,7 +629,22 @@ const EntryCard = memo(function EntryCard({
   );
 });
 
-function RoleRow({
+/**
+ * Zone d'état du plafond de casters, montée dès un premier caster. Le texte
+ * s'y pose après le montage : une zone qui naît déjà pleine (deux casters
+ * posés d'un coup) ne serait pas annoncée.
+ */
+function CapStatus({ text }: { text: string | null }) {
+  const [shown, setShown] = useState<string | null>(null);
+  useEffect(() => setShown(text), [text]);
+  return (
+    <span /* NOSONAR S6819 — région live d'état : l'apparition du plafond est annoncée */ role="status" className={styles.muted}>
+      {shown}
+    </span>
+  );
+}
+
+const RoleRow = memo(function RoleRow({
   role,
   entry,
   view,
@@ -657,8 +669,11 @@ function RoleRow({
   const rows = entry.assignments.filter((row) => row.role === role);
   const selectId = useId();
   const roleName = t(`roles.${role}`);
-  const manage = view.canManage && entry.editable;
-  const candidates = manage ? candidatesFor(entry, role, view.members) : [];
+  // Plafond de casters atteint : plus de liste de choix (le serveur refuse aussi, `PLANNING_CASTERS_FULL`).
+  const { manage, full, candidates } = useMemo(
+    () => roleChoices(entry, role, view.members, view.canManage),
+    [entry, role, view.members, view.canManage],
+  );
   const assign = (userId: number, assigned: boolean) =>
     act(
       `assign:${entry.key}:${role}:${userId}`,
@@ -697,6 +712,7 @@ function RoleRow({
             </span>
           );
         })}
+        {role === "CASTER" && manage && rows.length > 0 && <CapStatus text={full ? t(`assignment.${castersFullKind(entry)}`) : null} />}
         {manage && candidates.length > 0 && (
           <>
             <label htmlFor={selectId} className="sr-only">
@@ -724,10 +740,17 @@ function RoleRow({
             </select>
           </>
         )}
+        {role === "CASTER" && manage && (
+          <InfoHintRow>
+            <InfoHint id={`${selectId}-casters`} subject={t("assignment.castersHintSubject")}>
+              {t("assignment.castersHint")}
+            </InfoHint>
+          </InfoHintRow>
+        )}
       </dd>
     </div>
   );
-}
+});
 
 /** Les désistements d'une entrée, au staff des tournois seul (la route ne les rend qu'à lui). */
 function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView; text: Text; names: ReadonlyMap<number, string> }>) {

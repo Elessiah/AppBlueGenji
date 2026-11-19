@@ -5,15 +5,17 @@
  */
 import type { PillVariant } from "@/components/cyber/Pill";
 import {
+  planningCastersFull,
   planningDayStart,
   planningNextWeekStart,
   planningWeekStart,
+  PLANNING_MAX_CASTERS,
   type AvailabilityStatus,
   type CoverageLevel,
   type PlanningRole,
 } from "@/lib/shared/planning";
 import { rolesConflict } from "@/lib/shared/planning-planner";
-import type { PlanningAvailabilityView, PlanningEntryView, PlanningMember, PlanningView } from "@/lib/shared/planning-view";
+import type { PlanningAvailabilityView, PlanningEntryView, PlanningMember, PlanningView, WithdrawalResponse } from "@/lib/shared/planning-view";
 
 export type PlanningDay = { dayStart: number; entries: PlanningEntryView[] };
 export type PlanningWeek = { weekStart: number; entries: PlanningEntryView[]; days: PlanningDay[] };
@@ -189,6 +191,64 @@ export function candidatesFor(
         Number(b.preferred) - Number(a.preferred) ||
         a.member.pseudo.localeCompare(b.member.pseudo),
     );
+}
+
+/**
+ * Ce que la ligne d'un rôle offre au staff : `full`, le plafond de casters
+ * atteint (`PLANNING_MAX_CASTERS` : liste masquée, « Deux casters au plus ») ;
+ * `candidates`, la liste « Ajouter » (vide sans droit, entrée close ou plafond) ;
+ * `manage`, le staff peut modifier la ligne (droit et entrée modifiable).
+ */
+export function roleChoices(
+  entry: PlanningEntryView,
+  role: PlanningRole,
+  members: readonly PlanningMember[],
+  canManage: boolean,
+): { manage: boolean; full: boolean; candidates: ReturnType<typeof candidatesFor> } {
+  const manage = canManage && entry.editable;
+  const full = manage && role === "CASTER" && planningCastersFull(entry.assignments);
+  return { manage, full, candidates: manage && !full ? candidatesFor(entry, role, members) : [] };
+}
+
+/**
+ * Le texte du plafond atteint : ce que le staff peut faire. Un caster retirable
+ * ici (ligne du planning) : le retirer ; s'il n'y a que des propositions du
+ * calcul, le dire ; si tous sont inscrits sur le match, ou si les inscrits y
+ * suffisent à atteindre le plafond, il faut passer par le match.
+ */
+export function castersFullKind(
+  entry: PlanningEntryView,
+): "castersFull" | "castersFullProvisional" | "castersFullMatch" | "castersFullOver" {
+  const casters = entry.assignments.filter((row) => row.role === "CASTER");
+  const removable = casters.filter((row) => row.source !== "CAST");
+  // Les inscrits sur le match atteignent seuls le plafond (inscriptions non plafonnées) : retirer une ligne du
+  // planning ne rouvrirait pas la liste, il faut passer par le match.
+  if (removable.length === 0 || casters.length - removable.length >= PLANNING_MAX_CASTERS) return "castersFullMatch";
+  // Au-delà du plafond (inscrits compris) : un seul retrait ne suffit pas, il faut n'en laisser qu'un.
+  if (casters.length > PLANNING_MAX_CASTERS) return "castersFullOver";
+  return removable.every((row) => row.provisional) ? "castersFullProvisional" : "castersFull";
+}
+
+/** Le texte du dialogue de désistement : l'exception de l'autre caster qui garde la diffusion ne vaut que pour un caster. */
+export function withdrawBodyKey(role: PlanningRole): "withdraw.body" | "withdraw.bodyCaster" {
+  return role === "CASTER" ? "withdraw.bodyCaster" : "withdraw.body";
+}
+
+/** Le message de succès d'un désistement, selon son issue. */
+export function withdrawDoneKey(
+  result: WithdrawalResponse,
+):
+  | "withdraw.doneReplaced"
+  | "withdraw.doneStreamLost"
+  | "withdraw.doneUnfilled"
+  | "withdraw.doneStillSignedUp"
+  | "withdraw.done" {
+  if (result.replaced) return "withdraw.doneReplaced";
+  // Encore inscrit sur le match, il le cast toujours : à lui de s'en retirer depuis le match.
+  if (result.stillSignedUp) return "withdraw.doneStillSignedUp";
+  if (!result.unfilled) return "withdraw.done";
+  // Diffusion perdue : le caster restant est toujours affiché, rien n'est montré « à pourvoir ».
+  return result.streamLost ? "withdraw.doneStreamLost" : "withdraw.doneUnfilled";
 }
 
 /** Clé du texte d'un refus : un code connu de `errors`, sinon `generic`. */

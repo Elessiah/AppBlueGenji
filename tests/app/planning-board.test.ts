@@ -16,6 +16,10 @@ import {
   mergeView,
   needsCover,
   NO_FILTERS,
+  castersFullKind,
+  withdrawBodyKey,
+  withdrawDoneKey,
+  roleChoices,
   tournamentChoices,
   weekWindow,
 } from "@/app/(secured)/planning/_lib/planning-board";
@@ -526,5 +530,127 @@ describe("textes du désistement", () => {
 
   it("assignedPushTitle_french_isNotGendered", () => {
     expect(FR_PUSH.planning.assigned.title).not.toMatch(/Affecté/);
+  });
+});
+
+describe("roleChoices", () => {
+  const casters = [
+    { userId: 1, role: "CASTER" as const, source: "MANUAL" as const, reason: "MANUAL" as const, provisional: false },
+    { userId: 2, role: "CASTER" as const, source: "AUTO" as const, reason: "LOAD" as const, provisional: true },
+  ];
+  const members = [member({ userId: 1 }), member({ userId: 2 }), member({ userId: 3, pseudo: "Troisième" }), member({ userId: 4, roles: ["PROD"] })];
+
+  it("roleChoices_twoCastersManager_fullNoCandidates", () => {
+    const choices = roleChoices(entryView({ assignments: casters }), "CASTER", members, true);
+
+    expect(choices).toEqual({ manage: true, full: true, candidates: [] });
+  });
+
+  it("roleChoices_oneCasterManager_candidatesListed", () => {
+    const choices = roleChoices(entryView({ assignments: [casters[0]] }), "CASTER", members, true);
+
+    expect(choices.full).toBe(false);
+    expect(choices.candidates.map((row) => row.member.userId)).toEqual([2, 3]);
+  });
+
+  it("roleChoices_notManager_notFullNoCandidates", () => {
+    const choices = roleChoices(entryView({ assignments: casters }), "CASTER", members, false);
+
+    expect(choices).toEqual({ manage: false, full: false, candidates: [] });
+  });
+
+  it("roleChoices_closedEntryManager_notManaged", () => {
+    const choices = roleChoices(entryView({ assignments: casters, editable: false }), "CASTER", members, true);
+
+    expect(choices).toEqual({ manage: false, full: false, candidates: [] });
+  });
+
+  it("roleChoices_twoCastersProdRole_notFull", () => {
+    const choices = roleChoices(entryView({ assignments: casters }), "PROD", members, true);
+
+    expect(choices.full).toBe(false);
+    expect(choices.candidates.map((row) => row.member.userId)).toEqual([4]);
+  });
+});
+
+describe("castersFullKind", () => {
+  const caster = (userId: number, source: "CAST" | "MANUAL" | "AUTO", provisional: boolean) => ({
+    userId,
+    role: "CASTER" as const,
+    source,
+    reason: "MANUAL" as const,
+    provisional,
+  });
+
+  it("castersFullKind_onlyMatchCasters_returnsMatch", () => {
+    expect(castersFullKind(entryView({ assignments: [caster(1, "CAST", false), caster(2, "CAST", false)] }))).toBe("castersFullMatch");
+  });
+
+  it("castersFullKind_onlyProvisionalRemovable_returnsProvisional", () => {
+    expect(castersFullKind(entryView({ assignments: [caster(1, "CAST", false), caster(2, "AUTO", true)] }))).toBe("castersFullProvisional");
+  });
+
+  it("castersFullKind_confirmedRemovable_returnsPlain", () => {
+    expect(castersFullKind(entryView({ assignments: [caster(1, "MANUAL", false), caster(2, "AUTO", true)] }))).toBe("castersFull");
+  });
+
+  it("castersFullKind_twoSignupsPlusManual_returnsMatch", () => {
+    const assignments = [caster(1, "CAST", false), caster(2, "CAST", false), caster(3, "MANUAL", false)];
+
+    expect(castersFullKind(entryView({ assignments }))).toBe("castersFullMatch");
+  });
+
+  it("castersFullKind_signupPushesTotalOverCap_returnsOver", () => {
+    const assignments = [caster(1, "CAST", false), caster(2, "MANUAL", false), caster(3, "AUTO", true)];
+
+    expect(castersFullKind(entryView({ assignments }))).toBe("castersFullOver");
+  });
+
+  it("castersFullKind_everyKind_hasFrAndEnText", () => {
+    for (const kind of ["castersFull", "castersFullProvisional", "castersFullMatch", "castersFullOver"] as const) {
+      expect(frPlanning.assignment[kind]).toBeTruthy();
+      expect(enPlanning.assignment[kind]).toBeTruthy();
+    }
+  });
+});
+
+describe("withdrawBodyKey", () => {
+  it("withdrawBodyKey_caster_returnsBodyCaster", () => {
+    expect(withdrawBodyKey("CASTER")).toBe("withdraw.bodyCaster");
+  });
+
+  it("withdrawBodyKey_prod_returnsBody", () => {
+    expect(withdrawBodyKey("PROD")).toBe("withdraw.body");
+  });
+});
+
+describe("withdrawDoneKey", () => {
+  it("withdrawDoneKey_stillSignedUp_returnsStillSignedUp", () => {
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: true })).toBe(
+      "withdraw.doneStillSignedUp",
+    );
+    expect(frPlanning.withdraw.doneStillSignedUp).toBeTruthy();
+    expect(enPlanning.withdraw.doneStillSignedUp).toBeTruthy();
+  });
+
+  it("withdrawDoneKey_replaced_returnsReplaced", () => {
+    expect(withdrawDoneKey({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false })).toBe("withdraw.doneReplaced");
+  });
+
+  it("withdrawDoneKey_unfilledStreamLost_returnsStreamLost", () => {
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: true, streamLost: true, stillSignedUp: false })).toBe("withdraw.doneStreamLost");
+  });
+
+  it("withdrawDoneKey_unfilled_returnsUnfilled", () => {
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false })).toBe("withdraw.doneUnfilled");
+  });
+
+  it("withdrawDoneKey_held_returnsDone", () => {
+    expect(withdrawDoneKey({ late: false, replaced: false, unfilled: false, streamLost: false, stillSignedUp: false })).toBe("withdraw.done");
+  });
+
+  it("withdrawDoneKey_streamLostText_hasFrAndEn", () => {
+    expect(frPlanning.withdraw.doneStreamLost).toBeTruthy();
+    expect(enPlanning.withdraw.doneStreamLost).toBeTruthy();
   });
 });

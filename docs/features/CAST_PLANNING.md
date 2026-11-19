@@ -78,6 +78,42 @@ Un prod n'est jamais attribué ni compté sans caster ; un caster non autonome
 (`bg_planning_profiles.solo_caster`) ne diffuse qu'avec un prod. La couverture
 compte les **rôles**, pas les personnes.
 
+### Deux casters (`PLANNING_MAX_CASTERS` = 2)
+
+- Une entrée (match ou tournoi entier) tient **deux casters au plus** au
+  planning ; le premier la couvre, le second n'est qu'un **renfort**. Deux
+  casters non autonomes ont **encore besoin d'un prod** pour que l'entrée soit
+  « diffusée » (un seul autonome des deux suffit) : la couverture ne change
+  pas de règle.
+- Les inscriptions de cast du match (`bg_match_casters`) restent **sans
+  plafond** ; elles comptent dans les deux du planning.
+- **Calcul** : le second caster vient en dernier, une fois le planning stable
+  (chaque entrée à sa meilleure couverture), sur une entrée qui a déjà son
+  caster, jamais à quelqu'un déjà sur l'entrée (aucun cumul pour un renfort),
+  ni à qui une entrée qui la chevauche attend encore : à venir et non jouée
+  (`fillable` ; une entrée commencée ou jouée n'attend plus personne), il lui
+  manque un rôle qu'il pourrait prendre — caster, prod (seulement auprès d'un
+  caster qui l'attend : entrée avec caster, pas encore diffusée) ou place
+  d'arbitre (un caster qui est aussi prod ou arbitre n'y est pas pris) —, ouverte au lot
+  ou non (jamais pris à une autre entrée). Les exclusions (joueur, tournoi
+  caché, condition d'arbitrage, suspension) se lisent aussi pour ces entrées
+  voisines (`loadExclusions`) : n'y est attendu que qui pourrait les tenir. Ordre :
+  ceux qui préfèrent l'entrée (sur tout le lot) d'abord, puis les autres
+  entrée par entrée dans l'ordre du calendrier ; parmi les candidats, ce qui
+  rend l'entrée diffusée (un autonome auprès d'un caster qui attend son prod),
+  la préférence, la charge (semaine, historique), l'identifiant.
+- **Choix du staff** : poser un caster de plus sur une entrée qui en a déjà
+  deux (lignes du planning, propositions provisoires comprises, et inscrits du
+  match) est refusé `PLANNING_CASTERS_FULL` (409) ; la page masque alors la
+  liste « Ajouter — Caster » et dit « Deux casters au plus »
+  (`planningCastersFull`, même règle des deux côtés ; texte selon ce qui se
+  retire, `castersFullKind` : un caster, une proposition, depuis le match, ou
+  « n'en laisser qu'un » quand les inscrits portent le total au-delà de deux). Retirer d'abord l'un des
+  deux (une proposition retirée à la main n'est plus reproposée). Une
+  inscription de cast faite sur le match au même instant (hors du verrou du
+  planning) peut donner un troisième caster : c'est l'état qu'une inscription
+  après coup donne aussi, les inscriptions n'ayant pas de plafond.
+
 ## Calcul (`lib/shared/planning-planner.ts`, pur et déterministe)
 
 - **Par lot** sur une fenêtre (une semaine depuis la page, `PLANNING_BATCH_MAX_DAYS`
@@ -240,7 +276,9 @@ de Paris, lien vers `/planning` dans la langue du destinataire).
 - `PLANNING_WITHDRAWAL` (« Désistements du planning ») : aux autres affectés
   **confirmés** de l'entrée quand une attribution **confirmée** est quittée
   (une proposition provisoire, quittée ou co-affectée, n'en reçoit aucun) — « un caster
-  s'est désisté », remplaçant affecté ou place à pourvoir.
+  s'est désisté », remplaçant affecté, autre caster encore affecté (second
+  caster, `bodyStillHeld` ; au caster restant lui-même, `bodySelfHeld`) ou
+  place à pourvoir.
 - `PLANNING_UNFILLED` (« Places à pourvoir », `tournaments`) :
   aucun remplaçant trouvé — push **et** message privé au staff des tournois
   (comptes qui tiennent `tournaments`, choisis par la règle de `notifyStaff`
@@ -276,11 +314,69 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   et l'entrée exclut ensuite le membre pour ce rôle (comme un retrait manuel).
 - **Remplacement automatique** sous le verrou du planning, par les règles du
   calcul (`pickReplacement` : `preparePlanner` sur la seule entrée, rôle
-  quitté). La ligne remplaçante hérite de l'état de la ligne quittée :
+  quitté). Caster quitté alors qu'un **autre caster confirmé** tient encore
+  l'entrée : il était le renfort (l'autre devient le premier) ; son remplaçant
+  suit la règle du second caster (libre, attendu sur aucune entrée qui la
+  chevauche), cherché seul — rien d'autre n'est posé sur l'entrée pendant ce
+  calcul (`spareOnly`), aucun prod d'essai n'écarte un candidat. Le seul autre
+  caster est une **proposition** provisoire : la place quittée est la première,
+  remplacée par la règle ordinaire, la proposition écartée de ce seul calcul
+  (elle reste en base). Sans remplaçant, la place n'est pas « à pourvoir » si
+  le caster confirmé restant suffit à ce que le départ n'ôtait pas (l'entrée
+  reste diffusée, ou ne l'était pas non plus avant ; rôles confirmés seuls) :
+  ni pastille, ni avis au staff (`stillHeldBy`) ; les autres co-affectés lisent
+  « un autre caster reste affecté », le caster restant « tu restes affecté
+  comme caster » (`bodySelfHeld`). Le désisté encore inscrit sur le match
+  (`CAST`) n'est jamais « un autre caster » : `casterHold` l'écarte de
+  `casterIds` et le dit par `selfHeld` ; seul à tenir le rôle, il le cast
+  toujours : aucun remplaçant cherché, aucun avis aux co-affectés (`selfKept`), et
+  le désisté lit qu'il reste inscrit et doit se retirer depuis le match
+  (`stillSignedUp`, « withdraw.doneStillSignedUp ») ; aucun avis au staff — sauf s'il
+  est suspendu : pour le staff, un compte suspendu ne tient rien, la place
+  y est à pourvoir et le staff prévenu (`staffUnfilled`). Un caster **autonome** parti laissant un
+  caster sans prod (`casterHold` → `streamLost`) : son remplaçant doit rendre
+  la diffusion — un caster **autonome** seulement (`restoreStream`), pris même
+  si une entrée qui chevauche l'attend, la diffusion de celle-ci passant
+  d'abord. Un prod seulement **proposé** auprès du caster restant la tiendra
+  une fois confirmé : la règle ordinaire du second caster est tentée d'abord,
+  le caster autonome (même attendu ailleurs) à défaut. La perte de diffusion
+  et l'alerte se jugent sur les rôles **confirmés** seuls, à la relecture qui
+  suit le retrait (une inscription de cast faite ou défaite entre-temps compte) ;
+  un remplaçant non autonome posé auprès d'un prod proposé ne déclenche pas
+  d'alerte : le staff confirme ce prod depuis le tableau. Une **proposition** de caster autonome quittée n'ôtait
+  aucune diffusion confirmée : jamais `streamLost`. Sans remplaçant, la diffusion est perdue : la place est à pourvoir, le
+  staff prévenu, et tous lisent « diffusion perdue, il manque un prod ou un
+  caster autonome » (`bodyStreamLost`, push et message privé ; pas de
+  pastille : un caster reste confirmé, la couverture de la carte le dit). Le groupe d'arbitres d'un tournoi entier garde la règle
+  d'avant (un arbitre quitté sans remplaçant laisse sa place à pourvoir). La ligne remplaçante hérite de l'état de la ligne quittée :
   confirmée (et le remplaçant prévenu, `PLANNING_ASSIGNED`) si elle l'était,
   provisoire sinon (sans message). Aucun candidat : la place est **« à
   pourvoir »** (pastille sur la carte, `unfilled` de la vue) et le staff est
   prévenu (`PLANNING_UNFILLED`) si la ligne était confirmée.
+- **Caster restant suspendu** (`casterHolds`) : deux lectures. Celle des
+  membres (`shown` : annonces aux co-affectés, message rendu au désisté —
+  « Désistement enregistré : la diffusion est perdue » pour `streamLost`)
+  compte le compte suspendu comme le tableau le montre, sans rien trahir de
+  la suspension. Celle du calcul et du staff (`staff`) ne le compte pas : le
+  remplaçant se cherche comme pour une première place (le suspendu est écarté
+  de ce seul calcul et ne prend aucune des deux places), et sans remplaçant le
+  staff est prévenu (`staffUnfilled`) même si les membres lisent « un autre
+  caster reste affecté » ; une place que les membres lisent à pourvoir l'est
+  toujours pour le staff (le message « le staff est prévenu » ne ment pas).
+  Sur le tableau du staff seul, la place quittée que ne tient plus qu'un
+  compte suspendu se montre « à pourvoir » (`unfilledRoles`), comme son
+  alerte, et sa couverture ne compte aucun compte suspendu (`coverage`). Hors du
+  lot, `preparePlanner` ne verrouille aucune ligne d'un compte suspendu : une
+  entrée voisine qu'il tenait seul attend encore son rôle (`neededElsewhere`),
+  comme le tableau du staff la montre. Le plafond, lui, compte toute ligne de
+  caster restée (proposition, inscription au match, compte suspendu) : un
+  remplaçant ne le dépasse jamais (`pickReplacement`). Un désisté encore **inscrit sur le match** (`CAST`)
+  cast toujours : sa ligne d'inscription compte comme caster restant, y compris
+  sur la lecture d'avant le retrait (repli quand la relecture échoue).
+  `loadExclusions` juge, outre le lot, ses seules voisines encore ouvertes
+  (joueurs lus autour du lot, arbitrage hors entrées gérées par le tournoi) —
+  pour le remplaçant d'un caster seulement (`neighbours: false` pour un prod ou
+  un arbitre, que `neededElsewhere` ne juge jamais).
 - Arbitre **d'un match** confirmé : le retrait passe par
   `assignMatchReferee` (le match perd son arbitre, ligne anonyme au journal),
   puis le remplaçant y est posé par la même porte — un refus métier compte
