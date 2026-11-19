@@ -68,6 +68,15 @@ export function blocksImplicitSubmit(key: string, inputType: string | null): boo
   return key === "Enter" && inputType !== null && inputType !== "text";
 }
 
+/** État d'une carte (créneau) du tour : vide, imposée (une carte) ou pool (plusieurs, tirée au sort). */
+export type SlotState = "empty" | "imposed" | "pool";
+
+/** État d'une carte selon son nombre de cartes retenues (liseré `data-state` et pastille de la fenêtre). */
+export function slotState(count: number): SlotState {
+  if (count <= 0) return "empty";
+  return count === 1 ? "imposed" : "pool";
+}
+
 /** Tours découpés en lots d'au plus `size` (une écriture par lot). */
 export function chunkRounds<T>(rounds: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];

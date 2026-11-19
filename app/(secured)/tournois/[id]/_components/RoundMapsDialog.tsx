@@ -17,6 +17,7 @@ import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
+import { BanRuleSegments } from "./BanRuleSegments";
 import { NumberInput } from "@/components/ui/number-input";
 import {
   clipMapPointTargets,
@@ -70,6 +71,8 @@ import {
   slotGap,
   slotHasMap,
   slotOverMax,
+  slotState,
+  type SlotState,
   slotsDirty,
   slotsToEdit,
   slotsToSave,
@@ -301,7 +304,7 @@ function MapPicker({
         </div>
         <button
           type="button"
-          className={`btn ghost ${styles.compact}`}
+          className="btn ghost compact"
           aria-label={t("dialog.customAddLabel", { number })}
           onClick={addCustom}
         >
@@ -312,11 +315,8 @@ function MapPicker({
   );
 }
 
-/** État d'une carte du tour, pour le liseré (`data-state`) : vide, imposée (une carte) ou pool. */
-function slotState(count: number): "empty" | "imposed" | "pool" {
-  if (count === 0) return "empty";
-  return count === 1 ? "imposed" : "pool";
-}
+/** Texte et pastille de chaque état d'une carte du tour (`slotState`). */
+const SLOT_STATE_PILL = { empty: "pill-neutral", imposed: "pill-info", pool: "pill-info" } as const satisfies Record<SlotState, string>;
 
 /** Une carte (créneau) du tour : sa nature, ses cartes retenues, l'ouverture de la liste. */
 function SlotEditor({
@@ -366,33 +366,25 @@ function SlotEditor({
     const next = focusIndexAfterRemoval(removed, slot.length);
     document.getElementById(next === null ? toggleId : `${chipsId}-${next}`)?.focus();
   }, [slot, chipsId, toggleId]);
-  let kind = t("dialog.slotEmpty");
-  if (slot.length === 1) kind = t("dialog.slotImposed");
-  else if (slot.length > 1) kind = t("dialog.slotPool", { count: slot.length });
+  const state = slotState(slot.length);
+  const kind = {
+    empty: () => t("dialog.slotEmpty"),
+    imposed: () => t("dialog.slotImposed"),
+    pool: () => t("dialog.slotPool", { count: slot.length }),
+  }[state]();
   return (
-    <li className={styles.slot} data-state={slotState(slot.length)}>
+    <li className={styles.slot} data-state={state}>
       <div className={styles.slotHead}>
         <span className={styles.slotNumber} aria-hidden="true">
           {number}
         </span>
         <span className={styles.slotTitle}>{t("dialog.slot", { number })}</span>
-        <span className={`pill ${slot.length === 0 ? "pill-neutral" : "pill-info"}`}>{kind}</span>
-        <button
-          type="button"
-          id={toggleId}
-          className={`btn ghost ${styles.compact} ${styles.slotToggle}`}
-          aria-expanded={open}
-          aria-controls={pickerId}
-          {...errorAria}
-          onClick={onToggle}
-        >
-          {t(open ? "dialog.hideMaps" : "dialog.chooseMaps")}
-        </button>
+        <span className={`pill ${SLOT_STATE_PILL[state]}`}>{kind}</span>
         {removable && (
           <BusyButton
             busy={busy}
             type="button"
-            className={`btn ghost ${styles.compact} ${styles.iconButton}`}
+            className={`btn ghost compact ${styles.iconButton} ${styles.slotRemove}`}
             aria-label={t("dialog.removeSlot", { number })}
             onClick={() => {
               if (!isBusy()) onRemoveSlot();
@@ -423,7 +415,22 @@ function SlotEditor({
           ))}
         </ul>
       )}
-      <FieldErrorText fieldId={toggleId} message={errorMessage} />
+      {/* Le bouton de la liste et son refus, côte à côte : un refus sur ce créneau se lit à côté du
+          contrôle qu'il désigne, et l'ordre de tabulation suit l'écran (pastilles, puis la liste). */}
+      <div className={styles.slotFoot}>
+        <button
+          type="button"
+          id={toggleId}
+          className="btn ghost compact"
+          aria-expanded={open}
+          aria-controls={pickerId}
+          {...errorAria}
+          onClick={onToggle}
+        >
+          {t(open ? "dialog.hideMaps" : "dialog.chooseMaps")}
+        </button>
+        <FieldErrorText fieldId={toggleId} message={errorMessage} />
+      </div>
       {open && (
         <div id={pickerId}>
           <MapPicker number={number} slot={slot} overwatch={overwatch} onEdit={onEdit} />
@@ -574,7 +581,7 @@ function TiebreakForm({
             busy={busy}
             blocked={saved === null}
             type="button"
-            className={`btn ghost ${styles.compact}`}
+            className="btn ghost compact"
             onClick={() => {
               if (isBusy() || saved === null) return;
               // Le champ suit le serveur tout seul s'il n'a pas été modifié ; un texte en cours de saisie reste.
@@ -583,7 +590,7 @@ function TiebreakForm({
           >
             {t("dialog.tiebreakRemove")}
           </BusyButton>
-          <BusyButton busy={busy} blocked={!dirty || !allowed} type="submit" className={`btn ghost ${styles.compact}`}>
+          <BusyButton busy={busy} blocked={!dirty || !allowed} type="submit" className="btn ghost compact">
             {t("dialog.tiebreakSave")}
           </BusyButton>
         </div>
@@ -854,7 +861,7 @@ function RoundPointsForm({
             busy={busy}
             blocked={locked || !hasOwn}
             type="button"
-            className={`btn ghost ${styles.compact}`}
+            className="btn ghost compact"
             onClick={() => {
               if (isBusy() || locked || !hasOwn) return;
               void send(null, [], t("dialog.pointsRemoved"));
@@ -862,7 +869,7 @@ function RoundPointsForm({
           >
             {t("dialog.pointsRemove")}
           </BusyButton>
-          <BusyButton busy={busy} blocked={locked || !dirty} type="submit" className={`btn ghost ${styles.compact}`}>
+          <BusyButton busy={busy} blocked={locked || !dirty} type="submit" className="btn ghost compact">
             {t("dialog.pointsSave")}
           </BusyButton>
         </div>
@@ -948,7 +955,7 @@ function StaleTiebreaks({
                 busy={busy}
                 type="button"
                 id={`${ids}-${index}`}
-                className={`btn ghost ${styles.compact}`}
+                className="btn ghost compact"
                 aria-label={t("dialog.staleTiebreakRemoveLabel", { round: label })}
                 onClick={() => {
                   if (isBusy()) return;
@@ -1363,43 +1370,29 @@ export function RoundMapsDialog({
         <form onSubmit={saveRules} aria-busy={busy}>
           <fieldset className={styles.section}>
             <legend className={styles.legend}>{t("dialog.rulesTitle")}</legend>
-            <fieldset className={styles.rule}>
-              <legend className={styles.ruleLegend}>{t("dialog.firstBan")}</legend>
-              <div className={styles.segments} data-tap-zone>
-                {FIRST_BAN_RULES.map((rule) => (
-                  <label key={rule} className={styles.segment}>
-                    <input
-                      type="radio"
-                      name={`${ids}-first`}
-                      value={rule}
-                      checked={firstBan === rule}
-                      onChange={() => setFirstBan(rule)}
-                    />
-                    <span>{t(`dialog.firstBanOptions.${rule}`)}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset className={styles.rule}>
-              <legend className={styles.ruleLegend}>{t("dialog.nextBan")}</legend>
-              <div className={styles.segments} data-tap-zone>
-                {NEXT_BAN_RULES.map((rule) => (
-                  <label key={rule} className={styles.segment}>
-                    <input
-                      type="radio"
-                      name={`${ids}-next`}
-                      value={rule}
-                      checked={nextBan === rule}
-                      onChange={() => setNextBan(rule)}
-                    />
-                    <span>{t(`dialog.nextBanOptions.${rule}`)}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+            <BanRuleSegments
+              legend={t("dialog.firstBan")}
+              name={`${ids}-first`}
+              rules={FIRST_BAN_RULES}
+              value={firstBan}
+              busy={busy}
+              isBusy={isBusy}
+              labelOf={(rule) => t(`dialog.firstBanOptions.${rule}`)}
+              onChange={setFirstBan}
+            />
+            <BanRuleSegments
+              legend={t("dialog.nextBan")}
+              name={`${ids}-next`}
+              rules={NEXT_BAN_RULES}
+              value={nextBan}
+              busy={busy}
+              isBusy={isBusy}
+              labelOf={(rule) => t(`dialog.nextBanOptions.${rule}`)}
+              onChange={setNextBan}
+            />
             <div className={styles.actions}>
               <UnsavedNote dirty={rulesDirty} text={t("dialog.unsaved")} />
-              <BusyButton busy={busy} blocked={!rulesDirty} type="submit" className={`btn ${styles.compact}`}>
+              <BusyButton busy={busy} blocked={!rulesDirty} type="submit" className="btn compact">
                 {t("dialog.saveRules")}
               </BusyButton>
             </div>
@@ -1473,7 +1466,7 @@ export function RoundMapsDialog({
                   <BusyButton
                     busy={busy}
                     type="button"
-                    className={`btn ghost ${styles.compact}`}
+                    className="btn ghost compact"
                     onClick={() => {
                       if (isBusy()) return;
                       setSlots((current) => [...current, []]);
@@ -1494,19 +1487,19 @@ export function RoundMapsDialog({
                   busy={busy}
                   blocked={!saved}
                   type="button"
-                  className={`btn ghost ${styles.compact}`}
+                  className="btn ghost compact"
                   onClick={() => {
                     if (!isBusy() && saved) setPending({ kind: "reset" });
                   }}
                 >
                   {t("dialog.clearRound")}
                 </BusyButton>
-                <BusyButton busy={busy} blocked={!roundDirty} type="submit" className={`btn ${styles.compact}`}>
+                <BusyButton busy={busy} blocked={!roundDirty} type="submit" className="btn compact">
                   {t("dialog.saveRound")}
                 </BusyButton>
               </div>
               {rounds.length > 1 && (
-                <div className={styles.copyRow} data-part="copy">
+                <div className={styles.copyRow}>
                   <div className={`field ${styles.grow}`}>
                     <label htmlFor={`${ids}-copy`}>{t("dialog.copyLabel")}</label>
                     <select
@@ -1530,7 +1523,7 @@ export function RoundMapsDialog({
                     busy={busy}
                     blocked={copyTarget === "" || toSave.length === 0}
                     type="button"
-                    className={`btn ghost ${styles.compact}`}
+                    className="btn ghost compact"
                     onClick={copy}
                   >
                     {t("dialog.copy")}
@@ -1539,7 +1532,7 @@ export function RoundMapsDialog({
                     busy={busy}
                     blocked={toSave.length === 0}
                     type="button"
-                    className={`btn ghost ${styles.compact}`}
+                    className="btn ghost compact"
                     id={`${ids}-apply-all`}
                     {...fieldErrors.aria("applyAll")}
                     onClick={applyAll}
@@ -1602,7 +1595,7 @@ export function RoundMapsDialog({
             busy={busy}
             id={`${ids}-close`}
             type="button"
-            className={`btn ghost ${styles.compact}`}
+            className="btn ghost compact"
             onClick={() => {
               if (!isBusy()) requestClose();
             }}

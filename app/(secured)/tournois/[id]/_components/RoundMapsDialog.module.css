@@ -37,70 +37,13 @@
   color: var(--blue-300);
 }
 
-/* Un réglage à deux valeurs : légende, puis deux segments côte à côte. */
-.rule {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.ruleLegend {
-  margin: 0 0 6px;
-  padding: 0;
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-
-.segments {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 6px;
-}
-
-.segment {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 6px 12px;
-  border: 1px solid rgba(90, 200, 255, 0.22);
-  border-radius: 999px;
-  font-size: 13px;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-/* Choix retenu : la pastille ronde cochée (le texte et le contrôle le disent), puis le contour et le fond bleu glacier. */
-.segment:has(input:checked) {
-  border-color: rgba(90, 200, 255, 0.7);
-  background: rgba(90, 200, 255, 0.14);
-}
-
-.segment:has(input:focus-visible) {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
-
-/* Contrôles compacts : la pilule de `.btn`, en plus fine (la cible tactile remonte à 44 px). */
-button.compact {
-  min-height: 32px;
-  padding: 4px 12px;
-  font-size: 12px;
-}
-
+/* Bouton icône (retirer une carte) : carré, la cible tactile remonte à 44 px. Taille compacte : `.btn.compact` (globals.css). */
 button.iconButton {
   min-width: 32px;
   padding: 4px 8px;
 }
 
 @media (pointer: coarse) {
-  button.compact {
-    min-height: 44px;
-  }
-
   button.iconButton {
     min-width: 44px;
   }
@@ -125,13 +68,14 @@ button.iconButton {
   background: rgba(6, 8, 12, 0.35);
 }
 
-/* Etat d'une carte : pool = glacier plein, imposée = bleu, à compléter = filet pointillé (le texte de la pastille le dit aussi). */
+/* État d'une carte, dit d'abord par le texte de la pastille ; le liseré change aussi de motif :
+   imposée = trait plein cyan, pool = double trait glacier, à compléter = pointillés. */
 .slot[data-state="pool"] {
-  border-left-color: var(--blue-500);
+  border-left: 4px double var(--blue-500);
 }
 
 .slot[data-state="imposed"] {
-  border-left-color: rgba(90, 200, 255, 0.6);
+  border-left-color: var(--cyan-400);
 }
 
 .slot[data-state="empty"] {
@@ -163,8 +107,16 @@ button.iconButton {
   color: var(--ink);
 }
 
-/* Les boutons de la carte se rangent à droite de son titre. */
-.slotToggle {
+/* Bouton de la liste et son refus, sous les pastilles. */
+.slotFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+/* Le bouton de retrait se range à droite du titre de la carte. */
+button.slotRemove {
   margin-left: auto;
 }
 
@@ -268,11 +220,6 @@ button.iconButton {
   background: rgba(90, 200, 255, 0.14);
 }
 
-.option:has(input:focus-visible) {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
-
 /* Au toucher, des pastilles de 30 px serrées à 6 px se ratent : 44 px de cible (WCAG 2.5.5). */
 @media (pointer: coarse) {
   .options {
@@ -308,6 +255,12 @@ button.iconButton {
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px;
+}
+
+/* Filet de séparation : saisie libre, copie vers d'autres tours, barre d'enregistrement. */
+.customRow,
+.copyRow,
+.actionsBar {
   padding-top: 12px;
   border-top: 1px solid rgba(90, 200, 255, 0.12);
 }
@@ -334,12 +287,6 @@ button.iconButton {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
-}
-
-/* Barre d'enregistrement d'un tour : séparée des cartes qu'elle valide. */
-.actionsBar {
-  padding-top: 12px;
-  border-top: 1px solid rgba(90, 200, 255, 0.12);
 }
 
 /* Témoin « non enregistré » : à gauche des boutons de son formulaire. */

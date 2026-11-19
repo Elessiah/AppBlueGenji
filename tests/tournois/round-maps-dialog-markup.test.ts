@@ -13,16 +13,17 @@ const DIALOG = "app/(secured)/tournois/[id]/_components/RoundMapsDialog.tsx";
 const STYLES = "app/(secured)/tournois/[id]/_components/RoundMapsDialog.module.css";
 
 describe("ban rules segments", () => {
-  it("dialog_banRules_renderedAsRadioGroupsWithStoredValueChecked", () => {
+  it("dialog_banRules_bothGroupsUseBanRuleSegmentsWithStoredValue", () => {
     const source = readSource(DIALOG);
 
-    expect(source).toContain('type="radio"');
-    expect(source).toContain("checked={firstBan === rule}");
-    expect(source).toContain("checked={nextBan === rule}");
-    expect(source).toContain("name={`${ids}-first`}");
-    expect(source).toContain("name={`${ids}-next`}");
-    expect(source).toContain("<legend className={styles.ruleLegend}>{t(\"dialog.firstBan\")}</legend>");
-    expect(source).toContain("<legend className={styles.ruleLegend}>{t(\"dialog.nextBan\")}</legend>");
+    expect(source).toMatch(/<BanRuleSegments\s+legend=\{t\("dialog\.firstBan"\)\}\s+name=\{`\$\{ids\}-first`\}\s+rules=\{FIRST_BAN_RULES\}\s+value=\{firstBan\}\s+busy=\{busy\}\s+isBusy=\{isBusy\}/);
+    expect(source).toMatch(/<BanRuleSegments\s+legend=\{t\("dialog\.nextBan"\)\}\s+name=\{`\$\{ids\}-next`\}\s+rules=\{NEXT_BAN_RULES\}\s+value=\{nextBan\}\s+busy=\{busy\}\s+isBusy=\{isBusy\}/);
+    expect(source).toContain("onChange={setFirstBan}");
+    expect(source).toContain("onChange={setNextBan}");
+  });
+
+  it("dialog_saveRules_payloadUnchanged", () => {
+    expect(readSource(DIALOG)).toContain("{ firstBan, nextBan, nextPick: rules.nextPick }");
   });
 
   it("dialog_banRules_everyOptionHasFrenchAndEnglishLabel", () => {
@@ -34,21 +35,30 @@ describe("ban rules segments", () => {
 });
 
 describe("slot state", () => {
-  it("slot_state_emptyImposedPool_exposeDataStateAndPillText", () => {
+  it("slot_state_dataStateAndPillComeFromSlotState", () => {
     const source = readSource(DIALOG);
 
-    expect(source).toContain("data-state={slotState(slot.length)}");
-    expect(source).toMatch(/if \(count === 0\) return "empty";\s*return count === 1 \? "imposed" : "pool";/);
+    expect(source).toContain("const state = slotState(slot.length);");
+    expect(source).toContain("data-state={state}");
+    expect(source).toContain("SLOT_STATE_PILL[state]");
     expect(source).toContain('t("dialog.slotEmpty")');
     expect(source).toContain('t("dialog.slotImposed")');
     expect(source).toContain('t("dialog.slotPool", { count: slot.length })');
   });
 
-  it("slot_toggleButton_keepsErrorAriaAndAriaControls", () => {
+  it("slot_toggleButton_sitsNextToItsErrorText", () => {
     const source = readSource(DIALOG);
 
-    expect(source).toMatch(/id=\{toggleId\}[\s\S]{0,200}aria-expanded=\{open\}[\s\S]{0,80}aria-controls=\{pickerId\}[\s\S]{0,40}\{\.\.\.errorAria\}/);
-    expect(source).toContain("<FieldErrorText fieldId={toggleId} message={errorMessage} />");
+    expect(source).toMatch(
+      /<div className=\{styles\.slotFoot\}>\s*<button[\s\S]{0,120}id=\{toggleId\}[\s\S]{0,120}aria-expanded=\{open\}\s*aria-controls=\{pickerId\}\s*\{\.\.\.errorAria\}[\s\S]{0,200}<\/button>\s*<FieldErrorText fieldId=\{toggleId\} message=\{errorMessage\} \/>/,
+    );
+  });
+
+  it("styles_slotStates_differByPatternNotOnlyOpacity", () => {
+    const css = readSource(STYLES);
+
+    expect(css).toMatch(/\.slot\[data-state="pool"\] \{\s*border-left: 4px double/);
+    expect(css).toMatch(/\.slot\[data-state="empty"\] \{\s*border-left-style: dashed/);
   });
 });
 
@@ -72,21 +82,29 @@ describe("map list", () => {
 });
 
 describe("compact controls and chips", () => {
-  it("dialog_compactButtons_useCompactClassNotBareBtn", () => {
+  it("dialog_compactButtons_useSharedCompactClass", () => {
     const source = readSource(DIALOG);
-    const css = readSource(STYLES);
+    const globals = readSource("app/globals.css");
 
     expect(source).not.toContain('className="btn ghost"');
-    expect(source).toContain("styles.compact");
-    expect(css).toMatch(/@media \(pointer: coarse\) \{\s*button\.compact \{\s*min-height: 44px;/);
+    expect(source).not.toContain("styles.compact");
+    expect(source).toContain('className="btn ghost compact"');
+    expect(globals).toMatch(/@media \(pointer: coarse\) \{\s*\.btn\.compact \{\s*min-height: 44px;/);
   });
 
-  it("styles_checkedChips_declareFocusVisibleAndSelectedState", () => {
-    const css = readSource(STYLES);
+  it("globals_radioSegments_touchTargetAndCheckedState", () => {
+    const globals = readSource("app/globals.css");
 
-    for (const selector of [".segment", ".option"]) {
-      expect(css).toContain(`${selector}:has(input:checked)`);
-      expect(css).toContain(`${selector}:has(input:focus-visible)`);
-    }
+    expect(globals).toContain(".radio-segment:has(input:checked)");
+    expect(globals).toMatch(/@media \(pointer: coarse\) \{[^}]*\}\s*\.radio-segment \{\s*min-height: 44px;/);
+  });
+
+  it("styles_chips_checkedStateWithoutSecondFocusRing", () => {
+    const css = readSource(STYLES);
+    const globals = readSource("app/globals.css");
+
+    expect(css).toContain(".option:has(input:checked)");
+    expect(css).not.toContain(":has(input:focus-visible)");
+    expect(globals).not.toContain(".radio-segment:has(input:focus-visible)");
   });
 });
