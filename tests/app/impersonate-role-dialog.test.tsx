@@ -33,6 +33,7 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import frShell from "@/messages/fr/shell.json";
 import enShell from "@/messages/en/shell.json";
+import { readSource } from "../helpers/read-source";
 
 const globals = globalThis as { document?: unknown };
 const saved = globals.document;
@@ -86,6 +87,13 @@ describe("ImpersonateRoleDialog — français", () => {
 
   it("render_french_hintGivesTheHourCap", () => {
     expect(render("fr")).toContain(`au plus ${PLAYER_VIEW_MAX_HOURS} heures`);
+  });
+
+  it("render_french_bodyScrollsThroughScrollArea", () => {
+    const html = render("fr");
+
+    expect(html).toContain("overflow-y:auto");
+    expect(readSource("components/impersonate-role-dialog.module.css")).not.toMatch(/overflow(-y)?:\s*auto/);
   });
 
   it("render_french_tapZoneOnTheRoleRows", () => {

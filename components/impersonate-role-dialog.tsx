@@ -3,6 +3,7 @@
 import { FormEvent, KeyboardEvent, memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Coche } from "@/components/Coche";
+import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { useShellText } from "@/components/i18n/shell-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -130,7 +131,7 @@ export function ImpersonateRoleDialog({ onClose, onConfirm }: Readonly<Impersona
         <h3 id={titleId} className={s.title}>
           {t("impersonate.title")}
         </h3>
-        <div className={s.body}>
+        <ScrollArea orientation="y" className={s.body} ariaLabel={t("impersonate.bodyLabel")}>
           <InfoHintRow>
             <button
               type="button"
@@ -174,7 +175,7 @@ export function ImpersonateRoleDialog({ onClose, onConfirm }: Readonly<Impersona
               </div>
             </div>
           </div>
-        </div>
+        </ScrollArea>
         <div className={s.actions}>
           <button type="button" className="btn ghost" onClick={() => !busy && onClose()} aria-disabled={busy || undefined}>
             {t("impersonate.cancel")}

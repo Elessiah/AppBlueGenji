@@ -7,7 +7,7 @@
  * Les noms `playerView*` viennent de la première version (vue joueur seule) :
  * `playerView` dit « la session incarne un rôle (ou aucun) ».
  */
-import { can, isPlatformRole, PLATFORM_ROLES, type Permission, type PlatformRole } from "@/lib/shared/permissions";
+import { can, isPlatformRole, PLATFORM_ROLES, sanitizePlatformRoles, type Permission, type PlatformRole } from "@/lib/shared/permissions";
 
 /**
  * Durée maximale d'une vue joueur, en heures : passé ce délai, la session
@@ -38,16 +38,7 @@ export function canImpersonate(real: { isAdmin: boolean }): boolean {
  * illisible ou absente : aucun rôle (vue joueur) — jamais plus de droits.
  */
 export function parseImpersonatedRoles(input: unknown): PlatformRole[] {
-  let candidates: unknown = input;
-  if (typeof input === "string") {
-    try {
-      candidates = JSON.parse(input);
-    } catch {
-      return [];
-    }
-  }
-  if (!Array.isArray(candidates)) return [];
-  return IMPERSONABLE_ROLES.filter((role) => candidates.includes(role));
+  return sanitizePlatformRoles(input).filter((role) => role !== "ADMIN");
 }
 
 /**

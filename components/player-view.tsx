@@ -19,12 +19,9 @@ import s from "./player-view.module.css";
  */
 export function PlayerViewBanner({ until, roles = [] }: Readonly<{ until: string | null; roles?: readonly PlatformRole[] }>) {
   const { t } = useShellText();
-  const state =
-    roles.length > 0
-      ? t("playerView.activeRoles", {
-          roles: roles.map((role) => t(`impersonate.roles.${role as Exclude<PlatformRole, "ADMIN">}.label`)).join(", "),
-        })
-      : t("playerView.active");
+  const roleNames = roles.map((role) => t(`impersonate.roles.${role as Exclude<PlatformRole, "ADMIN">}.label`)).join(", ");
+  const roleKey = roles.length > 1 ? "playerView.activeRoles" : "playerView.activeRole";
+  const state = roles.length > 0 ? t(roleKey, { roles: roleNames }) : t("playerView.active");
   const router = useLocaleRouter();
   const { pending, toggle } = usePlayerViewToggle();
   const backRef = useRef<HTMLButtonElement>(null);

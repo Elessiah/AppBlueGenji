@@ -41,12 +41,14 @@
     "loggingOut": "Déconnexion…",
     "logoutFailed": "La déconnexion a échoué. Réessaie dans un instant.",
     "impersonate": "Incarner un rôle",
-    "impersonateFailed": "Impossible d'incarner ce rôle. Réessaie dans un instant."
+    "impersonateFailed": "Impossible d'incarner ce rôle. Réessaie dans un instant.",
+    "impersonateConflict": "Une autre incarnation est déjà en cours sur cette session : reviens en vue admin avant d'en choisir une autre."
   },
   "playerView": {
-    "label": "Rôle incarné",
+    "label": "Incarnation",
     "active": "Vue joueur active",
-    "activeRoles": "Rôle incarné : {roles}",
+    "activeRole": "Rôle incarné : {roles}",
+    "activeRoles": "Rôles incarnés : {roles}",
     "back": "Revenir en vue admin",
     "backPending": "Retour en vue admin…",
     "backFailed": "Impossible de revenir en vue admin. Réessaie dans un instant.",
@@ -56,6 +58,7 @@
     "title": "Incarner un rôle",
     "lead": "Coche les rôles à incarner",
     "hint": "Sur cet appareil seulement, tes droits se réduisent exactement aux rôles cochés jusqu'à ton retour, au plus {hours} heures. Aucun rôle coché : vue joueur.",
+    "bodyLabel": "Rôles à incarner",
     "tableLabel": "Rôles à incarner et ce qu'ils ouvrent",
     "columnRole": "Rôle",
     "columnOpens": "Ouvre",

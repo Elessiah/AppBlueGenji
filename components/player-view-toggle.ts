@@ -7,24 +7,32 @@ import { useToast } from "@/components/ui/toast";
 import type { PlatformRole } from "@/lib/shared/permissions";
 
 /**
+ * Issue d'une bascule : faite, refusée parce que la session incarne déjà
+ * d'autres rôles (`409`, posés depuis un autre onglet), ou échouée.
+ */
+export type PlayerViewOutcome = "done" | "conflict" | "failed";
+
+/**
  * Pose (rôles à incarner, vides : vue joueur) ou retire l'incarnation de
  * **cette session** (`docs/features/ADMIN_ROLE_IMPERSONATION.md`).
- * Rend `false` si la requête échoue ou est refusée : l'appelant le dit (toast).
+ * Rend `"failed"` si la requête échoue ou est refusée, `"conflict"` si une
+ * autre incarnation tient déjà la session : l'appelant le dit (toast).
  */
 export async function requestPlayerView(
   active: boolean,
   roles: readonly PlatformRole[] = [],
   fetchImpl: typeof fetch = fetch,
-): Promise<boolean> {
+): Promise<PlayerViewOutcome> {
   try {
     const res = await fetchImpl("/api/auth/player-view", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(active ? { active, roles } : { active }),
     });
-    return res.ok;
+    if (res.ok) return "done";
+    return active && res.status === 409 ? "conflict" : "failed";
   } catch {
-    return false;
+    return "failed";
   }
 }
 
@@ -50,7 +58,9 @@ export function takePlayerViewFocus(target: FocusTarget): boolean {
  * Le geste, commun à la modale « Incarner un rôle » et à la bannière : un second clic
  * n'envoie rien de plus, un échec se dit en notification, une réussite relit
  * la page (`router.refresh()`) — la barre, les menus et les écrans de gestion
- * changent avec les droits de la session.
+ * changent avec les droits de la session. Une entrée refusée parce qu'une
+ * autre incarnation tient déjà la session (autre onglet) le dit, et relit
+ * aussi la page : la bannière montre les rôles réellement incarnés.
  */
 export function usePlayerViewToggle(onDone?: () => void): {
   pending: boolean;
@@ -64,13 +74,14 @@ export function usePlayerViewToggle(onDone?: () => void): {
     if (inFlight) return false;
     inFlight = true;
     setPending(true);
-    const done = await requestPlayerView(active, roles);
+    const outcome = await requestPlayerView(active, roles);
     inFlight = false;
     setPending(false);
-    if (!done) {
+    if (outcome === "failed") {
       showError(t(active ? "account.impersonateFailed" : "playerView.backFailed"));
       return false;
     }
+    if (outcome === "conflict") showError(t("account.impersonateConflict"));
     pendingFocus = active ? "banner" : "account";
     onDone?.();
     router.refresh();

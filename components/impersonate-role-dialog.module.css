@@ -19,7 +19,10 @@
   max-width: 640px;
   max-height: calc(100vh - 32px); /* repli : navigateurs sans `dvh` */
   max-height: calc(100dvh - 32px);
-  overflow: auto;
+  /* Seul le corps défile (<ScrollArea>, ACCESSIBILITY_SCROLL_AREA_FOCUS.md) :
+     titre et boutons restent visibles. */
+  display: flex;
+  flex-direction: column;
   padding: 22px;
   background: var(--cyber-bg-2);
   border: 1px solid var(--line-strong-cy);
@@ -36,6 +39,8 @@
 .body {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 12px;
   margin-top: 14px;
   font-size: 13px;

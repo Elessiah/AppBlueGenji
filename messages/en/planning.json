@@ -125,6 +125,7 @@
     "UNAUTHORIZED": "Your session has expired: sign in again.",
     "FORBIDDEN": "This action is reserved for tournament staff.",
     "PLANNING_ADMIN_ONLY": "This action is reserved for administrators.",
+    "PLAYER_VIEW_ACTIVE": "The role you are impersonating doesn't hold this slot: switch back to admin view to withdraw from it.",
     "PLANNING_MEMBERS_ONLY": "This action is reserved for the schedule's referees, casters and prods.",
     "NETWORK_ERROR": "Cannot connect. Check your network and try again.",
     "PLANNING_ENTRY_NOT_FOUND": "This slot no longer exists. The page is reloaded.",

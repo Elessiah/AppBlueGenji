@@ -123,6 +123,18 @@ describe("usePlayerViewToggle", () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
+  it("toggle_entryConflict_saysItThenClosesAndRefreshes", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 409 }));
+    const onDone = jest.fn();
+
+    const done = await ToggleProbe(onDone).toggle(true, ["CASTER"]);
+
+    expect(done).toBe(true);
+    expect(showError).toHaveBeenCalledWith("account.impersonateConflict");
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it("toggle_failureReturning_showsBackFailed", async () => {
     fetchMock.mockRejectedValue(new TypeError("offline"));
 

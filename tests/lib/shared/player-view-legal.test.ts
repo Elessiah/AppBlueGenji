@@ -100,12 +100,16 @@ describe("registre", () => {
 
     expect(JSON.stringify(fr.subPurposes)).toContain("Incarner un rôle : un administrateur réduit ses droits");
     expect(JSON.stringify(fr.legalBasis)).toContain("de l'administrateur qui incarne un rôle ou en revient");
-    expect(JSON.stringify(fr.dataSubjects)).toContain("Développeurs (rôle de plateforme, hors staff) passés en vue joueur ou revenus avant novembre 2026");
+    expect(JSON.stringify(fr.dataSubjects)).toContain("Développeurs (rôle de plateforme, hors staff) passés en vue joueur ou revenus jusqu'en novembre 2026");
     expect(JSON.stringify(fr.dataCategories)).toContain("pour une incarnation d'un rôle entrée ou quittée : pseudo et identifiant de son auteur");
     expect(JSON.stringify(en.subPurposes)).toContain("Impersonate a role: an administrator narrows their rights");
     expect(JSON.stringify(en.legalBasis)).toContain("the administrator who impersonates a role or switches back");
-    expect(JSON.stringify(en.dataSubjects)).toContain("Developers (platform role, not staff) who switched into or out of player view before November 2026");
+    expect(JSON.stringify(en.dataSubjects)).toContain("Developers (platform role, not staff) who switched into or out of player view until November 2026");
     expect(JSON.stringify(en.dataCategories)).toContain("for an impersonation of a role switched on or off: username and identifier of its author");
+    // La vue joueur ouverte à tout rôle (#627) n'a vécu qu'en novembre 2026 : « avant novembre » ne couvrirait aucune bascule.
+    expect(JSON.stringify(fr)).not.toContain("avant novembre 2026, aussi");
+    expect(JSON.stringify(fr)).not.toContain("revenus avant novembre 2026");
+    expect(JSON.stringify(en)).not.toContain("before November 2026");
   });
 });
 

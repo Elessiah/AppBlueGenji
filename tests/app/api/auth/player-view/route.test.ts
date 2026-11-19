@@ -36,15 +36,46 @@ beforeEach(() => {
 });
 
 describe("POST /api/auth/player-view", () => {
-  it("POST_moreThanRuleLimitPerAccount_returns429", async () => {
+  it("POST_moreEntriesThanRuleLimitPerAccount_returns429", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    for (let i = 0; i < PLAYER_VIEW_TOGGLE_RULE.limit; i += 1) await toggle({ active: i % 2 === 0 });
+    for (let i = 0; i < PLAYER_VIEW_TOGGLE_RULE.limit; i += 1) await toggle({ active: true });
     jest.mocked(setPlayerView).mockClear();
 
     const res = await toggle({ active: true });
 
     expect(res.status).toBe(429);
     expect(setPlayerView).not.toHaveBeenCalled();
+  });
+
+  it("POST_exitAfterEntryLimitReached_isNeverThrottled", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    for (let i = 0; i < PLAYER_VIEW_TOGGLE_RULE.limit; i += 1) await toggle({ active: true });
+    jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
+
+    const res = await toggle({ active: false });
+
+    expect(res.status).toBe(200);
+    expect(setPlayerView).toHaveBeenLastCalledWith(adminInPlayerView, false, []);
+  });
+
+  it("POST_enterWhileOtherRolesImpersonated_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
+    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["ARBITRE"] });
+
+    const res = await toggle({ active: true, roles: ["CASTER"] });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: "IMPERSONATION_ALREADY_ACTIVE" });
+  });
+
+  it("POST_enterSameRolesAlreadyImpersonated_returns200", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(adminInPlayerView);
+    jest.mocked(setPlayerView).mockResolvedValue({ until: "2026-11-20T12:00:00.000Z", roles: ["ARBITRE", "CASTER"] });
+
+    const res = await toggle({ active: true, roles: ["CASTER", "ARBITRE"] });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ playerView: true, roles: ["ARBITRE", "CASTER"] });
   });
 
   it("POST_crossSiteRequest_returns403WithoutReadingSession", async () => {

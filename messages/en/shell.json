@@ -41,12 +41,14 @@
     "loggingOut": "Logging out…",
     "logoutFailed": "Couldn't log you out. Try again in a moment.",
     "impersonate": "Impersonate a role",
-    "impersonateFailed": "Couldn't impersonate this role. Try again in a moment."
+    "impersonateFailed": "Couldn't impersonate this role. Try again in a moment.",
+    "impersonateConflict": "Another impersonation is already running on this session: switch back to admin view before choosing another one."
   },
   "playerView": {
-    "label": "Impersonated role",
+    "label": "Impersonation",
     "active": "Player view on",
-    "activeRoles": "Impersonated role: {roles}",
+    "activeRole": "Impersonated role: {roles}",
+    "activeRoles": "Impersonated roles: {roles}",
     "back": "Back to admin view",
     "backPending": "Returning to admin view…",
     "backFailed": "Couldn't return to admin view. Try again in a moment.",
@@ -56,6 +58,7 @@
     "title": "Impersonate a role",
     "lead": "Tick the roles to impersonate",
     "hint": "On this device only, your rights narrow to exactly the ticked roles until you switch back, for {hours} hours at most. No role ticked: player view.",
+    "bodyLabel": "Roles to impersonate",
     "tableLabel": "Roles to impersonate and what they open",
     "columnRole": "Role",
     "columnOpens": "Opens",

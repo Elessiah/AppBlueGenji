@@ -47,15 +47,27 @@ describe("PlayerViewBanner", () => {
 
     expect(html).toContain("Vue joueur active");
     expect(html).toContain("Revenir en vue admin");
-    expect(html).toContain('aria-label="Rôle incarné"');
+    expect(html).toContain('aria-label="Incarnation"');
   });
 
-  it("PlayerViewBanner_frenchWithRoles_namesTheImpersonatedRoles", () => {
-    expect(banner("fr", ["ARBITRE", "CASTER"])).toContain("Rôle incarné : Arbitre, Caster");
+  it("PlayerViewBanner_frenchOneRole_namesItInTheSingular", () => {
+    expect(banner("fr", ["ARBITRE"])).toContain("Rôle incarné : Arbitre");
   });
 
-  it("PlayerViewBanner_englishWithRoles_namesTheImpersonatedRoles", () => {
+  it("PlayerViewBanner_frenchSeveralRoles_namesThemInThePlural", () => {
+    expect(banner("fr", ["ARBITRE", "CASTER"])).toContain("Rôles incarnés : Arbitre, Caster");
+  });
+
+  it("PlayerViewBanner_englishOneRole_namesItInTheSingular", () => {
     expect(banner("en", ["ARBITRE"])).toContain("Impersonated role: Referee");
+  });
+
+  it("PlayerViewBanner_englishSeveralRoles_namesThemInThePlural", () => {
+    expect(banner("en", ["ARBITRE", "CASTER"])).toContain("Impersonated roles: Referee, Caster");
+  });
+
+  it("PlayerViewBanner_english_labelsTheSectionNeutrally", () => {
+    expect(banner("en")).toContain('aria-label="Impersonation"');
   });
 
   it("PlayerViewBanner_english_isTranslated", () => {
@@ -128,10 +140,10 @@ describe("takePlayerViewFocus", () => {
 });
 
 describe("requestPlayerView", () => {
-  it("requestPlayerView_success_postsJsonAndReturnsTrue", async () => {
+  it("requestPlayerView_success_postsJsonAndReturnsDone", async () => {
     const fetchImpl = jest.fn<typeof fetch>().mockResolvedValue(new Response("{}", { status: 200 }));
 
-    await expect(requestPlayerView(true, [], fetchImpl)).resolves.toBe(true);
+    await expect(requestPlayerView(true, [], fetchImpl)).resolves.toBe("done");
     expect(fetchImpl).toHaveBeenCalledWith(
       "/api/auth/player-view",
       expect.objectContaining({ method: "POST", body: JSON.stringify({ active: true, roles: [] }) }),
@@ -154,16 +166,28 @@ describe("requestPlayerView", () => {
     expect(fetchImpl.mock.calls[0][1]?.body).toBe(JSON.stringify({ active: false }));
   });
 
-  it("requestPlayerView_refused_returnsFalse", async () => {
+  it("requestPlayerView_refused_returnsFailed", async () => {
     const fetchImpl = jest.fn<typeof fetch>().mockResolvedValue(new Response("{}", { status: 403 }));
 
-    await expect(requestPlayerView(false, [], fetchImpl)).resolves.toBe(false);
+    await expect(requestPlayerView(false, [], fetchImpl)).resolves.toBe("failed");
   });
 
-  it("requestPlayerView_networkFailure_returnsFalseWithoutThrowing", async () => {
+  it("requestPlayerView_entryConflict_returnsConflict", async () => {
+    const fetchImpl = jest.fn<typeof fetch>().mockResolvedValue(new Response("{}", { status: 409 }));
+
+    await expect(requestPlayerView(true, ["CASTER"], fetchImpl)).resolves.toBe("conflict");
+  });
+
+  it("requestPlayerView_exitConflict_returnsFailed", async () => {
+    const fetchImpl = jest.fn<typeof fetch>().mockResolvedValue(new Response("{}", { status: 409 }));
+
+    await expect(requestPlayerView(false, [], fetchImpl)).resolves.toBe("failed");
+  });
+
+  it("requestPlayerView_networkFailure_returnsFailedWithoutThrowing", async () => {
     const fetchImpl = jest.fn<typeof fetch>().mockRejectedValue(new TypeError("offline"));
 
-    await expect(requestPlayerView(true, [], fetchImpl)).resolves.toBe(false);
+    await expect(requestPlayerView(true, [], fetchImpl)).resolves.toBe("failed");
   });
 });
 
