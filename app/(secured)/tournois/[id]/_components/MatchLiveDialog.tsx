@@ -728,6 +728,8 @@ export function MatchLiveDialog({
             </BusyButton>
           </div>
         )}
+        {/* Voulu en double avec l'entrée de la carte : cette fenêtre sert aussi
+            au caster (seule `live`), qui n'a pas l'entrée de la carte. */}
         {canEditReplay(match, mayEditReplay(match, controls)) && (
           <div className={styles.section}>
             <BusyButton

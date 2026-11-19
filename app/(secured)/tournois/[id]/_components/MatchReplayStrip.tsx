@@ -11,8 +11,8 @@ import { versusText } from "@/lib/shared/tournament-page-text";
  * monde le voit dès qu'une rediff est posée sur une rencontre jouée — la carte
  * entière du bandeau est le lien, pour qu'on ne puisse pas le manquer.
  *
- * Le bouton qui pose, modifie ou retire le lien (permission `live`) vit dans le
- * pied d'action de la carte (`MatchCardActions`), sous `canEditReplay`
+ * Le bouton qui pose, modifie ou retire le lien (permissions `tournaments` et
+ * `live`) vit dans le menu d'actions de la carte (`MatchCardActions`), sous `canEditReplay`
  * (`lib/shared/match-replay.ts`). Le lien
  * stocké n'est pas montré tel quel : `visibleReplayUrl` le tait sur un match
  * rouvert par un retour en arrière — le staff garde alors son bouton, pour

@@ -20,7 +20,7 @@ Code : `lib/shared/cast-settings.ts` (règles pures),
 | **Retirer le caster** | permission `tournaments`, et un **autre** caster que le lecteur | confirmation existante (avis au caster, `CAST_NOTICES.md`) |
 | **Diffuser ce match / Diffusion officielle** | permissions `tournaments` **et** `live` (ses routes, `/api/admin/matches/[id]/live` et la rediff, demandent `live`) | `MatchLiveDialog` (diffusion de l'organisation) |
 
-Trois conséquences voulues :
+Quatre conséquences voulues :
 
 - un porteur de `live` qui **ne caste pas** n'a plus aucune configuration de
   diffusion : elle appartient soit au caster (la sienne), soit au staff
@@ -33,7 +33,9 @@ Trois conséquences voulues :
   de la carte, pour tout match joué (`canEditReplay`), diffusion marquée ou
   non, association ou invité : elle ouvre `MatchReplayDialog`. Porte du
   client = celle de la route (`tournaments` **et** `live` : admin, arbitre,
-  arbitre désigné) ; jamais avant la fin du match. Le caster garde en plus son
+  arbitre désigné) ; pas avant la fin du match, sauf « Modifier la rediff »
+  sur un match rouvert ou tranché par forfait qui garde un lien stocké (seul
+  moyen de le retirer). Le caster garde en plus son
   accès dans sa fenêtre de diffusion (`showReplay` : `match-card-model.ts`).
 
 ## S'inscrire : « Caster ce match »

@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
+import { MatchPageScope } from "@/app/(secured)/tournois/[id]/_lib/match-page-context";
 import { IssueReportProvider } from "@/app/(secured)/tournois/[id]/_lib/issue-report-context";
 import { PlayerScoreProvider } from "@/app/(secured)/tournois/[id]/_lib/player-score-context";
 import { ToastProvider } from "@/components/ui/toast";
@@ -142,9 +143,10 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
     expect(html).toContain("Score verrouillé");
   });
 
-  it("diffusion : la carte n'offre plus la rediff — elle vit dans les fenêtres de diffusion", () => {
+  it("diffusion : un porteur de `live` seul n'a ni rediff ni réglage de diffusion sur la carte", () => {
     // `docs/features/CAST_SETTINGS.md` : un porteur de `live` qui ne caste pas
-    // n'a plus de réglage de diffusion sur la carte.
+    // n'a plus de réglage de diffusion ; la rediff de la carte demande aussi
+    // `tournaments`.
     const html = card(played, { canManage: true });
     expect(html).not.toContain('data-action="replay"');
     expect(html).not.toContain('data-action="castConfig"');
@@ -168,8 +170,8 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
   });
 
   it("matchCard_playedUncastMatchForOrganisationStaff_offersReplay", () => {
-    // Joué sans diffusion marquée : aucune fenêtre de diffusion ne s'ouvre, la
-    // rediff garde son entrée sur la carte.
+    // Joué sans diffusion marquée : aucune fenêtre de diffusion ne s'ouvre ; la
+    // rediff a son entrée sur la carte, comme pour tout match joué.
     const html = card(played, { canSchedule: true, canManage: true });
     expect(html).toContain("Ajouter la rediff : Alpha contre Bravo");
     expect(html).not.toContain('data-action="liveConfig"');
@@ -214,5 +216,55 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
   it("matchCard_reopenedWithExistingLink_staffKeepsEditEntry", () => {
     const reopened = launched({ replayUrl: "https://www.youtube.com/watch?v=abcdefghijk" });
     expect(card(reopened, staff)).toContain("Modifier la rediff : Alpha contre Bravo");
+  });
+
+  it("matchCard_completedForStaff_replayStaysInMenu", () => {
+    const html = card(played, staff);
+    expect(html).toContain('<li data-action="replay">');
+    expect(html).toContain('<li data-action="matchPage" data-primary="true">');
+  });
+
+  it("matchCard_onMatchPageWithOtherActions_replayNotPrimary", () => {
+    const html = wrap(
+      staff,
+      <MatchPageScope value>
+        <MatchRow
+          match={played}
+          adminResolvable={false}
+          onOpenAdminModal={() => undefined}
+          scoreLocked={false}
+          roundNumber={1}
+        />
+      </MatchPageScope>,
+    );
+    expect(html).not.toContain('data-action="matchPage"');
+    expect(html).toContain('<li data-action="replay">');
+  });
+
+  it("matchCard_doubleForfeitWithoutLink_noReplay", () => {
+    const doubleForfeit = bracketMatch({ ...played, winnerTeamId: null, doubleForfeit: true });
+    expect(card(doubleForfeit, staff)).not.toContain('data-action="replay"');
+  });
+
+  it("matchCard_forfeitWithStoredLink_staffKeepsEditEntry", () => {
+    const forfeit = bracketMatch({
+      ...played,
+      forfeitTeamId: 20,
+      replayUrl: "https://www.youtube.com/watch?v=abcdefghijk",
+    });
+    expect(card(forfeit, staff)).toContain("Modifier la rediff : Alpha contre Bravo");
+  });
+
+  it("matchCard_completedWithCaster_replayInMenuOnceLiveWindowCloses", () => {
+    // La diffusion de l'organisation ne s'offre plus sur un match joué : la
+    // rediff ne dépend pas d'elle et reste dans le menu.
+    const html = card(bracketMatch({ ...played, casters: casterNamed(77) }), staff);
+    expect(html).not.toContain('data-action="liveConfig"');
+    expect(html).toContain('<li data-action="replay">Ajouter la rediff : Alpha contre Bravo</li>');
+  });
+  it("matchCard_completedWithOfficialLive_staffSeesLiveConfigAndReplay", () => {
+    const html = card(bracketMatch({ ...played, casters: casterNamed(77), liveTrigger: "MANUAL" }), staff);
+    expect(html).toContain('data-action="liveConfig"');
+    expect(html).toContain('<li data-action="replay">Ajouter la rediff : Alpha contre Bravo</li>');
   });
 });
