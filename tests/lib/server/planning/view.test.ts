@@ -17,6 +17,7 @@ import {
   resetPlanningMembersCache,
   unfilledRoles,
   entryConfirmState,
+  provisionalRoles,
   visibleAssignment,
 } from "@/lib/server/planning/view";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
@@ -34,6 +35,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetPlanningMembersCache();
   jest.mocked(withConnection).mockImplementation(<T>(run: (c: PoolConnection) => Promise<T>) => run(fakeConnection(connection)));
+  connection.execute.mockResolvedValue([[], []]);
   jest.mocked(loadPlanningMembers).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
   jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
   jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) =>
@@ -397,5 +399,22 @@ describe("loadPlanningView — place quittée tenue par un compte suspendu", () 
     const view = await loadPlanningView(caster, MONDAY - 48 * 60 * 60 * 1000);
 
     expect(view.entries[0].unfilled).toEqual([]);
+  });
+});
+
+describe("provisionalRoles", () => {
+  it("provisionalRoles_mixedAssignments_countsProvisionalOnly", () => {
+    expect(
+      provisionalRoles([
+        { role: "CASTER", provisional: true },
+        { role: "CASTER", provisional: true },
+        { role: "REFEREE", provisional: false },
+        { role: "PROD", provisional: true },
+      ]),
+    ).toEqual({ CASTER: 2, PROD: 1 });
+  });
+
+  it("provisionalRoles_noneProvisional_empty", () => {
+    expect(provisionalRoles([{ role: "REFEREE", provisional: false }])).toEqual({});
   });
 });

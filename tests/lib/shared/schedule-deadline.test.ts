@@ -10,6 +10,7 @@ import {
   dueDeadlineReminder,
   formatScheduleDeadline,
   planningConfirmAt,
+  upcomingScheduleDeadline,
   readScheduleDeadline,
   scheduleOpenedAt,
   suggestedScheduleDeadline,
@@ -345,5 +346,26 @@ describe("saisie", () => {
 
   it("formatScheduleDeadline_en_showsParisTime", () => {
     expect(formatScheduleDeadline("2026-11-17T20:00:00.000Z", "en")).toMatch(/Tue.*Nov.*17.*21:00/);
+  });
+});
+
+describe("upcomingScheduleDeadline", () => {
+  const AT = "2026-11-21T20:00:00.000Z";
+  const AT_MS = Date.parse(AT);
+
+  it("upcomingScheduleDeadline_noDeadline_null", () => {
+    expect(upcomingScheduleDeadline(null, AT_MS)).toBeNull();
+  });
+
+  it("upcomingScheduleDeadline_clockUnknown_shown", () => {
+    expect(upcomingScheduleDeadline(AT, null)).toBe(AT);
+  });
+
+  it("upcomingScheduleDeadline_future_shown", () => {
+    expect(upcomingScheduleDeadline(AT, AT_MS - 1)).toBe(AT);
+  });
+
+  it("upcomingScheduleDeadline_reachedOrPast_hidden", () => {
+    expect(upcomingScheduleDeadline(AT, AT_MS)).toBeNull();
   });
 });

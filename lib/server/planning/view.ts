@@ -19,6 +19,7 @@ import {
   type LoadedMember,
   type LoadedWithdrawal,
 } from "./load";
+import { autoConfirmAwaiting, readStoredAutoConfirms, type PendingRoles } from "./auto-confirm";
 import { entryAssignments, entryCoverage } from "./model";
 
 /**
@@ -91,32 +92,43 @@ function groupByEntry<T extends { entryKey: string }>(rows: readonly T[]): Map<s
 
 /**
  * Confirmation d'office d'une entrée ouverte : l'instant (ISO) tant qu'il est
- * à venir, ou passé alors que des propositions restent provisoires
- * (`confirmPending` : en attente — semaine en échec, reprise plus tard) ;
- * `null` pour une entrée close, ou passée sans rien de provisoire.
+ * à venir, ou passé alors qu'une confirmation d'office reste à faire
+ * (`awaiting`, `autoConfirmAwaiting` ; `confirmPending` : en attente —
+ * semaine en échec, reprise plus tard) ; `null` pour une entrée close, ou
+ * passée sans rien que le balayage reprendra (un reste qu'il n'a pas pu
+ * confirmer se confirme à la main).
  */
 export function entryConfirmState(
   entry: Pick<LoadedEntry, "open" | "startAt" | "deadlineAt">,
   leadHours: number,
   now: number,
-  provisional: boolean,
+  awaiting: boolean,
 ): { confirmAt: string | null; confirmPending: boolean } {
   if (!entry.open) return { confirmAt: null, confirmPending: false };
   const at = planningConfirmAt(entry.startAt, entry.deadlineAt, leadHours);
   if (at > now) return { confirmAt: new Date(at).toISOString(), confirmPending: false };
-  return provisional ? { confirmAt: new Date(at).toISOString(), confirmPending: true } : { confirmAt: null, confirmPending: false };
+  return awaiting ? { confirmAt: new Date(at).toISOString(), confirmPending: true } : { confirmAt: null, confirmPending: false };
+}
+
+/** Propositions provisoires d'une entrée, comptées par rôle. */
+export function provisionalRoles(assignments: readonly { role: string; provisional: boolean }[]): PendingRoles {
+  const counts: Record<string, number> = {};
+  for (const row of assignments) if (row.provisional) counts[row.role] = (counts[row.role] ?? 0) + 1;
+  return counts;
 }
 
 export async function loadPlanningView(user: AuthUser, now: number = Date.now()): Promise<PlanningView> {
   const canManage = can(user, "tournaments");
-  const data = await withConnection(async (connection) =>
-    loadPlanningData(connection, {
+  const { data, marks } = await withConnection(async (connection) => {
+    const loaded = await loadPlanningData(connection, {
       now,
       includeHidden: canManage,
       members: await pageMembers(connection, now),
       ...(canManage ? {} : { availabilityOf: user.id }),
-    }),
-  );
+    });
+    const openKeys = loaded.entries.filter((entry) => entry.open).map((entry) => entry.key);
+    return { data: loaded, marks: await readStoredAutoConfirms(connection, openKeys) };
+  });
   // Un caster autonome suspendu ne couvre plus seul son créneau aux yeux du staff, comme pour le calcul
   // (`preparePlanner`) ; les autres lecteurs gardent la couverture d'avant (rien n'y trahit la suspension).
   const solo = coveringSoloCasterIds(data.members, canManage);
@@ -146,7 +158,12 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       channelUrl: entry.channelUrl,
       selfManaged: entry.selfManaged,
       deadlineAt: entry.deadlineAt === null ? null : new Date(entry.deadlineAt).toISOString(),
-      ...entryConfirmState(entry, data.durations.confirmLeadHours, now, assignments.some((row) => row.provisional)),
+      ...entryConfirmState(
+        entry,
+        data.durations.confirmLeadHours,
+        now,
+        autoConfirmAwaiting(entry.startAt, provisionalRoles(assignments), marks.get(entry.key)),
+      ),
       assignments: assignments.map((row) => visibleAssignment(row, user.id, canManage)),
       // Pour le staff, un compte suspendu ne tient rien (comme pour le calcul, `preparePlanner`, et l'alerte) ;
       // les autres lecteurs gardent la couverture d'avant.

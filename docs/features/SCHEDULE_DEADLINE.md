@@ -64,7 +64,9 @@ exemples (« la date butoir mardi 21:00 ») ont été suivis.
 Balayage `sweepScheduleDeadlines`, chaque minute (`startScheduleDeadlineClock`,
 `instrumentation.ts`), sous le verrou nommé **`bg_schedule_deadlines`** pris
 sans attendre (un autre processus le tient : passage sauté). Pages de 200
-matchs (`SWEEP_BATCH`, jusqu'à 10 pages par passage), du plus urgent : dates
+matchs (`SWEEP_BATCH`, jusqu'à 10 pages et 100 gestes — forfaits, retraits,
+extinctions, avis — par passage, `SWEEP_MAX_PAGES`/`SWEEP_MAX_ACTIONS` ; la
+suite attend la minute d'après), du plus urgent : dates
 butoir des matchs sans horaire, et dates **échues** des matchs programmés ou
 lancés pas encore retirées. Décision pure `sweepAction` :
 
@@ -72,7 +74,7 @@ lancés pas encore retirées. Décision pure `sweepAction` :
 | --- | --- |
 | Toujours **à planifier** (deux engagées, ni horaire ni lancement), tournoi `RUNNING`, date butoir **armée** à temps pour cette paire | **Double forfait** |
 | Engagée manquante, option éteinte, tournoi pas `RUNNING` ou `FINISHED`, paire jamais prévenue ou prévenue moins de 30 min avant | La date butoir **s'éteint** (effacée, traces comprises) |
-| Horaire posé ou match lancé | La date butoir est **retirée** (marque `RETIRED` dans `bg_schedule_deadline_notices`, jamais envoyée) : elle reste sur le match, où le planning la lit encore (confirmation d'office à la date butoir), mais ne frappera plus — un match qui repasse à planifier (horaire retiré, lancement défait) voit alors sa date butoir s'éteindre, sans forfait |
+| Horaire posé ou match lancé | La date butoir est **retirée** (marque `RETIRED` dans `bg_schedule_deadline_notices`, jamais envoyée, posée seulement si le match est toujours programmé ou lancé à l'écriture, et gardée quand les avis d'une paire précédente s'effacent) : elle reste sur le match, où le planning la lit encore (confirmation d'office à la date butoir), mais ne frappera plus — un match qui repasse à planifier (horaire retiré, lancement défait) voit alors sa date butoir s'éteindre, sans forfait |
 | Match joué | Rien |
 
 **Armée** (`deadlineArmed`) : le premier avis de la paire **actuelle** est
@@ -82,8 +84,9 @@ après l'annonce n'est donc jamais forfaitée. Un match dont le passage échoue
 5 fois d'affilée pour la même date butoir (`SWEEP_MAX_FAILURES`, forfait
 refusé à chaque fois, ou verrou tenu longtemps) est **mis de côté** 15 minutes
 (`SWEEP_FAILURE_BACKOFF_MS`, sauté par la lecture), avec une erreur dans le
-journal pour l'arbitrage ; sa date butoir **reste** : une panne passagère ne
-la fait jamais perdre. Les échecs d'un match que la lecture ne rend plus sont
+journal pour l'arbitrage ; repris, il repart d'une série neuve (compte
+borné). Sa date butoir **reste** : une panne passagère ne la fait jamais
+perdre. La pastille « à planifier » n'affiche qu'une date butoir à venir. Les échecs d'un match que la lecture ne rend plus sont
 oubliés.
 
 Le double forfait passe par la chaîne existante, rien de neuf par format :
@@ -145,7 +148,8 @@ propositions **provisoires** autour de ce qui est confirmé, puis
 affectés reçoivent `PLANNING_ASSIGNED`. Écritures sous `bg_planning`
 (`withPlanningLock`). La marque `bg_planning_auto_confirms` (entrée, début
 confirmé `start_at`, propositions provisoires comptées par rôle
-`pending_roles` lues juste **avant** la confirmation, date) est posée
+`pending_roles` : celles lues avant la confirmation et encore provisoires
+après, `leftoverRoles` — ce qu'elle n'a pas pu confirmer —, date) est posée
 **après** la confirmation : une
 confirmation faite ne se refait pas pour le même début (un staff qui retire
 ensuite une affectation n'est pas contredit). Une entrée **reprogrammée** se
@@ -157,8 +161,11 @@ un nouveau calcul, ne la rouvre pas (aucun compte nommé n'est gardé). Une sema
 (`FAILED_WEEK_RETRY_MS`). Marques purgées avec le planning (90 jours).
 La carte d'une entrée montre « Confirmation d'office : … » (et la date butoir)
 tant que cet instant est à venir, puis « Confirmation d'office en attente »
-s'il est passé alors que des propositions restent provisoires (semaine en
-échec, reprise plus tard) ; rien une fois tout confirmé (`entryConfirmState`).
+s'il est passé alors qu'une confirmation d'office reste à faire
+(`autoConfirmAwaiting` : propositions provisoires sans marque pour ce début,
+ou plus nombreuses qu'à la marque — semaine en échec, reprise plus tard) ;
+rien sinon : un reste que la confirmation n'a pas pu confirmer se confirme à
+la main (`entryConfirmState`).
 
 ## RGPD
 

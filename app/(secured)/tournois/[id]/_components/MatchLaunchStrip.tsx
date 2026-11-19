@@ -2,7 +2,8 @@
 
 import { readyCount, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
-import { formatScheduleDeadline } from "@/lib/shared/schedule-deadline";
+import { formatScheduleDeadline, upcomingScheduleDeadline } from "@/lib/shared/schedule-deadline";
+import { useClock } from "@/lib/shared/hooks/useClock";
 import type { BracketMatch } from "@/lib/shared/types";
 import { launchPhaseBadgeKind } from "../_lib/launch-strip";
 import styles from "./MatchLaunchStrip.module.css";
@@ -29,14 +30,17 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
   const { t, locale } = useTournamentPageText();
   const spectator = useSpectatorView();
   const kind = launchPhaseBadgeKind(match, phase);
+  // Une date butoir passée (retirée, ou au forfait d'ici la minute) ne s'annonce plus.
+  const now = useClock(60 * 1000, kind === "TO_PLAN" && match.scheduleDeadlineAt !== null);
+  const deadlineAt = kind === "TO_PLAN" ? upcomingScheduleDeadline(match.scheduleDeadlineAt, now) : null;
   if (kind === "TO_PLAN") {
     return (
       <span className={styles.toPlan} title={t("launch.toPlanTitle")}>
         <span aria-hidden="true">📅</span> {t("launch.toPlan")}
-        {match.scheduleDeadlineAt && (
+        {deadlineAt && (
           <span className={styles.deadline} data-testid="schedule-deadline">
             {" · "}
-            {t("launch.toPlanDeadline", { date: formatScheduleDeadline(match.scheduleDeadlineAt, locale) })}
+            {t("launch.toPlanDeadline", { date: formatScheduleDeadline(deadlineAt, locale) })}
           </span>
         )}
         <span className="sr-only">{t("launch.toPlanSr")}</span>

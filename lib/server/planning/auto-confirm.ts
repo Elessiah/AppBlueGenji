@@ -15,12 +15,12 @@
  * Une entrée n'est confirmée d'office qu'une fois **par horaire**
  * (`bg_planning_auto_confirms`, marque posée après la confirmation avec le
  * début confirmé) : reprogrammée, elle se confirme de nouveau. La marque
- * compte aussi, par rôle, les propositions provisoires lues juste **avant**
- * la confirmation (`pending_roles`, celles qu'elle n'a pas pu confirmer y
- * restent) : une proposition de plus par la suite (un caster libéré, un
- * nouveau calcul, même entre la confirmation et la marque) rouvre l'entrée au
- * passage suivant, alors qu'un reste recréé à l'identique par un nouveau
- * calcul ne la rouvre pas. Une semaine en échec attend
+ * compte aussi, par rôle, les propositions provisoires que la confirmation
+ * **n'a pas pu** confirmer (`pending_roles` : lues avant elle, encore
+ * provisoires après — `leftoverRoles`) : une proposition de plus par la suite
+ * (un caster libéré, un nouveau calcul, même entre la confirmation et la
+ * marque) rouvre l'entrée au passage suivant, alors qu'un reste recréé à
+ * l'identique par un nouveau calcul ne la rouvre pas. Une semaine en échec attend
  * {@link FAILED_WEEK_RETRY_MS} avant d'être relancée. Un seul
  * processus à la fois (verrou nommé `bg_planning_confirms`, pris sans
  * attendre) ; les écritures du planning prennent en plus le verrou du planning
@@ -115,33 +115,87 @@ export function reopenedEntries(
   return reopened;
 }
 
-/** Propositions provisoires des entrées, comptées par rôle. */
-async function readPendingRoles(executor: Executor, keys: readonly string[]): Promise<Map<string, PendingRoles>> {
+/** Une proposition provisoire : entrée, compte, rôle. */
+export type PendingProposal = { entryKey: string; userId: number; role: string };
+
+/** Compte par entrée et par rôle. */
+export function countPendingRoles(proposals: readonly PendingProposal[]): Map<string, PendingRoles> {
   const pending = new Map<string, Record<string, number>>();
-  if (keys.length === 0) return pending;
-  const [rows] = await executor.execute<(RowDataPacket & { entry_key: string; role: string; n: number | string })[]>(
-    `SELECT entry_key, role, COUNT(*) AS n FROM bg_planning_assignments
-      WHERE confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})
-      GROUP BY entry_key, role`,
-    [...keys],
-  );
-  for (const row of rows) {
-    const counts = pending.get(row.entry_key) ?? {};
-    counts[row.role] = Number(row.n);
-    pending.set(row.entry_key, counts);
+  for (const proposal of proposals) {
+    const counts = pending.get(proposal.entryKey) ?? {};
+    counts[proposal.role] = (counts[proposal.role] ?? 0) + 1;
+    pending.set(proposal.entryKey, counts);
   }
   return pending;
 }
 
-async function readMarks(executor: Executor, keys: readonly string[]): Promise<AutoConfirmMarks> {
-  if (keys.length === 0) return { startAt: new Map(), reopened: new Set() };
-  const list = keys.map(() => "?").join(", ");
+/**
+ * Ce que la confirmation n'a pas pu confirmer : les propositions lues avant
+ * elle et encore provisoires après. Une proposition arrivée entre-temps n'y
+ * compte pas (elle rouvrira l'entrée), une proposition confirmée non plus.
+ */
+export function leftoverRoles(
+  before: readonly PendingProposal[],
+  after: readonly PendingProposal[],
+): Map<string, PendingRoles> {
+  const id = (proposal: PendingProposal) => `${proposal.entryKey}|${proposal.userId}|${proposal.role}`;
+  const earlier = new Set(before.map(id));
+  return countPendingRoles(after.filter((proposal) => earlier.has(id(proposal))));
+}
+
+/** Propositions provisoires des entrées. */
+async function readPendingProposals(executor: Executor, keys: readonly string[]): Promise<PendingProposal[]> {
+  if (keys.length === 0) return [];
+  const [rows] = await executor.execute<(RowDataPacket & { entry_key: string; user_id: number | string; role: string })[]>(
+    `SELECT entry_key, user_id, role FROM bg_planning_assignments
+      WHERE confirmed = 0 AND entry_key IN (${keys.map(() => "?").join(", ")})`,
+    [...keys],
+  );
+  return rows.map((row) => ({ entryKey: row.entry_key, userId: Number(row.user_id), role: row.role }));
+}
+
+/** Propositions provisoires des entrées, comptées par rôle. */
+async function readPendingRoles(executor: Executor, keys: readonly string[]): Promise<Map<string, PendingRoles>> {
+  return countPendingRoles(await readPendingProposals(executor, keys));
+}
+
+/** Une marque lue : début confirmé et restes comptés à la marque. */
+export type StoredAutoConfirm = { startAt: number | null; pending: PendingRoles };
+
+/** Lit les marques des entrées. */
+export async function readStoredAutoConfirms(executor: Executor, keys: readonly string[]): Promise<Map<string, StoredAutoConfirm>> {
+  if (keys.length === 0) return new Map();
   const [rows] = await executor.execute<
     (RowDataPacket & { entry_key: string; start_at: Date | string | null; pending_roles: string | null })[]
-  >(`SELECT entry_key, start_at, pending_roles FROM bg_planning_auto_confirms WHERE entry_key IN (${list})`, [...keys]);
-  const startAt = new Map(rows.map((row) => [row.entry_key, row.start_at === null ? null : new Date(row.start_at).getTime()]));
+  >(`SELECT entry_key, start_at, pending_roles FROM bg_planning_auto_confirms WHERE entry_key IN (${keys.map(() => "?").join(", ")})`, [
+    ...keys,
+  ]);
+  return new Map(
+    rows.map((row) => [
+      row.entry_key,
+      { startAt: row.start_at === null ? null : new Date(row.start_at).getTime(), pending: parsePendingRoles(row.pending_roles) },
+    ]),
+  );
+}
+
+/**
+ * Une confirmation d'office reste à faire pour l'entrée : des propositions
+ * provisoires, et pas de marque pour ce début, ou plus de propositions
+ * qu'à la marque (le passage suivant la reprendra). Un reste que la
+ * confirmation n'a pas pu confirmer n'est **pas** en attente : rien ne le
+ * reprendra, le staff le confirme à la main.
+ */
+export function autoConfirmAwaiting(startAt: number, current: PendingRoles, mark: StoredAutoConfirm | undefined): boolean {
+  if (Object.keys(current).length === 0) return false;
+  if (mark === undefined || mark.startAt !== startAt) return true;
+  return Object.entries(current).some(([role, count]) => count > (mark.pending[role] ?? 0));
+}
+
+async function readMarks(executor: Executor, keys: readonly string[]): Promise<AutoConfirmMarks> {
+  const marks = await readStoredAutoConfirms(executor, keys);
+  const startAt = new Map([...marks].map(([key, mark]) => [key, mark.startAt]));
   if (startAt.size === 0) return { startAt, reopened: new Set() };
-  const stored = new Map(rows.map((row) => [row.entry_key, parsePendingRoles(row.pending_roles)]));
+  const stored = new Map([...marks].map(([key, mark]) => [key, mark.pending]));
   return { startAt, reopened: reopenedEntries(stored, await readPendingRoles(executor, [...startAt.keys()])) };
 }
 
@@ -187,12 +241,13 @@ export async function sweepAutoConfirms(now: number = Date.now()): Promise<numbe
         if ((retryAfter().get(week.from) ?? 0) > now) continue;
         try {
           await runAutoAssign(null, { from: week.from, to: week.to }, now);
-          // Lues **avant** la confirmation : ce qu'elle laisse provisoire y reste
-          // compté ; une proposition arrivée ensuite rouvrira l'entrée.
-          const attempted = await readPendingRoles(connection, week.keys);
+          // Lues avant et après la confirmation : seul ce qu'elle n'a pas pu confirmer
+          // est compté ; une proposition arrivée entre-temps ou ensuite rouvrira l'entrée.
+          const before = await readPendingProposals(connection, week.keys);
           await confirmAssignments(null, { entryKeys: week.keys }, now);
+          const leftover = leftoverRoles(before, await readPendingProposals(connection, week.keys));
           const keys = new Set(week.keys);
-          await markConfirmed(connection, due.filter((entry) => keys.has(entry.key)), attempted);
+          await markConfirmed(connection, due.filter((entry) => keys.has(entry.key)), leftover);
           confirmed += week.keys.length;
           retryAfter().delete(week.from);
         } catch (error) {

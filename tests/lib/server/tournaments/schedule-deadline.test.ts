@@ -36,7 +36,10 @@ import {
   sentNoticesByMatch,
   SWEEP_BATCH,
   SWEEP_FAILURE_BACKOFF_MS,
+  SWEEP_MAX_ACTIONS,
   SWEEP_MAX_FAILURES,
+  SWEEP_MAX_PAGES,
+  failureCounts,
   type SentNotices,
   setMatchScheduleDeadline,
   setTournamentScheduleDeadlines,
@@ -465,7 +468,7 @@ describe("sweepScheduleDeadlines", () => {
 
     await expect(sweepScheduleDeadlines(DEADLINE + HOUR)).resolves.toEqual({ forfeited: 0, lapsed: 0, retired: 1, reminded: 0 });
 
-    expect(executed(connection, /INSERT IGNORE/)[0][1]).toEqual(["RETIRED", PAIRING, new Date(DEADLINE + HOUR), 40, new Date(DEADLINE)]);
+    expect(executed(connection, /INSERT IGNORE/)[0][1]).toEqual(["RETIRED", PAIRING, new Date(DEADLINE + HOUR), 40, new Date(DEADLINE), PAIRING]);
     expect(executed(connection, /UPDATE bg_matches SET schedule_deadline_at = NULL/)).toHaveLength(0);
     expect(notifyUsers).not.toHaveBeenCalled();
   });
@@ -494,7 +497,9 @@ describe("sweepScheduleDeadlines", () => {
 
     await expect(sweepScheduleDeadlines(NOW)).resolves.toEqual({ forfeited: 0, lapsed: 0, retired: 0, reminded: 1 });
 
-    expect(executed(connection, /DELETE FROM bg_schedule_deadline_notices WHERE match_id = \? AND NOT/)[0][1]).toEqual([40, PAIRING]);
+    const [deleteSql, deleteParams] = executed(connection, /DELETE FROM bg_schedule_deadline_notices WHERE match_id = \? AND NOT/)[0];
+    expect(deleteSql).toContain("notice_key <> ?");
+    expect(deleteParams).toEqual([40, PAIRING, "RETIRED"]);
     expect(executed(connection, /INSERT IGNORE/)[0][1]).toEqual(["SET", PAIRING, new Date(NOW), 40, new Date(DEADLINE), 100, 200]);
   });
 
@@ -585,6 +590,74 @@ describe("sweepScheduleDeadlines", () => {
     // Le match 41 s'éteint (échec), le match 40 reçoit encore son rappel 3 h.
     await expect(sweepScheduleDeadlines(DEADLINE - 2 * HOUR)).resolves.toEqual({ forfeited: 0, lapsed: 0, retired: 0, reminded: 1 });
     expect(error).toHaveBeenCalled();
+  });
+  it("sweepScheduleDeadlines_retireAfterScheduleRemoved_guardRequiresSchedule", async () => {
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row({ start_at: new Date(DEADLINE + 24 * HOUR) })]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(0)],
+    ]);
+
+    await expect(sweepScheduleDeadlines(DEADLINE + HOUR)).resolves.toEqual({ forfeited: 0, lapsed: 0, retired: 0, reminded: 0 });
+
+    expect(executed(connection, /INSERT IGNORE/)[0][0]).toContain("(start_at IS NOT NULL OR (launched_at IS NOT NULL AND launch_pairing <=> ?))");
+  });
+
+  it("sweepScheduleDeadlines_actionCapReached_stopsPassWithoutForgettingFailures", async () => {
+    failureCounts().set(9999, { deadlineAt: DEADLINE, failures: 2, retryAt: 0 });
+    const page = Array.from({ length: SWEEP_MAX_ACTIONS + 5 }, (_, index) => row({ id: 1000 + index, team2_id: null }));
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [page]],
+      [/UPDATE bg_matches SET schedule_deadline_at = NULL/, () => [{ affectedRows: 1 }]],
+    ]);
+
+    await expect(sweepScheduleDeadlines(DEADLINE + HOUR)).resolves.toMatchObject({ lapsed: SWEEP_MAX_ACTIONS });
+
+    expect(executed(connection, /FROM bg_matches m/)).toHaveLength(1);
+    expect(failureCounts().has(9999)).toBe(true);
+  });
+
+  it("sweepScheduleDeadlines_maxPagesReached_failureTableKept", async () => {
+    failureCounts().set(9999, { deadlineAt: DEADLINE, failures: 2, retryAt: 0 });
+    let reads = 0;
+    routeSql(connection, [
+      [
+        /FROM bg_matches m/,
+        () => {
+          reads += 1;
+          return [Array.from({ length: SWEEP_BATCH }, (_, index) => row({ id: reads * 10000 + index, team2_id: null }))];
+        },
+      ],
+      [/UPDATE bg_matches SET schedule_deadline_at = NULL/, () => [{ affectedRows: 0 }]],
+    ]);
+
+    await sweepScheduleDeadlines(DEADLINE + HOUR);
+
+    expect(executed(connection, /FROM bg_matches m/)).toHaveLength(SWEEP_MAX_PAGES);
+    expect(failureCounts().has(9999)).toBe(true);
+  });
+
+  it("sweepScheduleDeadlines_equalDeadlines_cursorKeepsDeadlineAndId", async () => {
+    let reads = 0;
+    const page = Array.from({ length: SWEEP_BATCH }, (_, index) => row({ id: 1000 + index, team2_id: null }));
+    routeSql(connection, [[/FROM bg_matches m/, () => [(reads += 1) === 1 ? page : []]]]);
+
+    await sweepScheduleDeadlines(DEADLINE + HOUR);
+
+    expect(executed(connection, /FROM bg_matches m/)[1][0]).toContain("m.schedule_deadline_at = ? AND m.id > ?");
+  });
+
+  it("sweepScheduleDeadlines_failureAfterBackoff_startsNewSeries", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => Promise.reject(new Error("panne"))],
+    ]);
+    for (let pass = 1; pass <= SWEEP_MAX_FAILURES; pass += 1) await sweepScheduleDeadlines(NOW);
+
+    await sweepScheduleDeadlines(NOW + SWEEP_FAILURE_BACKOFF_MS);
+
+    expect(failureCounts().get(40)).toEqual({ deadlineAt: DEADLINE, failures: 1, retryAt: 0 });
+    expect(String(error.mock.calls.at(-1)?.[0])).toContain("(1/" + SWEEP_MAX_FAILURES + ")");
   });
 });
 

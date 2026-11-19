@@ -293,3 +293,14 @@ export function formatScheduleDeadline(iso: string, locale: Locale): string {
     }),
   ).format(new Date(iso));
 }
+
+/**
+ * La date butoir à montrer sur la pastille « à planifier » : celle à venir
+ * seulement (`now` inconnu, au premier rendu : montrée). Une date passée ne
+ * frappe plus ou va frapper : la pastille ne l'annonce pas.
+ */
+export function upcomingScheduleDeadline(deadlineAt: string | null, now: number | null): string | null {
+  if (deadlineAt === null) return null;
+  if (now === null) return deadlineAt;
+  return new Date(deadlineAt).getTime() > now ? deadlineAt : null;
+}

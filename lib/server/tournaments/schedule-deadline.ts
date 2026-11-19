@@ -57,6 +57,12 @@ export const SWEEP_BATCH = 200;
 /** Pages lues par passage au plus : au-delà, la suite attend la minute d'après. */
 export const SWEEP_MAX_PAGES = 10;
 /**
+ * Gestes (forfaits, retraits, extinctions, avis envoyés) par passage au plus :
+ * les messages privés partent un à un sous le verrou ; au-delà, la suite
+ * attend la minute d'après.
+ */
+export const SWEEP_MAX_ACTIONS = 100;
+/**
  * Passages en échec d'affilée sur un même match (pour la même date butoir)
  * avant qu'il ne soit mis de côté {@link SWEEP_FAILURE_BACKOFF_MS} : un
  * forfait qui échoue toujours (résultat déjà saisi plus loin dans l'arbre, par
@@ -567,14 +573,18 @@ async function lapseDeadline(connection: PoolConnection, row: SweepRow, deadline
 
 /**
  * Retire une date butoir échue d'un match programmé ou lancé, si c'est
- * toujours celle lue : marque `SCHEDULE_DEADLINE_RETIRED_KEY` (jamais
- * envoyée), la date reste sur le match pour le planning.
+ * toujours celle lue et que le match est toujours programmé ou lancé (un
+ * horaire retiré entre-temps le laisse à planifier, donc au forfait) : marque
+ * `SCHEDULE_DEADLINE_RETIRED_KEY` (jamais envoyée), la date reste sur le
+ * match pour le planning.
  */
 async function retireDeadline(connection: PoolConnection, row: SweepRow, deadlineAt: number, now: number): Promise<boolean> {
   const [result] = await connection.execute<ResultSetHeader>(
     `INSERT IGNORE INTO bg_schedule_deadline_notices (match_id, notice_key, pairing, deadline_at, sent_at)
-     SELECT id, ?, ?, schedule_deadline_at, ? FROM bg_matches WHERE id = ? AND schedule_deadline_at = ?`,
-    [SCHEDULE_DEADLINE_RETIRED_KEY, rowPairing(row), new Date(now), Number(row.id), new Date(deadlineAt)],
+     SELECT id, ?, ?, schedule_deadline_at, ? FROM bg_matches
+      WHERE id = ? AND schedule_deadline_at = ?
+        AND (start_at IS NOT NULL OR (launched_at IS NOT NULL AND launch_pairing <=> ?))`,
+    [SCHEDULE_DEADLINE_RETIRED_KEY, rowPairing(row), new Date(now), Number(row.id), new Date(deadlineAt), rowPairing(row)],
   );
   return Number(result.affectedRows ?? 0) > 0;
 }
@@ -603,12 +613,13 @@ async function applySweepAction(
   if (action.kind === "lapse") return (await lapseDeadline(connection, row, action.deadlineAt)) ? "lapsed" : null;
   if (action.kind === "retire") return (await retireDeadline(connection, row, action.deadlineAt, now)) ? "retired" : null;
   if (action.kind !== "remind") return null;
-  // Avis d'une paire précédente : la nouvelle repart de l'annonce.
+  // Avis d'une paire précédente : la nouvelle repart de l'annonce. La marque de retrait vaut pour
+  // toute paire : elle reste.
   if (sent.stale) {
-    await connection.execute(`DELETE FROM bg_schedule_deadline_notices WHERE match_id = ? AND NOT (pairing <=> ?)`, [
-      matchId,
-      rowPairing(row),
-    ]);
+    await connection.execute(
+      `DELETE FROM bg_schedule_deadline_notices WHERE match_id = ? AND NOT (pairing <=> ?) AND notice_key <> ?`,
+      [matchId, rowPairing(row), SCHEDULE_DEADLINE_RETIRED_KEY],
+    );
   }
   if (await claimNotices(connection, row, action.deadlineAt, action.consumes, action.key, now)) {
     await sendDeadlineNotices(row, action.key, action.deadlineAt);
@@ -636,13 +647,15 @@ function deadlineOf(row: DeadlineRow): number | null {
  * Un match en échec n'arrête pas les autres ; il est repris à la minute
  * suivante. Au bout de {@link SWEEP_MAX_FAILURES} échecs d'affilée, il est mis
  * de côté {@link SWEEP_FAILURE_BACKOFF_MS} (journal d'erreur pour
- * l'arbitrage) ; sa date butoir reste.
+ * l'arbitrage) ; sa date butoir reste. Repris, il repart d'une série neuve.
  */
-function recordFailure(row: SweepRow, error: unknown, now: number): void {
+export function recordFailure(row: SweepRow, error: unknown, now: number): void {
   const matchId = Number(row.id);
   const deadlineAt = deadlineOf(row);
   const previous = failureCounts().get(matchId);
-  const failures = (previous !== undefined && previous.deadlineAt === deadlineAt ? previous.failures : 0) + 1;
+  // Une série mise de côté puis reprise repart de zéro : le compte reste borné.
+  const continued = previous !== undefined && previous.deadlineAt === deadlineAt && previous.retryAt === 0;
+  const failures = (continued ? previous.failures : 0) + 1;
   const parked = failures >= SWEEP_MAX_FAILURES;
   failureCounts().set(matchId, { deadlineAt, failures, retryAt: parked ? now + SWEEP_FAILURE_BACKOFF_MS : 0 });
   console.error(`[schedule-deadline] match ${matchId} : passage en échec (${failures}/${SWEEP_MAX_FAILURES})`, failureReason(error));
@@ -673,7 +686,8 @@ function forgetUnseen(seen: ReadonlySet<number>, now: number): void {
  * se relit sous verrou, un avis se réserve avant l'envoi, une extinction ne
  * touche que la date butoir lue —, et un seul processus à la fois (verrou
  * nommé, pris sans attendre : un autre passage en cours fera le travail). La
- * lecture va par pages ({@link SWEEP_BATCH}), jusqu'à {@link SWEEP_MAX_PAGES}.
+ * lecture va par pages ({@link SWEEP_BATCH}), jusqu'à {@link SWEEP_MAX_PAGES}
+ * et {@link SWEEP_MAX_ACTIONS} gestes.
  */
 export async function sweepScheduleDeadlines(now: number = Date.now()): Promise<SweepReport> {
   const report: SweepReport = { forfeited: 0, lapsed: 0, retired: 0, reminded: 0 };
@@ -686,7 +700,7 @@ export async function sweepScheduleDeadlines(now: number = Date.now()): Promise<
       let complete = false;
       for (let page = 0; page < SWEEP_MAX_PAGES; page += 1) {
         const rows = await readSweepRows(connection, now, skipIds, after);
-        await sweepPage(connection, rows, now, report, seen);
+        if (!(await sweepPage(connection, rows, now, report, seen))) break;
         const last = rows[rows.length - 1];
         if (rows.length < SWEEP_BATCH || !last || last.schedule_deadline_at === null) {
           complete = true;
@@ -709,9 +723,10 @@ async function sweepPage(
   now: number,
   report: SweepReport,
   seen: Set<number>,
-): Promise<void> {
+): Promise<boolean> {
   const sent = await readSentNotices(connection, rows);
   for (const row of rows) {
+    if (reportTotal(report) >= SWEEP_MAX_ACTIONS) return false;
     const matchId = Number(row.id);
     seen.add(matchId);
     const notices = sent.get(matchId) ?? NO_NOTICES;
@@ -723,6 +738,11 @@ async function sweepPage(
       recordFailure(row, error, now);
     }
   }
+  return true;
+}
+
+function reportTotal(report: SweepReport): number {
+  return report.forfeited + report.lapsed + report.retired + report.reminded;
 }
 
 type ClockState = { timer: ReturnType<typeof setInterval> | null; failing: boolean; running: boolean };
