@@ -1328,7 +1328,9 @@ export function RgpdEn({
             which also turns off its direct message. Everyone can withdraw from an assignment until the slot
             starts, with an optional reason read by the tournament staff only; the site keeps the withdrawal
             (role, date, reason, whether it is late — less than 24 h before) with the history, and replaces
-            the person automatically. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
+            the person automatically (a slot holds two casters at most; a second caster who withdraws is only
+            replaced by a caster needed nowhere else, and the slot is not “open” while the other caster stays
+            confirmed there). Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
             of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds the
             caster role; deleting the account removes everything about it (the actions it took as staff
             remain, without naming it), and the export of your data contains it, actions taken as staff

@@ -115,6 +115,8 @@ export type WithdrawalAnnouncement = {
    * le match par une autre voie. Faux : le rôle est tenu.
    */
   unfilled: boolean;
+  /** Pas de remplaçant, mais un autre caster confirmé tient encore l'entrée (second caster). Absent : faux. */
+  stillHeld?: boolean;
   /** Les autres affectés de l'entrée (tenus, ni le désisté ni le remplaçant). */
   coAssignedIds: readonly number[];
 };
@@ -128,7 +130,8 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
   const notice: PlanningWithdrawalNotice = {
     ...noticeEntry(input.entry),
     role: input.role,
-    replaced: !input.unfilled,
+    replaced: !input.unfilled && input.stillHeld !== true,
+    stillHeld: input.stillHeld === true,
     late: input.late,
   };
   try {

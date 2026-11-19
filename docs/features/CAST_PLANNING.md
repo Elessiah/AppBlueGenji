@@ -78,6 +78,31 @@ Un prod n'est jamais attribué ni compté sans caster ; un caster non autonome
 (`bg_planning_profiles.solo_caster`) ne diffuse qu'avec un prod. La couverture
 compte les **rôles**, pas les personnes.
 
+### Deux casters (`PLANNING_MAX_CASTERS` = 2)
+
+- Une entrée (match ou tournoi entier) tient **deux casters au plus** au
+  planning ; le premier la couvre, le second n'est qu'un **renfort**. Deux
+  casters non autonomes ont **encore besoin d'un prod** pour que l'entrée soit
+  « diffusée » (un seul autonome des deux suffit) : la couverture ne change
+  pas de règle.
+- Les inscriptions de cast du match (`bg_match_casters`) restent **sans
+  plafond** ; elles comptent dans les deux du planning.
+- **Calcul** : le second caster vient en dernier, une fois le planning stable
+  (chaque entrée à sa meilleure couverture), sur une entrée qui a déjà son
+  caster, jamais à quelqu'un déjà sur l'entrée (aucun cumul pour un renfort),
+  ni à un caster disponible sur une entrée qui la chevauche et reste **sans
+  caster** — ouverte au lot ou non (jamais pris à une autre entrée). Ordre :
+  ceux qui préfèrent l'entrée (sur tout le lot) d'abord, puis les autres
+  entrée par entrée dans l'ordre du calendrier ; parmi les candidats, ce qui
+  rend l'entrée diffusée (un autonome auprès d'un caster qui attend son prod),
+  la préférence, la charge (semaine, historique), l'identifiant.
+- **Choix du staff** : poser un caster de plus sur une entrée qui en a déjà
+  deux (lignes du planning, propositions provisoires comprises, et inscrits du
+  match) est refusé `PLANNING_CASTERS_FULL` (409) ; la page masque alors la
+  liste « Ajouter — Caster » et dit « Deux casters au plus »
+  (`planningCastersFull`, même règle des deux côtés). Retirer d'abord l'un des
+  deux (une proposition retirée à la main n'est plus reproposée).
+
 ## Calcul (`lib/shared/planning-planner.ts`, pur et déterministe)
 
 - **Par lot** sur une fenêtre (une semaine depuis la page, `PLANNING_BATCH_MAX_DAYS`
@@ -240,7 +265,8 @@ de Paris, lien vers `/planning` dans la langue du destinataire).
 - `PLANNING_WITHDRAWAL` (« Désistements du planning ») : aux autres affectés
   **confirmés** de l'entrée quand une attribution **confirmée** est quittée
   (une proposition provisoire, quittée ou co-affectée, n'en reçoit aucun) — « un caster
-  s'est désisté », remplaçant affecté ou place à pourvoir.
+  s'est désisté », remplaçant affecté, autre caster encore affecté (second
+  caster, `bodyStillHeld`) ou place à pourvoir.
 - `PLANNING_UNFILLED` (« Places à pourvoir », `tournaments`) :
   aucun remplaçant trouvé — push **et** message privé au staff des tournois
   (comptes qui tiennent `tournaments`, choisis par la règle de `notifyStaff`
@@ -276,7 +302,14 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   et l'entrée exclut ensuite le membre pour ce rôle (comme un retrait manuel).
 - **Remplacement automatique** sous le verrou du planning, par les règles du
   calcul (`pickReplacement` : `preparePlanner` sur la seule entrée, rôle
-  quitté). La ligne remplaçante hérite de l'état de la ligne quittée :
+  quitté). Caster quitté alors qu'un **autre caster** tient encore l'entrée :
+  il était le renfort (l'autre devient le premier, la première place n'est
+  jamais vide) ; son remplaçant suit la règle du second caster (libre, attendu
+  sur aucune entrée qui la chevauche), sinon personne. Si l'autre caster est
+  **confirmé**, la place n'est pas « à pourvoir » : ni pastille, ni avis au
+  staff (`stillHeld`) ; les co-affectés lisent « un autre caster reste
+  affecté ». Le groupe d'arbitres d'un tournoi entier garde la règle
+  d'avant (un arbitre quitté sans remplaçant laisse sa place à pourvoir). La ligne remplaçante hérite de l'état de la ligne quittée :
   confirmée (et le remplaçant prévenu, `PLANNING_ASSIGNED`) si elle l'était,
   provisoire sinon (sans message). Aucun candidat : la place est **« à
   pourvoir »** (pastille sur la carte, `unfilled` de la vue) et le staff est

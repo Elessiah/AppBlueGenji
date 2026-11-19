@@ -94,7 +94,11 @@ async function writeWithdrawalEvent(
  * Le remplaçant : le calcul rouvre la seule entrée (toutes les autres
  * attributions verrouillées, provisoires comprises) et rend son premier choix
  * pour ce rôle. Relu après le désistement : le désisté est écarté
- * (`removals`), l'arbitre du match retiré.
+ * (`removals`), l'arbitre du match retiré. Un caster quitté alors qu'un autre
+ * caster tient encore l'entrée était un renfort (`PLANNING_MAX_CASTERS`) :
+ * il n'est remplacé que par un caster libre, attendu sur aucune entrée qui
+ * la chevauche (la règle du second caster du calcul) ; sinon, la place reste
+ * tenue par l'autre, jamais « à pourvoir ».
  */
 export function pickReplacement(
   data: PlanningData,
@@ -105,7 +109,12 @@ export function pickReplacement(
   historyWeek: number,
 ): PlannedAssignment | null {
   const base = preparePlanner(data, [], history, excluded, historyWeek);
-  const input = { ...base, entries: base.entries.map((item) => (item.key === entry.key ? { ...item, open: true } : item)) };
+  const spare = role === "CASTER" && entryAssignments(entry, data).some((row) => row.role === "CASTER");
+  const input = {
+    ...base,
+    entries: base.entries.map((item) => (item.key === entry.key ? { ...item, open: true } : item)),
+    spareCasters: spare,
+  };
   return planAssignments(input).find((row) => row.entryKey === entry.key && row.role === role) ?? null;
 }
 
@@ -224,6 +233,20 @@ async function releaseMatchReferee(matchId: number, userId: number, undo: Planni
   return null;
 }
 
+/**
+ * Un caster quitté dont l'entrée garde un **autre** caster confirmé (le
+ * second caster, `PLANNING_MAX_CASTERS`) : le rôle reste tenu, la place n'est
+ * pas « à pourvoir » et le staff n'est pas prévenu. Les autres rôles (dont le
+ * groupe d'arbitres d'un tournoi entier) gardent leur règle : sans remplaçant,
+ * la place quittée est à pourvoir.
+ */
+function casterStillHeld(entry: LoadedEntry, data: PlanningData, role: PlanningRole, userId: number): boolean {
+  return (
+    role === "CASTER" &&
+    entryAssignments(entry, data).some((row) => row.role === "CASTER" && !row.provisional && row.userId !== userId)
+  );
+}
+
 /** Les autres affectés tenus de l'entrée : ni le désisté, ni le remplaçant. */
 function coAssigned(entry: LoadedEntry, data: PlanningData, userId: number, replacementId: number | null): number[] {
   return entryAssignments(entry, data)
@@ -240,21 +263,33 @@ function coAssigned(entry: LoadedEntry, data: PlanningData, userId: number, repl
 async function replaceWithdrawn(
   connection: PoolConnection,
   gesture: { entry: LoadedEntry; data: PlanningData; role: PlanningRole; now: number; confirmed: boolean; userId: number },
-): Promise<{ fresh: LoadedEntry; replacementId: number | null; coAssignedIds: number[] }> {
+): Promise<{ fresh: LoadedEntry; replacementId: number | null; coAssignedIds: number[]; stillHeld: boolean }> {
   const { entry, data, role, now, confirmed, userId } = gesture;
   try {
     const found = await findReplacement(connection, entry.key, role, now, data.members);
     const fresh = found.entry ?? entry;
     const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, userId));
     const replacementId = placed && found.pick ? found.pick.userId : null;
-    return { fresh, replacementId, coAssignedIds: coAssigned(fresh, found.data, userId, replacementId) };
+    return {
+      fresh,
+      replacementId,
+      coAssignedIds: coAssigned(fresh, found.data, userId, replacementId),
+      stillHeld: casterStillHeld(fresh, found.data, role, userId),
+    };
   } catch (error) {
     console.error("[planning] remplaçant introuvable après un désistement.", failureReason(error));
-    return { fresh: entry, replacementId: null, coAssignedIds: coAssigned(entry, data, userId, null) };
+    return {
+      fresh: entry,
+      replacementId: null,
+      coAssignedIds: coAssigned(entry, data, userId, null),
+      stillHeld: casterStillHeld(entry, data, role, userId),
+    };
   }
 }
 
 type Outcome = WithdrawalResult & {
+  /** Un autre caster confirmé tient encore l'entrée (aucune place à pourvoir). */
+  stillHeld: boolean;
   confirmed: boolean;
   entry: LoadedEntry;
   replacementId: number | null;
@@ -292,6 +327,7 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
         late,
         replaced: false,
         unfilled: false,
+        stillHeld: false,
         confirmed,
         entry,
         replacementId: null,
@@ -299,11 +335,19 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
         coAssignedIds: coAssigned(entry, data, user.id, heldBy),
       };
     }
-    const { fresh, replacementId, coAssignedIds } = await replaceWithdrawn(connection, { entry, data, role: input.role, now, confirmed, userId: user.id });
+    const { fresh, replacementId, coAssignedIds, stillHeld } = await replaceWithdrawn(connection, {
+      entry,
+      data,
+      role: input.role,
+      now,
+      confirmed,
+      userId: user.id,
+    });
     return {
       late,
       replaced: replacementId !== null,
-      unfilled: confirmed && replacementId === null,
+      unfilled: confirmed && replacementId === null && !stillHeld,
+      stillHeld: replacementId === null && stillHeld,
       confirmed,
       entry: fresh,
       replacementId,
@@ -320,6 +364,7 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
       withdrawnUserId: user.id,
       replacementId: outcome.replacementId,
       unfilled: outcome.unfilled,
+      stillHeld: outcome.stillHeld,
       coAssignedIds: outcome.coAssignedIds,
     });
   }

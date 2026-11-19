@@ -574,3 +574,150 @@ describe("planAssignments — déterminisme", () => {
     expect(planAssignments(shuffled)).toEqual(planAssignments(ordered));
   });
 });
+
+describe("planAssignments — second caster", () => {
+  it("planAssignments_twoCastersAvailable_secondCasterAfterFirst", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20)],
+      availability: [available("m:1", 1, "CASTER"), available("m:1", 2, "CASTER"), available("m:1", 3, "PROD")],
+      members: new Map([[1, CASTER], [2, CASTER], [3, PROD]]),
+    });
+
+    const result = planAssignments(input);
+
+    expect(picks(result)).toEqual([
+      { entryKey: "m:1", userId: 1, role: "CASTER" },
+      { entryKey: "m:1", userId: 2, role: "CASTER" },
+      { entryKey: "m:1", userId: 3, role: "PROD" },
+    ]);
+  });
+
+  it("planAssignments_threeCastersAvailable_cappedAtTwo", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20)],
+      availability: [1, 2, 3].map((userId) => available("m:1", userId, "CASTER")),
+      members: new Map([[1, CASTER], [2, CASTER], [3, CASTER]]),
+      soloCasterIds: new Set([1, 2, 3]),
+    });
+
+    const result = planAssignments(input);
+
+    expect(result.filter((row) => row.role === "CASTER")).toHaveLength(2);
+  });
+
+  it("planAssignments_overlappingEntryNeedsCaster_casterNotTakenAsSpare", () => {
+    // Le caster 2 peut couvrir m:1 et m:2 (qui se chevauchent) ; le caster 1, m:1 seulement.
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20), plannerEntry("m:2", 20)],
+      availability: [available("m:1", 1, "CASTER"), available("m:1", 2, "CASTER"), available("m:2", 2, "CASTER")],
+      members: new Map([[1, CASTER], [2, CASTER]]),
+      soloCasterIds: new Set([1, 2]),
+    });
+
+    const result = planAssignments(input);
+
+    expect(picks(result)).toEqual([
+      { entryKey: "m:1", userId: 1, role: "CASTER" },
+      { entryKey: "m:2", userId: 2, role: "CASTER" },
+    ]);
+  });
+
+  it("planAssignments_overlappingEntryOutsideBatchNeedsCaster_casterNotTakenAsSpare", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20), plannerEntry("m:2", 20, { open: false })],
+      availability: [available("m:1", 1, "CASTER"), available("m:1", 2, "CASTER"), available("m:2", 2, "CASTER")],
+      members: new Map([[1, CASTER], [2, CASTER]]),
+      soloCasterIds: new Set([1, 2]),
+      locked: [{ entryKey: "m:1", userId: 1, role: "CASTER", reason: "MANUAL" }],
+    });
+
+    expect(planAssignments(input)).toEqual([]);
+  });
+
+  it("planAssignments_spareCasterPrefersEntry_placedThere", () => {
+    // Deux entrées qui se chevauchent, chacune avec son caster : le renfort va à celle qu'il préfère.
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20), plannerEntry("m:2", 20)],
+      availability: [
+        available("m:1", 3, "CASTER"),
+        available("m:2", 3, "CASTER", { preferred: true }),
+      ],
+      members: new Map([[1, CASTER], [2, CASTER], [3, CASTER]]),
+      soloCasterIds: new Set([1, 2, 3]),
+      locked: [
+        { entryKey: "m:1", userId: 1, role: "CASTER", reason: "MANUAL" },
+        { entryKey: "m:2", userId: 2, role: "CASTER", reason: "MANUAL" },
+      ],
+    });
+
+    const result = planAssignments(input);
+
+    expect(result).toEqual([{ entryKey: "m:2", userId: 3, role: "CASTER", reason: "PREFERENCE", weekLoad: 1, historyLoad: 0 }]);
+  });
+
+  it("planAssignments_unstreamedEntry_soloSpareChosenOverLighterCaster", () => {
+    // Le caster 1 (verrouillé) attend un prod ; 2 n'a rien fait, 3 (autonome) a déjà travaillé.
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20)],
+      availability: [available("m:1", 2, "CASTER"), available("m:1", 3, "CASTER")],
+      members: new Map([[1, CASTER], [2, CASTER], [3, CASTER]]),
+      soloCasterIds: new Set([3]),
+      locked: [{ entryKey: "m:1", userId: 1, role: "CASTER", reason: "MANUAL" }],
+      history: new Map([[3, 5]]),
+    });
+
+    expect(picks(planAssignments(input))).toEqual([{ entryKey: "m:1", userId: 3, role: "CASTER" }]);
+  });
+
+  it("planAssignments_spareCastersFalse_noSecondCaster", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20)],
+      availability: [available("m:1", 1, "CASTER"), available("m:1", 2, "CASTER")],
+      members: new Map([[1, CASTER], [2, CASTER]]),
+      soloCasterIds: new Set([1, 2]),
+      spareCasters: false,
+    });
+
+    expect(picks(planAssignments(input))).toEqual([{ entryKey: "m:1", userId: 1, role: "CASTER" }]);
+  });
+
+  it("planAssignments_spareCandidateAlreadyRefereeOnEntry_notAddedAsSpare", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20)],
+      availability: [available("m:1", 2, "CASTER")],
+      members: new Map<number, PlanningRole[]>([[1, CASTER], [2, ["REFEREE", "CASTER"]]]),
+      soloCasterIds: new Set([1, 2]),
+      locked: [
+        { entryKey: "m:1", userId: 1, role: "CASTER", reason: "MANUAL" },
+        { entryKey: "m:1", userId: 2, role: "REFEREE", reason: "MANUAL" },
+      ],
+    });
+
+    expect(planAssignments(input)).toEqual([]);
+  });
+
+  it("planAssignments_twoLockedCasters_noSpareAdded", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20)],
+      availability: [available("m:1", 3, "CASTER")],
+      members: new Map([[1, CASTER], [2, CASTER], [3, CASTER]]),
+      soloCasterIds: new Set([3]),
+      locked: [
+        { entryKey: "m:1", userId: 1, role: "CASTER", reason: "CAST" },
+        { entryKey: "m:1", userId: 2, role: "CASTER", reason: "MANUAL" },
+      ],
+    });
+
+    expect(planAssignments(input)).toEqual([]);
+  });
+
+  it("planAssignments_nonSoloCastersWithoutProd_noCasterAtAll", () => {
+    const input = plannerInput({
+      entries: [plannerEntry("m:1", 20)],
+      availability: [available("m:1", 1, "CASTER"), available("m:1", 2, "CASTER")],
+      members: new Map([[1, CASTER], [2, CASTER]]),
+    });
+
+    expect(planAssignments(input)).toEqual([]);
+  });
+});

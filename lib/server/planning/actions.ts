@@ -10,7 +10,7 @@ import { withConnection } from "@/lib/server/database";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
 import { can } from "@/lib/shared/permissions";
-import { planningRolesOf, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
+import { planningCastersFull, planningRolesOf, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { rolesConflict, slotsOverlap } from "@/lib/shared/planning-planner";
 import { MATCH_REFEREE_REFUSAL_CODES, holdingRefusal, lockedHolding, withPlanningLock, writeAssignment, writeEvent } from "./auto-assign";
@@ -36,6 +36,7 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   PLANNING_ROLE_NOT_HELD: 409,
   PLANNING_HIDDEN_FOR_MEMBER: 409,
   PLANNING_ROLE_CONFLICT: 409,
+  PLANNING_CASTERS_FULL: 409,
   PLANNING_IS_PLAYER: 409,
   PLANNING_OVERLAP: 409,
   PLANNING_OVERLAP_MANAGED: 409,
@@ -171,7 +172,8 @@ async function overlappingProposals(
   return proposals;
 }
 
-async function assignManually({ connection, actor, data, entry, input, current, matchId }: ManualContext): Promise<void> {
+/** Les refus d'une pose à la main jugés sur la lecture du geste (rôle, conflit, cast inscrit, plafond de casters). */
+function refuseManualPose({ data, entry, input, current }: Pick<ManualContext, "data" | "entry" | "input" | "current">): void {
   const member = data.members.find((candidate) => candidate.userId === input.userId);
   // Rôle tenu, et tournoi encore caché seulement pour qui le voit, comme pour le calcul (`excludeFromHidden`).
   const refusal = holdingRefusal(member, entry, input.role);
@@ -180,6 +182,11 @@ async function assignManually({ connection, actor, data, entry, input, current, 
     throw new Error("PLANNING_ROLE_CONFLICT");
   }
   if (current?.source === "CAST") throw new Error("PLANNING_CAST_MANAGED");
+  if (input.role === "CASTER" && planningCastersFull(entryAssignments(entry, data), input.userId)) throw new Error("PLANNING_CASTERS_FULL");
+}
+
+async function assignManually({ connection, actor, data, entry, input, current, matchId }: ManualContext): Promise<void> {
+  refuseManualPose({ data, entry, input, current });
   const released = await overlappingProposals(connection, data, entry, input.userId);
   // L'instantané ne sert qu'à l'arbitre d'un match (seul geste qui passe par le match) : les lignes que le geste retire.
   const releasedKeys = new Set(released.map((proposal) => `${proposal.entry.key}|${proposal.role}`));

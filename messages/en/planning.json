@@ -41,7 +41,7 @@
     "needsProd": "Caster without prod",
     "idleProds": "Prod without caster",
     "label": "Coverage",
-    "hint": "Complete: referee, caster and prod. Streamed: a solo caster, or a caster and a prod. Self-managed: nobody, teams manage themselves."
+    "hint": "Complete: referee, caster and prod. Streamed: a solo caster, or a caster and a prod. Self-managed: nobody, teams manage themselves. Two casters at most: without a solo caster, they need a prod."
   },
   "status": {
     "AVAILABLE": "Available",
@@ -71,7 +71,8 @@
     "add": "Add — {role}",
     "option": "{name} · {status}",
     "optionPreferred": "{name} · {status} ★",
-    "unknown": "No answer"
+    "unknown": "No answer",
+    "castersFull": "Two casters at most"
   },
   "solo": {
     "label": "I stream alone (solo caster)",
@@ -120,6 +121,7 @@
     "PLANNING_ROLE_NOT_HELD": "This account cannot hold this role here.",
     "PLANNING_HIDDEN_FOR_MEMBER": "This tournament is still hidden: this account cannot see it.",
     "PLANNING_ROLE_CONFLICT": "The same person cannot be caster and prod on one slot.",
+    "PLANNING_CASTERS_FULL": "This slot already has two casters: remove one before adding another.",
     "PLANNING_IS_PLAYER": "This person plays during this slot: they cannot cover it.",
     "PLANNING_OVERLAP": "This person already holds a slot that overlaps this one: remove them from the other one first.",
     "PLANNING_OVERLAP_MANAGED": "This person already holds an overlapping slot on the match itself (signed-up caster or appointed referee): remove them from that match first.",

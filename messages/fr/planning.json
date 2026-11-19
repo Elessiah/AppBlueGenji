@@ -41,7 +41,7 @@
     "needsProd": "Caster sans prod",
     "idleProds": "Prod sans caster",
     "label": "Couverture",
-    "hint": "Complet : arbitre, caster et prod. Diffusé : un caster autonome, ou un caster et un prod. Autogestion : personne, les équipes se gèrent."
+    "hint": "Complet : arbitre, caster et prod. Diffusé : un caster autonome, ou un caster et un prod. Autogestion : personne, les équipes se gèrent. Deux casters au plus : sans caster autonome, il leur faut un prod."
   },
   "status": {
     "AVAILABLE": "Dispo",
@@ -71,7 +71,8 @@
     "add": "Ajouter — {role}",
     "option": "{name} · {status}",
     "optionPreferred": "{name} · {status} ★",
-    "unknown": "Pas répondu"
+    "unknown": "Pas répondu",
+    "castersFull": "Deux casters au plus"
   },
   "solo": {
     "label": "Je diffuse seul (caster autonome)",
@@ -120,6 +121,7 @@
     "PLANNING_ROLE_NOT_HELD": "Ce compte ne peut pas tenir ce rôle ici.",
     "PLANNING_HIDDEN_FOR_MEMBER": "Ce tournoi est encore caché : ce compte ne le voit pas.",
     "PLANNING_ROLE_CONFLICT": "Une même personne ne peut pas être caster et prod sur un même créneau.",
+    "PLANNING_CASTERS_FULL": "Ce créneau a déjà deux casters : retire-en un avant d'en poser un autre.",
     "PLANNING_IS_PLAYER": "Cette personne joue pendant ce créneau : elle ne peut pas le couvrir.",
     "PLANNING_OVERLAP": "Cette personne tient déjà un créneau qui chevauche celui-ci : retire-la d'abord de l'autre.",
     "PLANNING_OVERLAP_MANAGED": "Cette personne tient déjà, sur le match lui-même, un créneau qui chevauche celui-ci (caster inscrit ou arbitre désigné) : retire-la d'abord depuis ce match.",

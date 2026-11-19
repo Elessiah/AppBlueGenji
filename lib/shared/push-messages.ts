@@ -1237,10 +1237,18 @@ export function planningWithdrawalPush(notice: PlanningWithdrawalNotice, locale:
   };
   return {
     title: text.t("planning.withdrawal.title"),
-    body: text.t(notice.replaced ? "planning.withdrawal.bodyReplaced" : "planning.withdrawal.bodyOpen", values),
+    body: text.t(withdrawalBody(notice), values),
     url: localeHref(PLANNING_PATH, locale),
     tag: `planning-withdrawal-${notice.key}-${notice.role}`,
   };
+}
+
+/** Texte d'un désistement : remplaçant affecté, autre caster encore affecté, ou place à pourvoir. */
+function withdrawalBody(
+  notice: PlanningWithdrawalNotice,
+): "planning.withdrawal.bodyReplaced" | "planning.withdrawal.bodyStillHeld" | "planning.withdrawal.bodyOpen" {
+  if (notice.replaced) return "planning.withdrawal.bodyReplaced";
+  return notice.stillHeld === true ? "planning.withdrawal.bodyStillHeld" : "planning.withdrawal.bodyOpen";
 }
 
 /** Place à pourvoir après un désistement sans remplaçant (`PLANNING_UNFILLED`, staff des tournois). */

@@ -37,6 +37,11 @@ export type PlanningWithdrawalNotice = PlanningNoticeEntry & {
   role: PlanningRole;
   /** Un remplaçant a été affecté (sans le nommer). */
   replaced: boolean;
+  /**
+   * Pas de remplaçant, mais un autre caster (second caster de l'entrée) reste
+   * affecté : la place n'est pas à pourvoir. Absent : faux.
+   */
+  stillHeld?: boolean;
   /** Désistement à moins de 24 h du début. */
   late: boolean;
 };
@@ -169,10 +174,12 @@ export function formatPlanningWithdrawalDm(notice: PlanningWithdrawalNotice, sit
   const label = planningEntryLabel(notice, locale);
   const url = planningNoticeUrl(siteBase, locale);
   if (locale === "en") {
-    const outcome = notice.replaced ? "A replacement has been assigned." : "The slot is open.";
+    let outcome = notice.replaced ? "A replacement has been assigned." : "The slot is open.";
+    if (!notice.replaced && notice.stillHeld === true) outcome = `Another ${role} is still assigned.`;
     return `↩️ BlueGenji — A ${role} withdrew from ${label} (${when}, Paris time). ${outcome} ${url}`;
   }
-  const outcome = notice.replaced ? "Un remplaçant a été affecté." : "La place est à pourvoir.";
+  let outcome = notice.replaced ? "Un remplaçant a été affecté." : "La place est à pourvoir.";
+  if (!notice.replaced && notice.stillHeld === true) outcome = `Un autre ${role} reste affecté.`;
   return `↩️ BlueGenji — Un ${role} s'est désisté de ${label} (${when}, heure de Paris). ${outcome} ${url}`;
 }
 

@@ -326,6 +326,39 @@ describe("setManualAssignment — pose", () => {
     );
   });
 
+  it("setManualAssignment_entryHasTwoCasters_throwsCastersFull", async () => {
+    const casters = [...members, loadedMember({ userId: 7, roles: ["CASTER"] })];
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        members: casters,
+        assignments: [loadedAssignment({ userId: 7, role: "CASTER", source: "MANUAL", confirmed: true })],
+        matchCasters: new Map([["m:1", [8]]]),
+      }),
+    );
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "CASTER", userId: 4, assigned: true })).rejects.toThrow(
+      "PLANNING_CASTERS_FULL",
+    );
+    expect(callsWith("INSERT INTO bg_planning_assignments")).toEqual([]);
+  });
+
+  it("setManualAssignment_entryHasOneCaster_secondCasterAssigned", async () => {
+    const casters = [...members, loadedMember({ userId: 7, roles: ["CASTER"] })];
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [event],
+        members: casters,
+        assignments: [loadedAssignment({ entryKey: "t:10", userId: 7, role: "CASTER", source: "MANUAL", confirmed: true })],
+      }),
+    );
+
+    await setManualAssignment(staff, { entryKey: "t:10", role: "CASTER", userId: 4, assigned: true });
+
+    expect(callsWith("INSERT INTO bg_planning_assignments")[0][1]).toEqual(["t:10", 4, "CASTER", 10, null, "MANUAL", "MANUAL", 1, 9]);
+  });
+
   it("setManualAssignment_castSource_throwsCastManaged", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
       planningData({ entries: [loadedEntry()], members, matchCasters: new Map([["m:1", [4]]]) }),
@@ -768,5 +801,6 @@ describe("PLANNING_STATUSES", () => {
     expect(PLANNING_STATUSES.MATCH_NOT_FOUND).toBe(404);
     expect(PLANNING_STATUSES.REFEREE_DISCORD_REQUIRED).toBe(409);
     expect(PLANNING_STATUSES.PLANNING_OVERLAP_MANAGED).toBe(409);
+    expect(PLANNING_STATUSES.PLANNING_CASTERS_FULL).toBe(409);
   });
 });

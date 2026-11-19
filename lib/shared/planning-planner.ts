@@ -20,6 +20,12 @@
  *    chevauchent, chacun posé sur celle que l'autre voulait). Jusqu'à ce que
  *    plus rien ne s'améliore. Chaque essai se juge sur la seule partie du
  *    planning qu'il touche : un lot d'un mois se calcule en un instant.
+ * 3. **Second caster** ({@link PLANNING_MAX_CASTERS}), en renfort seulement,
+ *    une fois chaque entrée à sa meilleure couverture : sur une entrée qui a
+ *    déjà son caster, à qui n'est attendu sur aucune entrée qui la chevauche
+ *    et reste sans caster (jamais pris à une autre entrée), préférences
+ *    d'abord (sur tout le lot), puis ce qui rend l'entrée diffusée (un caster
+ *    autonome auprès d'un caster sans prod), puis la charge.
  *
  * Une personne ne tient pas deux entrées qui se **chevauchent** (durées
  * estimées, `planning-durations.ts`) mais enchaîne des entrées consécutives.
@@ -29,6 +35,7 @@
 import {
   planningCoverage,
   planningWeekStart,
+  PLANNING_MAX_CASTERS,
   PLANNING_ROLES,
   type AssignmentReason,
   type AvailabilityStatus,
@@ -89,6 +96,11 @@ export type PlannerInput = {
   historyWeek?: number;
   /** `entryKey|userId|role` refusés (joueur du match, condition d'arbitrage, retrait par le staff). */
   excluded: ReadonlySet<string>;
+  /**
+   * Pose un second caster en renfort (défaut : oui). Le remplacement d'un
+   * caster seul sur son entrée l'éteint : sa place est la première, pas un renfort.
+   */
+  spareCasters?: boolean;
 };
 
 export type PlannedAssignment = {
@@ -203,6 +215,11 @@ class PlannerState {
 
   entry(key: string): PlannerEntry | undefined {
     return this.entries.get(key);
+  }
+
+  /** Les entrées dont le créneau chevauche celui de `key`. */
+  overlapsOf(key: string): readonly string[] {
+    return this.overlapping.get(key) ?? [];
   }
 
   weekOf(key: string): number {
@@ -469,6 +486,65 @@ function fillAll(state: PlannerState, open: readonly PlannerEntry[]): boolean {
   return changed;
 }
 
+/**
+ * Un caster disponible ici est-il attendu ailleurs : une entrée qui chevauche
+ * celle-ci, encore sans caster, qu'il pourrait prendre (ouverte au calcul ou
+ * non : un lot ne prend jamais un caster à une entrée d'un autre lot).
+ */
+function casterNeededElsewhere(state: PlannerState, entry: PlannerEntry, userId: number): boolean {
+  return state.overlapsOf(entry.key).some((key) => {
+    const other = state.entry(key);
+    return other !== undefined && state.held(key, "CASTER").length === 0 && state.eligible(other, userId, "CASTER");
+  });
+}
+
+/**
+ * Le second caster d'une entrée, en renfort : l'entrée a déjà son premier
+ * caster (jamais un second sans premier) et pas encore son plafond ; le
+ * candidat n'est pas déjà sur l'entrée (aucun cumul pour un renfort) ni
+ * attendu ailleurs ({@link casterNeededElsewhere}). `preferredOnly` : seuls
+ * ceux qui préfèrent l'entrée. Ordre : ce qui rend l'entrée diffusée (un
+ * caster autonome auprès d'un caster qui attend son prod), la préférence, la
+ * charge de la semaine, celle des semaines précédentes, l'identifiant.
+ */
+function spareCaster(state: PlannerState, entry: PlannerEntry, preferredOnly: boolean): number | null {
+  const held = state.held(entry.key, "CASTER").length;
+  if (held === 0 || held >= PLANNING_MAX_CASTERS) return null;
+  const streamed = state.coverage(entry.key).streamed;
+  const ranked = state
+    .candidates(entry, "CASTER")
+    .filter((userId) => state.rolesOn(entry.key, userId).length === 0)
+    .filter((userId) => !preferredOnly || state.preferred(entry.key, userId, "CASTER"))
+    .filter((userId) => !casterNeededElsewhere(state, entry, userId))
+    .map((userId) => ({
+      userId,
+      streams: !streamed && state.input.soloCasterIds.has(userId) ? 0 : 1,
+      preferred: state.preferred(entry.key, userId, "CASTER") ? 0 : 1,
+      week: state.weekLoad(userId, entry.key),
+      history: state.historyOf(userId, entry.key),
+    }));
+  ranked.sort(
+    (a, b) =>
+      a.streams - b.streams || a.preferred - b.preferred || a.week - b.week || a.history - b.history || a.userId - b.userId,
+  );
+  return ranked[0]?.userId ?? null;
+}
+
+/**
+ * Les seconds casters, une fois le planning stable (chaque entrée à sa
+ * meilleure couverture) : d'abord ceux qui préfèrent l'entrée, sur tout le
+ * lot, puis les autres, entrée par entrée dans l'ordre du calendrier.
+ */
+function fillSpareCasters(state: PlannerState, open: readonly PlannerEntry[]): void {
+  const order = [...open].sort((a, b) => a.startAt - b.startAt || a.key.localeCompare(b.key));
+  for (const preferredOnly of [true, false]) {
+    for (const entry of order) {
+      const pick = spareCaster(state, entry, preferredOnly);
+      if (pick !== null) state.place(entry.key, pick, "CASTER", false);
+    }
+  }
+}
+
 /** Propositions remises en jeu, dans l'ordre du calendrier puis de la clé, du rôle et du membre. */
 function movablePlacements(state: PlannerState): Placement[] {
   return [...state.placements]
@@ -595,6 +671,7 @@ export function planAssignments(input: PlannerInput, stats?: PlannerStats): Plan
     const filled = fillAll(state, open);
     if (!moved && !swapped && !filled) break;
   }
+  if (input.spareCasters !== false) fillSpareCasters(state, open);
   if (stats) {
     stats.passes = passes;
     stats.trials = state.trials;

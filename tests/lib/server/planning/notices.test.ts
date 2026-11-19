@@ -106,6 +106,15 @@ describe("announceWithdrawal", () => {
     expect(sendBotLog).not.toHaveBeenCalled();
   });
 
+  it("announceWithdrawal_stillHeld_coAssignedToldNoOpenSlotAlert", async () => {
+    await announceWithdrawal(withdrawal({ unfilled: false, stillHeld: true, coAssignedIds: [5] }));
+
+    expect(sent()).toEqual([[[5], "PLANNING_WITHDRAWAL"]]);
+    expect(sendBotLog).not.toHaveBeenCalled();
+    const message = jest.mocked(notifyUsers).mock.calls[0][1].discord?.message("fr");
+    expect(message).toContain("Un autre caster reste affecté.");
+  });
+
   it("announceWithdrawal_noReplacement_tournamentStaffWarnedWithoutTheWithdrawer", async () => {
     await announceWithdrawal(withdrawal({ role: "PROD", late: true }));
 

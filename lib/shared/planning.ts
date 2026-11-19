@@ -54,6 +54,13 @@ export const PLANNING_PAST_DAYS = 7;
  * tableaux est déjà planifiée.
  */
 export const PLANNING_HORIZON_DAYS = 90;
+/**
+ * Casters qu'une entrée du planning tient au plus (calcul et choix du staff) :
+ * le premier couvre l'entrée, le second n'est qu'un renfort, posé par le calcul
+ * seulement quand aucune autre entrée n'a besoin de lui. Les inscriptions de
+ * cast sur le match (`bg_match_casters`) n'ont pas de plafond, mais comptent.
+ */
+export const PLANNING_MAX_CASTERS = 2;
 /** Arbitres posés par le calcul sur un tournoi entier (évènement aux matchs enchaînés) ; le staff peut en ajouter. */
 export const PLANNING_EVENT_REFEREES = 2;
 
@@ -106,6 +113,22 @@ export function planningRolesOf(
   if (roles.includes("CASTER")) held.push("CASTER");
   if (roles.includes("PROD")) held.push("PROD");
   return held;
+}
+
+/**
+ * Le plafond de casters d'une entrée ({@link PLANNING_MAX_CASTERS}) est-il
+ * atteint pour poser `userId` ? Comptent les casters affichés de l'entrée —
+ * lignes du planning (propositions provisoires comprises, que le staff retire
+ * d'abord) et casters inscrits sur le match —, sauf `userId` lui-même (une
+ * proposition que le choix du staff fixe). Serveur (`PLANNING_CASTERS_FULL`)
+ * et page (liste de choix masquée) jugent par cette même règle.
+ */
+export function planningCastersFull(
+  assignments: readonly { role: PlanningRole; userId: number }[],
+  userId: number | null = null,
+): boolean {
+  const others = new Set(assignments.filter((row) => row.role === "CASTER" && row.userId !== userId).map((row) => row.userId));
+  return others.size >= PLANNING_MAX_CASTERS;
 }
 
 /** Ce que compte une entrée pour sa couverture. */

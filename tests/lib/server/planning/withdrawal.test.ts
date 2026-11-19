@@ -492,3 +492,66 @@ describe("withdrawFromEntry — panne après le désistement", () => {
     error.mockRestore();
   });
 });
+
+/**
+ * Deux casters confirmés (4 et 5) ; 4 se désiste. `candidates` : casters libres
+ * pour un renfort ; `elsewhere` : une entrée m:2 qui chevauche, sans caster,
+ * où ces candidats sont aussi disponibles.
+ */
+function twoCasterData(options: { candidates?: number[]; elsewhere?: boolean }) {
+  const candidates = options.candidates ?? [];
+  const entries = [loadedEntry(), ...(options.elsewhere ? [loadedEntry({ key: "m:2", matchId: 2 })] : [])];
+  const members = [4, 5, ...candidates].map((userId) => loadedMember({ userId, roles: ["CASTER"], soloCaster: true }));
+  const availability = candidates.flatMap((userId) => [
+    available("m:1", userId, "CASTER"),
+    ...(options.elsewhere ? [available("m:2", userId, "CASTER")] : []),
+  ]);
+  const second = loadedAssignment({ userId: 5, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true });
+  jest
+    .mocked(loadPlanningData)
+    .mockResolvedValueOnce(
+      planningData({
+        entries,
+        assignments: [loadedAssignment({ userId: 4, role: "CASTER", confirmed: true }), second],
+        members,
+        availability,
+      }),
+    )
+    .mockResolvedValueOnce(
+      planningData({ entries, assignments: [second], members, availability, removals: [{ entryKey: "m:1", userId: 4, role: "CASTER" }] }),
+    );
+}
+
+describe("withdrawFromEntry — deux casters", () => {
+  it("withdrawFromEntry_oneOfTwoCastersNoSpare_stillHeldNotUnfilled", async () => {
+    twoCasterData({});
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({
+      replacementId: null,
+      unfilled: false,
+      stillHeld: true,
+      coAssignedIds: [5],
+    });
+  });
+
+  it("withdrawFromEntry_oneOfTwoCastersSpareFree_replaced", async () => {
+    twoCasterData({ candidates: [6] });
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: true, unfilled: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6, stillHeld: false });
+  });
+
+  it("withdrawFromEntry_spareNeededOnOverlappingEntry_notTaken", async () => {
+    twoCasterData({ candidates: [6], elsewhere: true });
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: false });
+    expect(statements()).toEqual(["DELETE FROM bg_planning_assignments WHER", "INSERT INTO bg_planning_events (entry_ke"]);
+  });
+});

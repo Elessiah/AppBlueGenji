@@ -126,6 +126,19 @@ describe("formatPlanningWithdrawalDm", () => {
     expect(message).toContain("Un remplaçant a été affecté.");
   });
 
+  it("formatPlanningWithdrawalDm_stillHeldFr_saysAnotherCasterAssigned", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ stillHeld: true }), SITE, "fr");
+
+    expect(message).toContain("Un autre caster reste affecté.");
+    expect(message).not.toContain("à pourvoir");
+  });
+
+  it("formatPlanningWithdrawalDm_stillHeldEn_saysAnotherCasterAssigned", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ stillHeld: true }), SITE, "en");
+
+    expect(message).toContain("Another caster is still assigned.");
+  });
+
   it("formatPlanningWithdrawalDm_open_saysSlotOpen", () => {
     const message = formatPlanningWithdrawalDm(withdrawal(), SITE, "en");
 
@@ -179,6 +192,11 @@ describe("push du planning", () => {
 
     expect(replaced.body).not.toBe(open.body);
     expect(replaced.tag).toBe("planning-withdrawal-m:12-CASTER");
+  });
+
+  it("planningWithdrawalPush_stillHeld_bodyStillHeld", () => {
+    expect(planningWithdrawalPush(withdrawal({ stillHeld: true }), "fr").body).toContain("un autre caster reste affecté");
+    expect(planningWithdrawalPush(withdrawal({ stillHeld: true }), "en").body).toContain("another caster is still assigned");
   });
 
   it("planningUnfilledPush_late_usesLateBody", () => {
