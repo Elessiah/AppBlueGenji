@@ -173,6 +173,20 @@ export function matchPageDecision(
 }
 
 /**
+ * Détail du fait « Hôte » : « Crée la partie » sans arbitre, « Côté gauche en
+ * jeu » quand l'arbitre désigné la crée (décision `REFEREE`), rien sur un match
+ * arbitré **déjà joué** (`COMPLETED`, aucune décision) : on ne sait plus qui l'a
+ * créée (match joué avant la règle), comme le premier ban qui s'y tait aussi.
+ */
+export function hostFactDetailKey(
+  refereeAssigned: boolean,
+  decision: RefereeDecision | null,
+): "facts.hostDetail" | "facts.hostRefereedDetail" | null {
+  if (!refereeAssigned) return "facts.hostDetail";
+  return decision === "REFEREE" ? "facts.hostRefereedDetail" : null;
+}
+
+/**
  * Le champ « Première map » de la page reprend-il la carte du plateau ? Oui
  * tant qu'il n'a pas été modifié ; après un enregistrement (`saved`, la valeur
  * envoyée), seulement quand le plateau relu la porte — sinon l'ancienne carte

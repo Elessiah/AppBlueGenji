@@ -119,7 +119,6 @@
   "copy": "Copy",
   "host": "Hosts the game — creates the lobby",
   "hostRefereed": "Host team — left side in the game",
-  "refereeCreates": "Hosts the game — creates the lobby",
   "ghost": "Guest team: no contact.",
   "contactsAtLaunch": "Contacts show up at launch — or right now through the match's “Contacts” action on the tournament page (under “More actions” if needed).",
   "contactsAtLaunchForCaster": "Contacts show up at launch.",

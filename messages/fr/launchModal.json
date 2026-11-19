@@ -119,7 +119,6 @@
   "copy": "Copier",
   "host": "Héberge la partie — crée le salon",
   "hostRefereed": "Équipe hôte — côté gauche en jeu",
-  "refereeCreates": "Héberge la partie — crée le salon",
   "ghost": "Équipe invitée : pas de contact.",
   "contactsAtLaunch": "Les contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match, sur la page du tournoi (menu « Plus d'actions » au besoin).",
   "contactsAtLaunchForCaster": "Les contacts s'affichent au lancement.",

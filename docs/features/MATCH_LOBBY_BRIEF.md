@@ -101,14 +101,14 @@ ouvrir de fausse section.
 # Check-in du match « A » Vs « B »
 *Manche 2 · « Coupe » — coup d'envoi dans moins de 15 minutes.*
 
-**Ton match est en autogestion.** Voici les éléments importants à savoir. Si un arbitre est désigné ensuite, c'est lui qui crée la partie : la page du match fait foi.
+**Ton match est en autogestion.** Voici les éléments importants à savoir.
 *Les contacts et les BattleTags à inviter sont sur la page du match : <lien>*
 
 ## Avant le coup d'envoi
 * Le salon de check-in est ouvert sur Discord — <invitation>
 * Tous les joueurs doivent rejoindre le salon vocal de leur équipe, ouvert par le bot — <invitation>
 * Gauche (hôte) : « A » · Droite : « B »
-* **C'est à ton équipe de créer la partie.**
+* **C'est à ton équipe de créer la partie.** Si un arbitre est nommé ensuite, c'est lui qui la crée : la page du match fait foi.
 
 ## Paramètres de partie
 * Paramètres compétitifs
@@ -147,13 +147,16 @@ messages Discord. Vu de l'engagée du destinataire :
   créer la partie), **seulement si ce lancement est celui de l'appariement
   courant** (`launch_pairing`) : un `launched_at` resté d'un appariement
   remplacé ne le dit pas.
-- **Ouverture** : ce que dit la décision d'arbitrage — « **Ton match est en
-  autogestion.** », « **Un arbitre est désigné pour votre match.** », ou, sans
-  décision, « Voici les éléments importants à savoir avant le coup d'envoi. »
-  (le staff est averti à part). Contre une **fantôme**, l'autogestion n'est pas
-  annoncée : personne en face. L'ouverture de l'autogestion ajoute qu'un
-  arbitre **désigné ensuite** crée la partie (la page du match fait foi) : le
-  brief ne part qu'une fois et n'est pas corrigé par une désignation tardive.
+- **Ouverture** (`introLine`) : le brief ne part que pour un match en
+  autogestion, donc « **Ton match est en autogestion.** Voici les éléments
+  importants à savoir. » ; contre une **fantôme**, l'autogestion n'est pas
+  annoncée (personne en face) : « Voici les éléments importants à savoir avant
+  le coup d'envoi. »
+- **Arbitre nommé ensuite** : le brief ne part qu'une fois et n'est pas
+  corrigé par une désignation tardive. Chaque consigne « crée la partie »
+  (`createGame`, `checkSettings` et leurs variantes solo) ajoute donc
+  qu'un arbitre nommé ensuite la crée à sa place, la page du match faisant
+  foi (`REFEREE_LATER_FR` / `_EN`) : la ligne qu'on suit ne contredit pas la page.
 - **Lien de la page du match** (`matchPageHref`, sous `/en` pour un compte
   anglais), en italique et **entre chevrons** (`discordUrl` : nu, l'autolien
   de Discord pouvait avaler l'astérisque qui ferme l'italique) : seule page à

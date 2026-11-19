@@ -194,14 +194,20 @@ la règle de ban du tournoi (`refereeHostedFirstBanTeamId`,
 match l'explique derrière un `InfoHint` (`roundMaps.page.refereeHostBan`, FR/EN).
 Sur la page du match, la modale de lancement, la fenêtre « Contacts » et la
 fiche de connexion, « crée la partie » va donc à l'**arbitre** (fait « Arbitre »,
-`facts.refereeCreates` ; fiche de l'arbitre : `launchModal.refereeCreates`) ;
+même texte que l'hôte d'un match sans arbitre, `facts.hostDetail` ; badge de la
+fiche de l'arbitre dans la modale et la fenêtre « Contacts » : `launchModal.host`,
+tu sur la page du match où le fait le dit déjà, `createsBadge={false}`) ;
 l'équipe hôte, qui reste à gauche (règlement §14), lit « Côté gauche en jeu »
 (`facts.hostRefereedDetail`) et « Équipe hôte — côté gauche en jeu » sur sa fiche
 (`launchModal.hostRefereed` : la modale garde l'ordre équipe 1 / équipe 2, la
 fiche de l'hôte peut être à droite). La page du match tire « arbitré » de
 l'instantané (`refereeAssigned`) pour les faits clés, et de la lecture du lancement
-(`MatchLaunchInfo.refereeAssigned`) pour la fiche de connexion et les modales : chaque
-bloc suit ses propres données. Un match en autogestion ou sans décision garde « Crée la partie »
+(`MatchLaunchInfo.refereeAssigned`, égal à `referee !== null` : jamais de badge
+« côté gauche » sans fiche d'arbitre) pour la fiche de connexion et les modales :
+chaque bloc suit ses propres données (un écart d'un aller-retour au plus, le temps
+que la lecture se refasse après une désignation). Sur un match arbitré **déjà
+joué**, le fait « Hôte » n'a aucun détail (`hostFactDetailKey`) : on ne sait plus
+qui a créé la partie (match joué avant la règle). Un match en autogestion ou sans décision garde « Crée la partie »
 sous l'hôte — y compris un match dont l'arbitre est retiré, même lancé
 (opposition retenue) : sans arbitre, l'hôte reprend la main.
 Un match arbitré **déjà joué** (`COMPLETED`) n'affirme aucun premier ban

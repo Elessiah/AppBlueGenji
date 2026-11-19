@@ -691,14 +691,29 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
     expect(html).not.toContain("🏠");
   });
 
-  it("messages_refereeCreatesKeys_equalTheHostKeysInFrAndEn", () => {
+  it("messages_refereeCreatesKeys_removedInFrAndEn", () => {
+    // Le badge de l'arbitre et son fait reprennent les clés de l'hôte : une seule phrase à tenir.
     for (const lang of ["fr", "en"]) {
       const read = (file: string) => JSON.parse(readFileSync(join(process.cwd(), "messages", lang, file), "utf8"));
-      const modal = read("launchModal.json");
-      const page = read("matchPage.json");
-      expect(modal.refereeCreates).toBe(modal.host);
-      expect(page.facts.refereeCreates).toBe(page.facts.hostDetail);
+      expect(read("launchModal.json")).not.toHaveProperty("refereeCreates");
+      expect(read("matchPage.json").facts).not.toHaveProperty("refereeCreates");
     }
+  });
+
+  it("RefereeCard_createsBadgeFalse_noCreatesBadge", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ userId: 77, pseudo: "Juge", ready: false, contactsShown: true, isViewer: false }}
+        selfManaged={false}
+        createsBadge={false}
+        phase="LOBBY"
+        onCopy={noop}
+      />,
+    );
+
+    expect(html).toContain("Juge");
+    expect(html).not.toContain("🎮");
+    expect(html).not.toContain("Héberge la partie");
   });
 
   it("RefereeCard_selfManagedNoReferee_noHostsGameBadge", () => {

@@ -459,9 +459,15 @@ export function RefereeCard({
   linkNames = false,
   battletagNote,
   laterText,
+  createsBadge = true,
 }: Readonly<{
   referee: LaunchReferee | null;
   selfManaged: boolean;
+  /**
+   * Badge « crée le salon » (l'arbitre désigné crée la partie). La page du
+   * match le tait : son fait « Arbitre » le dit déjà.
+   */
+  createsBadge?: boolean;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   linkNames?: boolean;
@@ -496,9 +502,12 @@ export function RefereeCard({
         <ReadyChip ready={referee.ready} phase={phase} />
       </div>
       {/* L'arbitre désigné crée la partie (MATCH_REFEREE.md § Hôte et premier ban). */}
-      <p className={styles.hostBadge}>
-        <span aria-hidden="true">🎮</span> {t("refereeCreates")}
-      </p>
+      {createsBadge && (
+        <p className={styles.hostBadge}>
+          {/* Même texte que le badge de l'hôte d'un match sans arbitre (`host`). */}
+          <span aria-hidden="true">🎮</span> {t("host")}
+        </p>
+      )}
       {/* Contacts pas encore ouverts : la note dit quand, comme sur la fiche d'un caster. */}
       {casterCardPending(referee) && <p className={styles.note}>{laterText ?? t("casterContactsAtLaunch")}</p>}
       {/* Contacts ouverts mais vides (`discordTag` vaut `null`, non `undefined` : le serveur

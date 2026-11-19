@@ -982,7 +982,8 @@ function buildLaunchInfo(
     team2: buildLaunchSide(row, 2, ctx),
     casters,
     referee,
-    refereeAssigned: row.referee_user_id !== null && row.refereeEligible,
+    // Même source que la fiche de l'arbitre : jamais de badge « côté gauche » sans fiche.
+    refereeAssigned: referee !== null,
     selfManaged: Number(row.self_managed ?? 0) === 1,
     battletagRelevant: battletagRelevantFor(row.tournament_game),
     viewer: {

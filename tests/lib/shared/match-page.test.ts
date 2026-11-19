@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   firstMapFieldFollows,
+  hostFactDetailKey,
   isByeMatch,
   isMemberMatchPageOf,
   matchPageDecision,
@@ -223,5 +224,19 @@ describe("isMemberMatchPageOf (« Page du match » de la fenêtre de lancement)"
     expect(isMemberMatchPageOf("/suivre/tournois/12/matchs/345", ids)).toBe(false);
     expect(isMemberMatchPageOf("/tournois/12", ids)).toBe(false);
     expect(isMemberMatchPageOf(null, ids)).toBe(false);
+  });
+});
+
+describe("hostFactDetailKey", () => {
+  it("hostFactDetailKey_notRefereed_returnsHostDetail", () => {
+    expect(hostFactDetailKey(false, "SELF_MANAGED")).toBe("facts.hostDetail");
+  });
+
+  it("hostFactDetailKey_refereeDecision_returnsHostRefereedDetail", () => {
+    expect(hostFactDetailKey(true, "REFEREE")).toBe("facts.hostRefereedDetail");
+  });
+
+  it("hostFactDetailKey_completedRefereedNoDecision_returnsNull", () => {
+    expect(hostFactDetailKey(true, null)).toBeNull();
   });
 });

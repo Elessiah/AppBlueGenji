@@ -1248,6 +1248,16 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
     expect(info.refereeAssigned).toBe(true);
   });
 
+  it("listViewerMatchLaunches_deletedRefereeAccount_cardNullAndNotAssigned", async () => {
+    state.candidates = [candidate({ referee_user_id: REFEREE, self_managed: 0 })];
+    state.users = [refereeUser({ is_deleted: 1 })];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+
+    expect(info.referee).toBeNull();
+    expect(info.refereeAssigned).toBe(false);
+  });
+
   it("listViewerMatchLaunches_noReferee_refereeAssignedFalse", async () => {
     state.candidates = [candidate({ referee_user_id: null, self_managed: 1 })];
 

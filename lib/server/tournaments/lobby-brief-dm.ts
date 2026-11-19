@@ -111,6 +111,14 @@ const pointsFr = (points: number) => `${points} point${points > 1 ? "s" : ""}`;
 /** "5 points", "1 point". */
 const pointsEn = (points: number) => `${points} point${points === 1 ? "" : "s"}`;
 
+/**
+ * Le brief ne part qu'une fois : un arbitre désigné **après** lui crée la
+ * partie à la place de l'hôte. Posé à côté de chaque consigne « crée la
+ * partie », pour que la ligne qu'on suit ne contredise pas la page du match.
+ */
+const REFEREE_LATER_FR = "Si un arbitre est nommé ensuite, c'est lui qui la crée : la page du match fait foi.";
+const REFEREE_LATER_EN = "A referee assigned later creates it instead: the match page prevails.";
+
 const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
   fr: {
     title: (subject) => `# Check-in ${subject}`,
@@ -123,7 +131,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
       UNSCHEDULED: (round, tournament) => `*${round} · ${tournament} — le salon du match est ouvert.*`,
     },
     subtitleLaunched: (round, tournament) => `*${round} · ${tournament} — match lancé.*`,
-    introSelfManaged: "**Ton match est en autogestion.** Voici les éléments importants à savoir. Si un arbitre est désigné ensuite, c'est lui qui crée la partie : la page du match fait foi.",
+    introSelfManaged: "**Ton match est en autogestion.** Voici les éléments importants à savoir.",
     introGhost: "Voici les éléments importants à savoir avant le coup d'envoi.",
     contacts: (url) => `*Les contacts et les BattleTags à inviter sont sur la page du match : ${url}*`,
     contactsNoBattletag: (url) => `*Tu peux retrouver les contacts sur la page du match : ${url}*`,
@@ -134,10 +142,10 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     voice: (invite) => `Tous les joueurs doivent rejoindre le salon vocal de leur équipe, ouvert par le bot — ${invite}`,
     checkIn: (invite) => `Le salon de check-in est ouvert sur Discord — ${invite}`,
     seats: (left, right) => `Gauche (hôte) : ${left} · Droite : ${right}`,
-    createGame: "**C'est à ton équipe de créer la partie.**",
-    checkSettings: "L'équipe hôte crée la partie : **vérifie les paramètres** avant de lancer.",
-    createGameSolo: "**C'est à toi de créer la partie.**",
-    checkSettingsSolo: "Ton adversaire crée la partie : **vérifie les paramètres** avant de lancer.",
+    createGame: `**C'est à ton équipe de créer la partie.** ${REFEREE_LATER_FR}`,
+    checkSettings: `L'équipe hôte crée la partie : **vérifie les paramètres** avant de lancer. ${REFEREE_LATER_FR}`,
+    createGameSolo: `**C'est à toi de créer la partie.** ${REFEREE_LATER_FR}`,
+    checkSettingsSolo: `Ton adversaire crée la partie : **vérifie les paramètres** avant de lancer. ${REFEREE_LATER_FR}`,
     map: (number, shown) => `Map ${number} : ${shown}`,
     noFirstMap: "pas encore fixée",
     toChoose: (pool) => `à choisir parmi ${pool}`,
@@ -174,7 +182,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
       UNSCHEDULED: (round, tournament) => `*${round} · ${tournament} — the match lobby is open.*`,
     },
     subtitleLaunched: (round, tournament) => `*${round} · ${tournament} — match started.*`,
-    introSelfManaged: "**Your match is self-managed.** Here is what you need to know. If a referee is assigned later, they create the game: the match page prevails.",
+    introSelfManaged: "**Your match is self-managed.** Here is what you need to know.",
     introGhost: "Here is what you need to know before kickoff.",
     contacts: (url) => `*The contacts and the BattleTags to invite are on the match page: ${url}*`,
     contactsNoBattletag: (url) => `*You can find the contacts on the match page: ${url}*`,
@@ -185,10 +193,10 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     voice: (invite) => `Every player must join their team's voice channel, opened by the bot — ${invite}`,
     checkIn: (invite) => `The check-in channel is open on Discord — ${invite}`,
     seats: (left, right) => `Left (host): ${left} · Right: ${right}`,
-    createGame: "**Your team creates the game.**",
-    checkSettings: "The host team creates the game: **check the settings** before starting.",
-    createGameSolo: "**You create the game.**",
-    checkSettingsSolo: "Your opponent creates the game: **check the settings** before starting.",
+    createGame: `**Your team creates the game.** ${REFEREE_LATER_EN}`,
+    checkSettings: `The host team creates the game: **check the settings** before starting. ${REFEREE_LATER_EN}`,
+    createGameSolo: `**You create the game.** ${REFEREE_LATER_EN}`,
+    checkSettingsSolo: `Your opponent creates the game: **check the settings** before starting. ${REFEREE_LATER_EN}`,
     map: (number, shown) => `Map ${number}: ${shown}`,
     noFirstMap: "not set yet",
     toChoose: (pool) => `to choose from ${pool}`,

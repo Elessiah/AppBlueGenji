@@ -27,6 +27,7 @@ import {
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
   firstMapFieldFollows,
+  hostFactDetailKey,
   matchPageDecision,
   matchPageSides,
   matchPageStreams,
@@ -380,7 +381,8 @@ function useOfficiatingFact(match: BracketMatch, decision: ReturnType<typeof mat
     return {
       id: "officiating",
       label: page.t("facts.referee"),
-      detail: page.t("facts.refereeCreates"),
+      // Même texte que l'hôte d'un match sans arbitre (`facts.hostDetail`).
+      detail: page.t("facts.hostDetail"),
       // Pseudo de l'arbitre pour un membre connecté (décision 52), « Arbitre
       // désigné » sans compte, ou tant que le pseudo de la désignation manque.
       value: (
@@ -486,9 +488,13 @@ function MapFactList({ mapFacts }: Readonly<{ mapFacts: readonly MatchPageMapFac
  * partie, sauf sur un match arbitré où c'est l'arbitre désigné (fait
  * « Arbitre ») : elle ne fait alors que jouer à gauche.
  */
-function hostFact(hostSide: PageSide | null, refereed: boolean, pending: ReactNode, page: MatchPageText): KeyFact {
-  let detail: string | undefined;
-  if (hostSide) detail = page.t(refereed ? "facts.hostRefereedDetail" : "facts.hostDetail");
+function hostFact(
+  hostSide: PageSide | null,
+  detailKey: ReturnType<typeof hostFactDetailKey>,
+  pending: ReactNode,
+  page: MatchPageText,
+): KeyFact {
+  const detail = hostSide && detailKey ? page.t(detailKey) : undefined;
   return {
     id: "host",
     label: page.t("facts.host"),
@@ -543,7 +549,7 @@ function MatchKeyFacts({
 
   const facts: KeyFact[] = [];
   if (hostSide || opponentsPending) {
-    facts.push(hostFact(hostSide, match.refereeAssigned, pending, page));
+    facts.push(hostFact(hostSide, hostFactDetailKey(match.refereeAssigned, decision), pending, page));
   }
   if (banSide || opponentsPending) {
     facts.push({
@@ -1007,6 +1013,8 @@ function OfficiatingSection({
         <RefereeCard
           referee={refereeCard}
           selfManaged={false}
+          // Le fait « Arbitre » dit déjà « Crée la partie » sur cette page.
+          createsBadge={false}
           phase={launch.phase}
           onCopy={onCopy}
           linkNames

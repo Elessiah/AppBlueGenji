@@ -426,10 +426,18 @@ describe("page d'un match — cartes du round et bans", () => {
     expect(facts).not.toContain("Côté gauche en jeu");
   });
 
-  it("keyFacts_completedRefereed_noRefereeFactNorCreatesGameClaim", () => {
+  it("keyFacts_completedRefereed_hostFactWithoutDetail", () => {
+    // Match arbitré déjà joué (peut-être avant la règle) : personne n'affirme qui a créé la partie.
     const facts = visible(render(match({ status: "COMPLETED", refereeAssigned: true }), "public"));
-    expect(facts).toContain("Hôte B Bravo Côté gauche en jeu");
+    expect(facts).toContain("Hôte B Bravo");
+    expect(facts).not.toContain("Côté gauche en jeu");
     expect(facts).not.toContain("Crée la partie");
+  });
+
+  it("OfficiatingSection_refereedMatch_refereeCardWithoutCreatesBadge", () => {
+    // Le fait « Arbitre » dit déjà « Crée la partie » : la fiche de la page ne le répète pas.
+    const source = readSource("app/(secured)/tournois/[id]/_components/MatchPage.tsx");
+    expect(source).toContain("createsBadge={false}");
   });
 
   it("keyFacts_refereedMatchEnglish_playsOnLeftAndCreatesGame", () => {
