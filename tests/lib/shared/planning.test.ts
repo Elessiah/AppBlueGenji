@@ -227,3 +227,9 @@ describe("planningCoverage — deux casters", () => {
     expect(coverage).toMatchObject({ level: "STREAMED", streamed: true, refereePriority: true });
   });
 });
+
+describe("planningRolesOf — invités", () => {
+  it("planningRolesOf_guestCasterProd_returnsEmpty", () => {
+    expect(planningRolesOf(authUser({ roles: ["CASTER", "PROD"], planningGuest: true }))).toEqual([]);
+  });
+});

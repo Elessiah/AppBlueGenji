@@ -91,7 +91,7 @@ import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { PLANNING_HISTORY_WEEKS, PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-21";
+export const REGISTER_UPDATED_AT = "2026-11-22";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -1766,6 +1766,8 @@ const ACTIVITIES = registerActivities({
         "Notifying referees, casters and prods, by Discord direct message and push notification, of new slots where they can hold a role (one summary per planning wave), of their assignments confirmed or set by hand, and of the withdrawal from a confirmed assignment on a slot where their own assignment is confirmed; notifying the tournament staff of an open slot or a lost stream \u2014 never naming a player or a staff member"),
       frEn("Confirmer d'office chaque créneau du planning à l'approche de son début (délai réglé par un administrateur, 24 h au moins), ou plus tôt à la date butoir de planification de son match ; les affectés en sont prévenus comme d'une confirmation par un administrateur",
         "Automatically confirming each schedule slot as its start draws near (a lead time set by an administrator, 24 h at least), or earlier at its match's scheduling deadline; the assignees are notified as for a confirmation by an administrator"),
+      frEn("Distinguer les casters et prods invités : sur décision du staff qui attribue les rôles, un compte marqué « invité » garde ses droits de diffusion mais sort du planning (ni proposé, ni désigné, ni prévenu, ni lecteur de la page) ; la marque quitte ses attributions à venir comme un désistement (remplaçant cherché de même) et efface ses disponibilités à venir, le passé restant",
+        "Telling guest casters and prods apart: on a decision of the staff who assigns roles, an account marked \u201cguest\u201d keeps its streaming rights but leaves the schedule (neither proposed, assigned, notified nor reader of the page); the mark leaves its upcoming assignments as a withdrawal would (a replacement looked for alike) and erases its upcoming availability, the past staying"),
     ],
     legalBasis: frEn("Intérêt légitime de l'association (RGPD, art. 6.1.f : organiser les bénévoles qui arbitrent et diffusent ses tournois), avec droit d'opposition ; les données viennent des bénévoles eux-mêmes ou du staff qui les organise ; pour les messages privés Discord du planning, même intérêt légitime, l'opposition (art. 21) honorée sujet par sujet par les réglages de notifications de « Mon profil », qui coupent ensemble la notification push (consentement, T12) et le message privé",
       "Legitimate interest of the association (GDPR, art. 6.1.f: organising the volunteers who referee and stream its tournaments), with a right to object; the data come from the volunteers themselves or from the staff who organises them; for the schedule's Discord direct messages, the same legitimate interest, the objection (art. 21) honoured topic by topic by the notification settings of \u201cMy profile\u201d, which turn off the push notification (consent, T12) and the direct message together"),
@@ -1784,6 +1786,8 @@ const ACTIVITIES = registerActivities({
       frEn("Pour les messages privés : identifiant Discord rattaché ou tag Discord certifié (T01), langue du compte, sujets de notification coupés (T12)",
         "For direct messages: linked Discord identifier or certified Discord tag (T01), account language, notification topics turned off (T12)"),
       frEn("Réglage « caster autonome »", "\u201cSolo caster\u201d setting"),
+      frEn("Marque « invité » (hors planning), posée sur le compte par le staff qui attribue les rôles",
+        "\u201cGuest\u201d mark (outside the schedule), set on the account by the staff who assigns roles"),
       frEn("Entrées confirmées d'office (créneau et date de la confirmation, sans personne)",
         "Entries confirmed automatically (slot and date of the confirmation, no person)"),
     ],
@@ -1793,6 +1797,8 @@ const ACTIVITIES = registerActivities({
         `Availability, preferences, assignments and their history (withdrawals, with their reason and lateness, included), slots already announced, entries already confirmed automatically: ${PLANNING_RETENTION_DAYS} days after the start of the slot, then erased by a daily purge, apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`),
       frEn("Réglage « caster autonome » : tant que le compte tient le rôle caster ; effacé à la purge quotidienne qui suit son retrait",
         "\u201cSolo caster\u201d setting: as long as the account holds the caster role; erased by the daily purge that follows its removal"),
+      frEn("Marque « invité » : tant que le staff qui attribue les rôles la laisse sur le compte ; elle part avec la suppression du compte et figure dans l'export de ses données",
+        "\u201cGuest\u201d mark: as long as the staff who assigns roles leaves it on the account; it goes with the account's deletion and is part of the export of its data"),
       frEn("Suppression du compte : tout ce qui le concerne dans le planning part avec lui ; les gestes qu'il a faits comme staff restent, sans le désigner. L'export de ses données (art. 15 et 20) contient ses disponibilités, préférences, attributions avec leur motif, leur historique (ses désistements avec leur motif et leur retard compris), son réglage « caster autonome » et les gestes qu'il a faits comme staff sur les attributions (sans l'identifiant de la personne visée)",
         "Account deletion: everything about it in the schedule goes with it; the actions it took as staff remain, without naming it. The export of its data (art. 15 and 20) contains its availability, preferences, assignments with their reason, their history (its withdrawals with their reason and lateness included), its \u201csolo caster\u201d setting and the actions it took as staff on assignments (without the identifier of the person concerned)"),
     ],
@@ -1803,6 +1809,8 @@ const ACTIVITIES = registerActivities({
         "Tournament staff (referees and administrators): everyone's availability and preferences, the reason for each assignment, and the withdrawals (reason, lateness), to assign; of a suspended account (T11), only enough to infer that the schedule no longer retains it, without the suspension or its reasons"),
       frEn("Par le planning, confirmer ou désigner l'arbitre d'un match, ou retirer son arbitre désigné, agit sur le match lui-même, comme un geste du staff (T04, T05) : une ligne sans nom au journal du staff sur Discord à chaque changement d'arbitre du match, une notification push à l'arbitre retiré par un autre que lui. Les notifications du planning partent en message privé Discord à leur destinataire, et une place à pourvoir en une ligne sans nom au journal du staff sur Discord ; aucune ne nomme un joueur ni un membre du staff",
         "Through the schedule, confirming or assigning a match's referee, or removing its assigned referee, acts on the match itself, like the staff does (T04, T05): a line naming no one in the staff log on Discord for each change of the match's referee, a push notification to a referee removed by someone else. The schedule's notifications are sent by Discord direct message to their recipient, and an open slot as a line naming no one in the staff log on Discord; none names a player or a staff member"),
+      frEn("Staff qui attribue les rôles (administrateurs) : la marque « invité » de chaque compte, sur sa fiche ; la poser ou la retirer est noté sans nom au journal du staff sur Discord, son auteur dans les journaux du serveur (T05) ; les autres membres du planning constatent seulement que l'invité n'y figure plus",
+        "Staff who assigns roles (administrators): each account's \u201cguest\u201d mark, on its page; setting or removing it is noted naming no one in the staff log on Discord, its author in the server logs (T05); the other schedule members only notice that the guest no longer appears there"),
       frEn("Discord, qui achemine les messages privés du planning ; le service de push du navigateur du destinataire, qui achemine la notification push chiffrée des mêmes avis (T12)",
         "Discord, which delivers the schedule's direct messages; the push service of the recipient's browser, which delivers the encrypted push notification of the same notices (T12)"),
       frEn("Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)",

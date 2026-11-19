@@ -23,7 +23,8 @@
  *   prévenu ; **provisoire** : il reste une proposition, sans message. Personne :
  *   la place est « à pourvoir » et le staff des tournois est prévenu.
  */
-import type { PoolConnection } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader } from "mysql2/promise";
+import { getDatabase } from "@/lib/server/database";
 import type { AuthUser } from "@/lib/server/auth";
 import { failureReason } from "@/lib/server/failure-reason";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -258,7 +259,7 @@ function placeReplacementRow(
 }
 
 /** L'attribution que `user` quitte, ou le refus par code. */
-function withdrawnAssignment(user: AuthUser, input: WithdrawalInput, data: PlanningData, now: number) {
+function withdrawnAssignment(user: { id: number }, input: WithdrawalInput, data: PlanningData, now: number) {
   const entry = data.entries.find((candidate) => candidate.key === input.entryKey);
   if (!entry) throw new Error("PLANNING_ENTRY_NOT_FOUND");
   if (!entry.editable || entry.startAt <= now) throw new Error("PLANNING_WITHDRAWAL_CLOSED");
@@ -431,8 +432,22 @@ type Outcome = WithdrawalResult & {
  * `PLANNING_NOT_ASSIGNED`, `PLANNING_CAST_MANAGED`, refus du match.
  */
 export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, now: number = Date.now()): Promise<WithdrawalResult> {
+  return withdrawMember({ id: user.id, includeHidden: can(user, "tournaments") }, input, now);
+}
+
+/**
+ * Le désistement lui-même, pour le compte `user.id` : celui de la session
+ * ({@link withdrawFromEntry}) ou un invité que le staff sort du planning
+ * ({@link releaseGuestPlanning}). `includeHidden` : les entrées des tournois
+ * encore cachés sont lues.
+ */
+async function withdrawMember(
+  user: { id: number; includeHidden: boolean },
+  input: WithdrawalInput,
+  now: number,
+): Promise<WithdrawalResult> {
   const outcome = await withPlanningLock(async (connection): Promise<Outcome> => {
-    const data = await loadPlanningData(connection, { now, includeHidden: can(user, "tournaments") });
+    const data = await loadPlanningData(connection, { now, includeHidden: user.includeHidden });
     const { entry, current } = withdrawnAssignment(user, input, data, now);
     const confirmed = !current.provisional;
     const late = isLateWithdrawal(entry.startAt, now);
@@ -518,4 +533,68 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
     streamLost: outcome.streamLost,
     stillSignedUp: outcome.stillSignedUp,
   };
+}
+
+/** Bilan de la sortie d'un invité du planning ({@link releaseGuestPlanning}). */
+export type GuestRelease = {
+  /** Attributions à venir quittées (par le désistement ordinaire). */
+  withdrawn: number;
+  /** Attributions qu'un refus ou une panne a laissées en place (le staff les retire à la main). */
+  failed: number;
+  /** Disponibilités à venir effacées. */
+  availabilityCleared: number;
+};
+
+/**
+ * Un compte devenu **invité** (`bg_users.is_guest_staff`, `CAST_PLANNING.md`
+ * § Invités) quitte le planning à venir : chacune de ses attributions d'une
+ * entrée pas encore commencée passe par le désistement ordinaire (remplaçant,
+ * place « à pourvoir », annonces — comme s'il s'était désisté, sans motif),
+ * puis ses disponibilités de ces entrées sont effacées. Le passé (entrées
+ * commencées, historique) ne bouge pas ; une inscription de cast sur un match
+ * (`CAST`) ou un arbitre désigné hors du planning (`MATCH`) restent : ils se
+ * gèrent depuis le match. Appelé **après** l'écriture du drapeau : le calcul
+ * du remplaçant ne le compte déjà plus parmi les membres. Ne lève pas : une
+ * attribution refusée ou en panne est comptée (`failed`) et journalisée.
+ */
+export async function releaseGuestPlanning(userId: number, now: number = Date.now()): Promise<GuestRelease> {
+  const result: GuestRelease = { withdrawn: 0, failed: 0, availabilityCleared: 0 };
+  let upcoming: { entryKey: string; role: PlanningRole }[];
+  let futureKeys: string[];
+  try {
+    const db = await getDatabase();
+    const data = await loadPlanningData(db, { now, includeHidden: true });
+    const future = data.entries.filter((entry) => entry.startAt > now);
+    futureKeys = future.map((entry) => entry.key);
+    upcoming = future.filter((entry) => entry.editable).flatMap((entry) =>
+      entryAssignments(entry, data)
+        .filter((row) => row.userId === userId && (row.source === "AUTO" || row.source === "MANUAL"))
+        .map((row) => ({ entryKey: entry.key, role: row.role })),
+    );
+  } catch (error) {
+    console.error("[planning] sortie d'un invité : lecture du planning impossible.", failureReason(error));
+    return result;
+  }
+  for (const row of upcoming) {
+    try {
+      await withdrawMember({ id: userId, includeHidden: true }, { entryKey: row.entryKey, role: row.role, reason: null }, now);
+      result.withdrawn += 1;
+    } catch (error) {
+      result.failed += 1;
+      console.error(`[planning] sortie d'un invité : attribution ${row.entryKey} (${row.role}) laissée en place.`, failureReason(error));
+    }
+  }
+  if (futureKeys.length > 0) {
+    try {
+      const db = await getDatabase();
+      const [deleted] = await db.execute<ResultSetHeader>(
+        `DELETE FROM bg_planning_availability WHERE user_id = ? AND entry_key IN (${futureKeys.map(() => "?").join(", ")})`,
+        [userId, ...futureKeys],
+      );
+      result.availabilityCleared = Number(deleted.affectedRows ?? 0);
+    } catch (error) {
+      console.error("[planning] sortie d'un invité : disponibilités non effacées.", failureReason(error));
+    }
+  }
+  return result;
 }

@@ -89,6 +89,8 @@ interface SpecialUserDef {
    * vérifié.
    */
   battletagTyped?: boolean;
+  /** Caster ou prod invité, hors planning (`is_guest_staff`, `CAST_PLANNING.md` § Invités). */
+  planningGuest?: boolean;
 }
 
 const SPECIAL_USERS: SpecialUserDef[] = [
@@ -167,6 +169,18 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     discordTag: "test_arbitre2",
     discordVerified: true,
     blizzardSub: "seed-blizzard-arbitre2",
+  },
+  {
+    pseudo: "CasterInvite",
+    purpose:
+      "rôle CASTER invité (hors planning) : garde l'aperçu et la diffusion, absent du planning des casts (ni page, ni lien, ni proposition) ; identité vérifiée",
+    platformRoles: ["CASTER"],
+    planningGuest: true,
+    isAdult: 1,
+    discordId: "900000000000000059",
+    discordTag: "test_caster_invite",
+    discordVerified: true,
+    blizzardSub: "seed-blizzard-caster-invite",
   },
   {
     pseudo: "CasterProd",
@@ -393,6 +407,7 @@ export async function createSpecialUsers(db: Pool): Promise<Map<string, number>>
         specialUserInsertParams(def, pseudo),
       );
       const id = result.insertId as number;
+      if (def.planningGuest) await db.execute(`UPDATE bg_users SET is_guest_staff = 1 WHERE id = ?`, [id]);
       if (def.deletionRequestedDaysAgo !== undefined) {
         // Anonyme dès la demande (`account-deletion-hold.ts`) : le vrai pseudo
         // attend dans le masque, la ligne porte un pseudo d'emprunt — gardé

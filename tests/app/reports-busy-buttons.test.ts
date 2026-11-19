@@ -149,7 +149,7 @@ describe("signalements du staff — boutons pendant une requête", () => {
     // `refresh` repassait la page en « Chargement… » : panneau et confirmation
     // démontés, focus perdu sur la page.
     const page = source("app/(secured)/joueurs/[id]/page.tsx");
-    expect(page).toContain("roles={data.roles} onSaved={revalidate} />");
+    expect(page).toMatch(/<PlayerRolesPanel[^>]*roles=\{data\.roles\}[^>]*onSaved=\{revalidate\}\s*\/>/);
     expect(page).not.toContain("onSaved={refresh}");
   });
 

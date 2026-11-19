@@ -320,6 +320,26 @@ describe("loadPlanningMembers", () => {
   });
 });
 
+describe("loadPlanningMembers — invités", () => {
+  it("loadPlanningMembers_sql_filtersGuests", async () => {
+    connection.execute.mockResolvedValue([[], []]);
+
+    await loadPlanningMembers(executor);
+
+    const [sql] = connection.execute.mock.calls[0];
+    expect(sql).toContain("u.is_guest_staff = 0");
+  });
+
+  it("loadPlanningMembers_guestRow_excluded", async () => {
+    jest.mocked(resolveRoles).mockReturnValue(["CASTER"]);
+    connection.execute.mockResolvedValue([[{ id: 3, pseudo: "Invité", is_admin: 0, platform_roles_json: '["CASTER"]', is_guest_staff: 1, solo_caster: null, suspended: 0 }], []]);
+
+    const members = await loadPlanningMembers(executor);
+
+    expect(members).toEqual([]);
+  });
+});
+
 describe("coveringSoloCasterIds", () => {
   const members = [
     loadedMember({ userId: 3, soloCaster: true }),

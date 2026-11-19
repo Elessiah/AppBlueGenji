@@ -195,7 +195,8 @@ describe("getCurrentUser — vue joueur", () => {
     const user = await getCurrentUser();
 
     expect(user).toMatchObject({ isAdmin: true, playerView: false });
-    expect(execute).toHaveBeenCalledTimes(2);
+    // La variante sans l'invité (la plus récente) tombe d'abord, puis celle sans la vue joueur.
+    expect(execute).toHaveBeenCalledTimes(3);
   });
 
   it("getCurrentUser_devBypassInPlayerView_seesNoPermission", async () => {

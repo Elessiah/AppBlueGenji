@@ -1129,6 +1129,12 @@ export type FullProfileResponse = {
    */
   moderationSuspendable: boolean;
   /**
+   * Caster ou prod **invité** (`bg_users.is_guest_staff`, `CAST_PLANNING.md`
+   * § Invités), rendu au seul staff qui tient `roles`, sur la fiche d'un autre
+   * compte vivant ; `null` si la lecture a échoué ; absent sinon.
+   */
+  planningGuest?: boolean | null;
+  /**
    * Langue du compte (lot 9-3), pour son **seul titulaire** (`isSelf`) :
    * absente de toute autre fiche.
    */
@@ -1197,6 +1203,11 @@ export type PersonalDataExport = {
      * `null` : origine inconnue (colonne absente de la base).
      */
     overwatchBattletagTyped: boolean | null;
+    /**
+     * `bg_users.is_guest_staff` : caster ou prod invité, hors planning (`CAST_PLANNING.md` § Invités) ;
+     * `null` : colonne absente de la base.
+     */
+    planningGuest: boolean | null;
     createdAt: string;
   };
   profile: {

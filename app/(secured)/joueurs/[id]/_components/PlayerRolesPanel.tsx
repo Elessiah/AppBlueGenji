@@ -19,6 +19,7 @@ import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import { reloadSucceeded } from "@/lib/shared/reload-outcome";
 import { rolesErrorMessage } from "../_lib/roles-errors";
+import { PlanningGuestField } from "./PlanningGuestField";
 
 /**
  * Attribution des rôles de plateforme depuis la fiche d'un joueur (réservée à
@@ -37,11 +38,14 @@ export function PlayerRolesPanel({
   userId,
   pseudo,
   roles,
+  planningGuest,
   onSaved,
 }: Readonly<{
   userId: string;
   pseudo: string;
   roles: PlatformRole[] | undefined;
+  /** Drapeau « invité » (hors planning) ; sans valeur lue (`null`, absent), la case n'est pas offerte. */
+  planningGuest?: boolean | null;
   /** Relit la fiche ; `false` : relecture échouée, les rôles affichés sont peut-être périmés. */
   onSaved: () => Promise<boolean | void> | void;
 }>) {
@@ -169,6 +173,9 @@ export function PlayerRolesPanel({
           Enregistrer les rôles
         </BusyButton>
       </div>
+      {typeof planningGuest === "boolean" ? (
+        <PlanningGuestField userId={userId} pseudo={pseudo} guest={planningGuest} onSaved={onSaved} />
+      ) : null}
       {pendingChange ? (
         <ConfirmActionDialog
           contentLang={staffLang}

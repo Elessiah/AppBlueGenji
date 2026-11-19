@@ -1,0 +1,74 @@
+/**
+ * PLANNING-GUESTS — case « Invité » de la fiche d'un joueur
+ * (`docs/features/CAST_PLANNING.md` § Invités) : rendu, aide, câblage.
+ */
+import { describe, expect, it, jest } from "@jest/globals";
+import type { ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { readSource } from "../helpers/read-source";
+
+jest.mock("next/navigation", () => ({
+  usePathname: () => "/joueurs/7",
+  useParams: () => ({}),
+  useSearchParams: () => new URLSearchParams(""),
+  useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined, prefetch: () => undefined }),
+}));
+jest.mock("@/components/ui/toast", () => ({
+  useToast: () => ({ showError: () => undefined, showSuccess: () => undefined, showInfo: () => undefined }),
+  ToastProvider: ({ children }: { children: ReactNode }) => children,
+}));
+
+import { PlanningGuestField } from "@/app/(secured)/joueurs/[id]/_components/PlanningGuestField";
+import { planningGuestErrorMessage } from "@/app/(secured)/joueurs/[id]/_lib/planning-guest-errors";
+
+function field(guest: boolean): string {
+  return renderToStaticMarkup(<PlanningGuestField userId="7" pseudo="Test_Caster" guest={guest} onSaved={() => undefined} />);
+}
+
+describe("PlanningGuestField", () => {
+  it("planningGuestField_member_uncheckedBox", () => {
+    const html = field(false);
+
+    expect(html).toContain("Invité");
+    expect(html).not.toMatch(/type="checkbox"[^>]*checked/);
+  });
+
+  it("planningGuestField_guest_checkedBox", () => {
+    expect(field(true)).toMatch(/type="checkbox"[^>]*checked/);
+  });
+
+  it("planningGuestField_infoHint_describesTheBox", () => {
+    const html = field(false);
+
+    expect(html).toContain('aria-describedby="player-planning-guest-help"');
+    expect(html).toContain("Hors planning : garde ses droits de caster/prod mais n&#x27;apparaît pas au planning.");
+  });
+
+  it("planningGuestField_save_putsToTheAdminRoute", () => {
+    const source = readSource("app/(secured)/joueurs/[id]/_components/PlanningGuestField.tsx");
+
+    expect(source).toContain("/api/admin/users/${userId}/planning-guest");
+    expect(source).toContain('method: "PUT"');
+    expect(source).toContain("ConfirmActionDialog");
+  });
+});
+
+describe("PlayerRolesPanel — câblage de la case", () => {
+  it("playerRolesPanel_planningGuestBoolean_rendersField", () => {
+    const panel = readSource("app/(secured)/joueurs/[id]/_components/PlayerRolesPanel.tsx");
+    const page = readSource("app/(secured)/joueurs/[id]/page.tsx");
+
+    expect(panel).toContain('typeof planningGuest === "boolean"');
+    expect(page).toContain("planningGuest={data.planningGuest}");
+  });
+});
+
+describe("planningGuestErrorMessage", () => {
+  it("planningGuestErrorMessage_knownCode_returnsSentence", () => {
+    expect(planningGuestErrorMessage("CANNOT_MODIFY_SELF")).toBe("Tu ne peux pas te déclarer invité toi-même.");
+  });
+
+  it("planningGuestErrorMessage_unknownCode_returnsFallbackNeverRawCode", () => {
+    expect(planningGuestErrorMessage("constructor")).toBe("L'enregistrement du réglage « Invité » a échoué.");
+  });
+});

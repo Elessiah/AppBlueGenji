@@ -171,7 +171,7 @@ type SubscriptionRow = RowDataPacket & {
 } & AudienceColumns;
 
 /** Droits du titulaire, relus avec l'abonnement pour un sujet réservé. */
-type AudienceColumns = { is_admin?: number; platform_roles_json?: unknown };
+type AudienceColumns = { is_admin?: number; platform_roles_json?: unknown; is_guest_staff?: number | null };
 
 /** Envois simultanés au plus : un tournoi prévient des dizaines d'appareils. */
 const PUSH_CONCURRENCY = 8;
@@ -213,7 +213,10 @@ function reachableSubscriptionsSql(accounts: number, topic: PushTopic): string {
 
 /** Colonnes de droits à lire avec l'abonnement pour un sujet réservé ; rien pour un sujet ouvert. */
 function audienceColumns(topic: PushTopic): string {
-  return PUSH_TOPICS[topic].audience === null ? "" : ", u.is_admin, u.platform_roles_json";
+  const audience = PUSH_TOPICS[topic].audience;
+  if (audience === null) return "";
+  // Le drapeau « invité » ne compte que pour les sujets du planning : lu pour eux seuls.
+  return audience === "planning" ? ", u.is_admin, u.platform_roles_json, u.is_guest_staff" : ", u.is_admin, u.platform_roles_json";
 }
 
 /**
@@ -228,10 +231,12 @@ function withinTopicAudience<T extends AudienceColumns>(rows: readonly T[], topi
   // Un compte à plusieurs appareils revient en plusieurs lignes aux droits identiques : jugés une fois.
   const verdicts = new Map<string, boolean>();
   return rows.filter((row) => {
-    const key = `${Number(row.is_admin)}|${JSON.stringify(row.platform_roles_json ?? null)}`;
+    const planningGuest = Number(row.is_guest_staff ?? 0) === 1;
+    const key = `${Number(row.is_admin)}|${planningGuest ? 1 : 0}|${JSON.stringify(row.platform_roles_json ?? null)}`;
     let allowed = verdicts.get(key);
     if (allowed === undefined) {
-      allowed = can({ isAdmin: Number(row.is_admin) === 1, roles: sanitizePlatformRoles(row.platform_roles_json) }, audience);
+      // Un invité (`CAST_PLANNING.md` § Invités) ne reçoit plus les sujets du planning.
+      allowed = can({ isAdmin: Number(row.is_admin) === 1, roles: sanitizePlatformRoles(row.platform_roles_json), planningGuest }, audience);
       verdicts.set(key, allowed);
     }
     return allowed;

@@ -295,7 +295,7 @@ describe("exportOwnData", () => {
         .mockResolvedValue([[]]);
       await mockDb(execute);
       const data = await exportOwnData(42);
-      expect(execute.mock.calls[0][0]).toMatch(/certification_prompt_dismissed_at, referee_objection_at, overwatch_battletag_typed, created_at/);
+      expect(execute.mock.calls[0][0]).toMatch(/certification_prompt_dismissed_at, referee_objection_at, overwatch_battletag_typed, is_guest_staff, created_at/);
       return [data.account.certificationPromptDismissedAt, data.account.refereeObjectionAt];
     };
     expect(await run(new Date("2026-10-27T08:00:00.000Z"))).toEqual(["2026-10-27T08:00:00.000Z", "2026-10-27T08:00:00.000Z"]);
@@ -330,9 +330,9 @@ describe("exportOwnData", () => {
     const execute = jest.fn<SqlQuery>().mockRejectedValue(unknownColumn);
     await mockDb(execute);
     await expect(exportOwnData(42)).rejects.toBe(unknownColumn);
-    // La lecture complète, puis une par colonne retirée (5), puis plus rien à retirer.
-    expect(execute).toHaveBeenCalledTimes(6);
-    expect(execute.mock.calls[5][0]).not.toMatch(/recruitment_modal_off/);
+    // La lecture complète, puis une par colonne retirée (6), puis plus rien à retirer.
+    expect(execute).toHaveBeenCalledTimes(7);
+    expect(execute.mock.calls[6][0]).not.toMatch(/recruitment_modal_off/);
   });
 
   it("rend l'origine du BattleTag : tapé à la main, il n'est pas tenu pour fourni par Battle.net", async () => {

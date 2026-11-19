@@ -156,25 +156,31 @@ export function hasPermission(
 }
 
 /**
+ * Ce que `can()` lit d'un compte : ses rôles, l'administration, et le drapeau
+ * « invité » (`bg_users.is_guest_staff`) — un caster ou un prod invité garde
+ * ses droits de diffusion mais n'est pas du planning (`CAST_PLANNING.md` § Invités).
+ */
+export type PermissionSubject = { roles?: readonly PlatformRole[]; isAdmin?: boolean; planningGuest?: boolean };
+
+/**
  * Vrai si l'utilisateur dispose de `permission`.
  * Helper pratique côté routes API : `if (!can(user, "tournaments")) ...`.
  *
  * Un administrateur (`isAdmin`) obtient toutes les permissions, indépendamment
  * du contenu de `roles` (en pratique `roles` inclut déjà `ADMIN`, mais ce
- * raccourci garantit l'invariant « admin = tous les droits »).
+ * raccourci garantit l'invariant « admin = tous les droits »). Un invité
+ * (`planningGuest`) non administrateur perd `planning`, et elle seule.
  */
-export function can(
-  user: { roles?: readonly PlatformRole[]; isAdmin?: boolean } | null | undefined,
-  permission: Permission,
-): boolean {
+export function can(user: PermissionSubject | null | undefined, permission: Permission): boolean {
   if (!user) return false;
   if (user.isAdmin) return true;
+  if (permission === "planning" && user.planningGuest === true) return false;
   return hasPermission(user.roles, permission);
 }
 
 /** Vrai si l'utilisateur dispose d'**au moins une** des permissions listées. */
 export function canAny(
-  user: { roles?: readonly PlatformRole[]; isAdmin?: boolean } | null | undefined,
+  user: PermissionSubject | null | undefined,
   permissions: readonly Permission[],
 ): boolean {
   return permissions.some((permission) => can(user, permission));

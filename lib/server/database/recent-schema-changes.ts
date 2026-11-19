@@ -657,6 +657,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Date butoir de planification d'un match (`docs/features/SCHEDULE_DEADLINE.md`).
     `ALTER TABLE bg_matches ADD COLUMN schedule_deadline_at DATETIME NULL AFTER start_at`,
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_schedule_deadline (schedule_deadline_at)`,
+    // Casters et prods invités, hors du planning (`docs/features/CAST_PLANNING.md` § Invités).
+    `ALTER TABLE bg_users ADD COLUMN is_guest_staff TINYINT(1) NOT NULL DEFAULT 0 AFTER platform_roles_json`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

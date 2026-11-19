@@ -57,6 +57,9 @@ export async function createAccountTables(db: Pool): Promise<void> {
       visible_discord TINYINT(1) NOT NULL DEFAULT 0,
       open_to_recruitment TINYINT(1) NOT NULL DEFAULT 0,
       platform_roles_json JSON NULL,
+      -- Caster ou prod invité (PLANNING-GUESTS, CAST_PLANNING.md § Invités) :
+      -- garde ses droits de diffusion, hors du planning. Posé par le staff (roles).
+      is_guest_staff TINYINT(1) NOT NULL DEFAULT 0,
       terms_version INT NULL,
       terms_accepted_at DATETIME NULL,
       locale ENUM('fr', 'en') NOT NULL DEFAULT 'fr',

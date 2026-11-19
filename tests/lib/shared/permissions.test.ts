@@ -216,3 +216,28 @@ describe("isStaffMember", () => {
     expect(isStaffMember(null)).toBe(false);
   });
 });
+
+describe("can — invités du planning (`CAST_PLANNING.md` § Invités)", () => {
+  it("can_planningGuestWithCaster_deniesPlanning", () => {
+    expect(can({ roles: ["CASTER"], planningGuest: true }, "planning")).toBe(false);
+  });
+
+  it("can_planningGuestWithCaster_keepsCastingAndLive", () => {
+    const guest = { roles: ["CASTER"] as PlatformRole[], planningGuest: true };
+
+    expect(can(guest, "casting")).toBe(true);
+    expect(can(guest, "live")).toBe(true);
+  });
+
+  it("can_casterNotGuest_keepsPlanning", () => {
+    expect(can({ roles: ["CASTER"], planningGuest: false }, "planning")).toBe(true);
+  });
+
+  it("can_adminPlanningGuest_keepsPlanning", () => {
+    expect(can({ isAdmin: true, roles: [], planningGuest: true }, "planning")).toBe(true);
+  });
+
+  it("canAny_planningGuest_planningOnlyDenied", () => {
+    expect(canAny({ roles: ["CASTER"], planningGuest: true }, ["planning"])).toBe(false);
+  });
+});

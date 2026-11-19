@@ -38,7 +38,7 @@ import {
 import { announceWithdrawal } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "@/lib/server/planning/planning-undo";
-import { casterHold, casterHolds, cleanWithdrawalReason, isLateWithdrawal, pickReplacement, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
+import { casterHold, casterHolds, cleanWithdrawalReason, isLateWithdrawal, pickReplacement, releaseGuestPlanning, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
 import { LATE_WITHDRAWAL_MS, WITHDRAWAL_REASON_MAX } from "@/lib/shared/planning";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -1142,5 +1142,86 @@ describe("withdrawFromEntry — caster restant suspendu", () => {
     await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ staffUnfilled: null });
+  });
+});
+
+describe("releaseGuestPlanning (`CAST_PLANNING.md` § Invités)", () => {
+  const GUEST = 4;
+
+  beforeEach(() => {
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  function availabilityDeletes() {
+    return execute.mock.calls.filter(([sql]) => sql.includes("DELETE FROM bg_planning_availability"));
+  }
+
+  it("releaseGuestPlanning_futureAutoAssignment_withdrawn", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(
+      planningData({ entries: [loadedEntry()], assignments: [loadedAssignment({ userId: GUEST, role: "CASTER" })] }),
+    );
+    casterData({ confirmed: false });
+
+    const release = await releaseGuestPlanning(GUEST, EARLY);
+
+    expect(release.withdrawn).toBe(1);
+    expect(release.failed).toBe(0);
+    expect(execute).toHaveBeenCalledWith(
+      "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ?",
+      ["m:1", GUEST, "CASTER"],
+    );
+  });
+
+  it("releaseGuestPlanning_castSignup_untouched", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(
+      planningData({ entries: [loadedEntry()], matchCasters: new Map([["m:1", [GUEST]]]) }),
+    );
+
+    const release = await releaseGuestPlanning(GUEST, EARLY);
+
+    expect(release.withdrawn).toBe(0);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("DELETE FROM bg_planning_assignments"))).toBe(false);
+  });
+
+  it("releaseGuestPlanning_pastEntry_untouched", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(
+      planningData({ entries: [loadedEntry()], assignments: [loadedAssignment({ userId: GUEST, role: "CASTER" })] }),
+    );
+
+    const release = await releaseGuestPlanning(GUEST, MONDAY + HOUR_MS);
+
+    expect(release).toEqual({ withdrawn: 0, failed: 0, availabilityCleared: 0 });
+    expect(availabilityDeletes()).toHaveLength(0);
+  });
+
+  it("releaseGuestPlanning_futureAvailability_cleared", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(planningData({ entries: [loadedEntry()] }));
+    execute.mockResolvedValueOnce([{ affectedRows: 2 }]);
+
+    const release = await releaseGuestPlanning(GUEST, EARLY);
+
+    expect(release.availabilityCleared).toBe(2);
+    expect(availabilityDeletes()[0][1]).toEqual([GUEST, "m:1"]);
+  });
+
+  it("releaseGuestPlanning_withdrawalFails_countsFailure", async () => {
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(planningData({ entries: [loadedEntry()], assignments: [loadedAssignment({ userId: GUEST, role: "CASTER" })] }))
+      .mockRejectedValueOnce(new Error("panne"));
+
+    const release = await releaseGuestPlanning(GUEST, EARLY);
+
+    expect(release.withdrawn).toBe(0);
+    expect(release.failed).toBe(1);
+  });
+
+  it("releaseGuestPlanning_loadFails_returnsZeroCounts", async () => {
+    jest.mocked(loadPlanningData).mockRejectedValueOnce(new Error("panne"));
+
+    const release = await releaseGuestPlanning(GUEST, EARLY);
+
+    expect(release).toEqual({ withdrawn: 0, failed: 0, availabilityCleared: 0 });
   });
 });

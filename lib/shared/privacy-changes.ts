@@ -2277,6 +2277,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Staff : une date butoir posée, changée ou retirée est notée au journal du staff sur Discord sans nommer son auteur ; les journaux du serveur gardent son auteur (T05).",
     ],
   },
+  {
+    // PLANNING-GUESTS — casters et prods invités, hors du planning
+    // (`docs/features/CAST_PLANNING.md` § Invités) : une marque posée sur le
+    // compte par le staff des rôles. Registre T20, /rgpd (FR et EN). Pour tous
+    // les comptes, comme l'entrée du planning. Datée du lendemain de la mise en
+    // ligne prévue, comme `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
+    id: "2026-11-planning-invites",
+    publishedAt: "2026-11-22",
+    title: "Planning : casters et prods invités",
+    links: [{ href: "/rgpd/registre#t20", label: "Lire la fiche T20 du registre" }],
+    summary: "Le staff qui attribue les rôles peut marquer un caster ou un prod comme « invité » : il garde ses droits de diffusion, mais ne fait plus partie du planning des casts et arbitres.",
+    details: [
+      "Ce qui est gardé : la marque « invité » sur le compte, tant que le staff la laisse ; elle est dans l'export de tes données et part avec la suppression du compte. Base : intérêt légitime de l'association (organiser ses bénévoles), avec droit d'opposition.",
+      "Ce qu'elle change : un invité n'est plus proposé, désigné ni prévenu par le planning, et n'en lit plus la page ; sa marque quitte ses attributions à venir comme un désistement (un remplaçant est cherché comme d'habitude) et efface ses disponibilités à venir ; ce qui est passé reste.",
+      "Qui la voit : le staff qui attribue les rôles ; les autres membres du planning peuvent seulement constater que l'invité n'y figure plus. Le geste est noté au journal du staff sur Discord sans nommer personne ; les journaux du serveur gardent son auteur (T05).",
+      "Ce qui ne change pas : pour un compte non marqué, rien de nouveau n'est collecté.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

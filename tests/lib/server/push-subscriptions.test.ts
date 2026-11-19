@@ -258,6 +258,30 @@ describe("usersReachableByPush", () => {
     await expect(usersReachableByPush([5, 6], "CAST_RELEASED", CONFIG)).resolves.toEqual(new Set([5]));
   });
 
+  it("usersReachableByPush_planningTopicGuest_excluded", async () => {
+    const roles = JSON.stringify(["CASTER"]);
+    const query = jest.fn<SqlQuery>().mockResolvedValue([
+      [
+        { user_id: 5, is_admin: 0, platform_roles_json: roles, is_guest_staff: 1 },
+        { user_id: 6, is_admin: 0, platform_roles_json: roles, is_guest_staff: 0 },
+      ],
+    ]);
+    pool({ query });
+
+    await expect(usersReachableByPush([5, 6], "PLANNING_ASSIGNED", CONFIG)).resolves.toEqual(new Set([6]));
+    expect(query.mock.calls[0][0]).toContain("u.is_guest_staff");
+  });
+
+  it("usersReachableByPush_castTopicGuest_stillReached", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([
+      [{ user_id: 5, is_admin: 0, platform_roles_json: JSON.stringify(["CASTER"]), is_guest_staff: 1 }],
+    ]);
+    pool({ query });
+
+    await expect(usersReachableByPush([5], "CAST_RELEASED", CONFIG)).resolves.toEqual(new Set([5]));
+    expect(query.mock.calls[0][0]).not.toContain("is_guest_staff");
+  });
+
   it("usersReachableByPush_openTopic_distinctUserIds", async () => {
     const query = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     pool({ query });

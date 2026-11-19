@@ -15,6 +15,7 @@ import { applyVisibility, mapPublicUser, type UserRow } from "./players";
 import { accountLocaleFromRow } from "./account-locale";
 import { matchDmEnabled } from "./match-dm-preference";
 import { anonymizedAccountHasNoPage } from "./profileless-players";
+import { readPlanningGuest } from "./planning-guest";
 
 /*
  * Fiche complète d'un joueur telle que la voit son lecteur — lui-même, le
@@ -113,6 +114,20 @@ async function hasNoPlayerPage(isDeleted: boolean, pending: boolean, userId: num
 /** Une donnée réservée au titulaire : `undefined` pour tout autre lecteur. */
 function onlyForSelf<T>(isSelf: boolean, value: T): T | undefined {
   return isSelf ? value : undefined;
+}
+
+/**
+ * Le drapeau « invité » (hors planning, `CAST_PLANNING.md` § Invités) : au
+ * seul staff des rôles, sur la fiche d'un autre compte vivant (`excluded` :
+ * sa propre fiche, ou un compte supprimé).
+ */
+async function planningGuestOf(
+  viewer: Parameters<typeof can>[0],
+  targetUserId: number,
+  excluded: boolean,
+): Promise<{ planningGuest?: boolean | null }> {
+  if (excluded || !can(viewer, "roles")) return {};
+  return { planningGuest: await readPlanningGuest(targetUserId) };
 }
 
 export async function getFullProfile(
@@ -281,6 +296,7 @@ export async function getFullProfile(
     // compte soit suspendu, et pourquoi, ne regarde que lui et elle.
     moderationSuspension: canModerate && !isDeleted ? await getActiveSuspension(targetUserId) : null,
     moderationSuspendable: canModerate && !isDeleted && !isSelf && !targetIsAdmin,
+    ...(await planningGuestOf(viewer, targetUserId, isSelf || isDeleted)),
     // La langue du compte ne regarde que son titulaire (lot 9-3) : « Mon
     // profil » l'affiche et la change, aucune autre fiche ne la porte.
     ...(isSelf ? { accountLocale: accountLocaleFromRow(userRows[0].locale) } : {}),

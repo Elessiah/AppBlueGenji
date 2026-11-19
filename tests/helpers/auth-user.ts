@@ -25,6 +25,7 @@ export function authUser(overrides: Partial<AuthUser> = {}): AuthUser {
     recruitmentModalOff: false,
     recruitmentModalBackOn: false,
     certifyPromptDue: false,
+    planningGuest: false,
     playerView: false,
     playerViewUntil: null,
     // Le compte porte réellement des droits dès qu'il a un rôle de plateforme.

@@ -92,6 +92,52 @@ désignation, réglages), `PLANNING_BATCH_RULE` (20 calculs ou confirmations /
 la requête : une requête mal formée n'use pas ce quota). Le refus `429`
 (`TOO_MANY_REQUESTS`) a son texte dans `planning.errors`.
 
+## Invités (casters et prods hors planning)
+
+L'association distingue ses casters et prods de ceux qu'elle **invite** : un
+invité garde son rôle et ses droits (`casting`, `live`, cast d'un match,
+arbitrage s'il est arbitre) mais ne fait pas partie du planning.
+
+- **Stockage** : `bg_users.is_guest_staff` (case « Invité » de la fiche du
+  joueur, bloc « Rôles & permissions », `PlanningGuestField`, avec son `InfoHint`
+  « Hors planning : garde ses droits de caster/prod mais n'apparaît pas au
+  planning »). Outil de l'administration resté français sous `/en` (D4).
+- **Qui le pose** : la permission `roles` seule, `PUT
+  /api/admin/users/[id]/planning-guest` (`{ guest: boolean }`) — `403
+  FORBIDDEN` sans elle, `400 CANNOT_MODIFY_SELF` sur son propre compte (ce
+  n'est pas un réglage du titulaire), `404 USER_NOT_FOUND` pour un compte
+  inconnu ou supprimé. Écriture conditionnelle (`is_guest_staff <> ?`) : deux
+  enregistrements concurrents ne libèrent qu'une fois.
+- **Effet, en un seul point** : `can(user, "planning")` est faux pour un invité
+  non administrateur (`planningGuest`, lu avec la session, `AuthUser`) ; un
+  administrateur garde tout (« admin = tous les droits »). En découlent : pas de
+  lien « Planning », page 404, routes `403 PLANNING_MEMBERS_ONLY`,
+  `planningRolesOf` vide (aucune disponibilité posée, `PLANNING_ROLE_NOT_HELD`),
+  absent de `PLANNING_MEMBER_SQL` (listes de membres, calcul, remplaçants,
+  récapitulatif des nouveaux créneaux, avis, caster autonome réglé par le staff
+  refusé en `409 NOT_CASTER`) et des sujets push d'audience `planning`
+  (`withinTopicAudience`, la colonne n'est lue que pour eux).
+- **Sortie du planning** (`releaseGuestPlanning`, `withdrawal.ts`) : au moment
+  où le drapeau est **posé** (pas à chaque enregistrement identique), chaque
+  attribution du compte sur une entrée modifiable pas encore commencée
+  (`AUTO` ou `MANUAL`) passe par le **désistement ordinaire**
+  (`withdrawMember`, sans motif : remplaçant, place « à pourvoir », annonces,
+  évènement `WITHDRAWN`, tardif si moins de 24 h), puis ses disponibilités des
+  entrées à venir sont effacées. Une inscription de cast sur un match (`CAST`) ou
+  un arbitre désigné hors du planning (`MATCH`) restent : ils se gèrent depuis
+  le match. Le passé (entrées commencées, historique) ne bouge pas. Une
+  attribution refusée ou en panne est comptée (`failed`, toast « retire-les
+  depuis le planning ») sans défaire le drapeau. Décocher ne rend rien : le
+  compte redevient membre, sans attribution.
+- **Journal du staff** : `publishPlanningGuestChange` (`publishStaffAction`) —
+  ligne anonyme sur Discord, auteur et compte visé (`#id`, bilan de la sortie)
+  dans pm2 ; rien pour un enregistrement sans écart.
+- **Seed** : `Test_CasterInvite` (caster invité).
+- **RGPD** : registre T20 (sous-finalité, catégorie, conservation,
+  destinataires), `/rgpd` § planning (FR, EN), entrée
+  `2026-11-planning-invites` de `PRIVACY_CHANGES` ; la marque est exportée
+  (`account.planningGuest`) et remise à `0` à l'anonymisation.
+
 ## Entrées
 
 - Tournoi **à matchs planifiés** (`referee_scheduling = 1`) : une entrée par
