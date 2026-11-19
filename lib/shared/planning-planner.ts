@@ -22,8 +22,9 @@
  *    planning qu'il touche : un lot d'un mois se calcule en un instant.
  * 3. **Second caster** ({@link PLANNING_MAX_CASTERS}), en renfort seulement,
  *    une fois chaque entrée à sa meilleure couverture : sur une entrée qui a
- *    déjà son caster, à qui n'est attendu sur aucune entrée qui la chevauche
- *    et reste sans caster (jamais pris à une autre entrée), préférences
+ *    déjà son caster, à qui n'est attendu sur aucune entrée qui la chevauche,
+ *    peut encore être tenue et manque d'un rôle qu'il pourrait prendre
+ *    (caster, prod ou arbitre : jamais pris à une autre entrée), préférences
  *    d'abord (sur tout le lot), puis ce qui rend l'entrée diffusée (un caster
  *    autonome auprès d'un caster sans prod), puis la charge.
  *
@@ -49,6 +50,17 @@ export type PlannerEntry = {
   endAt: number;
   /** Entrée que le calcul remplit : à venir, non jouée, dans la fenêtre du lot. */
   open: boolean;
+  /**
+   * Rouverte pour son seul second caster (remplacement d'un renfort) : le
+   * calcul n'y pose rien d'autre. Absent : faux.
+   */
+  spareOnly?: boolean;
+  /**
+   * Peut encore recevoir quelqu'un, dans ce lot ou un autre (à venir, non
+   * jouée). Faux : commencée ou jouée, elle n'attend plus personne et ne
+   * retient aucun renfort. Absent : vrai.
+   */
+  fillable?: boolean;
   /** Arbitres que le calcul pose au plus (défaut 1 ; un tournoi entier : un groupe). */
   refereeSlots?: number;
 };
@@ -487,14 +499,22 @@ function fillAll(state: PlannerState, open: readonly PlannerEntry[]): boolean {
 }
 
 /**
- * Un caster disponible ici est-il attendu ailleurs : une entrée qui chevauche
- * celle-ci, encore sans caster, qu'il pourrait prendre (ouverte au calcul ou
- * non : un lot ne prend jamais un caster à une entrée d'un autre lot).
+ * Un candidat au renfort est-il attendu ailleurs : une entrée qui chevauche
+ * celle-ci, qui peut encore recevoir quelqu'un ({@link PlannerEntry.fillable}),
+ * et à qui il manque un rôle qu'il pourrait prendre — caster, prod, ou une
+ * place d'arbitre (ouverte au calcul ou non : un lot ne prend jamais une
+ * personne à une entrée d'un autre lot, et un caster qui est aussi prod ou
+ * arbitre n'est pas pris à l'entrée qui l'attend dans cet autre rôle).
  */
-function casterNeededElsewhere(state: PlannerState, entry: PlannerEntry, userId: number): boolean {
+function neededElsewhere(state: PlannerState, entry: PlannerEntry, userId: number): boolean {
   return state.overlapsOf(entry.key).some((key) => {
     const other = state.entry(key);
-    return other !== undefined && state.held(key, "CASTER").length === 0 && state.eligible(other, userId, "CASTER");
+    if (other === undefined || other.fillable === false) return false;
+    const missing: PlanningRole[] = [];
+    if (state.held(key, "CASTER").length === 0) missing.push("CASTER");
+    if (state.held(key, "PROD").length === 0) missing.push("PROD");
+    if (!state.input.refereeDecided.has(key) && state.held(key, "REFEREE").length < (other.refereeSlots ?? 1)) missing.push("REFEREE");
+    return missing.some((role) => state.eligible(other, userId, role));
   });
 }
 
@@ -502,7 +522,7 @@ function casterNeededElsewhere(state: PlannerState, entry: PlannerEntry, userId:
  * Le second caster d'une entrée, en renfort : l'entrée a déjà son premier
  * caster (jamais un second sans premier) et pas encore son plafond ; le
  * candidat n'est pas déjà sur l'entrée (aucun cumul pour un renfort) ni
- * attendu ailleurs ({@link casterNeededElsewhere}). `preferredOnly` : seuls
+ * attendu ailleurs ({@link neededElsewhere}). `preferredOnly` : seuls
  * ceux qui préfèrent l'entrée. Ordre : ce qui rend l'entrée diffusée (un
  * caster autonome auprès d'un caster qui attend son prod), la préférence, la
  * charge de la semaine, celle des semaines précédentes, l'identifiant.
@@ -515,7 +535,7 @@ function spareCaster(state: PlannerState, entry: PlannerEntry, preferredOnly: bo
     .candidates(entry, "CASTER")
     .filter((userId) => state.rolesOn(entry.key, userId).length === 0)
     .filter((userId) => !preferredOnly || state.preferred(entry.key, userId, "CASTER"))
-    .filter((userId) => !casterNeededElsewhere(state, entry, userId))
+    .filter((userId) => !neededElsewhere(state, entry, userId))
     .map((userId) => ({
       userId,
       streams: !streamed && state.input.soloCasterIds.has(userId) ? 0 : 1,
@@ -661,7 +681,7 @@ export function planAssignments(input: PlannerInput, stats?: PlannerStats): Plan
     }
   }
   state.freezeHistory();
-  const open = input.entries.filter((entry) => entry.open);
+  const open = input.entries.filter((entry) => entry.open && entry.spareOnly !== true);
   fillAll(state, open);
   let passes = 0;
   while (passes < PLANNER_MAX_PASSES) {
@@ -671,7 +691,7 @@ export function planAssignments(input: PlannerInput, stats?: PlannerStats): Plan
     const filled = fillAll(state, open);
     if (!moved && !swapped && !filled) break;
   }
-  if (input.spareCasters !== false) fillSpareCasters(state, open);
+  if (input.spareCasters !== false) fillSpareCasters(state, input.entries.filter((entry) => entry.open));
   if (stats) {
     stats.passes = passes;
     stats.trials = state.trials;

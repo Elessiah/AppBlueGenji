@@ -139,6 +139,19 @@ describe("formatPlanningWithdrawalDm", () => {
     expect(message).toContain("Another caster is still assigned.");
   });
 
+  it("formatPlanningWithdrawalDm_selfHeldFr_saysRecipientStaysAssigned", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ stillHeld: true, selfHeld: true }), SITE, "fr");
+
+    expect(message).toContain("Tu restes affecté comme caster.");
+    expect(message).not.toContain("Un autre caster");
+  });
+
+  it("formatPlanningWithdrawalDm_selfHeldEn_saysRecipientStaysAssigned", () => {
+    const message = formatPlanningWithdrawalDm(withdrawal({ stillHeld: true, selfHeld: true }), SITE, "en");
+
+    expect(message).toContain("You remain assigned as caster.");
+  });
+
   it("formatPlanningWithdrawalDm_open_saysSlotOpen", () => {
     const message = formatPlanningWithdrawalDm(withdrawal(), SITE, "en");
 
@@ -197,6 +210,13 @@ describe("push du planning", () => {
   it("planningWithdrawalPush_stillHeld_bodyStillHeld", () => {
     expect(planningWithdrawalPush(withdrawal({ stillHeld: true }), "fr").body).toContain("un autre caster reste affecté");
     expect(planningWithdrawalPush(withdrawal({ stillHeld: true }), "en").body).toContain("another caster is still assigned");
+  });
+
+  it("planningWithdrawalPush_selfHeld_bodySelfHeld", () => {
+    const notice = withdrawal({ stillHeld: true, selfHeld: true });
+
+    expect(planningWithdrawalPush(notice, "fr").body).toContain("tu restes affecté comme caster");
+    expect(planningWithdrawalPush(notice, "en").body).toContain("you remain assigned as caster");
   });
 
   it("planningUnfilledPush_late_usesLateBody", () => {

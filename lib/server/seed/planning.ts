@@ -1,5 +1,6 @@
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { planningEntryKey, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
+import { writeAssignment } from "@/lib/server/planning/auto-assign";
 import { BOOTSTRAP_SETTING } from "@/lib/server/planning/new-entries";
 import { SEED_TOURNAMENT_PREFIX } from "./cases";
 
@@ -62,19 +63,9 @@ async function writeAnswers(db: Pool, entry: Entry, answers: Answer[], ids: Map<
   return written;
 }
 
-/** Un choix du staff, confirmé et verrouillé (le calcul le garde tel quel), et son évènement. */
+/** Un choix du staff, confirmé et verrouillé (le calcul le garde tel quel), et son évènement : l'écriture même du site. */
 async function writeManual(db: Pool, entry: Entry, userId: number, role: PlanningRole, admin: number | null): Promise<void> {
-  await db.execute(
-    `INSERT INTO bg_planning_assignments
-       (entry_key, user_id, role, tournament_id, match_id, source, reason, confirmed, assigned_by_user_id)
-     VALUES (?, ?, ?, ?, ?, 'MANUAL', 'MANUAL', 1, ?)`,
-    [entry.key, userId, role, entry.tournamentId, entry.matchId, admin],
-  );
-  await db.execute(
-    `INSERT INTO bg_planning_events (entry_key, user_id, role, tournament_id, match_id, kind, source, actor_user_id)
-     VALUES (?, ?, ?, ?, ?, 'ASSIGNED', 'MANUAL', ?)`,
-    [entry.key, userId, role, entry.tournamentId, entry.matchId, admin],
-  );
+  await writeAssignment(db, entry, { userId, role, source: "MANUAL", reason: "MANUAL" }, admin);
 }
 
 export async function applyPlanningCases(db: Pool, ids: Map<string, number>): Promise<void> {

@@ -1243,12 +1243,17 @@ export function planningWithdrawalPush(notice: PlanningWithdrawalNotice, locale:
   };
 }
 
-/** Texte d'un désistement : remplaçant affecté, autre caster encore affecté, ou place à pourvoir. */
+/** Texte d'un désistement : remplaçant affecté, autre caster encore affecté (ou le destinataire lui-même), ou place à pourvoir. */
 function withdrawalBody(
   notice: PlanningWithdrawalNotice,
-): "planning.withdrawal.bodyReplaced" | "planning.withdrawal.bodyStillHeld" | "planning.withdrawal.bodyOpen" {
+):
+  | "planning.withdrawal.bodyReplaced"
+  | "planning.withdrawal.bodyStillHeld"
+  | "planning.withdrawal.bodySelfHeld"
+  | "planning.withdrawal.bodyOpen" {
   if (notice.replaced) return "planning.withdrawal.bodyReplaced";
-  return notice.stillHeld === true ? "planning.withdrawal.bodyStillHeld" : "planning.withdrawal.bodyOpen";
+  if (notice.stillHeld !== true) return "planning.withdrawal.bodyOpen";
+  return notice.selfHeld === true ? "planning.withdrawal.bodySelfHeld" : "planning.withdrawal.bodyStillHeld";
 }
 
 /** Place à pourvoir après un désistement sans remplaçant (`PLANNING_UNFILLED`, staff des tournois). */

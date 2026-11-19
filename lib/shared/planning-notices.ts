@@ -42,6 +42,8 @@ export type PlanningWithdrawalNotice = PlanningNoticeEntry & {
    * affecté : la place n'est pas à pourvoir. Absent : faux.
    */
   stillHeld?: boolean;
+  /** Avec `stillHeld` : le destinataire est lui-même ce caster qui reste. Absent : faux. */
+  selfHeld?: boolean;
   /** Désistement à moins de 24 h du début. */
   late: boolean;
 };
@@ -175,11 +177,15 @@ export function formatPlanningWithdrawalDm(notice: PlanningWithdrawalNotice, sit
   const url = planningNoticeUrl(siteBase, locale);
   if (locale === "en") {
     let outcome = notice.replaced ? "A replacement has been assigned." : "The slot is open.";
-    if (!notice.replaced && notice.stillHeld === true) outcome = `Another ${role} is still assigned.`;
+    if (!notice.replaced && notice.stillHeld === true) {
+      outcome = notice.selfHeld === true ? `You remain assigned as ${role}.` : `Another ${role} is still assigned.`;
+    }
     return `↩️ BlueGenji — A ${role} withdrew from ${label} (${when}, Paris time). ${outcome} ${url}`;
   }
   let outcome = notice.replaced ? "Un remplaçant a été affecté." : "La place est à pourvoir.";
-  if (!notice.replaced && notice.stillHeld === true) outcome = `Un autre ${role} reste affecté.`;
+  if (!notice.replaced && notice.stillHeld === true) {
+    outcome = notice.selfHeld === true ? `Tu restes affecté comme ${role}.` : `Un autre ${role} reste affecté.`;
+  }
   return `↩️ BlueGenji — Un ${role} s'est désisté de ${label} (${when}, heure de Paris). ${outcome} ${url}`;
 }
 

@@ -5,6 +5,7 @@
  */
 import type { PillVariant } from "@/components/cyber/Pill";
 import {
+  planningCastersFull,
   planningDayStart,
   planningNextWeekStart,
   planningWeekStart,
@@ -189,6 +190,22 @@ export function candidatesFor(
         Number(b.preferred) - Number(a.preferred) ||
         a.member.pseudo.localeCompare(b.member.pseudo),
     );
+}
+
+/**
+ * Ce que la ligne d'un rôle offre au staff : `full`, le plafond de casters
+ * atteint (`PLANNING_MAX_CASTERS` : liste masquée, « Deux casters au plus ») ;
+ * `candidates`, la liste « Ajouter » (vide sans droit, entrée close ou plafond).
+ */
+export function roleChoices(
+  entry: PlanningEntryView,
+  role: PlanningRole,
+  members: readonly PlanningMember[],
+  canManage: boolean,
+): { full: boolean; candidates: ReturnType<typeof candidatesFor> } {
+  const manage = canManage && entry.editable;
+  const full = manage && role === "CASTER" && planningCastersFull(entry.assignments);
+  return { full, candidates: manage && !full ? candidatesFor(entry, role, members) : [] };
 }
 
 /** Clé du texte d'un refus : un code connu de `errors`, sinon `generic`. */

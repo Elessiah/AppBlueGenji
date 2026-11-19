@@ -107,12 +107,25 @@ describe("announceWithdrawal", () => {
   });
 
   it("announceWithdrawal_stillHeld_coAssignedToldNoOpenSlotAlert", async () => {
-    await announceWithdrawal(withdrawal({ unfilled: false, stillHeld: true, coAssignedIds: [5] }));
+    await announceWithdrawal(withdrawal({ unfilled: false, stillHeldBy: [6], coAssignedIds: [5] }));
 
     expect(sent()).toEqual([[[5], "PLANNING_WITHDRAWAL"]]);
     expect(sendBotLog).not.toHaveBeenCalled();
     const message = jest.mocked(notifyUsers).mock.calls[0][1].discord?.message("fr");
     expect(message).toContain("Un autre caster reste affecté.");
+  });
+
+  it("announceWithdrawal_stillHeld_remainingCasterGetsSelfText_othersGetOtherText", async () => {
+    await announceWithdrawal(withdrawal({ unfilled: false, stillHeldBy: [6], coAssignedIds: [5, 6] }));
+
+    expect(sent()).toEqual([
+      [[5], "PLANNING_WITHDRAWAL"],
+      [[6], "PLANNING_WITHDRAWAL"],
+    ]);
+    expect(sendBotLog).not.toHaveBeenCalled();
+    const calls = jest.mocked(notifyUsers).mock.calls;
+    expect(calls[0][1].discord?.message("fr")).toContain("Un autre caster reste affecté.");
+    expect(calls[1][1].discord?.message("fr")).toContain("Tu restes affecté comme caster.");
   });
 
   it("announceWithdrawal_noReplacement_tournamentStaffWarnedWithoutTheWithdrawer", async () => {

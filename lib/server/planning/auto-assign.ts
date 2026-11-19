@@ -178,6 +178,7 @@ export function preparePlanner(
       startAt: entry.startAt,
       endAt: entry.endAt,
       open: inBatch.has(entry.key),
+      fillable: entry.open,
       refereeSlots: entry.kind === "TOURNAMENT" ? PLANNING_EVENT_REFEREES : 1,
     })),
     availability: data.availability,
@@ -219,9 +220,10 @@ export async function writeEvent(
 /** Pose une ligne d'attribution (un choix du staff naît confirmé) et l'évènement qui la retrace (son identifiant rendu). */
 export async function writeAssignment(
   executor: Executor,
-  entry: LoadedEntry,
+  entry: EventEntry,
   row: { userId: number; role: PlanningRole; source: "AUTO" | "MANUAL"; reason: "PREFERENCE" | "LOAD" | "MANUAL" },
-  actorId: number,
+  /** `null` : aucun auteur (le seed, sans compte admin). */
+  actorId: number | null,
 ): Promise<number> {
   const confirmed = row.source === "MANUAL" ? 1 : 0;
   await executor.execute(

@@ -115,8 +115,12 @@ export type WithdrawalAnnouncement = {
    * le match par une autre voie. Faux : le rôle est tenu.
    */
   unfilled: boolean;
-  /** Pas de remplaçant, mais un autre caster confirmé tient encore l'entrée (second caster). Absent : faux. */
-  stillHeld?: boolean;
+  /**
+   * Pas de remplaçant, mais ces autres casters confirmés tiennent encore
+   * l'entrée (second caster) : la place n'est pas à pourvoir. Ils apprennent
+   * qu'ils restent affectés ; les autres, qu'un autre caster reste. Absent : vide.
+   */
+  stillHeldBy?: readonly number[];
   /** Les autres affectés de l'entrée (tenus, ni le désisté ni le remplaçant). */
   coAssignedIds: readonly number[];
 };
@@ -127,22 +131,30 @@ export type WithdrawalAnnouncement = {
  * le staff des tournois quand la place reste à pourvoir (`PLANNING_UNFILLED`).
  */
 export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise<void> {
+  const stillHeldBy = new Set(input.stillHeldBy ?? []);
+  const stillHeld = stillHeldBy.size > 0;
   const notice: PlanningWithdrawalNotice = {
     ...noticeEntry(input.entry),
     role: input.role,
-    replaced: !input.unfilled && input.stillHeld !== true,
-    stillHeld: input.stillHeld === true,
+    replaced: !input.unfilled && !stillHeld,
+    stillHeld,
     late: input.late,
   };
   try {
     const others = [...new Set(input.coAssignedIds)].filter((id) => id !== input.replacementId && id !== input.withdrawnUserId);
-    if (others.length > 0) {
-      const recipients = await loadNotificationRecipients(others, "proven", { excludeSuspended: true });
-      const base = siteCanonicalBase();
+    // Le caster qui reste ne lit pas « un autre caster reste affecté » : c'est lui ; il apprend qu'il reste.
+    const groups: [number[], PlanningWithdrawalNotice][] = [
+      [others.filter((id) => !stillHeldBy.has(id)), notice],
+      [others.filter((id) => stillHeldBy.has(id)), { ...notice, selfHeld: true }],
+    ];
+    const base = siteCanonicalBase();
+    for (const [ids, text] of groups) {
+      if (ids.length === 0) continue;
+      const recipients = await loadNotificationRecipients(ids, "proven", { excludeSuspended: true });
       await notifyUsers(recipients, {
         topic: "PLANNING_WITHDRAWAL",
-        push: (locale) => planningWithdrawalPush(notice, locale),
-        discord: { message: (locale) => formatPlanningWithdrawalDm(notice, base, locale), context: "planning-withdrawal" },
+        push: (locale) => planningWithdrawalPush(text, locale),
+        discord: { message: (locale) => formatPlanningWithdrawalDm(text, base, locale), context: "planning-withdrawal" },
         dmFollowsTopic: true,
       });
     }

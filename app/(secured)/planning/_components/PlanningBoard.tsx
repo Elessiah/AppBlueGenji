@@ -19,7 +19,6 @@ import {
   LATE_WITHDRAWAL_MS,
   WITHDRAWAL_FIELD_ERRORS,
   WITHDRAWAL_REASON_MAX,
-  planningCastersFull,
   type AvailabilityStatus,
   type PlanningRole,
 } from "@/lib/shared/planning";
@@ -37,7 +36,7 @@ import {
   COVERAGE_PILL,
   NO_FILTERS,
   applyAvailability,
-  candidatesFor,
+  roleChoices,
   canWithdraw,
   errorKey,
   filterEntries,
@@ -660,8 +659,7 @@ function RoleRow({
   const roleName = t(`roles.${role}`);
   const manage = view.canManage && entry.editable;
   // Plafond de casters atteint : plus de liste de choix (le serveur refuse aussi, `PLANNING_CASTERS_FULL`).
-  const full = role === "CASTER" && planningCastersFull(rows);
-  const candidates = manage && !full ? candidatesFor(entry, role, view.members) : [];
+  const { full, candidates } = roleChoices(entry, role, view.members, view.canManage);
   const assign = (userId: number, assigned: boolean) =>
     act(
       `assign:${entry.key}:${role}:${userId}`,
@@ -700,7 +698,7 @@ function RoleRow({
             </span>
           );
         })}
-        {manage && full && <span className={styles.muted}>{t("assignment.castersFull")}</span>}
+        {full && <span className={styles.muted}>{t("assignment.castersFull")}</span>}
         {manage && candidates.length > 0 && (
           <>
             <label htmlFor={selectId} className="sr-only">

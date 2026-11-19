@@ -221,7 +221,8 @@
       "title": "Withdrawal on your match",
       "bodyReplaced": "A {role} withdrew from {entry} ({start}): a replacement has been assigned.",
       "bodyOpen": "A {role} withdrew from {entry} ({start}): the slot is open.",
-      "bodyStillHeld": "A {role} withdrew from {entry} ({start}): another {role} is still assigned."
+      "bodyStillHeld": "A {role} withdrew from {entry} ({start}): another {role} is still assigned.",
+      "bodySelfHeld": "A {role} withdrew from {entry} ({start}): you remain assigned as {role}."
     },
     "unfilled": {
       "title": "Open slot",

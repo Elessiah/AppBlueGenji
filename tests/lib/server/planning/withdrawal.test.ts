@@ -38,7 +38,7 @@ import {
 import { announceWithdrawal } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "@/lib/server/planning/planning-undo";
-import { cleanWithdrawalReason, isLateWithdrawal, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
+import { cleanWithdrawalReason, isLateWithdrawal, pickReplacement, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
 import { LATE_WITHDRAWAL_MS, WITHDRAWAL_REASON_MAX } from "@/lib/shared/planning";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -498,10 +498,11 @@ describe("withdrawFromEntry — panne après le désistement", () => {
  * pour un renfort ; `elsewhere` : une entrée m:2 qui chevauche, sans caster,
  * où ces candidats sont aussi disponibles.
  */
-function twoCasterData(options: { candidates?: number[]; elsewhere?: boolean }) {
+function twoCasterData(options: { candidates?: number[]; elsewhere?: boolean; onlySolo?: number }) {
   const candidates = options.candidates ?? [];
   const entries = [loadedEntry(), ...(options.elsewhere ? [loadedEntry({ key: "m:2", matchId: 2 })] : [])];
-  const members = [4, 5, ...candidates].map((userId) => loadedMember({ userId, roles: ["CASTER"], soloCaster: true }));
+  const solo = (userId: number) => options.onlySolo === undefined || options.onlySolo === userId;
+  const members = [4, 5, ...candidates].map((userId) => loadedMember({ userId, roles: ["CASTER"], soloCaster: solo(userId) }));
   const availability = candidates.flatMap((userId) => [
     available("m:1", userId, "CASTER"),
     ...(options.elsewhere ? [available("m:2", userId, "CASTER")] : []),
@@ -532,7 +533,7 @@ describe("withdrawFromEntry — deux casters", () => {
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({
       replacementId: null,
       unfilled: false,
-      stillHeld: true,
+      stillHeldBy: [5],
       coAssignedIds: [5],
     });
   });
@@ -543,7 +544,7 @@ describe("withdrawFromEntry — deux casters", () => {
     const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
     expect(result).toEqual({ late: false, replaced: true, unfilled: false });
-    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6, stillHeld: false });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ replacementId: 6, stillHeldBy: [] });
   });
 
   it("withdrawFromEntry_spareNeededOnOverlappingEntry_notTaken", async () => {
@@ -553,5 +554,47 @@ describe("withdrawFromEntry — deux casters", () => {
 
     expect(result).toEqual({ late: false, replaced: false, unfilled: false });
     expect(statements()).toEqual(["DELETE FROM bg_planning_assignments WHER", "INSERT INTO bg_planning_events (entry_ke"]);
+  });
+});
+
+describe("withdrawFromEntry — deux casters, diffusion perdue", () => {
+  it("withdrawFromEntry_soloCasterLeavesNonSoloWithoutProd_unfilled", async () => {
+    twoCasterData({ onlySolo: 4 });
+
+    const result = await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(result).toEqual({ late: false, replaced: false, unfilled: true });
+    expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ unfilled: true, stillHeldBy: [] });
+  });
+});
+
+describe("pickReplacement — second caster", () => {
+  it("pickReplacement_spareWithCasterProdOnlyFree_casterProdPickedAsCaster", () => {
+    // 5 (non autonome) reste confirmé, sans prod ; 7, caster et prod, est le seul libre.
+    const data = planningData({
+      entries: [loadedEntry()],
+      assignments: [loadedAssignment({ userId: 5, role: "CASTER", source: "MANUAL", reason: "MANUAL", confirmed: true })],
+      members: [loadedMember({ userId: 5, roles: ["CASTER"] }), loadedMember({ userId: 7, roles: ["CASTER", "PROD"] })],
+      availability: [available("m:1", 7, "CASTER"), available("m:1", 7, "PROD")],
+    });
+
+    const pick = pickReplacement(data, data.entries[0], "CASTER", new Map(), new Set(), MONDAY);
+
+    expect(pick).toMatchObject({ entryKey: "m:1", userId: 7, role: "CASTER" });
+  });
+
+  it("pickReplacement_onlyProvisionalCoCaster_firstCasterRuleApplied", () => {
+    // 5 n'est qu'une proposition : la place quittée est la première ; 6 la prend même si m:2 (qui chevauche) n'a pas de caster.
+    const entries = [loadedEntry(), loadedEntry({ key: "m:2", matchId: 2 })];
+    const data = planningData({
+      entries,
+      assignments: [loadedAssignment({ userId: 5, role: "CASTER", confirmed: false })],
+      members: [5, 6].map((userId) => loadedMember({ userId, roles: ["CASTER"], soloCaster: true })),
+      availability: [available("m:1", 5, "CASTER"), available("m:1", 6, "CASTER"), available("m:2", 6, "CASTER")],
+    });
+
+    const pick = pickReplacement(data, entries[0], "CASTER", new Map(), new Set(), MONDAY);
+
+    expect(pick).toMatchObject({ entryKey: "m:1", userId: 6, role: "CASTER" });
   });
 });

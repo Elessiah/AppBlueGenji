@@ -221,7 +221,8 @@
       "title": "Désistement sur ton match",
       "bodyReplaced": "Un {role} s'est désisté de {entry} ({start}) : un remplaçant a été affecté.",
       "bodyOpen": "Un {role} s'est désisté de {entry} ({start}) : la place est à pourvoir.",
-      "bodyStillHeld": "Un {role} s'est désisté de {entry} ({start}) : un autre {role} reste affecté."
+      "bodyStillHeld": "Un {role} s'est désisté de {entry} ({start}) : un autre {role} reste affecté.",
+      "bodySelfHeld": "Un {role} s'est désisté de {entry} ({start}) : tu restes affecté comme {role}."
     },
     "unfilled": {
       "title": "Place à pourvoir",

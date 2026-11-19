@@ -90,8 +90,11 @@ compte les **rôles**, pas les personnes.
 - **Calcul** : le second caster vient en dernier, une fois le planning stable
   (chaque entrée à sa meilleure couverture), sur une entrée qui a déjà son
   caster, jamais à quelqu'un déjà sur l'entrée (aucun cumul pour un renfort),
-  ni à un caster disponible sur une entrée qui la chevauche et reste **sans
-  caster** — ouverte au lot ou non (jamais pris à une autre entrée). Ordre :
+  ni à qui une entrée qui la chevauche attend encore : à venir et non jouée
+  (`fillable` ; une entrée commencée ou jouée n'attend plus personne), il lui
+  manque un rôle qu'il pourrait prendre — caster, prod ou place d'arbitre
+  (un caster qui est aussi prod ou arbitre n'y est pas pris) —, ouverte au lot
+  ou non (jamais pris à une autre entrée). Ordre :
   ceux qui préfèrent l'entrée (sur tout le lot) d'abord, puis les autres
   entrée par entrée dans l'ordre du calendrier ; parmi les candidats, ce qui
   rend l'entrée diffusée (un autonome auprès d'un caster qui attend son prod),
@@ -101,7 +104,10 @@ compte les **rôles**, pas les personnes.
   match) est refusé `PLANNING_CASTERS_FULL` (409) ; la page masque alors la
   liste « Ajouter — Caster » et dit « Deux casters au plus »
   (`planningCastersFull`, même règle des deux côtés). Retirer d'abord l'un des
-  deux (une proposition retirée à la main n'est plus reproposée).
+  deux (une proposition retirée à la main n'est plus reproposée). Une
+  inscription de cast faite sur le match au même instant (hors du verrou du
+  planning) peut donner un troisième caster : c'est l'état qu'une inscription
+  après coup donne aussi, les inscriptions n'ayant pas de plafond.
 
 ## Calcul (`lib/shared/planning-planner.ts`, pur et déterministe)
 
@@ -266,7 +272,8 @@ de Paris, lien vers `/planning` dans la langue du destinataire).
   **confirmés** de l'entrée quand une attribution **confirmée** est quittée
   (une proposition provisoire, quittée ou co-affectée, n'en reçoit aucun) — « un caster
   s'est désisté », remplaçant affecté, autre caster encore affecté (second
-  caster, `bodyStillHeld`) ou place à pourvoir.
+  caster, `bodyStillHeld` ; au caster restant lui-même, `bodySelfHeld`) ou
+  place à pourvoir.
 - `PLANNING_UNFILLED` (« Places à pourvoir », `tournaments`) :
   aucun remplaçant trouvé — push **et** message privé au staff des tournois
   (comptes qui tiennent `tournaments`, choisis par la règle de `notifyStaff`
@@ -302,13 +309,21 @@ nommé** (ni celui qui se désiste, ni le remplaçant, ni l'auteur du geste).
   et l'entrée exclut ensuite le membre pour ce rôle (comme un retrait manuel).
 - **Remplacement automatique** sous le verrou du planning, par les règles du
   calcul (`pickReplacement` : `preparePlanner` sur la seule entrée, rôle
-  quitté). Caster quitté alors qu'un **autre caster** tient encore l'entrée :
-  il était le renfort (l'autre devient le premier, la première place n'est
-  jamais vide) ; son remplaçant suit la règle du second caster (libre, attendu
-  sur aucune entrée qui la chevauche), sinon personne. Si l'autre caster est
-  **confirmé**, la place n'est pas « à pourvoir » : ni pastille, ni avis au
-  staff (`stillHeld`) ; les co-affectés lisent « un autre caster reste
-  affecté ». Le groupe d'arbitres d'un tournoi entier garde la règle
+  quitté). Caster quitté alors qu'un **autre caster confirmé** tient encore
+  l'entrée : il était le renfort (l'autre devient le premier) ; son remplaçant
+  suit la règle du second caster (libre, attendu sur aucune entrée qui la
+  chevauche), cherché seul — rien d'autre n'est posé sur l'entrée pendant ce
+  calcul (`spareOnly`), aucun prod d'essai n'écarte un candidat. Le seul autre
+  caster est une **proposition** provisoire : la place quittée est la première,
+  remplacée par la règle ordinaire, la proposition écartée de ce seul calcul
+  (elle reste en base). Sans remplaçant, la place n'est pas « à pourvoir » si
+  le caster confirmé restant suffit à ce que le départ n'ôtait pas (l'entrée
+  reste diffusée, ou ne l'était pas non plus avant ; rôles confirmés seuls) :
+  ni pastille, ni avis au staff (`stillHeldBy`) ; les autres co-affectés lisent
+  « un autre caster reste affecté », le caster restant « tu restes affecté
+  comme caster » (`bodySelfHeld`). Un caster **autonome** parti laissant un
+  caster sans prod : la diffusion est perdue, la place est à pourvoir et le
+  staff prévenu (pas de pastille : un caster reste confirmé). Le groupe d'arbitres d'un tournoi entier garde la règle
   d'avant (un arbitre quitté sans remplaçant laisse sa place à pourvoir). La ligne remplaçante hérite de l'état de la ligne quittée :
   confirmée (et le remplaçant prévenu, `PLANNING_ASSIGNED`) si elle l'était,
   provisoire sinon (sans message). Aucun candidat : la place est **« à

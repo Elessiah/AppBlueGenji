@@ -16,6 +16,7 @@ import {
   mergeView,
   needsCover,
   NO_FILTERS,
+  roleChoices,
   tournamentChoices,
   weekWindow,
 } from "@/app/(secured)/planning/_lib/planning-board";
@@ -526,5 +527,39 @@ describe("textes du désistement", () => {
 
   it("assignedPushTitle_french_isNotGendered", () => {
     expect(FR_PUSH.planning.assigned.title).not.toMatch(/Affecté/);
+  });
+});
+
+describe("roleChoices", () => {
+  const casters = [
+    { userId: 1, role: "CASTER" as const, source: "MANUAL" as const, reason: "MANUAL" as const, provisional: false },
+    { userId: 2, role: "CASTER" as const, source: "AUTO" as const, reason: "LOAD" as const, provisional: true },
+  ];
+  const members = [member({ userId: 1 }), member({ userId: 2 }), member({ userId: 3, pseudo: "Troisième" }), member({ userId: 4, roles: ["PROD"] })];
+
+  it("roleChoices_twoCastersManager_fullNoCandidates", () => {
+    const choices = roleChoices(entryView({ assignments: casters }), "CASTER", members, true);
+
+    expect(choices).toEqual({ full: true, candidates: [] });
+  });
+
+  it("roleChoices_oneCasterManager_candidatesListed", () => {
+    const choices = roleChoices(entryView({ assignments: [casters[0]] }), "CASTER", members, true);
+
+    expect(choices.full).toBe(false);
+    expect(choices.candidates.map((row) => row.member.userId)).toEqual([2, 3]);
+  });
+
+  it("roleChoices_notManager_notFullNoCandidates", () => {
+    const choices = roleChoices(entryView({ assignments: casters }), "CASTER", members, false);
+
+    expect(choices).toEqual({ full: false, candidates: [] });
+  });
+
+  it("roleChoices_twoCastersProdRole_notFull", () => {
+    const choices = roleChoices(entryView({ assignments: casters }), "PROD", members, true);
+
+    expect(choices.full).toBe(false);
+    expect(choices.candidates.map((row) => row.member.userId)).toEqual([4]);
   });
 });
