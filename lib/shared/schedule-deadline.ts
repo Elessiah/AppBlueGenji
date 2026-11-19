@@ -343,7 +343,7 @@ export function deadlineEntryHours(day: string, now: number, reapply: readonly n
 export function deadlineEntryChoices(now: number, keep: string | null = null, reapply: readonly number[] = []): string[] {
   const days = deadlineEntryDays(now);
   if (keep !== null && !days.includes(keep)) days.push(keep);
-  return days.sort().filter((day) => deadlineEntryHours(day, now, reapply).length > 0);
+  return days.sort((a, b) => a.localeCompare(b)).filter((day) => deadlineEntryHours(day, now, reapply).length > 0);
 }
 
 /**
