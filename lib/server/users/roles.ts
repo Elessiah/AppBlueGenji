@@ -146,6 +146,15 @@ export async function setUserRoles(
       // n'écrit que les sessions (`liftStrayImpersonations`).
       if (previous.includes("ADMIN") && !isAdmin) {
         impersonationsCleared = await clearAccountImpersonation(connection, targetUserId);
+      } else if (!previous.includes("ADMIN") && isAdmin) {
+        // Promotion : une incarnation restée sur un compte non administrateur
+        // (entrée concurrente d'une rétrogradation dont le défaire a échoué,
+        // avant le balayage du démarrage) reprendrait effet avec
+        // l'administration rendue, sans geste ni ligne pm2. Elle tombe donc
+        // ici, dans la même transaction que la promotion (registre T01 et
+        // T05 : sans effet sur un compte qui n'est plus administrateur).
+        // Aucune ligne pm2 : aucun retour, l'incarnation était déjà sans effet.
+        await clearAccountImpersonation(connection, targetUserId);
       }
     }
     await connection.commit();

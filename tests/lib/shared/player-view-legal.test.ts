@@ -62,8 +62,17 @@ describe("historique des changements — incarner un rôle", () => {
 
   it("privacyChanges_impersonateEntry_hasEnglishWithSameShape", () => {
     expect(entryEn(ENTRY_ID)?.details).toHaveLength(entryFr(ENTRY_ID)?.details.length ?? -1);
-    expect(entryEn(ENTRY_ID)?.linkLabels).toHaveLength(1);
-    expect(entryFr(ENTRY_ID)?.links?.[0]?.href).toBe("/rgpd/registre#t05");
+    expect(entryEn(ENTRY_ID)?.linkLabels).toHaveLength(entryFr(ENTRY_ID)?.links?.length ?? -1);
+  });
+
+  it("privacyChanges_impersonateEntry_linksT01AndT05", () => {
+    expect(entryFr(ENTRY_ID)?.links?.map((link) => link.href)).toEqual(["/rgpd/registre#t01", "/rgpd/registre#t05"]);
+    expect(entryEn(ENTRY_ID)?.linkLabels).toEqual(["Read record T01 of the register", "Read record T05 of the register"]);
+  });
+
+  it("privacyChanges_impersonateEntry_erasedOnReturnBeforeDeadlineOtherwiseWithSession", () => {
+    expect(entryFr(ENTRY_ID)?.details[0]).toContain("effacés au retour fait avant l'échéance, sinon au plus tard avec la session");
+    expect(entryEn(ENTRY_ID)?.details[0]).toContain("erased on a return made before the deadline, otherwise at the latest with the session");
   });
 
   it("privacyChanges_impersonateEntry_namesAdminsRolesCapAndBasisInBothLanguages", () => {
@@ -125,11 +134,39 @@ describe("registre", () => {
     const en = JSON.stringify(activity(PROCESSING_ACTIVITIES_EN, "T01").dataCategories);
 
     expect(fr).toContain("une échéance passée (même celle de la vue joueur ouverte, avant « Incarner un rôle »");
-    expect(fr).toContain("ou dont la remise à vide échoue, peut rester sur la session, sans effet");
-    expect(fr).not.toContain("démarrage suivant du serveur si cette remise");
+    expect(fr).toContain("ou celle d'un compte qui n'est plus administrateur, peut rester sur la session, sans effet");
+    expect(fr).not.toContain("remise à vide échoue");
     expect(en).toContain("a past deadline (even one of the player view open, before “Impersonate a role”");
-    expect(en).toContain("or one whose clearing fails, may stay on the session, with no effect");
-    expect(en).not.toContain("next start if that clearing fails");
+    expect(en).toContain("or one on an account that is no longer an administrator, may stay on the session, with no effect");
+    expect(en).not.toContain("clearing fails");
+  });
+
+  it("register_t01_framedOnTheSessionNotOnAdministratorsOnly", () => {
+    const fr = JSON.stringify(activity(PROCESSING_ACTIVITIES, "T01").dataCategories);
+    const en = JSON.stringify(activity(PROCESSING_ACTIVITIES_EN, "T01").dataCategories);
+
+    expect(fr).toContain("Sur la session de connexion, quand un administrateur incarne un rôle : échéance");
+    expect(fr).not.toContain("Sur la session de connexion d'un administrateur qui incarne un rôle");
+    expect(en).toContain("On the login session, when an administrator impersonates a role: deadline");
+    expect(en).not.toContain("On the login session of an administrator impersonating a role");
+  });
+
+  it("register_t05_strayOnNonAdminAccountHasNoEffect", () => {
+    const fr = JSON.stringify(activity(PROCESSING_ACTIVITIES, "T05").subPurposes);
+    const en = JSON.stringify(activity(PROCESSING_ACTIVITIES_EN, "T05").subPurposes);
+
+    expect(fr).toContain("une fois passés ou sur un compte qui n'est plus administrateur, jusqu'à l'effacement de la session");
+    expect(fr).not.toContain("remise à vide échoue");
+    expect(en).toContain("once passed or on an account that is no longer an administrator, until the session is erased");
+    expect(en).not.toContain("clearing fails");
+  });
+
+  it("register_t05_dataCategoryPutsRolesOnTheEntryOnly", () => {
+    const fr = JSON.stringify(activity(PROCESSING_ACTIVITIES, "T05").dataCategories);
+    const en = JSON.stringify(activity(PROCESSING_ACTIVITIES_EN, "T05").dataCategories);
+
+    expect(fr).toContain("sens de la bascule et, à l'entrée, rôles incarnés");
+    expect(en).toContain("direction of the switch and, on entry, roles impersonated");
   });
 
   it("register_t05_legacyWordingIsDateIndependentInBothLanguages", () => {
@@ -158,7 +195,7 @@ describe("registre", () => {
 
     expect(JSON.stringify(fr.subPurposes)).toContain("peut nommer à la place l'administrateur qui l'a retirée, avec le numéro du compte et le nombre de sessions");
     expect(JSON.stringify(fr.dataCategories)).toContain("identifiant du compte concerné et nombre de sessions");
-    expect(JSON.stringify(en.subPurposes)).toContain("may name instead the administrator who removed it, with the account number and the number of sessions");
+    expect(JSON.stringify(en.subPurposes)).toContain("may instead name the administrator who removed it, with the account number and the number of sessions");
     expect(JSON.stringify(en.dataCategories)).toContain("identifier of the account concerned and number of sessions");
   });
 
@@ -186,7 +223,7 @@ describe("/rgpd", () => {
     const paragraph = paragraphAround("app/rgpd/page.tsx", "Un administrateur peut réduire ses droits sur une de ses sessions");
 
     expect(paragraph).toContain("{PLAYER_VIEW_MAX_HOURS} heures au plus");
-    expect(paragraph).toContain("son pseudo, son identifiant, les rôles incarnés et le sens de la bascule");
+    expect(paragraph).toContain("son pseudo, son identifiant, le sens de la bascule (entrée ou retour) et, à l&apos;entrée, les rôles incarnés");
     expect(paragraph).toContain("intérêt légitime");
     expect(paragraph).toContain('href="/rgpd/registre#t05"');
   });
@@ -195,7 +232,7 @@ describe("/rgpd", () => {
     const paragraph = paragraphAround("app/rgpd/RgpdEn.tsx", "An administrator can narrow their rights on one of their sessions");
 
     expect(paragraph).toContain("{PLAYER_VIEW_MAX_HOURS} hours at most");
-    expect(paragraph).toContain("their username, their identifier, the roles impersonated and the direction of the switch");
+    expect(paragraph).toContain("their username, their identifier, the direction of the switch (in or back) and, on entry, the roles impersonated");
     expect(paragraph).toContain("legitimate interest");
     expect(paragraph).toContain('href="/rgpd/registre#t05"');
   });
@@ -208,9 +245,9 @@ describe("/rgpd", () => {
   });
 
   it("rgpdFrEn_deletionNote_legacyWordingIsDateIndependent", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain("ses incarnations d&apos;un rôle (et, avant « Incarner un rôle », pour tout titulaire");
+    expect(readSource("app/rgpd/page.tsx")).toContain("ses incarnations d&apos;un rôle (et, avant l&apos;arrivée d&apos;« Incarner un rôle », pour tout titulaire");
     expect(readSource("app/rgpd/page.tsx")).not.toContain("jusqu&apos;en novembre 2026, pour tout titulaire");
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("their impersonations of a role (and, before “Impersonate a role”, for any holder");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("their impersonations of a role (and, until “Impersonate a role” arrived, for any holder");
     expect(readSource("app/rgpd/RgpdEn.tsx")).not.toContain("until November 2026, for any holder");
   });
 
@@ -218,7 +255,7 @@ describe("/rgpd", () => {
     const paragraph = paragraphAround("app/rgpd/page.tsx", "Un administrateur peut réduire ses droits sur une de ses sessions");
 
     expect(paragraph).toContain("peut nommer l&apos;administrateur qui l&apos;a retirée, avec l&apos;identifiant du compte et le nombre de sessions");
-    expect(paragraph).toContain("s&apos;effacent au retour ou au plus tard avec la session");
+    expect(paragraph).toContain("s&apos;effacent au retour fait avant l&apos;échéance, sinon au plus tard avec la session");
     expect(paragraph).not.toContain("démarrage suivant");
   });
 
@@ -226,12 +263,12 @@ describe("/rgpd", () => {
     const paragraph = paragraphAround("app/rgpd/RgpdEn.tsx", "An administrator can narrow their rights on one of their sessions");
 
     expect(paragraph).toContain("may name the administrator who removed it, with the identifier of the account and the number of sessions");
-    expect(paragraph).toContain("are erased on return or at the latest with the session");
+    expect(paragraph).toContain("are erased on a return made before the deadline, otherwise at the latest with the session");
     expect(paragraph).not.toContain("next start");
   });
 
   it("rgpdFrEn_cookieParagraph_pastDeadlineMayStay", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain("une échéance passée, même d&apos;une ancienne vue joueur, peut y rester, sans effet");
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("a past deadline, even one of the former player view, may stay there, with no effect");
+    expect(readSource("app/rgpd/page.tsx")).toContain("une échéance passée, même d&apos;une ancienne vue joueur, ou celle d&apos;un compte qui n&apos;est plus administrateur, peut y rester, sans effet");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("a past deadline, even one of the former player view, or one on an account that is no longer an administrator, may stay there, with no effect");
   });
 });

@@ -70,6 +70,12 @@ la même transaction, l'incarnation **en cours** de toutes les sessions du
 compte (`clearAccountImpersonation`) : sans quoi l'échéance et les rôles,
 ignorés tant que le compte n'est plus administrateur, revenaient tels quels
 s'il le redevenait dans les 12 h. Une échéance déjà passée reste, sans effet.
+À l'inverse, `setUserRoles` qui **accorde** `ADMIN` lève aussi, dans la même
+transaction et sans ligne pm2, l'incarnation en cours restée sur le compte
+(défaire en échec, ci-dessous) : elle ne reprend jamais effet avec
+l'administration rendue (registre T01 et T05 : « sans effet » sur un compte
+qui n'est plus administrateur ; une panne de cette levée fait échouer la
+promotion).
 La route des rôles en laisse la ligne pm2 du retour (`PLAYER_VIEW_OFF_AUDIT`,
 au nom de l'administrateur qui rétrograde, avec le numéro du compte et le
 nombre de sessions), à part de la publication du changement de rôles (une
@@ -237,9 +243,10 @@ rétrogradation et au balayage.
 Les colonnes ne servent qu'à réduire des droits, à la demande de
 l'administrateur lui-même, et partent avec la session (déconnexion, purge des
 sessions échues, suppression du compte), ou plus tôt au retour ou quand le
-compte perd l'administration pendant l'incarnation ; une échéance passée (ou
-dont la remise à vide a échoué) peut rester sur la ligne, sans effet, avec ses
-rôles, jusque-là. Jusqu'au déploiement de cette version, tout titulaire d'un
+compte perd l'administration pendant l'incarnation ; une échéance passée, ou
+celle d'un compte qui n'est plus administrateur, peut rester sur la ligne, sans
+effet, avec ses rôles, jusque-là (un retour en échec laisse simplement
+l'incarnation courir jusqu'à son échéance). Jusqu'au déploiement de cette version, tout titulaire d'un
 rôle de plateforme (développeur compris) pouvait passer en vue joueur : ses
 lignes pm2 restent jusqu'à leur rotation, d'où les mentions « avant l'arrivée
 d'« Incarner un rôle » » du registre et de `/rgpd` (sans date, qui deviendrait
@@ -256,7 +263,8 @@ fausse si le déploiement glissait).
 - `/rgpd` (FR et EN) et l'entrée `PRIVACY_CHANGES` restent **générales** : le
   retour imposé « peut » nommer l'administrateur qui rétrograde (une entrée
   annulée en course est notée au nom du compte lui-même), l'effacement est dit
-  « au retour ou au plus tard avec la session », sans décrire le balayage du
+  « au retour fait avant l'échéance, sinon au plus tard avec la session », les
+  rôles incarnés ne sont notés qu'à l'entrée, sans décrire le balayage du
   démarrage (détaillé dans T05 seul). Paragraphe des journaux du staff (base,
   opposition), note sur ce qui survit à la suppression (bascules dans les deux
   sens), paragraphe du cookie de session (échéance et rôles portés par la

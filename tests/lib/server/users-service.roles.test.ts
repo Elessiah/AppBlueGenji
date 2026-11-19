@@ -69,6 +69,7 @@ describe("setUserRoles", () => {
   it("setUserRoles_adminGranted_persistsIsAdminAndKeepsAdminOutOfJson", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const result = await setUserRoles(7, ["ADMIN", "ARBITRE"], 3);
 
@@ -331,6 +332,52 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
     expect(clearSql).toContain("WHERE (user_id = ?) AND player_view_until > NOW()");
     expect(clearParams).toEqual([7]);
     expect(connection.execute.mock.invocationCallOrder[2]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  // Revue juridique 2 : une incarnation restée sur un compte non administrateur
+  // (défaire en échec) reprenait effet si l'administration était rendue.
+  it("setUserRoles_adminGranted_clearsActiveImpersonationOnAllSessionsBeforeCommit", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    await setUserRoles(7, ["ADMIN"], 3);
+
+    const [clearSql, clearParams] = connection.execute.mock.calls[2] as [string, unknown[]];
+    expect(clearSql).toContain("UPDATE bg_user_sessions SET player_view_until = NULL, impersonated_roles_json = NULL");
+    expect(clearSql).toContain("WHERE (user_id = ?) AND player_view_until > NOW()");
+    expect(clearParams).toEqual([7]);
+    expect(connection.execute.mock.invocationCallOrder[2]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  it("setUserRoles_adminGrantedWithStrayImpersonation_omitsImpersonationsCleared", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 2 }]);
+
+    const result = await setUserRoles(7, ["ADMIN"], 3);
+
+    expect(result).toEqual({ roles: ["ADMIN"], previous: [] });
+  });
+
+  it("setUserRoles_adminGrantedClearFails_rollsBackAndRethrows", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute.mockRejectedValueOnce(new Error("lock wait timeout"));
+
+    await expect(setUserRoles(7, ["ADMIN"], 3)).rejects.toThrow("lock wait timeout");
+
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("setUserRoles_nonAdminRoleGranted_doesNotTouchSessions", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+
+    await setUserRoles(7, ["ARBITRE"], 3);
+
+    expect(connection.execute).toHaveBeenCalledTimes(2);
   });
 
   it("setUserRoles_adminDemoted_returnsImpersonationsCleared", async () => {
