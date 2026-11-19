@@ -89,6 +89,21 @@ function groupByEntry<T extends { entryKey: string }>(rows: readonly T[]): Map<s
   return byEntry;
 }
 
+/**
+ * Confirmation d'office **à venir** d'une entrée ouverte (ISO) ; `null` une
+ * fois l'instant passé — l'entrée est alors confirmée, ou sur le point de
+ * l'être — ou pour une entrée close.
+ */
+export function upcomingConfirmAt(
+  entry: Pick<LoadedEntry, "open" | "startAt" | "deadlineAt">,
+  leadHours: number,
+  now: number,
+): string | null {
+  if (!entry.open) return null;
+  const at = planningConfirmAt(entry.startAt, entry.deadlineAt, leadHours);
+  return at > now ? new Date(at).toISOString() : null;
+}
+
 export async function loadPlanningView(user: AuthUser, now: number = Date.now()): Promise<PlanningView> {
   const canManage = can(user, "tournaments");
   const data = await withConnection(async (connection) =>
@@ -128,9 +143,7 @@ export async function loadPlanningView(user: AuthUser, now: number = Date.now())
       channelUrl: entry.channelUrl,
       selfManaged: entry.selfManaged,
       deadlineAt: entry.deadlineAt === null ? null : new Date(entry.deadlineAt).toISOString(),
-      confirmAt: entry.open
-        ? new Date(planningConfirmAt(entry.startAt, entry.deadlineAt, data.durations.confirmLeadHours)).toISOString()
-        : null,
+      confirmAt: upcomingConfirmAt(entry, data.durations.confirmLeadHours, now),
       assignments: assignments.map((row) => visibleAssignment(row, user.id, canManage)),
       // Pour le staff, un compte suspendu ne tient rien (comme pour le calcul, `preparePlanner`, et l'alerte) ;
       // les autres lecteurs gardent la couverture d'avant.

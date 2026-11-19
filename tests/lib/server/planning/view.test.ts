@@ -11,7 +11,14 @@ jest.mock("@/lib/server/planning/load", () => ({
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { loadPlanningData, loadPlanningMembers, loadPlanningMembersByIds, type LoadedAvailability, type LoadedWithdrawal } from "@/lib/server/planning/load";
-import { loadPlanningView, PLANNING_MEMBERS_TTL_MS, resetPlanningMembersCache, unfilledRoles, visibleAssignment } from "@/lib/server/planning/view";
+import {
+  loadPlanningView,
+  PLANNING_MEMBERS_TTL_MS,
+  resetPlanningMembersCache,
+  unfilledRoles,
+  upcomingConfirmAt,
+  visibleAssignment,
+} from "@/lib/server/planning/view";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { authUser } from "../../../helpers/auth-user";
 import { loadedAssignment, loadedEntry, loadedMember, MONDAY, planningData } from "../../../helpers/planning";
@@ -32,6 +39,23 @@ beforeEach(() => {
   jest.mocked(loadPlanningData).mockImplementation(async (_executor, options) =>
     planningData({ entries: [loadedEntry()], members: options.members ?? [] }),
   );
+});
+
+describe("upcomingConfirmAt", () => {
+  const HOUR = 60 * 60 * 1000;
+  const startAt = MONDAY + 48 * HOUR;
+
+  it("upcomingConfirmAt_openEntryBeforeConfirm_returnsIso", () => {
+    expect(upcomingConfirmAt({ open: true, startAt, deadlineAt: null }, 24, MONDAY)).toBe(new Date(startAt - 24 * HOUR).toISOString());
+  });
+
+  it("upcomingConfirmAt_confirmTimeReached_returnsNull", () => {
+    expect(upcomingConfirmAt({ open: true, startAt, deadlineAt: null }, 24, startAt - 24 * HOUR)).toBeNull();
+  });
+
+  it("upcomingConfirmAt_closedEntry_returnsNull", () => {
+    expect(upcomingConfirmAt({ open: false, startAt, deadlineAt: null }, 24, MONDAY)).toBeNull();
+  });
 });
 
 describe("loadPlanningView — comptes", () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   acceptsScheduleDeadline,
+  deadlineArmed,
   deadlineEntryDays,
   deadlineEntryOf,
   deadlineFromEntry,
@@ -10,6 +11,8 @@ import {
   formatScheduleDeadline,
   planningConfirmAt,
   readScheduleDeadline,
+  scheduleOpenedAt,
+  suggestedScheduleDeadline,
   type DeadlineMatch,
 } from "@/lib/shared/schedule-deadline";
 
@@ -153,16 +156,67 @@ describe("deadlineOutcome", () => {
     expect(deadlineOutcome(toPlan({ refereeScheduling: false }), deadline, deadline + HOUR)).toBe("LAPSE");
   });
 
-  it("deadlineOutcome_dueButScheduled_returnsNull", () => {
-    expect(deadlineOutcome(toPlan({ startAt: "2026-11-18T19:00:00.000Z" }), deadline, deadline + HOUR)).toBeNull();
+  it("deadlineOutcome_dueButScheduled_returnsLapse", () => {
+    expect(deadlineOutcome(toPlan({ startAt: "2026-11-18T19:00:00.000Z" }), deadline, deadline + HOUR)).toBe("LAPSE");
   });
 
   it("deadlineOutcome_dueButCompleted_returnsNull", () => {
     expect(deadlineOutcome(toPlan({ status: "COMPLETED" }), deadline, deadline + HOUR)).toBeNull();
   });
 
-  it("deadlineOutcome_dueButLaunched_returnsNull", () => {
-    expect(deadlineOutcome(toPlan({ launchedAt: "2026-11-17T19:00:00.000Z" }), deadline, deadline + HOUR)).toBeNull();
+  it("deadlineOutcome_dueButLaunched_returnsLapse", () => {
+    expect(deadlineOutcome(toPlan({ launchedAt: "2026-11-17T19:00:00.000Z" }), deadline, deadline + HOUR)).toBe("LAPSE");
+  });
+});
+
+describe("deadlineArmed", () => {
+  const deadline = at("2026-11-17T20:00:00Z");
+
+  it("deadlineArmed_neverArmed_false", () => {
+    expect(deadlineArmed(null, deadline)).toBe(false);
+  });
+
+  it("deadlineArmed_exactlyThirtyMinutesBefore_true", () => {
+    expect(deadlineArmed(deadline - 30 * MINUTE, deadline)).toBe(true);
+  });
+
+  it("deadlineArmed_lessThanThirtyMinutesBefore_false", () => {
+    expect(deadlineArmed(deadline - 30 * MINUTE + 1, deadline)).toBe(false);
+  });
+});
+
+describe("scheduleOpenedAt", () => {
+  const now = at("2026-11-16T08:00:00Z");
+  const completed = (updatedAt: string) => ({ status: "COMPLETED", updatedAt });
+
+  it("scheduleOpenedAt_latestCompletedWithinWeek_returnsIt", () => {
+    const matches = [completed("2026-11-15T20:00:00Z"), completed("2026-11-15T22:00:00Z"), { status: "READY", updatedAt: "2026-11-16T07:00:00Z" }];
+
+    expect(scheduleOpenedAt(matches, now)).toBe(at("2026-11-15T22:00:00Z"));
+  });
+
+  it("scheduleOpenedAt_nothingCompleted_returnsNow", () => {
+    expect(scheduleOpenedAt([{ status: "READY", updatedAt: "2026-11-15T22:00:00Z" }], now)).toBe(now);
+  });
+
+  it("scheduleOpenedAt_completedOverAWeekAgo_returnsNow", () => {
+    expect(scheduleOpenedAt([completed("2026-11-09T07:59:00Z")], now)).toBe(now);
+  });
+
+  it("scheduleOpenedAt_completedInTheFuture_ignored", () => {
+    expect(scheduleOpenedAt([completed("2026-11-16T09:00:00Z")], now)).toBe(now);
+  });
+});
+
+describe("suggestedScheduleDeadline", () => {
+  it("suggestedScheduleDeadline_roundEndedSundayNightOpenedMonday_tuesday21Paris", () => {
+    // Manche finie dimanche 15 nov. 23:00 (Paris), fenêtre ouverte lundi 10:00 (Paris).
+    expect(suggestedScheduleDeadline(at("2026-11-15T22:00:00Z"), at("2026-11-16T09:00:00Z"))).toBe(at("2026-11-17T20:00:00Z"));
+  });
+
+  it("suggestedScheduleDeadline_openingDeadlineTooClose_fallsBackToNow", () => {
+    // Ouverture vendredi : sa date butoir (dimanche 21:00) est passée lundi ; repli sur mercredi 21:00.
+    expect(suggestedScheduleDeadline(at("2026-11-13T22:00:00Z"), at("2026-11-16T09:00:00Z"))).toBe(at("2026-11-18T20:00:00Z"));
   });
 });
 

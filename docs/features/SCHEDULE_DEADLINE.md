@@ -37,10 +37,16 @@ Code : `lib/shared/schedule-deadline.ts` (règle pure),
   plus (`SCHEDULE_DEADLINE_TOO_SOON` / `_TOO_FAR`), arrondie à la minute.
 - Transaction : `lockTournamentRow` en **première** instruction, puis les
   matchs `FOR UPDATE` ; changer ou retirer la date butoir efface les traces
-  d'avis (les paliers repartent pour la nouvelle). Geste audité
+  d'avis (les paliers repartent pour la nouvelle). Reposer la **même** date
+  (geste commun relancé pour de nouveaux matchs) ne réécrit rien : aucun avis
+  renvoyé, et le compte rendu ne compte que les matchs changés. Geste audité
   (`auditStaffAction`, staff anonymisé sur Discord), flux SSE réveillé.
 - Saisie : un jour et une heure pile, **heure de Paris** ; préremplie par la
-  date butoir en place, sinon par celle d'usage. Les équipes la voient sur la
+  date butoir en place, sinon par celle d'usage comptée depuis l'**ouverture**
+  de la planification : la fin du dernier match joué du tournoi, sur les
+  7 derniers jours (`scheduleOpenedAt`, `updatedAt` du match), sinon
+  l'instant de la saisie ; si cette date est déjà à moins d'une heure, celle
+  d'usage depuis maintenant (`suggestedScheduleDeadline`). Les équipes la voient sur la
   carte du match (« À planifier · avant le … », `MatchLaunchStrip`).
 
 **Défaut** (`defaultScheduleDeadline`) : **21:00, heure de Paris, deux jours
@@ -55,19 +61,29 @@ exemples (« la date butoir mardi 21:00 ») ont été suivis.
 Balayage `sweepScheduleDeadlines`, chaque minute (`startScheduleDeadlineClock`,
 `instrumentation.ts`), sous le verrou nommé **`bg_schedule_deadlines`** pris
 sans attendre (un autre processus le tient : passage sauté). Lot de 200
-matchs, du plus urgent. Décision pure `sweepAction` :
+matchs, du plus urgent : dates butoir des matchs sans horaire, et dates
+**échues** des matchs programmés. Décision pure `sweepAction` :
 
 | Match à l'échéance | Effet |
 | --- | --- |
-| Toujours **à planifier** (deux engagées, ni horaire ni lancement), tournoi `RUNNING` | **Double forfait** |
-| Engagée manquante, option éteinte, tournoi pas `RUNNING` ou `FINISHED` | La date butoir **s'éteint** (effacée, traces comprises) |
-| Horaire posé ou match joué | Rien : la date butoir reste, sans effet |
+| Toujours **à planifier** (deux engagées, ni horaire ni lancement), tournoi `RUNNING`, date butoir **armée** à temps pour cette paire | **Double forfait** |
+| Engagée manquante, option éteinte, tournoi pas `RUNNING` ou `FINISHED`, paire jamais prévenue ou prévenue moins de 30 min avant | La date butoir **s'éteint** (effacée, traces comprises) |
+| Horaire posé ou match lancé | La date butoir **s'éteint** : un match qui repasserait à planifier (horaire retiré, lancement défait) n'est jamais forfaité sans nouvelle date butoir |
+| Match joué | Rien |
+
+**Armée** (`deadlineArmed`) : le premier avis de la paire **actuelle** est
+parti au moins 30 minutes avant l'échéance (`SCHEDULE_DEADLINE_ARM_MIN_MS`).
+Une paire complétée trop tard (match d'origine fini juste avant) ou changée
+après l'annonce n'est donc jamais forfaitée. Un match dont le passage échoue
+5 fois d'affilée (`SWEEP_MAX_FAILURES`, forfait refusé à chaque fois par
+exemple) voit sa date butoir s'éteindre, avec une erreur dans le journal : il
+n'occupe plus la tête du lot.
 
 Le double forfait passe par la chaîne existante, rien de neuf par format :
 `forfeitMissedScheduleDeadlinePublic` → `runPlayerMatchWrite` (verrou du
 tournoi, `retryOnDeadlock`) → `forfeitMissedScheduleDeadline`, qui **relit
-sous verrou** l'état `RUNNING`, la date butoir **inchangée** et l'issue
-`FORFEIT`, puis `adminResolveMatch(…, { doubleForfeit: true })`. Les
+sous verrou** l'état `RUNNING`, la date butoir **inchangée**, l'issue
+`FORFEIT` et l'armement de la paire, puis `adminResolveMatch(…, { doubleForfeit: true })`. Les
 réconciliations (survie, suisse, endurance, phases, `BG_SURVIE` qualification
 rejouée et arbre final), la finalisation et les journaux sont ceux du double
 forfait posé à la main (`DOUBLE_FORFEIT.md` § Ce que chaque moteur en fait).
@@ -94,9 +110,12 @@ aucun membre du staff nommé.
 
 Un palier déjà ouvert quand un plus proche l'est aussi est **consommé** avec
 lui : un seul message, le plus récent (`dueDeadlineReminder`). Chaque palier
-se **réserve** dans `bg_schedule_deadline_notices` (PK `match_id, notice_key`)
-par un `INSERT IGNORE … SELECT … WHERE schedule_deadline_at = ?` : jamais deux
-fois, jamais pour une date butoir qui vient de changer. Rien ne part pour un
+se **réserve** dans `bg_schedule_deadline_notices` (PK `match_id, notice_key`,
+avec la paire `pairing` et l'instant d'envoi) par un `INSERT IGNORE … SELECT …
+WHERE schedule_deadline_at = ? AND team1_id <=> ? AND team2_id <=> ?` : jamais
+deux fois, jamais pour une date butoir qui vient de changer ni pour une paire
+remplacée. Les avis d'une paire précédente sont effacés : la nouvelle paire
+reçoit son annonce. Rien ne part pour un
 match qui n'est plus à planifier.
 
 ## Planning : confirmation d'office
@@ -117,11 +136,16 @@ planning ; pour chacune, `runAutoAssign(null, semaine)` refait les
 propositions **provisoires** autour de ce qui est confirmé, puis
 `confirmAssignments(null, { entryKeys })` ne confirme **que** les échues ; les
 affectés reçoivent `PLANNING_ASSIGNED`. Écritures sous `bg_planning`
-(`withPlanningLock`). La marque `bg_planning_auto_confirms` (entrée, date) est
-posée **après** la confirmation : un échec se reprend au passage suivant, une
-confirmation faite ne se refait pas (un staff qui retire ensuite une
-affectation n'est pas contredit). Marques purgées avec le planning (90 jours).
-La carte d'une entrée montre « Confirmation d'office : … » (et la date butoir).
+(`withPlanningLock`). La marque `bg_planning_auto_confirms` (entrée, début
+confirmé `start_at`, date) est posée **après** la confirmation : une
+confirmation faite ne se refait pas pour le même début (un staff qui retire
+ensuite une affectation n'est pas contredit). Une entrée **reprogrammée** se
+confirme de nouveau à son nouvel instant ; une proposition provisoire née
+**après** la marque (nouveau calcul, caster libéré) est confirmée au passage
+suivant. Une semaine en échec attend 10 minutes avant d'être relancée
+(`FAILED_WEEK_RETRY_MS`). Marques purgées avec le planning (90 jours).
+La carte d'une entrée montre « Confirmation d'office : … » (et la date butoir)
+tant que cet instant est à venir (`upcomingConfirmAt`).
 
 ## RGPD
 
@@ -136,4 +160,7 @@ privés passent par la remise existante.
 `tests/lib/shared/schedule-deadline*.test.ts`,
 `tests/lib/server/tournaments/schedule-deadline*.test.ts`,
 `tests/lib/server/planning/auto-confirm.test.ts`,
-`tests/app/api/admin/schedule-deadline*.test.ts`.
+`tests/lib/server/planning/view.test.ts` (`upcomingConfirmAt`),
+`tests/lib/server/match-schedule-service.test.ts` (horaire retiré),
+`tests/app/api/admin/match-schedule-deadline.test.ts`,
+`tests/app/api/admin/tournament-schedule-deadlines.test.ts`.

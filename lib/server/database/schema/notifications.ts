@@ -53,6 +53,10 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
       CREATE TABLE IF NOT EXISTS bg_schedule_deadline_notices (
         match_id BIGINT NOT NULL,
         notice_key VARCHAR(8) NOT NULL,
+        -- Paire du match à l'envoi (\`launchPairingKey\`) : les avis d'une
+        -- paire remplacée ne comptent plus, ni pour les paliers ni pour armer
+        -- le double forfait.
+        pairing VARCHAR(48) NULL,
         deadline_at DATETIME NOT NULL,
         sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (match_id, notice_key),

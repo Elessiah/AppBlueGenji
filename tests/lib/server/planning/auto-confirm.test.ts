@@ -10,7 +10,14 @@ jest.mock("@/lib/server/planning/load", () => ({ loadDurationSettings: jest.fn()
 
 import { getDatabase } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
-import { AUTO_CONFIRM_LOCK, dueAutoConfirms, groupByWeek, sweepAutoConfirms } from "@/lib/server/planning/auto-confirm";
+import {
+  AUTO_CONFIRM_LOCK,
+  dueAutoConfirms,
+  FAILED_WEEK_RETRY_MS,
+  groupByWeek,
+  sweepAutoConfirms,
+  type AutoConfirmMarks,
+} from "@/lib/server/planning/auto-confirm";
 import { confirmAssignments, runAutoAssign } from "@/lib/server/planning/auto-assign";
 import { loadDurationSettings, loadPlanningEntries } from "@/lib/server/planning/load";
 import { DEFAULT_PLANNING_DURATIONS } from "@/lib/shared/planning-durations";
@@ -27,10 +34,14 @@ const WEEK_MS = 7 * 24 * HOUR_MS;
 /** Mercredi de la semaine de `MONDAY`, 21:00 à Paris. */
 const WEDNESDAY_21 = MONDAY + (2 * 24 + 21) * HOUR_MS;
 
+/** Aucune marque de confirmation d'office. */
+const NO_MARKS: AutoConfirmMarks = { startAt: new Map(), reopened: new Set() };
+
 let connection: ReturnType<typeof connectionMock>;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete (globalThis as typeof globalThis & { __bgPlanningAutoConfirmRetry?: Map<number, number> }).__bgPlanningAutoConfirmRetry;
   connection = connectionMock();
   connection.execute.mockImplementation(async (sql) => (sql.startsWith("SELECT") ? [[], []] : [{ affectedRows: 1 }, []]));
   jest.mocked(getDatabase).mockResolvedValue(fakePool({}));
@@ -42,7 +53,7 @@ beforeEach(() => {
 
 function insertedKeys(): unknown[] {
   return connection.execute.mock.calls
-    .filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_planning_auto_confirms"))
+    .filter(([sql]) => sql.startsWith("INSERT INTO bg_planning_auto_confirms"))
     .map(([, params]) => (params as unknown[])[0]);
 }
 
@@ -50,35 +61,53 @@ describe("dueAutoConfirms", () => {
   it("dueAutoConfirms_leadReached_returnsEntry", () => {
     const entry = loadedEntry({ startAt: WEDNESDAY_21 });
 
-    expect(dueAutoConfirms([entry], new Set(), 24, WEDNESDAY_21 - 24 * HOUR_MS)).toEqual([entry]);
+    expect(dueAutoConfirms([entry], NO_MARKS, 24, WEDNESDAY_21 - 24 * HOUR_MS)).toEqual([entry]);
   });
 
   it("dueAutoConfirms_leadNotReached_returnsNothing", () => {
     const entry = loadedEntry({ startAt: WEDNESDAY_21 });
 
-    expect(dueAutoConfirms([entry], new Set(), 24, WEDNESDAY_21 - 24 * HOUR_MS - 1)).toEqual([]);
+    expect(dueAutoConfirms([entry], NO_MARKS, 24, WEDNESDAY_21 - 24 * HOUR_MS - 1)).toEqual([]);
   });
 
   it("dueAutoConfirms_deadlineBeforeLead_confirmsAtDeadline", () => {
     // Cas du lundi soir : date butoir lundi 21:00, avant « début − 24 h » (mardi 21:00).
     const entry = loadedEntry({ startAt: WEDNESDAY_21, deadlineAt: MONDAY + 21 * HOUR_MS });
 
-    expect(dueAutoConfirms([entry], new Set(), 24, MONDAY + 21 * HOUR_MS)).toEqual([entry]);
-    expect(dueAutoConfirms([entry], new Set(), 24, MONDAY + 21 * HOUR_MS - 1)).toEqual([]);
+    expect(dueAutoConfirms([entry], NO_MARKS, 24, MONDAY + 21 * HOUR_MS)).toEqual([entry]);
+    expect(dueAutoConfirms([entry], NO_MARKS, 24, MONDAY + 21 * HOUR_MS - 1)).toEqual([]);
   });
 
   it("dueAutoConfirms_leadBeforeDeadline_confirmsAtLead", () => {
     const entry = loadedEntry({ startAt: WEDNESDAY_21, deadlineAt: WEDNESDAY_21 - HOUR_MS });
 
-    expect(dueAutoConfirms([entry], new Set(), 48, WEDNESDAY_21 - 48 * HOUR_MS)).toEqual([entry]);
+    expect(dueAutoConfirms([entry], NO_MARKS, 48, WEDNESDAY_21 - 48 * HOUR_MS)).toEqual([entry]);
   });
 
   it("dueAutoConfirms_closedEntry_skipped", () => {
-    expect(dueAutoConfirms([loadedEntry({ open: false })], new Set(), 24, MONDAY)).toEqual([]);
+    expect(dueAutoConfirms([loadedEntry({ open: false })], NO_MARKS, 24, MONDAY)).toEqual([]);
   });
 
-  it("dueAutoConfirms_alreadyConfirmed_skipped", () => {
-    expect(dueAutoConfirms([loadedEntry({ key: "m:1" })], new Set(["m:1"]), 24, MONDAY)).toEqual([]);
+  it("dueAutoConfirms_markedForSameStart_skipped", () => {
+    const entry = loadedEntry({ key: "m:1" });
+    const marks: AutoConfirmMarks = { startAt: new Map([["m:1", entry.startAt]]), reopened: new Set() };
+
+    expect(dueAutoConfirms([entry], marks, 24, entry.startAt)).toEqual([]);
+  });
+
+  it("dueAutoConfirms_markedForOtherStart_due", () => {
+    // Match reprogrammé après sa confirmation d'office : il se confirme de nouveau.
+    const entry = loadedEntry({ key: "m:1" });
+    const marks: AutoConfirmMarks = { startAt: new Map([["m:1", entry.startAt - 24 * HOUR_MS]]), reopened: new Set() };
+
+    expect(dueAutoConfirms([entry], marks, 24, entry.startAt)).toEqual([entry]);
+  });
+
+  it("dueAutoConfirms_markedButProposalArrivedSince_due", () => {
+    const entry = loadedEntry({ key: "m:1" });
+    const marks: AutoConfirmMarks = { startAt: new Map([["m:1", entry.startAt]]), reopened: new Set(["m:1"]) };
+
+    expect(dueAutoConfirms([entry], marks, 24, entry.startAt)).toEqual([entry]);
   });
 });
 
@@ -119,10 +148,41 @@ describe("sweepAutoConfirms", () => {
     expect(insertedKeys()).toEqual(["m:1"]);
   });
 
+  it("sweepAutoConfirms_dueEntry_markStoresConfirmedStart", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ key: "m:1", matchId: 1, tournamentId: 10, startAt: WEDNESDAY_21 })]);
+
+    await sweepAutoConfirms(NOW);
+
+    const [sql, params] = connection.execute.mock.calls.filter(([text]) => text.startsWith("INSERT INTO bg_planning_auto_confirms"))[0];
+    expect(sql).toContain("ON DUPLICATE KEY UPDATE start_at = VALUES(start_at)");
+    expect(params).toEqual(["m:1", 10, 1, new Date(WEDNESDAY_21)]);
+  });
+
+  it("sweepAutoConfirms_weekFailed_skippedUntilRetryDelay", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ key: "m:1", startAt: WEDNESDAY_21 })]);
+    jest.mocked(confirmAssignments).mockRejectedValueOnce(new Error("planning occupé"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    await sweepAutoConfirms(NOW);
+
+    await sweepAutoConfirms(NOW + FAILED_WEEK_RETRY_MS - 1);
+
+    expect(jest.mocked(runAutoAssign)).toHaveBeenCalledTimes(1);
+  });
+
+  it("sweepAutoConfirms_weekFailed_retriedAfterDelay", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ key: "m:1", startAt: WEDNESDAY_21 })]);
+    jest.mocked(confirmAssignments).mockRejectedValueOnce(new Error("planning occupé"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    await sweepAutoConfirms(NOW);
+
+    await expect(sweepAutoConfirms(NOW + FAILED_WEEK_RETRY_MS)).resolves.toBe(1);
+    expect(jest.mocked(runAutoAssign)).toHaveBeenCalledTimes(2);
+  });
+
   it("sweepAutoConfirms_alreadyMarked_doesNothing", async () => {
     jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ key: "m:1", startAt: WEDNESDAY_21 })]);
     connection.execute.mockImplementation(async (sql) =>
-      sql.startsWith("SELECT entry_key") ? [[{ entry_key: "m:1" }], []] : [{ affectedRows: 1 }, []],
+      sql.startsWith("SELECT entry_key, start_at") ? [[{ entry_key: "m:1", start_at: new Date(WEDNESDAY_21) }], []] : sql.startsWith("SELECT") ? [[], []] : [{ affectedRows: 1 }, []],
     );
 
     expect(await sweepAutoConfirms(NOW)).toBe(0);

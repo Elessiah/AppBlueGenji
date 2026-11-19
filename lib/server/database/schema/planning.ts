@@ -153,6 +153,8 @@ export async function createPlanningTables(db: Pool): Promise<void> {
       entry_key VARCHAR(24) NOT NULL PRIMARY KEY,
       tournament_id BIGINT NOT NULL,
       match_id BIGINT NULL,
+      -- Début de l'entrée confirmée : reprogrammée, elle se confirme de nouveau.
+      start_at DATETIME NULL,
       confirmed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_bg_planning_auto_confirms_tournament (tournament_id),
       INDEX idx_bg_planning_auto_confirms_match (match_id),

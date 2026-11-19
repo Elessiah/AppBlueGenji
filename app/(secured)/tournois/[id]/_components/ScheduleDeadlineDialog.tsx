@@ -12,8 +12,10 @@ import {
   deadlineEntryDays,
   deadlineEntryOf,
   deadlineFromEntry,
-  defaultScheduleDeadline,
+  scheduleOpenedAt,
   SCHEDULE_DEADLINE_DEFAULT_HOUR,
+  suggestedScheduleDeadline,
+  type OpenedAtMatch,
 } from "@/lib/shared/schedule-deadline";
 import { useActionsText } from "../_lib/actions-text";
 import { useMapError } from "../_lib/error-map";
@@ -26,7 +28,7 @@ const NONE = "";
 
 /** Ce que la fenêtre écrit : un match, ou tous les matchs à planifier d'un tournoi. */
 export type ScheduleDeadlineTarget =
-  | { kind: "match"; matchId: number; label: string; deadlineAt: string | null }
+  | { kind: "match"; matchId: number; team1Name: string | null; team2Name: string | null; deadlineAt: string | null }
   | { kind: "tournament"; tournamentId: number; count: number };
 
 /** « mar. 18 nov. » : un jour de Paris (`AAAA-MM-JJ`), lu à midi UTC pour ne pas glisser d'un jour. */
@@ -39,13 +41,21 @@ function dayLabel(day: string, locale: "fr" | "en"): string {
 /**
  * Date butoir de planification (`docs/features/SCHEDULE_DEADLINE.md`) : un
  * jour et une heure pile, **heure de Paris**. Préremplie par la date butoir en
- * place, sinon par celle d'usage (21:00, deux jours plus tard). « Aucune »
+ * place, sinon par celle d'usage : 21:00, deux jours après l'**ouverture** de
+ * la planification — la fin du dernier match joué du tournoi
+ * (`scheduleOpenedAt`), pas l'instant où la fenêtre s'ouvre. « Aucune »
  * l'efface. Portée et piège de focus : `ConfirmActionDialog`.
  */
 export function ScheduleDeadlineDialog({
   target,
+  matches,
   onClose,
-}: Readonly<{ target: ScheduleDeadlineTarget; onClose: () => void }>) {
+}: Readonly<{
+  target: ScheduleDeadlineTarget;
+  /** Matchs du tournoi : la fin du dernier joué ouvre la planification. */
+  matches: readonly OpenedAtMatch[];
+  onClose: () => void;
+}>) {
   const text = useActionsText();
   const { t, locale } = text;
   const mapError = useMapError();
@@ -53,7 +63,8 @@ export function ScheduleDeadlineDialog({
   const fieldErrors = useFieldErrors(SCHEDULE_DEADLINE_FIELD_ERRORS, FIELD_IDS);
   const [now] = useState(() => Date.now());
   const current = target.kind === "match" && target.deadlineAt !== null ? Date.parse(target.deadlineAt) : null;
-  const initial = deadlineEntryOf(current ?? defaultScheduleDeadline(now));
+  const [suggested] = useState(() => suggestedScheduleDeadline(scheduleOpenedAt(matches, now), now));
+  const initial = deadlineEntryOf(current ?? suggested);
   const [day, setDay] = useState<string>(initial.day);
   const [hour, setHour] = useState<number>(current === null ? SCHEDULE_DEADLINE_DEFAULT_HOUR : initial.hour);
   const days = useMemo(() => {
@@ -113,7 +124,12 @@ export function ScheduleDeadlineDialog({
     >
       <InfoHintRow>
         <p>
-          {target.kind === "match" ? target.label : t("scheduleDeadline.bulkScope", { count: target.count })}
+          {target.kind === "match"
+            ? t("scheduleDeadline.matchLabel", {
+                team1: target.team1Name ?? t("scheduleDeadline.tbd"),
+                team2: target.team2Name ?? t("scheduleDeadline.tbd"),
+              })
+            : t("scheduleDeadline.bulkScope", { count: target.count })}
         </p>
         <InfoHint id="schedule-deadline-hint" subject={title}>
           <p>{t("scheduleDeadline.hint")}</p>

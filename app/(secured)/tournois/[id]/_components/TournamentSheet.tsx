@@ -1454,7 +1454,8 @@ function TournamentSheetView({
             setDeadlineTarget({
               kind: "match",
               matchId: matchForSchedule.id,
-              label: `${matchForSchedule.team1Name ?? "TBD"} – ${matchForSchedule.team2Name ?? "TBD"}`,
+              team1Name: matchForSchedule.team1Name,
+              team2Name: matchForSchedule.team2Name,
               deadlineAt: matchForSchedule.scheduleDeadlineAt,
             });
           }}
@@ -1462,7 +1463,7 @@ function TournamentSheetView({
       )}
 
       {deadlineTarget && (
-        <ScheduleDeadlineDialog target={deadlineTarget} onClose={() => setDeadlineTarget(null)} />
+        <ScheduleDeadlineDialog target={deadlineTarget} matches={detail.matches} onClose={() => setDeadlineTarget(null)} />
       )}
 
       {matchForReplay && detail.canManageLive && (

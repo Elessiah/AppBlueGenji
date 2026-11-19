@@ -217,6 +217,24 @@ describe("setMatchStartAt", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
   });
 
+  it("setMatchStartAt_startCleared_clearsOnlyExpiredDeadline", async () => {
+    const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }) });
+
+    await setMatchStartAt(42, null);
+
+    const clear = writes.find((w) => w.sql.startsWith("UPDATE bg_matches SET schedule_deadline_at = NULL"));
+    expect(clear?.sql).toContain("schedule_deadline_at <= ?");
+    expect(clear?.params[0]).toBe(42);
+  });
+
+  it("setMatchStartAt_startSet_deadlineUntouched", async () => {
+    const { writes } = world();
+
+    await setMatchStartAt(42, FUTURE);
+
+    expect(writes.some((w) => w.sql.includes("schedule_deadline_at"))).toBe(false);
+  });
+
   it("traite une chaîne vide comme un effacement — le formulaire renvoie « »", async () => {
     const { writes } = world({ row: matchRow({ start_at: new Date("2026-08-29T18:30:00Z") }) });
     expect(await setMatchStartAt(42, "   ")).toBeNull();

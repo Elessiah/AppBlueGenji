@@ -491,8 +491,8 @@
     "cleared": "Deadline removed.",
     "bulkSaved": "{count, plural, =0 {No match to schedule.} =1 {Deadline set on 1 match.} other {Deadline set on # matches.}}",
     "bulkCleared": "{count, plural, =0 {No deadline to remove.} =1 {Deadline removed from 1 match.} other {Deadline removed from # matches.}}",
-    "open": "Deadline",
-    "openAria": "Scheduling deadline of the match {team1} vs {team2}",
+    "matchLabel": "{team1} vs {team2}",
+    "tbd": "TBD",
     "bulkOpen": "Matches deadline"
   }
 }

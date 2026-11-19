@@ -491,8 +491,8 @@
     "cleared": "Date butoir retirée.",
     "bulkSaved": "{count, plural, =0 {Aucun match à planifier.} =1 {Date butoir posée sur 1 match.} other {Date butoir posée sur # matchs.}}",
     "bulkCleared": "{count, plural, =0 {Aucune date butoir à retirer.} =1 {Date butoir retirée d'1 match.} other {Date butoir retirée de # matchs.}}",
-    "open": "Date butoir",
-    "openAria": "Date butoir de planification du match {team1} contre {team2}",
+    "matchLabel": "{team1} contre {team2}",
+    "tbd": "À venir",
     "bulkOpen": "Date butoir des matchs"
   }
 }

@@ -28,6 +28,13 @@ export const SCHEDULE_DEADLINE_DEFAULT_HOUR = 21;
 export const SCHEDULE_DEADLINE_DEFAULT_DAYS = 2;
 /** Une date butoir se pose au moins une heure devant (le temps d'en prévenir les engagées). */
 export const SCHEDULE_DEADLINE_MIN_AHEAD_MS = HOUR_MS;
+/**
+ * Préavis minimal d'une paire : une date butoir ne frappe que si son premier
+ * avis est parti au moins trente minutes avant elle (`deadlineArmed`) — la
+ * moitié du préavis minimal de la pose, pour laisser au balayage le temps
+ * d'annoncer une date butoir posée une heure devant.
+ */
+export const SCHEDULE_DEADLINE_ARM_MIN_MS = 30 * MINUTE_MS;
 /** …et au plus soixante jours devant : au-delà, c'est une faute de saisie. */
 export const SCHEDULE_DEADLINE_MAX_AHEAD_MS = 60 * DAY_MS;
 
@@ -91,20 +98,65 @@ export function acceptsScheduleDeadline(match: DeadlineMatch): boolean {
 export type DeadlineOutcome = "FORFEIT" | "LAPSE" | null;
 
 /**
- * L'issue d'une date butoir (`null` : pas encore échue, ou plus rien à faire —
- * le match a reçu son horaire, ou il est joué).
+ * L'issue d'une date butoir (`null` : pas encore échue, ou le match est joué).
  *
  * - toujours **à planifier** (deux engagées connues, ni date ni lancement,
  *   option allumée) → **double forfait** ;
- * - sans horaire mais une engagée manquante, ou option éteinte → la date
- *   butoir **s'éteint** (effacée) : rien à forfaiter, et elle ne doit pas
- *   frapper plus tard un match dont les engagées n'ont jamais eu le délai.
+ * - sans horaire mais une engagée manquante, option éteinte, ou match déjà
+ *   programmé ou lancé → la date butoir **s'éteint** (effacée) : rien à
+ *   forfaiter, et elle ne doit pas frapper plus tard un match qui repasserait
+ *   à planifier (horaire retiré, lancement défait) sans que personne l'ait vu
+ *   venir.
  */
 export function deadlineOutcome(match: DeadlineMatch, deadlineAt: number | null, now: number): DeadlineOutcome {
   if (deadlineAt === null || deadlineAt > now) return null;
   if (match.status === "COMPLETED" || match.status === "AWAITING_CONFIRMATION") return null;
-  if (match.startAt !== null || match.launchedAt !== null) return null;
+  if (match.startAt !== null || match.launchedAt !== null) return "LAPSE";
   return matchLaunchPhase(match, now) === "TO_PLAN" ? "FORFEIT" : "LAPSE";
+}
+
+/**
+ * La date butoir a-t-elle été **armée** pour la paire actuelle assez tôt pour
+ * frapper : son premier avis (`armedAt`, envoyé alors que le match était à
+ * planifier avec ces deux engagées) part au moins
+ * {@link SCHEDULE_DEADLINE_ARM_MIN_MS} avant elle. Une paire complétée trop tard (match
+ * d'origine fini juste avant), ou changée après l'annonce, n'est jamais
+ * forfaitée : la date butoir s'éteint.
+ */
+export function deadlineArmed(armedAt: number | null, deadlineAt: number): boolean {
+  return armedAt !== null && armedAt <= deadlineAt - SCHEDULE_DEADLINE_ARM_MIN_MS;
+}
+
+/** Ce que lit {@link scheduleOpenedAt} d'un match du tournoi. */
+export type OpenedAtMatch = { status: string; updatedAt: string };
+
+/** Une ouverture plus ancienne que ce délai n'est plus celle de la manche en cours. */
+export const SCHEDULE_OPENED_LOOKBACK_MS = 7 * DAY_MS;
+
+/**
+ * Quand la planification s'est ouverte : la fin du dernier match joué du
+ * tournoi (dimanche 23:00 pour une manche finie dimanche soir), sinon `now`
+ * (rien de joué depuis une semaine, ou horloge incohérente).
+ */
+export function scheduleOpenedAt(matches: readonly OpenedAtMatch[], now: number): number {
+  let latest: number | null = null;
+  for (const match of matches) {
+    if (match.status !== "COMPLETED") continue;
+    const at = Date.parse(match.updatedAt);
+    if (!Number.isFinite(at) || at > now || at < now - SCHEDULE_OPENED_LOOKBACK_MS) continue;
+    if (latest === null || at > latest) latest = at;
+  }
+  return latest ?? now;
+}
+
+/**
+ * Date butoir proposée à la saisie : celle d'usage depuis l'ouverture
+ * (`defaultScheduleDeadline(openedAt)`), ou depuis `now` si elle est déjà trop
+ * proche pour être acceptée.
+ */
+export function suggestedScheduleDeadline(openedAt: number, now: number): number {
+  const fromOpening = defaultScheduleDeadline(openedAt);
+  return fromOpening >= now + SCHEDULE_DEADLINE_MIN_AHEAD_MS ? fromOpening : defaultScheduleDeadline(now);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

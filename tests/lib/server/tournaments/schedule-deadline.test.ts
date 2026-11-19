@@ -31,7 +31,11 @@ import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import {
   deadlineNoticesFor,
   forfeitMissedScheduleDeadline,
+  NO_NOTICES,
   SCHEDULE_DEADLINES_LOCK,
+  sentNoticesByMatch,
+  SWEEP_MAX_FAILURES,
+  type SentNotices,
   setMatchScheduleDeadline,
   setTournamentScheduleDeadlines,
   sweepAction,
@@ -51,6 +55,14 @@ const NOW = Date.parse("2026-11-16T12:00:00Z");
 const DEADLINE = Date.parse("2026-11-17T20:00:00Z");
 const HOUR = 60 * 60 * 1000;
 const ACTOR = { id: 3, pseudo: "Arbitre" };
+const MINUTE = 60 * 1000;
+/** Paire du match type (`launchPairingKey(100, 200)`). */
+const PAIRING = "100:200";
+
+/** Avis partis pour la paire actuelle, le premier à `armedAt`. */
+function sentFor(keys: string[], armedAt: number | null = NOW): SentNotices {
+  return { keys: new Set(keys), armedAt, stale: false };
+}
 
 /** Un match **à planifier** d'un tournoi en cours, date butoir mardi 21:00 (Paris). */
 function row(overrides: RowOverrides<SweepRow> = {}): SweepRow {
@@ -91,6 +103,7 @@ let connection: ReturnType<typeof connectionMock>;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete (globalThis as typeof globalThis & { __bgScheduleDeadlineFailures?: Map<number, number> }).__bgScheduleDeadlineFailures;
   connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({}));
@@ -107,27 +120,49 @@ afterEach(() => {
 
 describe("sweepAction", () => {
   it("sweepAction_noDeadline_none", () => {
-    expect(sweepAction(row({ schedule_deadline_at: null }), new Set(), NOW)).toEqual({ kind: "none" });
+    expect(sweepAction(row({ schedule_deadline_at: null }), NO_NOTICES, NOW)).toEqual({ kind: "none" });
   });
 
   it("sweepAction_tournamentFinished_lapse", () => {
-    expect(sweepAction(row({ tournament_state: "FINISHED" }), new Set(), NOW)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
+    expect(sweepAction(row({ tournament_state: "FINISHED" }), NO_NOTICES, NOW)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
   });
 
-  it("sweepAction_dueToPlanRunning_forfeit", () => {
-    expect(sweepAction(row(), new Set(), DEADLINE)).toEqual({ kind: "forfeit", deadlineAt: DEADLINE });
+  it("sweepAction_dueArmedInTime_forfeit", () => {
+    expect(sweepAction(row(), sentFor(["SET"], DEADLINE - 30 * MINUTE), DEADLINE)).toEqual({ kind: "forfeit", deadlineAt: DEADLINE });
+  });
+
+  it("sweepAction_dueNeverArmed_lapse", () => {
+    expect(sweepAction(row(), NO_NOTICES, DEADLINE)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
+  });
+
+  it("sweepAction_dueArmedTooLate_lapse", () => {
+    // Paire complétée 29 min avant l'échéance : les équipes n'ont pas eu le temps.
+    expect(sweepAction(row(), sentFor(["DL3"], DEADLINE - 29 * MINUTE), DEADLINE)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
+  });
+
+  it("sweepAction_scheduledPastDeadline_lapse", () => {
+    expect(sweepAction(row({ start_at: new Date(DEADLINE + 24 * HOUR) }), sentFor(["SET"]), DEADLINE)).toEqual({
+      kind: "lapse",
+      deadlineAt: DEADLINE,
+    });
+  });
+
+  it("sweepAction_launchedPastDeadline_lapse", () => {
+    const launched = row({ launched_at: new Date(NOW), launch_pairing: PAIRING });
+
+    expect(sweepAction(launched, sentFor(["SET"]), DEADLINE)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
   });
 
   it("sweepAction_dueToPlanNotRunning_lapse", () => {
-    expect(sweepAction(row({ tournament_state: "REGISTRATION" }), new Set(), DEADLINE)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
+    expect(sweepAction(row({ tournament_state: "REGISTRATION" }), sentFor(["SET"]), DEADLINE)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
   });
 
   it("sweepAction_dueMissingEntrant_lapse", () => {
-    expect(sweepAction(row({ team2_id: null }), new Set(), DEADLINE)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
+    expect(sweepAction(row({ team2_id: null }), NO_NOTICES, DEADLINE)).toEqual({ kind: "lapse", deadlineAt: DEADLINE });
   });
 
   it("sweepAction_beforeDeadlineToPlan_remindWithDueKey", () => {
-    expect(sweepAction(row(), new Set(["SET"]), DEADLINE - 2 * HOUR)).toEqual({
+    expect(sweepAction(row(), sentFor(["SET"]), DEADLINE - 2 * HOUR)).toEqual({
       kind: "remind",
       key: "DL3",
       consumes: ["SET", "DL24", "DL3"],
@@ -136,11 +171,33 @@ describe("sweepAction", () => {
   });
 
   it("sweepAction_beforeDeadlineEntrantMissing_none", () => {
-    expect(sweepAction(row({ team2_id: null }), new Set(), NOW)).toEqual({ kind: "none" });
+    expect(sweepAction(row({ team2_id: null }), NO_NOTICES, NOW)).toEqual({ kind: "none" });
   });
 
   it("sweepAction_latestStepAlreadySent_none", () => {
-    expect(sweepAction(row(), new Set(["SET"]), NOW)).toEqual({ kind: "none" });
+    expect(sweepAction(row(), sentFor(["SET"]), NOW)).toEqual({ kind: "none" });
+  });
+});
+
+describe("sentNoticesByMatch", () => {
+  const notice = (notice_key: string, pairing: string | null, sentAt: number) => ({ match_id: 40, notice_key, pairing, sent_at: new Date(sentAt) });
+
+  it("sentNoticesByMatch_currentPairing_keysAndEarliestArmedAt", () => {
+    const sent = sentNoticesByMatch([row()], [notice("DL24", PAIRING, NOW + HOUR), notice("SET", PAIRING, NOW)]);
+
+    expect(sent.get(40)).toEqual({ keys: new Set(["DL24", "SET"]), armedAt: NOW, stale: false });
+  });
+
+  it("sentNoticesByMatch_otherPairing_staleWithoutKeys", () => {
+    const sent = sentNoticesByMatch([row()], [notice("SET", "100:300", NOW)]);
+
+    expect(sent.get(40)).toEqual({ keys: new Set(), armedAt: null, stale: true });
+  });
+
+  it("sentNoticesByMatch_forfeitKey_notArming", () => {
+    const sent = sentNoticesByMatch([row()], [notice("FORFEIT", PAIRING, NOW)]);
+
+    expect(sent.get(40)?.armedAt).toBeNull();
   });
 });
 
@@ -172,6 +229,7 @@ describe("forfeitMissedScheduleDeadline", () => {
     routeSql(connection, [
       [/FROM bg_tournaments/, () => tournament("RUNNING")],
       [/FROM bg_matches/, () => [[row()]]],
+      [/MIN\(sent_at\)/, () => [[{ armed_at: new Date(NOW) }]]],
     ]);
 
     await expect(run()).resolves.toBe(true);
@@ -179,6 +237,17 @@ describe("forfeitMissedScheduleDeadline", () => {
     expect(lockTournamentRow).toHaveBeenCalledWith(expect.anything(), 10);
     expect(jest.mocked(lockTournamentRow).mock.invocationCallOrder[0]).toBeLessThan(connection.execute.mock.invocationCallOrder[0]);
     expect(adminResolveMatch).toHaveBeenCalledWith(expect.anything(), 40, { doubleForfeit: true });
+  });
+
+  it("forfeitMissedScheduleDeadline_notArmed_false", async () => {
+    routeSql(connection, [
+      [/FROM bg_tournaments/, () => tournament("RUNNING")],
+      [/FROM bg_matches/, () => [[row()]]],
+      [/MIN\(sent_at\)/, () => [[{ armed_at: null }]]],
+    ]);
+
+    await expect(run()).resolves.toBe(false);
+    expect(adminResolveMatch).not.toHaveBeenCalled();
   });
 
   it("forfeitMissedScheduleDeadline_tournamentNotRunning_false", async () => {
@@ -257,7 +326,7 @@ describe("sweepScheduleDeadlines", () => {
   it("sweepScheduleDeadlines_stepAlreadySent_claimsNothing", async () => {
     routeSql(connection, [
       [/FROM bg_matches m/, () => [[row()]]],
-      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET" }]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW) }]]],
     ]);
 
     await sweepScheduleDeadlines(NOW);
@@ -282,6 +351,7 @@ describe("sweepScheduleDeadlines", () => {
     jest.mocked(forfeitMissedScheduleDeadlinePublic).mockResolvedValue(true);
     routeSql(connection, [
       [/FROM bg_matches m/, () => [[row()]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW) }]]],
       [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
     ]);
     jest.spyOn(console, "info").mockImplementation(() => undefined);
@@ -289,13 +359,16 @@ describe("sweepScheduleDeadlines", () => {
     await expect(sweepScheduleDeadlines(DEADLINE + HOUR)).resolves.toEqual({ forfeited: 1, lapsed: 0, reminded: 0 });
 
     expect(forfeitMissedScheduleDeadlinePublic).toHaveBeenCalledWith(10, 40, DEADLINE, DEADLINE + HOUR);
-    expect(executed(connection, /INSERT IGNORE/)[0][1]).toEqual(["FORFEIT", 40, new Date(DEADLINE)]);
+    expect(executed(connection, /INSERT IGNORE/)[0][1]).toEqual(["FORFEIT", PAIRING, new Date(DEADLINE + HOUR), 40, new Date(DEADLINE), 100, 200]);
     expect(notifyUsers).toHaveBeenCalledTimes(2);
   });
 
   it("sweepScheduleDeadlines_forfeitPreempted_nothingCounted", async () => {
     jest.mocked(forfeitMissedScheduleDeadlinePublic).mockResolvedValue(false);
-    routeSql(connection, [[/FROM bg_matches m/, () => [[row()]]]]);
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: PAIRING, sent_at: new Date(NOW) }]]],
+    ]);
 
     await expect(sweepScheduleDeadlines(DEADLINE + HOUR)).resolves.toEqual({ forfeited: 0, lapsed: 0, reminded: 0 });
     expect(notifyUsers).not.toHaveBeenCalled();
@@ -321,6 +394,54 @@ describe("sweepScheduleDeadlines", () => {
 
     await expect(sweepScheduleDeadlines(DEADLINE + HOUR)).resolves.toEqual({ forfeited: 0, lapsed: 0, reminded: 0 });
     expect(executed(connection, /DELETE FROM bg_schedule_deadline_notices/)).toHaveLength(0);
+  });
+
+  it("sweepScheduleDeadlines_readsPastDeadlinesOfScheduledMatches", async () => {
+    routeSql(connection, []);
+
+    await sweepScheduleDeadlines(NOW);
+
+    const [sql, params] = executed(connection, /FROM bg_matches m/)[0];
+    expect(sql).toContain("(m.start_at IS NULL OR m.schedule_deadline_at <= ?)");
+    expect(params).toEqual([new Date(NOW)]);
+  });
+
+  it("sweepScheduleDeadlines_staleNotices_deletedBeforeClaimingAnnouncement", async () => {
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/SELECT match_id, notice_key/, () => [[{ match_id: 40, notice_key: "SET", pairing: "100:300", sent_at: new Date(NOW - HOUR) }]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => claimed(1)],
+    ]);
+
+    await expect(sweepScheduleDeadlines(NOW)).resolves.toEqual({ forfeited: 0, lapsed: 0, reminded: 1 });
+
+    expect(executed(connection, /DELETE FROM bg_schedule_deadline_notices WHERE match_id = \? AND NOT/)[0][1]).toEqual([40, PAIRING]);
+    expect(executed(connection, /INSERT IGNORE/)[0][1]).toEqual(["SET", PAIRING, new Date(NOW), 40, new Date(DEADLINE), 100, 200]);
+  });
+
+  it("sweepScheduleDeadlines_fourFailures_keepsDeadline", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => Promise.reject(new Error("panne"))],
+    ]);
+
+    for (let pass = 1; pass < SWEEP_MAX_FAILURES; pass += 1) await sweepScheduleDeadlines(NOW);
+
+    expect(executed(connection, /UPDATE bg_matches SET schedule_deadline_at = NULL/)).toHaveLength(0);
+  });
+
+  it("sweepScheduleDeadlines_fifthConsecutiveFailure_lapsesDeadline", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    routeSql(connection, [
+      [/FROM bg_matches m/, () => [[row()]]],
+      [/INSERT IGNORE INTO bg_schedule_deadline_notices/, () => Promise.reject(new Error("panne"))],
+      [/UPDATE bg_matches SET schedule_deadline_at = NULL/, () => [{ affectedRows: 1 }]],
+    ]);
+    for (let pass = 1; pass < SWEEP_MAX_FAILURES; pass += 1) await sweepScheduleDeadlines(NOW);
+
+    await expect(sweepScheduleDeadlines(NOW)).resolves.toEqual({ forfeited: 0, lapsed: 1, reminded: 0 });
+    expect(executed(connection, /UPDATE bg_matches SET schedule_deadline_at = NULL/)[0][1]).toEqual([40, new Date(DEADLINE)]);
   });
 
   it("sweepScheduleDeadlines_rowFailure_otherRowsContinue", async () => {
@@ -383,6 +504,14 @@ describe("setMatchScheduleDeadline", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(10);
   });
 
+  it("setMatchScheduleDeadline_sameDeadline_noRewriteNoticesKept", async () => {
+    routeSql(connection, matchRoutes(row()));
+
+    await expect(setMatchScheduleDeadline(40, "2026-11-17T20:00:00Z", ACTOR, NOW)).resolves.toBe("2026-11-17T20:00:00.000Z");
+    expect(executed(connection, /UPDATE bg_matches SET schedule_deadline_at/)).toHaveLength(0);
+    expect(executed(connection, /DELETE FROM bg_schedule_deadline_notices/)).toHaveLength(0);
+  });
+
   it("setMatchScheduleDeadline_clearOnScheduledMatch_allowed", async () => {
     routeSql(connection, matchRoutes(row({ start_at: new Date(DEADLINE) })));
 
@@ -425,6 +554,17 @@ describe("setTournamentScheduleDeadlines", () => {
     await expect(setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, NOW)).resolves.toBe(1);
     expect(updatedIds()).toEqual([40]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(10);
+  });
+
+  it("setTournamentScheduleDeadlines_sameDeadlineAlreadySet_notRewritten", async () => {
+    routeSql(connection, [
+      [/FROM bg_tournaments/, () => [[{ referee_scheduling: 1, state: "RUNNING" }]]],
+      [/FROM bg_matches\s+WHERE tournament_id/, () => [[row({ id: 40 }), row({ id: 43, schedule_deadline_at: null })]]],
+    ]);
+
+    await expect(setTournamentScheduleDeadlines(10, "2026-11-17T20:00:00Z", ACTOR, NOW)).resolves.toBe(1);
+    expect(updatedIds()).toEqual([43]);
+    expect(executed(connection, /DELETE FROM bg_schedule_deadline_notices/).map(([, params]) => params)).toEqual([[43]]);
   });
 
   it("setTournamentScheduleDeadlines_clear_onlyMatchesWithDeadline", async () => {

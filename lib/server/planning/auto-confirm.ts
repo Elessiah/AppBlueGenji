@@ -12,9 +12,12 @@
  * un petit lot à lui ; les matchs programmés plus tard se répartissent ensuite
  * autour des confirmés.
  *
- * Une entrée n'est confirmée d'office qu'une fois (`bg_planning_auto_confirms`,
- * marque posée après la confirmation) : une confirmation en échec se relance à
- * la minute suivante, une confirmation faite ne se refait pas. Un seul
+ * Une entrée n'est confirmée d'office qu'une fois **par horaire**
+ * (`bg_planning_auto_confirms`, marque posée après la confirmation avec le
+ * début confirmé) : reprogrammée, elle se confirme de nouveau ; une
+ * proposition faite **après** la marque (un caster libéré, un nouveau calcul)
+ * l'est aussi au passage suivant. Une semaine en échec attend
+ * {@link FAILED_WEEK_RETRY_MS} avant d'être relancée. Un seul
  * processus à la fois (verrou nommé `bg_planning_confirms`, pris sans
  * attendre) ; les écritures du planning prennent en plus le verrou du planning
  * (`bg_planning`, `withPlanningLock`).
@@ -32,20 +35,33 @@ import { loadDurationSettings, loadPlanningEntries, type Executor, type LoadedEn
 export const AUTO_CONFIRM_LOCK = "bg_planning_confirms";
 const SWEEP_TICK_MS = 60 * 1000;
 const FIRST_SWEEP_DELAY_MS = 2 * 60 * 1000;
+/** Une semaine dont la confirmation a échoué est relancée au plus toutes les dix minutes. */
+export const FAILED_WEEK_RETRY_MS = 10 * 60 * 1000;
 
 /**
- * Les entrées à confirmer d'office maintenant : ouvertes, pas encore
- * confirmées d'office, et dont l'instant de confirmation est atteint.
+ * Marques des confirmations d'office : entrée → début confirmé (`null` : marque
+ * d'avant la colonne), et entrées marquées qui portent une proposition
+ * provisoire née après leur marque.
+ */
+export type AutoConfirmMarks = { startAt: ReadonlyMap<string, number | null>; reopened: ReadonlySet<string> };
+
+/**
+ * Les entrées à confirmer d'office maintenant : ouvertes, dont l'instant de
+ * confirmation est atteint, et pas encore confirmées d'office **pour ce début**
+ * — ou confirmées, mais avec une proposition provisoire arrivée depuis.
  */
 export function dueAutoConfirms(
   entries: readonly LoadedEntry[],
-  done: ReadonlySet<string>,
+  marks: AutoConfirmMarks,
   leadHours: number,
   now: number,
 ): LoadedEntry[] {
-  return entries.filter(
-    (entry) => entry.open && !done.has(entry.key) && now >= planningConfirmAt(entry.startAt, entry.deadlineAt, leadHours),
-  );
+  return entries.filter((entry) => {
+    if (!entry.open || now < planningConfirmAt(entry.startAt, entry.deadlineAt, leadHours)) return false;
+    const marked = marks.startAt.get(entry.key);
+    if (marked === undefined) return true;
+    return marked !== entry.startAt || marks.reopened.has(entry.key);
+  });
 }
 
 /** Les entrées échues, par semaine du planning (lundi 00:00, heure de Paris), dans l'ordre. */
@@ -62,22 +78,41 @@ export function groupByWeek(entries: readonly LoadedEntry[]): { from: number; to
     .map(([from, keys]) => ({ from, to: planningNextWeekStart(from), keys }));
 }
 
-async function confirmedKeys(executor: Executor, keys: readonly string[]): Promise<Set<string>> {
-  if (keys.length === 0) return new Set();
-  const [rows] = await executor.execute<(RowDataPacket & { entry_key: string })[]>(
-    `SELECT entry_key FROM bg_planning_auto_confirms WHERE entry_key IN (${keys.map(() => "?").join(", ")})`,
+async function readMarks(executor: Executor, keys: readonly string[]): Promise<AutoConfirmMarks> {
+  if (keys.length === 0) return { startAt: new Map(), reopened: new Set() };
+  const list = keys.map(() => "?").join(", ");
+  const [rows] = await executor.execute<(RowDataPacket & { entry_key: string; start_at: Date | string | null })[]>(
+    `SELECT entry_key, start_at FROM bg_planning_auto_confirms WHERE entry_key IN (${list})`,
     [...keys],
   );
-  return new Set(rows.map((row) => row.entry_key));
+  const startAt = new Map(rows.map((row) => [row.entry_key, row.start_at === null ? null : new Date(row.start_at).getTime()]));
+  if (startAt.size === 0) return { startAt, reopened: new Set() };
+  const marked = [...startAt.keys()];
+  const [late] = await executor.execute<(RowDataPacket & { entry_key: string })[]>(
+    `SELECT DISTINCT a.entry_key FROM bg_planning_assignments a
+       JOIN bg_planning_auto_confirms c ON c.entry_key = a.entry_key
+      WHERE a.confirmed = 0 AND a.created_at > c.confirmed_at AND a.entry_key IN (${marked.map(() => "?").join(", ")})`,
+    marked,
+  );
+  return { startAt, reopened: new Set(late.map((row) => row.entry_key)) };
 }
 
 async function markConfirmed(executor: Executor, entries: readonly LoadedEntry[]): Promise<void> {
   for (const entry of entries) {
     await executor.execute(
-      `INSERT IGNORE INTO bg_planning_auto_confirms (entry_key, tournament_id, match_id) VALUES (?, ?, ?)`,
-      [entry.key, entry.tournamentId, entry.matchId],
+      `INSERT INTO bg_planning_auto_confirms (entry_key, tournament_id, match_id, start_at) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE start_at = VALUES(start_at), confirmed_at = CURRENT_TIMESTAMP`,
+      [entry.key, entry.tournamentId, entry.matchId, new Date(entry.startAt)],
     );
   }
+}
+
+const globalRetry = globalThis as typeof globalThis & { __bgPlanningAutoConfirmRetry?: Map<number, number> };
+
+/** Semaine (début) → instant avant lequel elle n'est pas relancée, pour ce processus. */
+function retryAfter(): Map<number, number> {
+  globalRetry.__bgPlanningAutoConfirmRetry ??= new Map();
+  return globalRetry.__bgPlanningAutoConfirmRetry;
 }
 
 /**
@@ -92,17 +127,20 @@ export async function sweepAutoConfirms(now: number = Date.now()): Promise<numbe
       const durations = await loadDurationSettings(connection);
       const entries = await loadPlanningEntries(connection, { now, includeHidden: true, durations });
       const open = entries.filter((entry) => entry.open);
-      const done = await confirmedKeys(connection, open.map((entry) => entry.key));
-      const due = dueAutoConfirms(open, done, durations.confirmLeadHours, now);
+      const marks = await readMarks(connection, open.map((entry) => entry.key));
+      const due = dueAutoConfirms(open, marks, durations.confirmLeadHours, now);
       let confirmed = 0;
       for (const week of groupByWeek(due)) {
+        if ((retryAfter().get(week.from) ?? 0) > now) continue;
         try {
           await runAutoAssign(null, { from: week.from, to: week.to }, now);
           await confirmAssignments(null, { entryKeys: week.keys }, now);
           const keys = new Set(week.keys);
           await markConfirmed(connection, due.filter((entry) => keys.has(entry.key)));
           confirmed += week.keys.length;
+          retryAfter().delete(week.from);
         } catch (error) {
+          retryAfter().set(week.from, now + FAILED_WEEK_RETRY_MS);
           console.error("[planning] confirmation d'office en échec, reprise au prochain passage", failureReason(error));
         }
       }

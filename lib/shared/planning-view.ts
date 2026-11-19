@@ -86,7 +86,8 @@ export type PlanningEntryView = {
   deadlineAt: string | null;
   /**
    * Confirmation d'office des propositions de l'entrée (ISO) : au plus tôt de
-   * la date butoir et du début moins le délai de confirmation. `null` : entrée close.
+   * la date butoir et du début moins le délai de confirmation. `null` : entrée
+   * close, ou instant passé (confirmée, ou sur le point de l'être).
    */
   confirmAt: string | null;
   assignments: PlanningAssignmentShown[];
