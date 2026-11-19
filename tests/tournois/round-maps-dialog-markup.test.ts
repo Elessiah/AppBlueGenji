@@ -43,7 +43,8 @@ describe("slot state", () => {
     expect(source).toContain("SLOT_STATE_PILL[state]");
     expect(source).toContain('t("dialog.slotEmpty")');
     expect(source).toContain('t("dialog.slotImposed")');
-    expect(source).toContain('t("dialog.slotPool", { count: slot.length })');
+    expect(source).toContain('t("dialog.slotPool", { count })');
+    expect(source).toContain("slotStateText(state, slot.length, t)");
   });
 
   it("slot_toggleButton_sitsNextToItsErrorText", () => {
@@ -153,5 +154,22 @@ describe("lighter dialog details", () => {
 
   it("dialog_staleTiebreaks_titleIsARealLegend", () => {
     expect(readSource(DIALOG)).toMatch(/<legend className={styles\.legend}>\s*<span id={`\${ids}-title`}>/);
+  });
+});
+
+describe("map list rendering cost", () => {
+  it("dialog_mapList_optionsAreMemoisedWithStableToggle", () => {
+    const source = readSource(DIALOG);
+
+    expect(source).toContain("const MapOption = memo(function MapOption(");
+    expect(source).toMatch(/<MapOption key=\{map\}[^>]*onToggle=\{toggleMap\}/);
+    expect(source).toContain("latestEdit.current = onEdit;");
+    expect(source).not.toMatch(/\{\s*empty: \(\) =>/);
+  });
+
+  it("dialog_overwatchBranch_searchAndListShareOneCondition", () => {
+    const source = readSource(DIALOG);
+
+    expect(source.match(/\{overwatch && \(/g)).toHaveLength(1);
   });
 });

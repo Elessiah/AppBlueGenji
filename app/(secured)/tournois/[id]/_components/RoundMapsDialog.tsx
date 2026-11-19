@@ -239,17 +239,25 @@ function MapPicker({
   useEffect(() => {
     document.getElementById(`${ids}-${overwatch ? "search" : "custom"}`)?.focus();
   }, [ids, overwatch]);
+  // Rappel stable (dernier `onEdit` lu par référence) : seule la case dont l'état
+  // change se redessine, pas les quarante de la liste.
+  const latestEdit = useRef(onEdit);
+  latestEdit.current = onEdit;
+  const toggleMap = useCallback((map: string) => {
+    latestEdit.current((current) => toggleMapInSlot(current, map));
+  }, []);
   const addCustom = () => {
     if (onEdit((current) => addMapToSlot(current, custom))) setCustom("");
   };
   // Posé sur chaque champ, pas sur le conteneur : un `div` muni d'un gestionnaire
   // clavier passe pour un faux contrôle (Sonar S6848).
-  const blockSubmit = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+  const blockSubmit = useCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (blocksImplicitSubmit(event.key, event.currentTarget.type)) event.preventDefault();
-  };
+  }, []);
   return (
     <div className={styles.picker}>
       {overwatch && (
+        <>
         <div className="field">
           <label htmlFor={`${ids}-search`}>{t("dialog.searchLabel")}</label>
           <input
@@ -262,8 +270,6 @@ function MapPicker({
             onKeyDown={blockSubmit}
           />
         </div>
-      )}
-      {overwatch && (
         <ScrollArea orientation="y" ariaLabel={t("dialog.mapListLabel", { number })} className={styles.mapList}>
           {groups.length === 0 && <p className={styles.muted}>{t("dialog.noResult")}</p>}
           {groups.map((group) => (
@@ -271,20 +277,13 @@ function MapPicker({
               <legend className={styles.modeLegend}>{t(`dialog.modes.${group.mode}`)}</legend>
               <div className={styles.options} data-tap-zone>
                 {group.maps.map((map) => (
-                  <label key={map} className={styles.option}>
-                    <input
-                      type="checkbox"
-                      checked={slotHasMap(slot, map)}
-                      onChange={() => onEdit((current) => toggleMapInSlot(current, map))}
-                      onKeyDown={blockSubmit}
-                    />
-                    <span>{map}</span>
-                  </label>
+                  <MapOption key={map} map={map} checked={slotHasMap(slot, map)} onToggle={toggleMap} onKeyDown={blockSubmit} />
                 ))}
               </div>
             </fieldset>
           ))}
         </ScrollArea>
+        </>
       )}
       <div className={styles.customRow}>
         <div className={`field ${styles.grow}`}>
@@ -313,6 +312,33 @@ function MapPicker({
       </div>
     </div>
   );
+}
+
+/** Une case de la liste des cartes d'Overwatch : mémoïsée, elle ne se redessine que si son état change. */
+const MapOption = memo(function MapOption({
+  map,
+  checked,
+  onToggle,
+  onKeyDown,
+}: Readonly<{
+  map: string;
+  checked: boolean;
+  onToggle: (map: string) => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
+}>) {
+  return (
+    <label className={styles.option}>
+      <input type="checkbox" checked={checked} onChange={() => onToggle(map)} onKeyDown={onKeyDown} />
+      <span>{map}</span>
+    </label>
+  );
+});
+
+/** Texte de la pastille d'état d'une carte du tour. */
+function slotStateText(state: SlotState, count: number, t: ReturnType<typeof useRoundMapsText>["t"]): string {
+  if (state === "empty") return t("dialog.slotEmpty");
+  if (state === "imposed") return t("dialog.slotImposed");
+  return t("dialog.slotPool", { count });
 }
 
 /** Texte et pastille de chaque état d'une carte du tour (`slotState`). */
@@ -367,11 +393,7 @@ function SlotEditor({
     document.getElementById(next === null ? toggleId : `${chipsId}-${next}`)?.focus();
   }, [slot, chipsId, toggleId]);
   const state = slotState(slot.length);
-  const kind = {
-    empty: () => t("dialog.slotEmpty"),
-    imposed: () => t("dialog.slotImposed"),
-    pool: () => t("dialog.slotPool", { count: slot.length }),
-  }[state]();
+  const kind = slotStateText(state, slot.length, t);
   return (
     <li className={styles.slot} data-state={state}>
       <div className={styles.slotHead}>
