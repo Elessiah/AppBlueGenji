@@ -1308,7 +1308,7 @@ export function RgpdEn({
             that organises the production of a live stream) have a “Schedule” page: for each slot (a
             scheduled match, or a whole tournament when its matches are not scheduled) and each role they
             hold, they give their availability (available, away, maybe) and their preference there; a caster
-            also says whether they stream alone (“solo caster”), which an administrator can set for
+            also says whether they stream alone (“solo caster”), which the tournament staff can set for
             them. A calculation proposes the assignments from these answers and everyone&apos;s load (current
             week and the {PLANNING_HISTORY_WEEKS} previous weeks); its proposals stay provisional until confirmed, by an administrator or automatically by the site; the tournament staff can still assign or remove someone by hand, an assignment by hand being firm at once. The site keeps,
             with each assignment, who set it and its history (set, confirmed, removed, with the account that

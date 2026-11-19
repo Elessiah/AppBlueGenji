@@ -32,8 +32,9 @@ describe("/rgpd — planning (FR)", () => {
   it("rgpdFr_planning_noTournamentStaffAsConfirmerOrSetter", () => {
     expect(fr).not.toContain("confirmation par le staff des tournois");
     expect(fr).not.toContain("délai réglé par le staff des tournois");
-    expect(fr).not.toContain("staff des tournois peut régler pour lui");
-    expect(fr).toContain("ce qu&apos;un administrateur peut régler pour lui");
+    expect(fr).not.toContain("ce qu&apos;un administrateur peut régler pour lui");
+    expect(fr).toContain("ce que le staff");
+    expect(fr).toContain("des tournois peut régler pour lui");
     expect(fr).toContain("délai réglé par un administrateur");
     expect(fr).toContain("comme d&apos;une confirmation par un administrateur");
   });
@@ -51,8 +52,8 @@ describe("/rgpd — planning (EN)", () => {
   it("rgpdEn_planning_noTournamentStaffAsConfirmerOrSetter", () => {
     expect(en).not.toContain("tournament staff confirms them");
     expect(en).not.toContain("a lead time set by the tournament staff");
-    expect(en).not.toContain("which the tournament staff can set for them");
-    expect(en).toContain("which an administrator can set for them");
+    expect(en).not.toContain("which an administrator can set for them");
+    expect(en).toContain("which the tournament staff can set for");
     expect(en).toContain("a lead time set by an administrator");
     expect(en).toContain("as for a confirmation by an administrator");
   });
@@ -62,7 +63,7 @@ describe("registre T20", () => {
   it("registerT20_fr_adminConfirmsSetsSoloAndLeadTime", () => {
     const text = t20("fr");
     expect(text).toContain("jusqu'à leur confirmation, par un administrateur ou d'office par le site");
-    expect(text).toContain("réglage posé par le caster ou par un administrateur");
+    expect(text).toContain("réglage posé par le caster ou par le staff des tournois");
     expect(text).toContain("délai réglé par un administrateur");
     expect(text).toContain("comme d'une confirmation par un administrateur");
     expect(text).not.toContain("confirmation par le staff des tournois");
@@ -71,7 +72,7 @@ describe("registre T20", () => {
   it("registerT20_en_adminConfirmsSetsSoloAndLeadTime", () => {
     const text = t20("en");
     expect(text).toContain("until confirmed, by an administrator or automatically by the site");
-    expect(text).toContain("a setting made by the caster or by an administrator");
+    expect(text).toContain("a setting made by the caster or by the tournament staff");
     expect(text).toContain("a lead time set by an administrator");
     expect(text).toContain("as for a confirmation by an administrator");
     expect(text).not.toContain("confirmed by the tournament staff");

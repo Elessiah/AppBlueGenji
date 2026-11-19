@@ -13,7 +13,7 @@ Remplace le tableur partagé tenu jusqu'ici.
 | Voir le planning (attributions de tous, ses propres réponses) | `planning` | `GET /api/planning` |
 | Donner sa disponibilité / sa préférence | `planning` + le rôle concerné | `PUT /api/planning/availability` |
 | Se dire caster autonome | `planning` + rôle `CASTER` | `PUT /api/planning/solo-caster` |
-| Régler le caster autonome d'un autre | **administrateur** | `PUT /api/planning/solo-caster` (`userId`) |
+| Régler le caster autonome d'un autre | `tournaments` (le staff, **pas** réservé aux administrateurs) | `PUT /api/planning/solo-caster` (`userId`) |
 | Attribuer / retirer à la main | `tournaments` | `PUT /api/admin/planning/assignment` |
 | Calculer un lot | **administrateur** (`canComputePlanning`) | `POST /api/admin/planning/auto-assign` |
 | Confirmer des propositions | **administrateur** | `POST /api/admin/planning/confirm` |
@@ -21,17 +21,19 @@ Remplace le tableur partagé tenu jusqu'ici.
 
 **Calcul réservé aux administrateurs** (décision explicite, exception à la
 règle des permissions scopées) : `canComputePlanning(user)` (`user.isAdmin`).
-Le panneau « Calcul et confirmation » (confirmation à l'avance, caster
-autonome d'un autre, durées), le bouton « Calculer la semaine » et le bouton
+Le panneau « Calcul et confirmation » (confirmation à l'avance, durées), le bouton « Calculer la semaine » et le bouton
 de confirmation d'un créneau n'existent que pour eux : la vue (`GET
 /api/planning`, seule porte, le planning n'a pas de flux) porte `canCompute`
 et `durations` seulement pour un administrateur ; sinon rien n'est rendu (ni
 coquille vide ni indice). Les routes de calcul, de confirmation, de réglages
-et le caster autonome d'un autre rendent `403 PLANNING_ADMIN_ONLY` (« réservé
-aux administrateurs ») à tout autre compte, `tournaments` compris ; le panneau
+rendent `403 PLANNING_ADMIN_ONLY` (« réservé aux administrateurs ») à tout autre
+compte, `tournaments` compris ; le panneau
 n'est rendu que si la vue porte aussi les durées (jamais de valeurs par défaut
-qu'un enregistrement écrirait). L'attribution à la main reste à `tournaments`
-(`canManage`) : choisir à la main une personne déjà proposée remplace la
+qu'un enregistrement écrirait). **Caster autonome d'un autre** : hors de cette
+exception, il reste au staff des tournois (`tournaments`, `403 FORBIDDEN` sinon) ;
+son réglage vit dans la section « Casters autonomes » de `/planning`, rendue
+à tout `canManage` hors du panneau de calcul (`SoloCastersStaff`). L'attribution
+à la main reste à `tournaments` (`canManage`) : choisir à la main une personne déjà proposée remplace la
 proposition par un choix du staff (`MANUAL`, ferme par nature), ce n'est pas
 confirmer le calcul ; la confirmation d'office (`auto-confirm`) n'est pas un geste
 d'utilisateur et ne change pas ; le remplaçant cherché à un désistement

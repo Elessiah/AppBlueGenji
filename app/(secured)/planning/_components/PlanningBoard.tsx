@@ -330,6 +330,8 @@ export function PlanningBoard({
         <output className={styles.count}>{t("filters.count", { shown: shown.length, total: view.entries.length })}</output>
       </section>
 
+      {view.canManage && <SoloCastersStaff text={text} view={view} pending={pending} act={act} />}
+
       {panelDurations && (
         <StaffPanel text={text} view={view} durations={panelDurations} pending={pending} act={act} onConfirmLead={(hours) => setConfirming({ kind: "lead", hours })} />
       )}
@@ -856,6 +858,47 @@ const RoleRow = memo(function RoleRow({
   );
 });
 
+/**
+ * « Casters autonomes » : le staff des tournois (`canManage`, pas seulement
+ * l'administrateur) règle le « caster autonome » d'un autre compte. Hors du
+ * panneau de calcul, réservé aux administrateurs.
+ */
+function SoloCastersStaff({
+  text,
+  view,
+  pending,
+  act,
+}: Readonly<{ text: Text; view: Pick<PlanningView, "me" | "members">; pending: string | null; act: Act }>) {
+  const { t } = text;
+  const casters = view.members.filter((member) => member.roles.includes("CASTER"));
+  if (casters.length === 0) return null;
+  return (
+    <Disclosure title={t("solo.staffTitle")} storageKey={planningOpenKey("solo", view.me)} keepMounted className={styles.staff}>
+      <fieldset className={styles.solo}>
+        <legend className="sr-only">{t("solo.staffTitle")}</legend>
+        {casters.map((member) => (
+          <label key={member.userId} className={styles.check}>
+            <input
+              type="checkbox"
+              checked={member.soloCaster}
+              aria-disabled={pending !== null || undefined}
+              onChange={() =>
+                pending === null &&
+                void act(
+                  `solo:${member.userId}`,
+                  () => call("/api/planning/solo-caster", json("PUT", { solo: !member.soloCaster, userId: member.userId })),
+                  () => t("saved.solo"),
+                )
+              }
+            />
+            {member.pseudo}
+          </label>
+        ))}
+      </fieldset>
+    </Disclosure>
+  );
+}
+
 /** Les désistements d'une entrée, au staff des tournois seul (la route ne les rend qu'à lui). */
 function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView; text: Text; names: ReadonlyMap<number, string> }>) {
   const { t } = text;
@@ -966,7 +1009,6 @@ function StaffPanel({
     setSeenSaved(savedDurations);
     setDurations(resyncDurations(durations, seenSaved, savedDurations));
   }
-  const casters = view.members.filter((member) => member.roles.includes("CASTER"));
   const b = PLANNING_DURATION_BOUNDS;
   const field = (
     id: string,
@@ -1007,30 +1049,6 @@ function StaffPanel({
           {t("staff.confirmLead")}
         </BusyButton>
       </div>
-
-      {casters.length > 0 && (
-        <fieldset className={styles.solo}>
-          <legend className={styles.legend}>{t("solo.staffTitle")}</legend>
-          {casters.map((member) => (
-            <label key={member.userId} className={styles.check}>
-              <input
-                type="checkbox"
-                checked={member.soloCaster}
-                aria-disabled={pending !== null || undefined}
-                onChange={() =>
-                  pending === null &&
-                  void act(
-                    `solo:${member.userId}`,
-                    () => call("/api/planning/solo-caster", json("PUT", { solo: !member.soloCaster, userId: member.userId })),
-                    () => t("saved.solo"),
-                  )
-                }
-              />
-              {member.pseudo}
-            </label>
-          ))}
-        </fieldset>
-      )}
 
       <details className={styles.settings}>
         <summary>{t("settings.title")}</summary>

@@ -36,8 +36,9 @@ s'additionnent.
   (ses propres disponibilités) et `PUT /api/planning/solo-caster` pour soi
   (`CAST_PLANNING.md`). Rôles `ARBITRE`, `CASTER`, `PROD` (et `ADMIN`). Les
   gestes du staff du planning sous `/api/admin/planning/*` : l'attribution
-  manuelle demande `tournaments` en plus ; le **calcul, la confirmation, les
-  durées et le caster autonome d'un autre** (panneau « Calcul et confirmation »)
+  manuelle et le **caster autonome d'un autre** (section « Casters autonomes »,
+  `PUT /api/planning/solo-caster` avec `userId`) demandent `tournaments` en plus ;
+  le **calcul, la confirmation et les durées** (panneau « Calcul et confirmation »)
   sont réservés aux **administrateurs** (`canComputePlanning`, décision
   explicite : **exception** à la règle « jamais `user.isAdmin` pour un domaine
   scopé »). Un non-administrateur reçoit `403 PLANNING_ADMIN_ONLY` et la vue

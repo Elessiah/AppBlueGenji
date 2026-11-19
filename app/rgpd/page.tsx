@@ -1534,8 +1534,8 @@ function RgpdFr({
             plateforme qui organise la production d&apos;un direct) ont une page « Planning » : pour chaque
             créneau (un match planifié, ou un tournoi entier quand ses matchs ne sont pas planifiés) et
             chaque rôle qu&apos;ils tiennent, ils y donnent leur disponibilité (disponible, absent, à voir) et
-            leur préférence ; un caster y dit aussi s&apos;il diffuse seul (« caster autonome »), ce qu&apos;un
-            administrateur peut régler pour lui. Un calcul propose les attributions selon ces réponses et
+            leur préférence ; un caster y dit aussi s&apos;il diffuse seul (« caster autonome »), ce que le staff
+            des tournois peut régler pour lui. Un calcul propose les attributions selon ces réponses et
             la charge de chacun (semaine en cours et {PLANNING_HISTORY_WEEKS} semaines précédentes) ; ses
             propositions restent provisoires jusqu&apos;à leur confirmation, par un administrateur ou d&apos;office par le site ; le staff des tournois peut, lui, désigner ou retirer quelqu&apos;un à la main, une désignation à la main étant ferme d&apos;emblée. Le site garde, avec chaque attribution, qui l&apos;a
             posée et son historique (pose, confirmation, retrait, avec le compte qui a agi par le planning, sans compte quand le site agit de lui-même). Les attributions et

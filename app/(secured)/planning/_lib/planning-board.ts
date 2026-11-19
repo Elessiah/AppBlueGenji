@@ -52,7 +52,7 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
  * l'outil de développement d'un poste partagé n'y lit plus quels comptes ont
  * ouvert le planning.
  */
-export function planningOpenKey(section: "past" | "staff", userId: number): string {
+export function planningOpenKey(section: "past" | "staff" | "solo", userId: number): string {
   let hash = 0x811c9dc5;
   for (const char of `bg-planning:${userId}`) {
     hash ^= char.charCodeAt(0);
