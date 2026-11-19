@@ -385,7 +385,7 @@ export function PlanningBoard({
       {shown.length === 0 && <p className={styles.empty}>{t(view.entries.length === 0 ? "empty" : "filters.empty")}</p>}
 
       {split.past.length > 0 && (
-        <Disclosure title={t("past.title")} count={split.past.length} storageKey="planning:past-open" className={styles.past}>
+        <Disclosure title={t("past.title")} count={split.past.length} storageKey={`planning:past-open:${view.me}`} className={styles.past}>
           {renderWeeks(pastWeeks, "past")}
         </Disclosure>
       )}
@@ -930,7 +930,7 @@ function StaffPanel({
   return (
     <Disclosure
       title={t("staff.title")}
-      storageKey="planning:staff-open"
+      storageKey={`planning:staff-open:${view.me}`}
       keepMounted
       className={styles.staff}
       aside={

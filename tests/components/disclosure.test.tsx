@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 // Environnement Node, sans DOM : les crochets sont rejoués à la main (un état, un effet, un identifiant).
-const harness = { state: [] as unknown[], cursor: 0, effects: [] as (() => void)[] };
+const harness = { state: [] as unknown[], cursor: 0, server: false, subscribed: [] as (() => void)[] };
 jest.mock("react", () => {
   const actual = jest.requireActual<typeof import("react")>("react");
   return {
@@ -12,8 +12,9 @@ jest.mock("react", () => {
       if (!(index in harness.state)) harness.state[index] = initial;
       return [harness.state[index], (next: unknown) => (harness.state[index] = next)];
     },
-    useEffect: (effect: () => void) => {
-      harness.effects.push(effect);
+    useSyncExternalStore: (subscribe: (onChange: () => void) => () => void, snapshot: () => unknown, serverSnapshot: () => unknown) => {
+      harness.subscribed.push(subscribe(() => undefined));
+      return harness.server ? serverSnapshot() : snapshot();
     },
   };
 });
@@ -27,7 +28,7 @@ type Node = ReactElement<{ children?: ReactNode; [key: string]: unknown }>;
 
 function render(props: Props): Node {
   harness.cursor = 0;
-  harness.effects = [];
+  harness.subscribed = [];
   return Disclosure(props) as unknown as Node;
 }
 
@@ -57,6 +58,7 @@ const saved = globals.localStorage;
 
 beforeEach(() => {
   harness.state = [];
+  harness.server = false;
 });
 afterEach(() => {
   globals.localStorage = saved;
@@ -111,26 +113,66 @@ describe("Disclosure", () => {
     expect(html).toContain("(12)");
   });
 
-  it("Disclosure_levelThree_usesH3", () => {
-    expect(renderToStaticMarkup(<Disclosure {...base} level={3} />)).toContain("<h3");
+  it("Disclosure_always_titleIsAnH2WithTheButtonInside", () => {
+    expect(renderToStaticMarkup(<Disclosure {...base} />)).toMatch(/<h2[^>]*><button/);
   });
 
-  it("Disclosure_storedOne_opensAfterMount", () => {
-    globals.localStorage = { getItem: jest.fn(() => "1"), setItem: jest.fn() };
-    render({ ...base, storageKey: "k" });
+  it("Disclosure_withAside_flagsRootForHeadingWidth", () => {
+    expect(renderToStaticMarkup(<Disclosure {...base} aside={<i />} />)).toContain("data-aside");
+    expect(renderToStaticMarkup(<Disclosure {...base} />)).not.toContain("data-aside");
+  });
 
-    harness.effects.forEach((effect) => effect());
+  it("Disclosure_storedOne_opensOnFirstRender", () => {
+    globals.localStorage = { getItem: jest.fn(() => "1"), setItem: jest.fn() };
 
     expect(toggleOf(render({ ...base, storageKey: "k" })).props["aria-expanded"]).toBe(true);
   });
 
+  it("Disclosure_storedOneOnServer_rendersDefaultToKeepHydrationEqual", () => {
+    globals.localStorage = { getItem: jest.fn(() => "1"), setItem: jest.fn() };
+    harness.server = true;
+
+    expect(toggleOf(render({ ...base, storageKey: "k" })).props["aria-expanded"]).toBe(false);
+  });
+
   it("Disclosure_storedZeroOverDefaultOpen_staysCollapsed", () => {
     globals.localStorage = { getItem: jest.fn(() => "0"), setItem: jest.fn() };
-    render({ ...base, defaultOpen: true, storageKey: "k" });
-
-    harness.effects.forEach((effect) => effect());
 
     expect(toggleOf(render({ ...base, defaultOpen: true, storageKey: "k" })).props["aria-expanded"]).toBe(false);
+  });
+
+  it("Disclosure_noStorageKey_neverReadsStorage", () => {
+    const getItem = jest.fn(() => "1");
+    globals.localStorage = { getItem, setItem: jest.fn() };
+
+    expect(toggleOf(render(base)).props["aria-expanded"]).toBe(false);
+    expect(getItem).not.toHaveBeenCalled();
+  });
+
+  it("Disclosure_visitChoice_beatsStoredValue", () => {
+    globals.localStorage = { getItem: jest.fn(() => "1"), setItem: jest.fn() };
+    click(render({ ...base, storageKey: "k" }));
+
+    expect(toggleOf(render({ ...base, storageKey: "k" })).props["aria-expanded"]).toBe(false);
+  });
+
+  it("Disclosure_subscribe_listensToStorageEventsAndUnsubscribes", () => {
+    const add = jest.fn();
+    const remove = jest.fn();
+    const target = globalThis as unknown as { addEventListener?: unknown; removeEventListener?: unknown };
+    const saved = { add: target.addEventListener, remove: target.removeEventListener };
+    target.addEventListener = add;
+    target.removeEventListener = remove;
+    try {
+      render({ ...base, storageKey: "k" });
+      harness.subscribed.forEach((unsubscribe) => unsubscribe());
+    } finally {
+      target.addEventListener = saved.add;
+      target.removeEventListener = saved.remove;
+    }
+
+    expect(add).toHaveBeenCalledWith("storage", expect.any(Function));
+    expect(remove).toHaveBeenCalledWith("storage", add.mock.calls[0]?.[1]);
   });
 
   it("Disclosure_toggleWithStorage_writesChoice", () => {
@@ -147,9 +189,8 @@ describe("Disclosure", () => {
       throw new Error("blocked");
     };
     globals.localStorage = { getItem: failing, setItem: failing };
-    render({ ...base, storageKey: "k" });
 
-    expect(() => harness.effects.forEach((effect) => effect())).not.toThrow();
+    expect(toggleOf(render({ ...base, storageKey: "k" })).props["aria-expanded"]).toBe(false);
     click(render({ ...base, storageKey: "k" }));
 
     expect(toggleOf(render({ ...base, storageKey: "k" })).props["aria-expanded"]).toBe(true);

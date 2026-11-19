@@ -77,8 +77,8 @@ la requête : une requête mal formée n'use pas ce quota). Le refus `429`
   dans la liste à venir, avec ses actions. Elles sont rangées sous un bouton
   « Matchs passés (N) » (`Disclosure`, `DISCLOSURE.md`), **replié par
   défaut**, la semaine la plus récente en tête (`newestFirst`). Le choix du lecteur est gardé
-  dans son navigateur (`localStorage`, `try/catch` : sans stockage, l'état par
-  défaut vaut).
+  sur son appareil, par compte (`planning:past-open:<id>`, `localStorage`,
+  `try/catch` : sans stockage, l'état par défaut vaut).
 - **Calcul et confirmation** (staff) : même bouton repliable, **replié par
   défaut** ; le contenu reste monté (les durées en cours de saisie ne se
   perdent pas au repli).

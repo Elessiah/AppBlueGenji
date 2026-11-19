@@ -289,6 +289,7 @@
 }
 
 .staff {
+  --disclosure-body-gap: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;

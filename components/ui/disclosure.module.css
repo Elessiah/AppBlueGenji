@@ -14,7 +14,7 @@
 
 /* L'en-tête est la rangée d'un « i » (`InfoHintRow`) : le titre lui laisse sa
    place, l'explication passe dessous sur toute la largeur. */
-.head > :first-child {
+.root[data-aside] .head > :first-child {
   max-inline-size: calc(100% - 30px);
 }
 
@@ -38,8 +38,14 @@
   cursor: pointer;
 }
 
-.toggle:hover {
-  background: rgba(var(--blue-500-rgb), 0.08);
+@media (hover: hover) {
+  .toggle:hover {
+    background: rgba(var(--blue-500-rgb), 0.08);
+  }
+}
+
+.toggle:active {
+  background: rgba(var(--blue-500-rgb), 0.16);
 }
 
 .toggle:focus-visible {
@@ -65,7 +71,7 @@
 .body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--disclosure-body-gap, 16px);
 }
 
 .body[hidden] {
@@ -75,5 +81,21 @@
 @media (prefers-reduced-motion: reduce) {
   .caret {
     transition: none;
+  }
+}
+
+/* Contraste forcé : le fond translucide disparaît, le cadre et le focus suivent le système. */
+@media (forced-colors: active) {
+  .toggle:focus-visible {
+    outline-color: Highlight;
+  }
+
+  .toggle:hover,
+  .toggle:active {
+    outline: 1px solid ButtonText;
+  }
+
+  .caret {
+    color: ButtonText;
   }
 }
