@@ -2,9 +2,11 @@ import { describe, expect, it } from "@jest/globals";
 import {
   firstTargetOverMax,
   focusIndexAfterRemoval,
+  mapRulesPayload,
   sameRoundKeys,
   storedRoundsSignature,
   slotOverMax,
+  slotState,
   vanishedRoundFallback,
 } from "@/app/(secured)/tournois/[id]/_lib/round-maps-editor";
 
@@ -123,5 +125,27 @@ describe("storedRoundsSignature", () => {
 
   it("storedRoundsSignature_otherRoundAdded_signatureChanges", () => {
     expect(storedRoundsSignature([...stored([["a"]]), { ...R2, slots: [["x"]] }])).not.toBe(storedRoundsSignature(stored([["a"]])));
+  });
+});
+
+describe("slotState", () => {
+  it("slotState_noMap_isEmpty", () => {
+    expect(slotState(0)).toBe("empty");
+  });
+
+  it("slotState_oneMap_isImposed", () => {
+    expect(slotState(1)).toBe("imposed");
+  });
+
+  it("slotState_twoMaps_isPool", () => {
+    expect(slotState(2)).toBe("pool");
+  });
+});
+
+describe("mapRulesPayload", () => {
+  it("mapRulesPayload_draftDiffersFromSaved_sendsDraftBansAndSavedNextPick", () => {
+    const payload = mapRulesPayload({ firstBan: "HOST", nextBan: "WINNER" }, { nextPick: "FREE" });
+
+    expect(payload).toEqual({ firstBan: "HOST", nextBan: "WINNER", nextPick: "FREE" });
   });
 });

@@ -65,6 +65,7 @@
     "removeMap": "Remove {map} from map {number}",
     "chooseMaps": "Choose the maps",
     "hideMaps": "Hide the list",
+    "mapListLabel": "Map list, slot {number}",
     "searchLabel": "Search for a map",
     "searchPlaceholder": "E.g. Ilios",
     "noResult": "No map in the list matches.",

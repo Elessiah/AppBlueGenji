@@ -398,3 +398,33 @@ score, câblage), `tests/lib/shared/round-maps-tiebreak-plan.test.ts`,
   map de départage inactive rend le focus à la ligne voisine, ou à « Fermer ».
 - Deux fermetures d'écran simultanées sont chaînées côté serveur (`flushRoundMapsNotice`)
   : la seconde attend le verdict de la première au lieu d'être écartée par le plafond.
+
+## Fenêtre allégée (balisage)
+
+Même comportement, présentation refaite : chaque section (règles de ban, cartes d'un tour,
+map de départage, points) est une carte à filet glacier dont la légende est une étiquette.
+
+- **Règles de ban** : deux groupes de **segments radio** (`BanRuleSegments`, classes globales
+  `.radio-segments`) — `<fieldset>`/`<legend>` nomment le groupe, les flèches passent d'une
+  règle à l'autre (natif), l'état se dit par la radio cochée et le contour glacier. Charge
+  utile inchangée (`PUT …/map-rules` : `firstBan`, `nextBan`, `nextPick` en place,
+  `mapRulesPayload`). Pendant l'envoi, les radios sont figées (`aria-disabled` ; flèches,
+  Espace et clic annulés, `movesRadioChoice` : la radio cochée ne bouge pas un instant) ;
+  Entrée sur une radio **n'enregistre pas** (`blocksImplicitSubmit`, comme l'ancienne liste) —
+  seul « Enregistrer les règles » envoie.
+- **Carte du tour** : en-tête (numéro, titre, état en texte — « À compléter » / « Imposée » /
+  « Pool · N cartes », `slotState` de `_lib/round-maps-editor.ts` — et ✕), pastilles, puis
+  « Choisir les cartes » avec son refus à côté (`FieldErrorText`). Le liseré `data-state`
+  change de motif : pointillés (vide), trait cyan (imposée), double trait glacier (pool).
+- **Liste d'Overwatch** : `ScrollArea` verticale nommée (`dialog.mapListLabel`, FR + EN) de
+  pastilles à cocher (anneau de focus : celui de la case, `globals.css`). À 480 px et moins,
+  la zone perd son cadre mais garde un filet haut et bas : on la voit coupée, donc défilante.
+- **Légendes** : texte seul — une `InfoHint` (des `div`) n'entre jamais dans un `<legend>` ;
+  quand le titre porte une aide, légende `sr-only` et titre visible + « i » dans la rangée
+  suivante (cartes de départage périmées, points par map).
+- **Boutons** compacts : `.btn.compact` (globals.css, 32 px, 44 px au toucher). Saisie libre,
+  copie et barre d'enregistrement du tour sont séparées par un filet.
+
+Tests : `tests/tournois/round-maps-dialog-markup.test.ts` (balisage),
+`tests/tournois/ban-rule-segments.test.tsx` (gestes des segments : choix, envoi en cours,
+Entrée), `tests/tournois/round-maps-editor-guards.test.ts` (`slotState`, `mapRulesPayload`).

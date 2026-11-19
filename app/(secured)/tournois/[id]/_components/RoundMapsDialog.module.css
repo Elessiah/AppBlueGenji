@@ -11,21 +11,42 @@
   font-size: 16px;
 }
 
+/* Une section = une carte discrète : filet glacier, fond à peine éclairci. */
 .section {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  margin: 0 0 16px;
-  padding: 0;
-  border: 0;
+  margin: 0 0 12px;
+  padding: 14px;
+  border: 1px solid rgba(90, 200, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(90, 200, 255, 0.025);
 }
 
 .legend {
-  margin: 0 0 4px;
-  padding: 0;
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 600;
-  color: var(--ink);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+}
+
+/* Bouton icône (retirer une carte) : carré, la cible tactile remonte à 44 px. Taille compacte : `.btn.compact` (globals.css). */
+.slotHead button.iconButton {
+  min-width: 32px;
+  padding: 4px 8px;
+}
+
+@media (pointer: coarse) {
+  .slotHead button.iconButton {
+    min-width: 44px;
+  }
 }
 
 .slots {
@@ -40,9 +61,25 @@
   display: grid;
   gap: 8px;
   min-width: 0;
-  padding: 10px;
+  padding: 8px 10px;
   border: 1px solid rgba(90, 200, 255, 0.18);
+  border-left: 3px solid rgba(90, 200, 255, 0.3);
   border-radius: 8px;
+  background: rgba(6, 8, 12, 0.35);
+}
+
+/* État d'une carte, dit d'abord par le texte de la pastille ; le liseré change aussi de motif :
+   imposée = trait plein cyan, pool = double trait glacier, à compléter = pointillés. */
+.slot[data-state="pool"] {
+  border-left: 4px double var(--blue-500);
+}
+
+.slot[data-state="imposed"] {
+  border-left-color: var(--cyan-400);
+}
+
+.slot[data-state="empty"] {
+  border-left-style: dashed;
 }
 
 .slotHead {
@@ -53,10 +90,22 @@
 }
 
 .slotTitle {
-  flex: 1 1 auto;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
+}
+
+/* Bouton de la liste et son refus, sous les pastilles. */
+.slotFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+/* Le bouton de retrait se range à droite du titre de la carte. */
+button.slotRemove {
+  margin-left: auto;
 }
 
 .chips {
@@ -116,31 +165,53 @@
 .modeLegend {
   margin: 0 0 6px;
   padding: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+}
+
+/* La liste d'Overwatch défile dans sa propre zone : la fenêtre ne s'allonge pas de quarante cartes. */
+.mapList {
+  display: grid;
+  gap: 10px;
+  max-height: max(180px, min(280px, 40dvh));
+  padding: 8px;
+  border: 1px solid rgba(90, 200, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(6, 8, 12, 0.4);
 }
 
 .options {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 4px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
+/* Une carte = une pastille à cocher ; retenue : contour et fond bleu glacier en plus de la case cochée. */
 .option {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 28px;
-  font-size: 13px;
+  gap: 6px;
+  min-height: 30px;
+  padding: 3px 12px 3px 8px;
+  border: 1px solid rgba(90, 200, 255, 0.2);
+  border-radius: 999px;
+  font-size: 12px;
   color: var(--ink);
   cursor: pointer;
 }
 
-/* Au toucher, une case de 28 px serrée à 4 px de la suivante se rate : 44 px de cible (WCAG 2.5.5). */
+.option:has(input:checked) {
+  border-color: rgba(90, 200, 255, 0.7);
+  background: rgba(90, 200, 255, 0.14);
+}
+
+/* Au toucher, des pastilles de 30 px serrées à 6 px se ratent : 44 px de cible (WCAG 2.5.5). */
 @media (pointer: coarse) {
   .options {
-    gap: 8px 12px;
+    gap: 8px;
   }
 
   .option {
@@ -172,6 +243,14 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px;
+}
+
+/* Filet de séparation : barre d'enregistrement de chaque section, et saisie libre quand elle suit la liste.
+   La copie vers d'autres tours se range sous la barre, sans second filet. */
+.customRow:not(:first-child),
+.actionsBar {
+  padding-top: 12px;
+  border-top: 1px solid rgba(90, 200, 255, 0.12);
 }
 
 .grow {
@@ -229,12 +308,6 @@
 
 /* `<legend>` : bloc simple, la disposition en ligne vit dans un `<span>` (le flex
    d'une légende n'est pas honoré partout). */
-.pointMapsLegend {
-  display: block;
-  padding: 0;
-  margin-bottom: 8px;
-}
-
 .pointMapsTitle {
   font-size: 13px;
   font-weight: 600;
@@ -253,4 +326,25 @@
 .pointMap {
   gap: 4px;
   min-width: 0;
+}
+
+/* 375 px : les cartes de section rendent leur marge intérieure au contenu. */
+@media (max-width: 480px) {
+  .section {
+    padding: 12px 10px;
+  }
+
+  /* Moins de boîtes imbriquées : la liste rend son cadre et son rembourrage aux pastilles,
+     mais garde un filet haut et bas : la zone coupée à sa hauteur maximale se voit défiler. */
+  .mapList {
+    padding: 6px 0;
+    border: 0;
+    border-block: 1px solid rgba(90, 200, 255, 0.14);
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .slot {
+    padding: 8px;
+  }
 }

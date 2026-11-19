@@ -111,6 +111,8 @@ Primitives dans `components/cyber/` :
 
 Classes utilitaires : `.eyebrow`, `.display`, `.mono`, `.logotype`, `.num`, `.fabric`, `.card-ticks`, `.section-head`, `.scroll-subtle`
 
+Contrôles denses (fenêtres de réglage) : `.btn.compact` (bouton 32 px, 44 px au toucher) et les **segments radio** `.radio-segments-group` / `.radio-segments-legend` / `.radio-segments` / `.radio-segment` (un vrai `<input type="radio">` par pastille, choix dit par la radio cochée et le contour glacier, 44 px au toucher) — à réutiliser plutôt qu'une nouvelle copie locale (premier usage : `BanRuleSegments`, `ROUND_MAPS.md`).
+
 ### Typographie
 - **Sans-serif** : Inter (`var(--font-sans)`)
 - **Monospace** : JetBrains Mono (`var(--font-mono)`)

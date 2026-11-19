@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,7 +16,9 @@ import { BusyButton } from "@/components/ui/busy-button";
 import { useToast } from "@/components/ui/toast";
 import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { FieldErrorText } from "@/components/ui/field-error-text";
-import { InfoHint } from "@/components/ui/info-hint";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { ScrollArea } from "@/components/cyber/ScrollArea";
+import { BanRuleSegments } from "./BanRuleSegments";
 import { NumberInput } from "@/components/ui/number-input";
 import {
   clipMapPointTargets,
@@ -69,6 +72,9 @@ import {
   slotGap,
   slotHasMap,
   slotOverMax,
+  slotState,
+  type SlotState,
+  mapRulesPayload,
   slotsDirty,
   slotsToEdit,
   slotsToSave,
@@ -235,49 +241,54 @@ function MapPicker({
   useEffect(() => {
     document.getElementById(`${ids}-${overwatch ? "search" : "custom"}`)?.focus();
   }, [ids, overwatch]);
+  // Rappel stable (dernier `onEdit` lu par référence) : seule la case dont l'état
+  // change se redessine, pas les quarante de la liste.
+  // Mis à jour après le rendu validé (jamais pendant le rendu : un rendu abandonné
+  // ne doit pas y laisser un `onEdit` qui n'a jamais été affiché).
+  const latestEdit = useRef(onEdit);
+  useLayoutEffect(() => {
+    latestEdit.current = onEdit;
+  }, [onEdit]);
+  const toggleMap = useCallback((map: string) => {
+    latestEdit.current((current) => toggleMapInSlot(current, map));
+  }, []);
   const addCustom = () => {
     if (onEdit((current) => addMapToSlot(current, custom))) setCustom("");
   };
   // Posé sur chaque champ, pas sur le conteneur : un `div` muni d'un gestionnaire
   // clavier passe pour un faux contrôle (Sonar S6848).
-  const blockSubmit = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+  const blockSubmit = useCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (blocksImplicitSubmit(event.key, event.currentTarget.type)) event.preventDefault();
-  };
+  }, []);
   return (
     <div className={styles.picker}>
       {overwatch && (
         <>
-          <div className="field">
-            <label htmlFor={`${ids}-search`}>{t("dialog.searchLabel")}</label>
-            <input
-              id={`${ids}-search`}
-              type="search"
-              value={query}
-              placeholder={t("dialog.searchPlaceholder")}
-              maxLength={FIRST_MAP_MAX_LENGTH}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={blockSubmit}
-            />
-          </div>
+        <div className="field">
+          <label htmlFor={`${ids}-search`}>{t("dialog.searchLabel")}</label>
+          <input
+            id={`${ids}-search`}
+            type="search"
+            value={query}
+            placeholder={t("dialog.searchPlaceholder")}
+            maxLength={FIRST_MAP_MAX_LENGTH}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={blockSubmit}
+          />
+        </div>
+        <ScrollArea orientation="y" ariaLabel={t("dialog.mapListLabel", { number })} className={styles.mapList}>
           {groups.length === 0 && <p className={styles.muted}>{t("dialog.noResult")}</p>}
           {groups.map((group) => (
             <fieldset key={group.mode} className={styles.mode}>
               <legend className={styles.modeLegend}>{t(`dialog.modes.${group.mode}`)}</legend>
               <div className={styles.options} data-tap-zone>
                 {group.maps.map((map) => (
-                  <label key={map} className={styles.option}>
-                    <input
-                      type="checkbox"
-                      checked={slotHasMap(slot, map)}
-                      onChange={() => onEdit((current) => toggleMapInSlot(current, map))}
-                      onKeyDown={blockSubmit}
-                    />
-                    <span>{map}</span>
-                  </label>
+                  <MapOption key={map} map={map} checked={slotHasMap(slot, map)} onToggle={toggleMap} onKeyDown={blockSubmit} />
                 ))}
               </div>
             </fieldset>
           ))}
+        </ScrollArea>
         </>
       )}
       <div className={styles.customRow}>
@@ -296,13 +307,48 @@ function MapPicker({
             }}
           />
         </div>
-        <button type="button" className="btn ghost" aria-label={t("dialog.customAddLabel", { number })} onClick={addCustom}>
+        <button
+          type="button"
+          className="btn ghost compact"
+          aria-label={t("dialog.customAddLabel", { number })}
+          onClick={addCustom}
+        >
           {t("dialog.customAdd")}
         </button>
       </div>
     </div>
   );
 }
+
+/** Une case de la liste des cartes d'Overwatch : mémoïsée, elle ne se redessine que si son état change. */
+const MapOption = memo(function MapOption({
+  map,
+  checked,
+  onToggle,
+  onKeyDown,
+}: Readonly<{
+  map: string;
+  checked: boolean;
+  onToggle: (map: string) => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
+}>) {
+  return (
+    <label className={styles.option}>
+      <input type="checkbox" checked={checked} onChange={() => onToggle(map)} onKeyDown={onKeyDown} />
+      <span>{map}</span>
+    </label>
+  );
+});
+
+/** Texte de la pastille d'état d'une carte du tour. */
+function slotStateText(state: SlotState, count: number, t: ReturnType<typeof useRoundMapsText>["t"]): string {
+  if (state === "empty") return t("dialog.slotEmpty");
+  if (state === "imposed") return t("dialog.slotImposed");
+  return t("dialog.slotPool", { count });
+}
+
+/** Texte et pastille de chaque état d'une carte du tour (`slotState`). */
+const SLOT_STATE_PILL = { empty: "pill-neutral", imposed: "pill-info", pool: "pill-info" } as const satisfies Record<SlotState, string>;
 
 /** Une carte (créneau) du tour : sa nature, ses cartes retenues, l'ouverture de la liste. */
 function SlotEditor({
@@ -352,19 +398,18 @@ function SlotEditor({
     const next = focusIndexAfterRemoval(removed, slot.length);
     document.getElementById(next === null ? toggleId : `${chipsId}-${next}`)?.focus();
   }, [slot, chipsId, toggleId]);
-  let kind = t("dialog.slotEmpty");
-  if (slot.length === 1) kind = t("dialog.slotImposed");
-  else if (slot.length > 1) kind = t("dialog.slotPool", { count: slot.length });
+  const state = slotState(slot.length);
+  const kind = slotStateText(state, slot.length, t);
   return (
-    <li className={styles.slot}>
+    <li className={styles.slot} data-state={state}>
       <div className={styles.slotHead}>
         <span className={styles.slotTitle}>{t("dialog.slot", { number })}</span>
-        <span className={`pill ${slot.length === 0 ? "pill-neutral" : "pill-info"}`}>{kind}</span>
+        <span className={`pill ${SLOT_STATE_PILL[state]}`}>{kind}</span>
         {removable && (
           <BusyButton
             busy={busy}
             type="button"
-            className="btn ghost"
+            className={`btn ghost compact ${styles.iconButton} ${styles.slotRemove}`}
             aria-label={t("dialog.removeSlot", { number })}
             onClick={() => {
               if (!isBusy()) onRemoveSlot();
@@ -395,11 +440,13 @@ function SlotEditor({
           ))}
         </ul>
       )}
-      <div>
+      {/* Le bouton de la liste et son refus, côte à côte : un refus sur ce créneau se lit à côté du
+          contrôle qu'il désigne, et l'ordre de tabulation suit l'écran (pastilles, puis la liste). */}
+      <div className={styles.slotFoot}>
         <button
           type="button"
           id={toggleId}
-          className="btn ghost"
+          className="btn ghost compact"
           aria-expanded={open}
           aria-controls={pickerId}
           {...errorAria}
@@ -551,7 +598,7 @@ function TiebreakForm({
           </output>
           {overwatch && <MapNamesDatalist id={listId} />}
         </div>
-        <div className={styles.actions}>
+        <div className={`${styles.actions} ${styles.actionsBar}`}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
           {/* Toujours monté : après un retrait réussi il n'y a plus rien à retirer, mais un
               bouton démonté laisserait tomber le focus sur le <body> (WCAG 2.4.3). */}
@@ -559,7 +606,7 @@ function TiebreakForm({
             busy={busy}
             blocked={saved === null}
             type="button"
-            className="btn ghost"
+            className="btn ghost compact"
             onClick={() => {
               if (isBusy() || saved === null) return;
               // Le champ suit le serveur tout seul s'il n'a pas été modifié ; un texte en cours de saisie reste.
@@ -568,7 +615,7 @@ function TiebreakForm({
           >
             {t("dialog.tiebreakRemove")}
           </BusyButton>
-          <BusyButton busy={busy} blocked={!dirty || !allowed} type="submit" className="btn ghost">
+          <BusyButton busy={busy} blocked={!dirty || !allowed} type="submit" className="btn compact">
             {t("dialog.tiebreakSave")}
           </BusyButton>
         </div>
@@ -806,14 +853,16 @@ function RoundPointsForm({
             un champ désactivé sous le focus le renverrait sur la page. */}
         {rows > 0 && (
           <fieldset className={styles.pointMaps} disabled={locked}>
-            <legend className={styles.pointMapsLegend}>
-              <span className={styles.labelRow}>
-                <span className={styles.pointMapsTitle}>{t("dialog.pointsPerMapTitle")}</span>
-                <InfoHint id={`${ids}-points-maps-hint`} subject={t("dialog.pointsPerMapTitle")}>
-                  {t("dialog.pointsPerMapHint")}
-                </InfoHint>
+            {/* Légende en texte seul ; l'aide (des `div`) hors légende. */}
+            <legend className="sr-only">{t("dialog.pointsPerMapTitle")}</legend>
+            <div className={styles.labelRow}>
+              <span className={styles.pointMapsTitle} aria-hidden="true">
+                {t("dialog.pointsPerMapTitle")}
               </span>
-            </legend>
+              <InfoHint id={`${ids}-points-maps-hint`} subject={t("dialog.pointsPerMapTitle")}>
+                {t("dialog.pointsPerMapHint")}
+              </InfoHint>
+            </div>
             <ol className={styles.pointMapList}>
               {shownDrafts.map((draft, index) => (
                 <MapPointRow
@@ -833,13 +882,13 @@ function RoundPointsForm({
             </ol>
           </fieldset>
         )}
-        <div className={styles.actions}>
+        <div className={`${styles.actions} ${styles.actionsBar}`}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
           <BusyButton
             busy={busy}
             blocked={locked || !hasOwn}
             type="button"
-            className="btn ghost"
+            className="btn ghost compact"
             onClick={() => {
               if (isBusy() || locked || !hasOwn) return;
               void send(null, [], t("dialog.pointsRemoved"));
@@ -847,7 +896,7 @@ function RoundPointsForm({
           >
             {t("dialog.pointsRemove")}
           </BusyButton>
-          <BusyButton busy={busy} blocked={locked || !dirty} type="submit" className="btn ghost">
+          <BusyButton busy={busy} blocked={locked || !dirty} type="submit" className="btn compact">
             {t("dialog.pointsSave")}
           </BusyButton>
         </div>
@@ -914,15 +963,18 @@ function StaleTiebreaks({
   }, [items, ids, fallbackFocusId]);
   if (items.length === 0) return null;
   return (
-    <fieldset className={styles.section} aria-labelledby={`${ids}-title`}>
-      <div className={styles.labelRow}>
-        <span id={`${ids}-title`} className={styles.legend}>
+    <fieldset className={styles.section}>
+      {/* Légende en texte seul (nom du groupe) ; l'aide (des `div`) hors légende, qui
+          n'admet que du texte courant. */}
+      <legend className="sr-only">{t("dialog.staleTiebreakTitle")}</legend>
+      <InfoHintRow>
+        <span className={styles.legend} aria-hidden="true">
           {t("dialog.staleTiebreakTitle")}
         </span>
         <InfoHint id={`${ids}-hint`} subject={t("dialog.staleTiebreakTitle")}>
           {t("dialog.staleTiebreakHint")}
         </InfoHint>
-      </div>
+      </InfoHintRow>
       <ul className={styles.stale}>
         {items.map((item, index) => {
           const label = roundLabel(item);
@@ -933,7 +985,7 @@ function StaleTiebreaks({
                 busy={busy}
                 type="button"
                 id={`${ids}-${index}`}
-                className="btn ghost"
+                className="btn ghost compact"
                 aria-label={t("dialog.staleTiebreakRemoveLabel", { round: label })}
                 onClick={() => {
                   if (isBusy()) return;
@@ -1167,7 +1219,7 @@ export function RoundMapsDialog({
     if (isBusy() || !rulesDirty) return;
     void run(async () => {
       // La règle « carte suivante » n'est plus proposée (`NextPickRule`) : la valeur en place est renvoyée telle quelle.
-      await putJson(`/api/admin/tournaments/${tournamentId}/map-rules`, { firstBan, nextBan, nextPick: rules.nextPick });
+      await putJson(`/api/admin/tournaments/${tournamentId}/map-rules`, mapRulesPayload({ firstBan, nextBan }, rules));
       showSuccess(t("dialog.rulesSaved"));
     });
   };
@@ -1348,29 +1400,29 @@ export function RoundMapsDialog({
         <form onSubmit={saveRules} aria-busy={busy}>
           <fieldset className={styles.section}>
             <legend className={styles.legend}>{t("dialog.rulesTitle")}</legend>
-            <div className="field">
-              <label htmlFor={`${ids}-first`}>{t("dialog.firstBan")}</label>
-              <select id={`${ids}-first`} value={firstBan} onChange={(event) => setFirstBan(event.target.value as FirstBanRule)}>
-                {FIRST_BAN_RULES.map((rule) => (
-                  <option key={rule} value={rule}>
-                    {t(`dialog.firstBanOptions.${rule}`)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor={`${ids}-next`}>{t("dialog.nextBan")}</label>
-              <select id={`${ids}-next`} value={nextBan} onChange={(event) => setNextBan(event.target.value as NextBanRule)}>
-                {NEXT_BAN_RULES.map((rule) => (
-                  <option key={rule} value={rule}>
-                    {t(`dialog.nextBanOptions.${rule}`)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.actions}>
+            <BanRuleSegments
+              legend={t("dialog.firstBan")}
+              name={`${ids}-first`}
+              rules={FIRST_BAN_RULES}
+              value={firstBan}
+              busy={busy}
+              isBusy={isBusy}
+              labelOf={(rule) => t(`dialog.firstBanOptions.${rule}`)}
+              onChange={setFirstBan}
+            />
+            <BanRuleSegments
+              legend={t("dialog.nextBan")}
+              name={`${ids}-next`}
+              rules={NEXT_BAN_RULES}
+              value={nextBan}
+              busy={busy}
+              isBusy={isBusy}
+              labelOf={(rule) => t(`dialog.nextBanOptions.${rule}`)}
+              onChange={setNextBan}
+            />
+            <div className={`${styles.actions} ${styles.actionsBar}`}>
               <UnsavedNote dirty={rulesDirty} text={t("dialog.unsaved")} />
-              <BusyButton busy={busy} blocked={!rulesDirty} type="submit" className="btn ghost">
+              <BusyButton busy={busy} blocked={!rulesDirty} type="submit" className="btn compact">
                 {t("dialog.saveRules")}
               </BusyButton>
             </div>
@@ -1444,7 +1496,7 @@ export function RoundMapsDialog({
                   <BusyButton
                     busy={busy}
                     type="button"
-                    className="btn ghost"
+                    className="btn ghost compact"
                     onClick={() => {
                       if (isBusy()) return;
                       setSlots((current) => [...current, []]);
@@ -1457,7 +1509,7 @@ export function RoundMapsDialog({
               ) : (
                 <p className={styles.muted}>{t("dialog.slotsLimit", { max: slotCap })}</p>
               )}
-              <div className={styles.actions}>
+              <div className={`${styles.actions} ${styles.actionsBar}`}>
                 <UnsavedNote dirty={roundDirty} text={t("dialog.unsaved")} />
                 {/* Toujours monté : après une réinitialisation il n'y a plus rien à réinitialiser, mais un
                     bouton démonté laisserait tomber le focus sur le <body> (WCAG 2.4.3). */}
@@ -1465,14 +1517,14 @@ export function RoundMapsDialog({
                   busy={busy}
                   blocked={!saved}
                   type="button"
-                  className="btn ghost"
+                  className="btn ghost compact"
                   onClick={() => {
                     if (!isBusy() && saved) setPending({ kind: "reset" });
                   }}
                 >
                   {t("dialog.clearRound")}
                 </BusyButton>
-                <BusyButton busy={busy} blocked={!roundDirty} type="submit" className="btn">
+                <BusyButton busy={busy} blocked={!roundDirty} type="submit" className="btn compact">
                   {t("dialog.saveRound")}
                 </BusyButton>
               </div>
@@ -1501,7 +1553,7 @@ export function RoundMapsDialog({
                     busy={busy}
                     blocked={copyTarget === "" || toSave.length === 0}
                     type="button"
-                    className="btn ghost"
+                    className="btn ghost compact"
                     onClick={copy}
                   >
                     {t("dialog.copy")}
@@ -1510,7 +1562,7 @@ export function RoundMapsDialog({
                     busy={busy}
                     blocked={toSave.length === 0}
                     type="button"
-                    className="btn ghost"
+                    className="btn ghost compact"
                     id={`${ids}-apply-all`}
                     {...fieldErrors.aria("applyAll")}
                     onClick={applyAll}
@@ -1573,7 +1625,7 @@ export function RoundMapsDialog({
             busy={busy}
             id={`${ids}-close`}
             type="button"
-            className="btn ghost"
+            className="btn ghost compact"
             onClick={() => {
               if (!isBusy()) requestClose();
             }}
