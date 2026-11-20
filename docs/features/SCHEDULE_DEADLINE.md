@@ -205,7 +205,7 @@ préavis d'un match). Sans date butoir (tournoi entier) : `début − L`.
 - Match lointain : confirmé à la date butoir, avec tout ce qui est posé d'ici
   là.
 
-`sweepAutoConfirms`, chaque minute (`startPlanningAutoConfirmClock`), verrou
+`sweepAutoConfirms`, chaque minute (`startPlanningAutoConfirmClock`, arrêtable par `stopPlanningAutoConfirmClock` ; une suite qui appelle `register()` d'`instrumentation.ts` double les horloges avec `mockPlanningClocks`, `tests/helpers/instrumentation-clocks.ts`), verrou
 nommé **`bg_planning_confirms`** : entrées échues groupées par semaine du
 planning ; pour chacune, `runAutoAssign(null, semaine)` refait les
 propositions **provisoires** autour de ce qui est confirmé, puis

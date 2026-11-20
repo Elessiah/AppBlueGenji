@@ -6,6 +6,7 @@ jest.mock("@/lib/server/named-lock", () =>
 );
 jest.mock("@/lib/server/tournaments/transaction");
 
+import { mockPlanningClocks } from "../../helpers/instrumentation-clocks";
 import {
   getAudienceStats,
   maintainAudience,
@@ -164,6 +165,7 @@ describe("instrumentation", () => {
     // commun ne doit pas garder les doubles du test précédent.
     jest.resetModules();
     jest.isolateModules(() => {
+      mockPlanningClocks();
       jest.doMock("@/lib/server/bot-log-shutdown", () => ({ installBotLogShutdownFlush: botLog }));
       jest.doMock("@/lib/server/audience-service", () => ({ startAudienceMaintenanceClock: clock }));
       loaded.push(jest.requireActual<InstrumentationModule>("@/instrumentation"));

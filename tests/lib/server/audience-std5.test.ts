@@ -8,6 +8,7 @@ jest.mock("@/lib/server/named-lock", () => ({
 }));
 jest.mock("@/lib/server/tournaments/transaction");
 
+import { mockPlanningClocks } from "../../helpers/instrumentation-clocks";
 import { AUDIENCE_ROLLUP_LOCK_NAME, audienceVisitorKey, openAudienceViews, resetAudienceState, rollUpAudienceDays } from "@/lib/server/audience-service";
 import { getDatabase } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
@@ -139,6 +140,7 @@ describe("instrumentation — phase de construction", () => {
   function loadInstrumentation(startClock: () => void): InstrumentationModule {
     const loaded: InstrumentationModule[] = [];
     jest.isolateModules(() => {
+      mockPlanningClocks();
       jest.doMock("@/lib/server/bot-log-shutdown", () => ({ installBotLogShutdownFlush: jest.fn() }));
       jest.doMock("@/lib/server/audience-service", () => ({ startAudienceMaintenanceClock: startClock }));
       loaded.push(jest.requireActual<InstrumentationModule>("@/instrumentation"));

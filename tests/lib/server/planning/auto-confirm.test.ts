@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database", () => ({ getDatabase: jest.fn() }));
 jest.mock("@/lib/server/named-lock", () => {
@@ -25,6 +25,8 @@ import {
   MARK_CHUNK,
   parsePendingRoles,
   reopenedEntries,
+  startPlanningAutoConfirmClock,
+  stopPlanningAutoConfirmClock,
   sweepAutoConfirms,
   type AutoConfirmMarks,
 } from "@/lib/server/planning/auto-confirm";
@@ -488,5 +490,44 @@ describe("keyChunks", () => {
     const keys = Array.from({ length: KEY_CHUNK + 1 }, (_, index) => index);
 
     expect(keyChunks(keys).map((chunk) => chunk.length)).toEqual([KEY_CHUNK, 1]);
+  });
+});
+
+describe("startPlanningAutoConfirmClock / stopPlanningAutoConfirmClock", () => {
+  afterEach(() => {
+    stopPlanningAutoConfirmClock();
+    jest.useRealTimers();
+  });
+
+  it("stopPlanningAutoConfirmClock_neverStarted_doesNothing", () => {
+    expect(() => stopPlanningAutoConfirmClock()).not.toThrow();
+  });
+
+  it("startPlanningAutoConfirmClock_started_armsFirstSweepAndTick", () => {
+    jest.useFakeTimers();
+
+    startPlanningAutoConfirmClock();
+    startPlanningAutoConfirmClock();
+
+    expect(jest.getTimerCount()).toBe(2);
+  });
+
+  it("stopPlanningAutoConfirmClock_started_clearsBothTimers", () => {
+    jest.useFakeTimers();
+    startPlanningAutoConfirmClock();
+
+    stopPlanningAutoConfirmClock();
+
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it("stopPlanningAutoConfirmClock_afterStop_canRestart", () => {
+    jest.useFakeTimers();
+    startPlanningAutoConfirmClock();
+    stopPlanningAutoConfirmClock();
+
+    startPlanningAutoConfirmClock();
+
+    expect(jest.getTimerCount()).toBe(2);
   });
 });

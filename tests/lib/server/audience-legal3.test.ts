@@ -6,6 +6,7 @@ jest.mock("@/lib/server/named-lock", () =>
 );
 jest.mock("@/lib/server/tournaments/transaction");
 
+import { mockPlanningClocks } from "../../helpers/instrumentation-clocks";
 import {
   MAINTENANCE_CLOCK_TICK_MS,
   MAINTENANCE_INTERVAL_MS,
@@ -188,6 +189,7 @@ describe("instrumentation", () => {
     process.env.NEXT_RUNTIME = "nodejs";
     const loaded: InstrumentationModule[] = [];
     jest.isolateModules(() => {
+      mockPlanningClocks();
       jest.doMock("@/lib/server/bot-log-shutdown", () => ({ installBotLogShutdownFlush: jest.fn() }));
       jest.doMock("@/lib/server/audience-service", () => ({
         startAudienceMaintenanceClock: () => {

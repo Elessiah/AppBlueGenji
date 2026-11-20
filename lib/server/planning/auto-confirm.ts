@@ -311,7 +311,12 @@ export async function sweepAutoConfirms(now: number = Date.now()): Promise<numbe
   }
 }
 
-type ClockState = { timer: ReturnType<typeof setInterval> | null; failing: boolean; running: boolean };
+type ClockState = {
+  timer: ReturnType<typeof setInterval> | null;
+  first: ReturnType<typeof setTimeout> | null;
+  failing: boolean;
+  running: boolean;
+};
 const globalClock = globalThis as typeof globalThis & { __bgPlanningAutoConfirm?: ClockState };
 
 async function sweepOnce(state: ClockState): Promise<void> {
@@ -330,10 +335,20 @@ async function sweepOnce(state: ClockState): Promise<void> {
 
 /** Lance le balayage des confirmations d'office (une fois par processus). */
 export function startPlanningAutoConfirmClock(): void {
-  const state = (globalClock.__bgPlanningAutoConfirm ??= { timer: null, failing: false, running: false });
+  const state = (globalClock.__bgPlanningAutoConfirm ??= { timer: null, first: null, failing: false, running: false });
   if (state.timer) return;
-  const first = setTimeout(() => void sweepOnce(state), FIRST_SWEEP_DELAY_MS);
-  first.unref?.();
+  state.first = setTimeout(() => void sweepOnce(state), FIRST_SWEEP_DELAY_MS);
+  state.first.unref?.();
   state.timer = setInterval(() => void sweepOnce(state), SWEEP_TICK_MS);
   state.timer.unref?.();
+}
+
+/** Arrête le balayage (premier passage compris) ; relançable. Sert aux tests, qui ne doivent pas laisser de minuteur. */
+export function stopPlanningAutoConfirmClock(): void {
+  const state = globalClock.__bgPlanningAutoConfirm;
+  if (!state) return;
+  if (state.first) clearTimeout(state.first);
+  if (state.timer) clearInterval(state.timer);
+  state.first = null;
+  state.timer = null;
 }

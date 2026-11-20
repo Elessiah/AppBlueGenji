@@ -10,6 +10,7 @@ en-tête ni lien de retour — et une erreur d'exécution son « Application err
 | Fichier | Quand | Rendu |
 | --- | --- | --- |
 | `app/not-found.tsx` | URL inconnue, `notFound()` sans limite plus proche | `PublicPageShell` (en-tête, `<main>`, pied de page), « Page introuvable », liens vers l'accueil, les tournois et les règles ; titre « Page introuvable · BlueGenji Esport », `noindex` |
+| `app/(secured)/not-found.tsx` | `notFound()` jeté par une mise en page de l'espace sécurisé (`/admin/signalements`, `/devdoc`, `/planning`) | La seule carte « Page introuvable » et ses chemins de retour (`NotFoundContent`), **sans** en-tête ni pied de page : `SiteShell` porte déjà la navigation (la 404 racine y ajoutait un second en-tête à 375 px). |
 | `app/error.tsx` | erreur d'exécution d'une page | carte dans `<main>`, « Réessayer » (`router.refresh()` puis `reset()` — `reset()` seul rejouerait la réponse fautive) et retour à l'accueil, **référence** = `digest` de Next |
 | `app/global-error.tsx` | erreur de la mise en page racine elle-même | document complet (`<html lang="fr">`), mêmes textes, « Réessayer » et retour par rechargement complet |
 
