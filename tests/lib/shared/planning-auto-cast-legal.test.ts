@@ -45,6 +45,16 @@ describe("historique des changements — placement par le planning", () => {
     expect(frEntry().details.join(" ")).not.toContain("inchangée");
   });
 
+  it("planningPlacementEntry_frAndEn_staffActionAuthorInServerLogs", () => {
+    const fr = frEntry().details.join(" ");
+    const en = PRIVACY_CHANGES_EN[ENTRY_ID].details.join(" ");
+
+    expect(fr).toContain("l'auteur d'un geste du staff et les comptes visés dans les journaux du serveur");
+    expect(en).toContain("the author of a staff action and the accounts concerned in the server logs");
+    expect(fr).not.toContain("le staff qui agit");
+    expect(en).not.toContain("the acting staff");
+  });
+
   it("planningPlacementEntry_linksRegisterT20AndT16", () => {
     expect(frEntry().links?.map((link) => link.href)).toEqual(["/rgpd/registre#t20", "/rgpd/registre#t16"]);
   });
@@ -91,8 +101,11 @@ describe("registre — T16 et T20 déclarent le placement", () => {
     const fr = sheet(PROCESSING_ACTIVITIES, "T20").subPurposes.join(" ");
     const en = sheet(PROCESSING_ACTIVITIES_EN, "T20").subPurposes.join(" ");
 
-    expect(fr).toContain("le staff auteur et les comptes visés dans les journaux du serveur");
-    expect(en).toContain("the acting staff and the accounts concerned in the server logs");
+    // La ligne pm2 n'existe que pour un geste du staff (jamais pour la confirmation d'office).
+    expect(fr).toContain("l'auteur d'un geste du staff et les comptes visés dans les journaux du serveur");
+    expect(en).toContain("the author of a staff action and the accounts concerned in the server logs");
+    expect(fr).not.toContain("le staff auteur et les comptes visés");
+    expect(en).not.toContain("the acting staff and the accounts concerned");
     expect(fr).toContain("comme un désistement (remplaçant cherché de même, sa place déjà posée sur un match restant)");
     expect(en).toContain("as a withdrawal would (a replacement looked for alike, a place already set on a match staying)");
   });
@@ -160,11 +173,31 @@ describe("/rgpd — placement par le planning, en français et en anglais", () =
     const en = page("app/rgpd/RgpdEn.tsx");
 
     expect(fr).toContain("quand personne ne caste encore un match en dehors du planning, les casters et la prod qu&apos;une attribution confirmée ou posée à la main y désigne y sont placés");
-    expect(fr).toContain("ces gestes sont notés sans nom au journal du staff sur Discord, le staff auteur et les comptes visés dans les journaux du serveur");
-    expect(en).toContain("these actions are noted without names in the staff log on Discord, the acting staff and the accounts concerned in the server logs");
+    expect(fr).toContain("ces gestes sont notés sans nom au journal du staff sur Discord, l&apos;auteur d&apos;un geste du staff et les comptes visés dans les journaux du serveur");
+    expect(en).toContain("these actions are noted without names in the staff log on Discord, the author of a staff action and the accounts concerned in the server logs");
     expect(fr).toContain("une inscription faite par le caster lui-même, ou une prod prise par la personne ou posée par le staff depuis le match, reste");
     expect(en).toContain("when nobody casts a match yet outside the schedule, the casters and the prod that an assignment confirmed or set by hand names for it are placed on it");
     expect(en).toContain("a signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, stays");
+  });
+});
+
+describe("/rgpd — invité et prod placés par le planning", () => {
+  it("rgpdPages_bothLanguages_guestKeepsPlacedSeat", () => {
+    const fr = page("app/rgpd/page.tsx");
+    const en = page("app/rgpd/RgpdEn.tsx");
+
+    expect(fr).toContain("comme un désistement (sa place déjà posée sur un match restant), sans avis");
+    expect(en).toContain("as a withdrawal would (a place already set on a match staying), without notifying the guest");
+  });
+
+  it("rgpdPages_bothLanguages_prodPlacedByTheSchedule", () => {
+    const fr = page("app/rgpd/page.tsx");
+    const en = page("app/rgpd/RgpdEn.tsx");
+
+    expect(fr).toContain("s&apos;y place ou y est placé par le staff ou le planning ;");
+    expect(fr).toContain("l&apos;en retire, par le staff, le planning ou d&apos;office ;");
+    expect(en).toContain("takes the match or is placed on it by the staff or the schedule;");
+    expect(en).toContain("places or removes them, by the staff, the schedule or automatically;");
   });
 });
 
