@@ -26,7 +26,9 @@ import { nullableId } from "@/lib/shared/nullable-id";
 import { actingUserId, type SessionActor } from "./cast-settings";
 import type { CastPairing } from "./cast-notices";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { resolveTeamParty } from "./match-launch";
+import { assertMatchTournamentOpen, resolveTeamParty } from "./match-launch";
+import { auditStaffAction } from "@/lib/server/staff-audit";
+import type { StaffActor } from "@/lib/shared/log-privacy";
 import { loadMatchPlayerIds } from "./match-players";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { announceProdChange, type ProdChange } from "./prod-notices";
@@ -141,12 +143,14 @@ function afterCommit(result: { tournamentId: number; change: ProdChange } | null
  * « Faire la prod » : le lecteur se place comme prod du match. Déjà la sienne :
  * rien ne change. Une place tenue par un autre (sur le match, ou au planning)
  * est refusée ; un compte suspendu ne se place pas plus que le staff ne l'y place.
+ * Seulement dans un tournoi en cours ; un tournoi pas encore publié n'existe pas
+ * pour qui ne gère pas les tournois (`manages` : permission `tournaments`).
  *
  * @throws `PLAYER_VIEW_ACTIVE` | `NOT_PROD` | `PROD_SUSPENDED` | `MATCH_NOT_FOUND`
  *   | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE` | `MATCH_PROD_TAKEN`
  *   | `PROD_IS_PLAYER` | `PROD_IS_CASTER`
  */
-export async function claimMatchProd(matchId: number, actor: SessionActor): Promise<void> {
+export async function claimMatchProd(matchId: number, actor: SessionActor, manages = false): Promise<void> {
   const userId = actingUserId(actor, "prod");
   const result = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
@@ -154,6 +158,7 @@ export async function claimMatchProd(matchId: number, actor: SessionActor): Prom
       if (!account?.holdsProd) throw new Error("NOT_PROD");
       if ((await lockedSuspendedUserIds(connection, [userId])).has(userId)) throw new Error("PROD_SUSPENDED");
       const row = await lockProdMatch(connection, matchId);
+      await assertMatchTournamentOpen(connection, Number(row.tournament_id), manages, true);
       const current = nullableId(row.prod_user_id);
       if (current === userId) return null;
       if (current !== null) throw new Error("MATCH_PROD_TAKEN");
@@ -192,16 +197,21 @@ export async function releaseMatchProd(matchId: number, actor: SessionActor): Pr
  * `expected` : la prod que la fenêtre montrait (`null` : aucune) ; changée
  * depuis, rien ne bouge (`PROD_CHANGED`). `undefined` : pas de contrôle.
  *
+ * Le geste est nommé dans les journaux du serveur (`auditStaffAction`, son
+ * auteur `staff`) ; la ligne Discord, elle, ne nomme personne.
+ *
  * @throws `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE`
- *   | `PROD_CHANGED` | `NOT_PROD` (compte sans la permission `prod`, absent ou effacé)
- *   | `PROD_UNAVAILABLE` (compte suspendu) | `PROD_IS_PLAYER` | `PROD_IS_CASTER`
+ *   | `PROD_CHANGED` | `PROD_NOT_ELIGIBLE` (compte sans la permission `prod`, absent ou effacé)
+ *   | `PROD_UNAVAILABLE` (compte suspendu — refus au libellé neutre : le staff des
+ *   tournois n'a pas à apprendre une suspension) | `PROD_IS_PLAYER` | `PROD_IS_CASTER`
  */
 export async function assignMatchProd(
   matchId: number,
-  staffUserId: number,
+  staff: StaffActor,
   prodId: number | null,
   expected?: number | null,
 ): Promise<void> {
+  const staffUserId = staff.id;
   const result = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       if (prodId !== null) await assertAssignableProd(connection, prodId);
@@ -217,10 +227,18 @@ export async function assignMatchProd(
         notices: staffProdNotices(current, prodId, staffUserId),
         pairing: pairingOf(row),
       };
-      return { tournamentId: Number(row.tournament_id), change };
+      return { tournamentId: Number(row.tournament_id), change, previous: current };
     }),
   );
+  if (result !== null) auditStaffAction(staffProdAuditLine(matchId, result.change.log, result.previous, prodId), staff);
   afterCommit(result);
+}
+
+/** Ligne pm2 d'un geste du staff sur la place de prod : le match et les comptes visés, par identifiant. */
+export function staffProdAuditLine(matchId: number, log: ProdLogChange, previous: number | null, prodId: number | null): string {
+  if (log === "RELEASED_BY_STAFF") return `place de prod du match #${matchId} retirée au compte #${previous ?? "?"}`;
+  if (log === "REPLACED") return `prod du match #${matchId} changée : compte #${previous ?? "?"} → compte #${prodId ?? "?"}`;
+  return `compte #${prodId ?? "?"} placé comme prod du match #${matchId}`;
 }
 
 /** Compte à placer par le staff, lu en partage en première instruction : il tient `prod` et n'est pas suspendu. */

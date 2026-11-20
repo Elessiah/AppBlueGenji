@@ -70,7 +70,7 @@
     },
     "MATCH_PROD": {
       "label": "A match's prod",
-      "description": "The staff makes you a match's prod or removes you from that spot."
+      "description": "The staff makes you a match's prod or removes you from that spot, or the spot is removed automatically."
     },
     "PLANNING_NEW_ENTRIES": {
       "label": "New slots in the planning",

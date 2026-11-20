@@ -24,6 +24,7 @@ import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-
 import {
   assignMatchReferee,
   claimMatchCast,
+  assertMatchTournamentOpen,
   forceLaunchMatch,
   loadViewerIdentityBlocks,
   loadViewerRefereeEligible,
@@ -127,6 +128,10 @@ type World = {
   suspendedUsers?: number[];
   /** Compte de la prod relu avant un lancement (`prodUnfitness`) ; par défaut, prod en règle. */
   prodAccounts?: Record<number, { is_deleted: number; holds_prod: number; suspended: number }>;
+  /** Tournoi du match pas encore publié (`start_visibility_at` à venir) ; publié par défaut. */
+  unpublishedTournament?: boolean;
+  /** Comptes à qui le planning tient une ligne PROD sur le match, aucun par défaut. */
+  plannedProdUserIds?: number[];
 };
 
 const STAMP = "2026-09-24 20:00:00";
@@ -456,6 +461,18 @@ function suspendedAmong(state: World, params: unknown[]): { user_id: number }[] 
 }
 
 /** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
+/** Publication du tournoi et ligne PROD tenue au planning (`assertMatchTournamentOpen`, `claimMatchCast`) ; `null` pour le reste. */
+function readTournamentOpenRows(state: World, sql: string, params: unknown[]): [unknown, unknown[]] | null {
+  if (sql.startsWith("SELECT state, (start_visibility_at <= NOW()) AS published FROM bg_tournaments")) {
+    const match = state.match;
+    return [match ? [{ state: match.tournament_state, published: state.unpublishedTournament ? 0 : 1 }] : [], []];
+  }
+  if (sql.includes("FROM bg_planning_assignments") && sql.includes("role = 'PROD'")) {
+    return [(state.plannedProdUserIds ?? []).includes(Number(params[1])) ? [{ 1: 1 }] : [], []];
+  }
+  return null;
+}
+
 function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
@@ -496,6 +513,8 @@ function executeFor(state: World) {
     }
     const refereeResult = readRefereeRows(state, sql, params);
     if (refereeResult) return refereeResult;
+    const openResult = readTournamentOpenRows(state, sql, params);
+    if (openResult) return openResult;
     if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
       return [matchContextRows(state), []];
     }
@@ -1126,6 +1145,43 @@ describe("claimMatchCast", () => {
   it("refuse un joueur du match", async () => {
     state.users[1] = verified;
     await expect(claimMatchCast(42, { id: 1, playerView: false }, true, OWN_STREAM)).rejects.toThrow("CASTER_IS_PLAYER");
+  });
+
+  it("claimMatchCast_heldPlanningProdRow_throwsCasterIsProd", async () => {
+    state.users[CASTER] = verified;
+    state.plannedProdUserIds = [CASTER];
+
+    await expect(claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM)).rejects.toThrow("CASTER_IS_PROD");
+    expect(state.match?.casters).toEqual([]);
+  });
+
+  it("claimMatchCast_unpublishedTournament_nonManager_throwsMatchNotFound", async () => {
+    state.users[CASTER] = verified;
+    state.unpublishedTournament = true;
+
+    await expect(claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM)).rejects.toThrow("MATCH_NOT_FOUND");
+    expect(state.match?.casters).toEqual([]);
+  });
+
+  it("claimMatchCast_unpublishedTournament_manager_registers", async () => {
+    state.users[CASTER] = verified;
+    state.unpublishedTournament = true;
+
+    await claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM, {}, { oversees: false, manages: true });
+
+    expect(casterOf(state)).toBe(CASTER);
+  });
+
+  it("assertMatchTournamentOpen_finishedTournamentRequireRunning_throwsNotLaunchable", async () => {
+    state.match = matchState({ tournament_state: "FINISHED" });
+
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, false, true)).rejects.toThrow("MATCH_NOT_LAUNCHABLE");
+  });
+
+  it("assertMatchTournamentOpen_missingTournament_throwsNotFound", async () => {
+    state.match = null;
+
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, true)).rejects.toThrow("MATCH_NOT_FOUND");
   });
 
   it("sans plafond : un troisième caster s'ajoute ; rejouer sa propre inscription ne change rien", async () => {

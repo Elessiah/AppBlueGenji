@@ -52,7 +52,7 @@
     "PROD_IS_CASTER": "This account casts this match: it cannot be its prod as well.",
     "PROD_CHANGED": "This match's prod just changed: check who is assigned before trying again.",
     "PROD_NOT_ELIGIBLE": "This account no longer has the prod role: it cannot be placed.",
-    "PROD_UNAVAILABLE": "This account is suspended: it cannot be made a prod.",
+    "PROD_UNAVAILABLE": "This account cannot be made a prod right now.",
     "PROD_SUSPENDED": "Your account is suspended: you can't be a match's prod.",
     "NOT_MATCH_PROD": "You're not this match's prod.",
     "MATCH_PROD_CLAIM_FAILED": "Your prod spot could not be saved. Try again in a moment.",

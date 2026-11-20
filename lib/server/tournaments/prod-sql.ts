@@ -11,9 +11,14 @@ import { rolesGranting } from "@/lib/shared/permissions";
  * lus en base (jamais ceux d'une session), constantes du code vérifiées par
  * `jsonRoleLiteral`.
  */
-export const PROD_ROLE_SQL = `(u.is_admin = 1${rolesGranting("prod")
-  .map((role) => ` OR JSON_CONTAINS(u.platform_roles_json, ${jsonRoleLiteral(role)})`)
-  .join("")})`;
+export function prodRoleSql(alias: string): string {
+  return `(${alias}.is_admin = 1${rolesGranting("prod")
+    .map((role) => ` OR JSON_CONTAINS(${alias}.platform_roles_json, ${jsonRoleLiteral(role)})`)
+    .join("")})`;
+}
+
+/** {@link prodRoleSql} sur l'alias `u` de `bg_users`. */
+export const PROD_ROLE_SQL = prodRoleSql("u");
 
 /**
  * Ligne de `bg_planning_assignments` **tenue** (choix du staff ou proposition

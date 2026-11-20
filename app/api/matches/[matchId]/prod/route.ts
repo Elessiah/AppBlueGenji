@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { claimMatchProd, releaseMatchProd } from "@/lib/server/tournaments/match-prod";
 import { launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { sessionHolds } from "@/lib/shared/player-view";
+import { can } from "@/lib/shared/permissions";
 
 const STATUSES: Readonly<Record<string, number>> = {
   NOT_PROD: 403,
@@ -32,7 +33,7 @@ export async function POST(_req: Request, context: { params: Promise<{ matchId: 
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
   try {
-    await claimMatchProd(matchId, user);
+    await claimMatchProd(matchId, user, can(user, "tournaments"));
     return ok({ prodUserId: user.id });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_PROD_CLAIM_FAILED");

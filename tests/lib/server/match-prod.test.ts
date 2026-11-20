@@ -24,7 +24,7 @@ import { trackAnnouncement } from "@/lib/server/coalescer";
 import { withConnection } from "@/lib/server/database";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { lockedSuspendedUserIds } from "@/lib/server/suspension-sql";
-import { resolveTeamParty } from "@/lib/server/tournaments/match-launch";
+import { assertMatchTournamentOpen, resolveTeamParty } from "@/lib/server/tournaments/match-launch";
 import { loadMatchLogRow, type MatchLogRow } from "@/lib/server/tournaments/match-log-subject";
 import { loadMatchPlayerIds } from "@/lib/server/tournaments/match-players";
 import {
@@ -35,6 +35,7 @@ import {
   loadProdPanel,
   prodLogCategory,
   releaseMatchProd,
+  staffProdAuditLine,
   withdrawLostProdPlaces,
 } from "@/lib/server/tournaments/match-prod";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
@@ -53,6 +54,7 @@ import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 const PROD_ID = 5;
 const OTHER_PROD_ID = 6;
 const STAFF_ID = 1;
+const STAFF = { id: STAFF_ID, pseudo: "Test_Staff" };
 
 type Account = { is_deleted: number; holds_prod: number };
 
@@ -273,9 +275,62 @@ describe("releaseMatchProd", () => {
   });
 });
 
+describe("claimMatchProd — tournoi ouvert", () => {
+  it("claimMatchProd_checksTournamentOpenAndRunning", async () => {
+    await claimMatchProd(42, prodActor);
+
+    expect(assertMatchTournamentOpen).toHaveBeenCalledWith(expect.anything(), 7, false, true);
+  });
+
+  it("claimMatchProd_managerFlag_isForwarded", async () => {
+    await claimMatchProd(42, prodActor, true);
+
+    expect(assertMatchTournamentOpen).toHaveBeenCalledWith(expect.anything(), 7, true, true);
+  });
+
+  it("claimMatchProd_tournamentClosed_writesNothing", async () => {
+    jest.mocked(assertMatchTournamentOpen).mockRejectedValue(new Error("MATCH_NOT_FOUND"));
+
+    await expect(claimMatchProd(42, prodActor)).rejects.toThrow("MATCH_NOT_FOUND");
+    expect(updatesOfProd()).toHaveLength(0);
+    expect(trackAnnouncement).not.toHaveBeenCalled();
+  });
+});
+
+describe("assignMatchProd — audit du staff", () => {
+  it("assignMatchProd_assigned_auditsStaffInServerLog", async () => {
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await assignMatchProd(42, STAFF, PROD_ID, null);
+
+    expect(info).toHaveBeenCalledWith(
+      "[staff-audit] compte #5 placé comme prod du match #42 — auteur : Test_Staff (#1)",
+    );
+    info.mockRestore();
+  });
+
+  it("assignMatchProd_noChange_writesNoAudit", async () => {
+    match = { ...match, prod_user_id: PROD_ID };
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await assignMatchProd(42, STAFF, PROD_ID, PROD_ID);
+
+    expect(info).not.toHaveBeenCalled();
+    info.mockRestore();
+  });
+
+  it("staffProdAuditLine_released_namesTheFormerAccount", () => {
+    expect(staffProdAuditLine(42, "RELEASED_BY_STAFF", 5, null)).toBe("place de prod du match #42 retirée au compte #5");
+  });
+
+  it("staffProdAuditLine_replaced_namesBothAccounts", () => {
+    expect(staffProdAuditLine(42, "REPLACED", 6, 5)).toBe("prod du match #42 changée : compte #6 → compte #5");
+  });
+});
+
 describe("assignMatchProd", () => {
   it("assignMatchProd_emptyPlace_assignsAndNotifiesAssigned", async () => {
-    await assignMatchProd(42, STAFF_ID, PROD_ID, null);
+    await assignMatchProd(42, STAFF, PROD_ID, null);
     await settle();
 
     expect(updatesOfProd()).toEqual([[expect.any(String), [PROD_ID, 42]]]);
@@ -288,7 +343,7 @@ describe("assignMatchProd", () => {
   it("assignMatchProd_replace_notifiesBothAndLogsReplaced", async () => {
     match = { ...match, prod_user_id: OTHER_PROD_ID };
 
-    await assignMatchProd(42, STAFF_ID, PROD_ID, OTHER_PROD_ID);
+    await assignMatchProd(42, STAFF, PROD_ID, OTHER_PROD_ID);
     await settle();
 
     expect(loadNotificationRecipients).toHaveBeenNthCalledWith(1, [OTHER_PROD_ID], "certified", { matchDm: true });
@@ -299,7 +354,7 @@ describe("assignMatchProd", () => {
   it("assignMatchProd_remove_logsReleasedByStaffAndNotifiesReleased", async () => {
     match = { ...match, prod_user_id: PROD_ID };
 
-    await assignMatchProd(42, STAFF_ID, null, PROD_ID);
+    await assignMatchProd(42, STAFF, null, PROD_ID);
     await settle();
 
     expect(updatesOfProd()).toEqual([[expect.any(String), [null, 42]]]);
@@ -311,7 +366,7 @@ describe("assignMatchProd", () => {
   it("assignMatchProd_staffAssignsSelf_noNotice", async () => {
     accounts.set(STAFF_ID, { is_deleted: 0, holds_prod: 1 });
 
-    await assignMatchProd(42, STAFF_ID, STAFF_ID, null);
+    await assignMatchProd(42, STAFF, STAFF_ID, null);
     await settle();
 
     expect(updatesOfProd()).toHaveLength(1);
@@ -321,14 +376,14 @@ describe("assignMatchProd", () => {
   it("assignMatchProd_expectedDiffers_throwsProdChanged", async () => {
     match = { ...match, prod_user_id: OTHER_PROD_ID };
 
-    await expect(assignMatchProd(42, STAFF_ID, PROD_ID, null)).rejects.toThrow("PROD_CHANGED");
+    await expect(assignMatchProd(42, STAFF, PROD_ID, null)).rejects.toThrow("PROD_CHANGED");
     expect(updatesOfProd()).toHaveLength(0);
   });
 
   it("assignMatchProd_sameAsCurrent_noWrite", async () => {
     match = { ...match, prod_user_id: PROD_ID };
 
-    await assignMatchProd(42, STAFF_ID, PROD_ID, null);
+    await assignMatchProd(42, STAFF, PROD_ID, null);
 
     expect(updatesOfProd()).toHaveLength(0);
     expect(trackAnnouncement).not.toHaveBeenCalled();
@@ -337,20 +392,20 @@ describe("assignMatchProd", () => {
   it("assignMatchProd_targetWithoutProd_throwsNotProd", async () => {
     accounts.set(PROD_ID, { is_deleted: 0, holds_prod: 0 });
 
-    await expect(assignMatchProd(42, STAFF_ID, PROD_ID)).rejects.toThrow("PROD_NOT_ELIGIBLE");
+    await expect(assignMatchProd(42, STAFF, PROD_ID)).rejects.toThrow("PROD_NOT_ELIGIBLE");
   });
 
   it("assignMatchProd_suspendedTarget_throwsProdUnavailable", async () => {
     jest.mocked(lockedSuspendedUserIds).mockResolvedValue(new Set([PROD_ID]));
 
-    await expect(assignMatchProd(42, STAFF_ID, PROD_ID)).rejects.toThrow("PROD_UNAVAILABLE");
+    await expect(assignMatchProd(42, STAFF, PROD_ID)).rejects.toThrow("PROD_UNAVAILABLE");
     expect(updatesOfProd()).toHaveLength(0);
   });
 
   it("assignMatchProd_targetIsCaster_throwsProdIsCaster", async () => {
     casterIds = [PROD_ID];
 
-    await expect(assignMatchProd(42, STAFF_ID, PROD_ID)).rejects.toThrow("PROD_IS_CASTER");
+    await expect(assignMatchProd(42, STAFF, PROD_ID)).rejects.toThrow("PROD_IS_CASTER");
   });
 });
 

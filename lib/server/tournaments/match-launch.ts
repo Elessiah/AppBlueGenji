@@ -56,7 +56,7 @@ import {
 } from "./cast-eligibility";
 import { announceCastChange, queueCastChange, type CastPairing } from "./cast-notices";
 import { queueProdChange } from "./prod-notices";
-import { PROD_ROLE_SQL } from "./prod-sql";
+import { heldPlanningRowSql, PROD_ROLE_SQL } from "./prod-sql";
 import { announceStaffMatchAction } from "./staff-action-logs";
 import { actingUserId, applyCastSettings, PLAIN_CAST_ACCESS, type CastAccess, type SessionActor, type CastSettings, type CastSettingsOutcome } from "./cast-settings";
 import { sessionHolds, type SessionRights } from "@/lib/shared/player-view";
@@ -735,6 +735,29 @@ async function resolvePartyOrRefusal(
   return refusal;
 }
 
+/**
+ * Le tournoi du match est-il ouvert au geste d'un bénévole (s'inscrire au
+ * cast, se placer comme prod) ? Un tournoi pas encore publié
+ * (`start_visibility_at` à venir) n'existe pas pour qui ne gère pas les
+ * tournois (`MATCH_NOT_FOUND`, comme sa page) : sans quoi le geste
+ * l'annoncerait, noms d'équipe compris, au journal du staff.
+ * `requireRunning` : le tournoi doit être en cours (`MATCH_NOT_LAUNCHABLE`).
+ */
+export async function assertMatchTournamentOpen(
+  connection: Pick<PoolConnection, "execute">,
+  tournamentId: number,
+  manages: boolean,
+  requireRunning = false,
+): Promise<void> {
+  const [rows] = await connection.execute<(RowDataPacket & { state: string; published: number })[]>(
+    `SELECT state, (start_visibility_at <= NOW()) AS published FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  const tournament = rows[0];
+  if (!tournament || (!manages && Number(tournament.published) !== 1)) throw new Error("MATCH_NOT_FOUND");
+  if (requireRunning && tournament.state !== "RUNNING") throw new Error("MATCH_NOT_LAUNCHABLE");
+}
+
 /** Le lecteur joue-t-il ce match — appartenance en cours, ou entrée solo ? */
 export async function resolveTeamParty(
   connection: PoolConnection,
@@ -1260,6 +1283,7 @@ export async function claimMatchCast(
       // Le jeu vient du match verrouillé : aucune lecture avant son verrou (elle figerait l'instantané).
       const row = await lockLaunchMatch(connection, matchId);
       if (!row) throw new Error("MATCH_NOT_FOUND");
+      await assertMatchTournamentOpen(connection, Number(row.tournament_id), access.manages);
       const block = castBlockReason(hasLivePermission, identity, row.tournament_game);
       if (block) throw new Error(block);
       if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
@@ -1278,6 +1302,16 @@ export async function claimMatchCast(
       if (await resolveTeamParty(connection, row, userId)) throw new Error("CASTER_IS_PLAYER");
       // La prod du match n'en est pas caster (`docs/features/MATCH_PROD.md`).
       if (nullableId(row.prod_user_id ?? null) === userId) throw new Error("CASTER_IS_PROD");
+      // … ni la prod que le planning lui tient sur ce match (ligne PROD confirmée
+      // ou posée par le staff) — le pendant de `assertProdFree` : lecture
+      // courante et verrouillée, comme celle d'une prise de prod.
+      const [plannedProd] = await connection.execute<RowDataPacket[]>(
+        `SELECT 1 FROM bg_planning_assignments
+          WHERE match_id = ? AND user_id = ? AND role = 'PROD' AND ${heldPlanningRowSql()}
+          LIMIT 1 LOCK IN SHARE MODE`,
+        [matchId, userId],
+      );
+      if (plannedProd.length > 0) throw new Error("CASTER_IS_PROD");
 
       let streamId: number;
       if ("streamId" in castTarget) {

@@ -70,7 +70,7 @@
     },
     "MATCH_PROD": {
       "label": "Prod d'un match",
-      "description": "Le staff te place comme prod d'un match ou te retire cette place."
+      "description": "Le staff te place comme prod d'un match ou te retire cette place, ou elle t'est retirée d'office."
     },
     "PLANNING_NEW_ENTRIES": {
       "label": "Nouveaux créneaux au planning",

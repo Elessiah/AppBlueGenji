@@ -14,6 +14,10 @@ import {
   type ProdPanel,
 } from "@/lib/server/tournaments/match-prod";
 import { authUser } from "../../helpers/auth-user";
+import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import frErrors from "@/messages/fr/tournamentErrors.json";
+import enErrors from "@/messages/en/tournamentErrors.json";
 
 /**
  * Routes de la prod d'un match (`docs/features/MATCH_PROD.md`) : se placer et
@@ -75,6 +79,15 @@ describe("POST / DELETE /api/matches/[matchId]/prod", () => {
     expect(await response.json()).toMatchObject({ error: "NOT_PROD" });
   });
 
+  it("POST_prod_tournamentManager_passesManagesTrue", async () => {
+    const admin = authUser({ id: 1, isAdmin: true, roles: [] });
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(claimMatchProd).mockResolvedValue(undefined);
+
+    expect((await prodPost(jsonRequest("POST"), params("42"))).status).toBe(200);
+    expect(claimMatchProd).toHaveBeenCalledWith(42, admin, true);
+  });
+
   it("POST_prod_taken_returns409", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(prod);
     jest.mocked(claimMatchProd).mockRejectedValue(new Error("MATCH_PROD_TAKEN"));
@@ -89,7 +102,7 @@ describe("POST / DELETE /api/matches/[matchId]/prod", () => {
     const response = await prodPost(jsonRequest("POST"), params("42"));
 
     expect(response.status).toBe(200);
-    expect(claimMatchProd).toHaveBeenCalledWith(42, prod);
+    expect(claimMatchProd).toHaveBeenCalledWith(42, prod, false);
   });
 
   it("POST_prod_suspended_returns403", async () => {
@@ -177,7 +190,7 @@ describe("GET / PUT /api/admin/matches/[matchId]/prod", () => {
     const response = await prodPut(jsonRequest("PUT", { userId: 5, expectedUserId: 6 }), params("42"));
 
     expect(response.status).toBe(200);
-    expect(assignMatchProd).toHaveBeenCalledWith(42, 3, 5, 6);
+    expect(assignMatchProd).toHaveBeenCalledWith(42, { id: 3, pseudo: arbitre.pseudo }, 5, 6);
   });
 
   it("adminPUT_removal_passesNull", async () => {
@@ -186,7 +199,7 @@ describe("GET / PUT /api/admin/matches/[matchId]/prod", () => {
 
     await prodPut(jsonRequest("PUT", { userId: null, expectedUserId: 5 }), params("42"));
 
-    expect(assignMatchProd).toHaveBeenCalledWith(42, 3, null, 5);
+    expect(assignMatchProd).toHaveBeenCalledWith(42, { id: 3, pseudo: arbitre.pseudo }, null, 5);
   });
 
   it("adminPUT_prodChanged_returns409", async () => {
@@ -220,5 +233,24 @@ describe("GET / PUT /api/admin/matches/[matchId]/prod", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ panel: PANEL });
+  });
+});
+
+describe("textes de la prod", () => {
+  it("PROD_UNAVAILABLE_message_neverMentionsSuspension", () => {
+    expect(frErrors.codes.PROD_UNAVAILABLE).not.toMatch(/suspendu/i);
+    expect(enErrors.codes.PROD_UNAVAILABLE).not.toMatch(/suspend/i);
+  });
+
+  it("register_T16_declaresEveryAutomaticRemoval", () => {
+    const t16 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T16");
+
+    expect(t16?.retention.join(" ")).toMatch(/Prod d'un match : conservée avec le match ; retirée des matchs pas encore lancés quand son compte perd ce rôle, est suspendu ou joue désormais le match/);
+  });
+
+  it("privacyChange_prodMatch_declaresAutomaticRemovalNotice", () => {
+    const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-11-prod-match");
+
+    expect(entry?.details.join(" ")).toMatch(/quand sa place lui est retirée d'office, avec le motif/);
   });
 });

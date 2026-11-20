@@ -4,6 +4,7 @@ import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { isPositiveId, launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { assignMatchProd, loadProdPanel } from "@/lib/server/tournaments/match-prod";
 import { can } from "@/lib/shared/permissions";
+import { staffActor } from "@/lib/shared/log-privacy";
 
 const STATUSES: Readonly<Record<string, number>> = {
   MATCH_NOT_FOUND: 404,
@@ -65,7 +66,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if (expected !== undefined && expected !== null && !isPositiveId(expected)) return fail("INVALID_USER_ID", 400);
 
   try {
-    await assignMatchProd(matchId, user.id, prodId, expected);
+    await assignMatchProd(matchId, staffActor(user), prodId, expected);
     return ok({ prodAssigned: prodId !== null });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_PROD_ASSIGN_FAILED");

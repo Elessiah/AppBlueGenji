@@ -2,6 +2,8 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import type { TournamentGame, TournamentState } from "@/lib/shared/types";
 import { seedJoins } from "./match-host-seeds";
 import { playsMatchSql } from "./match-players";
+import { prodRoleSql } from "./prod-sql";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import { refereeKeptColumns } from "./cast-eligibility";
 import { forfeitMapCount, matchMaxMaps, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
@@ -377,6 +379,8 @@ export async function getMatchRows(
       m.prod_user_id,
       pu.pseudo AS prod_pseudo,
       pu.is_deleted AS prod_is_deleted,
+      (m.prod_user_id IS NOT NULL AND (NOT ${prodRoleSql("pu")} OR ${userSuspendedSql("pu.id")}
+        OR ${playsMatchSql("m.prod_user_id", "m.team1_id", "m.team2_id", "pp")})) AS prod_unfit,
       m.first_map,
       m.map_picks,
       ${refereeKeptColumns("ru")},

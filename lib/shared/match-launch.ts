@@ -846,7 +846,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PROD_IS_CASTER: "Ce compte caste ce match : il ne peut pas aussi en faire la prod.",
   PROD_CHANGED: "La prod de ce match vient de changer : vérifie qui est placé avant de recommencer.",
   PROD_NOT_ELIGIBLE: "Ce compte n'a plus le rôle prod : il ne peut pas être placé.",
-  PROD_UNAVAILABLE: "Ce compte est suspendu : il ne peut pas être placé comme prod.",
+  PROD_UNAVAILABLE: "Ce compte ne peut pas être placé comme prod pour l'instant.",
   PROD_SUSPENDED: "Ton compte est suspendu : tu ne peux pas faire la prod d'un match.",
   NOT_MATCH_PROD: "Tu ne fais pas la prod de ce match.",
   MATCH_PROD_CLAIM_FAILED: "Ta place de prod n'a pas pu être enregistrée. Réessaie dans un instant.",

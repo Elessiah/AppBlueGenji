@@ -132,7 +132,7 @@ export const PUSH_TOPICS = {
   },
   MATCH_PROD: {
     label: "Prod d'un match",
-    description: "Le staff te place comme prod d'un match ou te retire cette place.",
+    description: "Le staff te place comme prod d'un match ou te retire cette place, ou elle t'est retirée d'office.",
     audience: "prod",
   },
   PLANNING_NEW_ENTRIES: {
