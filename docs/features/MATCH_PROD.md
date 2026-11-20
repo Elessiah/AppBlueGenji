@@ -27,12 +27,13 @@ antenne, ni aperçu du plateau (`PERMISSION_ROLES.md`). Un compte marqué
 
 | Geste | Qui | Route | Refus |
 | --- | --- | --- | --- |
-| Se placer | `prod` (session, incarnation comprise) | `POST /api/matches/[id]/prod` | `NOT_PROD` (relu en base), `PROD_SUSPENDED` (compte suspendu), `MATCH_PROD_TAKEN` (place tenue sur le match, ou prod d'un autre compte tenue au planning), `PROD_IS_PLAYER`, `PROD_IS_CASTER`, match joué ou exemption, tournoi pas en cours (`MATCH_NOT_LAUNCHABLE`) ou pas encore publié pour qui n'a pas `tournaments` (`MATCH_NOT_FOUND`) |
+| Se placer | `prod` (session, incarnation comprise) | `POST /api/matches/[id]/prod` | `NOT_PROD` (relu en base), `PROD_SUSPENDED` (compte suspendu), `MATCH_PROD_TAKEN` (place tenue sur le match, ou prod d'un autre compte tenue au planning), `PROD_IS_PLAYER`, `PROD_IS_CASTER`, match joué ou exemption, tournoi pas en cours (`MATCH_NOT_LAUNCHABLE`, staff compris : « Faire la prod » n'est offert que dans un tournoi en cours, `prodClaimOpen` ; le staff place d'avance par sa fenêtre) ou pas encore publié pour qui n'a pas `tournaments` (`MATCH_NOT_FOUND`, jugé **avant** tout autre refus du match, qui trahirait son existence ou son état). Une prod tue (voir « Affichage ») qui tenait la place la rend d'abord (`releaseUnfitProd`) au lieu de la tenir contre celle qui la prend |
 | Se retirer | la prod elle-même, même sans le rôle (403 seulement pour une incarnation sans `prod`) | `DELETE /api/matches/[id]/prod` | `NOT_MATCH_PROD` |
 | Placer, changer, retirer | staff `tournaments` | `GET`/`PUT /api/admin/matches/[id]/prod` (`{ userId, expectedUserId }` ; `userId` obligatoire, `null` = retirer, absent = 400 `INVALID_USER_ID`) | `PROD_NOT_ELIGIBLE` (le compte visé n'a plus `prod`), `PROD_UNAVAILABLE` (suspendu — libellé neutre « ne peut pas être placé pour l'instant » : le staff des tournois n'apprend pas une suspension), `PROD_IS_PLAYER`, `PROD_IS_CASTER`, `PROD_CHANGED` (la prod a changé depuis l'ouverture de la fenêtre) |
 
 Un caster ne peut pas être la prod du même match (`CASTER_IS_PROD` à
-l'inscription de cast — prod du match, ou ligne PROD tenue au planning —,
+l'inscription de cast quand il est la prod du match, `CASTER_IS_PLANNED_PROD`
+quand seul le planning lui tient la ligne PROD,
 `PROD_IS_CASTER` dans l'autre sens — caster inscrit, ou
 ligne CASTER tenue au planning, confirmée ou posée par le staff). Verrous : ligne du
 compte (`LOCK IN SHARE MODE`) puis match (`FOR UPDATE`, sans jointure), puis
@@ -47,10 +48,15 @@ n'empêche pas de rendre la place qu'un match lancé a gardée) / « Prod du mat
 Affichage : comme un caster inéligible, une prod qui ne remplit plus la
 condition **avant le lancement** (rôle perdu, compte suspendu, joueuse du
 match — `prod_unfit`, calculé par la requête du plateau) n'est plus montrée,
-jusqu'à ce que l'entretien du lancement rende sa place ; un match lancé ou joué
-la garde. Cela couvre aussi la course « se placer » / « rejoindre une équipe
-du match » (l'adhésion ne prend pas le verrou du match). L'inscription de cast
-refuse de même un tournoi pas encore publié à qui n'a pas `tournaments`.
+jusqu'à ce que l'entretien du lancement (ou une prise de place) la rende ; un
+match lancé ou joué la garde. Cela couvre aussi la course « se placer » /
+« rejoindre une équipe du match » (l'adhésion ne prend pas le verrou du match ;
+le plateau la tait à sa prochaine trame, au plus `SNAPSHOT_TTL_MS` pour une
+lecture REST, comme un caster inéligible). L'inscription de cast refuse de même
+un tournoi pas encore publié à qui n'a pas `tournaments` — la date de
+publication est lue avec le contexte du lancement (`readLaunchContext`, aucune
+seconde lecture sous le verrou du match) et jugée par la règle de la fiche
+(`isTournamentPublished`), jamais par un `NOW()` SQL.
 
 Chaque geste du staff sur la place (placer, changer, retirer) est nommé dans
 les journaux du serveur (`auditStaffAction`, `staffProdAuditLine`), la ligne
@@ -103,6 +109,9 @@ de charge (`loadPlanningHistory`).
   un match lancé (direct en cours) ou joué la garde, comme un caster inéligible.
   Ce retrait verrouille les matchs **après** le compte, l'ordre inverse du
   lancement : `setUserRoles` est rejoué sur interblocage (`retryOnDeadlock`).
+- Compte suspendu (`suspendAccount`) : même retrait, dans la transaction de la
+  suspension (compte verrouillé d'abord, puis matchs), annoncé `UNAVAILABLE`
+  sans motif ; la suspension est rejouée sur interblocage.
 - Avant tout lancement (`releaseUnfitProd`, appelé par `adoptCurrentPairing` —
   « Prêt », lancement forcé, entretien, relance après un retrait), sous le verrou
   du match et tant qu'il n'est pas lancé : la prod qui ne peut plus l'être est

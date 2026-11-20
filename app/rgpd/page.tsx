@@ -1489,8 +1489,8 @@ function RgpdFr({
             Un match peut aussi avoir une <strong>prod</strong>, qui assure la production de son direct :
             un membre qui a ce rôle s&apos;y place ou y est placé par le staff ; son pseudo est montré avec le
             match comme celui des casters (avant le lancement, tant qu&apos;il remplit les conditions), gardé avec le match et
-            retiré des matchs pas encore lancés si son compte perd ce rôle, est suspendu, joue désormais le match ou
-            est supprimé ; la prod est prévenue quand le staff la place ou l&apos;en retire, ou quand sa place lui est
+            retiré des matchs pas encore lancés si son compte perd ce rôle, est suspendu ou joue désormais le match,
+            et des matchs pas encore joués s&apos;il est supprimé ; la prod est prévenue quand le staff la place ou l&apos;en retire, ou quand sa place lui est
             retirée d&apos;office, avec le motif (<Link href="/rgpd/registre#t16">registre, T16</Link>).{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres

@@ -26,7 +26,7 @@ import { nullableId } from "@/lib/shared/nullable-id";
 import { actingUserId, type SessionActor } from "./cast-settings";
 import type { CastPairing } from "./cast-notices";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { assertMatchTournamentOpen, resolveTeamParty } from "./match-launch";
+import { assertMatchTournamentOpen, releaseUnfitProd, resolveTeamParty } from "./match-launch";
 import { auditStaffAction } from "@/lib/server/staff-audit";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import { loadMatchPlayerIds } from "./match-players";
@@ -57,6 +57,7 @@ type ProdMatchRow = RowDataPacket & {
   is_bye: number;
   team1_id: number | null;
   team2_id: number | null;
+  launched_at: Date | string | null;
   prod_user_id: number | null;
 };
 
@@ -77,18 +78,28 @@ async function lockProdAccount(connection: PoolConnection, userId: number): Prom
   return { holdsProd: Number(row.holds_prod ?? 0) === 1 };
 }
 
-/** Le match verrouillé, seul (aucune jointure sous `FOR UPDATE` : MariaDB). */
-async function lockProdMatch(connection: PoolConnection, matchId: number): Promise<ProdMatchRow> {
+/**
+ * Le match verrouillé, seul (aucune jointure sous `FOR UPDATE` : MariaDB).
+ * `checkOpen` (par défaut) : un match joué ou une exemption est refusé tout
+ * de suite ; « Faire la prod » juge d'abord la publication du tournoi, puis
+ * appelle {@link assertProdMatchOpen} lui-même.
+ */
+async function lockProdMatch(connection: PoolConnection, matchId: number, checkOpen = true): Promise<ProdMatchRow> {
   const [rows] = await connection.execute<ProdMatchRow[]>(
-    `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, prod_user_id
+    `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, launched_at, prod_user_id
        FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
     [matchId],
   );
   const row = rows[0];
   if (!row) throw new Error("MATCH_NOT_FOUND");
+  if (checkOpen) assertProdMatchOpen(row);
+  return row;
+}
+
+/** Un match joué ou une exemption n'a pas de prod à changer. */
+function assertProdMatchOpen(row: ProdMatchRow): void {
   if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
   if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
-  return row;
 }
 
 /**
@@ -144,7 +155,11 @@ function afterCommit(result: { tournamentId: number; change: ProdChange } | null
  * rien ne change. Une place tenue par un autre (sur le match, ou au planning)
  * est refusée ; un compte suspendu ne se place pas plus que le staff ne l'y place.
  * Seulement dans un tournoi en cours ; un tournoi pas encore publié n'existe pas
- * pour qui ne gère pas les tournois (`manages` : permission `tournaments`).
+ * pour qui ne gère pas les tournois (`manages` : permission `tournaments`) —
+ * jugé avant tout autre refus du match, qui trahirait son existence et son état.
+ * Une prod qui ne remplit plus la condition (tue à l'affichage avant le
+ * lancement) quitte d'abord sa place (`releaseUnfitProd`) : elle ne la tient
+ * pas contre celle qui la prend.
  *
  * @throws `PLAYER_VIEW_ACTIVE` | `NOT_PROD` | `PROD_SUSPENDED` | `MATCH_NOT_FOUND`
  *   | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE` | `MATCH_PROD_TAKEN`
@@ -157,8 +172,11 @@ export async function claimMatchProd(matchId: number, actor: SessionActor, manag
       const account = await lockProdAccount(connection, userId);
       if (!account?.holdsProd) throw new Error("NOT_PROD");
       if ((await lockedSuspendedUserIds(connection, [userId])).has(userId)) throw new Error("PROD_SUSPENDED");
-      const row = await lockProdMatch(connection, matchId);
+      const row = await lockProdMatch(connection, matchId, false);
       await assertMatchTournamentOpen(connection, Number(row.tournament_id), manages, true);
+      assertProdMatchOpen(row);
+      // Lectures courantes : les verrous du compte ont précédé celui du match.
+      if (nullableId(row.prod_user_id) !== userId) await releaseUnfitProd(connection, row, true);
       const current = nullableId(row.prod_user_id);
       if (current === userId) return null;
       if (current !== null) throw new Error("MATCH_PROD_TAKEN");
@@ -263,9 +281,10 @@ function staffProdNotices(current: number | null, prodId: number | null, staffUs
 }
 
 /**
- * Le compte perd la permission `prod` (`setUserRoles`) : ses places de prod sur
- * des matchs **pas encore lancés** sont rendues, dans la transaction du
- * changement de rôles — comme un caster inéligible (`releaseIneligibleCast`).
+ * Le compte perd la permission `prod` (`setUserRoles`) ou est suspendu
+ * (`suspendAccount`) : ses places de prod sur des matchs **pas encore lancés**
+ * sont rendues, dans la transaction du geste — comme un caster inéligible
+ * (`releaseIneligibleCast`). Le compte est verrouillé avant (ordre : compte, puis matchs).
  * Un match lancé ou joué garde sa prod : le direct n'est pas coupé en cours, et
  * l'histoire ne se réécrit pas. Rend les matchs libérés, à annoncer après le
  * commit ({@link announceProdWithdrawals}).
@@ -297,8 +316,16 @@ export async function withdrawLostProdPlaces(connection: PoolConnection, userId:
   return rows.map((row) => ({ matchId: Number(row.id), tournamentId: Number(row.tournament_id), pairing: pairingOf(row) }));
 }
 
-/** Après le commit d'un retrait de rôle : plateaux rafraîchis, une ligne par match, l'ancienne prod prévenue du motif (une seule fois). */
-export function announceProdWithdrawals(userId: number, released: readonly ReleasedProdPlace[]): void {
+/**
+ * Après le commit d'un retrait de rôle (`INELIGIBLE`) ou d'une suspension
+ * (`UNAVAILABLE`, motif tu) : plateaux rafraîchis, une ligne par match,
+ * l'ancienne prod prévenue du motif (une seule fois).
+ */
+export function announceProdWithdrawals(
+  userId: number,
+  released: readonly ReleasedProdPlace[],
+  reason: "INELIGIBLE" | "UNAVAILABLE" = "INELIGIBLE",
+): void {
   for (const tournamentId of new Set(released.map((entry) => entry.tournamentId))) {
     publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   }
@@ -307,8 +334,8 @@ export function announceProdWithdrawals(userId: number, released: readonly Relea
   released.forEach((entry, index) => {
     announceProdChange({
       matchId: entry.matchId,
-      log: "INELIGIBLE",
-      notices: index === 0 ? [{ userId, kind: "INELIGIBLE" }] : [],
+      log: reason,
+      notices: index === 0 ? [{ userId, kind: reason }] : [],
       pairing: entry.pairing,
     });
   });

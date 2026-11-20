@@ -18,6 +18,7 @@
     "CASTER_DISCORD_REQUIRED": "To cast a Marvel Rivals match, verify your Discord tag from your profile.",
     "CASTER_IS_PLAYER": "You're playing this match: you can't cast it.",
     "CASTER_IS_PROD": "You're this match's prod: you can't cast it as well.",
+    "CASTER_IS_PLANNED_PROD": "The planning holds you as this match's prod: you can't cast it as well.",
     "NOT_PROD": "Doing a match's prod requires the prod role.",
     "MATCH_PROD_TAKEN": "This match already has a prod.",
     "PROD_IS_PLAYER": "This account plays this match: it cannot be its prod.",

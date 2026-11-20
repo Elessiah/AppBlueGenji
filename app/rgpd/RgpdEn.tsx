@@ -1267,8 +1267,8 @@ export function RgpdEn({
             A match may also have a <strong>prod</strong>, who handles the production of its live stream: a
             member holding that role takes the match or is placed on it by the staff; their username is shown with
             the match like the casters&apos; (before the launch, as long as they meet the requirements), kept with the match and
-            removed from matches not yet launched if their account loses that role, is suspended, now plays in the match
-            or is deleted; the prod is notified when the staff places or removes them, or when their place is removed
+            removed from matches not yet launched if their account loses that role, is suspended or now plays in the match,
+            and from matches not yet played if it is deleted; the prod is notified when the staff places or removes them, or when their place is removed
             automatically, with the reason (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>).{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match

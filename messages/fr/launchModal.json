@@ -46,6 +46,7 @@
     "MATCH_CAST_CLAIM_FAILED": "Ton inscription comme caster n'a pas pu être enregistrée. Réessaie dans un instant.",
     "MATCH_CAST_RELEASE_FAILED": "Ton retrait du cast n'a pas pu être enregistré. Réessaie dans un instant.",
     "CASTER_IS_PROD": "Tu fais la prod de ce match : tu ne peux pas aussi le caster.",
+    "CASTER_IS_PLANNED_PROD": "Le planning te tient la prod de ce match : tu ne peux pas aussi le caster.",
     "NOT_PROD": "Faire la prod d'un match demande le rôle prod.",
     "MATCH_PROD_TAKEN": "Ce match a déjà une prod.",
     "PROD_IS_PLAYER": "Ce compte joue ce match : il ne peut pas en faire la prod.",

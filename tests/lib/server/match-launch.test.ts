@@ -236,6 +236,7 @@ function matchContextRows(state: World) {
   if (!match) return [];
   return [{
     tournament_state: match.tournament_state,
+    tournament_visible_at: visibleAt(state),
     tournament_game: match.tournament_game,
     match_launch_phase: match.match_launch_phase,
     team1_is_ghost: match.team1_is_ghost,
@@ -460,12 +461,16 @@ function suspendedAmong(state: World, params: unknown[]): { user_id: number }[] 
     .map((id) => ({ user_id: id }));
 }
 
-/** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
+/** Date de publication du tournoi du monde : passée par défaut, à venir s'il n'est pas publié. */
+function visibleAt(state: World): string {
+  return state.unpublishedTournament ? "2999-01-01T00:00:00.000Z" : "2026-01-01T00:00:00.000Z";
+}
+
 /** Publication du tournoi et ligne PROD tenue au planning (`assertMatchTournamentOpen`, `claimMatchCast`) ; `null` pour le reste. */
 function readTournamentOpenRows(state: World, sql: string, params: unknown[]): [unknown, unknown[]] | null {
-  if (sql.startsWith("SELECT state, (start_visibility_at <= NOW()) AS published FROM bg_tournaments")) {
+  if (sql.startsWith("SELECT state, start_visibility_at FROM bg_tournaments")) {
     const match = state.match;
-    return [match ? [{ state: match.tournament_state, published: state.unpublishedTournament ? 0 : 1 }] : [], []];
+    return [match ? [{ state: match.tournament_state, start_visibility_at: visibleAt(state) }] : [], []];
   }
   if (sql.includes("FROM bg_planning_assignments") && sql.includes("role = 'PROD'")) {
     return [(state.plannedProdUserIds ?? []).includes(Number(params[1])) ? [{ 1: 1 }] : [], []];
@@ -473,6 +478,7 @@ function readTournamentOpenRows(state: World, sql: string, params: unknown[]): [
   return null;
 }
 
+/** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
 function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
@@ -1147,11 +1153,11 @@ describe("claimMatchCast", () => {
     await expect(claimMatchCast(42, { id: 1, playerView: false }, true, OWN_STREAM)).rejects.toThrow("CASTER_IS_PLAYER");
   });
 
-  it("claimMatchCast_heldPlanningProdRow_throwsCasterIsProd", async () => {
+  it("claimMatchCast_heldPlanningProdRow_throwsCasterIsPlannedProd", async () => {
     state.users[CASTER] = verified;
     state.plannedProdUserIds = [CASTER];
 
-    await expect(claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM)).rejects.toThrow("CASTER_IS_PROD");
+    await expect(claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM)).rejects.toThrow("CASTER_IS_PLANNED_PROD");
     expect(state.match?.casters).toEqual([]);
   });
 
@@ -1176,6 +1182,53 @@ describe("claimMatchCast", () => {
     state.match = matchState({ tournament_state: "FINISHED" });
 
     await expect(assertMatchTournamentOpen(connectionFor(state), 7, false, true)).rejects.toThrow("MATCH_NOT_LAUNCHABLE");
+  });
+
+  it("claimMatchCast_unpublishedTournament_readsVisibilityWithLaunchContext", async () => {
+    state.users[CASTER] = verified;
+    state.unpublishedTournament = true;
+    const base = executeFor(state);
+    const sqls: string[] = [];
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: async (sql: string, params: unknown[] = []) => {
+            sqls.push(sql);
+            return base(sql, params);
+          },
+          beginTransaction: async () => undefined,
+          commit: async () => undefined,
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+
+    await expect(claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM)).rejects.toThrow("MATCH_NOT_FOUND");
+    expect(sqls.some((sql) => sql.includes("AS tournament_visible_at"))).toBe(true);
+    expect(sqls.some((sql) => sql.startsWith("SELECT state, start_visibility_at FROM bg_tournaments"))).toBe(false);
+  });
+
+  it("assertMatchTournamentOpen_unpublishedNonManager_throwsNotFound", async () => {
+    state.unpublishedTournament = true;
+
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, false)).rejects.toThrow("MATCH_NOT_FOUND");
+  });
+
+  it("assertMatchTournamentOpen_unpublishedRunningNonManager_hidesStateWithNotFound", async () => {
+    state.unpublishedTournament = true;
+    state.match = matchState({ tournament_state: "FINISHED" });
+
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, false, true)).rejects.toThrow("MATCH_NOT_FOUND");
+  });
+
+  it("assertMatchTournamentOpen_unpublishedManager_passes", async () => {
+    state.unpublishedTournament = true;
+
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, true)).resolves.toBeUndefined();
+  });
+
+  it("assertMatchTournamentOpen_publishedNonManager_passes", async () => {
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, false)).resolves.toBeUndefined();
   });
 
   it("assertMatchTournamentOpen_missingTournament_throwsNotFound", async () => {

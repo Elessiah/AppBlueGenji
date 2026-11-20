@@ -84,12 +84,19 @@ import { nullableId } from "@/lib/shared/nullable-id";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
 import { lockedSuspendedUserIds, userSuspendedSql } from "@/lib/server/suspension-sql";
 import type { ProdNoticeKind } from "@/lib/shared/match-prod";
+import { isTournamentPublished } from "@/lib/shared/tournament-visibility";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
 export type LaunchMatchBaseRow = RowDataPacket & {
   id: number;
   tournament_id: number;
   tournament_state: string;
+  /**
+   * Date de publication du tournoi (`start_visibility_at`), lue avec le
+   * contexte du lancement (`readLaunchContext`) ; absente quand la ligne vient
+   * d'ailleurs — {@link assertCastTournamentVisible} la relit alors.
+   */
+  tournament_visible_at?: Date | string | null;
   /** Jeu du tournoi : la condition de cast et d'arbitrage en dépend (Battle.net en Overwatch seulement). */
   tournament_game: TournamentGame;
   /** Option du tournoi : matchs planifiés par l'arbitrage (1). */
@@ -313,8 +320,14 @@ async function prodUnfitness(account: ProdAccount | undefined, plays: () => Prom
   return (await plays()) ? "JOINED_TEAM" : null;
 }
 
+/** Ce que {@link releaseUnfitProd} lit et réécrit de la ligne du match (verrouillée). */
+export type ProdReleaseRow = Pick<LaunchMatchBaseRow, "id" | "team1_id" | "team2_id" | "launched_at"> & {
+  status: string;
+  prod_user_id?: number | null;
+};
+
 /** Le match peut-il encore perdre sa prod d'office (ni lancé, ni joué) ? */
-function holdsReleasableProd(row: LaunchMatchRow): boolean {
+function holdsReleasableProd(row: ProdReleaseRow): boolean {
   return nullableId(row.prod_user_id ?? null) !== null && row.launched_at === null && row.status !== "COMPLETED";
 }
 
@@ -326,15 +339,18 @@ function holdsReleasableProd(row: LaunchMatchRow): boolean {
  * (`queueProdChange` : journal du staff sans nom, avis au compte — aucun à un
  * compte effacé).
  *
+ * Aussi appelée par « Faire la prod » (`claimMatchProd`) : une prod tue à
+ * l'affichage ne doit pas tenir la place contre celle qui la prend.
+ *
  * `known.accounts` : comptes déjà relus (entretien, une lecture par passe) ;
  * `known.players` : les joueurs du match parmi casters et prod, déjà relus par
  * la remise à zéro (`null` : non relus).
  *
  * Rend `true` quand la place a été rendue.
  */
-async function releaseUnfitProd(
+export async function releaseUnfitProd(
   connection: PoolConnection,
-  row: LaunchMatchRow,
+  row: ProdReleaseRow,
   currentRead: boolean,
   known: { accounts?: ReadonlyMap<number, ProdAccount>; players: ReadonlySet<number> | null } = { players: null },
 ): Promise<boolean> {
@@ -561,6 +577,7 @@ async function lockLaunchMatch(
 /** Tournoi et engagées de la ligne : ceux d'une lecture ordinaire, hors verrou. */
 type LaunchContextRow = RowDataPacket & {
   tournament_state: string | null;
+  tournament_visible_at?: Date | string | null;
   tournament_game: TournamentGame | null;
   referee_scheduling: number | null;
   match_launch_phase: number | null;
@@ -590,7 +607,8 @@ async function readLaunchContext(connection: PoolConnection, base: LaunchMatchBa
        (SELECT referee_scheduling FROM bg_tournaments WHERE id = ?) AS referee_scheduling,
        (SELECT match_launch_phase FROM bg_tournaments WHERE id = ?) AS match_launch_phase,
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team1_is_ghost,
-       (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team2_is_ghost`,
+       (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team2_is_ghost,
+       (SELECT start_visibility_at FROM bg_tournaments WHERE id = ?) AS tournament_visible_at`,
     [
       base.tournament_id,
       base.tournament_id,
@@ -598,6 +616,7 @@ async function readLaunchContext(connection: PoolConnection, base: LaunchMatchBa
       base.tournament_id,
       nullableId(base.team1_id),
       nullableId(base.team2_id),
+      base.tournament_id,
     ],
   );
   return context;
@@ -607,7 +626,10 @@ async function finishLaunchRow(
   connection: PoolConnection,
   matchId: number,
   base: LaunchMatchBaseRow,
-  context: Pick<LaunchContextRow, "tournament_game" | "referee_scheduling" | "match_launch_phase" | "team1_is_ghost" | "team2_is_ghost">,
+  context: Pick<
+    LaunchContextRow,
+    "tournament_visible_at" | "tournament_game" | "referee_scheduling" | "match_launch_phase" | "team1_is_ghost" | "team2_is_ghost"
+  >,
   tournamentState: string,
   snapshotBeforeLock: boolean,
 ): Promise<LaunchMatchRow> {
@@ -645,6 +667,7 @@ async function finishLaunchRow(
     refereeStanding,
   });
   row.tournament_state = tournamentState;
+  if (context.tournament_visible_at !== undefined) row.tournament_visible_at = context.tournament_visible_at;
   row.referee_scheduling = context.referee_scheduling ?? 0;
   row.match_launch_phase = context.match_launch_phase ?? 0;
   row.team1_is_ghost = context.team1_is_ghost ?? null;
@@ -736,12 +759,23 @@ async function resolvePartyOrRefusal(
 }
 
 /**
- * Le tournoi du match est-il ouvert au geste d'un bénévole (s'inscrire au
- * cast, se placer comme prod) ? Un tournoi pas encore publié
- * (`start_visibility_at` à venir) n'existe pas pour qui ne gère pas les
- * tournois (`MATCH_NOT_FOUND`, comme sa page) : sans quoi le geste
- * l'annoncerait, noms d'équipe compris, au journal du staff.
- * `requireRunning` : le tournoi doit être en cours (`MATCH_NOT_LAUNCHABLE`).
+ * Un tournoi pas encore publié (`start_visibility_at` à venir) n'existe pas
+ * pour qui ne gère pas les tournois (`MATCH_NOT_FOUND`, comme sa page) : sans
+ * quoi un geste de bénévole (s'inscrire au cast, se placer comme prod)
+ * l'annoncerait, noms d'équipe compris, au journal du staff. La règle de la
+ * fiche (`isTournamentPublished`, horloge du serveur d'application), jamais
+ * une seconde définition en SQL. Une date absente ferme la porte.
+ */
+function assertTournamentVisible(visibleAt: Date | string | null | undefined, manages: boolean): void {
+  if (manages) return;
+  if (visibleAt == null || !isTournamentPublished({ startVisibilityAt: visibleAt })) throw new Error("MATCH_NOT_FOUND");
+}
+
+/**
+ * Le tournoi du match est-il ouvert au geste d'un bénévole ?
+ * Publication : {@link assertTournamentVisible}. `requireRunning` : le tournoi
+ * doit être en cours (`MATCH_NOT_LAUNCHABLE`) — jugé **après** la publication,
+ * pour qu'un tournoi caché ne se trahisse par aucun autre refus.
  */
 export async function assertMatchTournamentOpen(
   connection: Pick<PoolConnection, "execute">,
@@ -749,13 +783,32 @@ export async function assertMatchTournamentOpen(
   manages: boolean,
   requireRunning = false,
 ): Promise<void> {
-  const [rows] = await connection.execute<(RowDataPacket & { state: string; published: number })[]>(
-    `SELECT state, (start_visibility_at <= NOW()) AS published FROM bg_tournaments WHERE id = ? LIMIT 1`,
+  const [rows] = await connection.execute<(RowDataPacket & { state: string; start_visibility_at: Date | string | null })[]>(
+    `SELECT state, start_visibility_at FROM bg_tournaments WHERE id = ? LIMIT 1`,
     [tournamentId],
   );
   const tournament = rows[0];
-  if (!tournament || (!manages && Number(tournament.published) !== 1)) throw new Error("MATCH_NOT_FOUND");
+  if (!tournament) throw new Error("MATCH_NOT_FOUND");
+  assertTournamentVisible(tournament.start_visibility_at, manages);
   if (requireRunning && tournament.state !== "RUNNING") throw new Error("MATCH_NOT_LAUNCHABLE");
+}
+
+/**
+ * La publication du tournoi d'une ligne verrouillée par `lockLaunchMatch` :
+ * la date lue avec le contexte du lancement, sans seconde lecture du tournoi
+ * sous le verrou du match ; relue seulement si la ligne ne la porte pas.
+ */
+async function assertCastTournamentVisible(
+  connection: Pick<PoolConnection, "execute">,
+  row: Pick<LaunchMatchBaseRow, "tournament_id" | "tournament_visible_at">,
+  manages: boolean,
+): Promise<void> {
+  if (manages) return;
+  if (row.tournament_visible_at !== undefined) {
+    assertTournamentVisible(row.tournament_visible_at, manages);
+    return;
+  }
+  await assertMatchTournamentOpen(connection, Number(row.tournament_id), manages);
 }
 
 /** Le lecteur joue-t-il ce match — appartenance en cours, ou entrée solo ? */
@@ -1243,6 +1296,7 @@ async function releaseIneligibleCasters(
  *
  * @throws `NOT_CASTER` | `CASTER_IDENTITY_REQUIRED` | `MATCH_NOT_FOUND`
  *   | `MATCH_CAST_CLOSED` | `MATCH_NOT_LAUNCHABLE` | `CASTER_IS_PLAYER` | `CASTER_IS_PROD`
+ *   | `CASTER_IS_PLANNED_PROD`
  *   | `STREAM_NOT_FOUND` | `INVALID_STREAM_URL` | `STREAM_URL_REQUIRED`
  *   | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE` | `MATCH_START_AT_REQUIRED`
  *   | `INVALID_CAST_BATTLETAG` | `LIVE_TRIGGER_NOT_OWNED`
@@ -1283,7 +1337,7 @@ export async function claimMatchCast(
       // Le jeu vient du match verrouillé : aucune lecture avant son verrou (elle figerait l'instantané).
       const row = await lockLaunchMatch(connection, matchId);
       if (!row) throw new Error("MATCH_NOT_FOUND");
-      await assertMatchTournamentOpen(connection, Number(row.tournament_id), access.manages);
+      await assertCastTournamentVisible(connection, row, access.manages);
       const block = castBlockReason(hasLivePermission, identity, row.tournament_game);
       if (block) throw new Error(block);
       if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
@@ -1304,14 +1358,15 @@ export async function claimMatchCast(
       if (nullableId(row.prod_user_id ?? null) === userId) throw new Error("CASTER_IS_PROD");
       // … ni la prod que le planning lui tient sur ce match (ligne PROD confirmée
       // ou posée par le staff) — le pendant de `assertProdFree` : lecture
-      // courante et verrouillée, comme celle d'une prise de prod.
+      // courante et verrouillée, comme celle d'une prise de prod. Son propre
+      // refus : le compte n'est pas placé sur le match, seul le planning le tient.
       const [plannedProd] = await connection.execute<RowDataPacket[]>(
         `SELECT 1 FROM bg_planning_assignments
           WHERE match_id = ? AND user_id = ? AND role = 'PROD' AND ${heldPlanningRowSql()}
           LIMIT 1 LOCK IN SHARE MODE`,
         [matchId, userId],
       );
-      if (plannedProd.length > 0) throw new Error("CASTER_IS_PROD");
+      if (plannedProd.length > 0) throw new Error("CASTER_IS_PLANNED_PROD");
 
       let streamId: number;
       if ("streamId" in castTarget) {

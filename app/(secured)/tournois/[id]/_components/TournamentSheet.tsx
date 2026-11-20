@@ -18,6 +18,7 @@ import { toParticipantType } from "@/lib/shared/participants";
 import { remainingSlots } from "@/lib/shared/ghost-registration";
 import { useToast } from "@/components/ui/toast";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import { prodClaimOpen } from "@/lib/shared/match-prod";
 import { matchMapPlan } from "@/lib/shared/round-maps";
 import { CyberButton } from "@/components/cyber";
 import { useSpectatorView } from "@/components/spectator-view";
@@ -1268,7 +1269,7 @@ function TournamentSheetView({
         castBlock={detail.castBlock}
         openReplay={openMatchReplay}
         publicShare={published}
-        canProd={detail.canProd}
+        canProd={detail.canProd && prodClaimOpen(detail.card.state)}
         canLeaveProd={detail.canLeaveProd}
         refereeNames={detail.refereeNames}
       >

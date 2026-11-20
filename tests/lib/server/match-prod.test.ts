@@ -24,7 +24,7 @@ import { trackAnnouncement } from "@/lib/server/coalescer";
 import { withConnection } from "@/lib/server/database";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { lockedSuspendedUserIds } from "@/lib/server/suspension-sql";
-import { assertMatchTournamentOpen, resolveTeamParty } from "@/lib/server/tournaments/match-launch";
+import { assertMatchTournamentOpen, releaseUnfitProd, resolveTeamParty } from "@/lib/server/tournaments/match-launch";
 import { loadMatchLogRow, type MatchLogRow } from "@/lib/server/tournaments/match-log-subject";
 import { loadMatchPlayerIds } from "@/lib/server/tournaments/match-players";
 import {
@@ -289,11 +289,70 @@ describe("claimMatchProd — tournoi ouvert", () => {
   });
 
   it("claimMatchProd_tournamentClosed_writesNothing", async () => {
-    jest.mocked(assertMatchTournamentOpen).mockRejectedValue(new Error("MATCH_NOT_FOUND"));
+    jest.mocked(assertMatchTournamentOpen).mockRejectedValueOnce(new Error("MATCH_NOT_FOUND"));
 
     await expect(claimMatchProd(42, prodActor)).rejects.toThrow("MATCH_NOT_FOUND");
     expect(updatesOfProd()).toHaveLength(0);
     expect(trackAnnouncement).not.toHaveBeenCalled();
+  });
+});
+
+describe("claimMatchProd — publication avant tout refus du match", () => {
+  it("claimMatchProd_unpublishedCompletedMatch_throwsMatchNotFound", async () => {
+    match = { ...match, status: "COMPLETED" };
+    jest.mocked(assertMatchTournamentOpen).mockRejectedValueOnce(new Error("MATCH_NOT_FOUND"));
+
+    await expect(claimMatchProd(42, prodActor)).rejects.toThrow("MATCH_NOT_FOUND");
+  });
+
+  it("claimMatchProd_unpublishedByeMatch_throwsMatchNotFound", async () => {
+    match = { ...match, is_bye: 1 };
+    jest.mocked(assertMatchTournamentOpen).mockRejectedValueOnce(new Error("MATCH_NOT_FOUND"));
+
+    await expect(claimMatchProd(42, prodActor)).rejects.toThrow("MATCH_NOT_FOUND");
+  });
+});
+
+describe("claimMatchProd — prod tue qui tenait la place", () => {
+  it("claimMatchProd_unfitHolderReleased_writesClaimant", async () => {
+    match = { ...match, prod_user_id: OTHER_PROD_ID };
+    jest.mocked(releaseUnfitProd).mockImplementationOnce(async (_connection, row) => {
+      row.prod_user_id = null;
+      return true;
+    });
+
+    await claimMatchProd(42, prodActor);
+
+    expect(updatesOfProd()).toEqual([[expect.any(String), [PROD_ID, 42]]]);
+    expect(releaseUnfitProd).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 42 }), true);
+  });
+
+  it("claimMatchProd_fitHolderKept_throwsMatchProdTaken", async () => {
+    match = { ...match, prod_user_id: OTHER_PROD_ID };
+    jest.mocked(releaseUnfitProd).mockResolvedValueOnce(false);
+
+    await expect(claimMatchProd(42, prodActor)).rejects.toThrow("MATCH_PROD_TAKEN");
+    expect(updatesOfProd()).toHaveLength(0);
+  });
+
+  it("claimMatchProd_ownPlace_doesNotJudgeItself", async () => {
+    match = { ...match, prod_user_id: PROD_ID };
+
+    await claimMatchProd(42, prodActor);
+
+    expect(releaseUnfitProd).not.toHaveBeenCalled();
+  });
+});
+
+describe("announceProdWithdrawals — suspension", () => {
+  it("announceProdWithdrawals_unavailable_logsAndNoticesWithoutReason", async () => {
+    announceProdWithdrawals(PROD_ID, [{ matchId: 42, tournamentId: 7, pairing: { team1Id: 10, team2Id: 11 } }], "UNAVAILABLE");
+    await settle();
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("la prod n'est plus disponible");
+    const message = jest.mocked(notifyUsers).mock.calls[0][1].discord?.message("fr");
+    expect(message).toContain("Ton compte ne peut plus faire la prod pour le moment");
+    expect(message).not.toContain("suspendu");
   });
 });
 

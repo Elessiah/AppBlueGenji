@@ -4,10 +4,15 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/notify");
 jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://site.test" }));
+jest.mock("@/lib/server/tournaments/match-prod", () => ({
+  withdrawLostProdPlaces: jest.fn(),
+  announceProdWithdrawals: jest.fn(),
+}));
 
 import { getDatabase } from "@/lib/server/database";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
+import { announceProdWithdrawals, withdrawLostProdPlaces } from "@/lib/server/tournaments/match-prod";
 import {
   AccountSuspendedError,
   activeSuspensionSql,
@@ -44,6 +49,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(loadNotificationRecipients).mockResolvedValue([{ userId: 5, discord: null }]);
+  jest.mocked(withdrawLostProdPlaces).mockResolvedValue([]);
   jest.mocked(notifyUsers).mockResolvedValue({ discord: { sent: 0, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 0 });
 });
 
@@ -216,6 +222,36 @@ describe("suspendAccount", () => {
     expect(en).not.toContain("Faits retenus");
     expect(resolvePush(notification.push).url).toBe("/connexion");
     expect(resolvePush(notification.push).body).not.toContain(input.reason);
+  });
+
+  it("suspendAccount_heldProdPlaces_releasedInTransactionAndAnnouncedUnavailable", async () => {
+    const connection = transaction();
+    const released = [{ matchId: 42, tournamentId: 7, pairing: { team1Id: 10, team2Id: 11 } }];
+    jest.mocked(withdrawLostProdPlaces).mockResolvedValueOnce(released);
+
+    await suspendAccount(5, input, actor);
+
+    expect(withdrawLostProdPlaces).toHaveBeenCalledWith(expect.anything(), 5);
+    expect(jest.mocked(withdrawLostProdPlaces).mock.invocationCallOrder[0]).toBeLessThan(
+      connection.commit.mock.invocationCallOrder[0],
+    );
+    expect(announceProdWithdrawals).toHaveBeenCalledWith(5, released, "UNAVAILABLE");
+  });
+
+  it("suspendAccount_noProdPlace_announcesNothing", async () => {
+    transaction();
+
+    await suspendAccount(5, input, actor);
+
+    expect(announceProdWithdrawals).not.toHaveBeenCalled();
+  });
+
+  it("suspendAccount_refused_releasesNoProdPlace", async () => {
+    transaction([{ is_admin: 1 }]);
+
+    await expect(suspendAccount(5, input, actor)).rejects.toThrow("CANNOT_SUSPEND_ADMIN");
+    expect(withdrawLostProdPlaces).not.toHaveBeenCalled();
+    expect(announceProdWithdrawals).not.toHaveBeenCalled();
   });
 
   it("refuse son propre compte sans rien ouvrir", async () => {

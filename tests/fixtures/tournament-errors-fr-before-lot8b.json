@@ -1,5 +1,5 @@
 {
-  "count": 248,
+  "count": 249,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -237,6 +237,7 @@
     "SCHEDULE_DEADLINE_TOO_SOON": "La date butoir doit être au moins 24 heures devant.",
     "SCHEDULE_DEADLINE_UPDATE_FAILED": "La date butoir n'a pas pu être enregistrée. Réessaie dans un instant.",
     "CASTER_IS_PROD": "Tu fais la prod de ce match : tu ne peux pas aussi le caster.",
+    "CASTER_IS_PLANNED_PROD": "Le planning te tient la prod de ce match : tu ne peux pas aussi le caster.",
     "MATCH_PROD_ASSIGN_FAILED": "La prod du match n'a pas pu être enregistrée. Réessaie dans un instant.",
     "MATCH_PROD_CLAIM_FAILED": "Ta place de prod n'a pas pu être enregistrée. Réessaie dans un instant.",
     "MATCH_PROD_PANEL_FAILED": "La fenêtre de la prod n'a pas pu être chargée. Réessaie dans un instant.",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { formatProdChangeLog } from "@/lib/shared/bot-logs";
-import { prodControls, prodNoticeHref, type ProdNoticeMatch, type ProdViewer } from "@/lib/shared/match-prod";
+import { prodClaimOpen, prodControls, prodNoticeHref, type ProdNoticeMatch, type ProdViewer } from "@/lib/shared/match-prod";
 import { can } from "@/lib/shared/permissions";
 import { matchProdPush } from "@/lib/shared/push-messages";
 import { bracketMatch } from "../../helpers/bracket-match";
@@ -98,6 +98,20 @@ describe("prodControls", () => {
 
     expect(controls.isProd).toBe(false);
     expect(controls.showRelease).toBe(false);
+  });
+});
+
+describe("prodClaimOpen", () => {
+  it("prodClaimOpen_running_true", () => {
+    expect(prodClaimOpen("RUNNING")).toBe(true);
+  });
+
+  it("prodClaimOpen_finished_false", () => {
+    expect(prodClaimOpen("FINISHED")).toBe(false);
+  });
+
+  it("prodClaimOpen_registration_false", () => {
+    expect(prodClaimOpen("REGISTRATION")).toBe(false);
   });
 });
 

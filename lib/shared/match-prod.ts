@@ -15,7 +15,7 @@
  */
 import { isByeMatch } from "./match-page";
 import { tournamentMatchHref } from "./match-anchor";
-import type { BracketMatch } from "./types";
+import type { BracketMatch, TournamentState } from "./types";
 
 /** La prod d'un match telle que l'instantané la porte : son compte et son pseudo public. */
 export type MatchProd = { userId: number; pseudo: string };
@@ -47,6 +47,15 @@ export type ProdControls = {
   /** « Prod du match » (fenêtre du staff) : placer, changer ou retirer la prod. */
   showAssign: boolean;
 };
+
+/**
+ * « Faire la prod » ne s'offre que dans un tournoi en cours : le serveur le
+ * refuse ailleurs (`MATCH_NOT_LAUNCHABLE`), staff compris — le staff place une
+ * prod d'avance par sa fenêtre « Prod du match ».
+ */
+export function prodClaimOpen(state: TournamentState): boolean {
+  return state === "RUNNING";
+}
 
 /**
  * Ce que la carte offre de la prod. Même ouverture que le cast : un match à

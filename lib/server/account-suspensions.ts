@@ -17,6 +17,8 @@
  * sessions expirées qu'elle suit.
  */
 import { closeUserStreams } from "@/lib/server/session-streams";
+import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
+import { announceProdWithdrawals, withdrawLostProdPlaces, type ReleasedProdPlace } from "@/lib/server/tournaments/match-prod";
 import { failureReason } from "@/lib/server/failure-reason";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -172,6 +174,10 @@ function termsUrl(ground: SuspensionGround): string {
  * relire l'état qu'elle juge) : contrôle du compte, refus d'une seconde
  * suspension, écriture, puis effacement de toutes les sessions du compte.
  *
+ * Ses places de prod sur des matchs pas encore lancés lui sont retirées dans
+ * la même transaction (`withdrawLostProdPlaces`, `docs/features/MATCH_PROD.md`),
+ * annoncées après le commit sans dire pourquoi (`UNAVAILABLE`).
+ *
  * Le titulaire est prévenu **après le commit** (message privé et push, jamais
  * attendus), et le geste part au journal du staff sans le pseudo du joueur.
  *
@@ -189,43 +195,49 @@ export async function suspendAccount(
 ): Promise<AccountSuspensionView> {
   if (targetUserId === actor.id) throw new Error("CANNOT_SUSPEND_SELF");
   const db = await getDatabase();
-  const connection = await db.getConnection();
-  let view: AccountSuspensionView;
-  try {
-    await connection.beginTransaction();
-    const [users] = await connection.execute<(RowDataPacket & { is_admin: 0 | 1 })[]>(
-      `SELECT is_admin FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
-      [targetUserId],
-    );
-    if (users.length === 0) throw new Error("USER_NOT_FOUND");
-    if (Number(users[0].is_admin) === 1) throw new Error("CANNOT_SUSPEND_ADMIN");
-    if (await getActiveSuspension(targetUserId, connection)) throw new Error("ACCOUNT_ALREADY_SUSPENDED");
+  // Les places de prod verrouillent des matchs après le compte ; un geste de
+  // match qui relit le compte après son match peut s'y croiser : l'interblocage se rejoue.
+  const { view, releasedProd } = await retryOnDeadlock(async () => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [users] = await connection.execute<(RowDataPacket & { is_admin: 0 | 1 })[]>(
+        `SELECT is_admin FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
+        [targetUserId],
+      );
+      if (users.length === 0) throw new Error("USER_NOT_FOUND");
+      if (Number(users[0].is_admin) === 1) throw new Error("CANNOT_SUSPEND_ADMIN");
+      if (await getActiveSuspension(targetUserId, connection)) throw new Error("ACCOUNT_ALREADY_SUSPENDED");
 
-    const [inserted] = await connection.execute<ResultSetHeader>(
-      `INSERT INTO bg_account_suspensions (user_id, reason, ground, starts_at, ends_at, created_by)
-       VALUES (?, ?, ?, NOW(), ${input.durationDays === null ? "NULL" : "DATE_ADD(NOW(), INTERVAL ? DAY)"}, ?)`,
-      input.durationDays === null
-        ? [targetUserId, input.reason, input.ground, actor.id]
-        : [targetUserId, input.reason, input.ground, input.durationDays, actor.id],
-    );
-    const [rows] = await connection.execute<SuspensionRow[]>(
-      `SELECT id, reason, ground, starts_at, ends_at, lifted_at FROM bg_account_suspensions WHERE id = ?`,
-      [inserted.insertId],
-    );
-    view = toView(rows[0]);
-    await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [targetUserId]);
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
+      const [inserted] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO bg_account_suspensions (user_id, reason, ground, starts_at, ends_at, created_by)
+         VALUES (?, ?, ?, NOW(), ${input.durationDays === null ? "NULL" : "DATE_ADD(NOW(), INTERVAL ? DAY)"}, ?)`,
+        input.durationDays === null
+          ? [targetUserId, input.reason, input.ground, actor.id]
+          : [targetUserId, input.reason, input.ground, input.durationDays, actor.id],
+      );
+      const [rows] = await connection.execute<SuspensionRow[]>(
+        `SELECT id, reason, ground, starts_at, ends_at, lifted_at FROM bg_account_suspensions WHERE id = ?`,
+        [inserted.insertId],
+      );
+      const suspension = toView(rows[0]);
+      await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [targetUserId]);
+      const released: ReleasedProdPlace[] = await withdrawLostProdPlaces(connection, targetUserId);
+      await connection.commit();
+      return { view: suspension, releasedProd: released };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  });
 
   // Après le commit : un flux fermé sur une suspension défaite par un rollback
   // aurait seulement fait se reconnecter le client, mais la règle est la même
   // partout — on ne ferme que ce qui est réellement révoqué.
   closeUserStreams(targetUserId);
+  if (releasedProd.length > 0) announceProdWithdrawals(targetUserId, releasedProd, "UNAVAILABLE");
 
   publishStaffAction(formatSuspensionLog({ id: view.id, ground: view.ground, endsAt: view.endsAt }), actor, { category: "moderation" });
   void loadNotificationRecipients([targetUserId], "proven")

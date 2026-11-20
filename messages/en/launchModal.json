@@ -46,6 +46,7 @@
     "MATCH_CAST_CLAIM_FAILED": "Your casting sign-up could not be saved. Try again in a moment.",
     "MATCH_CAST_RELEASE_FAILED": "Your cast withdrawal could not be saved. Try again in a moment.",
     "CASTER_IS_PROD": "You're this match's prod: you can't cast it as well.",
+    "CASTER_IS_PLANNED_PROD": "The planning holds you as this match's prod: you can't cast it as well.",
     "NOT_PROD": "Doing a match's prod requires the prod role.",
     "MATCH_PROD_TAKEN": "This match already has a prod.",
     "PROD_IS_PLAYER": "This account plays this match: it cannot be its prod.",
