@@ -287,7 +287,8 @@ function withdrawnAssignment(user: { id: number }, input: WithdrawalInput, data:
  * défait le geste. Rend l'arbitre que le match porte déjà quand c'est **un
  * autre** (changé depuis la fenêtre « Arbitrage » entre la lecture et ce
  * retrait) : le rôle est tenu, il n'y a ni remplaçant à chercher ni place à
- * pourvoir. `null` sinon.
+ * pourvoir. `null` sinon. `guestRelease` : sortie d'un invité, retrait sans
+ * ligne de journal ni avis à l'invité (`assignMatchReferee`).
  */
 async function releaseMatchReferee(
   matchId: number,
@@ -295,11 +296,12 @@ async function releaseMatchReferee(
   actorId: number,
   undo: PlanningUndo,
   eventIds: readonly number[],
+  guestRelease: boolean,
 ): Promise<number | null> {
   const carried = await readMatchReferee(matchId);
   if (carried !== undefined && carried !== userId) return carried;
   try {
-    await assignMatchReferee(matchId, actorId, null, userId);
+    await assignMatchReferee(matchId, actorId, null, userId, { guestRelease });
   } catch (error) {
     await settleFailedDesignation(error, matchId, null, undo, eventIds);
     throw error;
@@ -490,7 +492,7 @@ async function withdrawMember(
       ]);
       return [await writeWithdrawalEvent(connection, entry, user.id, input, confirmed, late, user.actorId)];
     });
-    const heldBy = matchId !== null && undo !== undefined ? await releaseMatchReferee(matchId, user.id, user.actorId ?? user.id, undo, eventIds) : null;
+    const heldBy = matchId !== null && undo !== undefined ? await releaseMatchReferee(matchId, user.id, user.actorId ?? user.id, undo, eventIds, user.actorId !== null) : null;
     if (heldBy !== null) {
       // Les co-affectés se lisent dans `data` (lu sous le même verrou) : seule la ligne du désisté a changé.
       return {

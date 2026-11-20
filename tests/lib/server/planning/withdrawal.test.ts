@@ -330,7 +330,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     expect(result.replaced).toBe(true);
     expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([
-      [1, 3, null, 3],
+      [1, 3, null, 3, { guestRelease: false }],
       [1, 3, 5, null, { refuseSuspended: true }],
     ]);
   });
@@ -1380,7 +1380,7 @@ describe("releaseGuestPlanning (`CAST_PLANNING.md` § Invités)", () => {
 
     await releaseGuestPlanning(GUEST, STAFF, EARLY);
 
-    expect(jest.mocked(assignMatchReferee).mock.calls[0]).toEqual([1, STAFF, null, GUEST]);
+    expect(jest.mocked(assignMatchReferee).mock.calls[0]).toEqual([1, STAFF, null, GUEST, { guestRelease: true }]);
   });
 
   it("releaseGuestPlanning_alreadyGone_skippedNotFailed", async () => {

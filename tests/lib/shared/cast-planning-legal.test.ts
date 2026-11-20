@@ -204,3 +204,46 @@ describe("planning — /rgpd", () => {
     expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("(administrator, referee, caster, prod, community");
   });
 });
+
+// Revue juridique 1 (PLANNING-GUESTS) : textes vrais sur la marque « invité ».
+describe("planning — invités (registre T20, PRIVACY_CHANGES, /rgpd)", () => {
+  const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-11-planning-invites");
+  const entryEn = PRIVACY_CHANGES_EN["2026-11-planning-invites"];
+
+  it("planningInvites_entry_saysOtherRightsNotStreaming", () => {
+    expect(entry?.summary).toContain("garde ses autres droits");
+    expect(entryEn?.summary).toContain("keep their other rights");
+    expect(`${entry?.summary} ${entry?.details.join(" ")}`).not.toContain("droits de diffusion");
+    expect(`${entryEn?.summary} ${entryEn?.details.join(" ")}`).not.toContain("streaming rights");
+  });
+
+  it("planningInvites_entry_namesTournamentStaffAndOwnProfile", () => {
+    expect(entry?.details.join(" ")).toContain("Le staff des tournois voit, dans l'historique du planning");
+    expect(entry?.details.join(" ")).toContain("l'invité sur « Mon profil »");
+    expect(entryEn?.details.join(" ")).toContain("The tournament staff sees, in the schedule history");
+    expect(entryEn?.details.join(" ")).toContain("the guest on “My profile”");
+  });
+
+  it("planningInvites_entry_saysRefereeRoleIncludedAndNoNotice", () => {
+    expect(entry?.details.join(" ")).toContain("rôle d'arbitre compris");
+    expect(entry?.details.join(" ")).toContain("sans avis à l'invité");
+    expect(entryEn?.details.join(" ")).toContain("the referee role included");
+    expect(entryEn?.details.join(" ")).toContain("without notifying the guest");
+  });
+
+  it("t20_recipients_exceptGuestReleaseFromDiscordLines", () => {
+    expect(t20(PROCESSING_ACTIVITIES).recipients.join(" ")).toContain("(sauf celle laissée par la sortie d'un invité)");
+    expect(t20(PROCESSING_ACTIVITIES_EN).recipients.join(" ")).toContain("(except one left by the removal of a guest)");
+  });
+
+  it("t20_retention_guestMarkEndsWithLastCasterOrProdRole", () => {
+    expect(t20(PROCESSING_ACTIVITIES).retention.join(" ")).toContain("retirée avec le dernier d'entre eux");
+    expect(t20(PROCESSING_ACTIVITIES_EN).retention.join(" ")).toContain("removed with the last of them");
+    expect(t20(PROCESSING_ACTIVITIES).retention.join(" ")).toContain("sa marque « invité »");
+  });
+
+  it("rgpd_fr_en_guestParagraph_otherRights", () => {
+    expect(readSource("app/rgpd/page.tsx")).toContain("il garde ses autres droits mais sort du planning");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("they keep their other rights but leave the schedule");
+  });
+});

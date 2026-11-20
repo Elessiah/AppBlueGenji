@@ -13,7 +13,7 @@ import { releaseGuestPlanning, type GuestRelease } from "@/lib/server/planning/w
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { releaseWithServerLockWait, rollbackKeepingError } from "@/lib/server/tournaments/lock-wait";
 import type { StaffActor } from "@/lib/shared/log-privacy";
-import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
+import { holdsGuestEligibleRole } from "@/lib/shared/permissions";
 
 /** Ce que l'enregistrement a fait. */
 export type PlanningGuestSaveResult = {
@@ -39,13 +39,9 @@ export function planningGuestAuditLine(targetUserId: number, saved: PlanningGues
   return `🎙️ Compte #${targetUserId} ${head}${detail}.`;
 }
 
-/** Les rôles d'un compte qui peut être marqué invité : le drapeau sort un caster ou un prod du planning. */
-const GUEST_ELIGIBLE_ROLES: readonly PlatformRole[] = ["CASTER", "PROD"];
-
-/** Le compte tient un rôle de caster ou de prod (rôles cumulables enregistrés). */
-export function holdsGuestEligibleRole(rolesJson: unknown): boolean {
-  return sanitizePlatformRoles(rolesJson).some((role) => GUEST_ELIGIBLE_ROLES.includes(role));
-}
+// Les rôles qui rendent un compte marquable : `lib/shared/permissions.ts`
+// (lus aussi par `setUserRoles`, qui retire la marque avec le dernier d'entre eux).
+export { holdsGuestEligibleRole };
 
 type LockedUserRow = RowDataPacket & {
   id: number;

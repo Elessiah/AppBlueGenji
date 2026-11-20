@@ -375,7 +375,9 @@ règle a changé avec l'arbitre hôte.
   privé, avec le motif (`STAFF`, `REPLACED`, `SELF_MANAGED`, `OBJECTION`, `INELIGIBLE`,
   `JOINED_TEAM`). L'auteur du geste n'est jamais prévenu de son propre
   retrait (`actorId` : un arbitre-staff qui se remplace ou passe son match en
-  autogestion). Une reprise par « Je prends ce match » donne le vrai motif :
+  autogestion). La sortie d'un invité du planning (`guestRelease`,
+  `CAST_PLANNING.md` § Invités) retire l'arbitre sans avis ni ligne de journal
+  par match. Une reprise par « Je prends ce match » donne le vrai motif :
   `OBJECTION`, `JOINED_TEAM` ou `INELIGIBLE`. File d'après commit `queueRefereeChange` /
   `flushRefereeChanges`, vidée par `flushBotLogs` et jetée par `discardBotLogs`.
 - **Sans arbitre ni autogestion** à l'entrée en lancement : alerte

@@ -95,8 +95,10 @@ la requête : une requête mal formée n'use pas ce quota). Le refus `429`
 ## Invités (casters et prods hors planning)
 
 L'association distingue ses casters et prods de ceux qu'elle **invite** : un
-invité garde son rôle et ses droits (`casting`, `live`, cast d'un match,
-arbitrage s'il est arbitre) mais ne fait pas partie du planning.
+invité garde son rôle et ses autres droits (`casting`, `live`, cast d'un match
+pour un caster ; un prod, qui ne tient que `planning`, n'en garde aucun ;
+`tournaments` pour un arbitre) mais ne fait pas partie du planning, rôle
+d'arbitre compris.
 
 - **Stockage** : `bg_users.is_guest_staff` (case « Invité » de la fiche du
   joueur, bloc « Rôles & permissions », `PlanningGuestField`, avec son `InfoHint`
@@ -121,7 +123,13 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
   identifiant existe), une promotion concurrente attend ou est refusée. Une
   promotion en administrateur (`setUserRoles`) retire le drapeau dans sa
   transaction : il ne reprendrait pas effet à une rétrogradation ou une
-  incarnation. Une disponibilité enregistrée en même temps que le drapeau
+  incarnation. Le retrait du dernier rôle `CASTER`/`PROD` le retire de même
+  (la marque n'a plus d'objet : registre T20, conservation).
+- **Le titulaire la voit** : « Mon profil », section Notifications, une ligne
+  en lecture seule « Compte invité : hors du planning… » avec son `InfoHint`
+  (`PlanningGuestNotice`, `ownPlanningGuest` lu avec la session par
+  `/api/profile`, FR et EN `profile.planningGuest`) — le planning ne le
+  prévient plus, la fiche le lui dit. Une disponibilité enregistrée en même temps que le drapeau
   s'écrit sous condition (`is_guest_staff = 0`, relu par l'écriture) : elle ne
   revient pas après l'effacement de la sortie. Les avis « place à pourvoir »
   (message privé, push) partent encore, un par place, au seul staff des
@@ -164,7 +172,9 @@ arbitrage s'il est arbitre) mais ne fait pas partie du planning.
   (`actor_user_id`) et la marque `staff_release` (indépendante de l'auteur, que
   la suppression du compte du staff efface), n'est jamais tardif, n'écarte pas
   le compte des calculs suivants s'il redevient membre (`removals` ignore un
-  `WITHDRAWN` marqué), et le retrait d'un arbitre du match nomme le staff. Le
+  `WITHDRAWN` marqué), et le retrait d'un arbitre du match nomme le staff, sans
+  ligne de journal par match ni push `REFEREE_RELEASED` à l'invité
+  (`assignMatchReferee(…, { guestRelease })`, `RefereeChange.guestRelease`). Le
   tableau du staff le montre « Sorti par le staff », l'export du compte le dit
   (`staffRelease`, dans son historique comme dans les gestes de staff de
   l'auteur), et les avis le disent « retiré du planning » plutôt que

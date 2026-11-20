@@ -479,6 +479,30 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
     expect(connection.execute.mock.calls.some(([sql]) => String(sql).includes("is_guest_staff"))).toBe(false);
   });
 
+  // Revue juridique 1 (PLANNING-GUESTS) : la marque ne vise qu'un caster ou un prod (registre T20) ;
+  // elle tombe avec le dernier de ces rôles au lieu de rester sans objet.
+  it("setUserRoles_lastCasterRoleRemoved_clearsGuestFlagBeforeCommit", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["CASTER"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    await setUserRoles(7, ["ARBITRE"], 3);
+
+    const [guestSql, guestParams] = connection.execute.mock.calls[2] as [string, unknown[]];
+    expect(guestSql).toBe("UPDATE bg_users SET is_guest_staff = 0 WHERE id = ? AND is_deleted = 0 AND is_guest_staff = 1");
+    expect(guestParams).toEqual([7]);
+    expect(connection.execute.mock.invocationCallOrder[2]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  it("setUserRoles_casterKeptProdRemoved_leavesGuestFlag", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["CASTER","PROD"]' }]);
+
+    await setUserRoles(7, ["CASTER"], 3);
+
+    expect(connection.execute.mock.calls.some(([sql]) => String(sql).includes("is_guest_staff"))).toBe(false);
+  });
+
   it("setUserRoles_nonAdminRoleGranted_doesNotTouchSessions", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
@@ -568,7 +592,8 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
 
     await setUserRoles(7, ["ARBITRE"], 3, ["CASTER"]);
 
-    expect(connection.execute).toHaveBeenCalledTimes(2);
+    // Verrou, écriture, puis la marque « invité » retirée avec le dernier rôle de caster.
+    expect(connection.execute).toHaveBeenCalledTimes(3);
     expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 

@@ -11,6 +11,7 @@ import type { StaffActor } from "@/lib/shared/log-privacy";
 import {
   ROLE_LABELS,
   diffPlatformRoles,
+  holdsGuestEligibleRole,
   roleChangeNeedsConfirmation,
   sanitizePlatformRoles,
   type PlatformRole,
@@ -49,8 +50,9 @@ function storedRoles(row: { is_admin: unknown; platform_roles_json: unknown }): 
 }
 
 /**
- * Retire le drapeau « invité » d'un compte promu administrateur (`CAST_PLANNING.md`
- * § Invités), dans la transaction de la promotion. Une colonne absente (son
+ * Retire le drapeau « invité » d'un compte promu administrateur, ou qui perd son
+ * dernier rôle de caster ou de prod (`CAST_PLANNING.md` § Invités), dans la
+ * transaction de l'enregistrement. Une colonne absente (son
  * `ALTER` en échec) n'empêche pas la promotion : il n'y a alors aucun drapeau.
  */
 async function clearGuestFlag(connection: PoolConnection, userId: number): Promise<void> {
@@ -209,7 +211,10 @@ export async function setUserRoles(
       // Promotion : un drapeau « invité » resté posé (`CAST_PLANNING.md` § Invités)
       // tombe — il ne vise pas un administrateur (`PLANNING_GUEST_ADMIN`), et
       // reprendrait effet, sans geste, à une rétrogradation ou à une incarnation.
-      if (isAdmin && !wasAdmin) await clearGuestFlag(connection, targetUserId);
+      // Dernier rôle de caster ou de prod retiré : la marque, qui ne vise qu'eux,
+      // n'a plus d'objet et tombe aussi (registre T20, durée de conservation).
+      const lostGuestRole = holdsGuestEligibleRole(previous) && !holdsGuestEligibleRole(nonAdminRoles);
+      if ((isAdmin && !wasAdmin) || lostGuestRole) await clearGuestFlag(connection, targetUserId);
     }
     await connection.commit();
   } catch (error) {

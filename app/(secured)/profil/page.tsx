@@ -50,6 +50,7 @@ import { MatchDmField } from "./_components/MatchDmField";
 import { DiscordDmTestButton } from "./_components/DiscordDmTestButton";
 import { RecruitmentModalField } from "./_components/RecruitmentModalField";
 import { SelfRolesSection } from "./_components/SelfRolesField";
+import { PlanningGuestNotice } from "./_components/PlanningGuestNotice";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { useCertifyRequest } from "./useCertifyRequest";
 import { certifiedFromProfileEvent } from "@/lib/shared/discord-certify-prompt";
@@ -1245,6 +1246,7 @@ export default function ProfilePage() {
           onChoice={reportMatchDmChoice}
         />
         <RecruitmentModalField initialOff={data?.recruitmentModalOff} onSaved={() => router.refresh()} />
+        <PlanningGuestNotice guest={data?.ownPlanningGuest} />
       </ProfileSection>
 
       {invitations.length > 0 && (

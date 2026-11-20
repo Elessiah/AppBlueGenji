@@ -81,6 +81,34 @@ describe("GET /api/profile", () => {
     expect(getFullProfile).toHaveBeenCalledTimes(1);
   });
 
+  // Revue juridique 1 (PLANNING-GUESTS) : le titulaire voit sa propre marque « invité ».
+  it("GET_nonAdminGuestSession_returnsOwnPlanningGuestTrue", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42, roles: ["CASTER"], planningGuest: true }));
+    jest.mocked(getFullProfile).mockResolvedValue(profile);
+
+    const body = (await (await GET()).json()) as { ownPlanningGuest?: boolean };
+
+    expect(body.ownPlanningGuest).toBe(true);
+  });
+
+  it("GET_memberSession_omitsOwnPlanningGuest", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42, roles: ["CASTER"] }));
+    jest.mocked(getFullProfile).mockResolvedValue(profile);
+
+    const body = (await (await GET()).json()) as { ownPlanningGuest?: boolean };
+
+    expect(body).not.toHaveProperty("ownPlanningGuest");
+  });
+
+  it("GET_adminSessionWithGuestFlag_omitsOwnPlanningGuest", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42, isAdmin: true, roles: ["ADMIN"], planningGuest: true }));
+    jest.mocked(getFullProfile).mockResolvedValue(profile);
+
+    const body = (await (await GET()).json()) as { ownPlanningGuest?: boolean };
+
+    expect(body).not.toHaveProperty("ownPlanningGuest");
+  });
+
   it("rend 404 quand le compte n'existe plus", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     jest.mocked(getFullProfile).mockResolvedValue(null);

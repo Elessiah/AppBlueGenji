@@ -1150,6 +1150,12 @@ export type FullProfileResponse = {
    * `GET`/`PATCH /api/profile` : absent de toute autre fiche.
    */
   recruitmentModalOff?: boolean;
+  /**
+   * Sa propre marque « invité » (hors planning, `CAST_PLANNING.md` § Invités),
+   * lue avec la session par `GET`/`PATCH /api/profile` : `true` seulement pour
+   * son titulaire marqué, absente sinon et de toute autre fiche.
+   */
+  ownPlanningGuest?: boolean;
 };
 
 /**

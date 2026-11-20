@@ -169,6 +169,10 @@
     "enabledNotCertified": "Messages privés de match et d'équipe activés : ceux de tes matchs partiront une fois ton tag Discord certifié, ceux de tes équipes dès que ton compte Discord est lié.",
     "disabled": "Messages privés de match et d'équipe coupés."
   },
+  "planningGuest": {
+    "label": "Compte invité : hors du planning des casts et arbitres",
+    "hint": "Le staff qui attribue les rôles t'a marqué comme invité : tu gardes tes autres droits, mais le planning ne te propose, ne te désigne ni ne te prévient plus. Pour t'y opposer, contacte le staff (page « Confidentialité »)."
+  },
   "recruitmentModal": {
     "label": "Fenêtre des annonces de recrutement urgentes",
     "hint": "Cochée (par défaut), une fenêtre te présente à ton arrivée les annonces de recrutement urgentes pas encore vues. Décochée, elle ne s'ouvre plus d'elle-même ; les annonces restent sur la page Recrutement.",

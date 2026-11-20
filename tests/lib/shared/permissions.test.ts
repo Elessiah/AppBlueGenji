@@ -6,6 +6,7 @@ import {
   canAny,
   canComputePlanning,
   hasPermission,
+  holdsGuestEligibleRole,
   isPlatformRole,
   isStaffMember,
   permissionsForRoles,
@@ -239,5 +240,23 @@ describe("can — invités du planning (`CAST_PLANNING.md` § Invités)", () => 
 
   it("canAny_planningGuest_planningOnlyDenied", () => {
     expect(canAny({ roles: ["CASTER"], planningGuest: true }, ["planning"])).toBe(false);
+  });
+});
+
+describe("holdsGuestEligibleRole — la marque « invité » ne vise qu'un caster ou un prod", () => {
+  it("holdsGuestEligibleRole_prodJson_true", () => {
+    expect(holdsGuestEligibleRole('["PROD"]')).toBe(true);
+  });
+
+  it("holdsGuestEligibleRole_casterList_true", () => {
+    expect(holdsGuestEligibleRole(["ARBITRE", "CASTER"])).toBe(true);
+  });
+
+  it("holdsGuestEligibleRole_arbitreOnly_false", () => {
+    expect(holdsGuestEligibleRole('["ARBITRE"]')).toBe(false);
+  });
+
+  it("holdsGuestEligibleRole_invalidJson_false", () => {
+    expect(holdsGuestEligibleRole("not json")).toBe(false);
   });
 });

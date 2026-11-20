@@ -130,6 +130,14 @@ export function sanitizePlatformRoles(input: unknown): PlatformRole[] {
   return PLATFORM_ROLES.filter((role) => set.has(role));
 }
 
+/** Les rôles d'un compte qui peut être marqué invité : la marque sort un caster ou un prod du planning (`CAST_PLANNING.md` § Invités). */
+const GUEST_ELIGIBLE_ROLES: readonly PlatformRole[] = ["CASTER", "PROD"];
+
+/** Le compte tient un rôle de caster ou de prod (rôles cumulables enregistrés, JSON ou liste). */
+export function holdsGuestEligibleRole(rolesJson: unknown): boolean {
+  return sanitizePlatformRoles(rolesJson).some((role) => GUEST_ELIGIBLE_ROLES.includes(role));
+}
+
 /** Ensemble des permissions débloquées par un ensemble de rôles (cumul). */
 export function permissionsForRoles(roles: readonly PlatformRole[]): Set<Permission> {
   const permissions = new Set<Permission>();

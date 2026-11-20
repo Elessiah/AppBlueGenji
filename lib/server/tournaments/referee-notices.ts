@@ -39,8 +39,14 @@ export type RefereeChange =
    * `actorId` : l'auteur du geste (l'arbitre qui se remplace n'est pas prévenu).
    */
   | { kind: "ASSIGNED"; matchId: number; replacedRefereeId: number | null; actorId?: number }
-  /** Arbitrage retiré par son arbitre (`byStaff: false`) ou par le staff. */
-  | { kind: "RELEASED"; matchId: number; refereeId: number; byStaff: boolean }
+  /**
+   * Arbitrage retiré par son arbitre (`byStaff: false`) ou par le staff.
+   * `guestRelease` : retrait par la sortie d'un invité du planning
+   * (`CAST_PLANNING.md` § Invités) — ni ligne de journal par match (leur
+   * rafale, juste après la ligne anonyme de la marque, désignerait le compte),
+   * ni avis à l'invité, que le planning ne prévient plus.
+   */
+  | { kind: "RELEASED"; matchId: number; refereeId: number; byStaff: boolean; guestRelease?: true }
   /**
    * Arbitrage retiré parce que l'opposition de l'arbitre est retenue par le
    * staff : aucune ligne de journal par match (la route en écrit une seule,
@@ -136,7 +142,7 @@ export function refereeReleaseNotice(
       if (change.replacedRefereeId === null || change.replacedRefereeId === change.actorId) return null;
       return { refereeId: change.replacedRefereeId, reason: "REPLACED" };
     case "RELEASED":
-      return change.byStaff ? { refereeId: change.refereeId, reason: "STAFF" } : null;
+      return change.byStaff && !change.guestRelease ? { refereeId: change.refereeId, reason: "STAFF" } : null;
     case "OBJECTION_RELEASED":
       return { refereeId: change.refereeId, reason: "OBJECTION" };
     case "AUTO_RELEASED":
@@ -160,7 +166,11 @@ export async function deliverRefereeChange(change: RefereeChange, options: Refer
   // la ligne anonyme de la route désigneraient leur arbitre comme celui qui
   // s'oppose ; seule cette ligne, sans nombre, part sur Discord.
   // Hors de ce retrait en série (`takenOver`), la ligne du match part, motif générique.
-  const silent = options.log === false || (change.kind === "OBJECTION_RELEASED" && !change.takenOver);
+  // Sortie d'un invité : aucune ligne non plus (`guestRelease`).
+  const silent =
+    options.log === false ||
+    (change.kind === "OBJECTION_RELEASED" && !change.takenOver) ||
+    (change.kind === "RELEASED" && change.guestRelease === true);
   if (!silent) sendBotLog(
     formatRefereeChangeLog({
       tournament: match.tournament,
