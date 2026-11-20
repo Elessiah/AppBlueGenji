@@ -63,14 +63,6 @@ export async function eraseAccount(
   // D31 : le blocage ne garde que l'empreinte — les lignes de quarantaine du
   // compte partent dans cette transaction.
   await retireAccountQuarantinesOn(connection, userId);
-  // Une prod gardée par un match joué perd son compte par la clé étrangère
-  // (`SET NULL`) : sa marque « posée par le planning » part avec elle (T16) —
-  // sans bloquer l'effacement sur une base où la colonne manque encore.
-  try {
-    await connection.execute(`UPDATE bg_matches SET prod_planned = 0 WHERE prod_user_id = ? AND prod_planned = 1`, [userId]);
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
-  }
   await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
   return withdrawal;
 }

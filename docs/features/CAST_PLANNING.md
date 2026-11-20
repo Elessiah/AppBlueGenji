@@ -515,6 +515,10 @@ rejouée : qui a quitté le match n'y revient pas au geste suivant.
   un par match. Les lignes tenues se lisent par l'index `match_id` de
   `bg_planning_assignments` ; les marques `planned` / `prod_planned` ne sont
   jamais balayées (lues par clé de match ou de compte), elles n'ont pas d'index.
+- **Suppression du compte** : l'effacement retire casts et places, marque
+  comprise ; l'anonymisation garde le cast et la place d'un match joué mais en
+  vide la marque (`withdrawUserCasts`, comme le BattleTag de cast) — registre
+  T16, conservation de la marque.
 - Une panne d'un match est consignée dans pm2 et n'empêche ni les autres
   matchs ni le geste du planning, déjà validé.
 - **Attribution quittée** (`releasePlannedSeat`) : ce que le planning a placé,

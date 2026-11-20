@@ -140,7 +140,8 @@ de charge (`loadPlanningHistory`).
   matchs avant de lire, en une fois, les comptes de leurs prods. Annoncée après
   le commit (`queueProdChange`).
 - Demande de suppression (anonymisation) : places des matchs à jouer rendues,
-  une ligne « retirée d'office » au journal par match (`releasedProdPlaces`) ;
+  une ligne « retirée d'office » au journal par match (`releasedProdPlaces`),
+  la marque `prod_planned` des places gardées sur un match joué vidée ;
   effacement : toutes (`withdrawUserCasts`). Les tournois concernés sont rediffusés.
 - Export : `prodAssignments` (match, tournoi, `planned`) — `RGPD_DATA_RIGHTS.md`.
 - Textes légaux : registre T16 (base, en fin de champ « Base légale » : intérêt légitime, comme le planning T20, la prod pouvant quitter un match pas encore joué (un match joué la garde) et s’y opposer par le formulaire de signalement — aucune clause des conditions, qui ne couvrent que les casters), T04 (avis en message privé et push, même intérêt légitime que l’avis au caster, le message privé coupé par le même interrupteur, la push par son sujet ; prods parmi les personnes concernées), T05 (ligne Discord sans nom ; geste du staff nommé dans pm2 avec les comptes visés), T03 (pseudo sur `/suivre`) ; `/rgpd` FR et EN ; entrée `2026-11-prod-match`.
