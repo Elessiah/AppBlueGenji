@@ -2,10 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/coalescer");
+jest.mock("@/lib/server/periodic-clock");
 
 import { flushAllBotLogBatches } from "@/lib/server/bot-integration";
 import { flushAllCoalescers } from "@/lib/server/coalescer";
-import { flushBotLogsBeforeExit, holdExitUntil, installBotLogShutdownFlush } from "@/lib/server/bot-log-shutdown";
+import { resumeSuspendedPeriodicClocks, stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
+import {
+  SHUTDOWN_FLUSH_TIMEOUT_MS,
+  SHUTDOWN_PASS_WAIT_MS,
+  SHUTDOWN_RESUME_GRACE_MS,
+  flushBotLogsBeforeExit, holdExitUntil, installBotLogShutdownFlush } from "@/lib/server/bot-log-shutdown";
 import { resetBotLogShutdownState } from "@/tests/helpers/bot-log-batches";
 
 /** Arrêt propre : les lots du journal en attente partent (`docs/features/LOG_BATCHING.md`). */
@@ -23,6 +29,7 @@ beforeEach(() => {
   resetBotLogShutdownState();
   jest.mocked(flushAllBotLogBatches).mockResolvedValue();
   jest.mocked(flushAllCoalescers).mockResolvedValue();
+  jest.mocked(stopAllPeriodicClocks).mockResolvedValue();
   handlers = new Map();
   onceSpy = jest.spyOn(process, "once").mockImplementation(((event: string, listener: () => void) => {
     handlers.set(event, listener);
@@ -90,6 +97,22 @@ describe("flushBotLogsBeforeExit — rafales regroupées", () => {
 });
 
 describe("holdExitUntil", () => {
+  it("holdExitUntil_exitRequested_readerSaysSo", () => {
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    const exitRequested = holdExitUntil(new Promise<void>(() => undefined));
+
+    process.exit(0);
+
+    expect(exitRequested()).toBe(true);
+  });
+
+  it("holdExitUntil_noExit_readerSaysNone", async () => {
+    const exitRequested = holdExitUntil(Promise.resolve());
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(exitRequested()).toBe(false);
+  });
+
   it("holdExitUntil_exitCalledDuringTheFlush_deferredUntilItEnds", async () => {
     const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
     let finish: () => void = () => undefined;
@@ -177,6 +200,135 @@ describe("installBotLogShutdownFlush", () => {
     installBotLogShutdownFlush();
     installBotLogShutdownFlush();
     expect(onceSpy.mock.calls.map(([event]) => event)).toEqual(["SIGTERM", "SIGINT"]);
+  });
+
+  it("installBotLogShutdownFlush_signal_stopsBackgroundClocks", async () => {
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(stopAllPeriodicClocks).toHaveBeenCalledTimes(1);
+  });
+
+  it("installBotLogShutdownFlush_clockPassRunning_exitHeldUntilItEnds", async () => {
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    let finish: () => void = () => undefined;
+    jest.mocked(stopAllPeriodicClocks).mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    process.exit(0);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(exit).not.toHaveBeenCalled();
+
+    finish();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it("installBotLogShutdownFlush_clockPassHangs_exitOnceThePassWaitEndsAndBatchesLeft", async () => {
+    jest.useFakeTimers();
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    jest.mocked(stopAllPeriodicClocks).mockReturnValue(new Promise<void>(() => undefined));
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    process.exit(0);
+    await jest.advanceTimersByTimeAsync(SHUTDOWN_PASS_WAIT_MS - 1);
+    expect(exit).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1);
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it("installBotLogShutdownFlush_passAndFlushHang_exitAtTheWholeBudget", async () => {
+    jest.useFakeTimers();
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    jest.mocked(stopAllPeriodicClocks).mockReturnValue(new Promise<void>(() => undefined));
+    jest.mocked(flushAllBotLogBatches).mockReturnValue(new Promise<void>(() => undefined));
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    process.exit(0);
+    await jest.advanceTimersByTimeAsync(SHUTDOWN_FLUSH_TIMEOUT_MS - 1);
+    expect(exit).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1);
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it("installBotLogShutdownFlush_signalWithNextListening_resumesClocksOnlyAfterTheGrace", async () => {
+    jest.useFakeTimers();
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    await jest.advanceTimersByTimeAsync(SHUTDOWN_RESUME_GRACE_MS - 1);
+    expect(resumeSuspendedPeriodicClocks).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
+    expect(resumeSuspendedPeriodicClocks).toHaveBeenCalledTimes(1);
+  });
+
+  it("installBotLogShutdownFlush_exitRequestedDuringTheFlush_neverResumesClocks", async () => {
+    jest.useFakeTimers();
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    process.exit(0);
+    await jest.advanceTimersByTimeAsync(SHUTDOWN_RESUME_GRACE_MS * 2);
+
+    expect(resumeSuspendedPeriodicClocks).not.toHaveBeenCalled();
+  });
+
+  it("installBotLogShutdownFlush_clockPassRunning_batchesFlushedAfterIt", async () => {
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    let finish: () => void = () => undefined;
+    jest.mocked(stopAllPeriodicClocks).mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(flushAllBotLogBatches).not.toHaveBeenCalled();
+
+    finish();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
+  });
+
+  it("installBotLogShutdownFlush_clockPassHangs_batchesFlushedAtThePassWait", async () => {
+    jest.useFakeTimers();
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    jest.mocked(stopAllPeriodicClocks).mockReturnValue(new Promise<void>(() => undefined));
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    await jest.advanceTimersByTimeAsync(SHUTDOWN_PASS_WAIT_MS - 1);
+    expect(flushAllBotLogBatches).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
+  });
+
+  it("installBotLogShutdownFlush_signalWithoutOtherListener_doesNotResumeClocks", async () => {
+    jest.spyOn(process, "listenerCount").mockReturnValue(0);
+    const kill = jest.spyOn(process, "kill").mockImplementation((() => true) as typeof process.kill);
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(kill).toHaveBeenCalled();
+    expect(resumeSuspendedPeriodicClocks).not.toHaveBeenCalled();
   });
 
   it("installBotLogShutdownFlush_signalWithNextListening_flushesWithoutExiting", async () => {

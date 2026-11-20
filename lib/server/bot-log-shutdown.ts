@@ -22,13 +22,35 @@
  */
 import { flushAllBotLogBatches } from "@/lib/server/bot-integration";
 import { flushAllCoalescers } from "@/lib/server/coalescer";
+import { boundedWait } from "@/lib/server/bounded-wait";
+import { resumeSuspendedPeriodicClocks, stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
 
 export const SHUTDOWN_FLUSH_TIMEOUT_MS = 1200;
+
+/**
+ * Part du délai d'arrêt laissée aux passages de fond en cours (balayages,
+ * purges) : ils finissent **avant** le vidage, si bien que les lignes qu'ils
+ * posent en finissant (forfait, confirmation d'office) partent avec lui.
+ */
+export const SHUTDOWN_PASS_WAIT_MS = SHUTDOWN_FLUSH_TIMEOUT_MS / 2;
+
+/**
+ * Délai après lequel un processus toujours vivant, sans sortie demandée,
+ * relance ses horloges de fond. Sous `next start`, l'écouteur de Next garde
+ * le signal puis sort une fois le serveur fermé (connexions SSE comprises) :
+ * relancer aussitôt réarmerait les balayages pendant la fermeture.
+ */
+export const SHUTDOWN_RESUME_GRACE_MS = 120_000;
 
 const SIGNALS = ["SIGTERM", "SIGINT"] as const;
 
 /** État de l'arrêt propre, partagé par toutes les copies du module. */
-type ShutdownState = { installed: boolean; flush: Promise<void> | null };
+type ShutdownState = {
+  installed: boolean;
+  flush: Promise<void> | null;
+  /** Une sortie a-t-elle été demandée pendant le dernier vidage ? (`holdExitUntil`) */
+  exitRequested?: () => boolean;
+};
 const shutdownGlobal = globalThis as typeof globalThis & {
   __bgBotLogShutdown?: ShutdownState;
   /** Tour du dernier passage de `flushBotLogs` (`tournaments/bot-logs.ts`). */
@@ -42,32 +64,18 @@ function shutdownState(): ShutdownState {
 
 /** Envoie les lots en attente, sans dépasser `timeoutMs`. Ne lève jamais. */
 export async function flushBotLogsBeforeExit(timeoutMs: number = SHUTDOWN_FLUSH_TIMEOUT_MS): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const deadline = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, timeoutMs);
-    timer.unref?.();
-  });
-  try {
-    // Les rafales regroupées (journal du staff, casts) rejoignent d'abord les
-    // lots, mais ne tiennent que la moitié du délai : des lectures lentes ne
-    // doivent pas priver les lots déjà en attente de leur envoi.
-    const coalesced = Promise.all([
-      flushAllCoalescers(Date.now() + timeoutMs / 2).catch(() => undefined),
-      // Les passages encore en train de résoudre leurs lignes les posent au lot
-      // avant le vidage ; la limite de la moitié du délai les borne aussi.
-      shutdownGlobal.__bgBotLogOrder?.catch(() => undefined),
-    ]).then(() => undefined);
-    let half: ReturnType<typeof setTimeout> | null = null;
-    const halfDeadline = new Promise<void>((resolve) => {
-      half = setTimeout(resolve, timeoutMs / 2);
-      half.unref?.();
-    });
-    await Promise.race([coalesced, halfDeadline]);
-    if (half) clearTimeout(half);
-    await Promise.race([flushAllBotLogBatches().catch(() => undefined), deadline]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  const startedAt = Date.now();
+  // Les rafales regroupées (journal du staff, casts) rejoignent d'abord les
+  // lots, mais ne tiennent que la moitié du délai : des lectures lentes ne
+  // doivent pas priver les lots déjà en attente de leur envoi.
+  const coalesced = Promise.all([
+    flushAllCoalescers(Date.now() + timeoutMs / 2).catch(() => undefined),
+    // Les passages encore en train de résoudre leurs lignes les posent au lot
+    // avant le vidage ; la limite de la moitié du délai les borne aussi.
+    shutdownGlobal.__bgBotLogOrder?.catch(() => undefined),
+  ]);
+  await boundedWait(coalesced, timeoutMs / 2);
+  await boundedWait(flushAllBotLogBatches(), timeoutMs - (Date.now() - startedAt));
 }
 
 /** Un code de sortie qui signale un échec (tout sauf l'absence de code et `0`). */
@@ -81,9 +89,10 @@ function isFailureCode(code: number | string | null | undefined): boolean {
  * d'**échec** sort aussitôt, retenu ou non : un gestionnaire fatal qui appelle
  * `process.exit(1)` — avant ou après le `process.exit(0)` de Next — ne voit pas
  * son code poursuivre pendant l'envoi, et pm2 lit bien un échec. `process.exit`
- * n'est rendu que si personne ne l'a appelé pendant l'envoi.
+ * n'est rendu que si personne ne l'a appelé pendant l'envoi. Rend un lecteur :
+ * une sortie a-t-elle été demandée pendant l'envoi ?
  */
-export function holdExitUntil(done: Promise<void>): void {
+export function holdExitUntil(done: Promise<void>): () => boolean {
   const originalExit = process.exit;
   let requested = false;
   let exited = false;
@@ -109,6 +118,7 @@ export function holdExitUntil(done: Promise<void>): void {
   void done.finally(() => {
     if (!requested && process.exit === held) process.exit = originalExit;
   });
+  return () => requested || exited;
 }
 
 /** Branche l'envoi des lots sur les signaux d'arrêt ; une seule fois par processus. */
@@ -118,14 +128,23 @@ export function installBotLogShutdownFlush(): void {
   state.installed = true;
   for (const signal of SIGNALS) {
     process.once(signal, () => {
+      // Plus aucun balayage de fond ne démarre pendant la fermeture (la base
+      // s'en va) : les minuteurs sont coupés sur-le-champ.
+      const stopped = stopAllPeriodicClocks();
       // Un second signal rejoint le vidage en cours : ni second envoi, ni
       // second `process.exit` retenu par-dessus le premier.
       let flush = state.flush;
       if (!flush) {
-        const started = flushBotLogsBeforeExit();
+        // Les passages en cours finissent d'abord (bornés), puis le vidage
+        // emporte aussi les lignes qu'ils ont posées, dans le reste du délai.
+        const started = (async () => {
+          const startedAt = Date.now();
+          await boundedWait(stopped, SHUTDOWN_PASS_WAIT_MS);
+          await flushBotLogsBeforeExit(SHUTDOWN_FLUSH_TIMEOUT_MS - (Date.now() - startedAt));
+        })();
         flush = started;
         state.flush = started;
-        holdExitUntil(started);
+        state.exitRequested = holdExitUntil(started);
         // Un processus qui survit à l'arrêt rebatche ses lignes : l'autre signal
         // (SIGINT puis SIGTERM de pm2) doit vider de nouveau, non réutiliser ce
         // vidage terminé. Chaque écouteur est `once` : un même signal répété ne
@@ -137,7 +156,17 @@ export function installBotLogShutdownFlush(): void {
       void flush.then(() => {
         // Personne d'autre n'écoute : le signal relancé sans écouteur termine le
         // processus comme Node l'aurait fait (128 + n), et non en succès.
-        if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+        if (process.listenerCount(signal) === 0) {
+          process.kill(process.pid, signal);
+          return;
+        }
+        // Un autre écouteur (Next) garde le signal : il sort d'ordinaire une fois
+        // le serveur fermé. Les balayages ne repartent que si le processus vit
+        // encore bien après, sans qu'aucune sortie n'ait été demandée.
+        const grace = setTimeout(() => {
+          if (!state.exitRequested?.()) resumeSuspendedPeriodicClocks();
+        }, SHUTDOWN_RESUME_GRACE_MS);
+        grace.unref?.();
       });
     });
   }

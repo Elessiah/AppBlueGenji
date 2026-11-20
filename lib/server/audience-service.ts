@@ -33,6 +33,7 @@ import { audienceNetworkKey } from "@/lib/server/api-guard";
 import { failureDiagnostic, failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "./database";
 import { NamedLockUnavailableError, withNamedLock } from "./named-lock";
+import { backgroundPassesHalted, startPeriodicClock, stopPeriodicClock, trackBackgroundPass } from "./periodic-clock";
 import { readSiteCounts } from "./site-counts";
 import { inTransaction } from "./tournaments/transaction";
 import { PLAYED_STATES } from "@/lib/shared/stats";
@@ -131,8 +132,6 @@ interface AudienceState {
    */
   rolledThrough: string | null;
   maintaining: Promise<void> | null;
-  /** Horloge d'entretien ({@link startAudienceMaintenanceClock}), une par processus. */
-  maintenanceClock: ReturnType<typeof setInterval> | null;
   /**
    * Étapes de l'entretien en échec, avec le jour visé (sels) : une panne se
    * journalise une fois, pas à chaque passage — puis de nouveau chaque fois
@@ -165,7 +164,6 @@ function freshState(): AudienceState {
     lastMaintenanceAt: 0,
     rolledThrough: null,
     maintaining: null,
-    maintenanceClock: null,
     failing: new Map(),
     statsCache: null,
     knownRolledDay: null,
@@ -503,12 +501,15 @@ export function rawRetentionStart(now: Date): string {
  */
 export function maintainAudience(now: Date = new Date()): void {
   if (now.getTime() - S.lastMaintenanceAt < MAINTENANCE_INTERVAL_MS || S.maintaining) return;
+  // Arrêt du serveur en cours : une requête tardive ne lance plus de repli ni
+  // de purge sur une base qui s'en va (le passage suivant le fera).
+  if (backgroundPassesHalted()) return;
   S.lastMaintenanceAt = now.getTime();
   // Les échecs des étapes sont déjà journalisés (`reportStep`) ; ce qui
   // échappe aux étapes est imprévu (erreur de programmation) : journalisé ici,
   // jamais avalé en silence.
   // Borné : un passage figé est abandonné (journalisé), le suivant repart.
-  S.maintaining = withTimeout(runMaintenanceSteps(now), MAINTENANCE_TIMEOUT_MS, "audience maintenance timed out")
+  const pass = withTimeout(runMaintenanceSteps(now), MAINTENANCE_TIMEOUT_MS, "audience maintenance timed out")
     .then(
       () => undefined,
       (error: unknown) => {
@@ -518,6 +519,9 @@ export function maintainAudience(now: Date = new Date()): void {
     .finally(() => {
       S.maintaining = null;
     });
+  S.maintaining = pass;
+  // Entraîné par le trafic comme par l'horloge : l'arrêt du serveur l'attend.
+  trackBackgroundPass(pass);
 }
 
 /**
@@ -529,6 +533,8 @@ export function maintainAudience(now: Date = new Date()): void {
  */
 export const MAINTENANCE_CLOCK_TICK_MS = 60_000;
 
+const AUDIENCE_CLOCK_KEY = "audience-maintenance";
+
 /**
  * Lance l'entretien à intervalle régulier ({@link MAINTENANCE_INTERVAL_MS}, au
  * plus une minute de retard), une fois par processus (`instrumentation.ts` ;
@@ -538,9 +544,17 @@ export const MAINTENANCE_CLOCK_TICK_MS = 60_000;
  * textes. Sans effet si l'horloge tourne déjà ; ne retient pas le processus.
  */
 export function startAudienceMaintenanceClock(): void {
-  if (S.maintenanceClock) return;
-  S.maintenanceClock = setInterval(() => maintainAudience(), MAINTENANCE_CLOCK_TICK_MS);
-  S.maintenanceClock.unref?.();
+  startPeriodicClock({
+    key: AUDIENCE_CLOCK_KEY,
+    firstDelayMs: MAINTENANCE_CLOCK_TICK_MS,
+    tickMs: MAINTENANCE_CLOCK_TICK_MS,
+    // maintainAudience ne rend rien : le passage attend le sien (arrêt du serveur).
+    run: async () => {
+      maintainAudience();
+      await S.maintaining;
+    },
+    failureMessage: "[audience] Horloge d'entretien en échec.",
+  });
 }
 
 /** Issue d'une étape de l'entretien : réussie, ou ratée avec son erreur (même `null` levé). */
@@ -1041,8 +1055,7 @@ export async function getAudienceStats(now: Date = new Date()): Promise<Audience
 /** Remet l'état du module à zéro (tests). */
 export function resetAudienceState(): void {
   S.salts.clear();
-  if (S.maintenanceClock) clearInterval(S.maintenanceClock);
-  S.maintenanceClock = null;
+  void stopPeriodicClock(AUDIENCE_CLOCK_KEY);
   if (S.saltSweep) clearInterval(S.saltSweep);
   S.saltSweep = null;
   S.recording.clear();

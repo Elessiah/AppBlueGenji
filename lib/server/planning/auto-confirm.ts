@@ -33,6 +33,7 @@ import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-loc
 import { planningNextWeekStart, planningWeekStart } from "@/lib/shared/planning";
 import { planningConfirmAt } from "@/lib/shared/schedule-deadline";
 import { confirmAssignments, runAutoAssign } from "./auto-assign";
+import { startPeriodicClock, stopPeriodicClock } from "@/lib/server/periodic-clock";
 import { loadDurationSettings, loadPlanningEntries, type Executor, type LoadedEntry } from "./load";
 
 /** Verrou nommé du balayage des confirmations d'office. */
@@ -311,29 +312,20 @@ export async function sweepAutoConfirms(now: number = Date.now()): Promise<numbe
   }
 }
 
-type ClockState = { timer: ReturnType<typeof setInterval> | null; failing: boolean; running: boolean };
-const globalClock = globalThis as typeof globalThis & { __bgPlanningAutoConfirm?: ClockState };
-
-async function sweepOnce(state: ClockState): Promise<void> {
-  if (state.running) return;
-  state.running = true;
-  try {
-    await sweepAutoConfirms();
-    state.failing = false;
-  } catch (error) {
-    if (!state.failing) console.error("[planning] Balayage des confirmations d'office impossible.", failureReason(error));
-    state.failing = true;
-  } finally {
-    state.running = false;
-  }
-}
+const AUTO_CONFIRM_CLOCK_KEY = "planning-auto-confirm";
 
 /** Lance le balayage des confirmations d'office (une fois par processus). */
 export function startPlanningAutoConfirmClock(): void {
-  const state = (globalClock.__bgPlanningAutoConfirm ??= { timer: null, failing: false, running: false });
-  if (state.timer) return;
-  const first = setTimeout(() => void sweepOnce(state), FIRST_SWEEP_DELAY_MS);
-  first.unref?.();
-  state.timer = setInterval(() => void sweepOnce(state), SWEEP_TICK_MS);
-  state.timer.unref?.();
+  startPeriodicClock({
+    key: AUTO_CONFIRM_CLOCK_KEY,
+    firstDelayMs: FIRST_SWEEP_DELAY_MS,
+    tickMs: SWEEP_TICK_MS,
+    run: () => sweepAutoConfirms(),
+    failureMessage: "[planning] Balayage des confirmations d'office impossible.",
+  });
+}
+
+/** Arrête le balayage (premier passage compris) et attend celui en cours ; relançable. */
+export function stopPlanningAutoConfirmClock(): Promise<void> {
+  return stopPeriodicClock(AUTO_CONFIRM_CLOCK_KEY);
 }
