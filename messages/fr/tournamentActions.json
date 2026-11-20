@@ -389,7 +389,7 @@
     "prodDialog": {
       "title": "Prod : {match}",
       "hintSubject": "prod du match",
-      "hint": "La prod assure la production du direct de ce match ; elle ne joue pas le match et n'en est pas caster. Le compte placé ou retiré est prévenu.",
+      "hint": "La prod assure la production du direct de ce match ; elle ne joue pas le match et n'en est pas caster. Le compte placé ou retiré est prévenu, sauf si c'est le tien.",
       "loading": "Chargement…",
       "loadFailed": "Impossible de lire la prod de ce match. Réessaie dans un instant.",
       "current": "Prod du match : {pseudo}.",
@@ -409,7 +409,7 @@
       "removeConfirm": {
         "title": "Retirer {pseudo} de la prod ?",
         "confirm": "Retirer",
-        "body": "Le compte est prévenu ; la place redevient libre."
+        "body": "Le compte est prévenu, sauf si c'est le tien ; la place redevient libre."
       }
     },
     "castSettings": {

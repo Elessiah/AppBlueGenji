@@ -797,11 +797,13 @@ export const RoleRow = memo(function RoleRow({
     () => roleChoices(entry, role, view.members, view.canManage),
     [entry, role, view.members, view.canManage],
   );
+  // Retirer un caster ou une prod d'un match retire aussi ce que le planning y avait placé : le dire.
+  const removedKey = entry.matchId !== null && (role === "CASTER" || role === "PROD") ? "saved.removedFromMatch" : "saved.removed";
   const assign = (userId: number, assigned: boolean) =>
     act(
       `assign:${entry.key}:${role}:${userId}`,
       () => call("/api/admin/planning/assignment", json("PUT", { entryKey: entry.key, role, userId, assigned })),
-      () => t(assigned ? "saved.assigned" : "saved.removed"),
+      () => t(assigned ? "saved.assigned" : removedKey),
     );
   return (
     <div className={styles.roleRow}>

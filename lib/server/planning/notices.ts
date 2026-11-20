@@ -64,9 +64,19 @@ export type AssignmentNotice = { userId: number; entry: LoadedEntry; role: Plann
  * personne, qui liste toutes les siennes. L'auteur du geste n'est jamais
  * prévenu de ce qu'il vient de faire lui-même (`actorId`).
  */
-export async function announceAssignments(
+export function announceAssignments(
   items: readonly AssignmentNotice[],
   options: { actorId?: number | null; replacement?: boolean } = {},
+): Promise<void> {
+  // En file avec l'avis de lien (`announceCastLinkNeeded`) : l'annonce de l'affectation part toujours la première.
+  return assignedNotices.chain("assigned", () => deliverAssignments(items, options));
+}
+
+const assignedNotices = createKeyedChain<string>();
+
+async function deliverAssignments(
+  items: readonly AssignmentNotice[],
+  options: { actorId?: number | null; replacement?: boolean },
 ): Promise<void> {
   try {
     const byUser = new Map<number, PlanningNoticeAssignment[]>();
@@ -120,7 +130,12 @@ export async function announceAssignments(
  * nulle part. Sujet `PLANNING_ASSIGNED` (le même geste que l'affectation),
  * message privé coupé avec lui. Ne lève jamais.
  */
-export async function announceCastLinkNeeded(userIds: readonly number[], entry: LoadedEntry): Promise<void> {
+export function announceCastLinkNeeded(userIds: readonly number[], entry: LoadedEntry): Promise<void> {
+  // Derrière l'annonce de l'affectation déjà lancée : le lien se demande après « le planning te place ».
+  return assignedNotices.chain("assigned", () => deliverCastLinkNeeded(userIds, entry));
+}
+
+async function deliverCastLinkNeeded(userIds: readonly number[], entry: LoadedEntry): Promise<void> {
   try {
     if (userIds.length === 0 || entry.matchId === null) return;
     const recipients = await loadNotificationRecipients([...userIds], "proven", { excludeSuspended: true, planningMembersOnly: true });

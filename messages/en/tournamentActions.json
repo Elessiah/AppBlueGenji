@@ -389,7 +389,7 @@
     "prodDialog": {
       "title": "Prod: {match}",
       "hintSubject": "match prod",
-      "hint": "The prod runs the production of this match's broadcast; they don't play the match and don't cast it. The account placed or removed is notified.",
+      "hint": "The prod runs the production of this match's broadcast; they don't play the match and don't cast it. The account placed or removed is notified, unless it is yours.",
       "loading": "Loading…",
       "loadFailed": "Could not read this match's prod. Try again in a moment.",
       "current": "Match prod: {pseudo}.",
@@ -409,7 +409,7 @@
       "removeConfirm": {
         "title": "Remove {pseudo} from the prod?",
         "confirm": "Remove",
-        "body": "The account is notified; the spot becomes free again."
+        "body": "The account is notified, unless it is yours; the spot becomes free again."
       }
     },
     "castSettings": {

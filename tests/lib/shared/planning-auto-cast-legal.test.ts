@@ -110,3 +110,22 @@ describe("/rgpd — placement par le planning, en français et en anglais", () =
     expect(en).toContain("a signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, stays");
   });
 });
+
+describe("planning board messages (UI review cycle 1)", () => {
+  const load = (lang: string) =>
+    JSON.parse(readSource(`messages/${lang}/planning.json`)) as { saved: Record<string, string>; withdraw: Record<string, string>; errors: Record<string, string> };
+
+  it.each(["fr", "en"])("%s: removal from a match toast exists and withdrawal dialogs mention the match", (lang) => {
+    const messages = load(lang);
+    expect(messages.saved.removedFromMatch).toBeTruthy();
+    expect(messages.saved.removedFromMatch).not.toBe(messages.saved.removed);
+    expect(messages.withdraw.body.length).toBeGreaterThan(messages.saved.removed.length);
+    expect(messages.withdraw.bodyCaster).toBeTruthy();
+  });
+
+  it.each(["fr", "en"])("%s: prod-taken and cast-managed refusals point to the planning too", (lang) => {
+    const messages = load(lang);
+    expect(messages.errors.PLANNING_PROD_TAKEN).toMatch(/planning/i);
+    expect(messages.errors.PLANNING_CAST_MANAGED).toMatch(/planning/i);
+  });
+});

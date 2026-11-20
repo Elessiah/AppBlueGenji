@@ -109,6 +109,29 @@ describe("announceCastLinkNeeded", () => {
     expect(notification.discord?.message("fr")).toContain("https://bluegenji.test/tournois/10");
   });
 
+  it("announceCastLinkNeeded_launchedAfterAssignments_sentAfterThem", async () => {
+    let releaseFirst: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    jest.mocked(notifyUsers).mockImplementationOnce(async () => {
+      await gate;
+      return { discord: null, discordUnreachedUserIds: [], pushed: 0 };
+    });
+
+    const assigned = announceAssignments([{ userId: 4, entry: loadedEntry(), role: "CASTER" }]);
+    const link = announceCastLinkNeeded([4], loadedEntry());
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(jest.mocked(notifyUsers)).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await Promise.all([assigned, link]);
+
+    expect(jest.mocked(notifyUsers).mock.calls.map(([, notification]) => notification.discord?.context)).toEqual([
+      "planning-assigned",
+      "planning-cast-link",
+    ]);
+  });
+
   it("announceCastLinkNeeded_noRecipients_nothingSent", async () => {
     jest.mocked(loadNotificationRecipients).mockResolvedValue([]);
 
