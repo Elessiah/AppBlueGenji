@@ -148,7 +148,7 @@ function readWithdrawRows(state: WorldState, sql: string, params: unknown[]): un
 
 /** Les places de prod rendues par `withdrawUserCasts` (`MATCH_PROD.md`). */
 function applyProdWrites(state: WorldState, sql: string, params: unknown[]): unknown[] | null {
-  if (!sql.startsWith("UPDATE bg_matches SET prod_user_id = NULL WHERE prod_user_id = ? AND id IN")) return null;
+  if (!sql.startsWith("UPDATE bg_matches SET prod_user_id = NULL, prod_planned = 0 WHERE prod_user_id = ? AND id IN")) return null;
   const [userId, ...ids] = params;
   const held = state.matches.filter((m) => m.prod_user_id === userId && ids.includes(m.id));
   for (const m of held) m.prod_user_id = null;

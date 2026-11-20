@@ -93,7 +93,8 @@ ligne `PROD` **confirmée** y place sa prod quand le cast du match est libre
 (`CAST_PLANNING.md` § Placement sur le match, journal « Prod placée » sans
 nom, avis `PLANNED` « Le planning te place comme prod » sauf à qui se confirme
 lui-même), dans un tournoi en cours. Quitter cette ligne `PROD` (désistement,
-retrait par le staff) rend aussi la place du match (journal « Prod retirée »,
+retrait par le staff) rend aussi la place du match quand le planning l'y a
+posée (`prod_planned` ; une prod prise ou posée depuis le match reste) (journal « Prod retirée »,
 sauf match joué ; avis `RELEASED` quand c'est le staff) ; un invité sorti du
 planning la garde. La prod
 placée sur un match paraît au planning comme une ligne `PROD` tenue (source

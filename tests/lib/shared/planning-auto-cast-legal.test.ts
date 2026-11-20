@@ -50,9 +50,9 @@ describe("historique des changements — placement par le planning", () => {
     const en = PRIVACY_CHANGES_EN[ENTRY_ID].details.join(" ");
 
     expect(fr).toContain("pour la retirer quand la personne quitte son attribution (désistement, retrait à la main par le staff), sauf sur un match joué");
-    expect(fr).toContain("Une inscription faite par le caster lui-même n'est jamais touchée");
+    expect(fr).toContain("Une inscription faite par le caster lui-même, ou une prod prise par la personne ou posée par le staff depuis le match, n'est jamais touchée");
     expect(en).toContain("to remove it when the person leaves their assignment (withdrawal, removal by hand by the staff), except on a played match");
-    expect(en).toContain("A signup made by the caster themselves is never touched");
+    expect(en).toContain("A signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, is never touched");
   });
 
   it("planningPlacementEntry_frAndEn_noticesAndAnonymousStaffLog", () => {
@@ -84,6 +84,13 @@ describe("registre — T16 et T20 déclarent le placement", () => {
   it("registerT16_frAndEn_plannedMarkDataCategory", () => {
     expect(sheet(PROCESSING_ACTIVITIES, "T16").dataCategories.join(" ")).toContain("Marque d'une inscription de cast posée par le planning (T20)");
     expect(sheet(PROCESSING_ACTIVITIES_EN, "T16").dataCategories.join(" ")).toContain("Mark of a cast signup placed by the schedule (T20)");
+    expect(sheet(PROCESSING_ACTIVITIES, "T16").dataCategories.join(" ")).toContain("ou d'une place de prod qu'il a posée");
+    expect(sheet(PROCESSING_ACTIVITIES_EN, "T16").dataCategories.join(" ")).toContain("or of a prod place it set");
+  });
+
+  it("registerT20_frAndEn_prodTakenOrSetFromTheMatchStays", () => {
+    expect(JSON.stringify(sheet(PROCESSING_ACTIVITIES, "T20"))).toContain("ou une prod prise par la personne ou posée par le staff depuis le match, restant");
+    expect(JSON.stringify(sheet(PROCESSING_ACTIVITIES_EN, "T20"))).toContain("or a prod taken by the person or set by the staff from the match, staying");
   });
 
   it("registerT16_frAndEn_prodPlacedByThePlanning", () => {
@@ -98,8 +105,8 @@ describe("/rgpd — placement par le planning, en français et en anglais", () =
     const en = page("app/rgpd/RgpdEn.tsx");
 
     expect(fr).toContain("quand personne ne caste encore un match, les casters et la prod qu&apos;une attribution confirmée ou posée à la main y désigne y sont placés");
-    expect(fr).toContain("une inscription faite par le caster lui-même reste");
+    expect(fr).toContain("une inscription faite par le caster lui-même, ou une prod prise par la personne ou posée par le staff depuis le match, reste");
     expect(en).toContain("when nobody casts a match yet, the casters and the prod that an assignment confirmed or set by hand names for it are placed on it");
-    expect(en).toContain("a signup made by the caster themselves stays");
+    expect(en).toContain("a signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, stays");
   });
 });

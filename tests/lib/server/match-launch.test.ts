@@ -270,22 +270,25 @@ function applyCastWrite(state: World, sql: string, params: unknown[]): unknown[]
   if (sql.startsWith("UPDATE bg_match_casters SET cast_battletag = ?")) state.castBattletagWrites?.push(params);
   if (!match) return [{ affectedRows: 0 }, []];
   if (sql.includes("bg_match_streams")) return applyStreamWrite(match, sql, params);
-  applyCasterWrite(match, sql, params);
-  return [{ affectedRows: 1 }, []];
+  return [{ affectedRows: applyCasterWrite(match, sql, params) }, []];
 }
 
-/** `bg_match_casters` : « Prêt », retrait, inscription. */
-function applyCasterWrite(match: MatchState, sql: string, params: unknown[]): void {
+/** `bg_match_casters` : « Prêt », retrait (`AND planned = 1` : seule l'inscription du planning), inscription. Rend les lignes touchées. */
+function applyCasterWrite(match: MatchState, sql: string, params: unknown[]): number {
   if (sql.startsWith("UPDATE bg_match_casters SET ready_at")) {
     const value = sql.includes("ready_at = NOW()") ? STAMP : null;
     const userId = sql.includes("AND user_id = ?") ? Number(params[1]) : null;
     for (const caster of match.casters) if (userId === null || caster.user_id === userId) caster.ready_at = value;
   } else if (sql.startsWith("DELETE FROM bg_match_casters")) {
     const ids = params.slice(1).map(Number);
-    match.casters = match.casters.filter((caster) => !ids.includes(caster.user_id));
+    const plannedOnly = sql.includes("AND planned = 1");
+    const before = match.casters.length;
+    match.casters = match.casters.filter((caster) => !ids.includes(caster.user_id) || (plannedOnly && caster.planned !== 1));
+    return before - match.casters.length;
   } else if (sql.startsWith("INSERT INTO bg_match_casters")) {
     match.casters.push({ user_id: Number(params[1]), stream_id: Number(params[2]), ready_at: null });
   }
+  return 1;
 }
 
 /** `bg_match_streams` : ménage et stream neuf (qui rend son `insertId`). */
@@ -305,10 +308,6 @@ function applyStreamWrite(match: MatchState, sql: string, params: unknown[]): un
 /** Lectures des casters et des streams d'un match. */
 function readCastRows(state: World, sql: string, params: unknown[]): unknown[] | null {
   const match = state.match;
-  if (sql.includes("AND planned = 1")) {
-    const planned = (match?.casters ?? []).filter((caster) => caster.user_id === Number(params[1]) && caster.planned === 1);
-    return [planned.map(() => ({ 1: 1 })), []];
-  }
   if (sql.includes("FROM bg_match_casters WHERE match_id = ?")) {
     return [(match?.casters ?? []).map((caster) => ({ match_id: match?.id, ...caster })), []];
   }
@@ -770,7 +769,7 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
 
     await maintainMatchLaunches(connection, 7, report);
 
-    expect(state.writes).toContain("UPDATE bg_matches SET prod_user_id = NULL WHERE id = ? AND prod_user_id = ?");
+    expect(state.writes).toContain("UPDATE bg_matches SET prod_user_id = NULL, prod_planned = 0 WHERE id = ? AND prod_user_id = ?");
     expect(queueProdChange).toHaveBeenCalledWith(connection, {
       matchId: 42,
       log: "JOINED_TEAM",
@@ -949,7 +948,7 @@ describe("claimMatchCast", () => {
 
     await claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM);
 
-    expect(state.writes).toContain("UPDATE bg_matches SET prod_user_id = NULL WHERE id = ? AND prod_user_id = ?");
+    expect(state.writes).toContain("UPDATE bg_matches SET prod_user_id = NULL, prod_planned = 0 WHERE id = ? AND prod_user_id = ?");
     expect(casterOf(state)).toBe(CASTER);
     expect(queueProdChange).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ matchId: 42, log: "INELIGIBLE" }));
   });
@@ -1426,6 +1425,16 @@ describe("releasePlannedMatchCast", () => {
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "UNPLANNED", matchId: 42, casterId: CASTER, byStaff: false, pairing: PAIRING });
   });
 
+  it("releasePlannedMatchCast_plannedSignup_deletesWithPlannedFilterWithoutExtraRead", async () => {
+    state.match = matchState({ casters: [{ user_id: CASTER, stream_id: 1, ready_at: null, planned: 1 }], streams: [{ id: 1, live_url: null }] });
+    state.issued = [];
+
+    await releasePlannedMatchCast(42, CASTER, false);
+
+    expect(state.writes).toContain("DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ? AND planned = 1");
+    expect(state.issued.some((sql) => sql.startsWith("SELECT") && sql.includes("planned = 1"))).toBe(false);
+  });
+
   it("releasePlannedMatchCast_byStaff_announcedByStaff", async () => {
     state.match = matchState({ casters: [{ user_id: CASTER, stream_id: 1, ready_at: null, planned: 1 }], streams: [{ id: 1, live_url: null }] });
 
@@ -1442,6 +1451,7 @@ describe("releasePlannedMatchCast", () => {
     expect(released).toBe(false);
     expect(casterOf(state)).toBe(CASTER);
     expect(announceCastChange).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("releasePlannedMatchCast_matchCompleted_kept", async () => {

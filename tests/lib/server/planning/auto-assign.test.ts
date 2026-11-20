@@ -19,7 +19,7 @@ jest.mock("@/lib/server/planning/players", () => ({
 }));
 jest.mock("@/lib/server/tournaments/cast-eligibility");
 jest.mock("@/lib/server/planning/notices");
-jest.mock("@/lib/server/planning/cast-placement", () => ({ placePlannedCasts: jest.fn() }));
+jest.mock("@/lib/server/planning/cast-placement", () => ({ queuePlannedCasts: jest.fn() }));
 
 import type { PoolConnection } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
@@ -49,7 +49,7 @@ import {
   type LoadedAssignment,
   type PlanningData,
 } from "@/lib/server/planning/load";
-import { placePlannedCasts } from "@/lib/server/planning/cast-placement";
+import { queuePlannedCasts } from "@/lib/server/planning/cast-placement";
 import { announceAssignments } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
@@ -1167,7 +1167,7 @@ describe("confirmAssignments", () => {
 
     await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS, staff);
 
-    expect(placePlannedCasts).toHaveBeenCalledWith(
+    expect(queuePlannedCasts).toHaveBeenCalledWith(
       [
         { userId: 4, entry: first, role: "CASTER" },
         { userId: 6, entry: first, role: "PROD" },
@@ -1180,10 +1180,10 @@ describe("confirmAssignments", () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
       confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
     );
-    jest.mocked(placePlannedCasts).mockReturnValue(new Promise(() => undefined));
+    jest.mocked(queuePlannedCasts).mockReturnValue(new Promise(() => undefined));
 
     await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS, { id: 9, pseudo: "Admin" })).resolves.toBeDefined();
-    expect(placePlannedCasts).toHaveBeenCalledTimes(1);
+    expect(queuePlannedCasts).toHaveBeenCalledTimes(1);
   });
 
   it("confirmAssignments_nothingConfirmed_placesNothing", async () => {
@@ -1191,7 +1191,7 @@ describe("confirmAssignments", () => {
 
     await confirmAssignments(null, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
 
-    expect(placePlannedCasts).not.toHaveBeenCalled();
+    expect(queuePlannedCasts).not.toHaveBeenCalled();
   });
 
   it("confirmAssignments_prodPlacedSinceRead_refusesOtherProdProposal", async () => {

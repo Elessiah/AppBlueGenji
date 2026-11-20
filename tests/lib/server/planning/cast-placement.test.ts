@@ -20,6 +20,7 @@ import {
   placementAuditLine,
   placementTargets,
   placePlannedCasts,
+  queuePlannedCasts,
   releaseAuditLine,
   releasePlannedSeat,
   type PlannedCastLine,
@@ -239,6 +240,30 @@ describe("placePlannedCasts — marque et lien de diffusion", () => {
     expect(announceCastLinkNeeded).not.toHaveBeenCalled();
   });
 
+  it("placePlannedCasts_staffPlacesSelfOnUnlinkedStream_noLinkNotice", async () => {
+    const self = { id: CASTER_A, pseudo: "Staff caster" };
+
+    const placed = await placePlannedCasts([line(CASTER_A, "CASTER")], self);
+
+    expect(placed[0]?.linkNeeded).toBe(true);
+    expect(announceCastLinkNeeded).not.toHaveBeenCalled();
+  });
+
+  it("placePlannedCasts_staffPlacesSelfAndOtherOnUnlinkedStream_linkNoticeToOtherOnly", async () => {
+    const self = { id: CASTER_A, pseudo: "Staff caster" };
+
+    await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER")], self);
+
+    expect(announceCastLinkNeeded).toHaveBeenCalledWith([CASTER_B], ENTRY);
+  });
+
+  it("placePlannedCasts_prodPlaced_writesPlannedMarker", async () => {
+    await placePlannedCasts([line(PROD, "PROD")], STAFF);
+
+    const update = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE bg_matches"));
+    expect(update?.[0]).toBe("UPDATE bg_matches SET prod_user_id = ?, prod_planned = 1 WHERE id = ? AND prod_user_id IS NULL");
+  });
+
   it("placePlannedCasts_prodOnly_noLinkNotice", async () => {
     await placePlannedCasts([line(PROD, "PROD")], STAFF);
 
@@ -276,6 +301,16 @@ describe("releasePlannedSeat", () => {
     expect(released).toBe(true);
     expect(releasePlannedProd).toHaveBeenCalledWith(1, PROD, true);
     expect(auditStaffAction).toHaveBeenCalledWith(releaseAuditLine(1, PROD, "PROD"), STAFF);
+  });
+
+  it("releasePlannedSeat_staffReleasesOwnLine_noStaffNoticeButAudited", async () => {
+    const self = { id: PROD, pseudo: "Staff prod" };
+
+    const released = await releasePlannedSeat(ENTRY, PROD, "PROD", self);
+
+    expect(released).toBe(true);
+    expect(releasePlannedProd).toHaveBeenCalledWith(1, PROD, false);
+    expect(auditStaffAction).toHaveBeenCalledWith(releaseAuditLine(1, PROD, "PROD"), self);
   });
 
   it("releasePlannedSeat_nothingReleased_noAudit", async () => {
@@ -495,5 +530,21 @@ describe("placePlannedCasts", () => {
     expect(placed).toEqual([{ matchId: 2, casterIds: [CASTER_A], prodId: null, linkNeeded: true }]);
     expect(errorLog).toHaveBeenCalledWith(expect.stringContaining("cast du match #1 non placé"));
     errorLog.mockRestore();
+  });
+});
+
+describe("queuePlannedCasts", () => {
+  it("queuePlannedCasts_twoCalls_secondStartsAfterFirstSettles", async () => {
+    const gate: { open?: (check: HoldingCheck) => void } = {};
+    jest.mocked(lockedHolding).mockImplementationOnce(() => new Promise<HoldingCheck>((resolve) => (gate.open = resolve)));
+
+    const first = queuePlannedCasts([line(CASTER_A, "CASTER")], STAFF);
+    const second = queuePlannedCasts([line(CASTER_B, "CASTER", loadedEntry({ key: "m:2", matchId: 2 }))], STAFF);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(lockedHolding).toHaveBeenCalledTimes(1);
+    gate.open?.(allowed);
+    await Promise.all([first, second]);
+    expect(lockedHolding).toHaveBeenCalledTimes(2);
   });
 });

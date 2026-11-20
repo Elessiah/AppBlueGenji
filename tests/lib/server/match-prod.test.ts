@@ -305,6 +305,14 @@ describe("claimMatchProd", () => {
 });
 
 describe("releaseMatchProd", () => {
+  it("releaseMatchProd_ownPlace_resetsPlannedMarker", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
+
+    await releaseMatchProd(42, prodActor);
+
+    expect(updatesOfProd()[0]?.[0]).toContain("prod_planned = 0");
+  });
+
   it("releaseMatchProd_ownPlace_clearsProd", async () => {
     match = { ...match, prod_user_id: PROD_ID };
 
@@ -333,7 +341,7 @@ describe("releaseMatchProd", () => {
 
 describe("releasePlannedProd", () => {
   it("releasePlannedProd_memberHolds_clearedWithoutNotice", async () => {
-    match = { ...match, prod_user_id: PROD_ID };
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
 
     const released = await releasePlannedProd(42, PROD_ID, false);
     await settle();
@@ -344,8 +352,28 @@ describe("releasePlannedProd", () => {
     expect(notifyUsers).not.toHaveBeenCalled();
   });
 
+  it("releasePlannedProd_plannedProd_clearedAndMarkerReset", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
+
+    await releasePlannedProd(42, PROD_ID, false);
+
+    expect(updatesOfProd()[0]?.[0]).toContain("prod_planned = 0");
+  });
+
+  it("releasePlannedProd_prodTakenOutsidePlanning_kept", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 0 };
+
+    const released = await releasePlannedProd(42, PROD_ID, false);
+    await settle();
+
+    expect(released).toBe(false);
+    expect(updatesOfProd()).toHaveLength(0);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
   it("releasePlannedProd_byStaff_prodNotified", async () => {
-    match = { ...match, prod_user_id: PROD_ID };
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
 
     await releasePlannedProd(42, PROD_ID, true);
     await settle();
@@ -355,7 +383,7 @@ describe("releasePlannedProd", () => {
   });
 
   it("releasePlannedProd_otherProd_untouched", async () => {
-    match = { ...match, prod_user_id: OTHER_PROD_ID };
+    match = { ...match, prod_user_id: OTHER_PROD_ID, prod_planned: 1 };
 
     const released = await releasePlannedProd(42, PROD_ID, false);
 
@@ -365,7 +393,7 @@ describe("releasePlannedProd", () => {
   });
 
   it("releasePlannedProd_matchCompleted_kept", async () => {
-    match = { ...match, prod_user_id: PROD_ID, status: "COMPLETED" };
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1, status: "COMPLETED" };
 
     expect(await releasePlannedProd(42, PROD_ID, false)).toBe(false);
     expect(updatesOfProd()).toHaveLength(0);

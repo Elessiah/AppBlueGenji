@@ -546,7 +546,7 @@ export async function withdrawUserCasts(
   }
   if (prodsToDrop.length > 0) {
     await connection.execute(
-      `UPDATE bg_matches SET prod_user_id = NULL WHERE prod_user_id = ? AND id IN (${placeholders(prodsToDrop)})`,
+      `UPDATE bg_matches SET prod_user_id = NULL, prod_planned = 0 WHERE prod_user_id = ? AND id IN (${placeholders(prodsToDrop)})`,
       [userId, ...prodsToDrop],
     );
   }

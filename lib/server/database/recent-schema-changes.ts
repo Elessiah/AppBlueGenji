@@ -674,6 +674,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Inscription de cast posée par le planning (`lib/server/planning/cast-placement.ts`) :
     // l'attribution quittée la retire, une inscription du caster lui-même reste.
     `ALTER TABLE bg_match_casters ADD COLUMN planned TINYINT(1) NOT NULL DEFAULT 0 AFTER cast_battletag`,
+    // Prod placée par le planning : l'attribution quittée la retire, une prod prise ou posée autrement reste.
+    `ALTER TABLE bg_matches ADD COLUMN prod_planned TINYINT(1) NOT NULL DEFAULT 0 AFTER prod_user_id`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

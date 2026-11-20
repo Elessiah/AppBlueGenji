@@ -117,6 +117,7 @@ Ce qu'elle contient aujourd'hui :
 | — (fiche d'équipe) | `bg_team_invitations` | `roles_json` — rôles proposés avec une invitation, posés à l'arrivée du joueur (`NULL` sur une demande, et sur les invitations d'avant la colonne : DPS) |
 | — (litige, validation d'office) | `bg_matches` | `score_validation_paused_at` — « Enregistrer » d'arbitrage sur un report seul : validation d'office suspendue (`SCORE_DISPUTE_LOCK.md`) |
 | — (PLANNING-AUTO-CAST) | `bg_match_casters` | `planned` (`TINYINT(1)`, 0 par défaut) — inscription posée par le planning (`CAST_PLANNING.md` § Placement sur le match) : l'attribution quittée la retire, une inscription du caster lui-même reste |
+| — (PLANNING-AUTO-CAST) | `bg_matches` | `prod_planned` (`TINYINT(1)`, 0 par défaut) — prod placée par le planning : l'attribution quittée la retire ; toute autre écriture de la prod la remet à 0 |
 | — (MATCH-CAST-PROD) | `bg_matches` | `prod_user_id` (+ index `idx_bg_matches_prod` et clé étrangère `SET NULL`) — la prod du match, une au plus (`MATCH_PROD.md`) |
 | — (arbitre désigné) | `bg_matches` | `referee_user_id` (+ index et clé étrangère `SET NULL`), `referee_ready_at`, `self_managed`, `first_map` — arbitre désigné, son « Prêt », autogestion, première carte (`MATCH_REFEREE.md`) |
 | — (lancement des matchs) | `bg_matches` | `host_team_id` (+ clé étrangère `SET NULL`) — équipe hôte désignée par l'arbitrage, `NULL` = équipe 1 |

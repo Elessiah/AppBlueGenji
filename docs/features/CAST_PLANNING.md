@@ -487,21 +487,25 @@ rejouée : qui a quitté le match n'y revient pas au geste suivant.
   et le remplacement n'ont pas d'auteur.
 - **Quand** : après le verrou du planning. La confirmation (bouton ou d'office)
   le lance sans l'attendre — une transaction par match ne retarde ni la réponse
-  ni le balayage ; le choix du staff et le remplaçant d'un désistement (un seul
+  ni le balayage ; ces placements non attendus passent en file, l'un après
+  l'autre (`queuePlannedCasts`) ; le choix du staff et le remplaçant d'un désistement (un seul
   match) l'attendent.
 - Une panne d'un match est consignée dans pm2 et n'empêche ni les autres
   matchs ni le geste du planning, déjà validé.
 - **Attribution quittée** (`releasePlannedSeat`) : ce que le planning a placé,
   le planning le retire. Le désistement d'un caster ou d'une prod confirmé et
   le retrait à la main par le staff ôtent aussi du match l'inscription de cast
-  **posée par le planning** (`planned`) et la place de prod (même rôle que la
-  ligne) — sauf sur un match joué —, **avant** la recherche d'un remplaçant,
+  **posée par le planning** (`planned`) et la place de prod **posée par le
+  planning** (`bg_matches.prod_planned`, remis à 0 par toute autre écriture de
+  la prod) — sauf sur un match joué —, **avant** la recherche d'un remplaçant,
   qui peut alors y être placé. Journal anonyme « Cast retiré » / « Prod
   retirée » (alerte du staff) ; qui se désiste n'a pas d'avis (il sait), la
   personne que le staff retire reçoit l'avis d'un retrait par le staff
   (`CAST_RELEASED` motif `STAFF`, `MATCH_PROD` « Le staff te retire la prod »),
-  le staff étant nommé dans pm2. Une inscription faite par le caster lui-même
-  reste (`stillSignedUp` : il s'en retire depuis le match), comme les places
+  le staff étant nommé dans pm2 (le staff qui se retire lui-même n'a pas
+  d'avis, ni de lien à donner quand il se place). Une inscription faite par le
+  caster lui-même, une prod prise (« Faire la prod ») ou posée par le staff
+  depuis le match restent (`stillSignedUp` : il s'en retire depuis le match), comme les places
   d'un invité sorti du planning, qui garde ses autres droits (le staff l'en
   retire depuis le match).
 

@@ -133,12 +133,27 @@ export async function placePlannedCasts(lines: readonly PlannedCastLine[], actor
       if ("skip" in outcome) continue;
       placed.push(outcome.placement);
       afterPlacement(outcome, actor);
-      if (outcome.placement.linkNeeded) void announceCastLinkNeeded(outcome.placement.casterIds, target.entry);
+      // Le staff qui se place lui-même n'est pas prévenu de son propre geste (comme de l'affectation).
+      const toWarn = outcome.placement.casterIds.filter((id) => id !== actor?.id);
+      if (outcome.placement.linkNeeded && toWarn.length > 0) void announceCastLinkNeeded(toWarn, target.entry);
     } catch (error) {
       console.error(`[planning] cast du match #${matchId} non placé depuis le planning : ${failureDiagnostic(error)}`);
     }
   }
   return placed;
+}
+
+let placementChain: Promise<unknown> = Promise.resolve();
+
+/**
+ * {@link placePlannedCasts} mis en file : les placements lancés sans être
+ * attendus (confirmation, balayage d'office semaine par semaine) passent l'un
+ * après l'autre, jamais plusieurs chaînes de transactions à la fois.
+ */
+export function queuePlannedCasts(lines: readonly PlannedCastLine[], actor: StaffActor | null): Promise<MatchPlacement[]> {
+  const run = placementChain.then(() => placePlannedCasts(lines, actor));
+  placementChain = run.catch(() => undefined);
+  return run;
 }
 
 /**
@@ -167,7 +182,8 @@ function afterPlacement(outcome: Extract<PlacementOutcome, { placement: MatchPla
  * **après** le retrait de la ligne, avant de chercher un remplaçant (le match
  * relu le voit parti). `actor` : le staff du geste, nommé dans pm2, et la
  * personne retirée en est prévenue (avis de retrait par le staff) ; `null`
- * pour le membre lui-même. Ne lève jamais.
+ * pour le membre lui-même (le staff qui se retire lui-même n'est pas prévenu).
+ * Ne lève jamais.
  */
 export async function releasePlannedSeat(
   entry: Pick<LoadedEntry, "kind" | "matchId">,
@@ -178,7 +194,8 @@ export async function releasePlannedSeat(
   if (entry.kind !== "MATCH" || entry.matchId === null || role === "REFEREE") return false;
   const matchId = entry.matchId;
   try {
-    const byStaff = actor !== null;
+    // Le staff qui se retire lui-même n'est pas prévenu de son propre geste ; il reste nommé dans pm2.
+    const byStaff = actor !== null && actor.id !== userId;
     const released =
       role === "CASTER" ? await releasePlannedMatchCast(matchId, userId, byStaff) : await releasePlannedProd(matchId, userId, byStaff);
     if (released && actor !== null) auditStaffAction(releaseAuditLine(matchId, userId, role), actor);
@@ -292,7 +309,7 @@ async function writePlacement(
   casterStreams: readonly number[],
 ): Promise<boolean> {
   if (prodId !== null) {
-    await connection.execute("UPDATE bg_matches SET prod_user_id = ? WHERE id = ? AND prod_user_id IS NULL", [prodId, matchId]);
+    await connection.execute("UPDATE bg_matches SET prod_user_id = ?, prod_planned = 1 WHERE id = ? AND prod_user_id IS NULL", [prodId, matchId]);
   }
   if (casterIds.length === 0) return false;
   const stream = await placementStream(connection, matchId, casterStreams);

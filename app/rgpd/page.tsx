@@ -1566,7 +1566,7 @@ function RgpdFr({
             paraît alors avec le match comme une inscription de cast ou une prod placée (<Link href="/rgpd/registre#t16">registre, T16</Link>), la prod en est
             prévenue, un caster placé sur une diffusion encore sans lien est invité à donner celui de sa chaîne,
             et quitter l&apos;attribution (désistement, retrait à la main par le staff) les en retire, sauf sur un
-            match joué ; une inscription faite par le caster lui-même reste. Les arbitres, casters et prods sont prévenus en
+            match joué ; une inscription faite par le caster lui-même, ou une prod prise par la personne ou posée par le staff depuis le match, reste. Les arbitres, casters et prods sont prévenus en
             message privé Discord et en notification push des nouveaux créneaux où ils peuvent tenir un rôle
             (un récapitulatif par vague), de leurs affectations confirmées ou posées à la main, et du
             désistement d&apos;une attribution confirmée sur un créneau où leur propre attribution est

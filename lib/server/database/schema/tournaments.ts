@@ -184,6 +184,8 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       referee_user_id BIGINT NULL,
       -- Prod du match (docs/features/MATCH_PROD.md) : une seule par match.
       prod_user_id BIGINT NULL,
+      -- Prod placée par le planning (lib/server/planning/cast-placement.ts) : l'attribution quittée la retire.
+      prod_planned TINYINT(1) NOT NULL DEFAULT 0,
       referee_ready_at DATETIME NULL,
       self_managed TINYINT(1) NOT NULL DEFAULT 0,
       first_map VARCHAR(64) NULL,

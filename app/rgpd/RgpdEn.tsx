@@ -1338,7 +1338,7 @@ export function RgpdEn({
             username then shows with the match like a cast signup or a placed prod (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), the prod is
             notified, a caster placed on a stream with no link yet is asked to add their channel&apos;s, and
             leaving the assignment (withdrawal, removal by hand by the staff) takes them off it, except on a
-            played match; a signup made by the caster themselves stays. Referees, casters
+            played match; a signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, stays. Referees, casters
             and prods are notified by Discord direct message and push notification of new slots where they
             can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of the
             withdrawal from a confirmed assignment on a slot where their own assignment is confirmed, a caster

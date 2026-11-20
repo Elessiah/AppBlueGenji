@@ -39,7 +39,7 @@ import {
   type PlanningData,
 } from "./load";
 import { entryAssignments } from "./model";
-import { placePlannedCasts } from "./cast-placement";
+import { queuePlannedCasts } from "./cast-placement";
 import { announceAssignments } from "./notices";
 import { loadEntryPlayers, playersDuring } from "./players";
 
@@ -913,7 +913,7 @@ export async function confirmAssignments(
       // Les casters et la prod que ce geste vient de confirmer vont sur leur match s'il n'a encore
       // personne au cast (`cast-placement.ts`) ; après le verrou du planning, sans faire attendre
       // la réponse ni le balayage d'office (une transaction par match), et sans jamais lever.
-      void placePlannedCasts(
+      void queuePlannedCasts(
         announced.map((step) => ({ userId: step.userId, entry: step.entry, role: step.role })),
         staff,
       );
