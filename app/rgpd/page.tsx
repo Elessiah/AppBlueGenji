@@ -508,7 +508,7 @@ function RgpdFr({
             tournoi publié se consulte aussi sans se connecter, à l&apos;adresse{" "}
             <code>/suivre/tournois/…</code> : plateau, scores, classements, noms des équipes et
             pseudos des joueurs engagés, pseudos des casters d&apos;un match — ce que les retransmissions
-            et Discord montrent déjà — et de sa prod, ainsi que les logos des équipes et, pour un tournoi individuel,
+            montrent déjà — et de sa prod, ainsi que les logos des équipes et, pour un tournoi individuel,
             l&apos;avatar de chaque joueur engagé (sauf s&apos;il l&apos;a masqué) et son numéro de compte
             interne, qui porte sa marque du podium, et les pénalités d&apos;une BlueGenji Survie (engagé, manche,
             points), sans leur motif ni l&apos;arbitre qui les a posées. Le score de chaque map y
@@ -1490,9 +1490,9 @@ function RgpdFr({
             un membre qui a ce rôle s&apos;y place ou y est placé par le staff ; son pseudo est montré avec le
             match comme celui des casters (avant le lancement, tant qu&apos;il remplit les conditions), gardé avec le match et
             retiré des matchs pas encore lancés si son compte perd ce rôle, est suspendu ou joue désormais le match,
-            et des matchs pas encore joués s&apos;il est supprimé ; la prod est prévenue quand un autre qu&apos;elle la place ou l&apos;en retire, par le staff ou d&apos;office ; ces gestes sont
-            notés sans nom au journal du staff sur Discord, l&apos;auteur d&apos;un geste du staff et le compte visé dans les journaux du serveur
-            (<Link href="/rgpd/registre#t16">registre, T16</Link>).{" "}
+            et des matchs pas encore joués s&apos;il est supprimé ; la prod est prévenue quand un autre qu&apos;elle la place ou l&apos;en retire, par le staff ou d&apos;office ; sa place prise ou quittée et ces gestes sont
+            notés sans nom au journal du staff sur Discord, l&apos;auteur d&apos;un geste du staff et le compte visé dans les journaux du serveur ; base : intérêt légitime, la prod
+            pouvant s&apos;y opposer par le formulaire de signalement (<Link href="/rgpd/registre#t16">registre, T16</Link>).{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
             « Contacts » et de lancement, page du match : aux mêmes personnes et aux mêmes moments — parties
