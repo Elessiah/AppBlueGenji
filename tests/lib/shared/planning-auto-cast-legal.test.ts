@@ -87,7 +87,7 @@ describe("registre — T16 et T20 déclarent le placement", () => {
   });
 
   it("registerT16_frAndEn_prodPlacedByThePlanning", () => {
-    expect(JSON.stringify(sheet(PROCESSING_ACTIVITIES, "T16"))).toContain("y est placé par le staff ou par le planning (T20)");
+    expect(JSON.stringify(sheet(PROCESSING_ACTIVITIES, "T16"))).toContain("y est placée par le staff ou par le planning (T20)");
     expect(JSON.stringify(sheet(PROCESSING_ACTIVITIES_EN, "T16"))).toContain("is placed on it by the staff or by the schedule (T20)");
   });
 });

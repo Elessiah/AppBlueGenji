@@ -169,7 +169,7 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
   it("registerT16_subPurpose_feminineWithoutBasis", () => {
     const fr = sheet(PROCESSING_ACTIVITIES, "T16").subPurposes.find((line) => line.startsWith("Organiser la production du direct"));
 
-    expect(fr).toContain("la prod, membre qui a le rôle prod, s'y place ou y est placée par le staff (une au plus par match), est montrée");
+    expect(fr).toContain("la prod, membre qui a le rôle prod, s'y place ou y est placée par le staff ou par le planning (T20) (une au plus par match), est montrée");
     expect(fr).toContain("est prévenue quand un autre qu'elle la place ou l'en retire");
     expect(fr).not.toContain("un membre qui a le rôle de prod");
     expect(fr).not.toContain("base :");
