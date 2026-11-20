@@ -19,6 +19,8 @@ async function mockTransaction(targetRows: object[] = [{ id: 7 }]) {
   const connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
   connection.commit.mockResolvedValue(undefined);
+  // Toute écriture sans réponse dédiée : rien de changé (`affectedRows` lu par `clearGuestFlag`).
+  connection.execute.mockResolvedValue([{ affectedRows: 0 }]);
   const poolExecute = jest.fn<SqlQuery>().mockResolvedValue([targetRows]);
   const getConnection = jest.fn(async () => fakeConnection(connection));
   const { getDatabase } = await import("@/lib/server/database");
@@ -492,6 +494,37 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
     expect(guestSql).toBe("UPDATE bg_users SET is_guest_staff = 0 WHERE id = ? AND is_deleted = 0 AND is_guest_staff = 1");
     expect(guestParams).toEqual([7]);
     expect(connection.execute.mock.invocationCallOrder[2]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  // Revue juridique 2 : la marque tombée est rendue à la route, qui la note au journal du staff.
+  it("setUserRoles_lastCasterRoleRemovedFlagged_returnsGuestClearedRoleLost", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["CASTER"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const result = await setUserRoles(7, ["ARBITRE"], 3);
+
+    expect(result.guestCleared).toBe("ROLE_LOST");
+  });
+
+  it("setUserRoles_promotionFlagged_returnsGuestClearedPromoted", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const result = await setUserRoles(7, ["ADMIN"], 3);
+
+    expect(result.guestCleared).toBe("PROMOTED");
+  });
+
+  it("setUserRoles_lastCasterRoleRemovedNotFlagged_noGuestCleared", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["CASTER"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+    const result = await setUserRoles(7, ["ARBITRE"], 3);
+
+    expect(result).not.toHaveProperty("guestCleared");
   });
 
   it("setUserRoles_casterKeptProdRemoved_leavesGuestFlag", async () => {

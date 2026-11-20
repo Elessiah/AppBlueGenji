@@ -211,7 +211,8 @@ async function findReplacement(
  * (sa ligne s'écrit alors quand même). `actorId` : celui dont le geste
  * déclenche la pose (le désisté) ; le match ne s'en sert qu'à taire l'avis
  * d'un arbitre remplacé par lui-même — aucun ici, le match étant vide
- * (`expected` nul) — et ne le garde ni ne le publie.
+ * (`expected` nul) — et ne le garde ni ne le publie. `guestRelease` : pose
+ * due à la sortie d'un invité, sans ligne de journal par match.
  */
 async function placeReplacement(
   connection: PoolConnection,
@@ -219,12 +220,13 @@ async function placeReplacement(
   pick: PlannedAssignment,
   confirmed: boolean,
   actorId: number,
+  guestRelease: boolean,
 ): Promise<boolean> {
   const matchReferee = entry.kind === "MATCH" && pick.role === "REFEREE" && entry.matchId !== null;
   if (matchReferee && confirmed) {
     try {
       // Suspension jugée dans la transaction même du match : posée depuis le choix, la place reste à pourvoir.
-      await assignMatchReferee(entry.matchId as number, actorId, pick.userId, null, { refuseSuspended: true });
+      await assignMatchReferee(entry.matchId as number, actorId, pick.userId, null, { refuseSuspended: true, guestRelease });
     } catch (error) {
       if (isMatchRefereeRefusal(error)) return false;
       // Panne : posé malgré elle (validation faite, réponse perdue), le remplaçant tient le rôle.
@@ -287,21 +289,21 @@ function withdrawnAssignment(user: { id: number }, input: WithdrawalInput, data:
  * défait le geste. Rend l'arbitre que le match porte déjà quand c'est **un
  * autre** (changé depuis la fenêtre « Arbitrage » entre la lecture et ce
  * retrait) : le rôle est tenu, il n'y a ni remplaçant à chercher ni place à
- * pourvoir. `null` sinon. `guestRelease` : sortie d'un invité, retrait sans
- * ligne de journal ni avis à l'invité (`assignMatchReferee`).
+ * pourvoir. `null` sinon. `staffActorId` : le staff qui sort un invité du
+ * planning (retrait sans ligne de journal ni avis à l'invité,
+ * `assignMatchReferee`), `null` pour le désistement du membre lui-même.
  */
 async function releaseMatchReferee(
   matchId: number,
   userId: number,
-  actorId: number,
+  staffActorId: number | null,
   undo: PlanningUndo,
   eventIds: readonly number[],
-  guestRelease: boolean,
 ): Promise<number | null> {
   const carried = await readMatchReferee(matchId);
   if (carried !== undefined && carried !== userId) return carried;
   try {
-    await assignMatchReferee(matchId, actorId, null, userId, { guestRelease });
+    await assignMatchReferee(matchId, staffActorId ?? userId, null, userId, { guestRelease: staffActorId !== null });
   } catch (error) {
     await settleFailedDesignation(error, matchId, null, undo, eventIds);
     throw error;
@@ -408,14 +410,23 @@ function coAssigned(entry: LoadedEntry, data: PlanningData, userId: number, role
  */
 async function replaceWithdrawn(
   connection: PoolConnection,
-  gesture: { entry: LoadedEntry; data: PlanningData; current: PlanningAssignmentView; now: number; confirmed: boolean; userId: number },
+  gesture: {
+    entry: LoadedEntry;
+    data: PlanningData;
+    current: PlanningAssignmentView;
+    now: number;
+    confirmed: boolean;
+    userId: number;
+    /** Sortie d'un invité par le staff : remplaçant d'arbitre posé sans ligne de journal. */
+    guestRelease: boolean;
+  },
 ): Promise<{ fresh: LoadedEntry; replacementId: number | null; coAssignedIds: number[]; hold: CasterHolds }> {
-  const { entry, data, current, now, confirmed, userId } = gesture;
+  const { entry, data, current, now, confirmed, userId, guestRelease } = gesture;
   const role = current.role;
   try {
     const found = await findReplacement(connection, entry.key, role, now, data.members, current, entry);
     const fresh = found.entry ?? entry;
-    const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, userId));
+    const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, userId, guestRelease));
     const replacementId = placed && found.pick ? found.pick.userId : null;
     return {
       fresh,
@@ -464,8 +475,8 @@ export async function withdrawFromEntry(user: AuthUser, input: WithdrawalInput, 
  * ({@link withdrawFromEntry}, `actorId: null`) ou un invité que le staff
  * `actorId` sort du planning ({@link releaseGuestPlanning}). Posé par le
  * staff, il n'est jamais « tardif » (ce n'est pas un désistement du membre),
- * il porte son auteur, et le match nomme le staff comme auteur du retrait
- * d'un arbitre. `includeHidden` : les entrées des tournois encore cachés sont lues.
+ * il porte son auteur, et le retrait d'un arbitre du match comme la pose de
+ * son remplaçant ne laissent aucune ligne de journal par match. `includeHidden` : les entrées des tournois encore cachés sont lues.
  */
 async function withdrawMember(
   user: { id: number; includeHidden: boolean; actorId: number | null },
@@ -492,7 +503,7 @@ async function withdrawMember(
       ]);
       return [await writeWithdrawalEvent(connection, entry, user.id, input, confirmed, late, user.actorId)];
     });
-    const heldBy = matchId !== null && undo !== undefined ? await releaseMatchReferee(matchId, user.id, user.actorId ?? user.id, undo, eventIds, user.actorId !== null) : null;
+    const heldBy = matchId !== null && undo !== undefined ? await releaseMatchReferee(matchId, user.id, user.actorId, undo, eventIds) : null;
     if (heldBy !== null) {
       // Les co-affectés se lisent dans `data` (lu sous le même verrou) : seule la ligne du désisté a changé.
       return {
@@ -517,6 +528,7 @@ async function withdrawMember(
       now,
       confirmed,
       userId: user.id,
+      guestRelease: user.actorId !== null,
     });
     const open = confirmed && replacementId === null;
     // Inscrit sur le match, le désisté le cast encore (`selfHeld`) ; seul à tenir le rôle, rien ne change pour

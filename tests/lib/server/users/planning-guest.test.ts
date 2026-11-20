@@ -7,12 +7,14 @@ jest.mock("@/lib/server/planning/withdrawal");
 import { getDatabase } from "@/lib/server/database";
 import { releaseGuestPlanning } from "@/lib/server/planning/withdrawal";
 import { publishStaffAction } from "@/lib/server/staff-audit";
+import { holdsGuestEligibleRole } from "@/lib/shared/permissions";
 import {
-  holdsGuestEligibleRole,
+  PLANNING_GUEST_CLEARED_DISCORD_LINE,
   PLANNING_GUEST_OFF_DISCORD_LINE,
   PLANNING_GUEST_ON_DISCORD_LINE,
   PLANNING_GUEST_REPLAY_DISCORD_LINE,
   planningGuestAuditLine,
+  publishGuestFlagCleared,
   publishPlanningGuestChange,
   readPlanningGuest,
   setPlanningGuest,
@@ -247,6 +249,38 @@ describe("publishPlanningGuestChange", () => {
   it("planningGuestDiscordLines_nameNoAccountNorStaff", () => {
     expect(PLANNING_GUEST_ON_DISCORD_LINE).not.toMatch(/#\d|Test_/);
     expect(PLANNING_GUEST_OFF_DISCORD_LINE).not.toMatch(/#\d|Test_/);
+    expect(PLANNING_GUEST_CLEARED_DISCORD_LINE).not.toMatch(/#\d|Test_/);
+  });
+});
+
+// Revue juridique 2 : la marque tombée avec les rôles est notée comme tout geste sur elle (T20).
+describe("publishGuestFlagCleared", () => {
+  const actor = { id: 1, pseudo: "Test_Admin" };
+
+  it("publishGuestFlagCleared_roleLost_anonymousDiscordNamedPm2", () => {
+    publishGuestFlagCleared(actor, 7, "ROLE_LOST");
+
+    expect(publishStaffAction).toHaveBeenCalledWith(PLANNING_GUEST_CLEARED_DISCORD_LINE, actor, {
+      auditLine: "🎙️ Compte #7 retiré des invités (dernier rôle de caster ou de prod retiré).",
+      category: "admin",
+    });
+  });
+
+  it("publishGuestFlagCleared_promoted_auditSaysPromotion", () => {
+    publishGuestFlagCleared(actor, 7, "PROMOTED");
+
+    expect(jest.mocked(publishStaffAction).mock.calls[0][2]).toMatchObject({
+      auditLine: "🎙️ Compte #7 retiré des invités (promu administrateur).",
+    });
+  });
+
+  it("publishGuestFlagCleared_publishThrows_doesNotThrow", () => {
+    jest.mocked(publishStaffAction).mockImplementationOnce(() => {
+      throw new Error("bot down");
+    });
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(() => publishGuestFlagCleared(actor, 7, "ROLE_LOST")).not.toThrow();
   });
 });
 

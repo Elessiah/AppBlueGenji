@@ -172,9 +172,11 @@ d'arbitre compris.
   (`actor_user_id`) et la marque `staff_release` (indépendante de l'auteur, que
   la suppression du compte du staff efface), n'est jamais tardif, n'écarte pas
   le compte des calculs suivants s'il redevient membre (`removals` ignore un
-  `WITHDRAWN` marqué), et le retrait d'un arbitre du match nomme le staff, sans
-  ligne de journal par match ni push `REFEREE_RELEASED` à l'invité
-  (`assignMatchReferee(…, { guestRelease })`, `RefereeChange.guestRelease`). Le
+  `WITHDRAWN` marqué) ; le retrait d'un arbitre du match, comme la pose de son
+  remplaçant, ne laisse aucune ligne de journal par match (seul le bilan
+  `planningGuestAuditLine` de pm2 en garde le compte) ni push
+  `REFEREE_RELEASED` à l'invité (`assignMatchReferee(…, { guestRelease })`,
+  `RefereeChange.guestRelease` sur `RELEASED` et `ASSIGNED`). Le
   tableau du staff le montre « Sorti par le staff », l'export du compte le dit
   (`staffRelease`, dans son historique comme dans les gestes de staff de
   l'auteur), et les avis le disent « retiré du planning » plutôt que

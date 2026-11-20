@@ -7,7 +7,7 @@ import { resolveRoles } from "@/lib/server/auth";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import { visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { canSeeBattletagVerification } from "@/lib/shared/battletag-visibility";
-import { can, NON_STAFF_ROLES, type PlatformRole } from "@/lib/shared/permissions";
+import { can, holdsGuestEligibleRole, NON_STAFF_ROLES, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { getActiveSuspension } from "@/lib/server/account-suspensions";
 import type { FullProfileResponse, PublicUserProfile, UserTeamTimeline } from "@/lib/shared/types";
@@ -15,7 +15,7 @@ import { applyVisibility, mapPublicUser, type UserRow } from "./players";
 import { accountLocaleFromRow } from "./account-locale";
 import { matchDmEnabled } from "./match-dm-preference";
 import { anonymizedAccountHasNoPage } from "./profileless-players";
-import { holdsGuestEligibleRole, readPlanningGuest } from "./planning-guest";
+import { readPlanningGuest } from "./planning-guest";
 
 /*
  * Fiche complète d'un joueur telle que la voit son lecteur — lui-même, le

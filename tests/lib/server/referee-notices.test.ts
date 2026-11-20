@@ -234,6 +234,13 @@ describe("deliverRefereeChange", () => {
     expect(notifyUsers).not.toHaveBeenCalled();
   });
 
+  it("deliverRefereeChange_assignedForGuestRelease_sendsNoLog", async () => {
+    mockMatch(matchRow());
+    await deliverRefereeChange({ kind: "ASSIGNED", matchId: 42, replacedRefereeId: null, actorId: 1, guestRelease: true });
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
   it("autogestion d'une manche : `log: false` tait la ligne, l'avis à l'arbitre part", async () => {
     mockMatch(matchRow());
     await deliverRefereeChange({ kind: "SELF_MANAGED", matchId: 42, enabled: true, replacedRefereeId: REFEREE }, { log: false });

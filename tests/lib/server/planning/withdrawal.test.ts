@@ -331,7 +331,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     expect(result.replaced).toBe(true);
     expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([
       [1, 3, null, 3, { guestRelease: false }],
-      [1, 3, 5, null, { refuseSuspended: true }],
+      [1, 3, 5, null, { refuseSuspended: true, guestRelease: false }],
     ]);
   });
 
@@ -355,7 +355,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
     expect(result).toEqual({ late: false, replaced: false, unfilled: true, streamLost: false, stillSignedUp: false });
-    expect(jest.mocked(assignMatchReferee).mock.calls[1]).toEqual([1, 3, 5, null, { refuseSuspended: true }]);
+    expect(jest.mocked(assignMatchReferee).mock.calls[1]).toEqual([1, 3, 5, null, { refuseSuspended: true, guestRelease: false }]);
     expect(loadPlanningMembersByIds).not.toHaveBeenCalled();
   });
 
@@ -400,7 +400,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     const result = await withdrawFromEntry(referee, { entryKey: "m:1", role: "REFEREE", reason: null }, EARLY);
 
     expect(result).toEqual({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
-    expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([[1, 3, 5, null, { refuseSuspended: true }]]);
+    expect(jest.mocked(assignMatchReferee).mock.calls).toEqual([[1, 3, 5, null, { refuseSuspended: true, guestRelease: false }]]);
   });
 
   it("withdrawFromEntry_matchRefusesRelease_rethrowsAfterUndo", async () => {
@@ -1381,6 +1381,21 @@ describe("releaseGuestPlanning (`CAST_PLANNING.md` § Invités)", () => {
     await releaseGuestPlanning(GUEST, STAFF, EARLY);
 
     expect(jest.mocked(assignMatchReferee).mock.calls[0]).toEqual([1, STAFF, null, GUEST, { guestRelease: true }]);
+  });
+
+  // Revue juridique 2 : la pose du remplaçant d'un invité ne laisse pas non plus de ligne par match.
+  it("releaseGuestPlanning_confirmedRefereeReplaced_replacementAssignedAsGuestRelease", async () => {
+    const members = [loadedMember({ userId: 5 })];
+    jest
+      .mocked(loadPlanningData)
+      .mockResolvedValueOnce(planningData({ entries: [loadedEntry({ matchRefereeId: GUEST })], assignments: [loadedAssignment({ userId: GUEST, confirmed: true })] }))
+      .mockResolvedValueOnce(planningData({ entries: [loadedEntry({ matchRefereeId: GUEST })], assignments: [loadedAssignment({ userId: GUEST, confirmed: true })], members }))
+      .mockResolvedValueOnce(planningData({ entries: [loadedEntry()], members, availability: [available("m:1", 5, "REFEREE")], removals: [] }));
+    jest.mocked(readMatchReferee).mockResolvedValue(GUEST);
+
+    await releaseGuestPlanning(GUEST, STAFF, EARLY);
+
+    expect(jest.mocked(assignMatchReferee).mock.calls[1]).toEqual([1, GUEST, 5, null, { refuseSuspended: true, guestRelease: true }]);
   });
 
   it("releaseGuestPlanning_alreadyGone_skippedNotFailed", async () => {

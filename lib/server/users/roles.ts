@@ -39,6 +39,13 @@ export interface RolesSaveResult {
    * laisse une ligne pm2 sans nom, comme le balayage du démarrage (T05).
    */
   strayImpersonationsLifted?: number;
+  /**
+   * Marque « invité » tombée avec l'enregistrement (`CAST_PLANNING.md` §
+   * Invités) : à la promotion (`PROMOTED`) ou avec le dernier rôle de caster
+   * ou de prod (`ROLE_LOST`). La route la publie au journal du staff
+   * (`publishGuestFlagCleared`) : tout geste sur la marque y est noté (T20).
+   */
+  guestCleared?: "PROMOTED" | "ROLE_LOST";
 }
 
 /**
@@ -55,12 +62,33 @@ function storedRoles(row: { is_admin: unknown; platform_roles_json: unknown }): 
  * transaction de l'enregistrement. Une colonne absente (son
  * `ALTER` en échec) n'empêche pas la promotion : il n'y a alors aucun drapeau.
  */
-async function clearGuestFlag(connection: PoolConnection, userId: number): Promise<void> {
+async function clearGuestFlag(connection: PoolConnection, userId: number): Promise<boolean> {
   try {
-    await connection.execute(`UPDATE bg_users SET is_guest_staff = 0 WHERE id = ? AND is_deleted = 0 AND is_guest_staff = 1`, [userId]);
+    const [written] = await connection.execute<ResultSetHeader>(
+      `UPDATE bg_users SET is_guest_staff = 0 WHERE id = ? AND is_deleted = 0 AND is_guest_staff = 1`,
+      [userId],
+    );
+    return Number(written?.affectedRows ?? 0) > 0;
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
+    return false;
   }
+}
+
+/**
+ * La marque « invité » tombe à la promotion ou avec le dernier rôle de caster
+ * ou de prod ; rend sa cause si elle était posée, `undefined` sinon.
+ */
+async function clearGuestOnRoleChange(
+  connection: PoolConnection,
+  userId: number,
+  change: { previous: readonly PlatformRole[]; next: readonly PlatformRole[]; wasAdmin: boolean; isAdmin: boolean },
+): Promise<RolesSaveResult["guestCleared"]> {
+  const promoted = change.isAdmin && !change.wasAdmin;
+  const lostGuestRole = holdsGuestEligibleRole(change.previous) && !holdsGuestEligibleRole(change.next);
+  if (!promoted && !lostGuestRole) return undefined;
+  if (!(await clearGuestFlag(connection, userId))) return undefined;
+  return promoted ? "PROMOTED" : "ROLE_LOST";
 }
 
 /**
@@ -137,6 +165,7 @@ export async function setUserRoles(
   let unchanged = false;
   let wasAdmin = false;
   let lifted = 0;
+  let guestCleared: RolesSaveResult["guestCleared"];
   try {
     await connection.beginTransaction();
     // L'**auteur** doit être encore administrateur au moment d'écrire : la
@@ -213,8 +242,7 @@ export async function setUserRoles(
       // reprendrait effet, sans geste, à une rétrogradation ou à une incarnation.
       // Dernier rôle de caster ou de prod retiré : la marque, qui ne vise qu'eux,
       // n'a plus d'objet et tombe aussi (registre T20, durée de conservation).
-      const lostGuestRole = holdsGuestEligibleRole(previous) && !holdsGuestEligibleRole(nonAdminRoles);
-      if ((isAdmin && !wasAdmin) || lostGuestRole) await clearGuestFlag(connection, targetUserId);
+      guestCleared = await clearGuestOnRoleChange(connection, targetUserId, { previous, next: nonAdminRoles, wasAdmin, isAdmin });
     }
     await connection.commit();
   } catch (error) {
@@ -239,6 +267,7 @@ export async function setUserRoles(
     roles: sanitized,
     previous: journalPrevious(previous, wasAdmin),
     ...(lifted > 0 ? { [liftKey]: lifted } : {}),
+    ...(guestCleared ? { guestCleared } : {}),
   };
 }
 

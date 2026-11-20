@@ -39,10 +39,6 @@ export function planningGuestAuditLine(targetUserId: number, saved: PlanningGues
   return `🎙️ Compte #${targetUserId} ${head}${detail}.`;
 }
 
-// Les rôles qui rendent un compte marquable : `lib/shared/permissions.ts`
-// (lus aussi par `setUserRoles`, qui retire la marque avec le dernier d'entre eux).
-export { holdsGuestEligibleRole };
-
 type LockedUserRow = RowDataPacket & {
   id: number;
   is_admin: number | null;
@@ -103,7 +99,9 @@ export async function setPlanningGuest(
     if (!target) throw new Error("USER_NOT_FOUND");
     const flagged = Number(target.is_guest_staff ?? 0) === 1;
     if (guest && Number(target.is_admin ?? 0) === 1) throw new Error("PLANNING_GUEST_ADMIN");
-    // Un drapeau déjà posé se rejoue même si le compte a perdu depuis son rôle de caster ou de prod.
+    // Un drapeau déjà posé se rejoue sans relire les rôles : `setUserRoles` le
+    // retire avec le dernier rôle de caster ou de prod, sauf ligne antérieure
+    // à cette règle (drapeau posé puis rôle retiré avant elle).
     if (guest && !flagged && !holdsGuestEligibleRole(target.platform_roles_json)) throw new Error("PLANNING_GUEST_NOT_STAFF");
     if (flagged !== guest) {
       const [written] = await connection.execute<ResultSetHeader>(
@@ -121,6 +119,26 @@ export async function setPlanningGuest(
   }
   const release = guest ? await releaseGuestPlanning(targetUserId, actorId, now) : null;
   return { guest, changed, release };
+}
+
+/** Ligne Discord, anonyme : marque tombée avec un changement de rôles (`setUserRoles`). */
+export const PLANNING_GUEST_CLEARED_DISCORD_LINE = "🎙️ La marque « invité » d'un compte tombe avec ses rôles, par le staff.";
+
+/**
+ * Publie la marque tombée avec un changement de rôles (promotion, dernier rôle
+ * de caster ou de prod retiré) : anonyme sur Discord, auteur et compte visé
+ * dans pm2 — comme tout geste sur la marque (registre T20). Ne lève jamais.
+ */
+export function publishGuestFlagCleared(actor: StaffActor, targetUserId: number, cause: "PROMOTED" | "ROLE_LOST"): void {
+  const why = cause === "PROMOTED" ? "promu administrateur" : "dernier rôle de caster ou de prod retiré";
+  try {
+    publishStaffAction(PLANNING_GUEST_CLEARED_DISCORD_LINE, actor, {
+      auditLine: `🎙️ Compte #${targetUserId} retiré des invités (${why}).`,
+      category: "admin",
+    });
+  } catch (error) {
+    console.error(`[planning-guest] marque retirée non publiée : ${failureReason(error)}`);
+  }
 }
 
 /** Une sortie rejouée a encore quitté, laissé ou effacé quelque chose. */
