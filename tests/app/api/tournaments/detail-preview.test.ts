@@ -45,7 +45,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(detailCall()).toEqual([
       7,
       1,
-      { canManage: true, canPreview: true, canManageLive: true, canDelete: true, canCancelForfeit: true, canProd: true },
+      { canManage: true, canPreview: true, canManageLive: true, canDelete: true, canCancelForfeit: true, canProd: true, canLeaveProd: true },
     ]);
   });
 
@@ -58,7 +58,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(detailCall()).toEqual([
       7,
       2,
-      { canManage: true, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false, canProd: false },
+      { canManage: true, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false, canProd: false, canLeaveProd: true },
     ]);
   });
 
@@ -70,7 +70,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(detailCall()).toEqual([
       7,
       3,
-      { canManage: false, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false, canProd: false },
+      { canManage: false, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false, canProd: false, canLeaveProd: true },
     ]);
   });
 
@@ -82,7 +82,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(detailCall()).toEqual([
       7,
       4,
-      { canManage: false, canPreview: false, canManageLive: false, canDelete: false, canCancelForfeit: false, canProd: false },
+      { canManage: false, canPreview: false, canManageLive: false, canDelete: false, canCancelForfeit: false, canProd: false, canLeaveProd: true },
     ]);
   });
 
@@ -94,7 +94,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(detailCall()).toEqual([
       7,
       5,
-      { canManage: false, canPreview: false, canManageLive: false, canDelete: false, canCancelForfeit: false, canProd: false },
+      { canManage: false, canPreview: false, canManageLive: false, canDelete: false, canCancelForfeit: false, canProd: false, canLeaveProd: true },
     ]);
   });
 
@@ -178,7 +178,7 @@ describe("GET /api/tournaments/[id] — vue joueur (ADMIN_ROLE_IMPERSONATION.md)
     expect(detailCall()).toEqual([
       7,
       1,
-      { canManage: false, canPreview: false, canManageLive: false, canDelete: false, canCancelForfeit: false, canProd: false },
+      { canManage: false, canPreview: false, canManageLive: false, canDelete: false, canCancelForfeit: false, canProd: false, canLeaveProd: false },
     ]);
   });
 
@@ -192,8 +192,18 @@ describe("GET /api/tournaments/[id] — vue joueur (ADMIN_ROLE_IMPERSONATION.md)
     expect(detailCall()).toEqual([
       7,
       1,
-      { canManage: false, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false, canProd: false },
+      { canManage: false, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false, canProd: false, canLeaveProd: false },
     ]);
+  });
+
+  it("GET_adminImpersonatingProd_canClaimAndLeaveProd", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(
+      authUser({ id: 1, isAdmin: false, roles: ["PROD"], playerView: true, playerViewAvailable: true }),
+    );
+
+    await get("7");
+
+    expect(detailCall()?.[2]).toMatchObject({ canProd: true, canLeaveProd: true, canManage: false });
   });
 
   it("GET_adminImpersonatingArbitre_managesButNeverDeletes", async () => {
@@ -206,7 +216,7 @@ describe("GET /api/tournaments/[id] — vue joueur (ADMIN_ROLE_IMPERSONATION.md)
     expect(detailCall()).toEqual([
       7,
       1,
-      { canManage: true, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false, canProd: false },
+      { canManage: true, canPreview: true, canManageLive: true, canDelete: false, canCancelForfeit: false, canProd: false, canLeaveProd: false },
     ]);
   });
 });

@@ -134,6 +134,7 @@
     "PLANNING_ROLE_NOT_HELD": "Ce compte ne peut pas tenir ce rôle ici.",
     "PLANNING_HIDDEN_FOR_MEMBER": "Ce tournoi est encore caché : ce compte ne le voit pas.",
     "PLANNING_ROLE_CONFLICT": "Une même personne ne peut pas être caster et prod sur un même créneau.",
+    "PLANNING_PROD_TAKEN": "Ce match a déjà sa prod, placée depuis le match : retire-la d'abord depuis ce match.",
     "PLANNING_CASTERS_FULL": "Ce créneau a déjà deux casters : retire-en un avant d'en poser un autre.",
     "PLANNING_IS_PLAYER": "Cette personne joue pendant ce créneau : elle ne peut pas le couvrir.",
     "PLANNING_OVERLAP": "Cette personne tient déjà un créneau qui chevauche celui-ci : retire-la d'abord de l'autre.",

@@ -32,6 +32,7 @@ import {
 } from "@/lib/shared/planning-durations";
 import type { PlanningEntrant } from "@/lib/shared/planning-view";
 import { visibleText } from "@/lib/shared/visible-text";
+import { heldPlanningRowSql } from "@/lib/server/tournaments/prod-sql";
 
 export type Executor = Pick<PoolConnection, "execute">;
 
@@ -663,7 +664,7 @@ export async function loadPlanningHistory(executor: Executor, weekOf: number): P
          JOIN bg_tournaments t ON t.id = a.tournament_id
          LEFT JOIN bg_matches m ON m.id = a.match_id
         WHERE NOT (a.role = 'REFEREE' AND a.match_id IS NOT NULL)
-          AND (a.source = 'MANUAL' OR a.confirmed = 1)
+          AND ${heldPlanningRowSql("a")}
           AND COALESCE(m.start_at, t.start_at) >= ? AND COALESCE(m.start_at, t.start_at) < ?
        UNION ALL
        SELECT m.referee_user_id AS user_id FROM bg_matches m
@@ -673,13 +674,13 @@ export async function loadPlanningHistory(executor: Executor, weekOf: number): P
         WHERE m.start_at >= ? AND m.start_at < ?
           AND NOT EXISTS (SELECT 1 FROM bg_planning_assignments pa
                            WHERE pa.match_id = c.match_id AND pa.user_id = c.user_id AND pa.role = 'CASTER'
-                             AND (pa.source = 'MANUAL' OR pa.confirmed = 1))
+                             AND ${heldPlanningRowSql("pa")})
        UNION ALL
        SELECT m.prod_user_id AS user_id FROM bg_matches m
         WHERE m.prod_user_id IS NOT NULL AND m.start_at >= ? AND m.start_at < ?
           AND NOT EXISTS (SELECT 1 FROM bg_planning_assignments pa
                            WHERE pa.match_id = m.id AND pa.user_id = m.prod_user_id AND pa.role = 'PROD'
-                             AND (pa.source = 'MANUAL' OR pa.confirmed = 1))
+                             AND ${heldPlanningRowSql("pa")})
      ) jobs GROUP BY user_id`,
     [from, to, from, to, from, to, from, to],
   );

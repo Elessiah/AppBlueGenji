@@ -98,6 +98,7 @@ export function useMatchCardModel(
     viewerUserId,
     publicShare,
     canProd,
+    canLeaveProd,
   } = useLiveControls();
   // Lu à part (`useViewerRefereesMatch`) : une relecture des pseudos ne
   // redessine que les cartes dont la réponse change.
@@ -148,6 +149,7 @@ export function useMatchCardModel(
   // Prod du match (`docs/features/MATCH_PROD.md`) : même ouverture que le cast.
   const prod = prodControls(match, {
     canProd,
+    canLeaveProd,
     canSchedule,
     viewerUserId,
     myTeamIds: myTeamId === null ? [] : [myTeamId],

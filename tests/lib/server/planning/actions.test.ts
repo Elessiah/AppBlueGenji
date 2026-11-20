@@ -78,6 +78,8 @@ function routeSql(
     readFailsAfter?: number;
     /** L'arbitre du match lu dans la transaction du geste ; par défaut, la première lecture. */
     inTransaction?: number | null;
+    /** La prod du match relue sous verrou dans la transaction du geste ; par défaut aucune. */
+    matchProd?: number | null;
   } = {},
 ) {
   const reads = Array.isArray(options.matchReferee) ? [...options.matchReferee] : [options.matchReferee ?? null];
@@ -93,6 +95,7 @@ function routeSql(
       return [{ affectedRows: options.released }];
     }
     if (sql.startsWith("SELECT m.referee_user_id FROM bg_matches")) return [[{ referee_user_id: inTransaction }], []];
+    if (sql.startsWith("SELECT id, prod_user_id FROM bg_matches")) return [[{ id: 1, prod_user_id: options.matchProd ?? null }], []];
     if (sql.includes("SELECT referee_user_id FROM bg_matches")) {
       matchReads += 1;
       if (options.readFails || (options.readFailsAfter !== undefined && matchReads > options.readFailsAfter)) {
@@ -731,6 +734,36 @@ describe("setManualAssignment — pose", () => {
     );
     expect(connection.rollback).toHaveBeenCalled();
     expect(assignMatchReferee).not.toHaveBeenCalled();
+  });
+
+  it("setManualAssignment_prodOfOtherOnMatch_throwsProdTaken", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchProdId: 4 })], members }));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "PROD", userId: 6, assigned: true })).rejects.toThrow(
+      "PLANNING_PROD_TAKEN",
+    );
+    expect(callsWith("INSERT INTO bg_planning_assignments")).toHaveLength(0);
+  });
+
+  it("setManualAssignment_prodPlacedDuringGesture_throwsProdTaken", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()], members }));
+    routeSql({ matchProd: 4 });
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "PROD", userId: 6, assigned: true })).rejects.toThrow(
+      "PLANNING_PROD_TAKEN",
+    );
+    expect(callsWith("SELECT id, prod_user_id FROM bg_matches")[0]?.[0]).toContain("LOCK IN SHARE MODE");
+    expect(callsWith("INSERT INTO bg_planning_assignments")).toHaveLength(0);
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
+  it("setManualAssignment_casterWhoBecameMatchProd_throwsRoleConflict", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()], members }));
+    routeSql({ matchProd: 4 });
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "CASTER", userId: 4, assigned: true })).rejects.toThrow(
+      "PLANNING_ROLE_CONFLICT",
+    );
   });
 
   it("setManualAssignment_overlappingCastSignup_throwsOverlapManaged", async () => {

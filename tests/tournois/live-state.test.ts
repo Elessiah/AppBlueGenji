@@ -118,6 +118,7 @@ const viewer = (overrides: Partial<TournamentViewerContext> = {}): TournamentVie
   canCancelForfeit: false,
   canManageLive: false,
   canProd: false,
+  canLeaveProd: false,
   viewerUserId: 1,
   castBlock: "NOT_CASTER",
   registrationBlock: null,

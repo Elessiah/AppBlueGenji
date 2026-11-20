@@ -64,6 +64,15 @@ let plannedOtherProd: boolean;
 let execute: jest.Mock<SqlQuery>;
 let announcements: Promise<void>[];
 
+/** Lignes du planning relues par la prise de place (prod d'un autre, caster tenu) ; `null` pour le reste. */
+function readPlannedRows(sql: string, values: unknown[]): [unknown[], []] | null {
+  if (sql.includes("role = 'PROD' AND user_id <> ?")) return [plannedOtherProd ? [{ 1: 1 }] : [], []];
+  if (sql.includes("FROM bg_planning_assignments") && sql.includes("role = 'CASTER'")) {
+    return [plannedCasterIds.includes(Number(values[1])) ? [{ 1: 1 }] : [], []];
+  }
+  return null;
+}
+
 function updatesOfProd() {
   return execute.mock.calls.filter(([sql]) => sql.startsWith("UPDATE bg_matches SET prod_user_id"));
 }
@@ -103,16 +112,16 @@ beforeEach(() => {
   announcements = [];
   execute = jest.fn<SqlQuery>(async (sql, params) => {
     const values = params as unknown[];
-    if (sql.includes("LOCK IN SHARE MODE")) {
+    const planned = readPlannedRows(sql, values);
+    if (planned) return planned;
+    if (sql.includes("FROM bg_users u WHERE u.id = ?") && sql.includes("LOCK IN SHARE MODE")) {
       const account = accounts.get(Number(values[0]));
       return [account ? [account] : [], []];
     }
     if (sql.includes("FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE")) return [match ? [match] : [], []];
     if (sql.includes("FROM bg_match_casters WHERE match_id = ? AND user_id = ?")) {
-      const userId = Number(values[1]);
-      return [casterIds.includes(userId) || plannedCasterIds.includes(userId) ? [{ 1: 1 }] : [], []];
+      return [casterIds.includes(Number(values[1])) ? [{ 1: 1 }] : [], []];
     }
-    if (sql.includes("role = 'PROD' AND user_id <> ?")) return [plannedOtherProd ? [{ 1: 1 }] : [], []];
     if (sql.startsWith("UPDATE bg_matches SET prod_user_id")) return [{ affectedRows: 1 }, []];
     throw new Error(`requête inattendue : ${sql}`);
   });
@@ -218,15 +227,22 @@ describe("claimMatchProd", () => {
 
     await expect(claimMatchProd(42, prodActor)).rejects.toThrow("MATCH_PROD_TAKEN");
     expect(updatesOfProd()).toHaveLength(0);
+    // Lecture courante et verrouillée : une confirmation concurrente du planning est attendue.
+    const prodQuery = execute.mock.calls.find(([sql]) => sql.includes("role = 'PROD' AND user_id <> ?"));
+    expect(prodQuery?.[0]).toContain("LOCK IN SHARE MODE");
+    expect(prodQuery?.[0]).toContain("(source = 'MANUAL' OR confirmed = 1)");
   });
 
   it("claimMatchProd_heldPlanningCaster_throwsProdIsCaster", async () => {
     plannedCasterIds = [PROD_ID];
 
     await expect(claimMatchProd(42, prodActor)).rejects.toThrow("PROD_IS_CASTER");
-    const casterQuery = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_match_casters"));
-    expect(casterQuery?.[0]).toContain("bg_planning_assignments");
-    expect(casterQuery?.[0]).toContain("role = 'CASTER'");
+    expect(updatesOfProd()).toHaveLength(0);
+    const plannedQuery = execute.mock.calls.find(
+      ([sql]) => sql.includes("FROM bg_planning_assignments") && sql.includes("role = 'CASTER'"),
+    );
+    expect(plannedQuery?.[0]).toContain("LOCK IN SHARE MODE");
+    expect(plannedQuery?.[0]).toContain("(source = 'MANUAL' OR confirmed = 1)");
   });
 
   it("claimMatchProd_playerView_throwsPlayerViewActive", async () => {
@@ -500,6 +516,15 @@ describe("formatProdNotice", () => {
     solo: false,
     kind: "ASSIGNED",
   };
+
+  it("formatProdNotice_unavailable_frAndEn", () => {
+    const url = "https://bluegenji.test/tournois/7#match-42";
+
+    expect(formatProdNotice({ ...notice, kind: "UNAVAILABLE" }, url, "fr")).toContain(
+      "Ton compte ne peut plus faire la prod pour le moment",
+    );
+    expect(formatProdNotice({ ...notice, kind: "UNAVAILABLE" }, url, "en")).toContain("Your account cannot be a prod for now");
+  });
 
   it("formatProdNotice_teamMatchFr_namesTeams", () => {
     const text = formatProdNotice(notice, "https://bluegenji.test/tournois/7#match-42", "fr");

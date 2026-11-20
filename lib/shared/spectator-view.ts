@@ -353,6 +353,7 @@ export const SPECTATOR_VIEWER_CONTEXT: Readonly<TournamentViewerContext> = Objec
   canCancelForfeit: false,
   canManageLive: false,
   canProd: false,
+  canLeaveProd: false,
   viewerUserId: 0,
   castBlock: "NOT_CASTER",
   matchProposals: [],

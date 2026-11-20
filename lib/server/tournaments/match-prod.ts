@@ -20,11 +20,9 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
-import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
 import { lockedSuspendedUserIds, userSuspendedSql } from "@/lib/server/suspension-sql";
 import type { ProdLogChange } from "@/lib/shared/bot-logs";
 import { nullableId } from "@/lib/shared/nullable-id";
-import { rolesGranting } from "@/lib/shared/permissions";
 import { actingUserId, type SessionActor } from "./cast-settings";
 import type { CastPairing } from "./cast-notices";
 import { retryOnDeadlock } from "./deadlock-retry";
@@ -32,6 +30,7 @@ import { resolveTeamParty } from "./match-launch";
 import { loadMatchPlayerIds } from "./match-players";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { announceProdChange, type ProdChange } from "./prod-notices";
+import { heldPlanningRowSql, PROD_ROLE_SQL } from "./prod-sql";
 import { inTransaction } from "./transaction";
 
 export {
@@ -42,16 +41,10 @@ export {
   type ProdChange,
 } from "./prod-notices";
 
-/**
- * Le compte tient-il la permission `prod` ? Rôles lus en base (jamais ceux
- * d'une session), constantes du code vérifiées par `jsonRoleLiteral`.
- */
-export const PROD_ROLE_SQL = `(u.is_admin = 1${rolesGranting("prod")
-  .map((role) => ` OR JSON_CONTAINS(u.platform_roles_json, ${jsonRoleLiteral(role)})`)
-  .join("")})`;
+export { PROD_ROLE_SQL } from "./prod-sql";
 
 /** Ligne du planning **tenue** (choix du staff ou proposition confirmée), comme au décompte de l'équité. */
-const HELD_PLANNING_ROW_SQL = `(source = 'MANUAL' OR confirmed = 1)`;
+const HELD_PLANNING_ROW_SQL = heldPlanningRowSql();
 
 type ProdAccountRow = RowDataPacket & { is_deleted: number | null; holds_prod: number | null };
 
@@ -104,21 +97,26 @@ async function lockProdMatch(connection: PoolConnection, matchId: number): Promi
 async function assertProdFree(connection: PoolConnection, row: ProdMatchRow, userId: number): Promise<void> {
   if (await resolveTeamParty(connection, row, userId)) throw new Error("PROD_IS_PLAYER");
   const [casters] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND user_id = ?
-     UNION ALL
-     SELECT 1 FROM bg_planning_assignments
-      WHERE match_id = ? AND user_id = ? AND role = 'CASTER' AND ${HELD_PLANNING_ROW_SQL}
-     LIMIT 1`,
-    [row.id, userId, row.id, userId],
+    `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND user_id = ? LIMIT 1`,
+    [row.id, userId],
   );
   if (casters.length > 0) throw new Error("PROD_IS_CASTER");
+  // Lecture courante et verrouillée : une confirmation du planning en cours est
+  // attendue puis lue, et celle qui suit attend ce geste (`refuseMatchProdConflicts`).
+  const [planned] = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_planning_assignments
+      WHERE match_id = ? AND user_id = ? AND role = 'CASTER' AND ${HELD_PLANNING_ROW_SQL}
+      LIMIT 1 LOCK IN SHARE MODE`,
+    [row.id, userId],
+  );
+  if (planned.length > 0) throw new Error("PROD_IS_CASTER");
 }
 
-/** Une prod tenue au planning par un autre compte réserve la place du match. */
+/** Une prod tenue au planning par un autre compte réserve la place du match (lecture courante, verrouillée). */
 async function assertNoOtherPlannedProd(connection: PoolConnection, matchId: number, userId: number): Promise<void> {
   const [rows] = await connection.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_planning_assignments
-      WHERE match_id = ? AND role = 'PROD' AND user_id <> ? AND ${HELD_PLANNING_ROW_SQL} LIMIT 1`,
+      WHERE match_id = ? AND role = 'PROD' AND user_id <> ? AND ${HELD_PLANNING_ROW_SQL} LIMIT 1 LOCK IN SHARE MODE`,
     [matchId, userId],
   );
   if (rows.length > 0) throw new Error("MATCH_PROD_TAKEN");

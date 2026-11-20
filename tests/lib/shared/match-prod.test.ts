@@ -10,7 +10,7 @@ import { bracketMatch } from "../../helpers/bracket-match";
  * carte offre au lecteur, la ligne du journal du staff, le push, la permission.
  */
 
-const VIEWER: ProdViewer = { canProd: true, canSchedule: false, viewerUserId: 5, myTeamIds: [] };
+const VIEWER: ProdViewer = { canProd: true, canLeaveProd: true, canSchedule: false, viewerUserId: 5, myTeamIds: [] };
 const openMatch = (overrides: Parameters<typeof bracketMatch>[0] = {}) =>
   bracketMatch({ status: "READY", team1Id: 10, team2Id: 11, casters: [], prod: null, ...overrides });
 const caster = (userId: number) => ({ userId, pseudo: "Caster", streamId: 1, ready: false });
@@ -50,11 +50,22 @@ describe("prodControls", () => {
     });
   });
 
-  it("prodControls_isProdWithoutCanProd_hidesRelease", () => {
-    const controls = prodControls(openMatch({ prod: { userId: 5, pseudo: "Moi" } }), { ...VIEWER, canProd: false });
+  it("prodControls_impersonationWithoutProd_hidesRelease", () => {
+    const controls = prodControls(openMatch({ prod: { userId: 5, pseudo: "Moi" } }), {
+      ...VIEWER,
+      canProd: false,
+      canLeaveProd: false,
+    });
 
     expect(controls.isProd).toBe(true);
     expect(controls.showRelease).toBe(false);
+  });
+
+  it("prodControls_lostProdRoleOwnPlace_stillShowsRelease", () => {
+    const controls = prodControls(openMatch({ prod: { userId: 5, pseudo: "Moi" } }), { ...VIEWER, canProd: false });
+
+    expect(controls.showClaim).toBe(false);
+    expect(controls.showRelease).toBe(true);
   });
 
   it("prodControls_completedMatch_hidesEverything", () => {
@@ -123,6 +134,13 @@ describe("formatProdChangeLog", () => {
   it("formatProdChangeLog_ineligible_saysRoleLost", () => {
     expect(formatProdChangeLog({ ...context, change: "INELIGIBLE" })).toContain("la prod n'a plus le rôle prod");
   });
+
+  it("formatProdChangeLog_unavailable_neutralNoSuspension", () => {
+    const line = formatProdChangeLog({ ...context, change: "UNAVAILABLE" });
+
+    expect(line).toContain("la prod n'est plus disponible");
+    expect(line).not.toMatch(/suspen/i);
+  });
 });
 
 describe("matchProdPush", () => {
@@ -148,6 +166,17 @@ describe("matchProdPush", () => {
 
   it("matchProdPush_releasedEn_englishTitle", () => {
     expect(matchProdPush({ ...input, kind: "RELEASED" }, "en").title).toBe("Prod removed");
+  });
+
+  it("matchProdPush_unavailable_frAndEnNeutral", () => {
+    const fr = matchProdPush({ ...input, kind: "UNAVAILABLE" }, "fr");
+    const en = matchProdPush({ ...input, kind: "UNAVAILABLE" }, "en");
+
+    expect(fr.title).toBe("Prod retirée");
+    expect(fr.body).toContain("ne peut plus faire la prod");
+    expect(en.title).toBe("Prod removed");
+    expect(en.body).toContain("cannot be a prod for now");
+    expect(`${fr.body} ${en.body}`).not.toMatch(/suspen/i);
   });
 
   it("matchProdPush_solo_namesNoPlayer", () => {

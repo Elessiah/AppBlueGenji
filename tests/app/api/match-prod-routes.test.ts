@@ -109,6 +109,22 @@ describe("POST / DELETE /api/matches/[matchId]/prod", () => {
     expect((await prodDelete(jsonRequest("DELETE"), params("42"))).status).toBe(403);
   });
 
+  it("DELETE_prod_roleLessSessionNotImpersonating_reachesService", async () => {
+    // Rôle prod perdu, place gardée par un match lancé : elle se rend encore.
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    jest.mocked(releaseMatchProd).mockResolvedValue(undefined);
+
+    expect((await prodDelete(jsonRequest("DELETE"), params("42"))).status).toBe(200);
+    expect(releaseMatchProd).toHaveBeenCalledWith(42, player);
+  });
+
+  it("DELETE_prod_impersonationWithoutProd_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 1, isAdmin: true, playerView: true, roles: [] }));
+
+    expect((await prodDelete(jsonRequest("DELETE"), params("42"))).status).toBe(403);
+    expect(releaseMatchProd).not.toHaveBeenCalled();
+  });
+
   it("DELETE_prod_success_returns200", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(prod);
     jest.mocked(releaseMatchProd).mockResolvedValue(undefined);

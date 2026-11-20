@@ -1010,6 +1010,7 @@ export type ProdLogChange =
   | "REPLACED"
   | "RELEASED_BY_STAFF"
   | "INELIGIBLE"
+  | "UNAVAILABLE"
   | "JOINED_TEAM"
   | "ACCOUNT_DELETION";
 
@@ -1020,6 +1021,8 @@ const PROD_LOG_WORDING: Record<ProdLogChange, { kind: string; detail: string }> 
   REPLACED: { kind: "Prod changée", detail: `la prod du match est remplacée par ${ANONYMOUS_STAFF_LABEL}` },
   RELEASED_BY_STAFF: { kind: "Prod retirée", detail: `prod du match retirée par ${ANONYMOUS_STAFF_LABEL}` },
   INELIGIBLE: { kind: "Prod retirée d'office", detail: "la prod n'a plus le rôle prod" },
+  // Sans motif : une suspension n'est pas dite au journal du staff des tournois.
+  UNAVAILABLE: { kind: "Prod retirée d'office", detail: "la prod n'est plus disponible" },
   JOINED_TEAM: { kind: "Prod retirée d'office", detail: "la prod joue désormais le match" },
   ACCOUNT_DELETION: { kind: "Prod retirée d'office", detail: "le compte de la prod est en cours de suppression" },
 };

@@ -195,6 +195,7 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     canManageLive: state.detail.canManageLive,
     // Prod d'un match : tient à la personne, comme le droit de diffusion.
     canProd: state.detail.canProd,
+    canLeaveProd: state.detail.canLeaveProd,
     // Inscription comme caster : tient à l'identité du lecteur, pas au plateau.
     viewerUserId: state.detail.viewerUserId,
     castBlock: state.detail.castBlock,

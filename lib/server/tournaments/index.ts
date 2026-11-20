@@ -1053,6 +1053,12 @@ export type TournamentViewerRights = {
   /** Droit de se placer comme prod d'un match : permission `prod` (`MATCH_PROD.md`). */
   canProd?: boolean;
   /**
+   * Droit de quitter sa propre place de prod : toute session hors incarnation
+   * sans `prod` (`sessionHolds`), rôle prod perdu compris — la place qu'un match
+   * lancé lui a gardée se rend encore (`MATCH_PROD.md`).
+   */
+  canLeaveProd?: boolean;
+  /**
    * Droit de supprimer définitivement le tournoi : administrateur strict, et
    * non simple porteur de la permission `tournaments` — un arbitre gère un
    * tournoi, il ne l'efface pas (`docs/features/TOURNAMENT_DELETION.md`).
@@ -1248,6 +1254,7 @@ export async function getTournamentViewerContext(
     canPreview = canManage,
     canManageLive = canManage,
     canProd = false,
+    canLeaveProd = canProd,
     canDelete = false,
     canCancelForfeit = false,
   } = rights;
@@ -1403,6 +1410,7 @@ export async function getTournamentViewerContext(
     canCancelForfeit,
     canManageLive,
     canProd,
+    canLeaveProd,
     viewerUserId: userId,
     castBlock,
     matchProposals,

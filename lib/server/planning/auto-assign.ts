@@ -735,6 +735,53 @@ async function refuseLostRoles(connection: PoolConnection, steps: readonly Confi
   for (const step of pending) step.refused = holds(step.userId, step.entry, step.role) !== null;
 }
 
+/**
+ * La prod des matchs visés, relue **dans la transaction qui écrit**, en
+ * lecture courante et verrouillée en partage (le match seul, sans jointure —
+ * MariaDB), après les comptes : l'ordre de `claimMatchProd` (compte, match,
+ * puis lignes du planning). Une prod placée pendant le geste est attendue puis
+ * lue ; une prod qui se place ensuite attend ce geste et lit ses lignes.
+ */
+export async function lockedMatchProds(connection: Executor, matchIds: readonly number[]): Promise<Map<number, number | null>> {
+  const ids = [...new Set(matchIds)].sort((a, b) => a - b);
+  if (ids.length === 0) return new Map();
+  const [rows] = await connection.execute<(RowDataPacket & { id: number; prod_user_id: number | null })[]>(
+    `SELECT id, prod_user_id FROM bg_matches WHERE id IN (${ids.map(() => "?").join(", ")}) LOCK IN SHARE MODE`,
+    ids,
+  );
+  return new Map(rows.map((row) => [Number(row.id), row.prod_user_id === null ? null : Number(row.prod_user_id)]));
+}
+
+/**
+ * Le refus qu'oppose la prod du match (`MATCH_PROD.md`) à une ligne CASTER ou
+ * PROD : la prod placée fait foi — une autre prod n'y est pas tenue
+ * (`PLANNING_PROD_TAKEN`), et la prod n'en est pas caster
+ * (`PLANNING_ROLE_CONFLICT`). `null` : rien ne s'y oppose.
+ */
+export function matchProdRefusal(
+  matchProd: number | null | undefined,
+  userId: number,
+  role: PlanningRole,
+): "PLANNING_PROD_TAKEN" | "PLANNING_ROLE_CONFLICT" | null {
+  if (matchProd === null || matchProd === undefined) return null;
+  if (role === "PROD" && matchProd !== userId) return "PLANNING_PROD_TAKEN";
+  if (role === "CASTER" && matchProd === userId) return "PLANNING_ROLE_CONFLICT";
+  return null;
+}
+
+/** Les propositions CASTER / PROD que la prod du match, relue sous verrou, refuse. */
+async function refuseMatchProdConflicts(connection: PoolConnection, steps: readonly ConfirmStep[]): Promise<void> {
+  const pending = steps.filter((step) => !step.refused && step.role !== "REFEREE" && step.entry.matchId !== null);
+  if (pending.length === 0) return;
+  const prods = await lockedMatchProds(
+    connection,
+    pending.map((step) => Number(step.entry.matchId)),
+  );
+  for (const step of pending) {
+    if (matchProdRefusal(prods.get(Number(step.entry.matchId)), step.userId, step.role) !== null) step.refused = true;
+  }
+}
+
 /** Qui peut tenir quoi, relu dans la transaction d'écriture (`lockedHolding`) : `null` s'il le peut, sinon le refus. */
 export type HoldingCheck = (userId: number, entry: LoadedEntry, role: PlanningRole) => ReturnType<typeof holdingRefusal>;
 
@@ -784,6 +831,8 @@ async function writeConfirmSteps(
 ): Promise<ConfirmReport> {
   // Comptes et tournois verrouillés d'abord, avant les matchs (même ordre que `runAutoAssign`, sans interblocage).
   await refuseLostRoles(connection, steps);
+  // Puis les matchs : une prod placée depuis la lecture refuse ce qui la contredirait.
+  await refuseMatchProdConflicts(connection, steps);
   let confirmed = 0;
   let refused = 0;
   for (const step of steps) {

@@ -56,6 +56,7 @@ import {
 } from "./cast-eligibility";
 import { announceCastChange, queueCastChange, type CastPairing } from "./cast-notices";
 import { queueProdChange } from "./prod-notices";
+import { PROD_ROLE_SQL } from "./prod-sql";
 import { announceStaffMatchAction } from "./staff-action-logs";
 import { actingUserId, applyCastSettings, PLAIN_CAST_ACCESS, type CastAccess, type SessionActor, type CastSettings, type CastSettingsOutcome } from "./cast-settings";
 import { sessionHolds, type SessionRights } from "@/lib/shared/player-view";
@@ -81,7 +82,8 @@ import { loadRoundSlots } from "./round-map-slots";
 import { inTransaction, transact } from "./transaction";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
-import { lockedSuspendedUserIds } from "@/lib/server/suspension-sql";
+import { lockedSuspendedUserIds, userSuspendedSql } from "@/lib/server/suspension-sql";
+import type { ProdNoticeKind } from "@/lib/shared/match-prod";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
 export type LaunchMatchBaseRow = RowDataPacket & {
@@ -237,32 +239,61 @@ export function rowReadiness(row: LaunchMatchRow, casters: readonly MatchCasterL
  * côtoierait en base celui de l'équipe d'avant, que la lecture rejetterait
  * pourtant — et l'empreinte neuve le ressusciterait.
  */
-async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchRow): Promise<boolean> {
+async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchRow, currentRead = false): Promise<boolean> {
   const reset = await resetForNewPairing(connection, row);
   // Après la remise à zéro : un appariement neuf n'est pas encore lancé.
-  const prodReleased = await releasePlayingProd(connection, row);
+  const prodReleased = await releaseUnfitProd(connection, row, currentRead);
   return reset || prodReleased;
 }
 
+type ProdFitnessRow = RowDataPacket & { is_deleted: number | null; holds_prod: number | null; suspended: number | null };
+
 /**
- * La prod du match qui le joue désormais (son équipe vient d'y être placée, ou
- * elle a rejoint une des deux équipes) n'en est plus la prod
- * (`docs/features/MATCH_PROD.md`) : sa place est rendue d'office, sous le verrou
- * du match, tant que le match n'est ni lancé ni joué — comme un caster devenu
- * joueur (`JOINED_TEAM`). Annoncé après le commit (`queueProdChange`).
+ * Pourquoi la prod du match n'en est plus une (`docs/features/MATCH_PROD.md`) :
+ * elle a perdu la permission `prod` (`INELIGIBLE`), son compte est suspendu ou
+ * effacé (`UNAVAILABLE`, sans dire pourquoi), ou elle joue désormais le match
+ * — son équipe vient d'y être placée, ou elle a rejoint une des deux équipes
+ * (`JOINED_TEAM`). `null` : elle le reste. Une lecture du compte, puis, s'il
+ * convient, deux de ses équipes ; `currentRead` (un instantané a précédé le
+ * verrou du match) : lectures courantes, verrouillées en partage.
+ */
+async function prodUnfitness(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  prodId: number,
+  currentRead: boolean,
+): Promise<Exclude<ProdNoticeKind, "ASSIGNED" | "RELEASED"> | null> {
+  const [accounts] = await connection.execute<ProdFitnessRow[]>(
+    `SELECT u.is_deleted, ${PROD_ROLE_SQL} AS holds_prod, ${userSuspendedSql("u.id")} AS suspended
+       FROM bg_users u WHERE u.id = ? LIMIT 1${currentRead ? " LOCK IN SHARE MODE" : ""}`,
+    [prodId],
+  );
+  const account = accounts[0];
+  if (!account || Number(account.is_deleted ?? 0) === 1 || Number(account.suspended ?? 0) === 1) return "UNAVAILABLE";
+  if (Number(account.holds_prod ?? 0) !== 1) return "INELIGIBLE";
+  return (await playingUserIds(connection, row, [prodId], currentRead)).has(prodId) ? "JOINED_TEAM" : null;
+}
+
+/**
+ * La prod qui ne peut plus l'être ({@link prodUnfitness}) quitte sa place
+ * d'office, sous le verrou du match, **avant** tout lancement : tant que le
+ * match n'est ni lancé ni joué — un direct en cours n'est pas coupé, comme un
+ * caster (`releaseIneligibleCasters`). Annoncé après le commit
+ * (`queueProdChange` : journal du staff sans nom, avis au compte).
  *
  * Rend `true` quand la place a été rendue.
  */
-async function releasePlayingProd(connection: PoolConnection, row: LaunchMatchRow): Promise<boolean> {
+async function releaseUnfitProd(connection: PoolConnection, row: LaunchMatchRow, currentRead: boolean): Promise<boolean> {
   const prodId = nullableId(row.prod_user_id ?? null);
   if (prodId === null || row.launched_at !== null || row.status === "COMPLETED") return false;
-  if ((await resolveTeamParty(connection, row, prodId)) === null) return false;
+  const reason = await prodUnfitness(connection, row, prodId, currentRead);
+  if (reason === null) return false;
   await connection.execute(`UPDATE bg_matches SET prod_user_id = NULL WHERE id = ? AND prod_user_id = ?`, [row.id, prodId]);
   row.prod_user_id = null;
   queueProdChange(connection, {
     matchId: Number(row.id),
-    log: "JOINED_TEAM",
-    notices: [{ userId: prodId, kind: "JOINED_TEAM" }],
+    log: reason,
+    notices: [{ userId: prodId, kind: reason }],
     pairing: castPairingOf(row),
   });
   return true;
@@ -677,19 +708,21 @@ async function playingUserIds(
   connection: PoolConnection,
   match: { team1_id: number | null; team2_id: number | null },
   userIds: readonly number[],
+  currentRead = false,
 ): Promise<Set<number>> {
+  const lock = currentRead ? " LOCK IN SHARE MODE" : "";
   const teamIds = [nullableId(match.team1_id), nullableId(match.team2_id)].filter((id): id is number => id !== null);
   const users = [...new Set(userIds)];
   if (teamIds.length === 0 || users.length === 0) return new Set();
   const teams = sqlPlaceholders(teamIds.length);
   const asked = sqlPlaceholders(users.length);
   const [solo] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
-    `SELECT solo_user_id AS user_id FROM bg_teams WHERE solo_user_id IN (${asked}) AND id IN (${teams})`,
+    `SELECT solo_user_id AS user_id FROM bg_teams WHERE solo_user_id IN (${asked}) AND id IN (${teams})${lock}`,
     [...users, ...teamIds],
   );
   const [members] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
     `SELECT DISTINCT tm.user_id FROM bg_team_members tm
-     WHERE tm.user_id IN (${asked}) AND ${activeMemberSql("tm")} AND tm.team_id IN (${teams})`,
+     WHERE tm.user_id IN (${asked}) AND ${activeMemberSql("tm")} AND tm.team_id IN (${teams})${lock}`,
     [...users, ...teamIds],
   );
   return new Set([...solo, ...members].map((entry) => Number(entry.user_id)));
@@ -723,7 +756,7 @@ async function launchIfAllReady(
 ): Promise<boolean> {
   const row = locked ?? (await lockLaunchMatch(connection, matchId, snapshotBeforeLock));
   if (!row) return false;
-  if (!locked) await adoptCurrentPairing(connection, row);
+  if (!locked) await adoptCurrentPairing(connection, row, snapshotBeforeLock);
   if (matchLaunchPhase(toLaunchInput(row), Date.now()) !== "LOBBY") return false;
   // Un caster devenu inéligible ne donnera plus son « Prêt » : il est retiré
   // avant le décompte, sinon le match l'attendrait jusqu'au lancement d'office.
@@ -802,7 +835,7 @@ export async function setMatchReady(
     if (phase === "LAUNCHED") throw new Error("MATCH_ALREADY_LAUNCHED");
     if (phase !== "LOBBY") throw new Error("MATCH_NOT_IN_LOBBY");
 
-    await adoptCurrentPairing(connection, row);
+    const adopted = await adoptCurrentPairing(connection, row);
     // Lu après l'adoption, qui peut défaire l'ouverture d'un autre appariement.
     const lobbyWasOpen = row.lobby_opened_at !== null;
     const party = await resolvePartyOrRefusal(connection, row, userId, session);
@@ -829,7 +862,8 @@ export async function setMatchReady(
     const launchedNow = ready ? await launchIfAllReady(connection, matchId, false, row) : false;
     // Le « Prêt » du seul arbitre n'est pas dans l'instantané (décision 47) :
     // rien à publier tant qu'il ne lance ni n'ouvre le lobby.
-    const quietReferee = party.role === "MATCH_REFEREE" && !launchedNow && lobbyWasOpen;
+    // Une adoption qui retire un caster ou la prod change ce que voient les lecteurs : publiée.
+    const quietReferee = party.role === "MATCH_REFEREE" && !launchedNow && lobbyWasOpen && !adopted;
     return { tournamentId: Number(row.tournament_id), launched: launchedNow, quiet: quietReferee };
   });
   if (!quiet) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
@@ -1552,15 +1586,15 @@ function enteredLaunch(row: LaunchMatchBaseRow, now: number): boolean {
  * La phase est décidée en mémoire par le module pur, jamais réécrite en SQL :
  * la requête ne fait que réduire les candidats.
  *
- * `report.castReleased` : levé quand un caster a été retiré (inéligible, ou
- * devenu joueur de l'appariement qui arrive).
+ * `report.castCrewReleased` : levé quand un caster ou la prod a été retiré
+ * d'office (inéligible, indisponible, ou devenu joueur de l'appariement qui arrive).
  *
  * @returns le nombre de matchs modifiés.
  */
 export async function maintainMatchLaunches(
   connection: PoolConnection,
   tournamentId: number,
-  report?: { castReleased: boolean },
+  report?: { castCrewReleased: boolean },
 ): Promise<number> {
   const [rows] = await connection.execute<LaunchMatchBaseRow[]>(
     `SELECT ${LAUNCH_MATCH_COLUMNS} ${LAUNCH_MATCH_FROM}
@@ -1597,7 +1631,7 @@ export async function maintainMatchLaunches(
     const row = await lockLaunchMatch(connection, Number(candidate.id), true, candidate);
     if (row?.status !== "READY" || !enteredLaunch(row, now)) continue;
     const stale = row.launch_pairing !== launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
-    const adopted = await adoptCurrentPairing(connection, row);
+    const adopted = await adoptCurrentPairing(connection, row, true);
     locked.push({ row, stale, adopted });
   }
   // Tous les candidats sont verrouillés (par id croissant) : la condition du
@@ -1615,7 +1649,7 @@ export async function maintainMatchLaunches(
     const released = await releaseIneligibleCasters(connection, row, true, castBlocks.get(row.tournament_game));
     // Un caster retiré emporte son lien de l'accueil et de #live : l'appelant
     // qui publie le dit (`landingLive`).
-    if (report && (adopted || released)) report.castReleased = true;
+    if (report && (adopted || released)) report.castCrewReleased = true;
     const undecidedMatch = undecidedCandidate(row);
     if (undecidedMatch) undecided.push(undecidedMatch);
     const launch =
@@ -1636,7 +1670,7 @@ export async function maintainMatchLaunches(
         [row.id],
       );
       changed += 1;
-    } else if (stale || released) {
+    } else if (stale || released || adopted) {
       changed += 1;
     }
   }
@@ -2231,7 +2265,7 @@ export async function relaunchAfterRefereeWithdrawal(
     if (!row || row.status === "COMPLETED") continue;
     if (refereed.has(matchId)) queueRefereeChange(connection, { kind: "ACCOUNT_WITHDRAWN", matchId });
     if (row.tournament_state !== "RUNNING") continue;
-    await adoptCurrentPairing(connection, row);
+    await adoptCurrentPairing(connection, row, true);
     await launchIfAllReady(connection, matchId, true, row);
   }
 }

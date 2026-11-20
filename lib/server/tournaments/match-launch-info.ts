@@ -416,7 +416,7 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
       const { changed, report } = await retryOnDeadlock(async () => {
         await connection.beginTransaction();
         try {
-          const report = { castReleased: false };
+          const report = { castCrewReleased: false };
           const changed = await maintainMatchLaunches(connection, tournamentId, report);
           await connection.commit();
           return { changed, report };
@@ -431,9 +431,9 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
         }
       });
       flushBotLogs(connection);
-      // Un caster retiré par l'entretien emporte son lien : l'accueil et #live
+      // Un caster (ou la prod) retiré par l'entretien emporte son lien : l'accueil et #live
       // se relisent tout de suite, sans attendre l'expiration de leur cache.
-      if (changed > 0 && report.castReleased) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+      if (changed > 0 && report.castCrewReleased) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
       else if (changed > 0) publishMatchUpdatedEvent(tournamentId);
     } catch (error) {
       // Transaction peut-être encore ouverte : rien de plus sur cette

@@ -94,6 +94,7 @@ function viewerWith(overrides: Partial<TournamentViewerContext> = {}): Tournamen
     canCancelForfeit: false,
     canManageLive: false,
     canProd: false,
+    canLeaveProd: false,
     viewerUserId: 1,
     castBlock: "NOT_CASTER",
     certificationPrompt: null,
@@ -941,6 +942,7 @@ describe("GET /api/tournaments/[id]/stream — vue joueur (ADMIN_ROLE_IMPERSONAT
       canDelete: false,
       canCancelForfeit: false,
       canProd: false,
+      canLeaveProd: false,
     });
   });
 
@@ -958,6 +960,7 @@ describe("GET /api/tournaments/[id]/stream — vue joueur (ADMIN_ROLE_IMPERSONAT
       canDelete: false,
       canCancelForfeit: false,
       canProd: false,
+      canLeaveProd: false,
     });
   });
 
@@ -975,6 +978,7 @@ describe("GET /api/tournaments/[id]/stream — vue joueur (ADMIN_ROLE_IMPERSONAT
       canDelete: false,
       canCancelForfeit: false,
       canProd: false,
+      canLeaveProd: false,
     });
   });
 });

@@ -928,6 +928,12 @@ export type TournamentViewerContext = {
    * prod » sur les matchs (`docs/features/MATCH_PROD.md`), rien d'autre.
    */
   canProd: boolean;
+  /**
+   * Le lecteur peut-il quitter sa propre place de prod ? Vrai hors incarnation
+   * sans `prod`, même rôle prod perdu : la place qu'un match lancé a gardée se
+   * rend encore (« Ne plus faire la prod »).
+   */
+  canLeaveProd: boolean;
   /** Identifiant du lecteur : reconnaître « c'est moi qui caste ce match ». */
   viewerUserId: number;
   /**

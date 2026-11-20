@@ -50,6 +50,7 @@ export function tournamentViewerContext(
     canCancelForfeit: false,
     canManageLive: false,
     canProd: false,
+    canLeaveProd: false,
     viewerUserId: 1,
     castBlock: "NOT_CASTER",
     certificationPrompt: null,
