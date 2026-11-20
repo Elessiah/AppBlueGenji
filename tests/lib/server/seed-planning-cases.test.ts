@@ -54,20 +54,34 @@ describe("applyPlanningCases", () => {
       jest.mocked(placeOnMatch).mockReset();
     });
 
+    it("applyPlanningCases_firstMatchManualCaster_placedAlone", async () => {
+      const { pool } = seedPool();
+      jest.mocked(placeOnMatch).mockResolvedValue({ skip: "CAST_HELD" });
+
+      await applyPlanningCases(pool, ids);
+
+      expect(jest.mocked(placeOnMatch).mock.calls[0].slice(1)).toEqual([
+        101,
+        { key: "m:101", tournamentId: 10, matchId: 101 },
+        [2],
+        [],
+      ]);
+    });
+
     it("applyPlanningCases_lastMatchWithoutCast_placesPlannedCastersAndProd", async () => {
       const { pool, connection } = seedPool();
       jest.mocked(placeOnMatch).mockResolvedValue({ skip: "CAST_HELD" });
 
       await applyPlanningCases(pool, ids);
 
-      expect(jest.mocked(placeOnMatch).mock.calls[0].slice(1)).toEqual([
+      expect(jest.mocked(placeOnMatch).mock.calls[1].slice(1)).toEqual([
         105,
         { key: "m:105", tournamentId: 10, matchId: 105 },
         [2, 3],
         [4],
       ]);
-      expect(connection.commit).toHaveBeenCalledTimes(1);
-      expect(connection.release).toHaveBeenCalledTimes(1);
+      expect(connection.commit).toHaveBeenCalledTimes(2);
+      expect(connection.release).toHaveBeenCalledTimes(2);
     });
 
     it("applyPlanningCases_placementFails_rollsBackAndRethrows", async () => {
@@ -87,6 +101,19 @@ describe("applyPlanningCases", () => {
       await applyPlanningCases(pool, ids);
 
       expect(execute).toHaveBeenCalledWith("INSERT INTO bg_match_casters (match_id, user_id, stream_id) VALUES (?, ?, ?)", [102, 5, 77]);
+    });
+
+    it("applyPlanningCases_secondMatch_selfSignedStreamCarriesItsLink", async () => {
+      const { pool, execute } = seedPool();
+      jest.mocked(placeOnMatch).mockResolvedValue({ skip: "CAST_HELD" });
+
+      await applyPlanningCases(pool, ids);
+
+      expect(execute).toHaveBeenCalledWith("INSERT INTO bg_match_streams (match_id, live_url, link_user_id) VALUES (?, ?, ?)", [
+        102,
+        "https://www.twitch.tv/test_casterinvite",
+        5,
+      ]);
     });
   });
 });

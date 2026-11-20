@@ -13,6 +13,7 @@ import { discordInline } from "./discord-text";
 import { localizedSiteUrl } from "./dm-language";
 import { cached } from "./intl-cache";
 import { INTL_LOCALE, type Locale } from "./locales";
+import { tournamentMatchHref } from "./match-anchor";
 import { PLANNING_PATH, PLANNING_TIME_ZONE, type PlanningEntryKind, type PlanningRole } from "./planning";
 
 /** Une entrée du planning telle qu'une notification la décrit. */
@@ -28,6 +29,9 @@ export type PlanningNoticeEntry = {
   solo: boolean;
   startAt: string;
 };
+
+/** Un match où le planning vient de placer le caster sur une diffusion encore sans lien. */
+export type PlanningCastLinkNotice = PlanningNoticeEntry & { matchId: number };
 
 /** Une affectation annoncée : l'entrée et le rôle tenu. */
 export type PlanningNoticeAssignment = PlanningNoticeEntry & { role: PlanningRole };
@@ -171,6 +175,28 @@ export function formatPlanningAssignedDm(
   if (replacement) head = "🎙️ BlueGenji — Un membre du staff s'est désisté : tu es affecté à sa place :";
   else if (assignments.length === 1) head = "🎙️ BlueGenji — Tu es affecté au planning :";
   return [head, ...lines, `Heure de Paris. Empêché ? Désiste-toi sur le planning : ${url}`].join("\n");
+}
+
+/**
+ * Caster placé par le planning sur un match dont la diffusion n'a pas encore
+ * de lien (`PLANNING_ASSIGNED`) : donner celui de sa chaîne dans « Configurer
+ * ma diffusion », sur la fiche du match.
+ */
+export function formatPlanningCastLinkDm(notice: PlanningCastLinkNotice, siteBase: string, locale: Locale): string {
+  const url = localizedSiteUrl(`${siteBase}${tournamentMatchHref(notice.tournamentId, notice.matchId)}`, locale);
+  const line = `• ${planningNoticeTime(notice.startAt, locale)} — ${planningEntryLabel(notice, locale)}`;
+  if (locale === "en") {
+    return [
+      "🎙️ BlueGenji — The planning made you a caster of this match:",
+      line,
+      `Its stream has no link yet: add your channel's in “Configure my broadcast” on the match, or your stream shows nowhere. ${url}`,
+    ].join("\n");
+  }
+  return [
+    "🎙️ BlueGenji — Le planning te place comme caster de ce match :",
+    line,
+    `Sa diffusion n'a pas encore de lien : donne celui de ta chaîne dans « Configurer ma diffusion » sur le match, sans quoi ta diffusion ne paraît nulle part. ${url}`,
+  ].join("\n");
 }
 
 /**

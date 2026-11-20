@@ -35,6 +35,7 @@ import {
   loadProdPanel,
   prodLogCategory,
   releaseMatchProd,
+  releasePlannedProd,
   staffProdAuditLine,
   withdrawLostProdPlaces,
 } from "@/lib/server/tournaments/match-prod";
@@ -327,6 +328,53 @@ describe("releaseMatchProd", () => {
 
     await expect(releaseMatchProd(42, prodActor)).rejects.toThrow("NOT_MATCH_PROD");
     expect(updatesOfProd()).toHaveLength(0);
+  });
+});
+
+describe("releasePlannedProd", () => {
+  it("releasePlannedProd_memberHolds_clearedWithoutNotice", async () => {
+    match = { ...match, prod_user_id: PROD_ID };
+
+    const released = await releasePlannedProd(42, PROD_ID, false);
+    await settle();
+
+    expect(released).toBe(true);
+    expect(updatesOfProd()).toEqual([[expect.any(String), [null, 42]]]);
+    expect(sendBotLog).toHaveBeenCalledWith(expect.stringContaining("Prod retirée"), { tournamentId: 7, category: "staff-removal" });
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedProd_byStaff_prodNotified", async () => {
+    match = { ...match, prod_user_id: PROD_ID };
+
+    await releasePlannedProd(42, PROD_ID, true);
+    await settle();
+
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(notifyUsers).mock.calls[0][0]).toEqual([expect.objectContaining({ userId: PROD_ID })]);
+  });
+
+  it("releasePlannedProd_otherProd_untouched", async () => {
+    match = { ...match, prod_user_id: OTHER_PROD_ID };
+
+    const released = await releasePlannedProd(42, PROD_ID, false);
+
+    expect(released).toBe(false);
+    expect(updatesOfProd()).toHaveLength(0);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedProd_matchCompleted_kept", async () => {
+    match = { ...match, prod_user_id: PROD_ID, status: "COMPLETED" };
+
+    expect(await releasePlannedProd(42, PROD_ID, false)).toBe(false);
+    expect(updatesOfProd()).toHaveLength(0);
+  });
+
+  it("releasePlannedProd_matchMissing_false", async () => {
+    match = null;
+
+    expect(await releasePlannedProd(42, PROD_ID, false)).toBe(false);
   });
 });
 
@@ -767,6 +815,13 @@ describe("formatProdNotice", () => {
     expect(text).toContain("The staff removed you as the prod of a match");
     expect(text).not.toContain("Pseudo1");
     expect(text).not.toContain("Pseudo2");
+  });
+
+  it("formatProdNotice_plannedFrAndEn_saysThePlanning", () => {
+    const url = "https://bluegenji.test/tournois/7#match-42";
+
+    expect(formatProdNotice({ ...notice, kind: "PLANNED" }, url, "fr")).toContain("Le planning te place comme prod du match");
+    expect(formatProdNotice({ ...notice, kind: "PLANNED" }, url, "en")).toContain("The planning made you the prod of the match");
   });
 
   it("formatProdNotice_joinedTeamEn_saysNowPlayer", () => {

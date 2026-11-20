@@ -50,6 +50,11 @@ export type CastChange = (
   | { kind: "CLAIMED"; matchId: number; casterId: number; replacedCasterId: number | null }
   /** Inscription posée par le planning sur un match que personne ne castait (`lib/server/planning/cast-placement.ts`). */
   | { kind: "PLANNED"; matchId: number; casterId: number }
+  /**
+   * Inscription posée par le planning, retirée avec l'attribution que son caster quitte
+   * (`releasePlannedMatchCast`) : par lui-même (`byStaff: false`), ou par le staff.
+   */
+  | { kind: "UNPLANNED"; matchId: number; casterId: number; byStaff: boolean }
   /** Inscription retirée par son caster (`byStaff: false`) ou par le staff. */
   | { kind: "RELEASED"; matchId: number; casterId: number; byStaff: boolean }
   /**
@@ -89,6 +94,8 @@ export function castLogChange(change: CastChange): CastLogChange {
       return change.replacedCasterId === null ? "CLAIMED" : "REPLACED";
     case "PLANNED":
       return "PLANNED";
+    case "UNPLANNED":
+      return "UNPLANNED";
     case "RELEASED":
       return change.byStaff ? "RELEASED_BY_STAFF" : "RELEASED";
     case "AUTO_RELEASED":
@@ -119,6 +126,9 @@ export function castReleaseNotice(
     case "PLANNED":
       // Le caster l'apprend par l'avis d'affectation du planning : aucun retrait à lui dire.
       return null;
+    case "UNPLANNED":
+      // Son propre désistement : il sait ; le staff qui le retire du planning le retire du match, il en est prévenu.
+      return change.byStaff ? { casterId: change.casterId, reason: "STAFF" } : null;
     case "RELEASED":
       return change.byStaff ? { casterId: change.casterId, reason: "STAFF" } : null;
     case "AUTO_RELEASED":

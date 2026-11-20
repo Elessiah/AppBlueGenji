@@ -463,25 +463,47 @@ rejouée : qui a quitté le match n'y revient pas au geste suivant.
   règles), qui ne joue pas le match, qui n'est pas déjà dessus. Caster : mêmes
   conflits que l'inscription (`loadCastBlocks`, deux au plus, pas la prod).
   Prod : une seule (plus petit id si deux lignes), seulement si le match n'en a
-  pas (`prod_user_id IS NULL` à l'écriture).
+  pas (`prod_user_id IS NULL` à l'écriture) et dans un tournoi en cours
+  (`RUNNING`, comme « Faire la prod »).
 - **Pas** de match joué, exempté ou déjà lancé.
 - **Verrous** : comptes (partagé), match `FOR UPDATE` (sans jointure), ses
   casters `FOR UPDATE`, lignes du planning — même ordre que « Faire la prod » ;
   une transaction par match (`retryOnDeadlock`), matchs pris par id croissant.
   Rejouer un placement n'écrit rien deux fois.
 - **Diffusion** : le caster placé rejoint la diffusion d'un caster du planning
-  déjà là, sinon celle du staff, sinon une diffusion neuve sans lien (« Configurer
-  ma diffusion »). Le placement ne déclenche pas le direct.
+  déjà là, sinon celle du staff, sinon une diffusion neuve sans lien ; son
+  inscription est marquée posée par le planning (`bg_match_casters.planned`).
+  Une diffusion encore sans lien lui vaut un avis (`PLANNING_ASSIGNED`, push et
+  message privé, `announceCastLinkNeeded`) : donner le lien de sa chaîne dans
+  « Configurer ma diffusion », sans quoi elle ne paraît nulle part. Le
+  placement ne déclenche pas le direct.
 - **Annonces** : journal du staff anonyme (« Cast posé », « Prod placée », un
-  caster / une prod du planning, catégorie `casts`) ; la prod reçoit l'avis
-  `MATCH_PROD` d'une prod placée par le staff (sauf si elle confirme elle-même) ;
-  le caster n'a pas d'avis en plus de son affectation au planning. Le staff qui
-  confirme est nommé dans pm2 (`auditStaffAction`), jamais sur Discord ; la
-  confirmation d'office et le remplacement n'ont pas d'auteur.
+  caster / une prod du planning, catégorie `casts`) ; le caster n'a pas d'avis
+  du match en plus de son affectation au planning, hors l'avis du lien manquant
+  ci-dessus ; la prod reçoit l'avis `MATCH_PROD` « Le planning te place comme
+  prod » (`PLANNED`, sauf si elle se confirme elle-même), qui dit sa place sur
+  le match comme le promet `MATCH_PROD.md`. Le staff qui confirme est nommé
+  dans pm2 (`auditStaffAction`), jamais sur Discord ; la confirmation d'office
+  et le remplacement n'ont pas d'auteur.
+- **Quand** : après le verrou du planning. La confirmation (bouton ou d'office)
+  le lance sans l'attendre — une transaction par match ne retarde ni la réponse
+  ni le balayage ; le choix du staff et le remplaçant d'un désistement (un seul
+  match) l'attendent.
 - Une panne d'un match est consignée dans pm2 et n'empêche ni les autres
   matchs ni le geste du planning, déjà validé.
-- Un caster placé qui se désiste au planning reste inscrit sur le match
-  (`stillSignedUp`) : il s'en retire depuis le match.
+- **Attribution quittée** (`releasePlannedSeat`) : ce que le planning a placé,
+  le planning le retire. Le désistement d'un caster ou d'une prod confirmé et
+  le retrait à la main par le staff ôtent aussi du match l'inscription de cast
+  **posée par le planning** (`planned`) et la place de prod (même rôle que la
+  ligne) — sauf sur un match joué —, **avant** la recherche d'un remplaçant,
+  qui peut alors y être placé. Journal anonyme « Cast retiré » / « Prod
+  retirée » (alerte du staff) ; qui se désiste n'a pas d'avis (il sait), la
+  personne que le staff retire reçoit l'avis d'un retrait par le staff
+  (`CAST_RELEASED` motif `STAFF`, `MATCH_PROD` « Le staff te retire la prod »),
+  le staff étant nommé dans pm2. Une inscription faite par le caster lui-même
+  reste (`stillSignedUp` : il s'en retire depuis le match), comme les places
+  d'un invité sorti du planning, qui garde ses autres droits (le staff l'en
+  retire depuis le match).
 
 ## Notifications (`lib/server/planning/notices.ts`, `new-entries.ts`)
 

@@ -303,6 +303,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       stream_id BIGINT NOT NULL,
       ready_at DATETIME NULL,
       cast_battletag VARCHAR(64) NULL,
+      planned TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (match_id, user_id),
       INDEX idx_bg_match_casters_user (user_id),

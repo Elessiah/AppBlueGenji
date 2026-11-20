@@ -911,8 +911,9 @@ export async function confirmAssignments(
         { actorId },
       );
       // Les casters et la prod que ce geste vient de confirmer vont sur leur match s'il n'a encore
-      // personne au cast (`cast-placement.ts`) ; après le verrou du planning, sans jamais lever.
-      await placePlannedCasts(
+      // personne au cast (`cast-placement.ts`) ; après le verrou du planning, sans faire attendre
+      // la réponse ni le balayage d'office (une transaction par match), et sans jamais lever.
+      void placePlannedCasts(
         announced.map((step) => ({ userId: step.userId, entry: step.entry, role: step.role })),
         staff,
       );

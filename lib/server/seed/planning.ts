@@ -91,10 +91,50 @@ async function placeSeedCast(db: Pool, entry: Entry, casterIds: number[], prodId
   }
 }
 
-/** Un caster inscrit de lui-même sur le match, sans ligne au planning : le cast est tenu, le planning n'y touche pas. */
+/**
+ * Un caster inscrit de lui-même sur le match, sans ligne au planning : le cast est tenu, le planning n'y touche
+ * pas. Avec le lien de sa chaîne, comme l'inscription l'exige (`STREAM_URL_REQUIRED`).
+ */
 async function seedSelfSignedCaster(db: Pool, matchId: number, userId: number): Promise<void> {
-  const [stream] = await db.execute<ResultSetHeader>("INSERT INTO bg_match_streams (match_id, live_url) VALUES (?, NULL)", [matchId]);
+  const [stream] = await db.execute<ResultSetHeader>(
+    "INSERT INTO bg_match_streams (match_id, live_url, link_user_id) VALUES (?, ?, ?)",
+    [matchId, SEED_GUEST_STREAM_URL, userId],
+  );
   await db.execute("INSERT INTO bg_match_casters (match_id, user_id, stream_id) VALUES (?, ?, ?)", [matchId, userId, stream.insertId]);
+}
+
+/** Chaîne fictive du caster invité inscrit de lui-même (domaine de Twitch, compte inexistant). */
+const SEED_GUEST_STREAM_URL = "https://www.twitch.tv/test_casterinvite";
+
+/**
+ * Les choix du staff, verrouillés (le calcul les garde tels quels), posés sur
+ * leur match sans cast comme sur le site (`setManualAssignment`) : un caster
+ * sur le premier match ; deux casters et un prod (plafond
+ * `PLANNING_MAX_CASTERS`) sur le dernier, seul à son heure — le plafond se voit
+ * (plus de liste « Ajouter — Caster »), et le désistement d'un des deux garde
+ * l'autre. Rend le nombre d'attributions et de matchs posés.
+ */
+async function seedManualCases(db: Pool, entries: Entry[], ids: Map<string, number>): Promise<{ manual: number; placed: number }> {
+  const admin = ids.get("Admin") ?? null;
+  const caster = ids.get("Caster");
+  const first = entries[0];
+  let manual = 0;
+  let placed = 0;
+  if (first && caster !== undefined) {
+    await writeManual(db, first, caster, "CASTER", admin);
+    manual += 1;
+    if (await placeSeedCast(db, first, [caster], [])) placed += 1;
+  }
+  const last = entries.length > 4 ? entries.at(-1) : undefined;
+  const pair = ["Caster", "CasterProd"].map((pseudo) => ids.get(pseudo));
+  const prod = ids.get("Prod");
+  if (last && prod !== undefined && pair.every((id) => id !== undefined)) {
+    for (const id of pair as number[]) await writeManual(db, last, id, "CASTER", admin);
+    await writeManual(db, last, prod, "PROD", admin);
+    manual += 3;
+    if (await placeSeedCast(db, last, pair as number[], [prod])) placed += 1;
+  }
+  return { manual, placed };
 }
 
 export async function applyPlanningCases(db: Pool, ids: Map<string, number>): Promise<void> {
@@ -130,28 +170,7 @@ export async function applyPlanningCases(db: Pool, ids: Map<string, number>): Pr
     await db.execute("INSERT INTO bg_planning_profiles (user_id, solo_caster) VALUES (?, 1)", [solo]);
   }
 
-  // Un choix du staff, verrouillé : le calcul le garde tel quel.
-  const admin = ids.get("Admin") ?? null;
-  const caster = ids.get("Caster");
-  const first = entries[0];
-  let manual = 0;
-  let placed = false;
-  if (first && caster !== undefined) {
-    await writeManual(db, first, caster, "CASTER", admin);
-    manual += 1;
-  }
-  // Deux casters et un prod (plafond `PLANNING_MAX_CASTERS`) sur le dernier match, seul à son heure : le
-  // plafond se voit (plus de liste « Ajouter — Caster »), et le désistement d'un des deux garde l'autre.
-  const last = entries.length > 4 ? entries.at(-1) : undefined;
-  const pair = ["Caster", "CasterProd"].map((pseudo) => ids.get(pseudo));
-  const prod = ids.get("Prod");
-  if (last && prod !== undefined && pair.every((id) => id !== undefined)) {
-    for (const id of pair as number[]) await writeManual(db, last, id, "CASTER", admin);
-    await writeManual(db, last, prod, "PROD", admin);
-    manual += 3;
-    // Personne n'y caste : ces choix du staff y sont posés, comme sur le site.
-    placed = await placeSeedCast(db, last, pair as number[], [prod]);
-  }
+  const { manual, placed } = await seedManualCases(db, entries, ids);
   // Deuxième match : un caster inscrit de lui-même (invité, hors planning) — une
   // confirmation du planning ne doit rien y ajouter ni remplacer.
   const guest = ids.get("CasterInvite");
@@ -159,6 +178,6 @@ export async function applyPlanningCases(db: Pool, ids: Map<string, number>): Pr
   if (second && second.matchId !== null && guest !== undefined) await seedSelfSignedCaster(db, second.matchId, guest);
   console.log(
     `  ✓ ${entries.length} matchs planifiés + 1 soirée · ${answers} réponses · 1 caster autonome · ${manual} attributions manuelles` +
-      ` · cast du dernier match ${placed ? "posé" : "non posé"}`,
+      ` · cast posé sur ${placed} match(s) sans cast`,
   );
 }

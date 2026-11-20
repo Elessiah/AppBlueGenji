@@ -106,12 +106,12 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T16")!;
 
     expect(fr.legalBasis).toContain("pour la diffusion en direct et l'enregistrement de ses matchs sous son pseudo");
-    expect(fr.legalBasis).toContain("même base, prévue par la même section des conditions, pour ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode d'antenne), au titre du service auquel le caster s'inscrit sur un match, pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod");
+    expect(fr.legalBasis).toContain("même base, prévue par la même section des conditions, pour ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode d'antenne), au titre du service auquel le caster s'inscrit sur un match, ou auquel le planning l'inscrit sur une attribution confirmée ou posée à la main (T20), pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod");
     // D57b : aucun régime à part pour un joueur sans compte — plus d'intérêt légitime dans la base.
     // La prod d'un match (MATCH_PROD), seule sous intérêt légitime, clôt la fiche.
     expect(fr.legalBasis.split(" ; intérêt légitime de l'association")[0]).not.toMatch(/intérêt légitime|droit d'opposition|sans compte/i);
     expect(en.legalBasis).toContain("for the live streaming and recording of their matches under their username");
-    expect(en.legalBasis).toContain("same basis, provided for by the same section of the terms, for what concerns the casters (voice, username, link to their channel, live mode), under the service the caster registers for on a match, for the stream and replay links published on the site and for the AutoMod alert");
+    expect(en.legalBasis).toContain("same basis, provided for by the same section of the terms, for what concerns the casters (voice, username, link to their channel, live mode), under the service the caster registers for on a match, or that the schedule registers them for on an assignment confirmed or set by hand (T20), for the stream and replay links published on the site and for the AutoMod alert");
     expect(en.legalBasis.split("; the association's legitimate interest")[0]).not.toMatch(/legitimate interest|right to object|no account/i);
     expect(en.retention).toHaveLength(fr.retention.length);
   });
@@ -240,8 +240,8 @@ describe("entrée PRIVACY_CHANGES de la version 11", () => {
   it("privacyChange_termsV11_isLastDatedWithTermsForAllAccounts", () => {
     // Suivie, le même jour, du rectificatif de la reprise d'équipe (#595), des avis d'équipe (TEAMS-LOT) et de leur réglage (TEAM-DM-OPTOUT).
     // Puis l'avis d'exclusion du bot (même jour), le rectificatif de la marque de session (EF-63, plus tard) puis les trois entrées d'EF-65 (2026-11-18), puis la mesure détaillée (STATS-PAGE) et l'empreinte perceptuelle (EF-72).
-    expect(PRIVACY_CHANGES.at(-22)?.id).toBe(V11_ID);
-    expect(PRIVACY_CHANGES.at(-18)?.publishedAt).toBe(TERMS_UPDATED_AT);
+    expect(PRIVACY_CHANGES.at(-23)?.id).toBe(V11_ID);
+    expect(PRIVACY_CHANGES.at(-19)?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.audience).toBeUndefined();
   });

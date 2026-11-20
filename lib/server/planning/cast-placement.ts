@@ -15,6 +15,9 @@
  * casters, streams et lignes du planning relus en lecture courante. Ne lève
  * jamais : un match en échec est consigné et laissé au staff, le planning reste
  * écrit.
+ *
+ * L'inverse, {@link releasePlannedSeat} : qui quitte son attribution au
+ * planning quitte aussi ce que le planning lui avait placé sur le match.
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
@@ -23,7 +26,8 @@ import { announceCastChange, type CastPairing } from "@/lib/server/tournaments/c
 import { loadCastBlocks } from "@/lib/server/tournaments/cast-eligibility";
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { lockMatchCasters, lockMatchStreams } from "@/lib/server/tournaments/match-casters";
-import { resolveTeamParty } from "@/lib/server/tournaments/match-launch";
+import { releasePlannedMatchCast, resolveTeamParty } from "@/lib/server/tournaments/match-launch";
+import { releasePlannedProd } from "@/lib/server/tournaments/match-prod";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { announceProdChange, type ProdChange } from "@/lib/server/tournaments/prod-notices";
 import { heldPlanningRowSql } from "@/lib/server/tournaments/prod-sql";
@@ -34,12 +38,17 @@ import type { PlanningRole } from "@/lib/shared/planning";
 import type { TournamentGame } from "@/lib/shared/types";
 import { lockedHolding, type HoldingEntry } from "./auto-assign";
 import type { LoadedEntry } from "./load";
+import { announceCastLinkNeeded } from "./notices";
 
 /** Une ligne du planning qu'un geste vient de rendre tenue. */
 export type PlannedCastLine = { entry: LoadedEntry; userId: number; role: PlanningRole };
 
-/** Ce qu'un match a reçu du planning. */
-export type MatchPlacement = { matchId: number; casterIds: number[]; prodId: number | null };
+/**
+ * Ce qu'un match a reçu du planning. `linkNeeded` : les casters placés ont
+ * rejoint une diffusion encore sans lien — prévenus de donner celui de leur
+ * chaîne (« Configurer ma diffusion »).
+ */
+export type MatchPlacement = { matchId: number; casterIds: number[]; prodId: number | null; linkNeeded: boolean };
 
 /** Pourquoi rien n'a été placé sur un match. */
 export type PlacementSkip = "MATCH_GONE" | "MATCH_CLOSED" | "CAST_HELD" | "NONE_ELIGIBLE";
@@ -94,7 +103,7 @@ export function castFreeForPlanning(
 }
 
 /** Ligne pm2 du placement : le match et les comptes placés, par identifiant (jamais sur Discord). */
-export function placementAuditLine(placement: MatchPlacement): string {
+export function placementAuditLine(placement: Pick<MatchPlacement, "matchId" | "casterIds" | "prodId">): string {
   const parts: string[] = [];
   const casters = placement.casterIds.map((id) => "#" + id).join(", ");
   if (casters !== "") parts.push(`caster(s) ${casters}`);
@@ -102,11 +111,16 @@ export function placementAuditLine(placement: MatchPlacement): string {
   return `cast du match #${placement.matchId} posé depuis le planning : ${parts.join(" ; ")}`;
 }
 
+/** Ligne pm2 d'une place rendue avec l'attribution quittée (jamais sur Discord). */
+export function releaseAuditLine(matchId: number, userId: number, role: "CASTER" | "PROD"): string {
+  return `${role === "CASTER" ? "caster" : "prod"} #${userId} retiré du match #${matchId} avec son attribution au planning`;
+}
+
 /**
  * Place, match par match, les casters et la prod des lignes données (celles
  * qu'un geste vient de rendre tenues). `actor` : le staff du geste, nommé dans
- * pm2 (`auditStaffAction`) ; `null` pour la confirmation d'office. Rend ce qui a
- * été placé. Ne lève jamais.
+ * pm2 (`auditStaffAction`) ; `null` pour la confirmation d'office et le
+ * remplacement. Rend ce qui a été placé. Ne lève jamais.
  */
 export async function placePlannedCasts(lines: readonly PlannedCastLine[], actor: StaffActor | null): Promise<MatchPlacement[]> {
   const placed: MatchPlacement[] = [];
@@ -119,6 +133,7 @@ export async function placePlannedCasts(lines: readonly PlannedCastLine[], actor
       if ("skip" in outcome) continue;
       placed.push(outcome.placement);
       afterPlacement(outcome, actor);
+      if (outcome.placement.linkNeeded) void announceCastLinkNeeded(outcome.placement.casterIds, target.entry);
     } catch (error) {
       console.error(`[planning] cast du match #${matchId} non placé depuis le planning : ${failureDiagnostic(error)}`);
     }
@@ -126,17 +141,52 @@ export async function placePlannedCasts(lines: readonly PlannedCastLine[], actor
   return placed;
 }
 
-/** Après le commit : le plateau se rafraîchit, le journal du staff (anonyme) et l'avis à la prod partent. */
+/**
+ * Après le commit : le plateau se rafraîchit, le journal du staff (anonyme)
+ * part. Le caster apprend son affectation par le planning ; la prod reçoit en
+ * plus l'avis de prod placée (`MATCH_PROD`, « Le planning te place comme
+ * prod », `MATCH_PROD.md`) — sauf le staff qui se confirme lui-même.
+ */
 function afterPlacement(outcome: Extract<PlacementOutcome, { placement: MatchPlacement }>, actor: StaffActor | null): void {
   const { placement, tournamentId, pairing } = outcome;
   publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   for (const casterId of placement.casterIds) announceCastChange({ kind: "PLANNED", matchId: placement.matchId, casterId, pairing });
   if (placement.prodId !== null) {
-    // Prévenue comme une prod que le staff place — jamais le staff qui se place lui-même.
-    const notices: ProdChange["notices"] = placement.prodId === actor?.id ? [] : [{ userId: placement.prodId, kind: "ASSIGNED" }];
+    const notices: ProdChange["notices"] = placement.prodId === actor?.id ? [] : [{ userId: placement.prodId, kind: "PLANNED" }];
     announceProdChange({ matchId: placement.matchId, log: "PLANNED", notices, pairing });
   }
   if (actor !== null) auditStaffAction(placementAuditLine(placement), actor);
+}
+
+/**
+ * Le membre `userId` quitte son attribution `role` d'une entrée de match
+ * (désistement, retrait à la main par le staff) : ce que le planning
+ * lui avait placé sur le match part avec — l'inscription de cast que le
+ * planning a posée (`planned`), la place de prod (même rôle que la ligne). Une
+ * inscription faite par le caster lui-même reste, comme un match joué. À jouer
+ * **après** le retrait de la ligne, avant de chercher un remplaçant (le match
+ * relu le voit parti). `actor` : le staff du geste, nommé dans pm2, et la
+ * personne retirée en est prévenue (avis de retrait par le staff) ; `null`
+ * pour le membre lui-même. Ne lève jamais.
+ */
+export async function releasePlannedSeat(
+  entry: Pick<LoadedEntry, "kind" | "matchId">,
+  userId: number,
+  role: PlanningRole,
+  actor: StaffActor | null,
+): Promise<boolean> {
+  if (entry.kind !== "MATCH" || entry.matchId === null || role === "REFEREE") return false;
+  const matchId = entry.matchId;
+  try {
+    const byStaff = actor !== null;
+    const released =
+      role === "CASTER" ? await releasePlannedMatchCast(matchId, userId, byStaff) : await releasePlannedProd(matchId, userId, byStaff);
+    if (released && actor !== null) auditStaffAction(releaseAuditLine(matchId, userId, role), actor);
+    return released;
+  } catch (error) {
+    console.error(`[planning] place du match #${matchId} non rendue avec l'attribution : ${failureDiagnostic(error)}`);
+    return false;
+  }
 }
 
 async function lockPlacementMatch(connection: PoolConnection, matchId: number): Promise<PlacementMatchRow | null> {
@@ -162,31 +212,38 @@ async function lockedHeldLines(connection: PoolConnection, matchId: number): Pro
   return { casterIds, prodIds };
 }
 
-async function tournamentGame(connection: PoolConnection, tournamentId: number): Promise<TournamentGame | null> {
-  const [rows] = await connection.execute<(RowDataPacket & { game: TournamentGame })[]>(
-    "SELECT game FROM bg_tournaments WHERE id = ? LIMIT 1",
+/** Le jeu du tournoi (conditions du cast) et s'il est en cours (une prod ne se place que là, comme « Faire la prod »). */
+async function tournamentOf(connection: PoolConnection, tournamentId: number): Promise<{ game: TournamentGame; running: boolean } | null> {
+  const [rows] = await connection.execute<(RowDataPacket & { game: TournamentGame; state: string })[]>(
+    "SELECT game, state FROM bg_tournaments WHERE id = ? LIMIT 1",
     [tournamentId],
   );
-  return rows[0]?.game ?? null;
+  const row = rows[0];
+  return row ? { game: row.game, running: row.state === "RUNNING" } : null;
 }
 
 /**
  * Le stream que rejoignent les casters placés : celui d'un caster déjà posé par
  * le planning (co-cast), sinon le stream du staff (le lien de l'organisation),
  * sinon un stream neuf sans lien, que le caster habille de sa chaîne
- * (« Configurer ma diffusion ») ou le staff du lien de l'organisation.
+ * (« Configurer ma diffusion », dont il est prévenu) ou le staff du lien de
+ * l'organisation. `linked` : le stream a déjà un lien.
  */
-async function placementStream(connection: PoolConnection, matchId: number, casterStreams: readonly number[]): Promise<number> {
+async function placementStream(
+  connection: PoolConnection,
+  matchId: number,
+  casterStreams: readonly number[],
+): Promise<{ id: number; linked: boolean }> {
   const streams = await lockMatchStreams(connection, matchId);
-  const shared = casterStreams.find((id) => streams.some((stream) => stream.id === id));
-  if (shared !== undefined) return shared;
+  const shared = streams.find((stream) => casterStreams.includes(stream.id));
+  if (shared) return { id: shared.id, linked: shared.liveUrl !== null };
   const staff = streams.find((stream) => stream.staff);
-  if (staff) return staff.id;
+  if (staff) return { id: staff.id, linked: staff.liveUrl !== null };
   const [created] = await connection.execute<ResultSetHeader>(
     "INSERT INTO bg_match_streams (match_id, live_url, link_user_id) VALUES (?, NULL, NULL)",
     [matchId],
   );
-  return Number(created.insertId);
+  return { id: Number(created.insertId), linked: false };
 }
 
 /** La prod : une au plus (plus petit id), jamais un joueur du match. */
@@ -221,26 +278,31 @@ async function pickCasters(
   return placed;
 }
 
-/** L'écriture : la prod si la place est encore vide, les casters sur une diffusion du match. */
+/**
+ * L'écriture : la prod si la place est encore vide, les casters sur une
+ * diffusion du match, marqués posés par le planning (`planned` : leur
+ * attribution quittée les retire, {@link releasePlannedSeat}). Rend vrai si
+ * les casters ont rejoint une diffusion sans lien.
+ */
 async function writePlacement(
   connection: PoolConnection,
   matchId: number,
   prodId: number | null,
   casterIds: readonly number[],
   casterStreams: readonly number[],
-): Promise<void> {
+): Promise<boolean> {
   if (prodId !== null) {
     await connection.execute("UPDATE bg_matches SET prod_user_id = ? WHERE id = ? AND prod_user_id IS NULL", [prodId, matchId]);
   }
-  if (casterIds.length === 0) return;
-  const streamId = await placementStream(connection, matchId, casterStreams);
+  if (casterIds.length === 0) return false;
+  const stream = await placementStream(connection, matchId, casterStreams);
   for (const userId of casterIds) {
-    await connection.execute("INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, NULL)", [
-      matchId,
-      userId,
-      streamId,
-    ]);
+    await connection.execute(
+      "INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at, planned) VALUES (?, ?, ?, NULL, 1)",
+      [matchId, userId, stream.id],
+    );
   }
+  return !stream.linked;
 }
 
 /** Le placement d'un match, dans sa transaction (`placePlannedCasts`). */
@@ -264,8 +326,8 @@ export async function placeOnMatch(
   const currentProd = nullableId(row.prod_user_id);
   const held = await lockedHeldLines(connection, matchId);
   if (!castFreeForPlanning(casters.map((caster) => caster.userId), currentProd, held)) return { skip: "CAST_HELD" };
-  const game = await tournamentGame(connection, Number(row.tournament_id));
-  if (game === null) return { skip: "MATCH_GONE" };
+  const tournament = await tournamentOf(connection, Number(row.tournament_id));
+  if (tournament === null) return { skip: "MATCH_GONE" };
 
   const onMatch = new Set(casters.map((caster) => caster.userId));
   // Encore tenue (ni retirée ni désistée depuis le geste), par un membre qui peut la tenir
@@ -273,20 +335,20 @@ export async function placeOnMatch(
   const fit = (userId: number, role: "CASTER" | "PROD") =>
     (role === "CASTER" ? held.casterIds : held.prodIds).has(userId) && holds(userId, entry, role) === null;
 
-  // La prod : seulement si le match n'en a pas ; jamais un caster du match.
+  // La prod : seulement si le match n'en a pas, dans un tournoi en cours ; jamais un caster du match.
   const prodId =
-    currentProd === null
+    currentProd === null && tournament.running
       ? await pickProd(connection, row, prodIds, (userId) => fit(userId, "PROD") && !onMatch.has(userId))
       : null;
   const pending = casterIds.filter(
     (userId) => !onMatch.has(userId) && fit(userId, "CASTER") && userId !== currentProd && userId !== prodId,
   );
-  const placedCasters = await pickCasters(connection, row, pending, game);
+  const placedCasters = await pickCasters(connection, row, pending, tournament.game);
   if (prodId === null && placedCasters.length === 0) return { skip: "NONE_ELIGIBLE" };
 
-  await writePlacement(connection, matchId, prodId, placedCasters, casters.map((caster) => caster.streamId));
+  const linkNeeded = await writePlacement(connection, matchId, prodId, placedCasters, casters.map((caster) => caster.streamId));
   return {
-    placement: { matchId, casterIds: placedCasters, prodId },
+    placement: { matchId, casterIds: placedCasters, prodId, linkNeeded },
     tournamentId: Number(row.tournament_id),
     pairing: { team1Id: nullableId(row.team1_id), team2Id: nullableId(row.team2_id) },
   };

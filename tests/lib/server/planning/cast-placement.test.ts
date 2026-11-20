@@ -4,7 +4,9 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/planning/auto-assign", () => ({ lockedHolding: jest.fn() }));
 jest.mock("@/lib/server/tournaments/cast-eligibility", () => ({ loadCastBlocks: jest.fn() }));
 jest.mock("@/lib/server/tournaments/match-casters", () => ({ lockMatchCasters: jest.fn(), lockMatchStreams: jest.fn() }));
-jest.mock("@/lib/server/tournaments/match-launch", () => ({ resolveTeamParty: jest.fn() }));
+jest.mock("@/lib/server/tournaments/match-launch", () => ({ resolveTeamParty: jest.fn(), releasePlannedMatchCast: jest.fn() }));
+jest.mock("@/lib/server/tournaments/match-prod", () => ({ releasePlannedProd: jest.fn() }));
+jest.mock("@/lib/server/planning/notices", () => ({ announceCastLinkNeeded: jest.fn() }));
 jest.mock("@/lib/server/tournaments/notifications", () => ({ publishMatchUpdatedEvent: jest.fn() }));
 jest.mock("@/lib/server/tournaments/cast-notices", () => ({ announceCastChange: jest.fn() }));
 jest.mock("@/lib/server/tournaments/prod-notices", () => ({ announceProdChange: jest.fn() }));
@@ -18,13 +20,17 @@ import {
   placementAuditLine,
   placementTargets,
   placePlannedCasts,
+  releaseAuditLine,
+  releasePlannedSeat,
   type PlannedCastLine,
 } from "@/lib/server/planning/cast-placement";
+import { announceCastLinkNeeded } from "@/lib/server/planning/notices";
 import { auditStaffAction } from "@/lib/server/staff-audit";
 import { loadCastBlocks } from "@/lib/server/tournaments/cast-eligibility";
 import { announceCastChange } from "@/lib/server/tournaments/cast-notices";
 import { lockMatchCasters, lockMatchStreams, type MatchCasterLink, type MatchStreamRow } from "@/lib/server/tournaments/match-casters";
-import { resolveTeamParty } from "@/lib/server/tournaments/match-launch";
+import { releasePlannedMatchCast, resolveTeamParty } from "@/lib/server/tournaments/match-launch";
+import { releasePlannedProd } from "@/lib/server/tournaments/match-prod";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { announceProdChange } from "@/lib/server/tournaments/prod-notices";
 import type { CastBlock } from "@/lib/shared/match-launch";
@@ -77,7 +83,7 @@ function matchRow(id: number, state: MatchRowState) {
 }
 
 /** Base simulée : le match (`FOR UPDATE`), les lignes tenues, le jeu du tournoi, les écritures. */
-function route(options: { match?: MatchRowState; held?: HeldRow[]; failMatchIds?: number[] } = {}) {
+function route(options: { match?: MatchRowState; held?: HeldRow[]; failMatchIds?: number[]; tournamentState?: string } = {}) {
   execute.mockImplementation(async (sql: string, params?: unknown) => {
     if (sql.includes("FROM bg_matches WHERE id = ?")) {
       const id = Number((params as number[])[0]);
@@ -85,7 +91,7 @@ function route(options: { match?: MatchRowState; held?: HeldRow[]; failMatchIds?
       return [options.match?.missing ? [] : [matchRow(id, options.match ?? {})]];
     }
     if (sql.includes("FROM bg_planning_assignments")) return [options.held ?? DEFAULT_HELD];
-    if (sql.includes("SELECT game FROM bg_tournaments")) return [[{ game: "OW" }]];
+    if (sql.includes("SELECT game, state FROM bg_tournaments")) return [[{ game: "OW", state: options.tournamentState ?? "RUNNING" }]];
     if (sql.startsWith("INSERT INTO bg_match_streams")) return [{ affectedRows: 1, insertId: 77 }];
     return [{ affectedRows: 1 }];
   });
@@ -95,8 +101,8 @@ function caster(userId: number, streamId: number): MatchCasterLink {
   return { matchId: 1, userId, streamId, readyAt: null };
 }
 
-function stream(id: number, staff: boolean): MatchStreamRow {
-  return { id, matchId: 1, liveUrl: staff ? "https://www.twitch.tv/bluegenjiesport" : null, staff };
+function stream(id: number, staff: boolean, liveUrl: string | null = staff ? "https://www.twitch.tv/bluegenjiesport" : null): MatchStreamRow {
+  return { id, matchId: 1, liveUrl, staff };
 }
 
 function line(userId: number, role: PlanningRole, entry = ENTRY): PlannedCastLine {
@@ -185,11 +191,132 @@ describe("placementAuditLine", () => {
   });
 });
 
+describe("releaseAuditLine", () => {
+  it("releaseAuditLine_caster_namesIdsOnly", () => {
+    expect(releaseAuditLine(1, 4, "CASTER")).toContain("#1");
+    expect(releaseAuditLine(1, 4, "CASTER")).toContain("#4");
+  });
+});
+
+describe("placePlannedCasts — marque et lien de diffusion", () => {
+  it("placePlannedCasts_emptyCast_insertsCastersMarkedPlanned", async () => {
+    await placePlannedCasts([line(CASTER_A, "CASTER")], STAFF);
+
+    const insert = execute.mock.calls.find(([sql]) => sql.startsWith("INSERT INTO bg_match_casters"));
+    expect(insert?.[0]).toBe("INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at, planned) VALUES (?, ?, ?, NULL, 1)");
+  });
+
+  it("placePlannedCasts_newStreamWithoutLink_announcesLinkNeeded", async () => {
+    await placePlannedCasts([line(CASTER_A, "CASTER")], STAFF);
+
+    expect(announceCastLinkNeeded).toHaveBeenCalledWith([CASTER_A], ENTRY);
+  });
+
+  it("placePlannedCasts_staffStreamWithLink_noLinkNotice", async () => {
+    jest.mocked(lockMatchStreams).mockResolvedValue([stream(31, true)]);
+
+    const placed = await placePlannedCasts([line(CASTER_A, "CASTER")], STAFF);
+
+    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_A], prodId: null, linkNeeded: false }]);
+    expect(announceCastLinkNeeded).not.toHaveBeenCalled();
+  });
+
+  it("placePlannedCasts_staffStreamWithoutLink_linkNeeded", async () => {
+    jest.mocked(lockMatchStreams).mockResolvedValue([stream(31, true, null)]);
+
+    const placed = await placePlannedCasts([line(CASTER_A, "CASTER")], STAFF);
+
+    expect(placed[0]?.linkNeeded).toBe(true);
+  });
+
+  it("placePlannedCasts_sharedStreamWithLink_noLinkNotice", async () => {
+    jest.mocked(lockMatchCasters).mockResolvedValue([caster(CASTER_A, 40)]);
+    jest.mocked(lockMatchStreams).mockResolvedValue([stream(40, false, "https://www.twitch.tv/test_caster")]);
+
+    const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER")], STAFF);
+
+    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_B], prodId: null, linkNeeded: false }]);
+    expect(announceCastLinkNeeded).not.toHaveBeenCalled();
+  });
+
+  it("placePlannedCasts_prodOnly_noLinkNotice", async () => {
+    await placePlannedCasts([line(PROD, "PROD")], STAFF);
+
+    expect(announceCastLinkNeeded).not.toHaveBeenCalled();
+  });
+
+  it("placePlannedCasts_tournamentNotRunning_prodNotPlacedCastersPlaced", async () => {
+    route({ tournamentState: "REGISTRATION" });
+
+    const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(PROD, "PROD")], STAFF);
+
+    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_A], prodId: null, linkNeeded: true }]);
+    expect(castWrites().some((write) => write.sql.startsWith("UPDATE bg_matches"))).toBe(false);
+    expect(announceProdChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("releasePlannedSeat", () => {
+  beforeEach(() => {
+    jest.mocked(releasePlannedMatchCast).mockResolvedValue(true);
+    jest.mocked(releasePlannedProd).mockResolvedValue(true);
+  });
+
+  it("releasePlannedSeat_casterByMember_releasesWithoutStaffAndNoAudit", async () => {
+    const released = await releasePlannedSeat(ENTRY, CASTER_A, "CASTER", null);
+
+    expect(released).toBe(true);
+    expect(releasePlannedMatchCast).toHaveBeenCalledWith(1, CASTER_A, false);
+    expect(auditStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedSeat_prodByStaff_releasesByStaffAndAudits", async () => {
+    const released = await releasePlannedSeat(ENTRY, PROD, "PROD", STAFF);
+
+    expect(released).toBe(true);
+    expect(releasePlannedProd).toHaveBeenCalledWith(1, PROD, true);
+    expect(auditStaffAction).toHaveBeenCalledWith(releaseAuditLine(1, PROD, "PROD"), STAFF);
+  });
+
+  it("releasePlannedSeat_nothingReleased_noAudit", async () => {
+    jest.mocked(releasePlannedMatchCast).mockResolvedValue(false);
+
+    const released = await releasePlannedSeat(ENTRY, CASTER_A, "CASTER", STAFF);
+
+    expect(released).toBe(false);
+    expect(auditStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedSeat_refereeRole_nothingCalled", async () => {
+    expect(await releasePlannedSeat(ENTRY, CASTER_A, "REFEREE", STAFF)).toBe(false);
+    expect(releasePlannedMatchCast).not.toHaveBeenCalled();
+    expect(releasePlannedProd).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedSeat_tournamentEntry_nothingCalled", async () => {
+    const tournament = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+
+    expect(await releasePlannedSeat(tournament, CASTER_A, "CASTER", null)).toBe(false);
+    expect(releasePlannedMatchCast).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedSeat_releaseThrows_logsAndReturnsFalse", async () => {
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(releasePlannedProd).mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
+
+    const released = await releasePlannedSeat(ENTRY, PROD, "PROD", STAFF);
+
+    expect(released).toBe(false);
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining("place du match #1 non rendue"));
+    errorLog.mockRestore();
+  });
+});
+
 describe("placePlannedCasts", () => {
   it("placePlannedCasts_emptyCast_placesCastersOnNewStreamAndProd", async () => {
     const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER"), line(PROD, "PROD")], STAFF);
 
-    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_A, CASTER_B], prodId: PROD }]);
+    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_A, CASTER_B], prodId: PROD, linkNeeded: true }]);
     expect(castWrites()).toEqual([
       { sql: "UPDATE bg_matches SET prod_use", params: [PROD, 1] },
       { sql: "INSERT INTO bg_match_streams (", params: [1] },
@@ -212,7 +339,7 @@ describe("placePlannedCasts", () => {
 
     const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER")], STAFF);
 
-    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_B], prodId: null }]);
+    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_B], prodId: null, linkNeeded: true }]);
     expect(castWrites()).toEqual([{ sql: "INSERT INTO bg_match_casters (", params: [1, CASTER_B, 40] }]);
   });
 
@@ -267,7 +394,7 @@ describe("placePlannedCasts", () => {
 
     const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(PROD, "PROD")], STAFF);
 
-    expect(placed).toEqual([{ matchId: 1, casterIds: [], prodId: PROD }]);
+    expect(placed).toEqual([{ matchId: 1, casterIds: [], prodId: PROD, linkNeeded: false }]);
   });
 
   it("placePlannedCasts_memberCannotHold_notPlaced", async () => {
@@ -275,7 +402,7 @@ describe("placePlannedCasts", () => {
 
     const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER")], STAFF);
 
-    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_B], prodId: null }]);
+    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_B], prodId: null, linkNeeded: true }]);
   });
 
   it("placePlannedCasts_casterCastBlocked_notPlaced", async () => {
@@ -288,7 +415,7 @@ describe("placePlannedCasts", () => {
 
     const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER")], STAFF);
 
-    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_B], prodId: null }]);
+    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_B], prodId: null, linkNeeded: true }]);
   });
 
   it("placePlannedCasts_casterPlaysMatch_notPlaced", async () => {
@@ -298,7 +425,7 @@ describe("placePlannedCasts", () => {
 
     const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(PROD, "PROD")], STAFF);
 
-    expect(placed).toEqual([{ matchId: 1, casterIds: [], prodId: PROD }]);
+    expect(placed).toEqual([{ matchId: 1, casterIds: [], prodId: PROD, linkNeeded: false }]);
   });
 
   it("placePlannedCasts_prodPlaysMatch_notPlaced", async () => {
@@ -308,7 +435,7 @@ describe("placePlannedCasts", () => {
 
     const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(PROD, "PROD")], STAFF);
 
-    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_A], prodId: null }]);
+    expect(placed).toEqual([{ matchId: 1, casterIds: [CASTER_A], prodId: null, linkNeeded: true }]);
   });
 
   it("placePlannedCasts_noneEligible_placesNothingAndPublishesNothing", async () => {
@@ -326,7 +453,7 @@ describe("placePlannedCasts", () => {
 
     const placed = await placePlannedCasts([line(7, "PROD"), line(PROD, "PROD")], STAFF);
 
-    expect(placed).toEqual([{ matchId: 1, casterIds: [], prodId: PROD }]);
+    expect(placed).toEqual([{ matchId: 1, casterIds: [], prodId: PROD, linkNeeded: false }]);
   });
 
   it("placePlannedCasts_placed_announcesAnonymousLogsProdNoticeAndAudit", async () => {
@@ -337,7 +464,7 @@ describe("placePlannedCasts", () => {
     expect(announceProdChange).toHaveBeenCalledWith({
       matchId: 1,
       log: "PLANNED",
-      notices: [{ userId: PROD, kind: "ASSIGNED" }],
+      notices: [{ userId: PROD, kind: "PLANNED" }],
       pairing: PAIRING,
     });
     expect(auditStaffAction).toHaveBeenCalledWith("cast du match #1 posé depuis le planning : caster(s) #4 ; prod #6", STAFF);
@@ -365,7 +492,7 @@ describe("placePlannedCasts", () => {
 
     const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_A, "CASTER", other)], STAFF);
 
-    expect(placed).toEqual([{ matchId: 2, casterIds: [CASTER_A], prodId: null }]);
+    expect(placed).toEqual([{ matchId: 2, casterIds: [CASTER_A], prodId: null, linkNeeded: true }]);
     expect(errorLog).toHaveBeenCalledWith(expect.stringContaining("cast du match #1 non placé"));
     errorLog.mockRestore();
   });

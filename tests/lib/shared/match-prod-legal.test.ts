@@ -34,8 +34,8 @@ const EN_T16_PROD_BASIS = "the association's legitimate interest (GDPR, art. 6.1
 const page = (path: string) => readSource(path).replace(/\s+/g, " ");
 
 describe("historique des changements — prod d'un match", () => {
-  it("prodEntry_lastEntry_datedWithRegisterForEveryone", () => {
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ENTRY_ID);
+  it("prodEntry_beforePlanningPlacementEntry_datedWithRegisterForEveryone", () => {
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ENTRY_ID);
     expect(frEntry().publishedAt).toBe("2026-11-23");
     expect(REGISTER_UPDATED_AT).toBe("2026-11-23");
     expect(frEntry().audience).toBeUndefined();

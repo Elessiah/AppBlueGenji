@@ -807,6 +807,7 @@ export function formatRoundRolledBackLog(context: {
 export type CastLogChange =
   | "CLAIMED"
   | "PLANNED"
+  | "UNPLANNED"
   | "REPLACED"
   | "RELEASED"
   | "RELEASED_BY_STAFF"
@@ -817,6 +818,7 @@ export type CastLogChange =
 const CAST_LOG_WORDING: Record<CastLogChange, { kind: string; detail: string }> = {
   CLAIMED: { kind: "Cast réservé", detail: "un caster s'inscrit sur le match" },
   PLANNED: { kind: "Cast posé", detail: "un caster du planning est placé sur le match" },
+  UNPLANNED: { kind: "Cast retiré", detail: "un caster placé par le planning quitte le match avec son attribution" },
   REPLACED: {
     kind: "Cast repris",
     detail: "un caster prend la place du précédent, qui ne remplissait plus les conditions du cast",
@@ -1010,6 +1012,7 @@ export type ProdLogChange =
   | "RELEASED"
   | "ASSIGNED"
   | "PLANNED"
+  | "UNPLANNED"
   | "REPLACED"
   | "RELEASED_BY_STAFF"
   | "INELIGIBLE"
@@ -1022,6 +1025,7 @@ const PROD_LOG_WORDING: Record<ProdLogChange, { kind: string; detail: string }> 
   RELEASED: { kind: "Prod libérée", detail: "la prod se retire du match" },
   ASSIGNED: { kind: "Prod placée", detail: `une prod est placée sur le match par ${ANONYMOUS_STAFF_LABEL}` },
   PLANNED: { kind: "Prod placée", detail: "une prod du planning est placée sur le match" },
+  UNPLANNED: { kind: "Prod retirée", detail: "la prod quitte le match avec son attribution au planning" },
   REPLACED: { kind: "Prod changée", detail: `la prod du match est remplacée par ${ANONYMOUS_STAFF_LABEL}` },
   RELEASED_BY_STAFF: { kind: "Prod retirée", detail: `prod du match retirée par ${ANONYMOUS_STAFF_LABEL}` },
   // Une seule ligne pour le rôle perdu et la suspension : le staff des tournois

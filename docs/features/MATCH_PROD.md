@@ -91,7 +91,11 @@ compte qu'**une fois** (une ligne de journal par match).
 Le calcul automatique (provisoire) ne place ni caster ni prod sur un match ; une
 ligne `PROD` **confirmée** y place sa prod quand le cast du match est libre
 (`CAST_PLANNING.md` § Placement sur le match, journal « Prod placée » sans
-nom, avis `ASSIGNED` à la prod). La prod
+nom, avis `PLANNED` « Le planning te place comme prod » sauf à qui se confirme
+lui-même), dans un tournoi en cours. Quitter cette ligne `PROD` (désistement,
+retrait par le staff) rend aussi la place du match (journal « Prod retirée »,
+sauf match joué ; avis `RELEASED` quand c'est le staff) ; un invité sorti du
+planning la garde. La prod
 placée sur un match paraît au planning comme une ligne `PROD` tenue (source
 `CAST`, `entryAssignments`) et fait foi : une seule par match, elle remplace
 toute autre ligne `PROD` de l'entrée (proposition provisoire, ou ligne tenue

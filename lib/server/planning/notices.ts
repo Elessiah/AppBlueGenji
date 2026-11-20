@@ -20,6 +20,7 @@ import type { StaffActor } from "@/lib/shared/log-privacy";
 import type { PlanningRole } from "@/lib/shared/planning";
 import {
   formatPlanningAssignedDm,
+  formatPlanningCastLinkDm,
   formatPlanningSoloCasterDm,
   formatPlanningUnfilledDm,
   formatPlanningUnfilledLine,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/shared/planning-notices";
 import {
   planningAssignedPush,
+  planningCastLinkPush,
   planningSoloCasterPush,
   planningUnfilledPush,
   planningWithdrawalPush,
@@ -108,6 +110,34 @@ export async function announceAssignments(
     }
   } catch (error) {
     console.error("[planning] annonce des affectations impossible.", failureReason(error));
+  }
+}
+
+/**
+ * Avis aux casters que le planning vient de placer sur un match dont la
+ * diffusion n'a pas encore de lien (`cast-placement.ts`) : donner celui de leur
+ * chaîne dans « Configurer ma diffusion », sans quoi leur diffusion ne paraît
+ * nulle part. Sujet `PLANNING_ASSIGNED` (le même geste que l'affectation),
+ * message privé coupé avec lui. Ne lève jamais.
+ */
+export async function announceCastLinkNeeded(userIds: readonly number[], entry: LoadedEntry): Promise<void> {
+  try {
+    if (userIds.length === 0 || entry.matchId === null) return;
+    const recipients = await loadNotificationRecipients([...userIds], "proven", { excludeSuspended: true, planningMembersOnly: true });
+    if (recipients.length === 0) return;
+    const notice = { ...noticeEntry(entry), matchId: entry.matchId };
+    const base = siteCanonicalBase();
+    await notifyUsers(recipients, {
+      topic: "PLANNING_ASSIGNED",
+      push: (locale) => planningCastLinkPush(notice, locale),
+      discord: {
+        message: (locale) => formatPlanningCastLinkDm(notice, base, locale),
+        context: "planning-cast-link",
+      },
+      dmFollowsTopic: true,
+    });
+  } catch (error) {
+    console.error("[planning] avis du lien de diffusion impossible.", failureReason(error));
   }
 }
 

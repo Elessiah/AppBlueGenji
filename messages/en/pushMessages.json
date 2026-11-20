@@ -186,6 +186,7 @@
   "matchProd": {
     "title": {
       "ASSIGNED": "A match's prod",
+      "PLANNED": "A match's prod",
       "RELEASED": "Prod removed",
       "INELIGIBLE": "Prod removed",
       "UNAVAILABLE": "Prod removed",
@@ -193,6 +194,7 @@
     },
     "body": {
       "ASSIGNED": "The staff made you this match's prod. {pairing} · {tournament}, {round}.",
+      "PLANNED": "The planning made you this match's prod. {pairing} · {tournament}, {round}.",
       "RELEASED": "The staff removed you as this match's prod. {pairing} · {tournament}, {round}.",
       "INELIGIBLE": "You no longer hold the prod role: you are no longer this match's prod. {pairing} · {tournament}, {round}.",
       "UNAVAILABLE": "Your account cannot be a prod for now: you are no longer this match's prod. {pairing} · {tournament}, {round}.",
@@ -232,6 +234,10 @@
       "title": "{count, plural, one {Assigned in the planning} other {Assigned to # planning entries}}",
       "titleReplacement": "You replace a withdrawal",
       "line": "{start} · {role} · {entry}"
+    },
+    "castLink": {
+      "title": "Add your stream link",
+      "body": "The planning made you a caster of {entry} ({start}): add your channel's link in “Configure my broadcast” on the match."
     },
     "soloCaster": {
       "titleOn": "Solo caster turned on",

@@ -7,7 +7,7 @@ jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://bl
 
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { loadNotificationRecipients, loadStaffIds, notifyUsers } from "@/lib/server/notify";
-import { announceAssignments, announceSoloCasterChange, announceWithdrawal, noticeEntry } from "@/lib/server/planning/notices";
+import { announceAssignments, announceCastLinkNeeded, announceSoloCasterChange, announceWithdrawal, noticeEntry } from "@/lib/server/planning/notices";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { loadedEntry } from "../../../helpers/planning";
 
@@ -94,6 +94,42 @@ describe("announceAssignments", () => {
 
     await expect(announceAssignments([{ userId: 4, entry: loadedEntry(), role: "CASTER" }])).resolves.toBeUndefined();
     error.mockRestore();
+  });
+});
+
+describe("announceCastLinkNeeded", () => {
+  it("announceCastLinkNeeded_placedCasters_notifiedOnAssignedTopicWithMatchLink", async () => {
+    await announceCastLinkNeeded([4, 5], loadedEntry());
+
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4, 5], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
+    const notification = jest.mocked(notifyUsers).mock.calls[0][1];
+    expect(notification).toMatchObject({ topic: "PLANNING_ASSIGNED", dmFollowsTopic: true });
+    expect(notification.discord?.context).toBe("planning-cast-link");
+    expect(notification.push?.("fr").tag).toBe("planning-cast-link-1");
+    expect(notification.discord?.message("fr")).toContain("https://bluegenji.test/tournois/10");
+  });
+
+  it("announceCastLinkNeeded_noRecipients_nothingSent", async () => {
+    jest.mocked(loadNotificationRecipients).mockResolvedValue([]);
+
+    await announceCastLinkNeeded([4], loadedEntry());
+
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("announceCastLinkNeeded_emptyList_nothingLoaded", async () => {
+    await announceCastLinkNeeded([], loadedEntry());
+
+    expect(loadNotificationRecipients).not.toHaveBeenCalled();
+  });
+
+  it("announceCastLinkNeeded_sendFails_loggedNeverThrows", async () => {
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(notifyUsers).mockRejectedValue(new Error("BOT_DOWN"));
+
+    await expect(announceCastLinkNeeded([4], loadedEntry())).resolves.toBeUndefined();
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining("lien de diffusion"), expect.anything());
+    errorLog.mockRestore();
   });
 });
 

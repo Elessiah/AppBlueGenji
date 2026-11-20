@@ -14,7 +14,7 @@ jest.mock("@/lib/server/planning/load", () => ({
 }));
 jest.mock("@/lib/server/planning/profiles");
 jest.mock("@/lib/server/planning/notices");
-jest.mock("@/lib/server/planning/cast-placement", () => ({ placePlannedCasts: jest.fn() }));
+jest.mock("@/lib/server/planning/cast-placement", () => ({ placePlannedCasts: jest.fn(), releasePlannedSeat: jest.fn() }));
 jest.mock("@/lib/server/planning/players", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/players")>("@/lib/server/planning/players"),
   loadEntryPlayers: jest.fn(),
@@ -28,7 +28,7 @@ import { withNamedLock } from "@/lib/server/named-lock";
 import { PLANNING_STATUSES, setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
 import { MATCH_REFEREE_REFUSAL_CODES } from "@/lib/server/planning/auto-assign";
 import { loadHiddenTournamentIds, loadPlanningData, loadPlanningEntries, loadPlanningMembersByIds } from "@/lib/server/planning/load";
-import { placePlannedCasts } from "@/lib/server/planning/cast-placement";
+import { placePlannedCasts, releasePlannedSeat } from "@/lib/server/planning/cast-placement";
 import { announceAssignments } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { writeSoloCaster } from "@/lib/server/planning/profiles";
@@ -354,6 +354,34 @@ describe("setManualAssignment — pose", () => {
     await setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: false });
 
     expect(placePlannedCasts).not.toHaveBeenCalled();
+  });
+
+  it("setManualAssignment_removalConfirmed_releasesPlannedSeatByStaff", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        members: [loadedMember({ userId: 6, roles: ["PROD"] })],
+        assignments: [loadedAssignment({ userId: 6, role: "PROD", confirmed: true })],
+      }),
+    );
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "PROD", userId: 6, assigned: false });
+
+    expect(releasePlannedSeat).toHaveBeenCalledWith(expect.objectContaining({ key: "m:1" }), 6, "PROD", expect.objectContaining({ id: staff.id }));
+  });
+
+  it("setManualAssignment_removalProvisional_noPlannedSeatRelease", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        members: [loadedMember({ userId: 6, roles: ["PROD"] })],
+        assignments: [loadedAssignment({ userId: 6, role: "PROD", confirmed: false })],
+      }),
+    );
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "PROD", userId: 6, assigned: false });
+
+    expect(releasePlannedSeat).not.toHaveBeenCalled();
   });
 
   it("setManualAssignment_removal_notAnnounced", async () => {

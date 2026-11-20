@@ -186,6 +186,7 @@
   "matchProd": {
     "title": {
       "ASSIGNED": "Prod d'un match",
+      "PLANNED": "Prod d'un match",
       "RELEASED": "Prod retirée",
       "INELIGIBLE": "Prod retirée",
       "UNAVAILABLE": "Prod retirée",
@@ -193,6 +194,7 @@
     },
     "body": {
       "ASSIGNED": "Le staff te place comme prod de ce match. {pairing} · {tournament}, {round}.",
+      "PLANNED": "Le planning te place comme prod de ce match. {pairing} · {tournament}, {round}.",
       "RELEASED": "Le staff te retire la prod de ce match. {pairing} · {tournament}, {round}.",
       "INELIGIBLE": "Tu n'as plus le rôle prod : tu ne fais plus la prod de ce match. {pairing} · {tournament}, {round}.",
       "UNAVAILABLE": "Ton compte ne peut plus faire la prod pour le moment : tu ne fais plus la prod de ce match. {pairing} · {tournament}, {round}.",
@@ -232,6 +234,10 @@
       "title": "{count, plural, one {Nouvelle affectation au planning} other {# nouvelles affectations au planning}}",
       "titleReplacement": "Tu remplaces un désistement",
       "line": "{start} · {role} · {entry}"
+    },
+    "castLink": {
+      "title": "Donne le lien de ta diffusion",
+      "body": "Le planning te place comme caster de {entry} ({start}) : donne le lien de ta chaîne dans « Configurer ma diffusion » sur le match."
     },
     "soloCaster": {
       "titleOn": "Caster autonome activé",

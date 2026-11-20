@@ -671,6 +671,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
        ADD INDEX idx_bg_matches_prod (prod_user_id),
        ADD CONSTRAINT fk_bg_matches_prod FOREIGN KEY (prod_user_id)
          REFERENCES bg_users(id) ON DELETE SET NULL`,
+    // Inscription de cast posée par le planning (`lib/server/planning/cast-placement.ts`) :
+    // l'attribution quittée la retire, une inscription du caster lui-même reste.
+    `ALTER TABLE bg_match_casters ADD COLUMN planned TINYINT(1) NOT NULL DEFAULT 0 AFTER cast_battletag`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

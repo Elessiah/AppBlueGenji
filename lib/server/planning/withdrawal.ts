@@ -41,7 +41,7 @@ import {
   withPlanningLock,
   writeEvent,
 } from "./auto-assign";
-import { placePlannedCasts } from "./cast-placement";
+import { placePlannedCasts, releasePlannedSeat } from "./cast-placement";
 import { coveringSoloCasterIds, loadPlanningData, loadPlanningHistory, type Executor, type LoadedEntry, type LoadedMember, type PlanningData } from "./load";
 import { entryAssignments, entryCoverage } from "./model";
 import { announceWithdrawal } from "./notices";
@@ -303,6 +303,25 @@ function withdrawnAssignment(user: { id: number }, input: WithdrawalInput, data:
 }
 
 /**
+ * Ce que le planning avait placé sur le match au membre qui se désiste
+ * (inscription de cast posée par le planning, place de prod) part avec son
+ * attribution confirmée ; une inscription faite par le caster lui-même reste
+ * (`stillSignedUp`). Seul le désistement du membre lui-même : un invité sorti
+ * du planning par le staff (`actorId`) garde ses autres droits, dont ses places
+ * sur les matchs (sans avis, comme le reste de sa sortie) ; le staff l'en
+ * retire depuis le match. Ne lève jamais (`releasePlannedSeat`).
+ */
+async function releaseOwnPlannedSeat(
+  user: { id: number; actorId: number | null },
+  entry: LoadedEntry,
+  role: PlanningRole,
+  confirmed: boolean,
+): Promise<void> {
+  if (!confirmed || role === "REFEREE" || user.actorId !== null) return;
+  await releasePlannedSeat(entry, user.id, role, null);
+}
+
+/**
  * Retire l'arbitre désigné du match s'il s'agit encore de `userId` ; un refus
  * défait le geste. Rend l'arbitre que le match porte déjà quand c'est **un
  * autre** (changé depuis la fenêtre « Arbitrage » entre la lecture et ce
@@ -523,6 +542,8 @@ async function withdrawMember(
       return [await writeWithdrawalEvent(connection, entry, user.id, input, confirmed, late, user.actorId)];
     });
     const heldBy = matchId !== null && undo !== undefined ? await releaseMatchReferee(matchId, user.id, user.actorId, undo, eventIds) : null;
+    // Avant la recherche d'un remplaçant : le match relu le voit parti, et le remplaçant confirmé peut y être placé.
+    await releaseOwnPlannedSeat(user, entry, input.role, confirmed);
     if (heldBy !== null) {
       // Les co-affectés se lisent dans `data` (lu sous le même verrou) : seule la ligne du désisté a changé.
       return {

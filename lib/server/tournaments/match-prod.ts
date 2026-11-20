@@ -225,6 +225,36 @@ export async function releaseMatchProd(matchId: number, actor: SessionActor): Pr
 }
 
 /**
+ * La prod `userId` quitte la place du match avec son attribution `PROD` au
+ * planning (désistement, retrait à la main par le staff —
+ * `lib/server/planning/cast-placement.ts`) : la ligne du planning et la place
+ * sont le même rôle. Un match joué la garde ; une autre prod reste. Une ligne
+ * anonyme au journal (`UNPLANNED`) ; la prod que le staff retire (`byStaff`)
+ * en est prévenue (`RELEASED`), comme d'un retrait depuis le match.
+ *
+ * @returns vrai si la place a été rendue.
+ */
+export async function releasePlannedProd(matchId: number, userId: number, byStaff: boolean): Promise<boolean> {
+  const result = await retryOnDeadlock(() =>
+    inTransaction(async (connection) => {
+      const [rows] = await connection.execute<ProdMatchRow[]>(
+        `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, launched_at, prod_user_id
+           FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
+        [matchId],
+      );
+      const row = rows[0];
+      if (!row || row.status === "COMPLETED" || nullableId(row.prod_user_id) !== userId) return null;
+      await writeProd(connection, matchId, null);
+      const notices: ProdChange["notices"] = byStaff ? [{ userId, kind: "RELEASED" }] : [];
+      const change: ProdChange = { matchId, log: "UNPLANNED", notices, pairing: pairingOf(row) };
+      return { tournamentId: Number(row.tournament_id), change };
+    }),
+  );
+  afterCommit(result);
+  return result !== null;
+}
+
+/**
  * Le staff place la prod du match (`prodId`), la change, ou la retire (`null`).
  * `expected` : la prod que la fenêtre montrait (`null` : aucune) ; changée
  * depuis, rien ne bouge (`PROD_CHANGED`). `undefined` : pas de contrôle.

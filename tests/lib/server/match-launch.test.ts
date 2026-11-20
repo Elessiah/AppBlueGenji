@@ -35,6 +35,7 @@ import {
   releaseIneligibleReferee,
   releaseMatchCast,
   releaseMatchReferee,
+  releasePlannedMatchCast,
   releaseObjectingReferee,
   relaunchAfterRefereeWithdrawal,
   setMatchFirstMap,
@@ -100,7 +101,8 @@ type MatchState = {
   streams: { id: number; live_url: string | null; staff_owned?: number; link_user_id?: number }[];
 };
 
-type CasterState = { user_id: number; stream_id: number; ready_at: string | null };
+/** `planned` : inscription posée par le planning (`bg_match_casters.planned`), absente = par le caster. */
+type CasterState = { user_id: number; stream_id: number; ready_at: string | null; planned?: number };
 
 /**
  * Raccourci des fixtures : `caster_user_id` / `caster_ready_at` décrivent le
@@ -303,6 +305,10 @@ function applyStreamWrite(match: MatchState, sql: string, params: unknown[]): un
 /** Lectures des casters et des streams d'un match. */
 function readCastRows(state: World, sql: string, params: unknown[]): unknown[] | null {
   const match = state.match;
+  if (sql.includes("AND planned = 1")) {
+    const planned = (match?.casters ?? []).filter((caster) => caster.user_id === Number(params[1]) && caster.planned === 1);
+    return [planned.map(() => ({ 1: 1 })), []];
+  }
   if (sql.includes("FROM bg_match_casters WHERE match_id = ?")) {
     return [(match?.casters ?? []).map((caster) => ({ match_id: match?.id, ...caster })), []];
   }
@@ -1404,6 +1410,75 @@ describe("releaseMatchCast", () => {
     await releaseMatchCast(42, { id: CASTER, playerView: false }, false);
     expect(state.writes).toEqual([]);
     expect(announceCastChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("releasePlannedMatchCast", () => {
+  it("releasePlannedMatchCast_plannedSignup_removedAndAnnouncedUnplanned", async () => {
+    state.match = matchState({ casters: [{ user_id: CASTER, stream_id: 1, ready_at: null, planned: 1 }], streams: [{ id: 1, live_url: null }] });
+
+    const released = await releasePlannedMatchCast(42, CASTER, false);
+
+    expect(released).toBe(true);
+    expect(state.match?.casters).toEqual([]);
+    expect(state.match?.streams).toEqual([]);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "UNPLANNED", matchId: 42, casterId: CASTER, byStaff: false, pairing: PAIRING });
+  });
+
+  it("releasePlannedMatchCast_byStaff_announcedByStaff", async () => {
+    state.match = matchState({ casters: [{ user_id: CASTER, stream_id: 1, ready_at: null, planned: 1 }], streams: [{ id: 1, live_url: null }] });
+
+    await releasePlannedMatchCast(42, CASTER, true);
+
+    expect(announceCastChange).toHaveBeenCalledWith(expect.objectContaining({ kind: "UNPLANNED", byStaff: true }));
+  });
+
+  it("releasePlannedMatchCast_selfSignup_kept", async () => {
+    state.match = matchState({ caster_user_id: CASTER });
+
+    const released = await releasePlannedMatchCast(42, CASTER, false);
+
+    expect(released).toBe(false);
+    expect(casterOf(state)).toBe(CASTER);
+    expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedMatchCast_matchCompleted_kept", async () => {
+    state.match = matchState({ status: "COMPLETED", casters: [{ user_id: CASTER, stream_id: 1, ready_at: null, planned: 1 }], streams: [{ id: 1, live_url: null }] });
+
+    const released = await releasePlannedMatchCast(42, CASTER, false);
+
+    expect(released).toBe(false);
+    expect(casterOf(state)).toBe(CASTER);
+  });
+
+  it("releasePlannedMatchCast_notACaster_false", async () => {
+    state.match = matchState({ casters: [{ user_id: 901, stream_id: 1, ready_at: null, planned: 1 }], streams: [{ id: 1, live_url: null }] });
+
+    const released = await releasePlannedMatchCast(42, CASTER, false);
+
+    expect(released).toBe(false);
+    expect(casterOf(state)).toBe(901);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedMatchCast_coCasterStays_launchesWhenAllReady", async () => {
+    state.users[901] = ELIGIBLE_CASTER;
+    state.match = matchState({
+      team1_ready_at: STAMP,
+      team2_ready_at: STAMP,
+      casters: [
+        { user_id: 901, stream_id: 1, ready_at: STAMP },
+        { user_id: CASTER, stream_id: 1, ready_at: null, planned: 1 },
+      ],
+      streams: [{ id: 1, live_url: null }],
+    });
+
+    await releasePlannedMatchCast(42, CASTER, false);
+
+    expect(state.match?.casters.map((caster) => caster.user_id)).toEqual([901]);
+    expect(state.match?.launched_at).toBe(STAMP);
   });
 });
 

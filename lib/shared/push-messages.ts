@@ -54,6 +54,7 @@ import { PLANNING_PATH } from "./planning";
 import type { DeadlineNotice } from "./schedule-deadline-notices";
 import {
   planningNoticeTime,
+  type PlanningCastLinkNotice,
   type PlanningNoticeAssignment,
   type PlanningNoticeEntry,
   type PlanningWithdrawalNotice,
@@ -1247,6 +1248,24 @@ export function planningAssignedPush(
     multiline: true,
     url: localeHref(PLANNING_PATH, locale),
     tag: `planning-assigned-${idsFingerprint(assignments.map((item) => entryKeyNumber(item.key)))}`,
+  };
+}
+
+/**
+ * Caster placé par le planning sur un match dont la diffusion n'a pas encore
+ * de lien (`PLANNING_ASSIGNED`) : donner celui de sa chaîne. Ouvre la fiche du
+ * match.
+ */
+export function planningCastLinkPush(notice: PlanningCastLinkNotice, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("planning.castLink.title"),
+    body: text.t("planning.castLink.body", {
+      start: planningNoticeTime(notice.startAt, locale),
+      entry: planningEntryText(notice, text),
+    }),
+    url: localeHref(tournamentMatchHref(notice.tournamentId, notice.matchId), locale),
+    tag: `planning-cast-link-${notice.matchId}`,
   };
 }
 

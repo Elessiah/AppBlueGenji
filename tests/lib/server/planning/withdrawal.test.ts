@@ -25,7 +25,7 @@ jest.mock("@/lib/server/planning/planning-undo", () => ({
 jest.mock("@/lib/server/planning/notices");
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/tournaments/cast-eligibility");
-jest.mock("@/lib/server/planning/cast-placement", () => ({ placePlannedCasts: jest.fn() }));
+jest.mock("@/lib/server/planning/cast-placement", () => ({ placePlannedCasts: jest.fn(), releasePlannedSeat: jest.fn() }));
 
 import type { PoolConnection } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -36,7 +36,7 @@ import {
   loadPlanningHistory,
   loadPlanningMembersByIds,
 } from "@/lib/server/planning/load";
-import { placePlannedCasts } from "@/lib/server/planning/cast-placement";
+import { placePlannedCasts, releasePlannedSeat } from "@/lib/server/planning/cast-placement";
 import { announceWithdrawal } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "@/lib/server/planning/planning-undo";
@@ -256,6 +256,25 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
     expect(placePlannedCasts).not.toHaveBeenCalled();
+  });
+
+  it("withdrawFromEntry_confirmedCaster_releasesPlannedSeatBeforeReplacementPlaced", async () => {
+    casterData({ confirmed: true, candidates: [6] });
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(releasePlannedSeat).toHaveBeenCalledWith(expect.objectContaining({ key: "m:1" }), 4, "CASTER", null);
+    expect(jest.mocked(releasePlannedSeat).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(placePlannedCasts).mock.invocationCallOrder[0],
+    );
+  });
+
+  it("withdrawFromEntry_provisionalRow_noPlannedSeatRelease", async () => {
+    casterData({ confirmed: false, candidates: [6] });
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(releasePlannedSeat).not.toHaveBeenCalled();
   });
 
   it("withdrawFromEntry_memberWithdrawal_notReleasedNoActor", async () => {
@@ -1290,6 +1309,18 @@ describe("releaseGuestPlanning (`CAST_PLANNING.md` § Invités)", () => {
       "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ?",
       ["m:1", GUEST, "CASTER"],
     );
+  });
+
+  it("releaseGuestPlanning_confirmedAssignment_matchPlacesKept", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValueOnce(
+      planningData({ entries: [loadedEntry()], assignments: [loadedAssignment({ userId: GUEST, role: "CASTER", confirmed: true })] }),
+    );
+    casterData({ confirmed: true });
+
+    const release = await releaseGuestPlanning(GUEST, STAFF, EARLY);
+
+    expect(release.withdrawn).toBe(1);
+    expect(releasePlannedSeat).not.toHaveBeenCalled();
   });
 
   it("releaseGuestPlanning_castSignup_untouched", async () => {

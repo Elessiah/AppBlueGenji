@@ -1176,6 +1176,16 @@ describe("confirmAssignments", () => {
     );
   });
 
+  it("confirmAssignments_placementPending_returnsWithoutWaiting", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
+    );
+    jest.mocked(placePlannedCasts).mockReturnValue(new Promise(() => undefined));
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS, { id: 9, pseudo: "Admin" })).resolves.toBeDefined();
+    expect(placePlannedCasts).toHaveBeenCalledTimes(1);
+  });
+
   it("confirmAssignments_nothingConfirmed_placesNothing", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(confirmData({ entries: [first], assignments: [] }));
 

@@ -34,7 +34,7 @@ import {
   type LoadedEntry,
   type PlanningData,
 } from "./load";
-import { placePlannedCasts } from "./cast-placement";
+import { placePlannedCasts, releasePlannedSeat } from "./cast-placement";
 import { entryAssignments } from "./model";
 import { announceAssignments } from "./notices";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture, undoPlanningBlock } from "./planning-undo";
@@ -334,6 +334,9 @@ async function unassignManually({ connection, actor, entry, input, current, matc
     ]);
     return [await writeEvent(connection, entry, input.userId, input.role, "REMOVED", "MANUAL", actor.id)];
   });
+  // Un caster ou une prod tenu : ce que le planning lui avait placé sur le match part avec la ligne
+  // (`cast-placement.ts`, ne lève jamais) ; le staff est nommé dans pm2.
+  if (input.role !== "REFEREE" && !current.provisional) await releasePlannedSeat(entry, input.userId, input.role, staffActor(actor));
   if (matchId === null || undo === undefined) return;
   // Le match ne porte pas (ou plus) ce membre — plus d'arbitre, ou un autre posé depuis le match :
   // rien à lui demander, la ligne du planning n'était qu'un reste (la réconciliation l'aurait retirée).
