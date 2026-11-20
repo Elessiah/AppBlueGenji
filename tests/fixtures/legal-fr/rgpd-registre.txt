@@ -529,7 +529,7 @@ Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de m
 Invitation d'une équipe, reprise d'une équipe fantôme proposée par le staff, propriété de son équipe qui lui est transférée (nom de l'équipe seul, avec les mêmes plafonds que le message privé, T03)
 Alertes d'arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l'adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d'arbitrage et alertes de modération pour le staff qui détient ces rôles
 Retrait de son inscription de caster sur un match (par le staff ou d'office), avec le motif, pour le caster qui détient encore la permission de diffusion
-Place de prod d'un match donnée ou retirée par le staff, ou retirée d'office (compte suspendu, prod devenue joueuse du match), avec le motif, pour la prod qui détient encore la permission de prod
+Place de prod d'un match donnée ou retirée par le staff, ou retirée d'office (compte suspendu, prod devenue joueuse du match), pour la prod qui détient encore la permission de prod
 Retrait de son arbitrage d'un match (par le staff, match confié à un autre arbitre ou passé en autogestion, ou d'office), avec le motif, pour l'arbitre désigné qui détient encore la permission d'arbitrage
 Planning des casts et arbitres (T20), pour les arbitres, casters et prods : nouveaux créneaux, affectations, désistements, caster autonome réglé par le staff ; pour le staff des tournois : places à pourvoir — couper l'un de ces sujets coupe aussi son message privé Discord
 Base légale

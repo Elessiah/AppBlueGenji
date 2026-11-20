@@ -936,6 +936,27 @@ describe("claimMatchCast", () => {
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: CASTER, replacedCasterId: null, pairing: PAIRING });
   });
 
+  it("claimMatchCast_ownUnfitProdPlace_releasesItAndRegistersCaster", async () => {
+    state.users[CASTER] = verified;
+    state.match = matchState({ prod_user_id: CASTER });
+    state.prodAccounts = { [CASTER]: { is_deleted: 0, holds_prod: 0, suspended: 0 } };
+
+    await claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM);
+
+    expect(state.writes).toContain("UPDATE bg_matches SET prod_user_id = NULL WHERE id = ? AND prod_user_id = ?");
+    expect(casterOf(state)).toBe(CASTER);
+    expect(queueProdChange).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ matchId: 42, log: "INELIGIBLE" }));
+  });
+
+  it("claimMatchCast_ownFitProdPlace_throwsCasterIsProd", async () => {
+    state.users[CASTER] = verified;
+    state.match = matchState({ prod_user_id: CASTER });
+    state.prodAccounts = { [CASTER]: { is_deleted: 0, holds_prod: 1, suspended: 0 } };
+
+    await expect(claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM)).rejects.toThrow("CASTER_IS_PROD");
+    expect(state.match?.casters).toEqual([]);
+  });
+
   it("claimMatchCast_anyClaim_locksTheAccountRowFirst", async () => {
     // Même ordre que la suppression du compte (compte, puis ses matchs) : une
     // inscription ne peut pas se glisser derrière un retrait déjà parti.
@@ -3434,7 +3455,10 @@ describe("jeu du tournoi lu sous le verrou du match (revue sécurité #545)", ()
     state.issued = [];
     await claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM);
     const context = state.issued.find((sql) => sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches"));
-    expect(context).toContain("(SELECT game FROM bg_tournaments WHERE id = ?) AS tournament_game");
+    expect(context).toContain("t.game AS tournament_game");
+    // Une seule lecture du tournoi pour tout le contexte (revue sécurité, cycle 3).
+    expect(context?.match(/bg_tournaments/g)).toHaveLength(1);
+    expect(context).toContain("t.start_visibility_at AS tournament_visible_at");
     expect(context).not.toMatch(/FOR UPDATE|LOCK IN SHARE MODE/);
     const lock = state.issued.find((sql) => sql.includes("FROM bg_matches m WHERE m.id = ?") && sql.includes("FOR UPDATE"));
     expect(lock).not.toMatch(/\bgame\b/);

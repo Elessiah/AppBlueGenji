@@ -63,12 +63,22 @@ let accounts: Map<number, Account>;
 let casterIds: number[];
 let plannedCasterIds: number[];
 let plannedOtherProd: boolean;
+/** Comptes suspendus parmi ceux qui tiennent une ligne PROD au planning (lecture ordinaire). */
+let suspendedHolders: number[];
 let execute: jest.Mock<SqlQuery>;
 let announcements: Promise<void>[];
 
 /** Lignes du planning relues par la prise de place (prod d'un autre, caster tenu) ; `null` pour le reste. */
 function readPlannedRows(sql: string, values: unknown[]): [unknown[], []] | null {
-  if (sql.includes("role = 'PROD' AND user_id <> ?")) return [plannedOtherProd ? [{ 1: 1 }] : [], []];
+  if (sql.includes("role = 'PROD' AND user_id <> ?")) return [plannedOtherProd ? [{ user_id: OTHER_PROD_ID }] : [], []];
+  if (sql.startsWith("SELECT u.id FROM bg_users u") && sql.includes("u.id IN (")) {
+    // Le titulaire de la ligne PROD peut-il encore faire la prod ?
+    const fit = values.map(Number).filter((id) => {
+      const account = accounts.get(id);
+      return account?.is_deleted === 0 && account.holds_prod === 1 && !suspendedHolders.includes(id);
+    });
+    return [fit.slice(0, 1).map((id) => ({ id })), []];
+  }
   if (sql.includes("FROM bg_planning_assignments") && sql.includes("role = 'CASTER'")) {
     return [plannedCasterIds.includes(Number(values[1])) ? [{ 1: 1 }] : [], []];
   }
@@ -111,6 +121,7 @@ beforeEach(() => {
   casterIds = [];
   plannedCasterIds = [];
   plannedOtherProd = false;
+  suspendedHolders = [];
   announcements = [];
   execute = jest.fn<SqlQuery>(async (sql, params) => {
     const values = params as unknown[];
@@ -235,6 +246,43 @@ describe("claimMatchProd", () => {
     expect(prodQuery?.[0]).toContain("(source = 'MANUAL' OR confirmed = 1)");
   });
 
+  it("claimMatchProd_heldPlanningProdOfSuspendedAccount_writesClaimant", async () => {
+    plannedOtherProd = true;
+    suspendedHolders = [OTHER_PROD_ID];
+
+    await claimMatchProd(42, prodActor);
+
+    expect(updatesOfProd()).toEqual([[expect.any(String), [PROD_ID, 42]]]);
+  });
+
+  it("claimMatchProd_heldPlanningProdOfAccountWithoutRole_writesClaimant", async () => {
+    plannedOtherProd = true;
+    accounts.set(OTHER_PROD_ID, { is_deleted: 0, holds_prod: 0 });
+
+    await claimMatchProd(42, prodActor);
+
+    expect(updatesOfProd()).toEqual([[expect.any(String), [PROD_ID, 42]]]);
+  });
+
+  it("claimMatchProd_heldPlanningProdOfDeletedAccount_writesClaimant", async () => {
+    plannedOtherProd = true;
+    accounts.set(OTHER_PROD_ID, { is_deleted: 1, holds_prod: 1 });
+
+    await claimMatchProd(42, prodActor);
+
+    expect(updatesOfProd()).toEqual([[expect.any(String), [PROD_ID, 42]]]);
+  });
+
+  it("claimMatchProd_heldPlanningProdOfFitAccount_holderReadWithoutLock", async () => {
+    plannedOtherProd = true;
+
+    await expect(claimMatchProd(42, prodActor)).rejects.toThrow("MATCH_PROD_TAKEN");
+    // Le compte de l'autre prod, lu après le verrou du match : sans verrou (ordre compte → matchs).
+    const holderQuery = execute.mock.calls.find(([sql]) => sql.startsWith("SELECT u.id FROM bg_users u"));
+    expect(holderQuery?.[1]).toEqual([OTHER_PROD_ID]);
+    expect(holderQuery?.[0]).not.toMatch(/LOCK IN SHARE MODE|FOR UPDATE/);
+  });
+
   it("claimMatchProd_heldPlanningCaster_throwsProdIsCaster", async () => {
     plannedCasterIds = [PROD_ID];
 
@@ -265,6 +313,13 @@ describe("releaseMatchProd", () => {
     expect(updatesOfProd()).toEqual([[expect.any(String), [null, 42]]]);
     expect(sendBotLog).toHaveBeenCalledWith(expect.any(String), { tournamentId: 7, category: "staff-removal" });
     expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("releaseMatchProd_completedMatch_throwsMatchAlreadyCompleted", async () => {
+    match = { ...match, prod_user_id: PROD_ID, status: "COMPLETED" };
+
+    await expect(releaseMatchProd(42, prodActor)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    expect(updatesOfProd()).toHaveLength(0);
   });
 
   it("releaseMatchProd_notOwnPlace_throwsNotMatchProd", async () => {
@@ -324,7 +379,8 @@ describe("claimMatchProd — prod tue qui tenait la place", () => {
     await claimMatchProd(42, prodActor);
 
     expect(updatesOfProd()).toEqual([[expect.any(String), [PROD_ID, 42]]]);
-    expect(releaseUnfitProd).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 42 }), true);
+    // Lecture ordinaire du compte de l'autre prod : aucun verrou pris après le match.
+    expect(releaseUnfitProd).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 42 }), false);
   });
 
   it("claimMatchProd_fitHolderKept_throwsMatchProdTaken", async () => {
@@ -349,7 +405,7 @@ describe("announceProdWithdrawals — suspension", () => {
     announceProdWithdrawals(PROD_ID, [{ matchId: 42, tournamentId: 7, pairing: { team1Id: 10, team2Id: 11 } }], "UNAVAILABLE");
     await settle();
 
-    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("la prod n'est plus disponible");
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("la prod ne remplit plus les conditions");
     const message = jest.mocked(notifyUsers).mock.calls[0][1].discord?.message("fr");
     expect(message).toContain("Ton compte ne peut plus faire la prod pour le moment");
     expect(message).not.toContain("suspendu");
@@ -397,6 +453,13 @@ describe("assignMatchProd", () => {
     expect(loadNotificationRecipients).toHaveBeenCalledTimes(1);
     expect(loadNotificationRecipients).toHaveBeenCalledWith([PROD_ID], "certified", { matchDm: true });
     expect(notifyUsers).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ topic: "MATCH_PROD" }));
+  });
+
+  it("assignMatchProd_byeMatch_throwsMatchNotLaunchable", async () => {
+    match = { ...match, is_bye: 1 };
+
+    await expect(assignMatchProd(42, STAFF, PROD_ID, null)).rejects.toThrow("MATCH_NOT_LAUNCHABLE");
+    expect(updatesOfProd()).toHaveLength(0);
   });
 
   it("assignMatchProd_replace_notifiesBothAndLogsReplaced", async () => {
@@ -497,6 +560,18 @@ describe("withdrawLostProdPlaces", () => {
     expect(lost.mock.calls[1][1]).toEqual([40, 42, PROD_ID]);
   });
 
+  it("withdrawLostProdPlaces_lockedRows_selectLaunchedAt", async () => {
+    const lost = jest.fn<SqlQuery>(async (sql) => {
+      if (sql.startsWith("SELECT id FROM")) return [[{ id: 42 }], []];
+      if (sql.startsWith("SELECT")) return [[{ ...match, prod_user_id: PROD_ID, launched_at: null }], []];
+      return [{ affectedRows: 1 }, []];
+    });
+
+    await withdrawLostProdPlaces(fakeConnection({ execute: lost }), PROD_ID);
+
+    expect(lost.mock.calls[1][0]).toContain("launched_at, prod_user_id");
+  });
+
   it("withdrawLostProdPlaces_launchedMatch_notSelected", async () => {
     const lost = jest.fn<SqlQuery>(async () => [[], []]);
 
@@ -511,7 +586,7 @@ describe("announceProdWithdrawals", () => {
     announceProdWithdrawals(PROD_ID, [{ matchId: 42, tournamentId: 7, pairing: { team1Id: 10, team2Id: 11 } }]);
     await settle();
 
-    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("la prod n'a plus le rôle prod");
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("la prod ne remplit plus les conditions");
     expect(jest.mocked(notifyUsers).mock.calls[0][1].discord?.message("fr")).toContain("Tu n'as plus le rôle prod");
   });
 

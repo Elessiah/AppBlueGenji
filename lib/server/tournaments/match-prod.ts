@@ -80,11 +80,10 @@ async function lockProdAccount(connection: PoolConnection, userId: number): Prom
 
 /**
  * Le match verrouillé, seul (aucune jointure sous `FOR UPDATE` : MariaDB).
- * `checkOpen` (par défaut) : un match joué ou une exemption est refusé tout
- * de suite ; « Faire la prod » juge d'abord la publication du tournoi, puis
- * appelle {@link assertProdMatchOpen} lui-même.
+ * Chaque appelant juge ensuite lui-même s'il est ouvert ({@link assertProdMatchOpen}) :
+ * « Faire la prod » juge d'abord la publication du tournoi.
  */
-async function lockProdMatch(connection: PoolConnection, matchId: number, checkOpen = true): Promise<ProdMatchRow> {
+async function lockProdMatch(connection: PoolConnection, matchId: number): Promise<ProdMatchRow> {
   const [rows] = await connection.execute<ProdMatchRow[]>(
     `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, launched_at, prod_user_id
        FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
@@ -92,7 +91,6 @@ async function lockProdMatch(connection: PoolConnection, matchId: number, checkO
   );
   const row = rows[0];
   if (!row) throw new Error("MATCH_NOT_FOUND");
-  if (checkOpen) assertProdMatchOpen(row);
   return row;
 }
 
@@ -125,14 +123,27 @@ async function assertProdFree(connection: PoolConnection, row: ProdMatchRow, use
   if (planned.length > 0) throw new Error("PROD_IS_CASTER");
 }
 
-/** Une prod tenue au planning par un autre compte réserve la place du match (lecture courante, verrouillée). */
+/**
+ * Une prod tenue au planning par un autre compte réserve la place du match
+ * (lignes lues en lecture courante, verrouillée) — tant que ce compte peut
+ * l'être : effacé, suspendu ou sans la permission `prod`, il ne la tient plus
+ * (lecture ordinaire de son compte, sans verrou : l'ordre compte → matchs).
+ */
 async function assertNoOtherPlannedProd(connection: PoolConnection, matchId: number, userId: number): Promise<void> {
-  const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_planning_assignments
-      WHERE match_id = ? AND role = 'PROD' AND user_id <> ? AND ${HELD_PLANNING_ROW_SQL} LIMIT 1 LOCK IN SHARE MODE`,
+  const [rows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
+    `SELECT user_id FROM bg_planning_assignments
+      WHERE match_id = ? AND role = 'PROD' AND user_id <> ? AND ${HELD_PLANNING_ROW_SQL} LOCK IN SHARE MODE`,
     [matchId, userId],
   );
-  if (rows.length > 0) throw new Error("MATCH_PROD_TAKEN");
+  if (rows.length === 0) return;
+  const holders = [...new Set(rows.map((row) => Number(row.user_id)))];
+  const [fit] = await connection.execute<RowDataPacket[]>(
+    `SELECT u.id FROM bg_users u
+      WHERE u.id IN (${holders.map(() => "?").join(", ")}) AND u.is_deleted = 0 AND ${PROD_ROLE_SQL}
+        AND NOT ${userSuspendedSql("u.id")} LIMIT 1`,
+    holders,
+  );
+  if (fit.length > 0) throw new Error("MATCH_PROD_TAKEN");
 }
 
 function pairingOf(row: ProdMatchRow): CastPairing {
@@ -172,11 +183,13 @@ export async function claimMatchProd(matchId: number, actor: SessionActor, manag
       const account = await lockProdAccount(connection, userId);
       if (!account?.holdsProd) throw new Error("NOT_PROD");
       if ((await lockedSuspendedUserIds(connection, [userId])).has(userId)) throw new Error("PROD_SUSPENDED");
-      const row = await lockProdMatch(connection, matchId, false);
+      const row = await lockProdMatch(connection, matchId);
       await assertMatchTournamentOpen(connection, Number(row.tournament_id), manages, true);
       assertProdMatchOpen(row);
-      // Lectures courantes : les verrous du compte ont précédé celui du match.
-      if (nullableId(row.prod_user_id) !== userId) await releaseUnfitProd(connection, row, true);
+      // Lectures ordinaires (vue prise sous le verrou du match) : verrouiller le
+      // compte d'un autre **après** le match croiserait l'ordre compte → matchs
+      // de la suspension, du changement de rôles et de l'effacement.
+      if (nullableId(row.prod_user_id) !== userId) await releaseUnfitProd(connection, row, false);
       const current = nullableId(row.prod_user_id);
       if (current === userId) return null;
       if (current !== null) throw new Error("MATCH_PROD_TAKEN");
@@ -201,6 +214,7 @@ export async function releaseMatchProd(matchId: number, actor: SessionActor): Pr
   const result = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const row = await lockProdMatch(connection, matchId);
+      assertProdMatchOpen(row);
       if (nullableId(row.prod_user_id) !== userId) throw new Error("NOT_MATCH_PROD");
       await writeProd(connection, matchId, null);
       const change: ProdChange = { matchId, log: "RELEASED", notices: [], pairing: pairingOf(row) };
@@ -234,6 +248,7 @@ export async function assignMatchProd(
     inTransaction(async (connection) => {
       if (prodId !== null) await assertAssignableProd(connection, prodId);
       const row = await lockProdMatch(connection, matchId);
+      assertProdMatchOpen(row);
       const current = nullableId(row.prod_user_id);
       if (current === prodId) return null;
       if (expected !== undefined && expected !== current) throw new Error("PROD_CHANGED");
@@ -301,7 +316,7 @@ export async function withdrawLostProdPlaces(connection: PoolConnection, userId:
   );
   if (candidates.length === 0) return [];
   const [rows] = await connection.execute<ProdMatchRow[]>(
-    `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, prod_user_id
+    `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, launched_at, prod_user_id
        FROM bg_matches
       WHERE id IN (${candidates.map(() => "?").join(", ")}) AND prod_user_id = ? AND status <> 'COMPLETED' AND launched_at IS NULL
       ORDER BY id FOR UPDATE`,

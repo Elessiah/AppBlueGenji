@@ -18,6 +18,7 @@
  */
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
+import { transact } from "@/lib/server/tournaments/transaction";
 import { announceProdWithdrawals, withdrawLostProdPlaces, type ReleasedProdPlace } from "@/lib/server/tournaments/match-prod";
 import { failureReason } from "@/lib/server/failure-reason";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
@@ -200,34 +201,34 @@ export async function suspendAccount(
   const { view, releasedProd } = await retryOnDeadlock(async () => {
     const connection = await db.getConnection();
     try {
-      await connection.beginTransaction();
-      const [users] = await connection.execute<(RowDataPacket & { is_admin: 0 | 1 })[]>(
-        `SELECT is_admin FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
-        [targetUserId],
-      );
-      if (users.length === 0) throw new Error("USER_NOT_FOUND");
-      if (Number(users[0].is_admin) === 1) throw new Error("CANNOT_SUSPEND_ADMIN");
-      if (await getActiveSuspension(targetUserId, connection)) throw new Error("ACCOUNT_ALREADY_SUSPENDED");
+      // `transact` : un rollback en échec détruit la connexion (jamais rendue au
+      // pool en pleine transaction) et laisse remonter l'erreur d'origine — un
+      // interblocage reste rejoué.
+      return await transact(connection, async () => {
+        const [users] = await connection.execute<(RowDataPacket & { is_admin: 0 | 1 })[]>(
+          `SELECT is_admin FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
+          [targetUserId],
+        );
+        if (users.length === 0) throw new Error("USER_NOT_FOUND");
+        if (Number(users[0].is_admin) === 1) throw new Error("CANNOT_SUSPEND_ADMIN");
+        if (await getActiveSuspension(targetUserId, connection)) throw new Error("ACCOUNT_ALREADY_SUSPENDED");
 
-      const [inserted] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO bg_account_suspensions (user_id, reason, ground, starts_at, ends_at, created_by)
-         VALUES (?, ?, ?, NOW(), ${input.durationDays === null ? "NULL" : "DATE_ADD(NOW(), INTERVAL ? DAY)"}, ?)`,
-        input.durationDays === null
-          ? [targetUserId, input.reason, input.ground, actor.id]
-          : [targetUserId, input.reason, input.ground, input.durationDays, actor.id],
-      );
-      const [rows] = await connection.execute<SuspensionRow[]>(
-        `SELECT id, reason, ground, starts_at, ends_at, lifted_at FROM bg_account_suspensions WHERE id = ?`,
-        [inserted.insertId],
-      );
-      const suspension = toView(rows[0]);
-      await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [targetUserId]);
-      const released: ReleasedProdPlace[] = await withdrawLostProdPlaces(connection, targetUserId);
-      await connection.commit();
-      return { view: suspension, releasedProd: released };
-    } catch (error) {
-      await connection.rollback();
-      throw error;
+        const [inserted] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO bg_account_suspensions (user_id, reason, ground, starts_at, ends_at, created_by)
+           VALUES (?, ?, ?, NOW(), ${input.durationDays === null ? "NULL" : "DATE_ADD(NOW(), INTERVAL ? DAY)"}, ?)`,
+          input.durationDays === null
+            ? [targetUserId, input.reason, input.ground, actor.id]
+            : [targetUserId, input.reason, input.ground, input.durationDays, actor.id],
+        );
+        const [rows] = await connection.execute<SuspensionRow[]>(
+          `SELECT id, reason, ground, starts_at, ends_at, lifted_at FROM bg_account_suspensions WHERE id = ?`,
+          [inserted.insertId],
+        );
+        const suspension = toView(rows[0]);
+        await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [targetUserId]);
+        const released: ReleasedProdPlace[] = await withdrawLostProdPlaces(connection, targetUserId);
+        return { view: suspension, releasedProd: released };
+      });
     } finally {
       connection.release();
     }

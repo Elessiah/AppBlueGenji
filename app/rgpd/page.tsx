@@ -1491,7 +1491,7 @@ function RgpdFr({
             match comme celui des casters (avant le lancement, tant qu&apos;il remplit les conditions), gardé avec le match et
             retiré des matchs pas encore lancés si son compte perd ce rôle, est suspendu ou joue désormais le match,
             et des matchs pas encore joués s&apos;il est supprimé ; la prod est prévenue quand le staff la place ou l&apos;en retire, ou quand sa place lui est
-            retirée d&apos;office, avec le motif (<Link href="/rgpd/registre#t16">registre, T16</Link>).{" "}
+            retirée d&apos;office (<Link href="/rgpd/registre#t16">registre, T16</Link>).{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
             « Contacts » et de lancement, page du match : aux mêmes personnes et aux mêmes moments — parties

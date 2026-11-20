@@ -1244,7 +1244,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary: "A match can have a prod, who handles the production of its live stream: they take the match themselves or are placed on it by the staff, and their username is shown with the match, like the casters'.",
     details: [
       "What is kept: the prod's account with the match, for as long as the match exists; it is removed from matches not yet launched if the account loses that role, is suspended or now plays in the match, and from matches not yet played if it is deleted (before the launch, a prod who no longer meets these conditions is no longer shown), and appears in the export of their data. Basis: performance of the service, as for casters.",
-      "Who sees it: the readers of the match page, as for casters. The prod is notified (Discord direct message and push notification, “Match prod” topic, which can be turned off in “My profile”) when the staff places or removes them, or when their place is removed automatically, with the reason; these actions are noted in the staff log on Discord without naming anyone.",
+      "Who sees it: the readers of the match page, as for casters. The prod is notified (Discord direct message and push notification, “Match prod” topic, which can be turned off in “My profile”) when the staff places or removes them, or when their place is removed automatically; these actions are noted in the staff log on Discord without naming anyone.",
     ],
   },
 };

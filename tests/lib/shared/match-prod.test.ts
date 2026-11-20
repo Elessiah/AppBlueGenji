@@ -145,14 +145,14 @@ describe("formatProdChangeLog", () => {
     expect(formatProdChangeLog({ ...context, change: "RELEASED_BY_STAFF" })).toContain("par le staff");
   });
 
-  it("formatProdChangeLog_ineligible_saysRoleLost", () => {
-    expect(formatProdChangeLog({ ...context, change: "INELIGIBLE" })).toContain("la prod n'a plus le rôle prod");
+  it("formatProdChangeLog_ineligible_sameNeutralLineAsSuspension", () => {
+    expect(formatProdChangeLog({ ...context, change: "INELIGIBLE" })).toContain("la prod ne remplit plus les conditions");
   });
 
   it("formatProdChangeLog_unavailable_neutralNoSuspension", () => {
     const line = formatProdChangeLog({ ...context, change: "UNAVAILABLE" });
 
-    expect(line).toContain("la prod n'est plus disponible");
+    expect(line).toContain("la prod ne remplit plus les conditions");
     expect(line).not.toMatch(/suspen/i);
   });
 });

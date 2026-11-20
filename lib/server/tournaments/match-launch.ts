@@ -600,24 +600,20 @@ function sameLaunchContext(
 }
 
 async function readLaunchContext(connection: PoolConnection, base: LaunchMatchBaseRow): Promise<LaunchContextRow[]> {
+  // Une seule lecture du tournoi (jointure externe : un tournoi disparu rend
+  // une ligne au `tournament_state` nul, comme les sous-requêtes d'avant).
   const [context] = await connection.execute<LaunchContextRow[]>(
     `SELECT
-       (SELECT state FROM bg_tournaments WHERE id = ?) AS tournament_state,
-       (SELECT game FROM bg_tournaments WHERE id = ?) AS tournament_game,
-       (SELECT referee_scheduling FROM bg_tournaments WHERE id = ?) AS referee_scheduling,
-       (SELECT match_launch_phase FROM bg_tournaments WHERE id = ?) AS match_launch_phase,
+       t.state AS tournament_state,
+       t.game AS tournament_game,
+       t.referee_scheduling AS referee_scheduling,
+       t.match_launch_phase AS match_launch_phase,
+       t.start_visibility_at AS tournament_visible_at,
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team1_is_ghost,
-       (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team2_is_ghost,
-       (SELECT start_visibility_at FROM bg_tournaments WHERE id = ?) AS tournament_visible_at`,
-    [
-      base.tournament_id,
-      base.tournament_id,
-      base.tournament_id,
-      base.tournament_id,
-      nullableId(base.team1_id),
-      nullableId(base.team2_id),
-      base.tournament_id,
-    ],
+       (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team2_is_ghost
+     FROM (SELECT 1 AS one) AS anchor
+     LEFT JOIN bg_tournaments t ON t.id = ?`,
+    [nullableId(base.team1_id), nullableId(base.team2_id), base.tournament_id],
   );
   return context;
 }
@@ -1355,6 +1351,10 @@ export async function claimMatchCast(
       // caster (`resolveMatchParty` le rendrait `MATCH_REFEREE`, à tort refusé).
       if (await resolveTeamParty(connection, row, userId)) throw new Error("CASTER_IS_PLAYER");
       // La prod du match n'en est pas caster (`docs/features/MATCH_PROD.md`).
+      // Une place de prod qu'il ne peut plus tenir (tue à l'affichage) est rendue
+      // d'abord : rien à l'écran ne lui permettrait de la quitter. Son compte est
+      // déjà verrouillé : lectures courantes.
+      if (nullableId(row.prod_user_id ?? null) === userId) await releaseUnfitProd(connection, row, true);
       if (nullableId(row.prod_user_id ?? null) === userId) throw new Error("CASTER_IS_PROD");
       // … ni la prod que le planning lui tient sur ce match (ligne PROD confirmée
       // ou posée par le staff) — le pendant de `assertProdFree` : lecture

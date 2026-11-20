@@ -1269,7 +1269,7 @@ export function RgpdEn({
             the match like the casters&apos; (before the launch, as long as they meet the requirements), kept with the match and
             removed from matches not yet launched if their account loses that role, is suspended or now plays in the match,
             and from matches not yet played if it is deleted; the prod is notified when the staff places or removes them, or when their place is removed
-            automatically, with the reason (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>).{" "}
+            automatically (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>).{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match
             page: to the same people at the same times — parties to the match, its other casters and referees —, in an Overwatch tournament only): it is kept with their caster

@@ -94,7 +94,8 @@ placée sur un match paraît au planning comme une ligne `PROD` tenue (source
 `CAST`, `entryAssignments`) et fait foi : une seule par match, elle remplace
 toute autre ligne `PROD` de l'entrée (proposition provisoire, ou ligne tenue
 d'un autre compte) ; une ligne `PROD` tenue d'un autre compte réserve
-toutefois la place contre « Faire la prod » (`MATCH_PROD_TAKEN`). Elle
+toutefois la place contre « Faire la prod » (`MATCH_PROD_TAKEN`), tant que ce
+compte peut faire la prod (ni effacé, ni suspendu, rôle tenu). Elle
 se retire depuis le match (`PLANNING_CAST_MANAGED`). Le planning refuse ce qui
 la contredirait — une ligne `PROD` d'un autre compte (`PLANNING_PROD_TAKEN`), une
 ligne `CASTER` de la prod (`PLANNING_ROLE_CONFLICT`) — à la pose à la main comme à
@@ -111,7 +112,14 @@ de charge (`loadPlanningHistory`).
   lancement : `setUserRoles` est rejoué sur interblocage (`retryOnDeadlock`).
 - Compte suspendu (`suspendAccount`) : même retrait, dans la transaction de la
   suspension (compte verrouillé d'abord, puis matchs), annoncé `UNAVAILABLE`
-  sans motif ; la suspension est rejouée sur interblocage.
+  sans motif ; la suspension est rejouée sur interblocage. Au journal du staff
+  des tournois, `INELIGIBLE` et `UNAVAILABLE` font la même ligne (« la prod ne
+  remplit plus les conditions ») : une suspension n'y est pas reconnaissable.
+- « Faire la prod » (`claimMatchProd`) et « Caster » (`claimMatchCast`, sur sa
+  propre place) rendent d'abord la place d'une prod qui ne remplit plus la
+  condition (`releaseUnfitProd`) ; « Faire la prod » lit le compte de l'autre
+  prod sans verrou (vue prise sous le verrou du match), pour ne pas croiser
+  l'ordre compte → matchs.
 - Avant tout lancement (`releaseUnfitProd`, appelé par `adoptCurrentPairing` —
   « Prêt », lancement forcé, entretien, relance après un retrait), sous le verrou
   du match et tant qu'il n'est pas lancé : la prod qui ne peut plus l'être est

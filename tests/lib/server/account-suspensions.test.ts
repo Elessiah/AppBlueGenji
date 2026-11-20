@@ -133,6 +133,7 @@ describe("assertIdentityNotSuspended", () => {
 describe("suspendAccount", () => {
   function transaction(existing: unknown[] = [{ is_admin: 0 }], active: unknown[] = []) {
     const connection = connectionMock();
+    connection.rollback.mockResolvedValue(undefined);
     connection.execute
       .mockResolvedValueOnce([existing]) // verrou du compte
       .mockResolvedValueOnce([active]) // suspension en cours ?
@@ -236,6 +237,33 @@ describe("suspendAccount", () => {
       connection.commit.mock.invocationCallOrder[0],
     );
     expect(announceProdWithdrawals).toHaveBeenCalledWith(5, released, "UNAVAILABLE");
+  });
+
+  it("suspendAccount_rollbackFails_destroysConnectionAndKeepsOriginalError", async () => {
+    const connection = transaction([{ is_admin: 1 }]);
+    connection.rollback.mockRejectedValue(new Error("connection lost"));
+
+    await expect(suspendAccount(5, input, actor)).rejects.toThrow("CANNOT_SUSPEND_ADMIN");
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("suspendAccount_deadlockThenSuccess_retriesAndCommits", async () => {
+    const connection = transaction();
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK", errno: 1213 });
+    jest.mocked(withdrawLostProdPlaces).mockRejectedValueOnce(deadlock);
+    connection.execute
+      .mockResolvedValueOnce([[{ is_admin: 0 }]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ insertId: 11 }])
+      .mockResolvedValueOnce([[suspensionRow()]])
+      .mockResolvedValueOnce([{ affectedRows: 2 }]);
+
+    const view = await suspendAccount(5, input, actor);
+
+    expect(view.id).toBe(11);
+    expect(withdrawLostProdPlaces).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 
   it("suspendAccount_noProdPlace_announcesNothing", async () => {
