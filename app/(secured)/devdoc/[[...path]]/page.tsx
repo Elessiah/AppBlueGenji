@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import "@/app/bot/docs/docs.css";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
+import { notFoundMetadata } from "@/components/error-page/NotFoundContent";
 import { getCurrentUser } from "@/lib/server/auth";
 import { findDevDoc, loadDevDocIndex, renderDevDoc } from "@/lib/server/dev-docs";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -43,7 +44,8 @@ async function requestedDoc(params: PageProps["params"]) {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const found = await requestedDoc(params);
-  return found ? { title: found.summary.title } : {};
+  // Document inconnu : la page rend la 404, son onglet le dit aussi.
+  return found ? { title: found.summary.title } : notFoundMetadata();
 }
 
 export default async function DevDocPage({ params }: Readonly<PageProps>) {

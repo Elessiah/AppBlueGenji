@@ -68,3 +68,21 @@ test.describe("Barre de navigation — une copie par largeur, ordre du clavier (
     await expect(nav.getByRole("link", { name: "Accueil", exact: true })).toBeFocused();
   });
 });
+
+test.describe("Page introuvable de l'espace connecté — un seul en-tête", () => {
+  test.skip(!authConfigured, "Définir E2E_AUTH_USER : la barre n'existe qu'en session.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
+
+  for (const path of ["/devdoc/e2e-introuvable", "/en/devdoc/e2e-introuvable"]) {
+    test(`${path} à 375 px : 404, la barre du site seule, titre de page introuvable`, async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 900 });
+      const response = await page.goto(path);
+
+      expect(response?.status()).toBe(404);
+      await expect(page.getByRole("heading", { name: /Page introuvable|Page not found/ })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: /Navigation principale|Main navigation/ })).toHaveCount(1);
+      // L'en-tête de la vitrine (`<header>`, repère `banner`) n'est pas rendu par-dessus `SiteShell`.
+      await expect(page.getByRole("banner")).toHaveCount(0);
+      await expect(page).toHaveTitle(/^(Page introuvable|Page not found) · BlueGenji Esport$/);
+    });
+  }
+});

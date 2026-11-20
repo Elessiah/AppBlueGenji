@@ -75,6 +75,21 @@ mercredi 21:00. Le changement d'heure ne décale pas l'heure murale.
 qui, pris à la lettre, donnerait mercredi 21:00 pour dimanche 23:00 ; ses
 exemples (« la date butoir mardi 21:00 ») ont été suivis.
 
+## Horloges de fond
+
+Les balayages des dates butoir et de la confirmation d'office, comme ceux du
+planning (purge de conservation, nouvelles entrées), passent par
+`lib/server/periodic-clock.ts` : un premier passage après un délai, **puis**
+un par intervalle compté de là, jamais deux passages à la fois, une alerte par
+panne (pas une par passage), minuteurs `unref`, état sur `globalThis` par clé.
+`stopPeriodicClock(clé)` en arrête une (premier passage compris, attend le
+passage en cours, relançable ; `stopPlanningAutoConfirmClock` pour la
+confirmation d'office) ; l'arrêt propre du serveur (`bot-log-shutdown.ts`)
+coupe toutes les horloges dès le signal, pour qu'aucun passage ne démarre
+pendant la fermeture. Une suite qui appelle `register()` d'`instrumentation.ts`
+double ces horloges avec `mockPlanningClocks`
+(`tests/helpers/instrumentation-clocks.ts`), après `jest.resetModules()`.
+
 ## Échéance : double forfait ou extinction
 
 Balayage `sweepScheduleDeadlines`, chaque minute (`startScheduleDeadlineClock`,
@@ -205,7 +220,7 @@ préavis d'un match). Sans date butoir (tournoi entier) : `début − L`.
 - Match lointain : confirmé à la date butoir, avec tout ce qui est posé d'ici
   là.
 
-`sweepAutoConfirms`, chaque minute (`startPlanningAutoConfirmClock`, arrêtable par `stopPlanningAutoConfirmClock` ; une suite qui appelle `register()` d'`instrumentation.ts` double les horloges avec `mockPlanningClocks`, `tests/helpers/instrumentation-clocks.ts`), verrou
+`sweepAutoConfirms`, chaque minute (`startPlanningAutoConfirmClock`), verrou
 nommé **`bg_planning_confirms`** : entrées échues groupées par semaine du
 planning ; pour chacune, `runAutoAssign(null, semaine)` refait les
 propositions **provisoires** autour de ce qui est confirmé, puis

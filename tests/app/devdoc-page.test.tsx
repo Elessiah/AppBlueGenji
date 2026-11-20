@@ -19,7 +19,7 @@ jest.mock("next/navigation", () =>
 
 import { renderToStaticMarkup } from "react-dom/server";
 import DevDocLayout, { generateMetadata as generateLayoutMetadata } from "@/app/(secured)/devdoc/layout";
-import DevDocPage from "@/app/(secured)/devdoc/[[...path]]/page";
+import DevDocPage, { generateMetadata as generatePageMetadata } from "@/app/(secured)/devdoc/[[...path]]/page";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadDevDocIndex, type DevDocIndex } from "@/lib/server/dev-docs";
@@ -133,9 +133,39 @@ describe("DevDocLayout — garde", () => {
 });
 
 describe("DevDocLayout — titre", () => {
-  it("generateMetadata_plainUser_noTitle", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(authUser());
+  /** Titre de la page introuvable que ce lecteur reçoit, jamais indexée. */
+  const NOT_FOUND_METADATA = {
+    title: { absolute: "Page introuvable · BlueGenji Esport" },
+    robots: { index: false, follow: false },
+  };
+
+  it("generateMetadata_noSession_noTitle", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect(await generateLayoutMetadata()).toEqual({});
+  });
+
+  it("generateMetadata_plainUser_notFoundTitle", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser());
+    expect(await generateLayoutMetadata()).toEqual(NOT_FOUND_METADATA);
+  });
+
+  it("generateMetadata_unknownDocument_notFoundTitle", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ roles: ["DEV"] }));
+    const metadata = await generatePageMetadata({ params: Promise.resolve({ path: ["site", "features", "NOPE"] }) });
+    expect(metadata).toEqual(NOT_FOUND_METADATA);
+  });
+
+  it("generateMetadata_unknownDocumentInEnglish_englishNotFoundTitle", async () => {
+    mockLocale = "en";
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ roles: ["DEV"] }));
+    const metadata = await generatePageMetadata({ params: Promise.resolve({ path: ["site", "features", "NOPE"] }) });
+    expect(metadata.title).toEqual({ absolute: "Page not found · BlueGenji Esport" });
+  });
+
+  it("generateMetadata_knownDocument_documentTitle", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ roles: ["DEV"] }));
+    const metadata = await generatePageMetadata({ params: Promise.resolve({ path: ["site", "features", "BUSY_BUTTONS"] }) });
+    expect(metadata).toEqual({ title: "Boutons occupés" });
   });
 
   it("generateMetadata_devRole_setsTitle", async () => {

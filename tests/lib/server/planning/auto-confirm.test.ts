@@ -494,40 +494,48 @@ describe("keyChunks", () => {
 });
 
 describe("startPlanningAutoConfirmClock / stopPlanningAutoConfirmClock", () => {
-  afterEach(() => {
-    stopPlanningAutoConfirmClock();
+  /** Premier balayage deux minutes après le démarrage. */
+  const FIRST_SWEEP_MS = 2 * 60 * 1000;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(async () => {
+    await stopPlanningAutoConfirmClock();
     jest.useRealTimers();
   });
 
-  it("stopPlanningAutoConfirmClock_neverStarted_doesNothing", () => {
-    expect(() => stopPlanningAutoConfirmClock()).not.toThrow();
+  it("stopPlanningAutoConfirmClock_neverStarted_resolves", async () => {
+    await expect(stopPlanningAutoConfirmClock()).resolves.toBeUndefined();
   });
 
-  it("startPlanningAutoConfirmClock_started_armsFirstSweepAndTick", () => {
-    jest.useFakeTimers();
-
-    startPlanningAutoConfirmClock();
+  it("startPlanningAutoConfirmClock_afterFirstDelay_sweepsUnderTheLock", async () => {
     startPlanningAutoConfirmClock();
 
-    expect(jest.getTimerCount()).toBe(2);
+    await jest.advanceTimersByTimeAsync(FIRST_SWEEP_MS);
+
+    expect(withNamedLock).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(withNamedLock).mock.calls[0][1]).toBe(AUTO_CONFIRM_LOCK);
   });
 
-  it("stopPlanningAutoConfirmClock_started_clearsBothTimers", () => {
-    jest.useFakeTimers();
+  it("stopPlanningAutoConfirmClock_beforeFirstSweep_neverSweeps", async () => {
     startPlanningAutoConfirmClock();
 
-    stopPlanningAutoConfirmClock();
+    await stopPlanningAutoConfirmClock();
+    await jest.advanceTimersByTimeAsync(FIRST_SWEEP_MS * 3);
 
+    expect(withNamedLock).not.toHaveBeenCalled();
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it("stopPlanningAutoConfirmClock_afterStop_canRestart", () => {
-    jest.useFakeTimers();
+  it("stopPlanningAutoConfirmClock_afterStop_canRestart", async () => {
     startPlanningAutoConfirmClock();
-    stopPlanningAutoConfirmClock();
+    await stopPlanningAutoConfirmClock();
 
     startPlanningAutoConfirmClock();
+    await jest.advanceTimersByTimeAsync(FIRST_SWEEP_MS);
 
-    expect(jest.getTimerCount()).toBe(2);
+    expect(withNamedLock).toHaveBeenCalledTimes(1);
   });
 });

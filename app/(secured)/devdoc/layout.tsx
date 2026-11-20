@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { notFoundMetadata } from "@/components/error-page/NotFoundContent";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadDevDocIndex } from "@/lib/server/dev-docs";
@@ -12,9 +13,15 @@ import { scopedText } from "@/lib/shared/scoped-text";
 import { DevDocNav } from "./_components/DevDocNav";
 import styles from "./devdoc.module.css";
 
-/** Le titre de l'onglet n'est posé que pour un lecteur autorisé : la page 404 n'annonce rien. */
+/**
+ * Le titre de l'onglet n'est posé que pour un lecteur autorisé ; un compte
+ * sans la permission lit celui de la page introuvable qu'il reçoit, un
+ * visiteur sans session aucun (l'espace rend « Connexion requise »).
+ */
 export async function generateMetadata(): Promise<Metadata> {
-  if (!can(await getCurrentUser(), "dev")) return {};
+  const user = await getCurrentUser();
+  if (!user) return {};
+  if (!can(user, "dev")) return notFoundMetadata();
   const { devdoc } = messagesFor(await requestLocale());
   return { title: segmentTitle(devdoc.meta.title) };
 }

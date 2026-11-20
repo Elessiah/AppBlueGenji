@@ -188,6 +188,9 @@ describe("instrumentation", () => {
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     process.env.NEXT_RUNTIME = "nodejs";
     const loaded: InstrumentationModule[] = [];
+    // `register` importe ses étapes après coup, hors du bac isolé : le registre
+    // commun ne doit pas garder les doubles d'un test précédent.
+    jest.resetModules();
     jest.isolateModules(() => {
       mockPlanningClocks();
       jest.doMock("@/lib/server/bot-log-shutdown", () => ({ installBotLogShutdownFlush: jest.fn() }));

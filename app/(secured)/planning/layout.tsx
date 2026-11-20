@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { notFoundMetadata } from "@/components/error-page/NotFoundContent";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { getCurrentUser } from "@/lib/server/auth";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -7,9 +8,15 @@ import { requestLocale } from "@/lib/server/request-locale";
 import { segmentTitle } from "@/lib/shared/page-metadata";
 import { can } from "@/lib/shared/permissions";
 
-/** Le titre de l'onglet n'est posé que pour un lecteur autorisé : la page 404 n'annonce rien. */
+/**
+ * Le titre de l'onglet n'est posé que pour un lecteur autorisé ; un compte
+ * sans la permission lit celui de la page introuvable qu'il reçoit, un
+ * visiteur sans session aucun (l'espace rend « Connexion requise »).
+ */
 export async function generateMetadata(): Promise<Metadata> {
-  if (!can(await getCurrentUser(), "planning")) return {};
+  const user = await getCurrentUser();
+  if (!user) return {};
+  if (!can(user, "planning")) return notFoundMetadata();
   const { planning } = messagesFor(await requestLocale());
   return { title: segmentTitle(planning.meta.title) };
 }

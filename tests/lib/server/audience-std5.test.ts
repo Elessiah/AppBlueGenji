@@ -8,7 +8,7 @@ jest.mock("@/lib/server/named-lock", () => ({
 }));
 jest.mock("@/lib/server/tournaments/transaction");
 
-import { mockPlanningClocks } from "../../helpers/instrumentation-clocks";
+import { mockPlanningClocks, type PlanningClockMocks } from "../../helpers/instrumentation-clocks";
 import { AUDIENCE_ROLLUP_LOCK_NAME, audienceVisitorKey, openAudienceViews, resetAudienceState, rollUpAudienceDays } from "@/lib/server/audience-service";
 import { getDatabase } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
@@ -137,10 +137,15 @@ describe("instrumentation — phase de construction", () => {
     else process.env.NEXT_PHASE = saved.phase;
   });
 
+  let clocks: PlanningClockMocks;
+
   function loadInstrumentation(startClock: () => void): InstrumentationModule {
     const loaded: InstrumentationModule[] = [];
+    // `register` importe ses étapes après coup, hors du bac isolé : le registre
+    // commun ne doit pas garder les doubles d'un test précédent.
+    jest.resetModules();
     jest.isolateModules(() => {
-      mockPlanningClocks();
+      clocks = mockPlanningClocks();
       jest.doMock("@/lib/server/bot-log-shutdown", () => ({ installBotLogShutdownFlush: jest.fn() }));
       jest.doMock("@/lib/server/audience-service", () => ({ startAudienceMaintenanceClock: startClock }));
       loaded.push(jest.requireActual<InstrumentationModule>("@/instrumentation"));
@@ -166,5 +171,43 @@ describe("instrumentation — phase de construction", () => {
     await loadInstrumentation(startClock).register();
 
     expect(startClock).toHaveBeenCalledTimes(1);
+  });
+
+  it("register_productionBuildPhase_startsNoPlanningClock", async () => {
+    process.env.NEXT_RUNTIME = "nodejs";
+    process.env.NEXT_PHASE = "phase-production-build";
+
+    await loadInstrumentation(jest.fn()).register();
+
+    expect(clocks.retention).not.toHaveBeenCalled();
+    expect(clocks.autoConfirm).not.toHaveBeenCalled();
+  });
+
+  it("register_serverRuntime_startsEveryPlanningClock", async () => {
+    process.env.NEXT_RUNTIME = "nodejs";
+    delete process.env.NEXT_PHASE;
+
+    await loadInstrumentation(jest.fn()).register();
+
+    expect(clocks.retention).toHaveBeenCalledTimes(1);
+    expect(clocks.notices).toHaveBeenCalledTimes(1);
+    expect(clocks.deadlines).toHaveBeenCalledTimes(1);
+    expect(clocks.autoConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("register_autoConfirmClockThrows_logsAndResolves", async () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    process.env.NEXT_RUNTIME = "nodejs";
+    delete process.env.NEXT_PHASE;
+    const instrumentation = loadInstrumentation(jest.fn());
+    clocks.autoConfirm.mockImplementation(() => {
+      throw new TypeError("boom");
+    });
+
+    await expect(instrumentation.register()).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith("[planning] Confirmation d'office non lancée.", "TypeError");
+    expect(clocks.deadlines).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
   });
 });

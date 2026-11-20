@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/coalescer");
+jest.mock("@/lib/server/periodic-clock");
 
 import { flushAllBotLogBatches } from "@/lib/server/bot-integration";
 import { flushAllCoalescers } from "@/lib/server/coalescer";
+import { stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
 import { flushBotLogsBeforeExit, holdExitUntil, installBotLogShutdownFlush } from "@/lib/server/bot-log-shutdown";
 import { resetBotLogShutdownState } from "@/tests/helpers/bot-log-batches";
 
@@ -23,6 +25,7 @@ beforeEach(() => {
   resetBotLogShutdownState();
   jest.mocked(flushAllBotLogBatches).mockResolvedValue();
   jest.mocked(flushAllCoalescers).mockResolvedValue();
+  jest.mocked(stopAllPeriodicClocks).mockResolvedValue();
   handlers = new Map();
   onceSpy = jest.spyOn(process, "once").mockImplementation(((event: string, listener: () => void) => {
     handlers.set(event, listener);
@@ -177,6 +180,17 @@ describe("installBotLogShutdownFlush", () => {
     installBotLogShutdownFlush();
     installBotLogShutdownFlush();
     expect(onceSpy.mock.calls.map(([event]) => event)).toEqual(["SIGTERM", "SIGINT"]);
+  });
+
+  it("installBotLogShutdownFlush_signal_stopsBackgroundClocks", async () => {
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(stopAllPeriodicClocks).toHaveBeenCalledTimes(1);
   });
 
   it("installBotLogShutdownFlush_signalWithNextListening_flushesWithoutExiting", async () => {

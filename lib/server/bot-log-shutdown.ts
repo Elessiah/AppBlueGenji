@@ -22,6 +22,7 @@
  */
 import { flushAllBotLogBatches } from "@/lib/server/bot-integration";
 import { flushAllCoalescers } from "@/lib/server/coalescer";
+import { stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
 
 export const SHUTDOWN_FLUSH_TIMEOUT_MS = 1200;
 
@@ -118,6 +119,9 @@ export function installBotLogShutdownFlush(): void {
   state.installed = true;
   for (const signal of SIGNALS) {
     process.once(signal, () => {
+      // Plus aucun balayage de fond ne démarre pendant la fermeture (la base
+      // s'en va) ; ceux en cours finissent ou sont coupés par la sortie.
+      void stopAllPeriodicClocks();
       // Un second signal rejoint le vidage en cours : ni second envoi, ni
       // second `process.exit` retenu par-dessus le premier.
       let flush = state.flush;

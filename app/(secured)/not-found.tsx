@@ -1,18 +1,11 @@
-import type { Metadata } from "next";
-import { NotFoundContent, notFoundMetadata } from "@/components/error-page/NotFoundContent";
-
-export async function generateMetadata(): Promise<Metadata> {
-  return notFoundMetadata();
-}
-
 /**
- * Page introuvable **dans l'espace sécurisé** : un `notFound()` jeté par une
- * mise en page de l'espace (`/admin/signalements`, `/devdoc`, `/planning`) est
- * rattrapé par la limite du segment parent, déjà rendue sous `SiteShell`, qui
- * porte la navigation. La page introuvable de la racine ajoutait alors son
+ * Page introuvable **dans l'espace sécurisé** : tout `notFound()` jeté sous
+ * `(secured)` — par une mise en page (`/admin/signalements`, `/devdoc`,
+ * `/planning`, la page d'un match absent) ou par une page (`/planning`, un
+ * chemin inconnu de `/devdoc`) — est rattrapé ici, sous `SiteShell`, qui
+ * porte déjà la navigation. La page introuvable de la racine ajoutait son
  * propre en-tête (deux barres de navigation à 375 px) : celle-ci n'affiche que
- * la carte et ses chemins de retour.
+ * la carte et ses chemins de retour. Une URL qui ne correspond à aucune route
+ * reste à `app/not-found.tsx`.
  */
-export default async function SecuredNotFound() {
-  return NotFoundContent();
-}
+export { NotFoundContent as default, notFoundMetadata as generateMetadata } from "@/components/error-page/NotFoundContent";

@@ -1,11 +1,21 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { notFoundMetadata } from "@/components/error-page/NotFoundContent";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { getCurrentUser } from "@/lib/server/auth";
 import { segmentTitle } from "@/lib/shared/page-metadata";
 import { can } from "@/lib/shared/permissions";
 
-export const metadata: Metadata = { title: segmentTitle("Signalements") };
+/**
+ * Le titre de l'onglet n'est posé que pour la modération ; un autre compte lit
+ * celui de la page introuvable qu'il reçoit, un visiteur sans session aucun.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const user = await getCurrentUser();
+  if (!user) return {};
+  if (!can(user, "moderation")) return notFoundMetadata();
+  return { title: segmentTitle("Signalements") };
+}
 
 /**
  * Le panneau n'existe que pour la permission `moderation` : pour tout autre

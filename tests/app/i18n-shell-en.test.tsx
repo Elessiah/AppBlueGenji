@@ -248,6 +248,7 @@ describe("pages d'erreur en anglais", () => {
     expect(html).not.toContain("<header");
     expect(html).not.toContain("<footer");
     expect(html).not.toContain("<main");
+    expect(html).not.toContain("<nav");
     await expect(securedMetadata()).resolves.toEqual({
       title: { absolute: "Page not found · BlueGenji Esport" },
       robots: { index: false, follow: false },
