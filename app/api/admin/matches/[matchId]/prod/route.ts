@@ -17,17 +17,26 @@ const STATUSES: Readonly<Record<string, number>> = {
   PROD_CHANGED: 409,
 };
 
+type MatchRouteContext = { params: Promise<{ matchId: string }> };
+
+/** Le staff des tournois (permission `tournaments`) et le match visé — ou le refus à rendre. */
+async function staffMatch(context: MatchRouteContext) {
+  const user = await getCurrentUser();
+  if (!user) return fail("UNAUTHORIZED", 401);
+  if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
+  const matchId = parseMatchIdParam((await context.params).matchId);
+  if (matchId === null) return fail("INVALID_MATCH_ID", 400);
+  return { user, matchId };
+}
+
 /**
  * Fenêtre « Prod du match » (`docs/features/MATCH_PROD.md`) : la prod actuelle
  * et les comptes qui peuvent l'être. Réservée au staff (permission `tournaments`).
  */
-export async function GET(_req: Request, context: { params: Promise<{ matchId: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
-
-  const matchId = parseMatchIdParam((await context.params).matchId);
-  if (matchId === null) return fail("INVALID_MATCH_ID", 400);
+export async function GET(_req: Request, context: MatchRouteContext) {
+  const gate = await staffMatch(context);
+  if (gate instanceof Response) return gate;
+  const { matchId } = gate;
 
   try {
     const panel = await loadProdPanel(matchId);
@@ -47,13 +56,10 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
  * `expectedUserId` : la prod que la fenêtre montrait ; changée depuis, rien ne
  * change (409 `PROD_CHANGED`).
  */
-export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
-
-  const matchId = parseMatchIdParam((await context.params).matchId);
-  if (matchId === null) return fail("INVALID_MATCH_ID", 400);
+export async function PUT(req: Request, context: MatchRouteContext) {
+  const gate = await staffMatch(context);
+  if (gate instanceof Response) return gate;
+  const { user, matchId } = gate;
 
   const read = await readJsonBodyOrFallback(req, {});
   if ("refusal" in read) return read.refusal;

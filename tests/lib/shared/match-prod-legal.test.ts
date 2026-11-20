@@ -31,6 +31,11 @@ function sheet(list: typeof PROCESSING_ACTIVITIES, ref: string) {
 
 const page = (path: string) => readSource(path).replace(/\s+/g, " ");
 
+/** Chaque fragment figure dans le texte (un échec nomme le fragment manquant). */
+function expectAllParts(text: string | undefined, parts: readonly string[]): void {
+  expect(parts.filter((part) => !text?.includes(part))).toEqual([]);
+}
+
 describe("historique des changements — prod d'un match", () => {
   it("prodEntry_lastEntry_datedWithRegisterForEveryone", () => {
     expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ENTRY_ID);
@@ -88,8 +93,10 @@ describe("historique des changements — prod d'un match", () => {
 describe("registre — T16 déclare la prod", () => {
   it("registerT16_french_declaresProdSubjectAndData", () => {
     const t16 = activity(PROCESSING_ACTIVITIES, "T16");
-    expect(t16).toContain("Prods des matchs");
-    expect(t16).toContain("Prod d'un match : son compte et son pseudo");
+    expectAllParts(t16, [
+      "Prods des matchs",
+      "Prod d'un match : son compte et son pseudo",
+    ]);
   });
 
   it("registerT16_english_declaresProd", () => {
@@ -111,14 +118,18 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
     const fr = activity(PROCESSING_ACTIVITIES, "T05");
     const en = activity(PROCESSING_ACTIVITIES_EN, "T05");
 
-    expect(fr).toContain("sans nommer la prod ni le staff — dans les journaux du serveur, l'auteur d'un geste du staff et l'identifiant des comptes visés");
-    expect(fr).toContain("Prods des matchs (jamais nommées sur Discord");
-    expect(fr).toContain("pour un geste du staff sur la prod d'un match : pseudo et identifiant de son auteur");
-    expect(fr).toContain("des casters et des prods des matchs (jamais nommés sur Discord");
-    expect(en).toContain("without naming the prod or the staff — in the server logs, the author of a staff action");
-    expect(en).toContain("Match prods (never named on Discord");
-    expect(en).toContain("for a staff action on a match's prod: username and identifier of its author");
-    expect(en).toContain("to the casters and prods of the matches (never named on Discord");
+    expectAllParts(fr, [
+      "sans nommer la prod ni le staff — dans les journaux du serveur, l'auteur d'un geste du staff et l'identifiant des comptes visés",
+      "Prods des matchs (jamais nommées sur Discord",
+      "pour un geste du staff sur la prod d'un match : pseudo et identifiant de son auteur",
+      "des casters et des prods des matchs (jamais nommés sur Discord",
+    ]);
+    expectAllParts(en, [
+      "without naming the prod or the staff — in the server logs, the author of a staff action",
+      "Match prods (never named on Discord",
+      "for a staff action on a match's prod: username and identifier of its author",
+      "to the casters and prods of the matches (never named on Discord",
+    ]);
   });
 
   it("registerT04_frAndEn_declaresProdDmAndPushNotice", () => {
@@ -169,8 +180,10 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
   it("registerT16_subPurpose_feminineWithoutBasis", () => {
     const fr = sheet(PROCESSING_ACTIVITIES, "T16").subPurposes.find((line) => line.startsWith("Organiser la production du direct"));
 
-    expect(fr).toContain("la prod, membre qui a le rôle prod, s'y place ou y est placée par le staff (une au plus par match), est montrée");
-    expect(fr).toContain("est prévenue quand un autre qu'elle la place ou l'en retire");
+    expectAllParts(fr, [
+      "la prod, membre qui a le rôle prod, s'y place ou y est placée par le staff (une au plus par match), est montrée",
+      "est prévenue quand un autre qu'elle la place ou l'en retire",
+    ]);
     expect(fr).not.toContain("un membre qui a le rôle de prod");
     expect(fr).not.toContain("base :");
   });
@@ -188,14 +201,18 @@ describe("historique et /rgpd — base, lecteurs, journaux de la prod", () => {
     const fr = frEntry().details.join(" ");
     const en = PRIVACY_CHANGES_EN[ENTRY_ID].details.join(" ");
 
-    expect(fr).toContain("Base : intérêt légitime");
-    expect(fr).toContain("y compris sans compte");
-    expect(fr).toContain("quand un autre qu'elle la place ou l'en retire");
-    expect(fr).toContain("les journaux du serveur gardent l'auteur d'un geste du staff et le compte visé");
-    expect(en).toContain("Basis: legitimate interest");
-    expect(en).toContain("including without an account");
-    expect(en).toContain("when someone other than themselves places or removes them");
-    expect(en).toContain("the server logs keep the author of a staff action and the account concerned");
+    expectAllParts(fr, [
+      "Base : intérêt légitime",
+      "y compris sans compte",
+      "quand un autre qu'elle la place ou l'en retire",
+      "les journaux du serveur gardent l'auteur d'un geste du staff et le compte visé",
+    ]);
+    expectAllParts(en, [
+      "Basis: legitimate interest",
+      "including without an account",
+      "when someone other than themselves places or removes them",
+      "the server logs keep the author of a staff action and the account concerned",
+    ]);
   });
 
   it("rgpdPages_suivre_castersShownByStreamsOnly", () => {
@@ -204,10 +221,14 @@ describe("historique et /rgpd — base, lecteurs, journaux de la prod", () => {
   });
 
   it("rgpdPages_prod_ownPlaceLoggedAndBasisWithObjection", () => {
-    expect(page("app/rgpd/page.tsx")).toContain("sa place prise ou quittée et ces gestes sont notés sans nom au journal du staff sur Discord");
-    expect(page("app/rgpd/page.tsx")).toContain("base : intérêt légitime, la prod pouvant quitter un match pas encore joué et s&apos;y opposer par le formulaire de signalement");
-    expect(page("app/rgpd/RgpdEn.tsx")).toContain("their place taken or left and these actions are noted without a name in the staff log on Discord");
-    expect(page("app/rgpd/RgpdEn.tsx")).toContain("basis: legitimate interest, the prod being able to leave a match not yet played and object through the report form");
+    expectAllParts(page("app/rgpd/page.tsx"), [
+      "sa place prise ou quittée et ces gestes sont notés sans nom au journal du staff sur Discord",
+      "base : intérêt légitime, la prod pouvant quitter un match pas encore joué et s&apos;y opposer par le formulaire de signalement",
+    ]);
+    expectAllParts(page("app/rgpd/RgpdEn.tsx"), [
+      "their place taken or left and these actions are noted without a name in the staff log on Discord",
+      "basis: legitimate interest, the prod being able to leave a match not yet played and object through the report form",
+    ]);
   });
 
   it("rgpdPages_prodNotice_settableInMyProfile", () => {
@@ -229,16 +250,24 @@ describe("historique et /rgpd — base, lecteurs, journaux de la prod", () => {
     const fr = frEntry().details.join(" ");
     const en = PRIVACY_CHANGES_EN[ENTRY_ID].details.join(" ");
 
-    expect(fr).toContain("sa place prise ou quittée et ces gestes sont notés au journal du staff sur Discord");
-    expect(fr).toContain("la prod peut quitter un match pas encore joué et s'y opposer par le formulaire de signalement (catégorie RGPD)");
-    expect(en).toContain("their place taken or left and these actions are noted in the staff log on Discord");
-    expect(en).toContain("the prod can leave a match not yet played and object to it through the report form (GDPR category)");
+    expectAllParts(fr, [
+      "sa place prise ou quittée et ces gestes sont notés au journal du staff sur Discord",
+      "la prod peut quitter un match pas encore joué et s'y opposer par le formulaire de signalement (catégorie RGPD)",
+    ]);
+    expectAllParts(en, [
+      "their place taken or left and these actions are noted in the staff log on Discord",
+      "the prod can leave a match not yet played and object to it through the report form (GDPR category)",
+    ]);
   });
 
   it("rgpdPages_prodParagraph_namesLogsAndOnlyOthersGestures", () => {
-    expect(page("app/rgpd/page.tsx")).toContain("quand un autre qu&apos;elle la place ou l&apos;en retire");
-    expect(page("app/rgpd/page.tsx")).toContain("l&apos;auteur d&apos;un geste du staff et le compte visé dans les journaux du serveur");
-    expect(page("app/rgpd/RgpdEn.tsx")).toContain("when someone other than themselves places or removes them");
-    expect(page("app/rgpd/RgpdEn.tsx")).toContain("the author of a staff action and the account concerned in the server logs");
+    expectAllParts(page("app/rgpd/page.tsx"), [
+      "quand un autre qu&apos;elle la place ou l&apos;en retire",
+      "l&apos;auteur d&apos;un geste du staff et le compte visé dans les journaux du serveur",
+    ]);
+    expectAllParts(page("app/rgpd/RgpdEn.tsx"), [
+      "when someone other than themselves places or removes them",
+      "the author of a staff action and the account concerned in the server logs",
+    ]);
   });
 });
