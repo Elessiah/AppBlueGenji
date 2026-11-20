@@ -9,6 +9,7 @@ import type { AuthUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
+import { staffActor } from "@/lib/shared/log-privacy";
 import { can } from "@/lib/shared/permissions";
 import { planningCastersFull, planningRolesOf, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
@@ -33,6 +34,7 @@ import {
   type LoadedEntry,
   type PlanningData,
 } from "./load";
+import { queuePlannedCasts, releasePlannedSeat } from "./cast-placement";
 import { entryAssignments } from "./model";
 import { announceAssignments } from "./notices";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture, undoPlanningBlock } from "./planning-undo";
@@ -332,6 +334,9 @@ async function unassignManually({ connection, actor, entry, input, current, matc
     ]);
     return [await writeEvent(connection, entry, input.userId, input.role, "REMOVED", "MANUAL", actor.id)];
   });
+  // Un caster ou une prod tenu : ce que le planning lui avait placé sur le match part avec la ligne
+  // (`cast-placement.ts`, ne lève jamais) ; le staff est nommé dans pm2.
+  if (input.role !== "REFEREE" && !current.provisional) await releasePlannedSeat(entry, input.userId, input.role, staffActor(actor));
   if (matchId === null || undo === undefined) return;
   // Le match ne porte pas (ou plus) ce membre — plus d'arbitre, ou un autre posé depuis le match :
   // rien à lui demander, la ligne du planning n'était qu'un reste (la réconciliation l'aurait retirée).
@@ -357,6 +362,11 @@ export async function setManualAssignment(actor: AuthUser, input: ManualInput, n
     // Une affectation nouvelle (ou une proposition que ce choix fixe) s'annonce ; une déjà tenue, non.
     return input.assigned && (current === undefined || current.provisional) ? entry : null;
   });
+  if (announce === null) return;
   // Après le verrou, sans faire attendre la page ; l'auteur qui se pose lui-même n'est pas prévenu.
-  if (announce !== null) void announceAssignments([{ userId: input.userId, entry: announce, role: input.role }], { actorId: actor.id });
+  void announceAssignments([{ userId: input.userId, entry: announce, role: input.role }], { actorId: actor.id });
+  // Un caster ou une prod sur un match que personne ne caste encore y est placé (`cast-placement.ts`, ne lève jamais).
+  // En file avec les placements du balayage d'office (jamais deux chaînes de transactions sur les mêmes matchs),
+  // sans la faire attendre à la réponse : le plateau se rafraîchit une fois le placement joué.
+  void queuePlannedCasts([{ userId: input.userId, entry: announce, role: input.role }], staffActor(actor));
 }

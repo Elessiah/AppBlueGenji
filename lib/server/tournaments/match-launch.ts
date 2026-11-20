@@ -304,7 +304,7 @@ async function loadProdAccounts(
 }
 
 /** Pourquoi la prod quitte sa place : un avis de {@link ProdNoticeKind}, ou son compte effacé (`DELETED`, sans avis). */
-type ProdUnfitness = Exclude<ProdNoticeKind, "ASSIGNED" | "RELEASED"> | "DELETED";
+type ProdUnfitness = Exclude<ProdNoticeKind, "ASSIGNED" | "PLANNED" | "RELEASED"> | "DELETED";
 
 /**
  * Pourquoi la prod du match n'en est plus une : compte effacé (`DELETED`),
@@ -363,7 +363,7 @@ export async function releaseUnfitProd(
     (known.players ?? (await playingUserIds(connection, row, [prodId], currentRead))).has(prodId),
   );
   if (reason === null) return false;
-  await connection.execute(`UPDATE bg_matches SET prod_user_id = NULL WHERE id = ? AND prod_user_id = ?`, [row.id, prodId]);
+  await connection.execute(`UPDATE bg_matches SET prod_user_id = NULL, prod_planned = 0 WHERE id = ? AND prod_user_id = ?`, [row.id, prodId]);
   row.prod_user_id = null;
   queueProdChange(connection, {
     matchId: Number(row.id),
@@ -848,7 +848,7 @@ export async function resolveTeamParty(
  * d'une des deux équipes) — `resolveTeamParty` pour plusieurs comptes, en deux
  * lectures quel que soit leur nombre.
  */
-async function playingUserIds(
+export async function playingUserIds(
   connection: PoolConnection,
   match: { team1_id: number | null; team2_id: number | null },
   userIds: readonly number[],
@@ -1339,6 +1339,11 @@ export async function claimMatchCast(
       if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
       if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
       if (row.casters.some((caster) => caster.userId === userId)) {
+        // S'inscrire soi-même sur la place que le planning a posée la fait sienne : quitter le planning ne l'en retire plus.
+        await connection.execute("UPDATE bg_match_casters SET planned = 0 WHERE match_id = ? AND user_id = ? AND planned = 1", [
+          matchId,
+          userId,
+        ]);
         return {
           tournamentId: Number(row.tournament_id),
           claimed: false,
@@ -1560,21 +1565,7 @@ export async function releaseMatchCast(
       // restent (l'inscription et l'anonymisation refusent de même de le réécrire).
       if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
 
-      await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, casterId]);
-      row.casters = row.casters.filter((caster) => caster.userId !== casterId);
-      await pruneMatchStreams(connection, matchId, { casters: row.casters });
-      // L'inscription marque le match casté (`CAST_SETTINGS.md`) : le dernier
-      // caster parti sans qu'aucun stream reste (ni celui du staff avec son
-      // lien), le match n'est plus casté — sans quoi il passerait « En direct »
-      // à son lancement sans que personne ne diffuse.
-      const unmarked = await unmarkIfUncast(connection, row);
-      // Le caster qui avait posé le mode s'en va, le mode reste (d'autres
-      // streams tiennent) : il n'a plus de propriétaire et reste sans maître
-      // (`lib/shared/live-trigger-owner.ts`).
-      if (!unmarked && Number(row.live_trigger_user_id ?? 0) === casterId) {
-        await connection.execute(`UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?`, [matchId]);
-      }
-      if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
+      await dropCasterSignup(connection, row, casterId);
       return { tournamentId: Number(row.tournament_id), releasedCasterId: casterId, pairing: castPairingOf(row) };
     }),
   );
@@ -1590,6 +1581,70 @@ export async function releaseMatchCast(
       pairing,
     });
   }
+}
+
+/**
+ * Le retrait d'une inscription, sous le verrou du match (`lockLaunchMatch`) :
+ * l'inscription, les streams que plus personne ne tient, la marque « casté »
+ * du dernier caster parti, le mode d'antenne resté sans maître, et le départ
+ * d'un match qui n'attendait plus que lui. Commun à {@link releaseMatchCast}
+ * et à {@link releasePlannedMatchCast}. `plannedOnly` : seule une inscription
+ * posée par le planning (`planned`) part ; rend faux si rien n'a été retiré.
+ */
+async function dropCasterSignup(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  casterId: number,
+  plannedOnly = false,
+): Promise<boolean> {
+  const matchId = Number(row.id);
+  const [deleted] = await connection.execute<ResultSetHeader>(
+    `DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?${plannedOnly ? " AND planned = 1" : ""}`,
+    [matchId, casterId],
+  );
+  if (deleted.affectedRows === 0) return false;
+  row.casters = row.casters.filter((caster) => caster.userId !== casterId);
+  await pruneMatchStreams(connection, matchId, { casters: row.casters });
+  // L'inscription marque le match casté (`CAST_SETTINGS.md`) : le dernier
+  // caster parti sans qu'aucun stream reste (ni celui du staff avec son
+  // lien), le match n'est plus casté — sans quoi il passerait « En direct »
+  // à son lancement sans que personne ne diffuse.
+  const unmarked = await unmarkIfUncast(connection, row);
+  // Le caster qui avait posé le mode s'en va, le mode reste (d'autres
+  // streams tiennent) : il n'a plus de propriétaire et reste sans maître
+  // (`lib/shared/live-trigger-owner.ts`).
+  if (!unmarked && Number(row.live_trigger_user_id ?? 0) === casterId) {
+    await connection.execute(`UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?`, [matchId]);
+  }
+  if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
+  return true;
+}
+
+/**
+ * Retire l'inscription que le planning a posée (`bg_match_casters.planned`,
+ * `lib/server/planning/cast-placement.ts`) au caster qui quitte son
+ * attribution au planning (désistement, retrait à la main par le staff)
+ * : ce que le planning a placé, le planning le retire. Une inscription
+ * faite par le caster lui-même reste (il s'en retire depuis le match), comme
+ * celle d'un match joué. Une ligne anonyme au journal du staff (`UNPLANNED`) ;
+ * le caster que le staff retire (`byStaff`) est prévenu comme d'un retrait par
+ * le staff (motif `STAFF`).
+ *
+ * @returns vrai si l'inscription a été retirée.
+ */
+export async function releasePlannedMatchCast(matchId: number, casterId: number, byStaff: boolean): Promise<boolean> {
+  const result = await retryOnDeadlock(() =>
+    inTransaction(async (connection) => {
+      const row = await lockLaunchMatch(connection, matchId);
+      if (!row?.casters.some((caster) => caster.userId === casterId) || row.status === "COMPLETED") return null;
+      if (!(await dropCasterSignup(connection, row, casterId, true))) return null;
+      return { tournamentId: Number(row.tournament_id), pairing: castPairingOf(row) };
+    }),
+  );
+  if (result === null) return false;
+  publishMatchUpdatedEvent(result.tournamentId, { landingLive: true });
+  announceCastChange({ kind: "UNPLANNED", matchId, casterId, byStaff, pairing: result.pairing });
+  return true;
 }
 
 /**

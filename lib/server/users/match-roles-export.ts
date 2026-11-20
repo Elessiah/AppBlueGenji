@@ -66,7 +66,8 @@ async function tolerantRows<T extends RowDataPacket>(
  * T16) et ses arbitrages désignés (`bg_matches.referee_user_id`, avec son
  * « Prêt », registre T04) et les modes d'antenne qu'il a posés
  * (`bg_matches.live_trigger_user_id`, registre T16) et ses places de prod
- * (`bg_matches.prod_user_id`) — ce que le site garde avec
+ * (`bg_matches.prod_user_id`), chacune avec sa marque « posée par le
+ * planning » (`planned`, registre T16) — ce que le site garde avec
  * le match. Cinq lectures indépendantes, chacune par l'index du compte,
  * lancées ensemble (le pool les sert en parallèle).
  */
@@ -81,6 +82,7 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
       ready_at: Date | null;
       created_at: Date | null;
       cast_battletag: string | null;
+      planned: number | null;
     }
   >(
     db,
@@ -93,6 +95,7 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
       { expr: "c.ready_at", alias: "ready_at" },
       { expr: "c.created_at", alias: "created_at" },
       { expr: "c.cast_battletag", alias: "cast_battletag" },
+      { expr: "c.planned", alias: "planned" },
     ],
     userId,
   ),
@@ -120,10 +123,10 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
     [{ expr: "live_trigger", alias: "live_trigger" }],
     userId,
   ),
-    tolerantRows<RowDataPacket & { id: number; tournament_id: number }>(
+    tolerantRows<RowDataPacket & { id: number; tournament_id: number; prod_planned: number | null }>(
     db,
-    () => `SELECT id, tournament_id FROM bg_matches WHERE prod_user_id = ? ORDER BY id`,
-    [],
+    (columns) => `SELECT id, tournament_id, ${columns} FROM bg_matches WHERE prod_user_id = ? ORDER BY id`,
+    [{ expr: "prod_planned", alias: "prod_planned" }],
     userId,
   ),
   ]);
@@ -135,6 +138,7 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
       readyAt: toIso(row.ready_at),
       createdAt: toIso(row.created_at),
       castBattletag: row.cast_battletag ?? null,
+      planned: Number(row.planned ?? 0) === 1,
     })),
     providedStreamLinks: links.map((row) => ({
       matchId: Number(row.match_id),
@@ -152,6 +156,10 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
       tournamentId: Number(row.tournament_id),
       liveTrigger: row.live_trigger ?? null,
     })),
-    prodAssignments: prods.map((row) => ({ matchId: Number(row.id), tournamentId: Number(row.tournament_id) })),
+    prodAssignments: prods.map((row) => ({
+      matchId: Number(row.id),
+      tournamentId: Number(row.tournament_id),
+      planned: Number(row.prod_planned ?? 0) === 1,
+    })),
   };
 }

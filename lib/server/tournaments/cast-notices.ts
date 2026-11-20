@@ -48,6 +48,13 @@ export interface CastPairing {
 export type CastChange = (
   /** Inscription posée par `casterId` ; `replacedCasterId` : le titulaire inéligible dont la place est reprise. */
   | { kind: "CLAIMED"; matchId: number; casterId: number; replacedCasterId: number | null }
+  /** Inscription posée par le planning sur un match que personne ne castait (`lib/server/planning/cast-placement.ts`). */
+  | { kind: "PLANNED"; matchId: number; casterId: number }
+  /**
+   * Inscription posée par le planning, retirée avec l'attribution que son caster quitte
+   * (`releasePlannedMatchCast`) : par lui-même (`byStaff: false`), ou par le staff.
+   */
+  | { kind: "UNPLANNED"; matchId: number; casterId: number; byStaff: boolean }
   /** Inscription retirée par son caster (`byStaff: false`) ou par le staff. */
   | { kind: "RELEASED"; matchId: number; casterId: number; byStaff: boolean }
   /**
@@ -85,6 +92,10 @@ export function castLogChange(change: CastChange): CastLogChange {
   switch (change.kind) {
     case "CLAIMED":
       return change.replacedCasterId === null ? "CLAIMED" : "REPLACED";
+    case "PLANNED":
+      return "PLANNED";
+    case "UNPLANNED":
+      return "UNPLANNED";
     case "RELEASED":
       return change.byStaff ? "RELEASED_BY_STAFF" : "RELEASED";
     case "AUTO_RELEASED":
@@ -102,7 +113,7 @@ export function castLogChange(change: CastChange): CastLogChange {
  * et pour un match supprimé, qui n'a plus de créneau.
  */
 export function castLogCategory(change: CastChange): BotLogCategory {
-  return change.kind === "CLAIMED" || change.kind === "MATCH_DELETED" ? "casts" : "staff-removal";
+  return change.kind === "CLAIMED" || change.kind === "PLANNED" || change.kind === "MATCH_DELETED" ? "casts" : "staff-removal";
 }
 
 /** Le caster à prévenir et son motif ; `null` quand personne n'a à l'être (il s'est retiré lui-même, ou rien n'est retiré). */
@@ -112,6 +123,12 @@ export function castReleaseNotice(
   switch (change.kind) {
     case "CLAIMED":
       return change.replacedCasterId === null ? null : { casterId: change.replacedCasterId, reason: "REPLACED" };
+    case "PLANNED":
+      // Le caster l'apprend par l'avis d'affectation du planning : aucun retrait à lui dire.
+      return null;
+    case "UNPLANNED":
+      // Son propre désistement : il sait ; le staff qui le retire du planning le retire du match, il en est prévenu.
+      return change.byStaff ? { casterId: change.casterId, reason: "STAFF" } : null;
     case "RELEASED":
       return change.byStaff ? { casterId: change.casterId, reason: "STAFF" } : null;
     case "AUTO_RELEASED":

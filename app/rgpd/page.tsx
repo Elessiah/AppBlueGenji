@@ -1461,7 +1461,7 @@ function RgpdFr({
             <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
             ou d&apos;un ou plusieurs casters : chaque caster rejoint un stream du match ou ouvre le sien,
-            avec le lien de sa chaîne (obligatoire pour l&apos;ouvrir), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
+            avec le lien de sa chaîne (obligatoire pour l&apos;ouvrir lui-même), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
             plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du
             match, par un membre de l&apos;organisation, reste au match quand ses casters s&apos;en vont. Le lien qu&apos;un caster a fourni en ouvrant
             son stream ou dans « Configurer ma diffusion » part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
@@ -1487,10 +1487,10 @@ function RgpdFr({
             ou que le staff l&apos;en retire, sans qu&apos;aucun stream reste). L&apos;arbitre désigné d&apos;un match peut aussi, pour ce
             seul match, modifier ou retirer le lien d&apos;un caster et configurer la diffusion de l&apos;organisation.{" "}
             Un match peut aussi avoir une <strong>prod</strong>, qui assure la production de son direct :
-            un membre qui a ce rôle s&apos;y place ou y est placé par le staff ; son pseudo est montré avec le
+            un membre qui a ce rôle s&apos;y place ou y est placé par le staff ou le planning ; son pseudo est montré avec le
             match comme celui des casters (avant le lancement, tant qu&apos;il remplit les conditions), gardé avec le match et
             retiré des matchs pas encore lancés si son compte perd ce rôle, est suspendu ou joue désormais le match,
-            et des matchs pas encore joués s&apos;il est supprimé ; la prod est prévenue (réglable dans « Mon profil ») quand un autre qu&apos;elle la place ou l&apos;en retire, par le staff ou d&apos;office ; sa place prise ou quittée et ces gestes sont
+            et des matchs pas encore joués s&apos;il est supprimé ; la prod est prévenue (réglable dans « Mon profil ») quand un autre qu&apos;elle la place ou l&apos;en retire, par le staff, le planning ou d&apos;office ; sa place prise ou quittée et ces gestes sont
             notés sans nom au journal du staff sur Discord, l&apos;auteur d&apos;un geste du staff et le compte visé dans les journaux du serveur ; base : intérêt légitime, la prod
             pouvant quitter un match pas encore joué et s&apos;y opposer par le formulaire de signalement (<Link href="/rgpd/registre#t16">registre, T16</Link>).{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
@@ -1505,7 +1505,7 @@ function RgpdFr({
             l&apos;<strong>exécution du service</strong>, et non plus de l&apos;intérêt légitime : il n&apos;y a
             plus d&apos;opposition par « nom neutre ». Ce qui touche les casters (voix, pseudo, lien de leur
             chaîne, mode d&apos;antenne) et les liens de diffusion et de rediffusion publiés sur le site relève
-            de la même base, que la même section des conditions prévoit.
+            de la même base, que la même section des conditions prévoit (le caster que le planning place : intérêt légitime, comme la prod).
             Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
@@ -1560,7 +1560,12 @@ function RgpdFr({
             sur le match lui-même, comme un geste du staff : le journal du staff sur Discord note chaque
             changement d&apos;arbitre du match sans nommer personne et l&apos;arbitre
             retiré par un autre que lui en est prévenu par notification, rien de cela quand un invité (marque décrite plus bas) quitte le planning (<Link href="/rgpd/registre#t04">registre, T04</Link> et{" "}
-            <Link href="/rgpd/registre#t05">T05</Link>). Les arbitres, casters et prods sont prévenus en
+            <Link href="/rgpd/registre#t05">T05</Link>). De même, quand personne ne tient encore le cast d&apos;un match (caster ou prod) en dehors du planning, les
+            casters et la prod qu&apos;une attribution confirmée ou posée à la main y désigne y sont placés,
+            s&apos;ils remplissent les conditions du cast ou de la prod et ne jouent pas le match : leur pseudo
+            paraît alors avec le match comme une inscription de cast ou une prod placée (<Link href="/rgpd/registre#t16">registre, T16</Link>), un caster placé sur une diffusion encore sans lien est invité à donner celui de sa chaîne,
+            et quitter l&apos;attribution (désistement, retrait à la main par le staff) les en retire, sauf sur un
+            match joué ; une inscription faite par le caster lui-même, ou une prod prise par la personne ou posée par le staff depuis le match, reste ; ces gestes sont notés sans nom au journal du staff sur Discord, l&apos;auteur d&apos;un geste du staff et les comptes visés dans les journaux du serveur. Les arbitres, casters et prods sont prévenus en
             message privé Discord et en notification push des nouveaux créneaux où ils peuvent tenir un rôle
             (un récapitulatif par vague), de leurs affectations confirmées ou posées à la main, et du
             désistement d&apos;une attribution confirmée sur un créneau où leur propre attribution est
@@ -1571,7 +1576,7 @@ function RgpdFr({
             attribution jusqu&apos;au début du créneau, avec un motif facultatif lu par le seul staff des
             tournois ; le site garde le désistement (rôle, date, motif, s&apos;il est tardif — moins de 24 h
             avant) avec l&apos;historique, et cherche automatiquement un remplaçant (un créneau compte au plus deux
-            casters : quand l&apos;un d&apos;eux part et que l&apos;autre reste, la place n&apos;est pas forcément à pourvoir). Chaque créneau du planning se confirme d&apos;office à l&apos;approche de son début (délai réglé par un administrateur, 24 h au moins), ou plus tôt à la date butoir de planification de son match ; ses affectés en sont prévenus comme d&apos;une confirmation par un administrateur, et le site note, sans personne, quels créneaux ont été confirmés d&apos;office. Le staff qui attribue les rôles peut marquer un caster ou un prod comme « invité » : il garde ses autres droits mais sort du planning, rôle d&apos;arbitre compris s&apos;il le tient aussi (le planning ne le propose, ne le désigne ni ne le prévient plus, et il n&apos;en lit plus la page) ; la marque quitte les attributions à venir que lui donnait le planning comme un désistement, sans avis à l&apos;invité, noté dans l&apos;historique du planning, que voit le staff des tournois, comme une sortie par le staff (l&apos;historique garde le compte de son auteur, sans le montrer), et efface ses disponibilités à venir, le passé restant ; elle reste sur le compte tant que le staff la laisse et que le compte est caster ou prod, s&apos;affiche sur « Mon profil », figure dans l&apos;export de vos données et part avec la suppression du compte ; chaque geste sur la marque est noté sans nom au journal du staff sur Discord, son auteur dans les journaux du serveur. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
+            casters : quand l&apos;un d&apos;eux part et que l&apos;autre reste, la place n&apos;est pas forcément à pourvoir). Chaque créneau du planning se confirme d&apos;office à l&apos;approche de son début (délai réglé par un administrateur, 24 h au moins), ou plus tôt à la date butoir de planification de son match ; ses affectés en sont prévenus comme d&apos;une confirmation par un administrateur, et le site note, sans personne, quels créneaux ont été confirmés d&apos;office. Le staff qui attribue les rôles peut marquer un caster ou un prod comme « invité » : il garde ses autres droits mais sort du planning, rôle d&apos;arbitre compris s&apos;il le tient aussi (le planning ne le propose, ne le désigne ni ne le prévient plus, et il n&apos;en lit plus la page) ; la marque quitte les attributions à venir que lui donnait le planning comme un désistement (sa place déjà posée sur un match restant), sans avis à l&apos;invité, noté dans l&apos;historique du planning, que voit le staff des tournois, comme une sortie par le staff (l&apos;historique garde le compte de son auteur, sans le montrer), et efface ses disponibilités à venir, le passé restant ; elle reste sur le compte tant que le staff la laisse et que le compte est caster ou prod, s&apos;affiche sur « Mon profil », figure dans l&apos;export de vos données et part avec la suppression du compte ; chaque geste sur la marque est noté sans nom au journal du staff sur Discord, son auteur dans les journaux du serveur. Tout est effacé <strong>{PLANNING_RETENTION_DAYS} jours après le début du
             créneau</strong> (purge quotidienne), le réglage « caster autonome » quand le compte ne tient plus
             le rôle caster ; la suppression du compte emporte tout ce qui le concerne (les gestes faits comme
             staff restent, sans le désigner), l&apos;export de vos données le contient, gestes faits comme staff

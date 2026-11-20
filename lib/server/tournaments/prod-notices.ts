@@ -39,12 +39,13 @@ export type ProdChange = {
 
 /** Catégorie de la ligne : `casts` quand le match gagne ou change de prod, `staff-removal` (alerte) quand il la perd. */
 export function prodLogCategory(change: ProdLogChange): BotLogCategory {
-  return change === "CLAIMED" || change === "ASSIGNED" || change === "REPLACED" ? "casts" : "staff-removal";
+  return change === "CLAIMED" || change === "ASSIGNED" || change === "PLANNED" || change === "REPLACED" ? "casts" : "staff-removal";
 }
 
 const DM_TEXT: Readonly<Record<Locale, Readonly<Record<ProdNoticeKind, string>>>> = {
   fr: {
     ASSIGNED: "Le staff te place comme prod",
+    PLANNED: "Le planning te place comme prod",
     RELEASED: "Le staff te retire la prod",
     INELIGIBLE: "Tu n'as plus le rôle prod : tu ne fais plus la prod",
     UNAVAILABLE: "Ton compte ne peut plus faire la prod pour le moment : tu ne fais plus la prod",
@@ -52,6 +53,7 @@ const DM_TEXT: Readonly<Record<Locale, Readonly<Record<ProdNoticeKind, string>>>
   },
   en: {
     ASSIGNED: "The staff made you the prod",
+    PLANNED: "The planning made you the prod",
     RELEASED: "The staff removed you as the prod",
     INELIGIBLE: "You no longer hold the prod role: you are no longer the prod",
     UNAVAILABLE: "Your account cannot be a prod for now: you are no longer the prod",

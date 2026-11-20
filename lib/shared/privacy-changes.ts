@@ -2354,6 +2354,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Qui le voit : comme pour les casters, les lecteurs du tournoi et du match, y compris sans compte. La prod est prévenue (message privé Discord, qui se coupe avec ses autres messages privés de match, et notification push, qui se coupe par son sujet, depuis « Mon profil ») quand un autre qu'elle la place ou l'en retire, par le staff ou d'office ; sa place prise ou quittée et ces gestes sont notés au journal du staff sur Discord sans nommer personne, et les journaux du serveur gardent l'auteur d'un geste du staff et le compte visé, selon leur rotation.",
     ],
   },
+  {
+    // PLANNING-AUTO-CAST — le planning place casters et prod sur un match sans cast
+    // (`docs/features/CAST_PLANNING.md` § Placement sur le match) : registre T16 et
+    // T20, /rgpd (FR et EN). Datée comme `REGISTER_UPDATED_AT` — tout avancer
+    // ensemble si la mise en ligne glisse.
+    id: "2026-11-planning-place-le-cast",
+    publishedAt: "2026-11-23",
+    title: "Planning : casters et prod placés sur leur match",
+    links: [
+      { href: "/rgpd/registre#t20", label: "Lire la fiche T20 du registre" },
+      { href: "/rgpd/registre#t16", label: "Lire la fiche T16 du registre" },
+    ],
+    summary: "Quand personne ne tient encore le cast d'un match (caster ou prod) en dehors du planning, les casters et la prod que le planning y tient (attribution confirmée ou posée à la main) y sont placés : leur pseudo est alors montré avec le match, comme une inscription de cast ou une prod placée.",
+    details: [
+      "Ce qui change : le site pose l'inscription de cast ou la place de prod lui-même, sur une attribution confirmée ou posée à la main, si la personne remplit les conditions du cast ou de la prod et ne joue pas le match ; il garde que l'inscription ou la place vient du planning, pour la retirer quand la personne quitte son attribution (désistement, retrait à la main par le staff), sauf sur un match joué. Une inscription faite par le caster lui-même, ou une prod prise par la personne ou posée par le staff depuis le match, n'est jamais touchée.",
+      "Qui le voit et qui est prévenu : comme toute inscription de cast ou prod, les lecteurs du tournoi et du match, y compris sans compte. La prod reçoit l'avis d'une prod placée ; un caster placé sur une diffusion encore sans lien est invité à donner celui de sa chaîne ; la personne que le staff retire en est prévenue. Ces gestes sont notés au journal du staff sur Discord sans nommer personne, l'auteur d'un geste du staff et les comptes visés dans les journaux du serveur. Base : l'intérêt légitime de l'association, comme pour le planning, avec droit d'opposition.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

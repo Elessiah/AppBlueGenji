@@ -6,6 +6,7 @@ jest.mock("@/lib/server/named-lock", () => {
   return { ...actual, withNamedLock: jest.fn() };
 });
 jest.mock("@/lib/server/planning/auto-assign", () => ({ runAutoAssign: jest.fn(), confirmAssignments: jest.fn() }));
+jest.mock("@/lib/server/planning/cast-placement", () => ({ drainPlannedCasts: jest.fn() }));
 jest.mock("@/lib/server/planning/load", () => ({ loadDurationSettings: jest.fn(), loadPlanningEntries: jest.fn() }));
 
 import { getDatabase } from "@/lib/server/database";
@@ -31,6 +32,7 @@ import {
   type AutoConfirmMarks,
 } from "@/lib/server/planning/auto-confirm";
 import { confirmAssignments, runAutoAssign } from "@/lib/server/planning/auto-assign";
+import { drainPlannedCasts } from "@/lib/server/planning/cast-placement";
 import { loadDurationSettings, loadPlanningEntries } from "@/lib/server/planning/load";
 import { DEFAULT_PLANNING_DURATIONS } from "@/lib/shared/planning-durations";
 import { HOUR_MS, MONDAY, loadedAssignment, loadedEntry } from "../../../helpers/planning";
@@ -182,6 +184,27 @@ describe("groupByWeek", () => {
 
 describe("sweepAutoConfirms", () => {
   const NOW = WEDNESDAY_21 - 24 * HOUR_MS;
+
+  it("sweepAutoConfirms_confirmed_waitsForQueuedCastPlacementsBeforeReturning", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry({ key: "m:1", matchId: 1, tournamentId: 10, startAt: WEDNESDAY_21 })]);
+    let drained = false;
+    jest.mocked(drainPlannedCasts).mockImplementation(async () => {
+      await new Promise((resolve) => setImmediate(resolve));
+      drained = true;
+    });
+
+    await sweepAutoConfirms(NOW);
+
+    expect(drained).toBe(true);
+  });
+
+  it("sweepAutoConfirms_nothingDue_noWaitForPlacements", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([]);
+
+    await sweepAutoConfirms(NOW);
+
+    expect(drainPlannedCasts).not.toHaveBeenCalled();
+  });
 
   it("sweepAutoConfirms_dueEntry_reassignsWeekThenConfirmsOnlyDueKeysThenMarks", async () => {
     const due = loadedEntry({ key: "m:1", matchId: 1, startAt: WEDNESDAY_21 });

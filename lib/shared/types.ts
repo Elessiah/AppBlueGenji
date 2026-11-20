@@ -1328,6 +1328,8 @@ export type PersonalDataExport = {
     createdAt: string | null;
     /** BattleTag donné pour ce cast (`bg_match_casters.cast_battletag`), `null` = celui du compte. */
     castBattletag: string | null;
+    /** Inscription posée par le planning (`bg_match_casters.planned`, T16). */
+    planned: boolean;
   }[];
   /**
    * Liens de chaîne qu'il a fournis sur un match (`bg_match_streams.link_user_id`,
@@ -1339,7 +1341,8 @@ export type PersonalDataExport = {
   /** Matchs dont il a posé le mode d'antenne (`bg_matches.live_trigger_user_id`, T16). */
   liveTriggers: { matchId: number; tournamentId: number; liveTrigger: string | null }[];
   /** Matchs dont il est la prod (`bg_matches.prod_user_id`, `MATCH_PROD.md`). */
-  prodAssignments: { matchId: number; tournamentId: number }[];
+  /** `planned` : place posée par le planning (`bg_matches.prod_planned`, T16). */
+  prodAssignments: { matchId: number; tournamentId: number; planned: boolean }[];
   /**
    * Planning des casts et arbitres (`docs/features/CAST_PLANNING.md`) : ses
    * disponibilités et préférences, les attributions qui le nomment, ses gestes

@@ -70,13 +70,13 @@ describe("listOwnMatchRoles", () => {
 
     expect(await listOwnMatchRoles(12)).toEqual({
       // Le BattleTag de cast est une donnée gardée : l'export la rend (art. 15).
-      casts: [{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: "2026-10-20T18:00:00.000Z", createdAt: "2026-10-20T17:00:00.000Z", castBattletag: "Voix#2100" }],
+      casts: [{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: "2026-10-20T18:00:00.000Z", createdAt: "2026-10-20T17:00:00.000Z", castBattletag: "Voix#2100", planned: false }],
       providedStreamLinks: [{ matchId: 5, tournamentId: 2, liveUrl: "https://twitch.tv/voix", createdAt: "2026-10-20T17:00:00.000Z" }],
       refereeAssignments: [{ matchId: 6, tournamentId: 2, readyAt: null }],
       // Le compte qui a posé le mode d'antenne est une donnée gardée (CAST-FOLLOWUP).
       liveTriggers: [{ matchId: 7, tournamentId: 2, liveTrigger: "MANUAL" }],
       // La place de prod tenue sur un match (MATCH_PROD.md).
-      prodAssignments: [{ matchId: 8, tournamentId: 2 }],
+      prodAssignments: [{ matchId: 8, tournamentId: 2, planned: false }],
     });
   });
 
@@ -191,7 +191,7 @@ describe("listOwnMatchRoles", () => {
     const roles = await listOwnMatchRoles(12);
 
     expect(roles.casts).toEqual([
-      { matchId: 5, tournamentId: 2, streamId: 3, readyAt: null, createdAt: "2026-10-20T17:00:00.000Z", castBattletag: "Voix#2100" },
+      { matchId: 5, tournamentId: 2, streamId: 3, readyAt: null, createdAt: "2026-10-20T17:00:00.000Z", castBattletag: "Voix#2100", planned: false },
     ]);
     const retried = callsOn(execute, "FROM bg_match_casters")[1];
     expect(retried).toContain("NULL AS ready_at");
@@ -218,7 +218,33 @@ describe("listOwnMatchRoles", () => {
 
     await listOwnMatchRoles(12);
 
-    expect(callsOn(execute, "FROM bg_match_casters")[1]).toContain("NULL AS cast_battletag");
+    expect(callsOn(execute, "FROM bg_match_casters")[1]).toContain("NULL AS planned");
+  });
+
+  // T16 : la marque « posée par le planning » est une donnée gardée, rendue à l'export (art. 15).
+  it("listOwnMatchRoles_plannedCastAndProd_exportsPlannedTrue", async () => {
+    const execute = bySql({
+      casts: [[{ match_id: 5, tournament_id: 2, stream_id: 3, ready_at: null, created_at: null, cast_battletag: null, planned: 1 }]],
+      prod: [[{ id: 8, tournament_id: 2, prod_planned: 1 }]],
+    });
+    await mockDb(execute);
+
+    const roles = await listOwnMatchRoles(12);
+
+    expect(roles.casts).toEqual([{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: null, createdAt: null, castBattletag: null, planned: true }]);
+    expect(roles.prodAssignments).toEqual([{ matchId: 8, tournamentId: 2, planned: true }]);
+  });
+
+  it("listOwnMatchRoles_prodPlannedColumnMissing_keepsProdWithPlannedFalse", async () => {
+    const execute = bySql({
+      prod: [Object.assign(new Error("Unknown column 'prod_planned' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" }), [{ id: 8, tournament_id: 2, prod_planned: null }]],
+    });
+    await mockDb(execute);
+
+    const roles = await listOwnMatchRoles(12);
+
+    expect(roles.prodAssignments).toEqual([{ matchId: 8, tournamentId: 2, planned: false }]);
+    expect(callsOn(execute, "prod_user_id = ?")[1]).toContain("NULL AS prod_planned");
   });
 
   it("listOwnMatchRoles_prodColumnMissing_returnsEmptyProdOnly", async () => {

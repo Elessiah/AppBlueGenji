@@ -7,7 +7,7 @@ jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://bl
 
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { loadNotificationRecipients, loadStaffIds, notifyUsers } from "@/lib/server/notify";
-import { announceAssignments, announceSoloCasterChange, announceWithdrawal, noticeEntry } from "@/lib/server/planning/notices";
+import { announceAssignments, announceCastLinkNeeded, announceSoloCasterChange, announceWithdrawal, noticeEntry } from "@/lib/server/planning/notices";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { loadedEntry } from "../../../helpers/planning";
 
@@ -94,6 +94,127 @@ describe("announceAssignments", () => {
 
     await expect(announceAssignments([{ userId: 4, entry: loadedEntry(), role: "CASTER" }])).resolves.toBeUndefined();
     error.mockRestore();
+  });
+});
+
+describe("announceAssignments — envois concurrents", () => {
+  it("announceAssignments_twoGestures_secondSentWhileFirstPending", async () => {
+    let releaseFirst: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    jest.mocked(notifyUsers).mockImplementationOnce(async () => {
+      await gate;
+      return { discord: null, discordUnreachedUserIds: [], pushed: 0 };
+    });
+
+    const first = announceAssignments([{ userId: 4, entry: loadedEntry(), role: "CASTER" }]);
+    await announceAssignments([{ userId: 5, entry: loadedEntry(), role: "CASTER" }]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+    releaseFirst();
+    await first;
+  });
+});
+
+describe("announceCastLinkNeeded", () => {
+  it("announceCastLinkNeeded_placedCasters_notifiedOnAssignedTopicWithMatchLink", async () => {
+    await announceCastLinkNeeded([4, 5].map((userId) => ({ userId, entry: loadedEntry() })));
+
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4, 5], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
+    const notification = jest.mocked(notifyUsers).mock.calls[0][1];
+    expect(notification).toMatchObject({ topic: "PLANNING_ASSIGNED", dmFollowsTopic: true });
+    expect(notification.discord?.context).toBe("planning-cast-link");
+    expect(notification.push?.("fr").tag).toBe("planning-cast-link-1");
+    expect(notification.discord?.message("fr")).toContain("https://bluegenji.test/tournois/10");
+  });
+
+  it("announceCastLinkNeeded_launchedAfterAssignments_sentAfterThem", async () => {
+    let releaseFirst: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    jest.mocked(notifyUsers).mockImplementationOnce(async () => {
+      await gate;
+      return { discord: null, discordUnreachedUserIds: [], pushed: 0 };
+    });
+
+    const assigned = announceAssignments([{ userId: 4, entry: loadedEntry(), role: "CASTER" }]);
+    const link = announceCastLinkNeeded([{ userId: 4, entry: loadedEntry() }]);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(jest.mocked(notifyUsers)).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await Promise.all([assigned, link]);
+
+    expect(jest.mocked(notifyUsers).mock.calls.map(([, notification]) => notification.discord?.context)).toEqual([
+      "planning-assigned",
+      "planning-cast-link",
+    ]);
+  });
+
+  it("announceCastLinkNeeded_otherUsersAssignmentPending_sentWithoutWaiting", async () => {
+    let releaseFirst: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    jest.mocked(notifyUsers).mockImplementationOnce(async () => {
+      await gate;
+      return { discord: null, discordUnreachedUserIds: [], pushed: 0 };
+    });
+
+    const assigned = announceAssignments([{ userId: 5, entry: loadedEntry(), role: "CASTER" }]);
+    await announceCastLinkNeeded([{ userId: 4, entry: loadedEntry() }]);
+
+    expect(jest.mocked(notifyUsers).mock.calls.map(([, notification]) => notification.discord?.context)).toEqual([
+      "planning-assigned",
+      "planning-cast-link",
+    ]);
+    releaseFirst();
+    await assigned;
+  });
+
+  it("announceCastLinkNeeded_sameCasterOnTwoMatches_oneNoticeListingBoth", async () => {
+    await announceCastLinkNeeded([
+      { userId: 4, entry: loadedEntry({ key: "m:1", matchId: 1 }) },
+      { userId: 4, entry: loadedEntry({ key: "m:2", matchId: 2 }) },
+    ]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+    const notification = jest.mocked(notifyUsers).mock.calls[0][1];
+    expect(notification.push?.("fr").url).toBe("/planning");
+    expect(notification.discord?.message("fr")).toContain("2 matchs");
+  });
+
+  it("announceCastLinkNeeded_twoCastersOnDifferentMatches_oneNoticeEach", async () => {
+    await announceCastLinkNeeded([
+      { userId: 4, entry: loadedEntry({ key: "m:1", matchId: 1 }) },
+      { userId: 5, entry: loadedEntry({ key: "m:2", matchId: 2 }) },
+    ]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+  });
+
+  it("announceCastLinkNeeded_noRecipients_nothingSent", async () => {
+    jest.mocked(loadNotificationRecipients).mockResolvedValue([]);
+
+    await announceCastLinkNeeded([{ userId: 4, entry: loadedEntry() }]);
+
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("announceCastLinkNeeded_emptyList_nothingLoaded", async () => {
+    await announceCastLinkNeeded([]);
+
+    expect(loadNotificationRecipients).not.toHaveBeenCalled();
+  });
+
+  it("announceCastLinkNeeded_sendFails_loggedNeverThrows", async () => {
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(notifyUsers).mockRejectedValue(new Error("BOT_DOWN"));
+
+    await expect(announceCastLinkNeeded([{ userId: 4, entry: loadedEntry() }])).resolves.toBeUndefined();
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining("lien de diffusion"), expect.anything());
+    errorLog.mockRestore();
   });
 });
 

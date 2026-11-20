@@ -1247,6 +1247,15 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Who sees it: as for casters, the readers of the tournament and of the match, including without an account. The prod is notified (Discord direct message, turned off with their other match direct messages, and push notification, turned off by its topic, from “My profile”) when someone other than themselves places or removes them, by the staff or automatically; their place taken or left and these actions are noted in the staff log on Discord without naming anyone, and the server logs keep the author of a staff action and the account concerned, according to their rotation.",
     ],
   },
+  "2026-11-planning-place-le-cast": {
+    linkLabels: ["Read record T20 of the register", "Read record T16 of the register"],
+    title: "Schedule: casters and prod placed on their match",
+    summary: "When nobody holds a match's cast (caster or prod) yet outside the schedule, the casters and the prod the schedule holds for it (assignment confirmed or set by hand) are placed on it: their username is then shown with the match, like a cast signup or a placed prod.",
+    details: [
+      "What changes: the site makes the cast signup or the prod place itself, on an assignment confirmed or set by hand, if the person meets the cast or prod requirements and does not play the match; it keeps that the signup or the place comes from the schedule, to remove it when the person leaves their assignment (withdrawal, removal by hand by the staff), except on a played match. A signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, is never touched.",
+      "Who sees it and who is notified: like any cast signup or prod, the readers of the tournament and of the match, including without an account. The prod receives the notice of a placed prod; a caster placed on a stream with no link yet is asked to add their channel's; the person the staff removes is notified. These actions are noted in the staff log on Discord without naming anyone, the author of a staff action and the accounts concerned in the server logs. Basis: the association's legitimate interest, as for the schedule, with a right to object.",
+    ],
+  },
 };
 
 /**

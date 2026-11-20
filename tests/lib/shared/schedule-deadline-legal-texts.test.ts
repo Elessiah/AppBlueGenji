@@ -29,7 +29,7 @@ const activity = (activities: typeof PROCESSING_ACTIVITIES, ref: string) => acti
 describe("entrée PRIVACY_CHANGES de la date butoir de planification", () => {
   it("privacyChange_deadlineEntry_followedByImpersonationAndGuestsDated20261121WithEnParity", () => {
     // Suivie de l'incarnation d'un rôle (ROLE-IMPERSONATE), puis des invités du planning (PLANNING-GUESTS).
-    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(ENTRY_ID);
+    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(ENTRY_ID);
     expect(entryFr?.publishedAt).toBe("2026-11-21");
     expect(REGISTER_UPDATED_AT >= "2026-11-21").toBe(true);
     expect(entryEn?.details).toHaveLength(entryFr?.details.length ?? -1);

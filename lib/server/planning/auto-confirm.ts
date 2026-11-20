@@ -34,6 +34,7 @@ import { planningNextWeekStart, planningWeekStart } from "@/lib/shared/planning"
 import { planningConfirmAt } from "@/lib/shared/schedule-deadline";
 import { confirmAssignments, runAutoAssign } from "./auto-assign";
 import { startPeriodicClock, stopPeriodicClock } from "@/lib/server/periodic-clock";
+import { drainPlannedCasts } from "./cast-placement";
 import { loadDurationSettings, loadPlanningEntries, type Executor, type LoadedEntry } from "./load";
 
 /** Verrou nommé du balayage des confirmations d'office. */
@@ -304,6 +305,9 @@ export async function sweepAutoConfirms(now: number = Date.now()): Promise<numbe
           console.error("[planning] confirmation d'office en échec, reprise au prochain passage", failureReason(error));
         }
       }
+      // Les placements de cast mis en file par ces confirmations se jouent avant la fin du passage : le passage
+      // suivant (et l'arrêt, qui attend les passages en cours) ne les croise ni ne les coupe en route.
+      await drainPlannedCasts();
       return confirmed;
     });
   } catch (error) {

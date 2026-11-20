@@ -37,8 +37,8 @@ function expectAllParts(text: string | undefined, parts: readonly string[]): voi
 }
 
 describe("historique des changements — prod d'un match", () => {
-  it("prodEntry_lastEntry_datedWithRegisterForEveryone", () => {
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ENTRY_ID);
+  it("prodEntry_beforePlanningPlacementEntry_datedWithRegisterForEveryone", () => {
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ENTRY_ID);
     expect(frEntry().publishedAt).toBe("2026-11-23");
     expect(REGISTER_UPDATED_AT).toBe("2026-11-23");
     expect(frEntry().audience).toBeUndefined();
@@ -69,8 +69,8 @@ describe("historique des changements — prod d'un match", () => {
   });
 
   it("registerT16_prodBasis_playedMatchKeptAsTournamentHistory", () => {
-    expect(FR_T16_PROD_BASIS.endsWith("un match joué gardant sa prod, qui fait partie de l'histoire du tournoi")).toBe(true);
-    expect(EN_T16_PROD_BASIS.endsWith("a played match keeping its prod, which is part of the tournament's history")).toBe(true);
+    expect(FR_T16_PROD_BASIS.endsWith("un match joué gardant sa prod et ses casters, qui font partie de l'histoire du tournoi")).toBe(true);
+    expect(EN_T16_PROD_BASIS.endsWith("a played match keeping its prod and its casters, which are part of the tournament's history")).toBe(true);
   });
 
   it("registerT16_subPurpose_namesProdRoleExplicitly", () => {
@@ -121,13 +121,13 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
     expectAllParts(fr, [
       "sans nommer la prod ni le staff — dans les journaux du serveur, l'auteur d'un geste du staff et l'identifiant des comptes visés",
       "Prods des matchs (jamais nommées sur Discord",
-      "pour un geste du staff sur la prod d'un match : pseudo et identifiant de son auteur",
+      "pour un geste du staff sur la prod d'un match, ou sur son cast par le planning : pseudo et identifiant de son auteur",
       "des casters et des prods des matchs (jamais nommés sur Discord",
     ]);
     expectAllParts(en, [
       "without naming the prod or the staff — in the server logs, the author of a staff action",
       "Match prods (never named on Discord",
-      "for a staff action on a match's prod: username and identifier of its author",
+      "for a staff action on a match's prod, or on its cast through the schedule: username and identifier of its author",
       "to the casters and prods of the matches (never named on Discord",
     ]);
   });
@@ -163,7 +163,7 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
   });
 
   it("registerT16_legalBasis_prodLeavesOnlyUnplayedMatches", () => {
-    expect(FR_T16_PROD_BASIS).toContain("peut quitter un match pas encore joué");
+    expect(FR_T16_PROD_BASIS).toContain("peuvent quitter un match pas encore joué");
     expect(FR_T16_PROD_BASIS).not.toContain("à tout moment");
     expect(EN_T16_PROD_BASIS).toContain("can leave a match not yet played");
     expect(EN_T16_PROD_BASIS).not.toContain("at any time");
@@ -181,7 +181,7 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
     const fr = sheet(PROCESSING_ACTIVITIES, "T16").subPurposes.find((line) => line.startsWith("Organiser la production du direct"));
 
     expectAllParts(fr, [
-      "la prod, membre qui a le rôle prod, s'y place ou y est placée par le staff (une au plus par match), est montrée",
+      "la prod, membre qui a le rôle prod, s'y place ou y est placée par le staff ou par le planning (T20) (une au plus par match), est montrée",
       "est prévenue quand un autre qu'elle la place ou l'en retire",
     ]);
     expect(fr).not.toContain("un membre qui a le rôle de prod");

@@ -139,6 +139,14 @@ describe("formatProdChangeLog", () => {
     expect(line).toContain("#42");
   });
 
+  it("formatProdChangeLog_planned_namesNobody", () => {
+    const line = formatProdChangeLog({ ...context, change: "PLANNED" });
+
+    expect(line).toContain("Prod placée");
+    expect(line).toContain("une prod du planning est placée sur le match");
+    expect(line).not.toContain("par le staff");
+  });
+
   it("formatProdChangeLog_staffGestures_anonymousStaff", () => {
     expect(formatProdChangeLog({ ...context, change: "ASSIGNED" })).toContain("par le staff");
     expect(formatProdChangeLog({ ...context, change: "REPLACED" })).toContain("par le staff");

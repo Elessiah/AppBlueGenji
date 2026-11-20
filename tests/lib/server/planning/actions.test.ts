@@ -14,6 +14,7 @@ jest.mock("@/lib/server/planning/load", () => ({
 }));
 jest.mock("@/lib/server/planning/profiles");
 jest.mock("@/lib/server/planning/notices");
+jest.mock("@/lib/server/planning/cast-placement", () => ({ queuePlannedCasts: jest.fn(), releasePlannedSeat: jest.fn() }));
 jest.mock("@/lib/server/planning/players", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/players")>("@/lib/server/planning/players"),
   loadEntryPlayers: jest.fn(),
@@ -27,6 +28,7 @@ import { withNamedLock } from "@/lib/server/named-lock";
 import { PLANNING_STATUSES, setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
 import { MATCH_REFEREE_REFUSAL_CODES } from "@/lib/server/planning/auto-assign";
 import { loadHiddenTournamentIds, loadPlanningData, loadPlanningEntries, loadPlanningMembersByIds } from "@/lib/server/planning/load";
+import { queuePlannedCasts, releasePlannedSeat } from "@/lib/server/planning/cast-placement";
 import { announceAssignments } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { writeSoloCaster } from "@/lib/server/planning/profiles";
@@ -328,6 +330,66 @@ describe("setManualAssignment — pose", () => {
     await setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: true });
 
     expect(jest.mocked(announceAssignments).mock.calls[0]).toEqual([[{ userId: 6, entry: event, role: "PROD" }], { actorId: 9 }]);
+  });
+
+  it("setManualAssignment_newAssignment_placedOnMatchWithStaffNamed", async () => {
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [event], members: [loadedMember({ userId: 6, roles: ["PROD"] })] }));
+
+    await setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: true });
+
+    expect(queuePlannedCasts).toHaveBeenCalledWith([{ userId: 6, entry: event, role: "PROD" }], { id: 9, pseudo: staff.pseudo });
+  });
+
+  it("setManualAssignment_placementPending_returnsWithoutWaiting", async () => {
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [event], members: [loadedMember({ userId: 6, roles: ["PROD"] })] }));
+    jest.mocked(queuePlannedCasts).mockReturnValue(new Promise(() => undefined));
+
+    await expect(setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: true })).resolves.toBeUndefined();
+  });
+
+  it("setManualAssignment_removal_notPlaced", async () => {
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [event],
+        members: [loadedMember({ userId: 6, roles: ["PROD"] })],
+        assignments: [loadedAssignment({ entryKey: "t:10", userId: 6, role: "PROD", confirmed: true })],
+      }),
+    );
+
+    await setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: false });
+
+    expect(queuePlannedCasts).not.toHaveBeenCalled();
+  });
+
+  it("setManualAssignment_removalConfirmed_releasesPlannedSeatByStaff", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        members: [loadedMember({ userId: 6, roles: ["PROD"] })],
+        assignments: [loadedAssignment({ userId: 6, role: "PROD", confirmed: true })],
+      }),
+    );
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "PROD", userId: 6, assigned: false });
+
+    expect(releasePlannedSeat).toHaveBeenCalledWith(expect.objectContaining({ key: "m:1" }), 6, "PROD", expect.objectContaining({ id: staff.id }));
+  });
+
+  it("setManualAssignment_removalProvisional_noPlannedSeatRelease", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      planningData({
+        entries: [loadedEntry()],
+        members: [loadedMember({ userId: 6, roles: ["PROD"] })],
+        assignments: [loadedAssignment({ userId: 6, role: "PROD", confirmed: false })],
+      }),
+    );
+
+    await setManualAssignment(staff, { entryKey: "m:1", role: "PROD", userId: 6, assigned: false });
+
+    expect(releasePlannedSeat).not.toHaveBeenCalled();
   });
 
   it("setManualAssignment_removal_notAnnounced", async () => {

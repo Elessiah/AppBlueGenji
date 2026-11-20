@@ -1240,7 +1240,7 @@ export function RgpdEn({
           <p id="retransmission">
             <strong>Match streaming.</strong> A tournament match may be streamed live and recorded on{" "}
             <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or that of one or more
-            casters: each caster joins a stream of the match or opens their own, with their channel link (required to open it),
+            casters: each caster joins a stream of the match or opens their own, with their channel link (required to open it themselves),
             published with the match; the channel name, read from that link (often the caster&apos;s username), is its visible text. That stream goes, with its link, once no caster holds it any more; only the link
             set in the match&apos;s live configuration, by a member of the organizers, stays with the match when its casters leave. The link a
             caster provided when opening their stream or in “Configure my broadcast” also goes when their account is deleted, played
@@ -1265,10 +1265,10 @@ export function RgpdEn({
             removed from it by the staff, with no stream left). The assigned referee of a match can also, for that match only, edit or remove a caster&apos;s
             link and configure the organizers&apos; broadcast.{" "}
             A match may also have a <strong>prod</strong>, who handles the production of its live stream: a
-            member holding that role takes the match or is placed on it by the staff; their username is shown with
+            member holding that role takes the match or is placed on it by the staff or the schedule; their username is shown with
             the match like the casters&apos; (before the launch, as long as they meet the requirements), kept with the match and
             removed from matches not yet launched if their account loses that role, is suspended or now plays in the match,
-            and from matches not yet played if it is deleted; the prod is notified (can be turned off in “My profile”) when someone other than themselves places or removes them, by the staff or automatically; their place taken or left and these
+            and from matches not yet played if it is deleted; the prod is notified (can be turned off in “My profile”) when someone other than themselves places or removes them, by the staff, the schedule or automatically; their place taken or left and these
             actions are noted without a name in the staff log on Discord, and the author of a staff action and the account concerned in the server logs; basis: legitimate interest, the prod
             being able to leave a match not yet played and object through the report form (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>).{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
@@ -1282,7 +1282,7 @@ export function RgpdEn({
             service</strong>, and no longer under legitimate interest: there is no longer an objection through a
             “neutral name”. What concerns the casters (voice, username, link to their channel, live mode) and the
             stream and replay links published on the site falls under the same basis, which the same section
-            of the terms provides for.
+            of the terms provides for (a caster the schedule places: legitimate interest, like the prod).
             Viewers, for their part, watch the stream on the platform, which processes their data as the controller
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
@@ -1332,7 +1332,12 @@ export function RgpdEn({
             administrators). Through the schedule, confirming or assigning a match&apos;s referee, or removing
             its assigned referee, acts on the match itself, like the staff does: the staff log on Discord
             notes each change of the match&apos;s referee without naming anyone and a referee removed by someone else is notified by push, none of this when a guest (a mark described below) leaves the schedule (<LocaleLink href="/rgpd/registre#t04">register,
-            T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>). Referees, casters
+            T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>). Likewise, when nobody
+            holds a match&apos;s cast (caster or prod) yet outside the schedule, the casters and the prod that an assignment confirmed or set by hand names for it
+            are placed on it, if they meet the cast or prod requirements and do not play the match: their
+            username then shows with the match like a cast signup or a placed prod (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), a caster placed on a stream with no link yet is asked to add their channel&apos;s, and
+            leaving the assignment (withdrawal, removal by hand by the staff) takes them off it, except on a
+            played match; a signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, stays; these actions are noted without names in the staff log on Discord, the author of a staff action and the accounts concerned in the server logs. Referees, casters
             and prods are notified by Discord direct message and push notification of new slots where they
             can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of the
             withdrawal from a confirmed assignment on a slot where their own assignment is confirmed, a caster
@@ -1344,7 +1349,7 @@ export function RgpdEn({
             starts, with an optional reason read by the tournament staff only; the site keeps the withdrawal
             (role, date, reason, whether it is late — less than 24 h before) with the history, and looks for
             a replacement automatically (a slot has two casters at most: when one of them leaves and the other
-            stays, the slot is not necessarily open). Each schedule slot is confirmed automatically as its start draws near (a lead time set by an administrator, 24 h at least), or earlier at its match&apos;s scheduling deadline; its assignees are notified as for a confirmation by an administrator, and the site records, with no person, which slots were confirmed automatically. The staff who assigns roles can mark a caster or a prod as a “guest”: they keep their other rights but leave the schedule, the referee role included if they also hold it (the schedule no longer proposes, assigns or notifies them, and they no longer read its page); the mark leaves the upcoming assignments the schedule had given them as a withdrawal would, without notifying the guest, recorded in the schedule history, which the tournament staff sees, as a removal by staff (the history keeps its author&apos;s account, without showing it), and erases their upcoming availability, the past staying; it stays on the account as long as the staff leaves it and the account is a caster or a prod, is shown on “My profile”, is part of the export of your data and goes with the account&apos;s deletion; each action on the mark is noted naming no one in the staff log on Discord, its author in the server logs. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
+            stays, the slot is not necessarily open). Each schedule slot is confirmed automatically as its start draws near (a lead time set by an administrator, 24 h at least), or earlier at its match&apos;s scheduling deadline; its assignees are notified as for a confirmation by an administrator, and the site records, with no person, which slots were confirmed automatically. The staff who assigns roles can mark a caster or a prod as a “guest”: they keep their other rights but leave the schedule, the referee role included if they also hold it (the schedule no longer proposes, assigns or notifies them, and they no longer read its page); the mark leaves the upcoming assignments the schedule had given them as a withdrawal would (a place already set on a match staying), without notifying the guest, recorded in the schedule history, which the tournament staff sees, as a removal by staff (the history keeps its author&apos;s account, without showing it), and erases their upcoming availability, the past staying; it stays on the account as long as the staff leaves it and the account is a caster or a prod, is shown on “My profile”, is part of the export of your data and goes with the account&apos;s deletion; each action on the mark is noted naming no one in the staff log on Discord, its author in the server logs. Everything is erased <strong>{PLANNING_RETENTION_DAYS} days after the start
             of the slot</strong> (daily purge), the “solo caster” setting when the account no longer holds the
             caster role; deleting the account removes everything about it (the actions it took as staff
             remain, without naming it), and the export of your data contains it, actions taken as staff

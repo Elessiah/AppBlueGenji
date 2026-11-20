@@ -83,7 +83,7 @@ export function prodControls(match: ProdMatch, viewer: ProdViewer): ProdControls
  * tenir, sans dire pourquoi (`UNAVAILABLE` : suspendu), ou devenu joueur du
  * match (`JOINED_TEAM`). Un geste sur sa propre place ne lui envoie rien : il sait.
  */
-export type ProdNoticeKind = "ASSIGNED" | "RELEASED" | "INELIGIBLE" | "UNAVAILABLE" | "JOINED_TEAM";
+export type ProdNoticeKind = "ASSIGNED" | "PLANNED" | "RELEASED" | "INELIGIBLE" | "UNAVAILABLE" | "JOINED_TEAM";
 
 /** Le match d'un avis de prod, tel que la notification et le message le nomment. */
 export type ProdNoticeMatch = {

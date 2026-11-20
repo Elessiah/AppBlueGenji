@@ -59,6 +59,8 @@ type ProdMatchRow = RowDataPacket & {
   team2_id: number | null;
   launched_at: Date | string | null;
   prod_user_id: number | null;
+  /** 1 : la prod a été placée par le planning (`lib/server/planning/cast-placement.ts`). */
+  prod_planned: number | null;
 };
 
 /** Un match dont la place de prod vient d'être rendue. */
@@ -84,14 +86,19 @@ async function lockProdAccount(connection: PoolConnection, userId: number): Prom
  * « Faire la prod » juge d'abord la publication du tournoi.
  */
 async function lockProdMatch(connection: PoolConnection, matchId: number): Promise<ProdMatchRow> {
+  const row = await lockProdMatchRow(connection, matchId);
+  if (!row) throw new Error("MATCH_NOT_FOUND");
+  return row;
+}
+
+/** {@link lockProdMatch} sans refus : `null` si le match n'existe pas. */
+async function lockProdMatchRow(connection: PoolConnection, matchId: number): Promise<ProdMatchRow | null> {
   const [rows] = await connection.execute<ProdMatchRow[]>(
-    `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, launched_at, prod_user_id
+    `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, launched_at, prod_user_id, prod_planned
        FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
     [matchId],
   );
-  const row = rows[0];
-  if (!row) throw new Error("MATCH_NOT_FOUND");
-  return row;
+  return rows[0] ?? null;
 }
 
 /** Un match joué ou une exemption n'a pas de prod à changer. */
@@ -151,7 +158,14 @@ function pairingOf(row: ProdMatchRow): CastPairing {
 }
 
 async function writeProd(connection: PoolConnection, matchId: number, userId: number | null): Promise<void> {
-  await connection.execute(`UPDATE bg_matches SET prod_user_id = ? WHERE id = ?`, [userId, matchId]);
+  // Une prod prise ou posée hors du planning n'est pas « placée par le planning » (`prod_planned`).
+  await connection.execute(`UPDATE bg_matches SET prod_user_id = ?, prod_planned = 0 WHERE id = ?`, [userId, matchId]);
+}
+
+/** La place posée par le planning (`prod_planned`) devient une place prise ou posée depuis le match ; rien sinon. */
+async function adoptPlannedProd(connection: PoolConnection, row: ProdMatchRow): Promise<void> {
+  if (Number(row.prod_planned ?? 0) !== 1) return;
+  await connection.execute("UPDATE bg_matches SET prod_planned = 0 WHERE id = ? AND prod_planned = 1", [row.id]);
 }
 
 /** Après le commit : le plateau se rafraîchit, puis l'annonce part sans attendre. */
@@ -191,7 +205,11 @@ export async function claimMatchProd(matchId: number, actor: SessionActor, manag
       // de la suspension, du changement de rôles et de l'effacement.
       if (nullableId(row.prod_user_id) !== userId) await releaseUnfitProd(connection, row, false);
       const current = nullableId(row.prod_user_id);
-      if (current === userId) return null;
+      if (current === userId) {
+        // Prendre soi-même la place que le planning a posée la fait sienne (`prod_planned` tombe) : quitter le planning ne l'en retire plus.
+        await adoptPlannedProd(connection, row);
+        return null;
+      }
       if (current !== null) throw new Error("MATCH_PROD_TAKEN");
       await assertNoOtherPlannedProd(connection, matchId, userId);
       await assertProdFree(connection, row, userId);
@@ -225,6 +243,35 @@ export async function releaseMatchProd(matchId: number, actor: SessionActor): Pr
 }
 
 /**
+ * La prod `userId` quitte la place du match avec son attribution `PROD` au
+ * planning (désistement, retrait à la main par le staff —
+ * `lib/server/planning/cast-placement.ts`) : la ligne du planning et la place
+ * sont le même rôle — seulement la place que le planning a posée
+ * (`prod_planned`) : une prod prise ou posée depuis le match reste. Un match
+ * joué la garde ; une autre prod reste. Une ligne
+ * anonyme au journal (`UNPLANNED`) ; la prod que le staff retire (`byStaff`)
+ * en est prévenue (`RELEASED`), comme d'un retrait depuis le match.
+ *
+ * @returns vrai si la place a été rendue.
+ */
+export async function releasePlannedProd(matchId: number, userId: number, byStaff: boolean): Promise<boolean> {
+  const result = await retryOnDeadlock(() =>
+    inTransaction(async (connection) => {
+      const row = await lockProdMatchRow(connection, matchId);
+      // Seule la prod que le planning a placée part avec l'attribution : une prod prise
+      // (« Faire la prod ») ou posée par le staff depuis le match reste.
+      if (!row || row.status === "COMPLETED" || nullableId(row.prod_user_id) !== userId || Number(row.prod_planned ?? 0) !== 1) return null;
+      await writeProd(connection, matchId, null);
+      const notices: ProdChange["notices"] = byStaff ? [{ userId, kind: "RELEASED" }] : [];
+      const change: ProdChange = { matchId, log: "UNPLANNED", notices, pairing: pairingOf(row) };
+      return { tournamentId: Number(row.tournament_id), change };
+    }),
+  );
+  afterCommit(result);
+  return result !== null;
+}
+
+/**
  * Le staff place la prod du match (`prodId`), la change, ou la retire (`null`).
  * `expected` : la prod que la fenêtre montrait (`null` : aucune) ; changée
  * depuis, rien ne bouge (`PROD_CHANGED`). `undefined` : pas de contrôle.
@@ -250,7 +297,11 @@ export async function assignMatchProd(
       const row = await lockProdMatch(connection, matchId);
       assertProdMatchOpen(row);
       const current = nullableId(row.prod_user_id);
-      if (current === prodId) return null;
+      if (current === prodId) {
+        // La même prod posée depuis le match par le staff : la place n'est plus celle du planning.
+        if (prodId !== null) await adoptPlannedProd(connection, row);
+        return null;
+      }
       if (expected !== undefined && expected !== current) throw new Error("PROD_CHANGED");
       if (prodId !== null) await assertProdFree(connection, row, prodId);
       await writeProd(connection, matchId, prodId);
@@ -324,7 +375,7 @@ export async function withdrawLostProdPlaces(connection: PoolConnection, userId:
   );
   if (rows.length === 0) return [];
   await connection.execute(
-    `UPDATE bg_matches SET prod_user_id = NULL
+    `UPDATE bg_matches SET prod_user_id = NULL, prod_planned = 0
       WHERE prod_user_id = ? AND id IN (${rows.map(() => "?").join(", ")})`,
     [userId, ...rows.map((row) => Number(row.id))],
   );

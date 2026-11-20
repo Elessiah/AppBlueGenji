@@ -136,8 +136,8 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04En.subPurposes.join(" ")).toMatch(/Notifying a caster, by Discord direct message and by push, that their registration for a match was removed by someone other than themselves[^"]*with the reason[^"]*without naming who removed it; the direct message only goes to a certified Discord tag/);
     expect(t04.recipients.join(" ")).toContain("caster : départ du match qu'il caste, retrait de son inscription sur un match");
     expect(t04En.recipients.join(" ")).toContain("caster: start of the match they cast, removal of their registration for a match");
-    expect(byRef("T05").subPurposes.join(" ")).toContain("sans nommer le caster ni le staff — et sans trace dans les journaux du serveur");
-    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.subPurposes.join(" ")).toContain("without naming the caster or the staff — and without any trace in the server logs");
+    expect(byRef("T05").subPurposes.join(" ")).toContain("sans nommer le caster ni le staff — dans les journaux du serveur, seulement quand un geste du staff au planning en place ou en retire, son auteur et l'identifiant des comptes visés");
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.subPurposes.join(" ")).toContain("without naming the caster or the staff — in the server logs, only when a staff action on the schedule places or removes one, its author and the identifier of the accounts concerned");
     expect(byRef("T05").dataCategories.join(" ")).toContain("aucun membre du staff, caster ni prod nommé (« le staff », « un caster »");
     expect(byRef("T12").subPurposes.join(" ")).toContain("Retrait de son inscription de caster sur un match");
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T12")!.subPurposes.join(" ")).toContain("Removal of their caster registration for a match");

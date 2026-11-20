@@ -35,6 +35,7 @@ import {
   loadProdPanel,
   prodLogCategory,
   releaseMatchProd,
+  releasePlannedProd,
   staffProdAuditLine,
   withdrawLostProdPlaces,
 } from "@/lib/server/tournaments/match-prod";
@@ -136,6 +137,7 @@ beforeEach(() => {
       return [casterIds.includes(Number(values[1])) ? [{ 1: 1 }] : [], []];
     }
     if (sql.startsWith("UPDATE bg_matches SET prod_user_id")) return [{ affectedRows: 1 }, []];
+    if (sql.startsWith("UPDATE bg_matches SET prod_planned = 0")) return [{ affectedRows: 1 }, []];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(inTransaction).mockImplementation((run) => run(fakeConnection({ execute })));
@@ -189,6 +191,26 @@ describe("claimMatchProd", () => {
     expect(updatesOfProd()).toHaveLength(0);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
     expect(trackAnnouncement).not.toHaveBeenCalled();
+  });
+
+  it("claimMatchProd_ownPlannedPlace_clearsPlannedMarkOnly", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
+
+    await claimMatchProd(42, prodActor);
+
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("UPDATE bg_matches SET prod_planned = 0"))).toEqual([
+      [expect.any(String), [42]],
+    ]);
+    expect(updatesOfProd()).toHaveLength(0);
+    expect(trackAnnouncement).not.toHaveBeenCalled();
+  });
+
+  it("claimMatchProd_ownPlaceNotPlanned_noMarkWrite", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 0 };
+
+    await claimMatchProd(42, prodActor);
+
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("UPDATE bg_matches SET prod_planned"))).toHaveLength(0);
   });
 
   it("claimMatchProd_takenByOther_throwsMatchProdTaken", async () => {
@@ -304,6 +326,14 @@ describe("claimMatchProd", () => {
 });
 
 describe("releaseMatchProd", () => {
+  it("releaseMatchProd_ownPlace_resetsPlannedMarker", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
+
+    await releaseMatchProd(42, prodActor);
+
+    expect(updatesOfProd()[0]?.[0]).toContain("prod_planned = 0");
+  });
+
   it("releaseMatchProd_ownPlace_clearsProd", async () => {
     match = { ...match, prod_user_id: PROD_ID };
 
@@ -327,6 +357,73 @@ describe("releaseMatchProd", () => {
 
     await expect(releaseMatchProd(42, prodActor)).rejects.toThrow("NOT_MATCH_PROD");
     expect(updatesOfProd()).toHaveLength(0);
+  });
+});
+
+describe("releasePlannedProd", () => {
+  it("releasePlannedProd_memberHolds_clearedWithoutNotice", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
+
+    const released = await releasePlannedProd(42, PROD_ID, false);
+    await settle();
+
+    expect(released).toBe(true);
+    expect(updatesOfProd()).toEqual([[expect.any(String), [null, 42]]]);
+    expect(sendBotLog).toHaveBeenCalledWith(expect.stringContaining("Prod retirée"), { tournamentId: 7, category: "staff-removal" });
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedProd_plannedProd_clearedAndMarkerReset", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
+
+    await releasePlannedProd(42, PROD_ID, false);
+
+    expect(updatesOfProd()[0]?.[0]).toContain("prod_planned = 0");
+  });
+
+  it("releasePlannedProd_prodTakenOutsidePlanning_kept", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 0 };
+
+    const released = await releasePlannedProd(42, PROD_ID, false);
+    await settle();
+
+    expect(released).toBe(false);
+    expect(updatesOfProd()).toHaveLength(0);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedProd_byStaff_prodNotified", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
+
+    await releasePlannedProd(42, PROD_ID, true);
+    await settle();
+
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(notifyUsers).mock.calls[0][0]).toEqual([expect.objectContaining({ userId: PROD_ID })]);
+  });
+
+  it("releasePlannedProd_otherProd_untouched", async () => {
+    match = { ...match, prod_user_id: OTHER_PROD_ID, prod_planned: 1 };
+
+    const released = await releasePlannedProd(42, PROD_ID, false);
+
+    expect(released).toBe(false);
+    expect(updatesOfProd()).toHaveLength(0);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("releasePlannedProd_matchCompleted_kept", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1, status: "COMPLETED" };
+
+    expect(await releasePlannedProd(42, PROD_ID, false)).toBe(false);
+    expect(updatesOfProd()).toHaveLength(0);
+  });
+
+  it("releasePlannedProd_matchMissing_false", async () => {
+    match = null;
+
+    expect(await releasePlannedProd(42, PROD_ID, false)).toBe(false);
   });
 });
 
@@ -511,6 +608,18 @@ describe("assignMatchProd", () => {
     expect(trackAnnouncement).not.toHaveBeenCalled();
   });
 
+  it("assignMatchProd_samePlannedProd_clearsPlannedMarkOnly", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
+
+    await assignMatchProd(42, STAFF, PROD_ID, null);
+
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("UPDATE bg_matches SET prod_planned = 0"))).toEqual([
+      [expect.any(String), [42]],
+    ]);
+    expect(updatesOfProd()).toHaveLength(0);
+    expect(trackAnnouncement).not.toHaveBeenCalled();
+  });
+
   it("assignMatchProd_targetWithoutProd_throwsNotProd", async () => {
     accounts.set(PROD_ID, { is_deleted: 0, holds_prod: 0 });
 
@@ -689,6 +798,10 @@ describe("prodLogCategory", () => {
     expect(prodLogCategory("ASSIGNED")).toBe("casts");
     expect(prodLogCategory("REPLACED")).toBe("casts");
   });
+
+  it("prodLogCategory_planned_isCasts", () => {
+    expect(prodLogCategory("PLANNED")).toBe("casts");
+  });
 });
 
 describe("queueProdChange", () => {
@@ -763,6 +876,13 @@ describe("formatProdNotice", () => {
     expect(text).toContain("The staff removed you as the prod of a match");
     expect(text).not.toContain("Pseudo1");
     expect(text).not.toContain("Pseudo2");
+  });
+
+  it("formatProdNotice_plannedFrAndEn_saysThePlanning", () => {
+    const url = "https://bluegenji.test/tournois/7#match-42";
+
+    expect(formatProdNotice({ ...notice, kind: "PLANNED" }, url, "fr")).toContain("Le planning te place comme prod du match");
+    expect(formatProdNotice({ ...notice, kind: "PLANNED" }, url, "en")).toContain("The planning made you the prod of the match");
   });
 
   it("formatProdNotice_joinedTeamEn_saysNowPlayer", () => {

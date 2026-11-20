@@ -20,16 +20,19 @@ import type { StaffActor } from "@/lib/shared/log-privacy";
 import type { PlanningRole } from "@/lib/shared/planning";
 import {
   formatPlanningAssignedDm,
+  formatPlanningCastLinkDm,
   formatPlanningSoloCasterDm,
   formatPlanningUnfilledDm,
   formatPlanningUnfilledLine,
   formatPlanningWithdrawalDm,
+  type PlanningCastLinkNotice,
   type PlanningNoticeAssignment,
   type PlanningNoticeEntry,
   type PlanningWithdrawalNotice,
 } from "@/lib/shared/planning-notices";
 import {
   planningAssignedPush,
+  planningCastLinkPush,
   planningSoloCasterPush,
   planningUnfilledPush,
   planningWithdrawalPush,
@@ -62,9 +65,32 @@ export type AssignmentNotice = { userId: number; entry: LoadedEntry; role: Plann
  * personne, qui liste toutes les siennes. L'auteur du geste n'est jamais
  * prévenu de ce qu'il vient de faire lui-même (`actorId`).
  */
-export async function announceAssignments(
+export function announceAssignments(
   items: readonly AssignmentNotice[],
   options: { actorId?: number | null; replacement?: boolean } = {},
+): Promise<void> {
+  // Envoyée sans attendre les autres gestes ; l'avis de lien d'un caster (`announceCastLinkNeeded`) attend
+  // seulement les annonces d'affectation encore en route pour lui : « le planning te place » part toujours le premier.
+  const run = deliverAssignments(items, options);
+  for (const userId of new Set(items.map((item) => item.userId))) trackAssignmentNotice(userId, run);
+  return run;
+}
+
+/** Les annonces d'affectation encore en route, par destinataire (jamais en rejet : `deliverAssignments` ne lève pas). */
+const pendingAssignmentNotices = new Map<number, Promise<void>>();
+
+function trackAssignmentNotice(userId: number, run: Promise<void>): void {
+  const prior = pendingAssignmentNotices.get(userId);
+  const pending = prior === undefined ? run : Promise.all([prior, run]).then(() => undefined);
+  pendingAssignmentNotices.set(userId, pending);
+  void pending.finally(() => {
+    if (pendingAssignmentNotices.get(userId) === pending) pendingAssignmentNotices.delete(userId);
+  });
+}
+
+async function deliverAssignments(
+  items: readonly AssignmentNotice[],
+  options: { actorId?: number | null; replacement?: boolean },
 ): Promise<void> {
   try {
     const byUser = new Map<number, PlanningNoticeAssignment[]>();
@@ -108,6 +134,66 @@ export async function announceAssignments(
     }
   } catch (error) {
     console.error("[planning] annonce des affectations impossible.", failureReason(error));
+  }
+}
+
+export type CastLinkItem = { userId: number; entry: LoadedEntry };
+
+/**
+ * Avis aux casters que le planning vient de placer sur des matchs dont la
+ * diffusion n'a pas encore de lien (`cast-placement.ts`) : donner celui de leur
+ * chaîne dans « Configurer ma diffusion », sans quoi leur diffusion ne paraît
+ * nulle part. Un seul avis par caster, quel que soit le nombre de matchs.
+ * Sujet `PLANNING_ASSIGNED` (le même geste que l'affectation), message privé
+ * coupé avec lui. Ne lève jamais.
+ */
+export function announceCastLinkNeeded(items: readonly CastLinkItem[]): Promise<void> {
+  // Derrière les annonces d'affectation déjà lancées pour ces casters (et elles seules) : le lien se demande
+  // après « le planning te place », sans attendre les avis des autres gestes.
+  const waits = [...new Set(items.map((item) => item.userId))].flatMap((userId) => pendingAssignmentNotices.get(userId) ?? []);
+  return Promise.all(waits).then(() => deliverCastLinkNeeded(items));
+}
+
+async function deliverCastLinkNeeded(items: readonly CastLinkItem[]): Promise<void> {
+  try {
+    const byUser = new Map<number, PlanningCastLinkNotice[]>();
+    for (const { userId, entry } of items) {
+      if (entry.matchId === null) continue;
+      const list = byUser.get(userId) ?? [];
+      list.push({ ...noticeEntry(entry), matchId: entry.matchId });
+      byUser.set(userId, list);
+    }
+    if (byUser.size === 0) return;
+    const recipients = await loadNotificationRecipients([...byUser.keys()], "proven", { excludeSuspended: true, planningMembersOnly: true });
+    const base = siteCanonicalBase();
+    // Les casters qui reçoivent la même liste partent en un envoi.
+    const groups = new Map<string, { list: PlanningCastLinkNotice[]; recipients: typeof recipients }>();
+    for (const recipient of recipients) {
+      const list = (byUser.get(recipient.userId) ?? []).sort((a, b) => a.startAt.localeCompare(b.startAt) || a.matchId - b.matchId);
+      if (list.length === 0) continue;
+      const signature = list.map((item) => item.matchId).join("|");
+      const group = groups.get(signature) ?? { list, recipients: [] };
+      group.recipients.push(recipient);
+      groups.set(signature, group);
+    }
+    const batches = [...groups.values()];
+    for (let index = 0; index < batches.length; index += ASSIGNMENT_SEND_CONCURRENCY) {
+      await Promise.all(
+        batches.slice(index, index + ASSIGNMENT_SEND_CONCURRENCY).map(({ list, recipients: group }) =>
+          notifyUsers(group, {
+            topic: "PLANNING_ASSIGNED",
+            push: (locale) => planningCastLinkPush(list, locale),
+            discord: {
+              message: (locale) => formatPlanningCastLinkDm(list, base, locale),
+              context: "planning-cast-link",
+            },
+            dmFollowsTopic: true,
+          }),
+        ),
+      );
+    }
+  } catch (error) {
+    console.error("[planning] avis du lien de diffusion impossible.", failureReason(error));
   }
 }
 

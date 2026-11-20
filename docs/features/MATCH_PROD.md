@@ -88,8 +88,15 @@ compte qu'**une fois** (une ligne de journal par match).
 
 ## Planning
 
-Le calcul automatique du planning ne place pas les casters sur les matchs (seuls
-les arbitres y sont désignés) : il ne place donc pas non plus la prod. La prod
+Le calcul automatique (provisoire) ne place ni caster ni prod sur un match ; une
+ligne `PROD` **confirmée** y place sa prod quand le cast du match est libre
+(`CAST_PLANNING.md` § Placement sur le match, journal « Prod placée » sans
+nom, avis `PLANNED` « Le planning te place comme prod » sauf à qui se confirme
+lui-même), dans un tournoi en cours. Quitter cette ligne `PROD` (désistement,
+retrait par le staff) rend aussi la place du match quand le planning l'y a
+posée (`prod_planned` ; une prod prise ou posée depuis le match reste) (journal « Prod retirée »,
+sauf match joué ; avis `RELEASED` quand c'est le staff) ; un invité sorti du
+planning la garde. La prod
 placée sur un match paraît au planning comme une ligne `PROD` tenue (source
 `CAST`, `entryAssignments`) et fait foi : une seule par match, elle remplace
 toute autre ligne `PROD` de l'entrée (proposition provisoire, ou ligne tenue
@@ -135,7 +142,7 @@ de charge (`loadPlanningHistory`).
 - Demande de suppression (anonymisation) : places des matchs à jouer rendues,
   une ligne « retirée d'office » au journal par match (`releasedProdPlaces`) ;
   effacement : toutes (`withdrawUserCasts`). Les tournois concernés sont rediffusés.
-- Export : `prodAssignments` (match, tournoi) — `RGPD_DATA_RIGHTS.md`.
+- Export : `prodAssignments` (match, tournoi, `planned`) — `RGPD_DATA_RIGHTS.md`.
 - Textes légaux : registre T16 (base, en fin de champ « Base légale » : intérêt légitime, comme le planning T20, la prod pouvant quitter un match pas encore joué (un match joué la garde) et s’y opposer par le formulaire de signalement — aucune clause des conditions, qui ne couvrent que les casters), T04 (avis en message privé et push, même intérêt légitime que l’avis au caster, le message privé coupé par le même interrupteur, la push par son sujet ; prods parmi les personnes concernées), T05 (ligne Discord sans nom ; geste du staff nommé dans pm2 avec les comptes visés), T03 (pseudo sur `/suivre`) ; `/rgpd` FR et EN ; entrée `2026-11-prod-match`.
 
 ## Seed

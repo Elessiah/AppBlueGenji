@@ -117,6 +117,10 @@ describe("castLogChange / castReleaseNotice", () => {
       "MATCH_DELETED",
       { casterId: 5, reason: "MATCH_DELETED" },
     ],
+    [{ kind: "PLANNED", matchId: 1, casterId: 9 }, "PLANNED", null],
+    // Inscription du planning retirée avec l'attribution : son propre désistement, rien à dire ; le staff, motif STAFF.
+    [{ kind: "UNPLANNED", matchId: 1, casterId: 9, byStaff: false }, "UNPLANNED", null],
+    [{ kind: "UNPLANNED", matchId: 1, casterId: 9, byStaff: true }, "UNPLANNED", { casterId: 9, reason: "STAFF" }],
   ])("%j → journal %s", (change, log, notice) => {
     expect(castLogChange(change)).toBe(log);
     expect(castReleaseNotice(change)).toEqual(notice);
@@ -134,6 +138,10 @@ describe("castLogCategory — un retrait alerte, une inscription reste une trace
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "JOINED_TEAM" }, "staff-removal"],
     // Match supprimé : plus de créneau à repourvoir, simple trace.
     [{ kind: "MATCH_DELETED", matchId: 1, casterId: 5, subject: deletedSubject() }, "casts"],
+    // Placé depuis le planning : une inscription, simple trace.
+    [{ kind: "PLANNED", matchId: 1, casterId: 9 }, "casts"],
+    // Retirée avec l'attribution : le créneau est à repourvoir, alerte du staff.
+    [{ kind: "UNPLANNED", matchId: 1, casterId: 9, byStaff: false }, "staff-removal"],
   ])("%j → %s", (change, category) => {
     expect(castLogCategory(change)).toBe(category);
   });
