@@ -1239,7 +1239,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
   },
   "2026-11-prod-match": {
-    linkLabels: ["Read record T16 of the register"],
+    linkLabels: ["Read record T16 of the register", "Read record T04 of the register", "Read record T05 of the register"],
     title: "Matches: the live stream's prod",
     summary: "A match can have a prod, who handles the production of its live stream: they take the match themselves or are placed on it by the staff, and their username is shown with the match, like the casters'.",
     details: [

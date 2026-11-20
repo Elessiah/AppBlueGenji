@@ -2337,12 +2337,16 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   },
   {
     // MATCH-CAST-PROD — la prod d'un match (`docs/features/MATCH_PROD.md`) :
-    // registre T16, /rgpd (FR et EN). Datée comme `REGISTER_UPDATED_AT` — tout
+    // registre T16 (et T03, T04, T05), /rgpd (FR et EN). Datée comme `REGISTER_UPDATED_AT` — tout
     // avancer ensemble si la mise en ligne glisse.
     id: "2026-11-prod-match",
     publishedAt: "2026-11-23",
     title: "Matchs : la prod du direct",
-    links: [{ href: "/rgpd/registre#t16", label: "Lire la fiche T16 du registre" }],
+    links: [
+      { href: "/rgpd/registre#t16", label: "Lire la fiche T16 du registre" },
+      { href: "/rgpd/registre#t04", label: "Lire la fiche T04 du registre" },
+      { href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" },
+    ],
     summary: "Un match peut avoir une prod, qui assure la production de son direct : elle s'y place elle-même ou y est placée par le staff, et son pseudo est montré avec le match, comme celui des casters.",
     details: [
       "Ce qui est gardé : le compte de la prod avec le match, tant que le match existe ; il est retiré des matchs pas encore lancés si le compte perd ce rôle, est suspendu ou joue désormais le match, et des matchs pas encore joués s'il est supprimé (avant le lancement, une prod qui ne remplit plus ces conditions n'est plus montrée), et figure dans l'export de ses données. Base : intérêt légitime (organiser les bénévoles qui diffusent les tournois), comme le planning ; la prod peut s'y opposer par le formulaire de signalement (catégorie RGPD).",
