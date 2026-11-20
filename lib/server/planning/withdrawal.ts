@@ -41,7 +41,7 @@ import {
   withPlanningLock,
   writeEvent,
 } from "./auto-assign";
-import { placePlannedCasts, releasePlannedSeat } from "./cast-placement";
+import { queuePlannedCasts, releasePlannedSeat } from "./cast-placement";
 import { coveringSoloCasterIds, loadPlanningData, loadPlanningHistory, type Executor, type LoadedEntry, type LoadedMember, type PlanningData } from "./load";
 import { entryAssignments, entryCoverage } from "./model";
 import { announceWithdrawal } from "./notices";
@@ -613,7 +613,7 @@ async function withdrawMember(
     // Un remplaçant confirmé (caster ou prod) va sur le match si personne ne le caste encore (`cast-placement.ts`) :
     // le désisté encore inscrit le garde tenu, rien n'est alors posé. Automatique, sans auteur nommé ; ne lève jamais.
     if (outcome.replacementId !== null) {
-      await placePlannedCasts([{ userId: outcome.replacementId, entry: outcome.entry, role: input.role }], null);
+      await queuePlannedCasts([{ userId: outcome.replacementId, entry: outcome.entry, role: input.role }], null);
     }
   }
   return {

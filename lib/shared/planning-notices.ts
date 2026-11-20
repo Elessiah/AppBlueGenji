@@ -178,24 +178,44 @@ export function formatPlanningAssignedDm(
 }
 
 /**
- * Caster placé par le planning sur un match dont la diffusion n'a pas encore
+ * Caster placé par le planning sur des matchs dont la diffusion n'a pas encore
  * de lien (`PLANNING_ASSIGNED`) : donner celui de sa chaîne dans « Configurer
- * ma diffusion », sur la fiche du match.
+ * ma diffusion », sur la fiche du match. Un seul match : son texte et son lien ;
+ * plusieurs : un seul message, une ligne par match (bornée, puis « … et N
+ * autres »), qui renvoie aussi au planning.
  */
-export function formatPlanningCastLinkDm(notice: PlanningCastLinkNotice, siteBase: string, locale: Locale): string {
-  const url = localizedSiteUrl(`${siteBase}${tournamentMatchHref(notice.tournamentId, notice.matchId)}`, locale);
-  const line = `• ${planningNoticeTime(notice.startAt, locale)} — ${planningEntryLabel(notice, locale)}`;
+export function formatPlanningCastLinkDm(notices: readonly PlanningCastLinkNotice[], siteBase: string, locale: Locale): string {
+  const matchUrl = (notice: PlanningCastLinkNotice) =>
+    localizedSiteUrl(`${siteBase}${tournamentMatchHref(notice.tournamentId, notice.matchId)}`, locale);
+  const lineOf = (notice: PlanningCastLinkNotice) => `• ${planningNoticeTime(notice.startAt, locale)} — ${planningEntryLabel(notice, locale)}`;
+  if (notices.length === 1) {
+    const url = matchUrl(notices[0]);
+    if (locale === "en") {
+      return [
+        "🎙️ BlueGenji — The planning made you a caster of this match:",
+        lineOf(notices[0]),
+        `Its stream has no link yet: add your channel's in “Configure my broadcast” on the match, or your stream shows nowhere. ${url}`,
+      ].join("\n");
+    }
+    return [
+      "🎙️ BlueGenji — Le planning te place comme caster de ce match :",
+      lineOf(notices[0]),
+      `Sa diffusion n'a pas encore de lien : donne celui de ta chaîne dans « Configurer ma diffusion » sur le match, sans quoi ta diffusion ne paraît nulle part. ${url}`,
+    ].join("\n");
+  }
+  const lines = boundedLines(notices.map((notice) => `${lineOf(notice)} : ${matchUrl(notice)}`), locale);
+  const planning = planningNoticeUrl(siteBase, locale);
   if (locale === "en") {
     return [
-      "🎙️ BlueGenji — The planning made you a caster of this match:",
-      line,
-      `Its stream has no link yet: add your channel's in “Configure my broadcast” on the match, or your stream shows nowhere. ${url}`,
+      `🎙️ BlueGenji — The planning made you a caster of ${notices.length} matches:`,
+      ...lines,
+      `Their streams have no link yet: add your channel's in “Configure my broadcast” on each match, or your stream shows nowhere. All your assignments: ${planning}`,
     ].join("\n");
   }
   return [
-    "🎙️ BlueGenji — Le planning te place comme caster de ce match :",
-    line,
-    `Sa diffusion n'a pas encore de lien : donne celui de ta chaîne dans « Configurer ma diffusion » sur le match, sans quoi ta diffusion ne paraît nulle part. ${url}`,
+    `🎙️ BlueGenji — Le planning te place comme caster de ${notices.length} matchs :`,
+    ...lines,
+    `Leurs diffusions n'ont pas encore de lien : donne celui de ta chaîne dans « Configurer ma diffusion » sur chaque match, sans quoi ta diffusion ne paraît nulle part. Toutes tes affectations : ${planning}`,
   ].join("\n");
 }
 

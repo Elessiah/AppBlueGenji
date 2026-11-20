@@ -237,7 +237,8 @@
     },
     "castLink": {
       "title": "Donne le lien de ta diffusion",
-      "body": "Le planning te place comme caster de {entry} ({start}) : donne le lien de ta chaîne dans « Configurer ma diffusion » sur le match."
+      "body": "Le planning te place comme caster de {entry} ({start}) : donne le lien de ta chaîne dans « Configurer ma diffusion » sur le match.",
+      "bodyMany": "Le planning te place comme caster de {count} matchs dont la diffusion n'a pas encore de lien : donne celui de ta chaîne dans « Configurer ma diffusion » sur chaque match."
     },
     "soloCaster": {
       "titleOn": "Caster autonome activé",

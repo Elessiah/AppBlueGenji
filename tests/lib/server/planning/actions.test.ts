@@ -14,7 +14,7 @@ jest.mock("@/lib/server/planning/load", () => ({
 }));
 jest.mock("@/lib/server/planning/profiles");
 jest.mock("@/lib/server/planning/notices");
-jest.mock("@/lib/server/planning/cast-placement", () => ({ placePlannedCasts: jest.fn(), releasePlannedSeat: jest.fn() }));
+jest.mock("@/lib/server/planning/cast-placement", () => ({ queuePlannedCasts: jest.fn(), releasePlannedSeat: jest.fn() }));
 jest.mock("@/lib/server/planning/players", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/players")>("@/lib/server/planning/players"),
   loadEntryPlayers: jest.fn(),
@@ -28,7 +28,7 @@ import { withNamedLock } from "@/lib/server/named-lock";
 import { PLANNING_STATUSES, setAvailability, setManualAssignment, setSoloCaster } from "@/lib/server/planning/actions";
 import { MATCH_REFEREE_REFUSAL_CODES } from "@/lib/server/planning/auto-assign";
 import { loadHiddenTournamentIds, loadPlanningData, loadPlanningEntries, loadPlanningMembersByIds } from "@/lib/server/planning/load";
-import { placePlannedCasts, releasePlannedSeat } from "@/lib/server/planning/cast-placement";
+import { queuePlannedCasts, releasePlannedSeat } from "@/lib/server/planning/cast-placement";
 import { announceAssignments } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { writeSoloCaster } from "@/lib/server/planning/profiles";
@@ -338,7 +338,7 @@ describe("setManualAssignment — pose", () => {
 
     await setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: true });
 
-    expect(placePlannedCasts).toHaveBeenCalledWith([{ userId: 6, entry: event, role: "PROD" }], { id: 9, pseudo: staff.pseudo });
+    expect(queuePlannedCasts).toHaveBeenCalledWith([{ userId: 6, entry: event, role: "PROD" }], { id: 9, pseudo: staff.pseudo });
   });
 
   it("setManualAssignment_removal_notPlaced", async () => {
@@ -353,7 +353,7 @@ describe("setManualAssignment — pose", () => {
 
     await setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: false });
 
-    expect(placePlannedCasts).not.toHaveBeenCalled();
+    expect(queuePlannedCasts).not.toHaveBeenCalled();
   });
 
   it("setManualAssignment_removalConfirmed_releasesPlannedSeatByStaff", async () => {

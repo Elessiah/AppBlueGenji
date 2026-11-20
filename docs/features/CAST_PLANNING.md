@@ -489,7 +489,22 @@ rejouée : qui a quitté le match n'y revient pas au geste suivant.
   le lance sans l'attendre — une transaction par match ne retarde ni la réponse
   ni le balayage ; ces placements non attendus passent en file, l'un après
   l'autre (`queuePlannedCasts`) ; le choix du staff et le remplaçant d'un désistement (un seul
-  match) l'attendent.
+  match) passent par la même file et l'attendent (jamais deux chaînes de
+  transactions sur les mêmes matchs). Le balayage d'office **attend** la file
+  (`drainPlannedCasts`) avant de finir son passage : le passage suivant ne la
+  croise pas, et l'arrêt du processus, qui attend les passages en cours dans son
+  délai, laisse aux placements leur chance de finir. Limite : un arrêt qui
+  tombe en pleine file perd les placements restants (rien n'est rejoué : une
+  personne qui a quitté le match n'y serait pas reposée) ; la ligne reste tenue
+  au planning, le staff place à la main.
+- **Coût** : par match, une transaction (comptes en partage, match, casters,
+  lignes tenues, conditions de cast) ; qui joue le match se lit en **deux**
+  requêtes pour tous les candidats (`playingUserIds`), non deux par candidat.
+  Après la série : **un** évènement de rafraîchissement par tournoi et **un**
+  avis « donne ton lien » par caster (tous ses matchs en une ligne chacun), non
+  un par match. Les lignes tenues se lisent par l'index `match_id` de
+  `bg_planning_assignments` ; les marques `planned` / `prod_planned` ne sont
+  jamais balayées (lues par clé de match ou de compte), elles n'ont pas d'index.
 - Une panne d'un match est consignée dans pm2 et n'empêche ni les autres
   matchs ni le geste du planning, déjà validé.
 - **Attribution quittée** (`releasePlannedSeat`) : ce que le planning a placé,

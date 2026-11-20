@@ -99,7 +99,7 @@ describe("announceAssignments", () => {
 
 describe("announceCastLinkNeeded", () => {
   it("announceCastLinkNeeded_placedCasters_notifiedOnAssignedTopicWithMatchLink", async () => {
-    await announceCastLinkNeeded([4, 5], loadedEntry());
+    await announceCastLinkNeeded([4, 5].map((userId) => ({ userId, entry: loadedEntry() })));
 
     expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4, 5], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
     const notification = jest.mocked(notifyUsers).mock.calls[0][1];
@@ -120,7 +120,7 @@ describe("announceCastLinkNeeded", () => {
     });
 
     const assigned = announceAssignments([{ userId: 4, entry: loadedEntry(), role: "CASTER" }]);
-    const link = announceCastLinkNeeded([4], loadedEntry());
+    const link = announceCastLinkNeeded([{ userId: 4, entry: loadedEntry() }]);
     await new Promise((resolve) => setImmediate(resolve));
     expect(jest.mocked(notifyUsers)).toHaveBeenCalledTimes(1);
     releaseFirst();
@@ -132,16 +132,37 @@ describe("announceCastLinkNeeded", () => {
     ]);
   });
 
+  it("announceCastLinkNeeded_sameCasterOnTwoMatches_oneNoticeListingBoth", async () => {
+    await announceCastLinkNeeded([
+      { userId: 4, entry: loadedEntry({ key: "m:1", matchId: 1 }) },
+      { userId: 4, entry: loadedEntry({ key: "m:2", matchId: 2 }) },
+    ]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+    const notification = jest.mocked(notifyUsers).mock.calls[0][1];
+    expect(notification.push?.("fr").url).toBe("/planning");
+    expect(notification.discord?.message("fr")).toContain("2 matchs");
+  });
+
+  it("announceCastLinkNeeded_twoCastersOnDifferentMatches_oneNoticeEach", async () => {
+    await announceCastLinkNeeded([
+      { userId: 4, entry: loadedEntry({ key: "m:1", matchId: 1 }) },
+      { userId: 5, entry: loadedEntry({ key: "m:2", matchId: 2 }) },
+    ]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+  });
+
   it("announceCastLinkNeeded_noRecipients_nothingSent", async () => {
     jest.mocked(loadNotificationRecipients).mockResolvedValue([]);
 
-    await announceCastLinkNeeded([4], loadedEntry());
+    await announceCastLinkNeeded([{ userId: 4, entry: loadedEntry() }]);
 
     expect(notifyUsers).not.toHaveBeenCalled();
   });
 
   it("announceCastLinkNeeded_emptyList_nothingLoaded", async () => {
-    await announceCastLinkNeeded([], loadedEntry());
+    await announceCastLinkNeeded([]);
 
     expect(loadNotificationRecipients).not.toHaveBeenCalled();
   });
@@ -150,7 +171,7 @@ describe("announceCastLinkNeeded", () => {
     const errorLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(notifyUsers).mockRejectedValue(new Error("BOT_DOWN"));
 
-    await expect(announceCastLinkNeeded([4], loadedEntry())).resolves.toBeUndefined();
+    await expect(announceCastLinkNeeded([{ userId: 4, entry: loadedEntry() }])).resolves.toBeUndefined();
     expect(errorLog).toHaveBeenCalledWith(expect.stringContaining("lien de diffusion"), expect.anything());
     errorLog.mockRestore();
   });

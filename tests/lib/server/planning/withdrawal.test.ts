@@ -25,7 +25,7 @@ jest.mock("@/lib/server/planning/planning-undo", () => ({
 jest.mock("@/lib/server/planning/notices");
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/tournaments/cast-eligibility");
-jest.mock("@/lib/server/planning/cast-placement", () => ({ placePlannedCasts: jest.fn(), releasePlannedSeat: jest.fn() }));
+jest.mock("@/lib/server/planning/cast-placement", () => ({ queuePlannedCasts: jest.fn(), releasePlannedSeat: jest.fn() }));
 
 import type { PoolConnection } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -36,7 +36,7 @@ import {
   loadPlanningHistory,
   loadPlanningMembersByIds,
 } from "@/lib/server/planning/load";
-import { placePlannedCasts, releasePlannedSeat } from "@/lib/server/planning/cast-placement";
+import { queuePlannedCasts, releasePlannedSeat } from "@/lib/server/planning/cast-placement";
 import { announceWithdrawal } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "@/lib/server/planning/planning-undo";
@@ -238,8 +238,8 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(jest.mocked(placePlannedCasts).mock.calls[0][0]).toMatchObject([{ userId: 6, role: "CASTER", entry: { key: "m:1" } }]);
-    expect(jest.mocked(placePlannedCasts).mock.calls[0][1]).toBeNull();
+    expect(jest.mocked(queuePlannedCasts).mock.calls[0][0]).toMatchObject([{ userId: 6, role: "CASTER", entry: { key: "m:1" } }]);
+    expect(jest.mocked(queuePlannedCasts).mock.calls[0][1]).toBeNull();
   });
 
   it("withdrawFromEntry_confirmedNoReplacement_notPlaced", async () => {
@@ -247,7 +247,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(placePlannedCasts).not.toHaveBeenCalled();
+    expect(queuePlannedCasts).not.toHaveBeenCalled();
   });
 
   it("withdrawFromEntry_provisionalReplacement_notPlaced", async () => {
@@ -255,7 +255,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
 
-    expect(placePlannedCasts).not.toHaveBeenCalled();
+    expect(queuePlannedCasts).not.toHaveBeenCalled();
   });
 
   it("withdrawFromEntry_confirmedCaster_releasesPlannedSeatBeforeReplacementPlaced", async () => {
@@ -265,7 +265,7 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
 
     expect(releasePlannedSeat).toHaveBeenCalledWith(expect.objectContaining({ key: "m:1" }), 4, "CASTER", null);
     expect(jest.mocked(releasePlannedSeat).mock.invocationCallOrder[0]).toBeLessThan(
-      jest.mocked(placePlannedCasts).mock.invocationCallOrder[0],
+      jest.mocked(queuePlannedCasts).mock.invocationCallOrder[0],
     );
   });
 

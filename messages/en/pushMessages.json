@@ -237,7 +237,8 @@
     },
     "castLink": {
       "title": "Add your stream link",
-      "body": "The planning made you a caster of {entry} ({start}): add your channel's link in “Configure my broadcast” on the match."
+      "body": "The planning made you a caster of {entry} ({start}): add your channel's link in “Configure my broadcast” on the match.",
+      "bodyMany": "The planning made you a caster of {count} matches whose streams have no link yet: add your channel's link in “Configure my broadcast” on each match."
     },
     "soloCaster": {
       "titleOn": "Solo caster turned on",

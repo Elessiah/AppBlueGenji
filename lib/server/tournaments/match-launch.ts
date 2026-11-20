@@ -848,7 +848,7 @@ export async function resolveTeamParty(
  * d'une des deux équipes) — `resolveTeamParty` pour plusieurs comptes, en deux
  * lectures quel que soit leur nombre.
  */
-async function playingUserIds(
+export async function playingUserIds(
   connection: PoolConnection,
   match: { team1_id: number | null; team2_id: number | null },
   userIds: readonly number[],

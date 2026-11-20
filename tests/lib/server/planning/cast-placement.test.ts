@@ -4,7 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/planning/auto-assign", () => ({ lockedHolding: jest.fn() }));
 jest.mock("@/lib/server/tournaments/cast-eligibility", () => ({ loadCastBlocks: jest.fn() }));
 jest.mock("@/lib/server/tournaments/match-casters", () => ({ lockMatchCasters: jest.fn(), lockMatchStreams: jest.fn() }));
-jest.mock("@/lib/server/tournaments/match-launch", () => ({ resolveTeamParty: jest.fn(), releasePlannedMatchCast: jest.fn() }));
+jest.mock("@/lib/server/tournaments/match-launch", () => ({ playingUserIds: jest.fn(), releasePlannedMatchCast: jest.fn() }));
 jest.mock("@/lib/server/tournaments/match-prod", () => ({ releasePlannedProd: jest.fn() }));
 jest.mock("@/lib/server/planning/notices", () => ({ announceCastLinkNeeded: jest.fn() }));
 jest.mock("@/lib/server/tournaments/notifications", () => ({ publishMatchUpdatedEvent: jest.fn() }));
@@ -20,6 +20,7 @@ import {
   placementAuditLine,
   placementTargets,
   placePlannedCasts,
+  drainPlannedCasts,
   queuePlannedCasts,
   releaseAuditLine,
   releasePlannedSeat,
@@ -30,7 +31,7 @@ import { auditStaffAction } from "@/lib/server/staff-audit";
 import { loadCastBlocks } from "@/lib/server/tournaments/cast-eligibility";
 import { announceCastChange } from "@/lib/server/tournaments/cast-notices";
 import { lockMatchCasters, lockMatchStreams, type MatchCasterLink, type MatchStreamRow } from "@/lib/server/tournaments/match-casters";
-import { releasePlannedMatchCast, resolveTeamParty } from "@/lib/server/tournaments/match-launch";
+import { playingUserIds, releasePlannedMatchCast } from "@/lib/server/tournaments/match-launch";
 import { releasePlannedProd } from "@/lib/server/tournaments/match-prod";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { announceProdChange } from "@/lib/server/tournaments/prod-notices";
@@ -73,7 +74,7 @@ const DEFAULT_HELD: HeldRow[] = [
 function matchRow(id: number, state: MatchRowState) {
   return {
     id,
-    tournament_id: 10,
+    tournament_id: id === 3 ? 11 : 10,
     status: state.status ?? "PENDING",
     is_bye: state.is_bye ?? 0,
     team1_id: 100,
@@ -129,7 +130,7 @@ beforeEach(() => {
   jest.mocked(lockedHolding).mockResolvedValue(allowed);
   jest.mocked(lockMatchCasters).mockResolvedValue([]);
   jest.mocked(lockMatchStreams).mockResolvedValue([]);
-  jest.mocked(resolveTeamParty).mockResolvedValue(null);
+  jest.mocked(playingUserIds).mockResolvedValue(new Set());
   jest.mocked(loadCastBlocks).mockImplementation(async (_executor, ids) => new Map(ids.map((id): [number, CastBlock | null] => [id, null])));
 });
 
@@ -210,7 +211,7 @@ describe("placePlannedCasts — marque et lien de diffusion", () => {
   it("placePlannedCasts_newStreamWithoutLink_announcesLinkNeeded", async () => {
     await placePlannedCasts([line(CASTER_A, "CASTER")], STAFF);
 
-    expect(announceCastLinkNeeded).toHaveBeenCalledWith([CASTER_A], ENTRY);
+    expect(announceCastLinkNeeded).toHaveBeenCalledWith([{ userId: CASTER_A, entry: ENTRY }]);
   });
 
   it("placePlannedCasts_staffStreamWithLink_noLinkNotice", async () => {
@@ -254,7 +255,7 @@ describe("placePlannedCasts — marque et lien de diffusion", () => {
 
     await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER")], self);
 
-    expect(announceCastLinkNeeded).toHaveBeenCalledWith([CASTER_B], ENTRY);
+    expect(announceCastLinkNeeded).toHaveBeenCalledWith([{ userId: CASTER_B, entry: ENTRY }]);
   });
 
   it("placePlannedCasts_prodPlaced_writesPlannedMarker", async () => {
@@ -454,9 +455,7 @@ describe("placePlannedCasts", () => {
   });
 
   it("placePlannedCasts_casterPlaysMatch_notPlaced", async () => {
-    jest.mocked(resolveTeamParty).mockImplementation(async (_connection, _match, userId) =>
-      userId === CASTER_A ? { role: "TEAM1", canDeclareReady: true } : null,
-    );
+    jest.mocked(playingUserIds).mockResolvedValue(new Set([CASTER_A]));
 
     const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(PROD, "PROD")], STAFF);
 
@@ -464,9 +463,7 @@ describe("placePlannedCasts", () => {
   });
 
   it("placePlannedCasts_prodPlaysMatch_notPlaced", async () => {
-    jest.mocked(resolveTeamParty).mockImplementation(async (_connection, _match, userId) =>
-      userId === PROD ? { role: "TEAM2", canDeclareReady: true } : null,
-    );
+    jest.mocked(playingUserIds).mockResolvedValue(new Set([PROD]));
 
     const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(PROD, "PROD")], STAFF);
 
@@ -546,5 +543,77 @@ describe("queuePlannedCasts", () => {
     gate.open?.(allowed);
     await Promise.all([first, second]);
     expect(lockedHolding).toHaveBeenCalledTimes(2);
+  });
+  it("drainPlannedCasts_queuedPlacements_resolvesAfterTheyRan", async () => {
+    const gate: { open?: (check: HoldingCheck) => void } = {};
+    jest.mocked(lockedHolding).mockImplementationOnce(() => new Promise<HoldingCheck>((resolve) => (gate.open = resolve)));
+    void queuePlannedCasts([line(CASTER_A, "CASTER")], STAFF);
+    let drained = false;
+    const draining = drainPlannedCasts().then(() => {
+      drained = true;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(drained).toBe(false);
+    gate.open?.(allowed);
+    await draining;
+    expect(castWrites().length).toBeGreaterThan(0);
+  });
+
+  it("drainPlannedCasts_placementQueuedWhileWaiting_alsoWaitedFor", async () => {
+    const first = queuePlannedCasts([line(CASTER_A, "CASTER")], STAFF);
+    const draining = drainPlannedCasts();
+    void queuePlannedCasts([line(CASTER_B, "CASTER", loadedEntry({ key: "m:2", matchId: 2 }))], STAFF);
+    await draining;
+    await first;
+
+    expect(lockedHolding).toHaveBeenCalledTimes(2);
+  });
+
+  it("drainPlannedCasts_nothingQueued_resolves", async () => {
+    await expect(drainPlannedCasts()).resolves.toBeUndefined();
+  });
+});
+
+describe("placePlannedCasts — une rafale de matchs", () => {
+  const ENTRY_2 = loadedEntry({ key: "m:2", matchId: 2, tournamentId: 10 });
+  const ENTRY_3 = loadedEntry({ key: "m:3", matchId: 3, tournamentId: 11 });
+
+  it("placePlannedCasts_manyMatchesOneTournament_publishesOnce", async () => {
+    await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER", ENTRY_2)], STAFF);
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(10, { landingLive: true });
+  });
+
+  it("placePlannedCasts_manyMatchesManyTournaments_oneEventPerTournament", async () => {
+    await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER", ENTRY_3)], STAFF);
+
+    expect(jest.mocked(publishMatchUpdatedEvent).mock.calls.map(([id]) => id)).toEqual([10, 11]);
+  });
+
+  it("placePlannedCasts_sameCasterOnTwoMatches_oneLinkNoticeCall", async () => {
+    await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_A, "CASTER", ENTRY_2)], STAFF);
+
+    expect(announceCastLinkNeeded).toHaveBeenCalledTimes(1);
+    expect(announceCastLinkNeeded).toHaveBeenCalledWith([
+      { userId: CASTER_A, entry: ENTRY },
+      { userId: CASTER_A, entry: ENTRY_2 },
+    ]);
+  });
+
+  it("placePlannedCasts_nothingPlaced_noEventNoNotice", async () => {
+    jest.mocked(lockedHolding).mockResolvedValue(() => "PLANNING_ROLE_NOT_HELD");
+    await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER", ENTRY_2)], STAFF);
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    expect(announceCastLinkNeeded).not.toHaveBeenCalled();
+  });
+
+  it("placePlannedCasts_candidates_playersAskedOncePerMatch", async () => {
+    await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER"), line(PROD, "PROD")], STAFF);
+
+    expect(playingUserIds).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(playingUserIds).mock.calls[0][2]).toEqual(expect.arrayContaining([CASTER_A, CASTER_B, PROD]));
   });
 });

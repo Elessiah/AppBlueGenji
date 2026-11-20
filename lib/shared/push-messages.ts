@@ -1252,12 +1252,21 @@ export function planningAssignedPush(
 }
 
 /**
- * Caster placé par le planning sur un match dont la diffusion n'a pas encore
- * de lien (`PLANNING_ASSIGNED`) : donner celui de sa chaîne. Ouvre la fiche du
- * match.
+ * Caster placé par le planning sur des matchs dont la diffusion n'a pas encore
+ * de lien (`PLANNING_ASSIGNED`) : donner celui de sa chaîne. Un match : ouvre sa
+ * fiche ; plusieurs : un seul avis, qui ouvre le planning.
  */
-export function planningCastLinkPush(notice: PlanningCastLinkNotice, locale: Locale = DEFAULT_LOCALE): PushContent {
+export function planningCastLinkPush(notices: readonly PlanningCastLinkNotice[], locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];
+  if (notices.length > 1) {
+    return {
+      title: text.t("planning.castLink.title"),
+      body: text.t("planning.castLink.bodyMany", { count: notices.length }),
+      url: localeHref(PLANNING_PATH, locale),
+      tag: `planning-cast-link-${idsFingerprint(notices.map((notice) => notice.matchId))}`,
+    };
+  }
+  const notice = notices[0];
   return {
     title: text.t("planning.castLink.title"),
     body: text.t("planning.castLink.body", {

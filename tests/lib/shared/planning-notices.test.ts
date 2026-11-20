@@ -338,7 +338,7 @@ describe("caster placé sur une diffusion sans lien", () => {
   const notice = { ...noticeEntry(), matchId: 12 };
 
   it("formatPlanningCastLinkDm_fr_saysPlanningAndConfigureButtonWithMatchLink", () => {
-    const text = formatPlanningCastLinkDm(notice, SITE, "fr");
+    const text = formatPlanningCastLinkDm([notice], SITE, "fr");
 
     expect(text).toContain("Le planning te place comme caster de ce match");
     expect(text).toContain("« Configurer ma diffusion »");
@@ -348,7 +348,7 @@ describe("caster placé sur une diffusion sans lien", () => {
   });
 
   it("formatPlanningCastLinkDm_en_englishTextAndEnglishLink", () => {
-    const text = formatPlanningCastLinkDm(notice, SITE, "en");
+    const text = formatPlanningCastLinkDm([notice], SITE, "en");
 
     expect(text).toContain("The planning made you a caster of this match");
     expect(text).toContain("“Configure my broadcast”");
@@ -356,14 +356,14 @@ describe("caster placé sur une diffusion sans lien", () => {
   });
 
   it("formatPlanningCastLinkDm_soloMatch_noPlayerPseudo", () => {
-    const text = formatPlanningCastLinkDm({ ...notice, solo: true, team1Name: "Pseudo1", team2Name: "Pseudo2" }, SITE, "fr");
+    const text = formatPlanningCastLinkDm([{ ...notice, solo: true, team1Name: "Pseudo1", team2Name: "Pseudo2" }], SITE, "fr");
 
     expect(text).not.toContain("Pseudo1");
     expect(text).not.toContain("Pseudo2");
   });
 
   it("planningCastLinkPush_fr_titleBodyUrlAndTag", () => {
-    const push = planningCastLinkPush(notice, "fr");
+    const push = planningCastLinkPush([notice], "fr");
 
     expect(push.title).toBe(frPushMessages.planning.castLink.title);
     expect(push.body).toContain("« Configurer ma diffusion »");
@@ -372,11 +372,46 @@ describe("caster placé sur une diffusion sans lien", () => {
   });
 
   it("planningCastLinkPush_en_englishTitleAndUrl", () => {
-    const push = planningCastLinkPush(notice, "en");
+    const push = planningCastLinkPush([notice], "en");
 
     expect(push.title).toBe(enPushMessages.planning.castLink.title);
     expect(push.body).toContain("“Configure my broadcast”");
     expect(push.url).toMatch(/^\/en\/tournois\/3/);
+  });
+});
+
+describe("caster placé sur plusieurs diffusions sans lien", () => {
+  const notices = [1, 2, 3].map((matchId) => ({ ...noticeEntry({ key: "m:" + matchId }), matchId }));
+
+  it("formatPlanningCastLinkDm_severalMatches_oneMessageWithCountAndLinks", () => {
+    const fr = formatPlanningCastLinkDm(notices, SITE, "fr");
+    const en = formatPlanningCastLinkDm(notices, SITE, "en");
+
+    expect(fr).toContain("3 matchs");
+    expect(fr.split("\n").filter((line) => line.startsWith("•"))).toHaveLength(3);
+    expect(fr).toContain(`${SITE}/tournois/3`);
+    expect(en).toContain("3 matches");
+    expect(en).toContain(`${SITE}/en/planning`);
+  });
+
+  it("formatPlanningCastLinkDm_manyMatches_linesBounded", () => {
+    const many = Array.from({ length: 40 }, (_, index) => ({ ...noticeEntry({ key: "m:" + index }), matchId: index + 1 }));
+
+    const text = formatPlanningCastLinkDm(many, SITE, "fr");
+
+    expect(text).toContain("… et ");
+    expect(text.length).toBeLessThan(2000);
+  });
+
+  it("planningCastLinkPush_severalMatches_countBodyAndPlanningUrl", () => {
+    const fr = planningCastLinkPush(notices, "fr");
+    const en = planningCastLinkPush(notices, "en");
+
+    expect(fr.body).toContain("3 matchs");
+    expect(fr.url).toBe("/planning");
+    expect(en.body).toContain("3 matches");
+    expect(en.url).toBe("/en/planning");
+    expect(fr.tag).not.toBe(planningCastLinkPush([notices[0]], "fr").tag);
   });
 });
 

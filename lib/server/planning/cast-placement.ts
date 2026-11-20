@@ -26,7 +26,7 @@ import { announceCastChange, type CastPairing } from "@/lib/server/tournaments/c
 import { loadCastBlocks } from "@/lib/server/tournaments/cast-eligibility";
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { lockMatchCasters, lockMatchStreams } from "@/lib/server/tournaments/match-casters";
-import { releasePlannedMatchCast, resolveTeamParty } from "@/lib/server/tournaments/match-launch";
+import { playingUserIds, releasePlannedMatchCast } from "@/lib/server/tournaments/match-launch";
 import { releasePlannedProd } from "@/lib/server/tournaments/match-prod";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { announceProdChange, type ProdChange } from "@/lib/server/tournaments/prod-notices";
@@ -38,7 +38,7 @@ import type { PlanningRole } from "@/lib/shared/planning";
 import type { TournamentGame } from "@/lib/shared/types";
 import { lockedHolding, type HoldingEntry } from "./auto-assign";
 import type { LoadedEntry } from "./load";
-import { announceCastLinkNeeded } from "./notices";
+import { announceCastLinkNeeded, type CastLinkItem } from "./notices";
 
 /** Une ligne du planning qu'un geste vient de rendre tenue. */
 export type PlannedCastLine = { entry: LoadedEntry; userId: number; role: PlanningRole };
@@ -116,6 +116,12 @@ export function releaseAuditLine(matchId: number, userId: number, role: "CASTER"
   return `${role === "CASTER" ? "caster" : "prod"} #${userId} retiré du match #${matchId} avec son attribution au planning`;
 }
 
+/** Les casters à prévenir de donner leur lien de diffusion : le staff qui se place lui-même n'est pas prévenu de son propre geste (comme de l'affectation). */
+function linkNoticeItems(placement: MatchPlacement, entry: LoadedEntry, actor: StaffActor | null): CastLinkItem[] {
+  if (!placement.linkNeeded) return [];
+  return placement.casterIds.filter((userId) => userId !== actor?.id).map((userId) => ({ userId, entry }));
+}
+
 /**
  * Place, match par match, les casters et la prod des lignes données (celles
  * qu'un geste vient de rendre tenues). `actor` : le staff du geste, nommé dans
@@ -124,6 +130,8 @@ export function releaseAuditLine(matchId: number, userId: number, role: "CASTER"
  */
 export async function placePlannedCasts(lines: readonly PlannedCastLine[], actor: StaffActor | null): Promise<MatchPlacement[]> {
   const placed: MatchPlacement[] = [];
+  const tournaments = new Set<number>();
+  const linkItems: CastLinkItem[] = [];
   const targets = [...placementTargets(lines)].sort(([a], [b]) => a - b);
   for (const [matchId, target] of targets) {
     try {
@@ -132,14 +140,16 @@ export async function placePlannedCasts(lines: readonly PlannedCastLine[], actor
       );
       if ("skip" in outcome) continue;
       placed.push(outcome.placement);
+      tournaments.add(outcome.tournamentId);
       afterPlacement(outcome, actor);
-      // Le staff qui se place lui-même n'est pas prévenu de son propre geste (comme de l'affectation).
-      const toWarn = outcome.placement.casterIds.filter((id) => id !== actor?.id);
-      if (outcome.placement.linkNeeded && toWarn.length > 0) void announceCastLinkNeeded(toWarn, target.entry);
+      linkItems.push(...linkNoticeItems(outcome.placement, target.entry, actor));
     } catch (error) {
       console.error(`[planning] cast du match #${matchId} non placé depuis le planning : ${failureDiagnostic(error)}`);
     }
   }
+  // Un seul évènement par tournoi et un seul avis de lien par caster, quel que soit le nombre de matchs placés.
+  for (const tournamentId of tournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  if (linkItems.length > 0) void announceCastLinkNeeded(linkItems);
   return placed;
 }
 
@@ -157,14 +167,26 @@ export function queuePlannedCasts(lines: readonly PlannedCastLine[], actor: Staf
 }
 
 /**
- * Après le commit : le plateau se rafraîchit, le journal du staff (anonyme)
- * part. Le caster apprend son affectation par le planning ; la prod reçoit en
+ * Attend que les placements mis en file soient joués : le balayage d'office le
+ * fait avant de rendre la main, l'arrêt du processus aussi — un redémarrage ne
+ * perd pas les placements d'une semaine confirmée.
+ */
+export async function drainPlannedCasts(): Promise<void> {
+  let waited: Promise<unknown>;
+  do {
+    waited = placementChain;
+    await waited;
+  } while (waited !== placementChain);
+}
+
+/**
+ * Après le commit : le journal du staff (anonyme) part (le plateau se
+ * rafraîchit une fois par tournoi, à la fin de {@link placePlannedCasts}). Le caster apprend son affectation par le planning ; la prod reçoit en
  * plus l'avis de prod placée (`MATCH_PROD`, « Le planning te place comme
  * prod », `MATCH_PROD.md`) — sauf le staff qui se confirme lui-même.
  */
 function afterPlacement(outcome: Extract<PlacementOutcome, { placement: MatchPlacement }>, actor: StaffActor | null): void {
-  const { placement, tournamentId, pairing } = outcome;
-  publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  const { placement, pairing } = outcome;
   for (const casterId of placement.casterIds) announceCastChange({ kind: "PLANNED", matchId: placement.matchId, casterId, pairing });
   if (placement.prodId !== null) {
     const notices: ProdChange["notices"] = placement.prodId === actor?.id ? [] : [{ userId: placement.prodId, kind: "PLANNED" }];
@@ -264,16 +286,13 @@ async function placementStream(
 }
 
 /** La prod : une au plus (plus petit id), jamais un joueur du match. */
-async function pickProd(
-  connection: PoolConnection,
-  row: PlacementMatchRow,
+function pickProd(
   prodIds: readonly number[],
   eligible: (userId: number) => boolean,
-): Promise<number | null> {
+  playing: ReadonlySet<number>,
+): number | null {
   for (const userId of [...prodIds].sort((a, b) => a - b)) {
-    if (!eligible(userId)) continue;
-    if (await resolveTeamParty(connection, row, userId)) continue;
-    return userId;
+    if (eligible(userId) && !playing.has(userId)) return userId;
   }
   return null;
 }
@@ -281,18 +300,12 @@ async function pickProd(
 /** Les casters qui remplissent la condition du cast (permission de diffusion, tag Discord certifié, Battle.net en Overwatch) et ne jouent pas le match. */
 async function pickCasters(
   connection: PoolConnection,
-  row: PlacementMatchRow,
   pending: readonly number[],
   game: TournamentGame,
+  playing: ReadonlySet<number>,
 ): Promise<number[]> {
   const blocks = await loadCastBlocks(connection, [...pending], game, true);
-  const placed: number[] = [];
-  for (const userId of [...pending].sort((a, b) => a - b)) {
-    if (blocks.get(userId) !== null) continue;
-    if (await resolveTeamParty(connection, row, userId)) continue;
-    placed.push(userId);
-  }
-  return placed;
+  return [...pending].sort((a, b) => a - b).filter((userId) => blocks.get(userId) === null && !playing.has(userId));
 }
 
 /**
@@ -353,14 +366,16 @@ export async function placeOnMatch(
     (role === "CASTER" ? held.casterIds : held.prodIds).has(userId) && holds(userId, entry, role) === null;
 
   // La prod : seulement si le match n'en a pas, dans un tournoi en cours ; jamais un caster du match.
+  // Qui joue le match : deux lectures pour tous les candidats (jamais un joueur du match au cast).
+  const playing = await playingUserIds(connection, row, [...casterIds, ...prodIds]);
   const prodId =
     currentProd === null && tournament.running
-      ? await pickProd(connection, row, prodIds, (userId) => fit(userId, "PROD") && !onMatch.has(userId))
+      ? pickProd(prodIds, (userId) => fit(userId, "PROD") && !onMatch.has(userId), playing)
       : null;
   const pending = casterIds.filter(
     (userId) => !onMatch.has(userId) && fit(userId, "CASTER") && userId !== currentProd && userId !== prodId,
   );
-  const placedCasters = await pickCasters(connection, row, pending, tournament.game);
+  const placedCasters = await pickCasters(connection, pending, tournament.game, playing);
   if (prodId === null && placedCasters.length === 0) return { skip: "NONE_ELIGIBLE" };
 
   const linkNeeded = await writePlacement(connection, matchId, prodId, placedCasters, casters.map((caster) => caster.streamId));

@@ -34,7 +34,7 @@ import {
   type LoadedEntry,
   type PlanningData,
 } from "./load";
-import { placePlannedCasts, releasePlannedSeat } from "./cast-placement";
+import { queuePlannedCasts, releasePlannedSeat } from "./cast-placement";
 import { entryAssignments } from "./model";
 import { announceAssignments } from "./notices";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture, undoPlanningBlock } from "./planning-undo";
@@ -366,5 +366,6 @@ export async function setManualAssignment(actor: AuthUser, input: ManualInput, n
   // Après le verrou, sans faire attendre la page ; l'auteur qui se pose lui-même n'est pas prévenu.
   void announceAssignments([{ userId: input.userId, entry: announce, role: input.role }], { actorId: actor.id });
   // Un caster ou une prod sur un match que personne ne caste encore y est placé (`cast-placement.ts`, ne lève jamais).
-  await placePlannedCasts([{ userId: input.userId, entry: announce, role: input.role }], staffActor(actor));
+  // En file avec les placements du balayage d'office : jamais deux chaînes de transactions sur les mêmes matchs.
+  await queuePlannedCasts([{ userId: input.userId, entry: announce, role: input.role }], staffActor(actor));
 }
