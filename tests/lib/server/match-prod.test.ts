@@ -337,7 +337,7 @@ describe("assignMatchProd", () => {
   it("assignMatchProd_targetWithoutProd_throwsNotProd", async () => {
     accounts.set(PROD_ID, { is_deleted: 0, holds_prod: 0 });
 
-    await expect(assignMatchProd(42, STAFF_ID, PROD_ID)).rejects.toThrow("NOT_PROD");
+    await expect(assignMatchProd(42, STAFF_ID, PROD_ID)).rejects.toThrow("PROD_NOT_ELIGIBLE");
   });
 
   it("assignMatchProd_suspendedTarget_throwsProdUnavailable", async () => {

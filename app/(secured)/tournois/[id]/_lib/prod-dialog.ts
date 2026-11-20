@@ -14,6 +14,15 @@ export type ProdPanelView = {
 };
 
 /**
+ * Les comptes affichés au choix : tous sauf la prod actuelle. Ceux qui ne peuvent
+ * pas être placés (`block`) y figurent grisés, avec leur raison — sinon le staff ne
+ * saurait pas pourquoi la personne qu'il cherche manque.
+ */
+export function prodOptions(panel: ProdPanelView): ProdPanelUserView[] {
+  return panel.candidates.filter((candidate) => candidate.userId !== panel.prod?.userId);
+}
+
+/**
  * Les comptes proposés : ceux qui peuvent être placés (ni joueur ni caster du
  * match), sans la prod actuelle — la choisir ne changerait rien.
  */

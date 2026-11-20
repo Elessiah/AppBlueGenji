@@ -125,7 +125,7 @@ describe("entryAssignments — prod du match (MATCH_PROD.md)", () => {
     const data = planningData({ assignments: [loadedAssignment({ userId: 7, role: "PROD", confirmed: false })] });
 
     expect(entryAssignments(loadedEntry({ matchProdId: 5 }), data)).toEqual([
-      { userId: 5, role: "PROD", source: "CAST", reason: "CAST", provisional: false },
+      { userId: 5, role: "PROD", source: "CAST", reason: "MATCH", provisional: false },
     ]);
   });
 
@@ -145,7 +145,7 @@ describe("entryAssignments — prod du match (MATCH_PROD.md)", () => {
     });
 
     expect(entryAssignments(loadedEntry({ matchProdId: 5 }), data)).toEqual([
-      { userId: 5, role: "PROD", source: "CAST", reason: "CAST", provisional: false },
+      { userId: 5, role: "PROD", source: "CAST", reason: "MATCH", provisional: false },
     ]);
   });
 
@@ -153,7 +153,7 @@ describe("entryAssignments — prod du match (MATCH_PROD.md)", () => {
     const data = planningData({ assignments: [loadedAssignment({ userId: 5, role: "CASTER", confirmed: false })] });
 
     expect(entryAssignments(loadedEntry({ matchProdId: 5 }), data)).toEqual([
-      { userId: 5, role: "PROD", source: "CAST", reason: "CAST", provisional: false },
+      { userId: 5, role: "PROD", source: "CAST", reason: "MATCH", provisional: false },
     ]);
   });
 

@@ -380,6 +380,12 @@
     },
     "prodClaimed": "Tu fais la prod de ce match.",
     "prodReleased": "Tu ne fais plus la prod de ce match.",
+    "prodReleaseConfirm": {
+      "title": "Ne plus faire la prod de {match} ?",
+      "confirm": "Ne plus faire la prod",
+      "pending": "Retrait…",
+      "body": "La place redevient libre : une autre prod peut la prendre aussitôt."
+    },
     "prodDialog": {
       "title": "Prod : {match}",
       "hintSubject": "prod du match",
@@ -395,6 +401,8 @@
       "assign": "Placer",
       "assigned": "{pseudo} fait la prod de ce match.",
       "removed": "La prod de ce match est retirée.",
+      "blockedPlayer": "{pseudo} (joue ce match)",
+      "blockedCaster": "{pseudo} (caste ce match)",
       "noCandidate": "Aucun autre compte prod ne peut être placé sur ce match.",
       "close": "Fermer",
       "pending": "Enregistrement…",

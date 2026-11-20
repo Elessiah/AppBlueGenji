@@ -75,7 +75,7 @@ export function entryAssignments(
     const kept = out.filter(
       (row) => row.role !== "PROD" && !(row.role === "CASTER" && row.userId === prodId && row.provisional),
     );
-    kept.push(held ?? { userId: prodId, role: "PROD", source: "CAST", reason: "CAST", provisional: false });
+    kept.push(held ?? { userId: prodId, role: "PROD", source: "CAST", reason: "MATCH", provisional: false });
     out.splice(0, out.length, ...kept);
   }
   const order = { REFEREE: 0, CASTER: 1, PROD: 2 } as const;

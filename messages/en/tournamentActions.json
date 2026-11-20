@@ -380,6 +380,12 @@
     },
     "prodClaimed": "You're doing this match's prod.",
     "prodReleased": "You're no longer doing this match's prod.",
+    "prodReleaseConfirm": {
+      "title": "Stop doing the prod of {match}?",
+      "confirm": "Stop doing the prod",
+      "pending": "Leaving…",
+      "body": "The slot becomes free again: another prod can take it right away."
+    },
     "prodDialog": {
       "title": "Prod: {match}",
       "hintSubject": "match prod",
@@ -395,6 +401,8 @@
       "assign": "Assign",
       "assigned": "{pseudo} is doing this match's prod.",
       "removed": "This match's prod has been removed.",
+      "blockedPlayer": "{pseudo} (plays this match)",
+      "blockedCaster": "{pseudo} (casts this match)",
       "noCandidate": "No other prod account can be placed on this match.",
       "close": "Close",
       "pending": "Saving…",

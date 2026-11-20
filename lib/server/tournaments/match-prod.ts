@@ -226,7 +226,7 @@ export async function assignMatchProd(
 /** Compte à placer par le staff, lu en partage en première instruction : il tient `prod` et n'est pas suspendu. */
 async function assertAssignableProd(connection: PoolConnection, prodId: number): Promise<void> {
   const account = await lockProdAccount(connection, prodId);
-  if (!account?.holdsProd) throw new Error("NOT_PROD");
+  if (!account?.holdsProd) throw new Error("PROD_NOT_ELIGIBLE");
   if ((await lockedSuspendedUserIds(connection, [prodId])).has(prodId)) throw new Error("PROD_UNAVAILABLE");
 }
 

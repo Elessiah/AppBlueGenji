@@ -29,7 +29,7 @@ antenne, ni aperçu du plateau (`PERMISSION_ROLES.md`). Un compte marqué
 | --- | --- | --- | --- |
 | Se placer | `prod` (session, incarnation comprise) | `POST /api/matches/[id]/prod` | `NOT_PROD` (relu en base), `PROD_SUSPENDED` (compte suspendu), `MATCH_PROD_TAKEN` (place tenue sur le match, ou prod d'un autre compte tenue au planning), `PROD_IS_PLAYER`, `PROD_IS_CASTER`, match joué ou exemption |
 | Se retirer | la prod elle-même, même sans le rôle (403 seulement pour une incarnation sans `prod`) | `DELETE /api/matches/[id]/prod` | `NOT_MATCH_PROD` |
-| Placer, changer, retirer | staff `tournaments` | `GET`/`PUT /api/admin/matches/[id]/prod` (`{ userId, expectedUserId }` ; `userId` obligatoire, `null` = retirer, absent = 400 `INVALID_USER_ID`) | `NOT_PROD`, `PROD_UNAVAILABLE` (suspendu), `PROD_IS_PLAYER`, `PROD_IS_CASTER`, `PROD_CHANGED` (la prod a changé depuis l'ouverture de la fenêtre) |
+| Placer, changer, retirer | staff `tournaments` | `GET`/`PUT /api/admin/matches/[id]/prod` (`{ userId, expectedUserId }` ; `userId` obligatoire, `null` = retirer, absent = 400 `INVALID_USER_ID`) | `PROD_NOT_ELIGIBLE` (le compte visé n'a plus `prod`), `PROD_UNAVAILABLE` (suspendu), `PROD_IS_PLAYER`, `PROD_IS_CASTER`, `PROD_CHANGED` (la prod a changé depuis l'ouverture de la fenêtre) |
 
 Un caster ne peut pas être la prod du même match (`CASTER_IS_PROD` à
 l'inscription de cast, `PROD_IS_CASTER` dans l'autre sens — caster inscrit, ou
@@ -38,7 +38,7 @@ compte (`LOCK IN SHARE MODE`) puis match (`FOR UPDATE`, sans jointure), puis
 lignes du planning relues en lecture courante (`LOCK IN SHARE MODE`) — même ordre
 que la confirmation du planning, qui relit la prod du match sous verrou.
 
-Sur la carte, « Plus d'actions » : « Faire la prod » / « Ne plus faire la prod »
+Sur la carte, « Plus d'actions » : « Faire la prod » / « Ne plus faire la prod » (confirmé par `ConfirmActionDialog`)
 (`canLeaveProd` : toute session hors incarnation sans `prod` — un rôle perdu
 n'empêche pas de rendre la place qu'un match lancé a gardée) / « Prod du match » (fenêtre `ProdDialog`, retrait confirmé par
 `ConfirmActionDialog`). La page du match l'affiche dans ses faits clés (« Prod »).
@@ -103,3 +103,5 @@ de charge (`loadPlanningHistory`).
 
 La deuxième manche des cas de lancement a pour prod `Test_Prod2` ; les autres
 sont libres pour `Test_Prod` (`docs/seed/SEED_RULES.md`).
+
+Au planning, la prod du match porte le motif « Désigné sur le match » (`MATCH`) ; la poser à la main sur son propre match est refusé (`PLANNING_CAST_MANAGED`). La fenêtre « Prod du match » montre les comptes qui jouent ou castent le match grisés, avec leur raison ; le staff dont la cible a perdu le rôle reçoit `PROD_NOT_ELIGIBLE`.

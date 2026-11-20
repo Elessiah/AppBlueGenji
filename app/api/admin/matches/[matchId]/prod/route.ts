@@ -9,7 +9,7 @@ const STATUSES: Readonly<Record<string, number>> = {
   MATCH_NOT_FOUND: 404,
   MATCH_ALREADY_COMPLETED: 409,
   MATCH_NOT_LAUNCHABLE: 409,
-  NOT_PROD: 409,
+  PROD_NOT_ELIGIBLE: 409,
   PROD_UNAVAILABLE: 409,
   PROD_IS_PLAYER: 409,
   PROD_IS_CASTER: 409,
@@ -41,7 +41,7 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
  * Place la prod du match, la change ou la retire. Corps :
  * `{ userId: number | null, expectedUserId?: number | null }` — `userId`
  * obligatoire (`null` : retirer ; absent : 400 `INVALID_USER_ID`). Le compte placé
- * tient la permission `prod` (409 `NOT_PROD`), n'est pas suspendu
+ * tient la permission `prod` (409 `PROD_NOT_ELIGIBLE`), n'est pas suspendu
  * (409 `PROD_UNAVAILABLE`), ne joue pas le match et n'en est pas caster.
  * `expectedUserId` : la prod que la fenêtre montrait ; changée depuis, rien ne
  * change (409 `PROD_CHANGED`).

@@ -11,9 +11,9 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
-import { prodPickable, type ProdPanelView } from "../_lib/prod-dialog";
+import { prodOptions, prodPickable, type ProdPanelUserView, type ProdPanelView } from "../_lib/prod-dialog";
 import { requestJson } from "../_lib/request-json";
-import styles from "./RefereeDialog.module.css";
+import styles from "./ProdDialog.module.css";
 
 /**
  * Fenêtre « Prod du match », pour le staff (permission `tournaments`) —
@@ -41,6 +41,11 @@ export function ProdDialog({
   const [panel, setPanel] = useState<ProdPanelView | null>(null);
   const [pick, setPick] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // Retrait réussi : le bouton qui ouvrait la confirmation n'existe plus, le focus
+  // revient au choix d'un autre compte, à défaut à « Fermer ».
+  const [refocus, setRefocus] = useState(false);
+  const selectRef = useRef<HTMLSelectElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const { busy, isBusy, run: guarded } = useBusyGuard();
   // Échec de lecture : un toast ; à l'ouverture, la fenêtre se referme (rien à montrer).
   const loadFailedRef = useRef<(initial: boolean) => void>(() => undefined);
@@ -73,6 +78,12 @@ export function ProdDialog({
     void load(true);
   }, [load]);
 
+  useEffect(() => {
+    if (!refocus || confirmRemove) return;
+    (selectRef.current ?? closeRef.current)?.focus();
+    setRefocus(false);
+  }, [refocus, confirmRemove, panel]);
+
   const put = async (userId: number | null, success: string): Promise<boolean> => {
     if (isBusy() || !panel) return false;
     const done = await guarded(async () => {
@@ -97,7 +108,13 @@ export function ProdDialog({
   };
 
   const choices = panel ? prodPickable(panel) : [];
+  const options = panel ? prodOptions(panel) : [];
   const picked = choices.find((candidate) => String(candidate.userId) === pick) ?? null;
+  const optionLabel = (candidate: ProdPanelUserView): string => {
+    if (candidate.block === null) return candidate.pseudo;
+    const key = candidate.block === "PROD_IS_PLAYER" ? "blockedPlayer" : "blockedCaster";
+    return t(`cardActions.prodDialog.${key}`, { pseudo: candidate.pseudo });
+  };
   const assign = (event: FormEvent) => {
     event.preventDefault();
     if (!picked) return;
@@ -135,7 +152,7 @@ export function ProdDialog({
                 </BusyButton>
               </div>
             )}
-            {choices.length === 0 ? (
+            {options.length === 0 ? (
               <p className={styles.muted}>{t("cardActions.prodDialog.noCandidate")}</p>
             ) : (
               <form className={styles.row} onSubmit={assign}>
@@ -143,11 +160,11 @@ export function ProdDialog({
                   <label htmlFor={pickId}>
                     {t(panel.prod ? "cardActions.prodDialog.replaceLabel" : "cardActions.prodDialog.assignLabel")}
                   </label>
-                  <select id={pickId} value={pick} onChange={(event) => setPick(event.target.value)} disabled={busy}>
+                  <select id={pickId} ref={selectRef} value={pick} onChange={(event) => setPick(event.target.value)} disabled={busy}>
                     <option value="">{t("cardActions.prodDialog.assignPlaceholder")}</option>
-                    {choices.map((candidate) => (
-                      <option key={candidate.userId} value={candidate.userId}>
-                        {candidate.pseudo}
+                    {options.map((candidate) => (
+                      <option key={candidate.userId} value={candidate.userId} disabled={candidate.block !== null}>
+                        {optionLabel(candidate)}
                       </option>
                     ))}
                   </select>
@@ -161,7 +178,7 @@ export function ProdDialog({
         )}
 
         <div className={styles.footer}>
-          <button type="button" className="btn ghost" onClick={close}>
+          <button ref={closeRef} type="button" className="btn ghost" onClick={close}>
             {t("cardActions.prodDialog.close")}
           </button>
         </div>
@@ -172,7 +189,11 @@ export function ProdDialog({
           confirmLabel={t("cardActions.prodDialog.removeConfirm.confirm")}
           pendingLabel={t("cardActions.prodDialog.pending")}
           onClose={() => setConfirmRemove(false)}
-          onConfirm={() => put(null, t("cardActions.prodDialog.removed"))}
+          onConfirm={async () => {
+            const removed = await put(null, t("cardActions.prodDialog.removed"));
+            if (removed) setRefocus(true);
+            return removed;
+          }}
         >
           <p>{t("cardActions.prodDialog.removeConfirm.body")}</p>
         </ConfirmActionDialog>
