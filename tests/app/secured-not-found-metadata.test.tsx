@@ -8,9 +8,14 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 let mockLocale: "fr" | "en" = "fr";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: jest.fn() }));
+jest.mock("next/navigation", () => ({
+  notFound: () => {
+    throw new Error("NEXT_NOT_FOUND");
+  },
+}));
 
 import { generateMetadata as planningMetadata } from "@/app/(secured)/planning/layout";
-import { generateMetadata as reportsMetadata } from "@/app/(secured)/admin/signalements/layout";
+import ReportsAdminLayout, { generateMetadata as reportsMetadata } from "@/app/(secured)/admin/signalements/layout";
 import { getCurrentUser } from "@/lib/server/auth";
 import { authUser } from "../helpers/auth-user";
 
@@ -63,5 +68,22 @@ describe("ReportsAdminLayout — titre", () => {
   it("generateMetadata_admin_reportsTitle", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ isAdmin: true }));
     expect(JSON.stringify((await reportsMetadata()).title)).toContain("Signalements");
+  });
+});
+
+describe("ReportsAdminLayout — accès", () => {
+  it("ReportsAdminLayout_noSession_rendersNothingWithoutNotFound", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
+    await expect(ReportsAdminLayout({ children: "panneau" })).resolves.toBeNull();
+  });
+
+  it("ReportsAdminLayout_withoutModeration_notFound", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ roles: ["ARBITRE"] }));
+    await expect(ReportsAdminLayout({ children: "panneau" })).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  it("ReportsAdminLayout_moderator_rendersThePanel", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ isAdmin: true }));
+    await expect(ReportsAdminLayout({ children: "panneau" })).resolves.not.toBeNull();
   });
 });

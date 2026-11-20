@@ -6,10 +6,11 @@ jest.mock("@/lib/server/named-lock", () =>
 );
 jest.mock("@/lib/server/tournaments/transaction");
 
-import { stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
+import { resumeSuspendedPeriodicClocks, stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
 import {
   MAINTENANCE_INTERVAL_MS,
   dailySalt,
+  maintainAudience,
   recordAudienceViews,
   resetAudienceState,
   runMaintenance,
@@ -66,6 +67,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Un test d'arrêt du serveur laisse les passages de fond suspendus.
+  resumeSuspendedPeriodicClocks();
   resetAudienceState();
   jest.useRealTimers();
   jest.restoreAllMocks();
@@ -177,6 +180,38 @@ describe("startAudienceMaintenanceClock — arrêt du serveur", () => {
     await jest.advanceTimersByTimeAsync(MAINTENANCE_INTERVAL_MS);
 
     expect(calls(execute, "DELETE FROM bg_audience_salts")).toHaveLength(0);
+  });
+
+  it("maintainAudience_serverStopping_noMaintenance", async () => {
+    const execute = database();
+    mockDb(execute);
+    await stopAllPeriodicClocks();
+
+    maintainAudience(new Date("2026-11-17T00:20:00Z"));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("stopAllPeriodicClocks_trafficMaintenanceRunning_waitsForIt", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      await gate;
+      if (sql.startsWith("DELETE") || sql.startsWith("INSERT")) return [{ affectedRows: 0 }];
+      return [[]];
+    });
+    mockDb(execute);
+    maintainAudience(new Date("2026-11-17T00:20:00Z"));
+    const stopped = jest.fn();
+
+    void stopAllPeriodicClocks().then(stopped);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(stopped).not.toHaveBeenCalled();
+
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stopped).toHaveBeenCalled();
   });
 });
 

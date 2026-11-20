@@ -33,7 +33,7 @@ import { audienceNetworkKey } from "@/lib/server/api-guard";
 import { failureDiagnostic, failureReason } from "@/lib/server/failure-reason";
 import { getDatabase } from "./database";
 import { NamedLockUnavailableError, withNamedLock } from "./named-lock";
-import { startPeriodicClock, stopPeriodicClock } from "./periodic-clock";
+import { backgroundPassesHalted, startPeriodicClock, stopPeriodicClock, trackBackgroundPass } from "./periodic-clock";
 import { readSiteCounts } from "./site-counts";
 import { inTransaction } from "./tournaments/transaction";
 import { PLAYED_STATES } from "@/lib/shared/stats";
@@ -501,12 +501,15 @@ export function rawRetentionStart(now: Date): string {
  */
 export function maintainAudience(now: Date = new Date()): void {
   if (now.getTime() - S.lastMaintenanceAt < MAINTENANCE_INTERVAL_MS || S.maintaining) return;
+  // Arrêt du serveur en cours : une requête tardive ne lance plus de repli ni
+  // de purge sur une base qui s'en va (le passage suivant le fera).
+  if (backgroundPassesHalted()) return;
   S.lastMaintenanceAt = now.getTime();
   // Les échecs des étapes sont déjà journalisés (`reportStep`) ; ce qui
   // échappe aux étapes est imprévu (erreur de programmation) : journalisé ici,
   // jamais avalé en silence.
   // Borné : un passage figé est abandonné (journalisé), le suivant repart.
-  S.maintaining = withTimeout(runMaintenanceSteps(now), MAINTENANCE_TIMEOUT_MS, "audience maintenance timed out")
+  const pass = withTimeout(runMaintenanceSteps(now), MAINTENANCE_TIMEOUT_MS, "audience maintenance timed out")
     .then(
       () => undefined,
       (error: unknown) => {
@@ -516,6 +519,9 @@ export function maintainAudience(now: Date = new Date()): void {
     .finally(() => {
       S.maintaining = null;
     });
+  S.maintaining = pass;
+  // Entraîné par le trafic comme par l'horloge : l'arrêt du serveur l'attend.
+  trackBackgroundPass(pass);
 }
 
 /**

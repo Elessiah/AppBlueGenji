@@ -7,6 +7,12 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { segmentTitle } from "@/lib/shared/page-metadata";
 import { can } from "@/lib/shared/permissions";
+import { segmentAccess } from "@/lib/shared/segment-access";
+
+/** Accès au segment, lu par l'onglet et par la mise en page. */
+function planningAccess(user: Awaited<ReturnType<typeof getCurrentUser>>) {
+  return segmentAccess(user, (reader) => can(reader, "planning"));
+}
 
 /**
  * Le titre de l'onglet n'est posé que pour un lecteur autorisé ; un compte
@@ -14,7 +20,7 @@ import { can } from "@/lib/shared/permissions";
  * visiteur sans session aucun (l'espace rend « Connexion requise »).
  */
 export async function generateMetadata(): Promise<Metadata> {
-  return permissionMetadata(await getCurrentUser(), (user) => can(user, "planning"), async () => {
+  return permissionMetadata(planningAccess(await getCurrentUser()), async () => {
     const { planning } = messagesFor(await requestLocale());
     return { title: segmentTitle(planning.meta.title) };
   });
@@ -29,9 +35,9 @@ export async function generateMetadata(): Promise<Metadata> {
  * frontière : la page refait le contrôle, et chaque route aussi.
  */
 export default async function PlanningLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const user = await getCurrentUser();
-  if (!user) return null;
-  if (!can(user, "planning")) notFound();
+  const access = planningAccess(await getCurrentUser());
+  if (access === "anonymous") return null;
+  if (access === "denied") notFound();
   // Écran de travail du staff : les noms y restent sobres, sans marche du podium.
   return <PodiumTiersOff>{children}</PodiumTiersOff>;
 }

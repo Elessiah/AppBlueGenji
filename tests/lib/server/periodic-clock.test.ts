@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { resumeSuspendedPeriodicClocks, startPeriodicClock, stopAllPeriodicClocks, stopPeriodicClock, type PeriodicClockOptions } from "@/lib/server/periodic-clock";
+import {
+  backgroundPassesHalted,
+  resumeSuspendedPeriodicClocks,
+  startPeriodicClock,
+  stopAllPeriodicClocks,
+  stopPeriodicClock,
+  trackBackgroundPass,
+  type PeriodicClockOptions,
+} from "@/lib/server/periodic-clock";
 
 /** Horloges de fond communes (`docs/features/SCHEDULE_DEADLINE.md`). */
 
@@ -20,6 +28,7 @@ beforeEach(() => {
 afterEach(async () => {
   await stopAllPeriodicClocks();
   delete (globalThis as typeof globalThis & { __bgPeriodicClocks?: unknown }).__bgPeriodicClocks;
+  delete (globalThis as typeof globalThis & { __bgBackgroundPasses?: unknown }).__bgBackgroundPasses;
   jest.useRealTimers();
   jest.restoreAllMocks();
 });
@@ -211,6 +220,59 @@ describe("restart while a pass is in flight", () => {
     await jest.advanceTimersByTimeAsync(0);
 
     expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe("restart while a pass is in flight — interval", () => {
+  it("startPeriodicClock_restartedDuringSlowPass_noSkippedTickWarningWhileWaiting", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    let release: () => void = () => undefined;
+    startPeriodicClock(clock(jest.fn(() => new Promise<void>((resolve) => { release = resolve; }))));
+    await jest.advanceTimersByTimeAsync(FIRST_MS);
+    void stopPeriodicClock("test-clock");
+    const run = jest.fn(async () => undefined);
+    startPeriodicClock(clock(run));
+
+    await jest.advanceTimersByTimeAsync(FIRST_MS + TICK_MS * 3);
+    release();
+    await jest.advanceTimersByTimeAsync(TICK_MS);
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("passages de fond hors horloge", () => {
+  it("backgroundPassesHalted_afterStopAll_trueUntilResume", async () => {
+    await stopAllPeriodicClocks();
+    expect(backgroundPassesHalted()).toBe(true);
+
+    resumeSuspendedPeriodicClocks();
+    expect(backgroundPassesHalted()).toBe(false);
+  });
+
+  it("backgroundPassesHalted_noShutdown_false", () => {
+    expect(backgroundPassesHalted()).toBe(false);
+  });
+
+  it("stopAllPeriodicClocks_trackedPassRunning_waitsForIt", async () => {
+    let release: () => void = () => undefined;
+    trackBackgroundPass(new Promise<void>((resolve) => { release = resolve; }));
+    const stopped = jest.fn();
+
+    void stopAllPeriodicClocks().then(stopped);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(stopped).not.toHaveBeenCalled();
+
+    release();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(stopped).toHaveBeenCalled();
+  });
+
+  it("stopAllPeriodicClocks_trackedPassRejects_stillResolves", async () => {
+    trackBackgroundPass(Promise.reject(new Error("db")));
+
+    await expect(stopAllPeriodicClocks()).resolves.toBeUndefined();
   });
 });
 

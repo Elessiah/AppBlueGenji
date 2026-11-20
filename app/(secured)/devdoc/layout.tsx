@@ -9,9 +9,15 @@ import { requestLocale } from "@/lib/server/request-locale";
 import { groupDevDocs } from "@/lib/shared/dev-docs";
 import { segmentTitle } from "@/lib/shared/page-metadata";
 import { can } from "@/lib/shared/permissions";
+import { segmentAccess } from "@/lib/shared/segment-access";
 import { scopedText } from "@/lib/shared/scoped-text";
 import { DevDocNav } from "./_components/DevDocNav";
 import styles from "./devdoc.module.css";
+
+/** Accès au segment, lu par l'onglet et par la mise en page. */
+function devAccess(user: Awaited<ReturnType<typeof getCurrentUser>>) {
+  return segmentAccess(user, (reader) => can(reader, "dev"));
+}
 
 /**
  * Le titre de l'onglet n'est posé que pour un lecteur autorisé ; un compte
@@ -19,7 +25,7 @@ import styles from "./devdoc.module.css";
  * visiteur sans session aucun (l'espace rend « Connexion requise »).
  */
 export async function generateMetadata(): Promise<Metadata> {
-  return permissionMetadata(await getCurrentUser(), (user) => can(user, "dev"), async () => {
+  return permissionMetadata(devAccess(await getCurrentUser()), async () => {
     const { devdoc } = messagesFor(await requestLocale());
     return { title: segmentTitle(devdoc.meta.title) };
   });
@@ -40,9 +46,9 @@ export async function generateMetadata(): Promise<Metadata> {
  * navigation survivent au choix d'un document.
  */
 export default async function DevDocLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const user = await getCurrentUser();
-  if (!user) return null;
-  if (!can(user, "dev")) notFound();
+  const access = devAccess(await getCurrentUser());
+  if (access === "anonymous") return null;
+  if (access === "denied") notFound();
 
   const [locale, index] = await Promise.all([requestLocale(), loadDevDocIndex()]);
   const messages = messagesFor(locale).devdoc;

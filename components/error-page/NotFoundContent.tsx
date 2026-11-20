@@ -5,6 +5,7 @@ import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestCache } from "@/lib/server/request-cache";
 import { requestLocale } from "@/lib/server/request-locale";
+import type { SegmentAccess } from "@/lib/shared/segment-access";
 import { NOT_FOUND_LINKS, errorPageTitle, notFoundCopy } from "@/lib/shared/error-pages";
 import { shellText } from "@/lib/shared/shell-text";
 
@@ -29,14 +30,14 @@ export async function notFoundMetadata(): Promise<Metadata> {
  * Titre d'onglet d'un segment à permission : aucun sans session (l'espace rend
  * « Connexion requise »), celui de la page introuvable pour un compte sans la
  * permission (la mise en page jette `notFound()`), le titre du segment sinon.
+ * `access` vient de {@link segmentAccess}, la réponse que lit aussi la mise en page.
  */
-export async function permissionMetadata<User>(
-  user: User | null,
-  allowed: (user: User) => boolean,
+export async function permissionMetadata(
+  access: SegmentAccess,
   metadata: () => Metadata | Promise<Metadata>,
 ): Promise<Metadata> {
-  if (!user) return {};
-  if (!allowed(user)) return notFoundMetadata();
+  if (access === "anonymous") return {};
+  if (access === "denied") return notFoundMetadata();
   return metadata();
 }
 

@@ -45,11 +45,44 @@ type ClockState = {
   skipLogged: boolean;
 };
 
-const globalClocks = globalThis as typeof globalThis & { __bgPeriodicClocks?: Map<string, ClockState> };
+/** Passages de fond lancés hors d'une horloge (entretien entraîné par le trafic), et l'arrêt du serveur. */
+type BackgroundState = { halted: boolean; passes: Set<Promise<unknown>> };
+
+const globalClocks = globalThis as typeof globalThis & {
+  __bgPeriodicClocks?: Map<string, ClockState>;
+  __bgBackgroundPasses?: BackgroundState;
+};
 
 function clocks(): Map<string, ClockState> {
   globalClocks.__bgPeriodicClocks ??= new Map();
   return globalClocks.__bgPeriodicClocks;
+}
+
+function background(): BackgroundState {
+  globalClocks.__bgBackgroundPasses ??= { halted: false, passes: new Set() };
+  return globalClocks.__bgBackgroundPasses;
+}
+
+/**
+ * Le serveur s'arrête ({@link stopAllPeriodicClocks}, jusqu'à une éventuelle
+ * reprise) : un passage de fond déclenché autrement que par une horloge (une
+ * requête qui entraîne l'entretien) ne démarre plus.
+ */
+export function backgroundPassesHalted(): boolean {
+  return background().halted;
+}
+
+/**
+ * Inscrit un passage de fond lancé hors d'une horloge : l'arrêt du serveur
+ * l'attend comme ceux des horloges. Retiré de lui-même à sa fin.
+ */
+export function trackBackgroundPass(pass: Promise<unknown>): void {
+  const { passes } = background();
+  passes.add(pass);
+  const settled = () => {
+    passes.delete(pass);
+  };
+  pass.then(settled, settled);
 }
 
 async function runOnce(state: ClockState, options: PeriodicClockOptions): Promise<void> {
@@ -96,11 +129,20 @@ export function startPeriodicClock(options: PeriodicClockOptions): void {
     current.first = null;
     // Relancée pendant que l'ancien passage court encore : ce premier passage
     // l'attend (le sauter coûterait un pas entier, un jour pour la purge).
+    // L'intervalle n'est armé qu'avec ce premier passage : armé pendant
+    // l'attente, il buterait sur l'ancien passage et l'annoncerait bloqué.
+    const begin = () => {
+      tick(current, options);
+      current.timer = setInterval(() => tick(current, options), options.tickMs);
+      current.timer.unref?.();
+    };
     const previous = current.inFlight;
-    if (previous) void previous.then(() => { if (current.generation === generation) tick(current, options); });
-    else tick(current, options);
-    current.timer = setInterval(() => tick(current, options), options.tickMs);
-    current.timer.unref?.();
+    if (previous) {
+      void previous.then(() => {
+        // Arrêtée (ou relancée) pendant l'attente : la nouvelle génération décide.
+        if (current.generation === generation && !current.timer) begin();
+      });
+    } else begin();
   }, options.firstDelayMs);
   current.first.unref?.();
 }
@@ -130,16 +172,20 @@ export async function stopPeriodicClock(key: string): Promise<void> {
 
 /**
  * Arrête toutes les horloges : leurs minuteurs sont coupés **sur-le-champ**
- * (aucun passage ne démarre plus), la promesse rendue attend les passages en
- * cours.
+ * (aucun passage ne démarre plus, {@link backgroundPassesHalted} non plus), la
+ * promesse rendue attend les passages en cours, ceux des horloges comme ceux
+ * inscrits par {@link trackBackgroundPass}.
  */
 export function stopAllPeriodicClocks(): Promise<void> {
-  return Promise.all(
-    [...clocks().values()].map((state) => {
-      if (state.first || state.timer) state.suspended = true;
-      return clearClock(state);
+  const state = background();
+  state.halted = true;
+  return Promise.all([
+    ...[...clocks().values()].map((clock) => {
+      if (clock.first || clock.timer) clock.suspended = true;
+      return clearClock(clock);
     }),
-  ).then(() => undefined);
+    ...[...state.passes].map((pass) => pass.catch(() => undefined)),
+  ]).then(() => undefined);
 }
 
 /**
@@ -148,6 +194,7 @@ export function stopAllPeriodicClocks(): Promise<void> {
  * balayages de fond ne doivent pas rester éteints jusqu'au prochain démarrage.
  */
 export function resumeSuspendedPeriodicClocks(): void {
+  background().halted = false;
   for (const state of clocks().values()) {
     if (state.suspended && state.options) startPeriodicClock(state.options);
   }
