@@ -88,8 +88,10 @@ compte qu'**une fois** (une ligne de journal par match).
 
 ## Planning
 
-Le calcul automatique du planning ne place pas les casters sur les matchs (seuls
-les arbitres y sont désignés) : il ne place donc pas non plus la prod. La prod
+Le calcul automatique (provisoire) ne place ni caster ni prod sur un match ; une
+ligne `PROD` **confirmée** y place sa prod quand le cast du match est libre
+(`CAST_PLANNING.md` § Placement sur le match, journal « Prod placée » sans
+nom, avis `ASSIGNED` à la prod). La prod
 placée sur un match paraît au planning comme une ligne `PROD` tenue (source
 `CAST`, `entryAssignments`) et fait foi : une seule par match, elle remplace
 toute autre ligne `PROD` de l'entrée (proposition provisoire, ou ligne tenue

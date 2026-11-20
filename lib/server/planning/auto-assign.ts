@@ -15,6 +15,7 @@ import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibilit
 import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
+import type { StaffActor } from "@/lib/shared/log-privacy";
 import type { RefereeIneligibility } from "@/lib/shared/match-referee";
 import { PLANNING_EVENT_REFEREES, PLANNING_ROLES, planningWeekStart, type PlanningRole } from "@/lib/shared/planning";
 import {
@@ -38,6 +39,7 @@ import {
   type PlanningData,
 } from "./load";
 import { entryAssignments } from "./model";
+import { placePlannedCasts } from "./cast-placement";
 import { announceAssignments } from "./notices";
 import { loadEntryPlayers, playersDuring } from "./players";
 
@@ -783,7 +785,10 @@ async function refuseMatchProdConflicts(connection: PoolConnection, steps: reado
 }
 
 /** Qui peut tenir quoi, relu dans la transaction d'écriture (`lockedHolding`) : `null` s'il le peut, sinon le refus. */
-export type HoldingCheck = (userId: number, entry: LoadedEntry, role: PlanningRole) => ReturnType<typeof holdingRefusal>;
+/** Ce que le contrôle lit d'une entrée : son tournoi (masqué ou non). */
+export type HoldingEntry = Pick<LoadedEntry, "tournamentId">;
+
+export type HoldingCheck = (userId: number, entry: HoldingEntry, role: PlanningRole) => ReturnType<typeof holdingRefusal>;
 
 /**
  * Relit, **dans la transaction qui écrit** et verrouillés en partage, les
@@ -794,7 +799,7 @@ export type HoldingCheck = (userId: number, entry: LoadedEntry, role: PlanningRo
  */
 export async function lockedHolding(
   connection: Executor,
-  rows: readonly { userId: number; entry: LoadedEntry }[],
+  rows: readonly { userId: number; entry: HoldingEntry }[],
 ): Promise<HoldingCheck> {
   if (rows.length === 0) return () => "PLANNING_ROLE_NOT_HELD";
   const members = await loadPlanningMembersByIds(connection, [...new Set(rows.map((row) => row.userId))], { lock: true });
@@ -880,6 +885,8 @@ export async function confirmAssignments(
   actorId: number | null,
   scope: ConfirmScope,
   now: number = Date.now(),
+  /** Le staff du geste, nommé dans pm2 par le placement du cast (`null` : confirmation d'office). */
+  staff: StaffActor | null = null,
 ): Promise<ConfirmReport> {
   // Les désignations d'arbitres de match (chacune sa transaction, son
   // évènement) prennent le verrou **une à une**, brièvement, et non d'un bloc :
@@ -902,6 +909,12 @@ export async function confirmAssignments(
       void announceAssignments(
         announced.map((step) => ({ userId: step.userId, entry: step.entry, role: step.role })),
         { actorId },
+      );
+      // Les casters et la prod que ce geste vient de confirmer vont sur leur match s'il n'a encore
+      // personne au cast (`cast-placement.ts`) ; après le verrou du planning, sans jamais lever.
+      await placePlannedCasts(
+        announced.map((step) => ({ userId: step.userId, entry: step.entry, role: step.role })),
+        staff,
       );
     }
   }

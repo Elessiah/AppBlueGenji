@@ -5,6 +5,7 @@ import { confirmAssignments } from "@/lib/server/planning/auto-assign";
 import { readConfirmScope } from "@/lib/server/planning/request";
 import { planningFailure } from "@/lib/server/planning/routes";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
+import { staffActor } from "@/lib/shared/log-privacy";
 import { canComputePlanning } from "@/lib/shared/permissions";
 
 /**
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
   if (throttled) return throttled;
 
   try {
-    return ok({ report: await confirmAssignments(user.id, scope) });
+    return ok({ report: await confirmAssignments(user.id, scope, Date.now(), staffActor(user)) });
   } catch (error) {
     return planningFailure(error, "PLANNING_CONFIRM_FAILED");
   }

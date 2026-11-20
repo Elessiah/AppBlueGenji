@@ -62,8 +62,9 @@ un secret — seul leur formulaire est réservé.
 **Prod d'un match** (`MATCH_PROD.md`) : la prod placée sur un match paraît sur
 son entrée comme une ligne `PROD` tenue (source `CAST`), comme un caster inscrit ;
 elle remplace une proposition provisoire de prod et se retire depuis le match
-(`PLANNING_CAST_MANAGED`, texte neutre : caster ou prod). Le calcul ne place pas
-de prod sur un match, pas plus qu'un caster.
+(`PLANNING_CAST_MANAGED`, texte neutre : caster ou prod). Le calcul (provisoire)
+ne place ni prod ni caster sur un match ; une ligne **confirmée** les y place
+quand le cast du match est libre (voir « Placement sur le match »).
 
 `planning` : rôles `ARBITRE`, `CASTER`, `PROD` (nouveau rôle de plateforme,
 production d'un direct) et `ADMIN` (`PERMISSION_ROLES.md`). Rôles du planning
@@ -375,8 +376,9 @@ compte les **rôles**, pas les personnes.
   match par `assignMatchReferee` ; seul un **refus métier** (conditions
   changées, arbitre posé entre-temps) retire la ligne et la compte — une panne
   (base, interblocage) fait échouer le geste sans rien retirer ; les
-  désignations déjà validées avant elle, et les casters et prods (qui ne
-  dépendent d'aucun match), s'écrivent quand même au planning ; si une partie
+  désignations déjà validées avant elle, et les casters et prods (dont la
+  pose sur le match vient après coup, voir « Placement sur le match »),
+  s'écrivent quand même au planning ; si une partie
   a ainsi été écrite, le geste répond `PLANNING_CONFIRM_PARTIAL` (« relance la
   confirmation », la panne d'origine va dans pm2), sinon la panne d'origine
   remonte (même si cette écriture échoue à son tour, consignée).
@@ -442,6 +444,44 @@ compte les **rôles**, pas les personnes.
 ### Confirmation d'office
 
 Chaque entrée ouverte se confirme d'office à `min(date butoir, début − délai)` (réglage « délai de confirmation », 24–168 h) : le calcul refait d'abord la semaine autour des confirmées, puis ne confirme que les échues (`lib/server/planning/auto-confirm.ts`, `SCHEDULE_DEADLINE.md` § Planning).
+
+## Placement sur le match (`lib/server/planning/cast-placement.ts`)
+
+Quand **personne** n'est sur le cast d'un match, les casters et la prod que le
+planning tient pour son entrée y sont placés. Déclencheurs : les lignes
+`CASTER`/`PROD` d'une entrée de match qu'un geste vient de rendre tenues —
+confirmation (bouton ou confirmation d'office), choix manuel du staff,
+remplaçant confirmé d'un désistement. Une ligne tenue avant n'est jamais
+rejouée : qui a quitté le match n'y revient pas au geste suivant.
+
+- **Cast libre** = aucun caster ni prod sur le match, ou seulement des comptes
+  qui y tiennent une ligne tenue du même rôle (placement relancé, renfort
+  confirmé ensuite). Un caster inscrit de lui-même ou une prod posée par le
+  staff sans ligne au planning ferme le match : rien n'y est ajouté ni remplacé.
+- **Qui** : ligne toujours tenue (relue `LOCK IN SHARE MODE`), compte apte
+  (`lockedHolding` : ni effacé, ni suspendu, rôle tenu, invité selon ses
+  règles), qui ne joue pas le match, qui n'est pas déjà dessus. Caster : mêmes
+  conflits que l'inscription (`loadCastBlocks`, deux au plus, pas la prod).
+  Prod : une seule (plus petit id si deux lignes), seulement si le match n'en a
+  pas (`prod_user_id IS NULL` à l'écriture).
+- **Pas** de match joué, exempté ou déjà lancé.
+- **Verrous** : comptes (partagé), match `FOR UPDATE` (sans jointure), ses
+  casters `FOR UPDATE`, lignes du planning — même ordre que « Faire la prod » ;
+  une transaction par match (`retryOnDeadlock`), matchs pris par id croissant.
+  Rejouer un placement n'écrit rien deux fois.
+- **Diffusion** : le caster placé rejoint la diffusion d'un caster du planning
+  déjà là, sinon celle du staff, sinon une diffusion neuve sans lien (« Configurer
+  ma diffusion »). Le placement ne déclenche pas le direct.
+- **Annonces** : journal du staff anonyme (« Cast posé », « Prod placée », un
+  caster / une prod du planning, catégorie `casts`) ; la prod reçoit l'avis
+  `MATCH_PROD` d'une prod placée par le staff (sauf si elle confirme elle-même) ;
+  le caster n'a pas d'avis en plus de son affectation au planning. Le staff qui
+  confirme est nommé dans pm2 (`auditStaffAction`), jamais sur Discord ; la
+  confirmation d'office et le remplacement n'ont pas d'auteur.
+- Une panne d'un match est consignée dans pm2 et n'empêche ni les autres
+  matchs ni le geste du planning, déjà validé.
+- Un caster placé qui se désiste au planning reste inscrit sur le match
+  (`stillSignedUp`) : il s'en retire depuis le match.
 
 ## Notifications (`lib/server/planning/notices.ts`, `new-entries.ts`)
 

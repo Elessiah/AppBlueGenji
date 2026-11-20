@@ -164,9 +164,9 @@
   },
   "staffConfirm": {
     "entryTitle": "Confirmer ce créneau ?",
-    "entryBody": "Les propositions provisoires de ce créneau deviennent des désignations : l'arbitre est posé sur le match.",
+    "entryBody": "Les propositions provisoires de ce créneau deviennent des désignations : l'arbitre est posé sur le match, ainsi que les casters et la prod si personne ne caste encore le match.",
     "leadTitle": "Confirmer ce qui commence dans {hours, plural, one {# heure} other {# heures}} ?",
-    "leadBody": "Toutes les propositions provisoires des créneaux qui commencent d'ici là deviennent des désignations : les arbitres sont posés sur leurs matchs.",
+    "leadBody": "Toutes les propositions provisoires des créneaux qui commencent d'ici là deviennent des désignations : les arbitres sont posés sur leurs matchs, ainsi que les casters et les prods sur les matchs que personne ne caste encore.",
     "confirm": "Confirmer",
     "pending": "Confirmation…"
   },

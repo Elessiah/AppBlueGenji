@@ -1,6 +1,7 @@
-import type { Pool, RowDataPacket } from "mysql2/promise";
+import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { planningEntryKey, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
 import { writeAssignment } from "@/lib/server/planning/auto-assign";
+import { placeOnMatch } from "@/lib/server/planning/cast-placement";
 import { BOOTSTRAP_SETTING } from "@/lib/server/planning/new-entries";
 import { SEED_TOURNAMENT_PREFIX } from "./cases";
 
@@ -68,6 +69,34 @@ async function writeManual(db: Pool, entry: Entry, userId: number, role: Plannin
   await writeAssignment(db, entry, { userId, role, source: "MANUAL", reason: "MANUAL" }, admin);
 }
 
+/**
+ * Pose sur le match les casters et la prod que le planning y tient
+ * (`CAST_PLANNING.md` § Placement sur le match) : la transaction même du site,
+ * sans ses annonces (pas de journal Discord ni d'avis depuis le seed).
+ */
+async function placeSeedCast(db: Pool, entry: Entry, casterIds: number[], prodIds: number[]): Promise<boolean> {
+  if (entry.matchId === null) return false;
+  const matchId = entry.matchId;
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const outcome = await placeOnMatch(connection, matchId, entry, casterIds, prodIds);
+    await connection.commit();
+    return "placement" in outcome;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/** Un caster inscrit de lui-même sur le match, sans ligne au planning : le cast est tenu, le planning n'y touche pas. */
+async function seedSelfSignedCaster(db: Pool, matchId: number, userId: number): Promise<void> {
+  const [stream] = await db.execute<ResultSetHeader>("INSERT INTO bg_match_streams (match_id, live_url) VALUES (?, NULL)", [matchId]);
+  await db.execute("INSERT INTO bg_match_casters (match_id, user_id, stream_id) VALUES (?, ?, ?)", [matchId, userId, stream.insertId]);
+}
+
 export async function applyPlanningCases(db: Pool, ids: Map<string, number>): Promise<void> {
   console.log("🗓️ Planning des casts et arbitres...");
   // Le seed vient de vider le planning (cascade des tournois Test_) : sans
@@ -106,6 +135,7 @@ export async function applyPlanningCases(db: Pool, ids: Map<string, number>): Pr
   const caster = ids.get("Caster");
   const first = entries[0];
   let manual = 0;
+  let placed = false;
   if (first && caster !== undefined) {
     await writeManual(db, first, caster, "CASTER", admin);
     manual += 1;
@@ -119,6 +149,16 @@ export async function applyPlanningCases(db: Pool, ids: Map<string, number>): Pr
     for (const id of pair as number[]) await writeManual(db, last, id, "CASTER", admin);
     await writeManual(db, last, prod, "PROD", admin);
     manual += 3;
+    // Personne n'y caste : ces choix du staff y sont posés, comme sur le site.
+    placed = await placeSeedCast(db, last, pair as number[], [prod]);
   }
-  console.log(`  ✓ ${entries.length} matchs planifiés + 1 soirée · ${answers} réponses · 1 caster autonome · ${manual} attributions manuelles`);
+  // Deuxième match : un caster inscrit de lui-même (invité, hors planning) — une
+  // confirmation du planning ne doit rien y ajouter ni remplacer.
+  const guest = ids.get("CasterInvite");
+  const second = entries[1];
+  if (second && second.matchId !== null && guest !== undefined) await seedSelfSignedCaster(db, second.matchId, guest);
+  console.log(
+    `  ✓ ${entries.length} matchs planifiés + 1 soirée · ${answers} réponses · 1 caster autonome · ${manual} attributions manuelles` +
+      ` · cast du dernier match ${placed ? "posé" : "non posé"}`,
+  );
 }

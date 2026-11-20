@@ -164,9 +164,9 @@
   },
   "staffConfirm": {
     "entryTitle": "Confirm this slot?",
-    "entryBody": "The provisional proposals on this slot become assignments: the referee is set on the match.",
+    "entryBody": "The provisional proposals on this slot become assignments: the referee is set on the match, and so are the casters and the prod if nobody is casting the match yet.",
     "leadTitle": "Confirm everything starting within {hours, plural, one {# hour} other {# hours}}?",
-    "leadBody": "Every provisional proposal on slots starting by then becomes an assignment: referees are set on their matches.",
+    "leadBody": "Every provisional proposal on slots starting by then becomes an assignment: referees are set on their matches, and casters and prods on the matches nobody is casting yet.",
     "confirm": "Confirm",
     "pending": "Confirming…"
   },

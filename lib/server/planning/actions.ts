@@ -9,6 +9,7 @@ import type { AuthUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
 import { transact } from "@/lib/server/tournaments/transaction";
+import { staffActor } from "@/lib/shared/log-privacy";
 import { can } from "@/lib/shared/permissions";
 import { planningCastersFull, planningRolesOf, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
@@ -33,6 +34,7 @@ import {
   type LoadedEntry,
   type PlanningData,
 } from "./load";
+import { placePlannedCasts } from "./cast-placement";
 import { entryAssignments } from "./model";
 import { announceAssignments } from "./notices";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture, undoPlanningBlock } from "./planning-undo";
@@ -357,6 +359,9 @@ export async function setManualAssignment(actor: AuthUser, input: ManualInput, n
     // Une affectation nouvelle (ou une proposition que ce choix fixe) s'annonce ; une déjà tenue, non.
     return input.assigned && (current === undefined || current.provisional) ? entry : null;
   });
+  if (announce === null) return;
   // Après le verrou, sans faire attendre la page ; l'auteur qui se pose lui-même n'est pas prévenu.
-  if (announce !== null) void announceAssignments([{ userId: input.userId, entry: announce, role: input.role }], { actorId: actor.id });
+  void announceAssignments([{ userId: input.userId, entry: announce, role: input.role }], { actorId: actor.id });
+  // Un caster ou une prod sur un match que personne ne caste encore y est placé (`cast-placement.ts`, ne lève jamais).
+  await placePlannedCasts([{ userId: input.userId, entry: announce, role: input.role }], staffActor(actor));
 }

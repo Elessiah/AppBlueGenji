@@ -19,6 +19,7 @@ jest.mock("@/lib/server/planning/players", () => ({
 }));
 jest.mock("@/lib/server/tournaments/cast-eligibility");
 jest.mock("@/lib/server/planning/notices");
+jest.mock("@/lib/server/planning/cast-placement", () => ({ placePlannedCasts: jest.fn() }));
 
 import type { PoolConnection } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
@@ -48,6 +49,7 @@ import {
   type LoadedAssignment,
   type PlanningData,
 } from "@/lib/server/planning/load";
+import { placePlannedCasts } from "@/lib/server/planning/cast-placement";
 import { announceAssignments } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
@@ -1149,6 +1151,37 @@ describe("confirmAssignments", () => {
       ["m:1", 4, "CASTER", 10, 1, "CONFIRMED", "AUTO", 9],
     ]);
     expect(assignMatchReferee).not.toHaveBeenCalled();
+  });
+
+  it("confirmAssignments_confirmedCasterAndProd_placedOnMatchWithStaff", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({
+        entries: [first],
+        assignments: [
+          loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" }),
+          loadedAssignment({ entryKey: "m:1", userId: 6, role: "PROD" }),
+        ],
+      }),
+    );
+    const staff = { id: 9, pseudo: "Admin" };
+
+    await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS, staff);
+
+    expect(placePlannedCasts).toHaveBeenCalledWith(
+      [
+        { userId: 4, entry: first, role: "CASTER" },
+        { userId: 6, entry: first, role: "PROD" },
+      ],
+      staff,
+    );
+  });
+
+  it("confirmAssignments_nothingConfirmed_placesNothing", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(confirmData({ entries: [first], assignments: [] }));
+
+    await confirmAssignments(null, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(placePlannedCasts).not.toHaveBeenCalled();
   });
 
   it("confirmAssignments_prodPlacedSinceRead_refusesOtherProdProposal", async () => {

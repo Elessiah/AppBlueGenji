@@ -689,6 +689,10 @@ describe("prodLogCategory", () => {
     expect(prodLogCategory("ASSIGNED")).toBe("casts");
     expect(prodLogCategory("REPLACED")).toBe("casts");
   });
+
+  it("prodLogCategory_planned_isCasts", () => {
+    expect(prodLogCategory("PLANNED")).toBe("casts");
+  });
 });
 
 describe("queueProdChange", () => {

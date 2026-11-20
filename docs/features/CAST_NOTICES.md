@@ -13,6 +13,7 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
 | Changement | Journal du staff (Discord) | Caster prévenu (DM + push `CAST_RELEASED`) |
 |---|---|---|
 | Inscription sur un match libre | « 🎙️ Cast réservé » | — |
+| Caster du planning placé sur un match sans cast (`PLANNED`, `CAST_PLANNING.md` § Placement sur le match) | « 🎙️ Cast posé » | — (avis d'affectation du planning) |
 | Place reprise à un titulaire inéligible | « 🎙️ Cast repris » | l'ancien titulaire, motif `REPLACED` |
 | Le caster retire son inscription | « 🎙️ Cast libéré » | — (il sait) |
 | Le staff la retire (`tournaments`, pas le caster lui-même) | « 🎙️ Cast retiré », par le staff | motif `STAFF` |

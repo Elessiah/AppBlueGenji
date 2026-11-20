@@ -25,6 +25,7 @@ jest.mock("@/lib/server/planning/planning-undo", () => ({
 jest.mock("@/lib/server/planning/notices");
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/tournaments/cast-eligibility");
+jest.mock("@/lib/server/planning/cast-placement", () => ({ placePlannedCasts: jest.fn() }));
 
 import type { PoolConnection } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -35,6 +36,7 @@ import {
   loadPlanningHistory,
   loadPlanningMembersByIds,
 } from "@/lib/server/planning/load";
+import { placePlannedCasts } from "@/lib/server/planning/cast-placement";
 import { announceWithdrawal } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "@/lib/server/planning/planning-undo";
@@ -229,6 +231,31 @@ describe("withdrawFromEntry — désistement et remplacement", () => {
     ]);
     expect(execute.mock.calls[1][1]).toEqual(["m:1", 4, "CASTER", 10, 1, "MANUAL", null, "Malade", 0, 0]);
     expect(jest.mocked(announceWithdrawal).mock.calls[0][0]).toMatchObject({ role: "CASTER", late: false, replacementId: 6 });
+  });
+
+  it("withdrawFromEntry_confirmedReplacement_placedOnMatchWithoutActor", async () => {
+    casterData({ confirmed: true, candidates: [6] });
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(jest.mocked(placePlannedCasts).mock.calls[0][0]).toMatchObject([{ userId: 6, role: "CASTER", entry: { key: "m:1" } }]);
+    expect(jest.mocked(placePlannedCasts).mock.calls[0][1]).toBeNull();
+  });
+
+  it("withdrawFromEntry_confirmedNoReplacement_notPlaced", async () => {
+    casterData({ confirmed: true });
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(placePlannedCasts).not.toHaveBeenCalled();
+  });
+
+  it("withdrawFromEntry_provisionalReplacement_notPlaced", async () => {
+    casterData({ confirmed: false, candidates: [6] });
+
+    await withdrawFromEntry(caster, { entryKey: "m:1", role: "CASTER", reason: null }, EARLY);
+
+    expect(placePlannedCasts).not.toHaveBeenCalled();
   });
 
   it("withdrawFromEntry_memberWithdrawal_notReleasedNoActor", async () => {

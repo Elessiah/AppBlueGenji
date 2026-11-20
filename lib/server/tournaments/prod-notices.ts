@@ -39,7 +39,7 @@ export type ProdChange = {
 
 /** Catégorie de la ligne : `casts` quand le match gagne ou change de prod, `staff-removal` (alerte) quand il la perd. */
 export function prodLogCategory(change: ProdLogChange): BotLogCategory {
-  return change === "CLAIMED" || change === "ASSIGNED" || change === "REPLACED" ? "casts" : "staff-removal";
+  return change === "CLAIMED" || change === "ASSIGNED" || change === "PLANNED" || change === "REPLACED" ? "casts" : "staff-removal";
 }
 
 const DM_TEXT: Readonly<Record<Locale, Readonly<Record<ProdNoticeKind, string>>>> = {

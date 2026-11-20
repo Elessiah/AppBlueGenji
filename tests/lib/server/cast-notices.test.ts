@@ -117,6 +117,7 @@ describe("castLogChange / castReleaseNotice", () => {
       "MATCH_DELETED",
       { casterId: 5, reason: "MATCH_DELETED" },
     ],
+    [{ kind: "PLANNED", matchId: 1, casterId: 9 }, "PLANNED", null],
   ])("%j → journal %s", (change, log, notice) => {
     expect(castLogChange(change)).toBe(log);
     expect(castReleaseNotice(change)).toEqual(notice);
@@ -134,6 +135,8 @@ describe("castLogCategory — un retrait alerte, une inscription reste une trace
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "JOINED_TEAM" }, "staff-removal"],
     // Match supprimé : plus de créneau à repourvoir, simple trace.
     [{ kind: "MATCH_DELETED", matchId: 1, casterId: 5, subject: deletedSubject() }, "casts"],
+    // Placé depuis le planning : une inscription, simple trace.
+    [{ kind: "PLANNED", matchId: 1, casterId: 9 }, "casts"],
   ])("%j → %s", (change, category) => {
     expect(castLogCategory(change)).toBe(category);
   });

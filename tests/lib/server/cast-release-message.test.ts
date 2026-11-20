@@ -9,7 +9,7 @@ import enPush from "@/messages/en/push.json";
 import frPush from "@/messages/fr/push.json";
 
 const REASONS: CastReleaseReason[] = ["STAFF", "REPLACED", "INELIGIBLE", "JOINED_TEAM"];
-const CHANGES: CastLogChange[] = ["CLAIMED", "REPLACED", "RELEASED", "RELEASED_BY_STAFF", "INELIGIBLE", "JOINED_TEAM"];
+const CHANGES: CastLogChange[] = ["CLAIMED", "REPLACED", "RELEASED", "RELEASED_BY_STAFF", "INELIGIBLE", "JOINED_TEAM", "PLANNED"];
 
 function match(overrides: Partial<CastReleasedMatch> = {}): CastReleasedMatch {
   return {
@@ -50,6 +50,12 @@ describe("formatCastChangeLog", () => {
       expect(line).not.toContain("\n");
     }
     expect(formatCastChangeLog({ ...base, change: "RELEASED_BY_STAFF" })).toContain("par le staff");
+  });
+
+  it("formatCastChangeLog_planned_namesNobody", () => {
+    expect(formatCastChangeLog({ ...base, change: "PLANNED" })).toBe(
+      "🎙️ Cast posé — « Coupe d'hiver » (#7) : Manche 2 — Renards vs Nova (#42), un caster du planning est placé sur le match.",
+    );
   });
 
   it("tournoi individuel : « un joueur » ; place vide : « TBD »", () => {
