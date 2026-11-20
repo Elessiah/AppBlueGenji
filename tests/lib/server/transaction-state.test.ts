@@ -138,6 +138,7 @@ describe("un seul cycle de vie pour les files « après commit »", () => {
       "lib/server/tournaments/bot-logs.ts",
       "lib/server/tournaments/cast-notices.ts",
       "lib/server/tournaments/departed-notices.ts",
+      "lib/server/tournaments/prod-notices.ts",
       "lib/server/tournaments/referee-notices.ts",
       "lib/server/tournaments/transaction-state.ts",
     ]);

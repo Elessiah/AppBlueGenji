@@ -12,18 +12,8 @@ import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
 import { prodPickable, type ProdPanelView } from "../_lib/prod-dialog";
+import { requestJson } from "../_lib/request-json";
 import styles from "./RefereeDialog.module.css";
-
-async function send(url: string, method: string, body?: unknown): Promise<unknown> {
-  const response = await fetch(url, {
-    method,
-    headers: body === undefined ? undefined : { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const payload = (await response.json().catch(() => ({}))) as { error?: string };
-  if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-  return payload;
-}
 
 /**
  * Fenêtre « Prod du match », pour le staff (permission `tournaments`) —
@@ -65,7 +55,11 @@ export function ProdDialog({
   const load = useCallback(
     async (initial = false) => {
       try {
-        const payload = (await send(`/api/admin/matches/${match.id}/prod`, "GET")) as { panel: ProdPanelView };
+        const payload = await requestJson<{ panel: ProdPanelView }>(
+          `/api/admin/matches/${match.id}/prod`,
+          {},
+          "MATCH_PROD_PANEL_FAILED",
+        );
         setPanel(payload.panel);
         setPick("");
       } catch {
@@ -83,7 +77,11 @@ export function ProdDialog({
     if (isBusy() || !panel) return false;
     const done = await guarded(async () => {
       try {
-        await send(`/api/admin/matches/${match.id}/prod`, "PUT", { userId, expectedUserId: panel.prod?.userId ?? null });
+        await requestJson(
+          `/api/admin/matches/${match.id}/prod`,
+          { method: "PUT", body: { userId, expectedUserId: panel.prod?.userId ?? null } },
+          "MATCH_PROD_ASSIGN_FAILED",
+        );
         showSuccess(success);
         window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
         await load(false);

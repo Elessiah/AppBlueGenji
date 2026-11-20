@@ -37,7 +37,7 @@ export type ProdControls = {
   isProd: boolean;
   /** « Faire la prod » : place libre, match à jouer, ni joueur ni caster du match. */
   showClaim: boolean;
-  /** « Ne plus faire la prod » : sa propre place, match à jouer. */
+  /** « Ne plus faire la prod » : sa propre place, match à jouer, session qui tient `prod` (la route refuse sinon). */
   showRelease: boolean;
   /** « Prod du match » (fenêtre du staff) : placer, changer ou retirer la prod. */
   showAssign: boolean;
@@ -57,17 +57,18 @@ export function prodControls(match: ProdMatch, viewer: ProdViewer): ProdControls
   return {
     isProd,
     showClaim: viewer.canProd && open && prod === null && !isPlayer && !isCaster,
-    showRelease: open && isProd,
+    showRelease: viewer.canProd && open && isProd,
     showAssign: viewer.canSchedule && open,
   };
 }
 
 /**
- * Ce qu'un avis dit au compte visé : placé par le staff (`ASSIGNED`), ou
- * retiré par lui (`RELEASED`, place rendue libre ou donnée à un autre). Un
- * geste sur sa propre place ne lui envoie rien : il sait.
+ * Ce qu'un avis dit au compte visé : placé par le staff (`ASSIGNED`), retiré
+ * par lui (`RELEASED`, place rendue libre ou donnée à un autre), ou place
+ * rendue d'office — rôle prod perdu (`INELIGIBLE`), ou devenu joueur du match
+ * (`JOINED_TEAM`). Un geste sur sa propre place ne lui envoie rien : il sait.
  */
-export type ProdNoticeKind = "ASSIGNED" | "RELEASED";
+export type ProdNoticeKind = "ASSIGNED" | "RELEASED" | "INELIGIBLE" | "JOINED_TEAM";
 
 /** Le match d'un avis de prod, tel que la notification et le message le nomment. */
 export type ProdNoticeMatch = {

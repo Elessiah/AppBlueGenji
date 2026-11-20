@@ -55,6 +55,7 @@ import {
   type RefereeStanding,
 } from "./cast-eligibility";
 import { announceCastChange, queueCastChange, type CastPairing } from "./cast-notices";
+import { queueProdChange } from "./prod-notices";
 import { announceStaffMatchAction } from "./staff-action-logs";
 import { actingUserId, applyCastSettings, PLAIN_CAST_ACCESS, type CastAccess, type SessionActor, type CastSettings, type CastSettingsOutcome } from "./cast-settings";
 import { sessionHolds, type SessionRights } from "@/lib/shared/player-view";
@@ -237,6 +238,38 @@ export function rowReadiness(row: LaunchMatchRow, casters: readonly MatchCasterL
  * pourtant — et l'empreinte neuve le ressusciterait.
  */
 async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchRow): Promise<boolean> {
+  const reset = await resetForNewPairing(connection, row);
+  // Après la remise à zéro : un appariement neuf n'est pas encore lancé.
+  const prodReleased = await releasePlayingProd(connection, row);
+  return reset || prodReleased;
+}
+
+/**
+ * La prod du match qui le joue désormais (son équipe vient d'y être placée, ou
+ * elle a rejoint une des deux équipes) n'en est plus la prod
+ * (`docs/features/MATCH_PROD.md`) : sa place est rendue d'office, sous le verrou
+ * du match, tant que le match n'est ni lancé ni joué — comme un caster devenu
+ * joueur (`JOINED_TEAM`). Annoncé après le commit (`queueProdChange`).
+ *
+ * Rend `true` quand la place a été rendue.
+ */
+async function releasePlayingProd(connection: PoolConnection, row: LaunchMatchRow): Promise<boolean> {
+  const prodId = nullableId(row.prod_user_id ?? null);
+  if (prodId === null || row.launched_at !== null || row.status === "COMPLETED") return false;
+  if ((await resolveTeamParty(connection, row, prodId)) === null) return false;
+  await connection.execute(`UPDATE bg_matches SET prod_user_id = NULL WHERE id = ? AND prod_user_id = ?`, [row.id, prodId]);
+  row.prod_user_id = null;
+  queueProdChange(connection, {
+    matchId: Number(row.id),
+    log: "JOINED_TEAM",
+    notices: [{ userId: prodId, kind: "JOINED_TEAM" }],
+    pairing: castPairingOf(row),
+  });
+  return true;
+}
+
+/** La remise à zéro de {@link adoptCurrentPairing} ; `true` quand un caster a été retiré. */
+async function resetForNewPairing(connection: PoolConnection, row: LaunchMatchRow): Promise<boolean> {
   const key = launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
   if (key === null || row.launch_pairing === key) return false;
   await connection.execute(

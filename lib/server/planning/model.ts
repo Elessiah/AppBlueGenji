@@ -16,8 +16,10 @@ import type { LoadedEntry, PlanningData } from "./load";
  * sur le match sans ligne du planning tenue (confirmée ou choix du staff) vaut
  * `CAST` : son inscription l'emporte sur une simple proposition provisoire.
  * La prod placée sur le match (`bg_matches.prod_user_id`, `MATCH_PROD.md`)
- * vaut aussi `CAST` : une au plus, elle remplace toute proposition provisoire
- * de prod ; une ligne PROD tenue qui la nomme en reste la provenance.
+ * vaut aussi `CAST` et fait foi : une seule par match, elle remplace toute
+ * autre ligne PROD (proposition provisoire ou ligne tenue d'un autre compte)
+ * et la proposition provisoire qui la ferait caster ; une ligne PROD tenue qui
+ * la nomme en reste la provenance.
  */
 function matchRefereeRows(entry: LoadedEntry, rows: PlanningData["assignments"]): PlanningAssignmentView[] {
   if (entry.matchRefereeId === null) {
@@ -69,12 +71,12 @@ export function entryAssignments(
   }
   if (entry.kind === "MATCH" && entry.matchProdId != null) {
     const prodId = entry.matchProdId;
-    const held = out.findIndex((row) => row.role === "PROD" && row.userId === prodId && !row.provisional);
-    if (held === -1) {
-      const kept = out.filter((row) => !(row.role === "PROD" && row.provisional));
-      kept.push({ userId: prodId, role: "PROD", source: "CAST", reason: "CAST", provisional: false });
-      out.splice(0, out.length, ...kept);
-    }
+    const held = out.find((row) => row.role === "PROD" && row.userId === prodId && !row.provisional);
+    const kept = out.filter(
+      (row) => row.role !== "PROD" && !(row.role === "CASTER" && row.userId === prodId && row.provisional),
+    );
+    kept.push(held ?? { userId: prodId, role: "PROD", source: "CAST", reason: "CAST", provisional: false });
+    out.splice(0, out.length, ...kept);
   }
   const order = { REFEREE: 0, CASTER: 1, PROD: 2 } as const;
   return out.sort((a, b) => order[a.role] - order[b.role] || a.userId - b.userId);

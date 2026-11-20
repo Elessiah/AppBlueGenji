@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/cast-notices");
 jest.mock("@/lib/server/tournaments/referee-notices");
+jest.mock("@/lib/server/tournaments/prod-notices");
 jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import type { PoolConnection } from "mysql2/promise";
@@ -18,6 +19,7 @@ import {
   queueCastChange,
 } from "@/lib/server/tournaments/cast-notices";
 import { announceRefereeChange, announceRefereeChanges, queueRefereeChange } from "@/lib/server/tournaments/referee-notices";
+import { queueProdChange } from "@/lib/server/tournaments/prod-notices";
 import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 import {
   assignMatchReferee,
@@ -89,6 +91,8 @@ type MatchState = {
   live_trigger?: string | null;
   /** Le caster qui a posé le mode (`bg_matches.live_trigger_user_id`). */
   live_trigger_user_id?: number | null;
+  /** Prod du match (`bg_matches.prod_user_id`, `MATCH_PROD.md`), absente : aucune. */
+  prod_user_id?: number | null;
   /** `bg_match_casters` du match, dans l'ordre d'inscription. */
   casters: CasterState[];
   /** `bg_match_streams` du match (`staff_owned` : 1 = stream du staff). */
@@ -704,6 +708,34 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
       pairing: PAIRING,
     });
     expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("maintainMatchLaunches_prodNowPlays_clearsProdAndQueuesJoinedTeam", async () => {
+    // Prod placée sur un match aux créneaux vides, puis son équipe (TEAM1) l'atteint.
+    state.memberships.push({ userId: 77, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, prod_user_id: 77 });
+    const connection = connectionFor(state);
+    const report = { castReleased: false };
+
+    await maintainMatchLaunches(connection, 7, report);
+
+    expect(state.writes).toContain("UPDATE bg_matches SET prod_user_id = NULL WHERE id = ? AND prod_user_id = ?");
+    expect(queueProdChange).toHaveBeenCalledWith(connection, {
+      matchId: 42,
+      log: "JOINED_TEAM",
+      notices: [{ userId: 77, kind: "JOINED_TEAM" }],
+      pairing: PAIRING,
+    });
+    expect(report.castReleased).toBe(true);
+  });
+
+  it("maintainMatchLaunches_prodDoesNotPlay_keepsProd", async () => {
+    state.match = matchState({ launch_pairing: null, prod_user_id: 77 });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.writes.some((write) => write.includes("prod_user_id = NULL"))).toBe(false);
+    expect(queueProdChange).not.toHaveBeenCalled();
   });
 
   it("maintainMatchLaunches_casterJoinedTeamOwnedTrigger_releasesOwnership", async () => {

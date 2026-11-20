@@ -39,7 +39,8 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
 
 /**
  * Place la prod du match, la change ou la retire. Corps :
- * `{ userId: number | null, expectedUserId?: number | null }`. Le compte placé
+ * `{ userId: number | null, expectedUserId?: number | null }` — `userId`
+ * obligatoire (`null` : retirer ; absent : 400 `INVALID_USER_ID`). Le compte placé
  * tient la permission `prod` (409 `NOT_PROD`), n'est pas suspendu
  * (409 `PROD_UNAVAILABLE`), ne joue pas le match et n'en est pas caster.
  * `expectedUserId` : la prod que la fenêtre montrait ; changée depuis, rien ne
@@ -56,6 +57,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const read = await readJsonBodyOrFallback(req, {});
   if ("refusal" in read) return read.refusal;
   const body = read.body as { userId?: unknown; expectedUserId?: unknown };
+  // Clé absente (corps vide, faute de frappe) : jamais lue comme un retrait.
+  if (!("userId" in body)) return fail("INVALID_USER_ID", 400);
   const prodId = body.userId ?? null;
   if (prodId !== null && !isPositiveId(prodId)) return fail("INVALID_USER_ID", 400);
   const expected = body.expectedUserId;

@@ -50,6 +50,13 @@ describe("prodControls", () => {
     });
   });
 
+  it("prodControls_isProdWithoutCanProd_hidesRelease", () => {
+    const controls = prodControls(openMatch({ prod: { userId: 5, pseudo: "Moi" } }), { ...VIEWER, canProd: false });
+
+    expect(controls.isProd).toBe(true);
+    expect(controls.showRelease).toBe(false);
+  });
+
   it("prodControls_completedMatch_hidesEverything", () => {
     const match = openMatch({ status: "COMPLETED", prod: { userId: 5, pseudo: "Moi" } });
 

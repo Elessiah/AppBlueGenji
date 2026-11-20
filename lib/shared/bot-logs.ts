@@ -1003,7 +1003,15 @@ export function formatCastChangeLog(context: {
  * `lib/server/tournaments/match-prod.ts`). Personne n'est nommé : « une prod »,
  * « le staff ».
  */
-export type ProdLogChange = "CLAIMED" | "RELEASED" | "ASSIGNED" | "REPLACED" | "RELEASED_BY_STAFF" | "INELIGIBLE";
+export type ProdLogChange =
+  | "CLAIMED"
+  | "RELEASED"
+  | "ASSIGNED"
+  | "REPLACED"
+  | "RELEASED_BY_STAFF"
+  | "INELIGIBLE"
+  | "JOINED_TEAM"
+  | "ACCOUNT_DELETION";
 
 const PROD_LOG_WORDING: Record<ProdLogChange, { kind: string; detail: string }> = {
   CLAIMED: { kind: "Prod réservée", detail: "une prod se place sur le match" },
@@ -1012,6 +1020,8 @@ const PROD_LOG_WORDING: Record<ProdLogChange, { kind: string; detail: string }> 
   REPLACED: { kind: "Prod changée", detail: `la prod du match est remplacée par ${ANONYMOUS_STAFF_LABEL}` },
   RELEASED_BY_STAFF: { kind: "Prod retirée", detail: `prod du match retirée par ${ANONYMOUS_STAFF_LABEL}` },
   INELIGIBLE: { kind: "Prod retirée d'office", detail: "la prod n'a plus le rôle prod" },
+  JOINED_TEAM: { kind: "Prod retirée d'office", detail: "la prod joue désormais le match" },
+  ACCOUNT_DELETION: { kind: "Prod retirée d'office", detail: "le compte de la prod est en cours de suppression" },
 };
 
 /** Ligne du journal du staff (salon des casts) pour un changement de prod d'un match. */

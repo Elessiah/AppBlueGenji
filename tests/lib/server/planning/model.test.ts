@@ -139,6 +139,24 @@ describe("entryAssignments — prod du match (MATCH_PROD.md)", () => {
     ]);
   });
 
+  it("entryAssignments_matchProdWithOtherHeldProd_keepsOnlyMatchProd", () => {
+    const data = planningData({
+      assignments: [loadedAssignment({ userId: 7, role: "PROD", confirmed: true, source: "MANUAL", reason: "MANUAL" })],
+    });
+
+    expect(entryAssignments(loadedEntry({ matchProdId: 5 }), data)).toEqual([
+      { userId: 5, role: "PROD", source: "CAST", reason: "CAST", provisional: false },
+    ]);
+  });
+
+  it("entryAssignments_matchProdProvisionalCasterRow_dropsCasterRow", () => {
+    const data = planningData({ assignments: [loadedAssignment({ userId: 5, role: "CASTER", confirmed: false })] });
+
+    expect(entryAssignments(loadedEntry({ matchProdId: 5 }), data)).toEqual([
+      { userId: 5, role: "PROD", source: "CAST", reason: "CAST", provisional: false },
+    ]);
+  });
+
   it("entryAssignments_noMatchProd_keepsProvisionalProd", () => {
     const data = planningData({ assignments: [loadedAssignment({ userId: 7, role: "PROD", confirmed: false })] });
 

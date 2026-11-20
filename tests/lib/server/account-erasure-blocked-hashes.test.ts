@@ -27,6 +27,7 @@ describe("eraseAccount — blocages d'empreinte", () => {
       liveTournamentIds: [],
       releasedRefereeMatchIds: [],
       releasedCastMatchIds: [],
+      releasedProdPlaces: [],
     });
     jest.mocked(retireAccountQuarantinesOn).mockResolvedValue(undefined);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);

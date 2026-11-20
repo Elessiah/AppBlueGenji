@@ -6,6 +6,7 @@ import { sessionHolds } from "@/lib/shared/player-view";
 
 const STATUSES: Readonly<Record<string, number>> = {
   NOT_PROD: 403,
+  PROD_SUSPENDED: 403,
   MATCH_NOT_FOUND: 404,
   MATCH_ALREADY_COMPLETED: 409,
   MATCH_NOT_LAUNCHABLE: 409,

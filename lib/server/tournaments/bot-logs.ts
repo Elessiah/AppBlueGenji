@@ -47,6 +47,7 @@ import { discardDepartedNotices, flushDepartedNotices } from "./departed-notices
 import { discardAutoValidatedNotices, flushAutoValidatedNotices } from "./auto-validated-notices";
 import { discardCastChanges, flushCastChanges } from "./cast-notices";
 import { discardRefereeChanges, flushRefereeChanges } from "./referee-notices";
+import { discardProdChanges, flushProdChanges } from "./prod-notices";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAbortedOn } from "@/lib/server/mysql-errors";
 import { botLogTournamentId } from "@/lib/shared/bot-log-batch";
@@ -404,6 +405,7 @@ export function discardBotLogs(connection: PoolConnection): void {
   // Comme les casters désinscrits d'office par l'entretien des lancements.
   discardCastChanges(connection);
   discardRefereeChanges(connection);
+  discardProdChanges(connection);
   // Les manches notées tranchées ne l'ont pas été : leurs réservations gardent
   // tout leur objet, et le prochain entretien les retrouvera telles quelles.
   resolvedMatches.discard(connection);
@@ -519,6 +521,8 @@ export function flushBotLogs(connection: PoolConnection): void {
   // Et les casters désinscrits d'office par l'entretien (`./cast-notices`).
   flushCastChanges(connection);
   flushRefereeChanges(connection);
+  // Et la prod devenue joueuse du match (`./prod-notices`).
+  flushProdChanges(connection);
   const validated = staffValidatedMatches.take(connection);
   const deadlineForfeits = deadlineForfeitMatches.take(connection);
   const queue = (pending.take(connection) ?? []).map((entry) => {

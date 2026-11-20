@@ -9,40 +9,38 @@
  *   base, et n'être ni suspendu ni effacé.
  *
  * Mêmes refus que le cast : un match joué ou une exemption n'a pas de prod à
- * changer ; qui joue le match ou en est caster n'en est pas la prod.
+ * changer ; qui joue le match ou en est caster (inscrit, ou caster tenu au
+ * planning) n'en est pas la prod. Une prod tenue au planning par un autre
+ * compte réserve la place : se placer soi-même est refusé (`MATCH_PROD_TAKEN`).
  * Ordre des verrous de la suppression de compte : la ligne du compte d'abord
  * (en partage), puis le match (`SELECT … FOR UPDATE`, sans jointure — MariaDB).
  *
- * Après le commit : une ligne au journal du staff (salon des casts), sans
- * personne nommée, et un avis (message privé, push `MATCH_PROD`) au compte que
- * le staff place ou retire — jamais à qui agit sur sa propre place.
+ * Après le commit : une ligne au journal du staff, sans personne nommée, et un
+ * avis au compte que le staff place ou retire (`./prod-notices`).
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { sendBotLog } from "@/lib/server/bot-integration";
-import { trackAnnouncement } from "@/lib/server/coalescer";
 import { withConnection } from "@/lib/server/database";
-import { failureDiagnostic } from "@/lib/server/failure-reason";
-import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
-import { siteCanonicalBase } from "@/lib/server/site-url";
 import { lockedSuspendedUserIds, userSuspendedSql } from "@/lib/server/suspension-sql";
-import { formatProdChangeLog, type ProdLogChange } from "@/lib/shared/bot-logs";
-import type { BotLogCategory } from "@/lib/shared/bot-log-category";
-import { discordQuoted } from "@/lib/shared/discord-text";
-import { localizedSiteUrl } from "@/lib/shared/dm-language";
-import type { Locale } from "@/lib/shared/locales";
-import { prodNoticeHref, type ProdNoticeKind, type ProdNoticeMatch } from "@/lib/shared/match-prod";
+import type { ProdLogChange } from "@/lib/shared/bot-logs";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { rolesGranting } from "@/lib/shared/permissions";
-import { matchProdPush, pushRoundLabel } from "@/lib/shared/push-messages";
 import { actingUserId, type SessionActor } from "./cast-settings";
 import type { CastPairing } from "./cast-notices";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { resolveTeamParty } from "./match-launch";
-import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 import { loadMatchPlayerIds } from "./match-players";
 import { publishMatchUpdatedEvent } from "./notifications";
+import { announceProdChange, type ProdChange } from "./prod-notices";
 import { inTransaction } from "./transaction";
+
+export {
+  announceProdChange,
+  deliverProdChange,
+  formatProdNotice,
+  prodLogCategory,
+  type ProdChange,
+} from "./prod-notices";
 
 /**
  * Le compte tient-il la permission `prod` ? Rôles lus en base (jamais ceux
@@ -51,6 +49,9 @@ import { inTransaction } from "./transaction";
 export const PROD_ROLE_SQL = `(u.is_admin = 1${rolesGranting("prod")
   .map((role) => ` OR JSON_CONTAINS(u.platform_roles_json, ${jsonRoleLiteral(role)})`)
   .join("")})`;
+
+/** Ligne du planning **tenue** (choix du staff ou proposition confirmée), comme au décompte de l'équité. */
+const HELD_PLANNING_ROW_SQL = `(source = 'MANUAL' OR confirmed = 1)`;
 
 type ProdAccountRow = RowDataPacket & { is_deleted: number | null; holds_prod: number | null };
 
@@ -62,16 +63,6 @@ type ProdMatchRow = RowDataPacket & {
   team1_id: number | null;
   team2_id: number | null;
   prod_user_id: number | null;
-};
-
-/** Un changement de prod constaté sous verrou, annoncé après le commit. */
-export type ProdChange = {
-  matchId: number;
-  log: ProdLogChange;
-  /** Comptes à prévenir (placés ou retirés par un autre qu'eux). */
-  notices: { userId: number; kind: ProdNoticeKind }[];
-  /** Appariement lu sous verrou : un match réapparié depuis n'est pas nommé par ses nouveaux engagés. */
-  pairing: CastPairing;
 };
 
 /** Un match dont la place de prod vient d'être rendue. */
@@ -105,14 +96,32 @@ async function lockProdMatch(connection: PoolConnection, matchId: number): Promi
   return row;
 }
 
-/** Qui joue le match ou en est caster n'en est pas la prod. */
+/**
+ * Qui joue le match ou en est caster n'en est pas la prod : caster inscrit sur
+ * le match, ou caster tenu au planning (une ligne CASTER confirmée ou posée par
+ * le staff) — le planning ne montrerait sinon le même compte aux deux places.
+ */
 async function assertProdFree(connection: PoolConnection, row: ProdMatchRow, userId: number): Promise<void> {
   if (await resolveTeamParty(connection, row, userId)) throw new Error("PROD_IS_PLAYER");
   const [casters] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND user_id = ? LIMIT 1`,
-    [row.id, userId],
+    `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND user_id = ?
+     UNION ALL
+     SELECT 1 FROM bg_planning_assignments
+      WHERE match_id = ? AND user_id = ? AND role = 'CASTER' AND ${HELD_PLANNING_ROW_SQL}
+     LIMIT 1`,
+    [row.id, userId, row.id, userId],
   );
   if (casters.length > 0) throw new Error("PROD_IS_CASTER");
+}
+
+/** Une prod tenue au planning par un autre compte réserve la place du match. */
+async function assertNoOtherPlannedProd(connection: PoolConnection, matchId: number, userId: number): Promise<void> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_planning_assignments
+      WHERE match_id = ? AND role = 'PROD' AND user_id <> ? AND ${HELD_PLANNING_ROW_SQL} LIMIT 1`,
+    [matchId, userId],
+  );
+  if (rows.length > 0) throw new Error("MATCH_PROD_TAKEN");
 }
 
 function pairingOf(row: ProdMatchRow): CastPairing {
@@ -132,10 +141,12 @@ function afterCommit(result: { tournamentId: number; change: ProdChange } | null
 
 /**
  * « Faire la prod » : le lecteur se place comme prod du match. Déjà la sienne :
- * rien ne change. Une place tenue par un autre est refusée.
+ * rien ne change. Une place tenue par un autre (sur le match, ou au planning)
+ * est refusée ; un compte suspendu ne se place pas plus que le staff ne l'y place.
  *
- * @throws `PLAYER_VIEW_ACTIVE` | `NOT_PROD` | `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED`
- *   | `MATCH_NOT_LAUNCHABLE` | `MATCH_PROD_TAKEN` | `PROD_IS_PLAYER` | `PROD_IS_CASTER`
+ * @throws `PLAYER_VIEW_ACTIVE` | `NOT_PROD` | `PROD_SUSPENDED` | `MATCH_NOT_FOUND`
+ *   | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE` | `MATCH_PROD_TAKEN`
+ *   | `PROD_IS_PLAYER` | `PROD_IS_CASTER`
  */
 export async function claimMatchProd(matchId: number, actor: SessionActor): Promise<void> {
   const userId = actingUserId(actor, "prod");
@@ -143,10 +154,12 @@ export async function claimMatchProd(matchId: number, actor: SessionActor): Prom
     inTransaction(async (connection) => {
       const account = await lockProdAccount(connection, userId);
       if (!account?.holdsProd) throw new Error("NOT_PROD");
+      if ((await lockedSuspendedUserIds(connection, [userId])).has(userId)) throw new Error("PROD_SUSPENDED");
       const row = await lockProdMatch(connection, matchId);
       const current = nullableId(row.prod_user_id);
       if (current === userId) return null;
       if (current !== null) throw new Error("MATCH_PROD_TAKEN");
+      await assertNoOtherPlannedProd(connection, matchId, userId);
       await assertProdFree(connection, row, userId);
       await writeProd(connection, matchId, userId);
       const change: ProdChange = { matchId, log: "CLAIMED", notices: [], pairing: pairingOf(row) };
@@ -235,25 +248,28 @@ function staffProdNotices(current: number | null, prodId: number | null, staffUs
 
 /**
  * Le compte perd la permission `prod` (`setUserRoles`) : ses places de prod sur
- * des matchs à jouer sont rendues, dans la transaction du changement de rôles.
- * Un match joué garde sa prod : l'histoire ne se réécrit pas. Rend les matchs
- * libérés, à annoncer après le commit ({@link announceProdWithdrawals}).
+ * des matchs **pas encore lancés** sont rendues, dans la transaction du
+ * changement de rôles — comme un caster inéligible (`releaseIneligibleCast`).
+ * Un match lancé ou joué garde sa prod : le direct n'est pas coupé en cours, et
+ * l'histoire ne se réécrit pas. Rend les matchs libérés, à annoncer après le
+ * commit ({@link announceProdWithdrawals}).
  */
 export async function withdrawLostProdPlaces(connection: PoolConnection, userId: number): Promise<ReleasedProdPlace[]> {
   const [rows] = await connection.execute<ProdMatchRow[]>(
     `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, prod_user_id
-       FROM bg_matches WHERE prod_user_id = ? AND status <> 'COMPLETED' FOR UPDATE`,
+       FROM bg_matches WHERE prod_user_id = ? AND status <> 'COMPLETED' AND launched_at IS NULL FOR UPDATE`,
     [userId],
   );
   if (rows.length === 0) return [];
   await connection.execute(
-    `UPDATE bg_matches SET prod_user_id = NULL WHERE prod_user_id = ? AND status <> 'COMPLETED'`,
-    [userId],
+    `UPDATE bg_matches SET prod_user_id = NULL
+      WHERE prod_user_id = ? AND id IN (${rows.map(() => "?").join(", ")})`,
+    [userId, ...rows.map((row) => Number(row.id))],
   );
   return rows.map((row) => ({ matchId: Number(row.id), tournamentId: Number(row.tournament_id), pairing: pairingOf(row) }));
 }
 
-/** Après le commit d'un retrait de rôle : plateaux rafraîchis, une ligne par match, l'ancienne prod prévenue. */
+/** Après le commit d'un retrait de rôle : plateaux rafraîchis, une ligne par match, l'ancienne prod prévenue du motif. */
 export function announceProdWithdrawals(userId: number, released: readonly ReleasedProdPlace[]): void {
   for (const tournamentId of new Set(released.map((entry) => entry.tournamentId))) {
     publishMatchUpdatedEvent(tournamentId, { landingLive: true });
@@ -262,7 +278,7 @@ export function announceProdWithdrawals(userId: number, released: readonly Relea
     announceProdChange({
       matchId: entry.matchId,
       log: "INELIGIBLE",
-      notices: [{ userId, kind: "RELEASED" }],
+      notices: [{ userId, kind: "INELIGIBLE" }],
       pairing: entry.pairing,
     });
   }
@@ -301,9 +317,13 @@ export async function loadProdPanel(matchId: number): Promise<ProdPanel | null> 
         WHERE u.is_deleted = 0 AND ${PROD_ROLE_SQL} AND NOT ${userSuspendedSql("u.id")}
         ORDER BY u.pseudo ASC, u.id ASC`,
     );
+    // Casters inscrits, et casters tenus au planning : la même règle que `assertProdFree`.
     const [casterRows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
-      `SELECT user_id FROM bg_match_casters WHERE match_id = ?`,
-      [matchId],
+      `SELECT user_id FROM bg_match_casters WHERE match_id = ?
+       UNION
+       SELECT user_id FROM bg_planning_assignments
+        WHERE match_id = ? AND role = 'CASTER' AND ${HELD_PLANNING_ROW_SQL}`,
+      [matchId, matchId],
     );
     const players = await loadMatchPlayerIds(connection, {
       team1_id: nullableId(match.team1_id),
@@ -327,86 +347,4 @@ export async function loadProdPanel(matchId: number): Promise<ProdPanel | null> 
     }
     return { matchId, prod, candidates };
   });
-}
-
-/** Catégorie de la ligne : `staff-removal` (alerte) quand le match perd sa prod, `casts` sinon. */
-export function prodLogCategory(change: ProdLogChange): BotLogCategory {
-  return change === "RELEASED" || change === "RELEASED_BY_STAFF" || change === "INELIGIBLE" ? "staff-removal" : "casts";
-}
-
-const DM_TEXT: Readonly<Record<Locale, Readonly<Record<ProdNoticeKind, string>>>> = {
-  fr: { ASSIGNED: "Le staff te place comme prod", RELEASED: "Le staff te retire la prod" },
-  en: { ASSIGNED: "The staff made you the prod", RELEASED: "The staff removed you as the prod" },
-};
-
-function quotedName(value: string | null, locale: Locale): string {
-  return value === null ? "TBD" : discordQuoted(value, locale);
-}
-
-/**
- * Le message privé Discord d'un avis de prod, dans la langue du compte. Aucun
- * pseudo de joueur : en tournoi individuel, « un match ».
- */
-export function formatProdNotice(match: ProdNoticeMatch, url: string, locale: Locale = "fr"): string {
-  const round = pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss);
-  const tournament = quotedName(match.tournamentName, locale);
-  const lead = DM_TEXT[locale][match.kind];
-  if (locale === "en") {
-    const subject = match.solo
-      ? "of a match"
-      : `of the match ${quotedName(match.team1Name, locale)} vs ${quotedName(match.team2Name, locale)}`;
-    return `🎛️ BlueGenji — ${lead} ${subject} (${round}, ${tournament}). Match page: ${localizedSiteUrl(url, locale)}`;
-  }
-  const subject = match.solo
-    ? "d'un match"
-    : `du match ${quotedName(match.team1Name, locale)} contre ${quotedName(match.team2Name, locale)}`;
-  return `🎛️ BlueGenji — ${lead} ${subject} (${round}, ${tournament}). Fiche du match : ${url}`;
-}
-
-/** Le journal, puis les avis. Peut lever : {@link announceProdChange} l'enveloppe. */
-export async function deliverProdChange(change: ProdChange): Promise<void> {
-  const row = await loadMatchLogRow(change.matchId);
-  if (!row) return;
-  const current =
-    change.pairing.team1Id === nullableId(row.team1_id ?? null) &&
-    change.pairing.team2Id === nullableId(row.team2_id ?? null);
-  // Appariement changé depuis le geste : le match est désigné sans ses engagés.
-  const named = current ? row : { ...row, team1_name: null, team2_name: null };
-  const match = matchLogSubject(named);
-  sendBotLog(formatProdChangeLog({ ...match, change: change.log }), {
-    tournamentId: match.tournament.id,
-    category: prodLogCategory(change.log),
-  });
-  for (const notice of change.notices) {
-    // Message de match : l'interrupteur « messages privés de mes matchs » le
-    // coupe, le push garde son sujet ; seul un tag Discord certifié le reçoit.
-    const recipients = await loadNotificationRecipients([notice.userId], "certified", { matchDm: true });
-    const subject: ProdNoticeMatch = {
-      tournamentId: match.tournament.id,
-      tournamentName: match.tournament.name,
-      matchId: match.matchId,
-      bracket: match.bracket,
-      roundNumber: match.roundNumber,
-      swiss: match.swiss,
-      team1Name: named.team1_name,
-      team2Name: named.team2_name,
-      solo: match.participantType === "SOLO",
-      kind: notice.kind,
-    };
-    const url = `${siteCanonicalBase()}${prodNoticeHref(subject)}`;
-    await notifyUsers(recipients, {
-      topic: "MATCH_PROD",
-      discord: { message: (locale) => formatProdNotice(subject, url, locale), context: "match-prod" },
-      push: (locale) => matchProdPush(subject, locale),
-    });
-  }
-}
-
-/** Annonce sans attendre ; attendue à l'arrêt du serveur. Ne lève jamais. */
-export function announceProdChange(change: ProdChange): void {
-  void trackAnnouncement(
-    deliverProdChange(change).catch((error: unknown) =>
-      console.error(`[prod] changement de prod non annoncé : ${failureDiagnostic(error)}`),
-    ),
-  );
 }

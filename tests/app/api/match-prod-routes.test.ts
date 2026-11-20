@@ -92,6 +92,16 @@ describe("POST / DELETE /api/matches/[matchId]/prod", () => {
     expect(claimMatchProd).toHaveBeenCalledWith(42, prod);
   });
 
+  it("POST_prod_suspended_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(prod);
+    jest.mocked(claimMatchProd).mockRejectedValue(new Error("PROD_SUSPENDED"));
+
+    const response = await prodPost(jsonRequest("POST"), params("42"));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual(expect.objectContaining({ error: "PROD_SUSPENDED" }));
+  });
+
   it("DELETE_prod_notOwn_returns403", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(prod);
     jest.mocked(releaseMatchProd).mockRejectedValue(new Error("NOT_MATCH_PROD"));
@@ -126,6 +136,16 @@ describe("GET / PUT /api/admin/matches/[matchId]/prod", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
     expect((await prodPut(jsonRequest("PUT", { userId: "5" }), params("42"))).status).toBe(400);
+  });
+
+  it("adminPUT_missingUserIdKey_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+
+    const response = await prodPut(jsonRequest("PUT", { user_id: 5 }), params("42"));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual(expect.objectContaining({ error: "INVALID_USER_ID" }));
+    expect(assignMatchProd).not.toHaveBeenCalled();
   });
 
   it("adminPUT_invalidExpected_returns400", async () => {

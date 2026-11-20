@@ -28,6 +28,7 @@ import { resolveTeamParty } from "@/lib/server/tournaments/match-launch";
 import { loadMatchLogRow, type MatchLogRow } from "@/lib/server/tournaments/match-log-subject";
 import { loadMatchPlayerIds } from "@/lib/server/tournaments/match-players";
 import {
+  announceProdWithdrawals,
   assignMatchProd,
   claimMatchProd,
   formatProdNotice,
@@ -37,6 +38,7 @@ import {
   withdrawLostProdPlaces,
 } from "@/lib/server/tournaments/match-prod";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { discardProdChanges, flushProdChanges, queueProdChange } from "@/lib/server/tournaments/prod-notices";
 import { inTransaction } from "@/lib/server/tournaments/transaction";
 import type { ProdNoticeMatch } from "@/lib/shared/match-prod";
 import { authUser } from "../../helpers/auth-user";
@@ -57,6 +59,8 @@ type Account = { is_deleted: number; holds_prod: number };
 let match: Record<string, unknown> | null;
 let accounts: Map<number, Account>;
 let casterIds: number[];
+let plannedCasterIds: number[];
+let plannedOtherProd: boolean;
 let execute: jest.Mock<SqlQuery>;
 let announcements: Promise<void>[];
 
@@ -94,6 +98,8 @@ beforeEach(() => {
     [OTHER_PROD_ID, { is_deleted: 0, holds_prod: 1 }],
   ]);
   casterIds = [];
+  plannedCasterIds = [];
+  plannedOtherProd = false;
   announcements = [];
   execute = jest.fn<SqlQuery>(async (sql, params) => {
     const values = params as unknown[];
@@ -103,8 +109,10 @@ beforeEach(() => {
     }
     if (sql.includes("FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE")) return [match ? [match] : [], []];
     if (sql.includes("FROM bg_match_casters WHERE match_id = ? AND user_id = ?")) {
-      return [casterIds.includes(Number(values[1])) ? [{ 1: 1 }] : [], []];
+      const userId = Number(values[1]);
+      return [casterIds.includes(userId) || plannedCasterIds.includes(userId) ? [{ 1: 1 }] : [], []];
     }
+    if (sql.includes("role = 'PROD' AND user_id <> ?")) return [plannedOtherProd ? [{ 1: 1 }] : [], []];
     if (sql.startsWith("UPDATE bg_matches SET prod_user_id")) return [{ affectedRows: 1 }, []];
     throw new Error(`requête inattendue : ${sql}`);
   });
@@ -196,6 +204,29 @@ describe("claimMatchProd", () => {
     jest.mocked(resolveTeamParty).mockResolvedValue({ role: "TEAM1", canDeclareReady: true });
 
     await expect(claimMatchProd(42, prodActor)).rejects.toThrow("PROD_IS_PLAYER");
+  });
+
+  it("claimMatchProd_suspendedAccount_throwsProdSuspended", async () => {
+    jest.mocked(lockedSuspendedUserIds).mockResolvedValue(new Set([PROD_ID]));
+
+    await expect(claimMatchProd(42, prodActor)).rejects.toThrow("PROD_SUSPENDED");
+    expect(updatesOfProd()).toHaveLength(0);
+  });
+
+  it("claimMatchProd_heldPlanningProdOfOther_throwsMatchProdTaken", async () => {
+    plannedOtherProd = true;
+
+    await expect(claimMatchProd(42, prodActor)).rejects.toThrow("MATCH_PROD_TAKEN");
+    expect(updatesOfProd()).toHaveLength(0);
+  });
+
+  it("claimMatchProd_heldPlanningCaster_throwsProdIsCaster", async () => {
+    plannedCasterIds = [PROD_ID];
+
+    await expect(claimMatchProd(42, prodActor)).rejects.toThrow("PROD_IS_CASTER");
+    const casterQuery = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_match_casters"));
+    expect(casterQuery?.[0]).toContain("bg_planning_assignments");
+    expect(casterQuery?.[0]).toContain("role = 'CASTER'");
   });
 
   it("claimMatchProd_playerView_throwsPlayerViewActive", async () => {
@@ -317,7 +348,25 @@ describe("withdrawLostProdPlaces", () => {
     const released = await withdrawLostProdPlaces(fakeConnection({ execute: lost }), PROD_ID);
 
     expect(released).toEqual([{ matchId: 42, tournamentId: 7, pairing: { team1Id: 10, team2Id: 11 } }]);
-    expect(lost).toHaveBeenLastCalledWith(expect.stringContaining("SET prod_user_id = NULL"), [PROD_ID]);
+    expect(lost).toHaveBeenLastCalledWith(expect.stringContaining("SET prod_user_id = NULL"), [PROD_ID, 42]);
+  });
+
+  it("withdrawLostProdPlaces_launchedMatch_notSelected", async () => {
+    const lost = jest.fn<SqlQuery>(async () => [[], []]);
+
+    await withdrawLostProdPlaces(fakeConnection({ execute: lost }), PROD_ID);
+
+    expect(lost.mock.calls[0][0]).toContain("launched_at IS NULL");
+  });
+});
+
+describe("announceProdWithdrawals", () => {
+  it("announceProdWithdrawals_roleLost_logsIneligibleAndDmGivesReason", async () => {
+    announceProdWithdrawals(PROD_ID, [{ matchId: 42, tournamentId: 7, pairing: { team1Id: 10, team2Id: 11 } }]);
+    await settle();
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("la prod n'a plus le rôle prod");
+    expect(jest.mocked(notifyUsers).mock.calls[0][1].discord?.message("fr")).toContain("Tu n'as plus le rôle prod");
   });
 
   it("withdrawLostProdPlaces_none_returnsEmptyWithoutUpdate", async () => {
@@ -344,7 +393,10 @@ describe("loadProdPanel", () => {
     panelCasters = [];
     panelExecute = jest.fn<SqlQuery>(async (sql) => {
       if (sql.includes("FROM bg_matches")) return [panelMatch ? [panelMatch] : [], []];
-      if (sql.includes("FROM bg_match_casters")) return [panelCasters.map((user_id) => ({ user_id })), []];
+      if (sql.includes("FROM bg_match_casters")) {
+        expect(sql).toContain("bg_planning_assignments");
+        return [panelCasters.map((user_id) => ({ user_id })), []];
+      }
       if (sql.includes("WHERE id = ? LIMIT 1")) return [[{ id: 9, pseudo: "Ancienne" }], []];
       if (sql.includes("FROM bg_users u")) return [users, []];
       throw new Error(`requête inattendue : ${sql}`);
@@ -393,10 +445,46 @@ describe("prodLogCategory", () => {
     expect(prodLogCategory("INELIGIBLE")).toBe("staff-removal");
   });
 
+  it("prodLogCategory_joinedTeamAndAccountDeletion_areStaffRemoval", () => {
+    expect(prodLogCategory("JOINED_TEAM")).toBe("staff-removal");
+    expect(prodLogCategory("ACCOUNT_DELETION")).toBe("staff-removal");
+  });
+
   it("prodLogCategory_gains_areCasts", () => {
     expect(prodLogCategory("CLAIMED")).toBe("casts");
     expect(prodLogCategory("ASSIGNED")).toBe("casts");
     expect(prodLogCategory("REPLACED")).toBe("casts");
+  });
+});
+
+describe("queueProdChange", () => {
+  const joined = {
+    matchId: 42,
+    log: "JOINED_TEAM" as const,
+    notices: [{ userId: PROD_ID, kind: "JOINED_TEAM" as const }],
+    pairing: { team1Id: 10, team2Id: 11 },
+  };
+
+  it("flushProdChanges_queuedChange_announcesAfterCommit", async () => {
+    const connection = fakeConnection({ execute });
+    queueProdChange(connection, joined);
+
+    flushProdChanges(connection);
+    await settle();
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("la prod joue désormais le match");
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("discardProdChanges_queuedChange_nothingAnnounced", async () => {
+    const connection = fakeConnection({ execute });
+    queueProdChange(connection, joined);
+
+    discardProdChanges(connection);
+    flushProdChanges(connection);
+    await settle();
+
+    expect(sendBotLog).not.toHaveBeenCalled();
   });
 });
 
@@ -432,5 +520,11 @@ describe("formatProdNotice", () => {
     expect(text).toContain("The staff removed you as the prod of a match");
     expect(text).not.toContain("Pseudo1");
     expect(text).not.toContain("Pseudo2");
+  });
+
+  it("formatProdNotice_joinedTeamEn_saysNowPlayer", () => {
+    const text = formatProdNotice({ ...notice, kind: "JOINED_TEAM" }, "https://bluegenji.test/tournois/7#match-42", "en");
+
+    expect(text).toContain("You are now one of the players: you are no longer the prod of the match");
   });
 });

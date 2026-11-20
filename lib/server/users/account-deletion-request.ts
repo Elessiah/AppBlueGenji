@@ -32,11 +32,12 @@ import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { rotateHeldAvatarFile } from "@/lib/server/avatar-rotation";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
+import { queueProdChange } from "@/lib/server/tournaments/prod-notices";
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { relaunchAfterRefereeWithdrawal } from "@/lib/server/tournaments/match-launch";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { lockedSuspendedUserIds, userSuspendedSql } from "@/lib/server/suspension-sql";
-import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
+import { withdrawUserCasts, type MatchWithdrawal } from "@/lib/server/tournaments/match-casters";
 import { cancelPendingTeamInvitations, lockMemberRoles, writeActiveMembership } from "@/lib/server/teams/access";
 import { dissolveTeamOn } from "@/lib/server/teams/dissolution";
 import { refreshTeamViewers, teamViewerScope } from "@/lib/server/teams/roster";
@@ -512,6 +513,19 @@ async function settleDeparture(userId: number, departure: TeamDeparture, replay 
 }
 
 /**
+ * Suites, dans la transaction de la demande, du retrait de ses casts et
+ * arbitrages (hors rejeu d'une restauration) : un match qui n'attendait plus
+ * que lui part, et chaque place de prod rendue sur un match à jouer vaut au
+ * staff une ligne au journal (sans nom), partie après le commit (`flushBotLogs`).
+ */
+async function followCastWithdrawal(connection: PoolConnection, withdrawal: MatchWithdrawal): Promise<void> {
+  await relaunchAfterRefereeWithdrawal(connection, withdrawal.releasedRefereeMatchIds, withdrawal.releasedCastMatchIds);
+  for (const place of withdrawal.releasedProdPlaces) {
+    queueProdChange(connection, { matchId: place.matchId, log: "ACCOUNT_DELETION", notices: [], pairing: place.pairing });
+  }
+}
+
+/**
  * Refuse (`LAST_ADMIN_ACCOUNT`) la demande du dernier administrateur vivant.
  * Les autres administrateurs se relèvent sans verrou (une recherche verrouillée
  * sans index sur `is_admin` verrouillerait toute la table), puis le premier
@@ -694,13 +708,7 @@ export async function requestAccountDeletion(
       const withdrawal = await withdrawUserCasts(connection, userId, false);
       castTournaments = withdrawal.tournamentIds;
       liveCastTournaments = withdrawal.liveTournamentIds;
-      if (!replay) {
-        await relaunchAfterRefereeWithdrawal(
-          connection,
-          withdrawal.releasedRefereeMatchIds,
-          withdrawal.releasedCastMatchIds,
-        );
-      }
+      if (!replay) await followCastWithdrawal(connection, withdrawal);
       // Ses invitations en attente ne seront acceptées par personne.
       await connection.execute(
         `UPDATE bg_team_invitations SET status = 'CANCELLED', responded_at = NOW()
