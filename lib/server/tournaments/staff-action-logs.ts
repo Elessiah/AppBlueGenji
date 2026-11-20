@@ -135,13 +135,17 @@ export async function deliverMatchReplayChange(matchId: number, entry: MatchRepl
     return;
   }
   const match = matchLogSubject(row);
-  const edit: MatchReplayEdit =
-    entry.change === "REMOVED" ? { change: "REMOVED", replayUrl: null } : { change: entry.change, replayUrl: entry.replayUrl };
-  publishStaffAction(
-    formatMatchReplayLog({ ...match, ...edit, author: entry.author }),
-    entry.actor,
-    { category: "referees", tournamentId: match.tournament.id },
-  );
+  // La ligne Discord et le pm2 s'écrivent ensemble (audit avant l'envoi) : une
+  // erreur ici ne doit pas laisser `announceMatchReplayChange` tracer une 2e fois.
+  try {
+    publishStaffAction(
+      formatMatchReplayLog({ ...match, ...entry }),
+      entry.actor,
+      { category: "referees", tournamentId: match.tournament.id },
+    );
+  } catch (error) {
+    console.error(`[staff-log] rediff du match #${matchId} non journalisée : ${failureDiagnostic(error)}`);
+  }
 }
 
 /** La trace courte nominative d'un changement de rediffusion sans ligne d'arbitrage (pm2 seul). */
@@ -157,7 +161,12 @@ function replayAuditTrace(matchId: number, entry: MatchReplayLogChange): void {
 export function announceMatchReplayChange(matchId: number, entry: MatchReplayLogChange): void {
   void matchLines.chain(matchId, () =>
     deliverMatchReplayChange(matchId, entry).catch((error) => {
-      replayAuditTrace(matchId, entry);
+      // La trace ne lève jamais ici : un rejet sans écouteur casserait la chaîne.
+      try {
+        replayAuditTrace(matchId, entry);
+      } catch {
+        // pm2 illisible : rien de plus à faire que le message d'échec ci-dessous.
+      }
       console.error(`[staff-log] rediff du match #${matchId} non journalisée : ${failureDiagnostic(error)}`);
     }),
   );

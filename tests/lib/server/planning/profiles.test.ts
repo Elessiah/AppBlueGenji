@@ -6,7 +6,7 @@ import { fakeConnection, type SqlQuery } from "../../../helpers/sql-double";
 
 /** Réponse d'un `UPDATE` : `changedRows` dit le changement réel. */
 const updated = (changedRows: number, affectedRows = changedRows) => [{ affectedRows, changedRows }, []];
-/** Réponse d'un `INSERT IGNORE` : `affectedRows` seul. */
+/** Réponse d'un `INSERT` : `affectedRows` seul. */
 const written = (affectedRows: number) => [{ affectedRows }, []];
 
 let execute: jest.Mock<SqlQuery>;
@@ -38,13 +38,31 @@ describe("writeSoloCaster", () => {
 
     await expect(writeSoloCaster(fakeConnection({ execute }), 4, true)).resolves.toBe(true);
 
-    expect(execute.mock.calls[1]).toEqual([expect.stringMatching(/^INSERT IGNORE INTO bg_planning_profiles/), [4]]);
+    expect(execute.mock.calls[1]).toEqual([expect.stringMatching(/^INSERT INTO bg_planning_profiles/), [4]]);
   });
 
   it("writeSoloCaster_setAlreadyOn_returnsFalse", async () => {
-    execute.mockResolvedValueOnce(updated(0)).mockResolvedValueOnce(written(0));
+    execute
+      .mockResolvedValueOnce(updated(0))
+      .mockRejectedValueOnce(Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" }));
 
     await expect(writeSoloCaster(fakeConnection({ execute }), 4, true)).resolves.toBe(false);
+  });
+
+  it("writeSoloCaster_insertFailsOtherwise_rethrows", async () => {
+    // Compte disparu (clé étrangère) : jamais un « enregistré » qui n'a rien écrit.
+    const failure = Object.assign(new Error("FK"), { code: "ER_NO_REFERENCED_ROW_2" });
+    execute.mockResolvedValueOnce(updated(0)).mockRejectedValueOnce(failure);
+
+    await expect(writeSoloCaster(fakeConnection({ execute }), 4, true)).rejects.toBe(failure);
+  });
+
+  it("writeSoloCaster_noChangedRowsField_fallsBackToAffectedRows", async () => {
+    // L'UPDATE ne trouve que des lignes qui diffèrent : trouvée = modifiée.
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+
+    await expect(writeSoloCaster(fakeConnection({ execute }), 4, true)).resolves.toBe(true);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("writeSoloCaster_foundRowsCountsUnchangedRow_returnsFalse", async () => {

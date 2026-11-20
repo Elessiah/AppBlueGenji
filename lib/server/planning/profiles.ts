@@ -10,12 +10,14 @@ function affected(result: unknown): number {
 }
 
 /**
- * Lignes réellement modifiées par un `UPDATE` (`changedRows`), 0 si la réponse
- * n'en dit rien. Jamais `affectedRows` : sous `CLIENT_FOUND_ROWS` (le défaut
- * de mysql2), il compte aussi une ligne trouvée mais inchangée.
+ * Lignes réellement modifiées par un `UPDATE` (`changedRows`). Si le pilote ne
+ * la rend pas, `affectedRows` : l'`UPDATE` d'ici ne trouve que des lignes qui
+ * diffèrent (`solo_caster <> ?`), donc trouvées = modifiées — un champ absent
+ * ne fait jamais lire « rien changé ».
  */
 function changed(result: unknown): number {
-  return Number((result as { changedRows?: number } | undefined)?.changedRows ?? 0);
+  const rows = result as { changedRows?: number; affectedRows?: number } | undefined;
+  return Number(rows?.changedRows ?? rows?.affectedRows ?? 0);
 }
 
 /**
@@ -33,12 +35,18 @@ export async function writeSoloCaster(executor: Executor, userId: number, solo: 
   if (changed(updated) > 0) return true;
   if (!solo) return false;
   // Pas de ligne qui diffère : soit elle vaut déjà « oui », soit elle manque.
-  // `INSERT IGNORE` ne crée que la ligne manquante (1 ligne touchée) et laisse
-  // une ligne déjà présente (0) — sans l'ambiguïté d'un `ON DUPLICATE KEY
-  // UPDATE`, qui compte 1 aussi pour une ligne inchangée sous `FOUND_ROWS`.
-  const [inserted] = await executor.execute(
-    `INSERT IGNORE INTO bg_planning_profiles (user_id, solo_caster) VALUES (?, 1)`,
-    [userId],
-  );
-  return affected(inserted) > 0;
+  // Un `INSERT` simple ne crée que la ligne manquante ; la clé en double (la
+  // ligne existe déjà, « oui ») se lit comme « rien changé », et toute autre
+  // erreur (compte disparu, valeur refusée) remonte — `INSERT IGNORE` les
+  // aurait toutes avalées en avertissements.
+  try {
+    const [inserted] = await executor.execute(
+      `INSERT INTO bg_planning_profiles (user_id, solo_caster) VALUES (?, 1)`,
+      [userId],
+    );
+    return affected(inserted) > 0;
+  } catch (error) {
+    if ((error as { code?: string } | null)?.code === "ER_DUP_ENTRY") return false;
+    throw error;
+  }
 }
