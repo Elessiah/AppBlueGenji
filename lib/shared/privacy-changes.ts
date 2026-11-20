@@ -2304,7 +2304,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // les comptes, comme l'entrée du planning. Datée du lendemain de la mise en
     // ligne prévue, comme `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
     id: "2026-11-planning-invites",
-    publishedAt: "2026-11-22",
+    publishedAt: "2026-11-21",
     title: "Planning : casters et prods invités",
     links: [{ href: "/rgpd/registre#t20", label: "Lire la fiche T20 du registre" }],
     summary: "Le staff qui attribue les rôles peut marquer un caster ou un prod comme « invité » : il garde ses autres droits sur le site, mais ne fait plus partie du planning des casts et arbitres.",
@@ -2322,7 +2322,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // T05 et T20, /rgpd (FR et EN). Datée du lendemain de la mise en ligne
     // prévue, comme `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
     id: "2026-11-caster-autonome-rediff",
-    publishedAt: "2026-11-22",
+    publishedAt: "2026-11-21",
     title: "Staff : caster autonome et rediffusions au journal",
     audience: "LIVE_STAFF",
     links: [
@@ -2340,7 +2340,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // registre T16 (et T03, T04, T05), /rgpd (FR et EN). Datée comme `REGISTER_UPDATED_AT` — tout
     // avancer ensemble si la mise en ligne glisse.
     id: "2026-11-prod-match",
-    publishedAt: "2026-11-23",
+    publishedAt: "2026-11-21",
     title: "Matchs : la prod du direct",
     links: [
       { href: "/rgpd/registre#t16", label: "Lire la fiche T16 du registre" },
@@ -2360,7 +2360,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // T20, /rgpd (FR et EN). Datée comme `REGISTER_UPDATED_AT` — tout avancer
     // ensemble si la mise en ligne glisse.
     id: "2026-11-planning-place-le-cast",
-    publishedAt: "2026-11-23",
+    publishedAt: "2026-11-21",
     title: "Planning : casters et prod placés sur leur match",
     links: [
       { href: "/rgpd/registre#t20", label: "Lire la fiche T20 du registre" },
