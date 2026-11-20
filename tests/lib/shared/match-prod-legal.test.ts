@@ -69,8 +69,8 @@ describe("historique des changements — prod d'un match", () => {
   });
 
   it("registerT16_prodBasis_playedMatchKeptAsTournamentHistory", () => {
-    expect(FR_T16_PROD_BASIS.endsWith("un match joué gardant sa prod, qui fait partie de l'histoire du tournoi")).toBe(true);
-    expect(EN_T16_PROD_BASIS.endsWith("a played match keeping its prod, which is part of the tournament's history")).toBe(true);
+    expect(FR_T16_PROD_BASIS.endsWith("un match joué gardant sa prod et ses casters, qui font partie de l'histoire du tournoi")).toBe(true);
+    expect(EN_T16_PROD_BASIS.endsWith("a played match keeping its prod and its casters, which are part of the tournament's history")).toBe(true);
   });
 
   it("registerT16_subPurpose_namesProdRoleExplicitly", () => {
@@ -121,13 +121,13 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
     expectAllParts(fr, [
       "sans nommer la prod ni le staff — dans les journaux du serveur, l'auteur d'un geste du staff et l'identifiant des comptes visés",
       "Prods des matchs (jamais nommées sur Discord",
-      "pour un geste du staff sur la prod d'un match : pseudo et identifiant de son auteur",
+      "pour un geste du staff sur la prod d'un match, ou sur son cast par le planning : pseudo et identifiant de son auteur",
       "des casters et des prods des matchs (jamais nommés sur Discord",
     ]);
     expectAllParts(en, [
       "without naming the prod or the staff — in the server logs, the author of a staff action",
       "Match prods (never named on Discord",
-      "for a staff action on a match's prod: username and identifier of its author",
+      "for a staff action on a match's prod, or on its cast through the schedule: username and identifier of its author",
       "to the casters and prods of the matches (never named on Discord",
     ]);
   });
@@ -163,7 +163,7 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
   });
 
   it("registerT16_legalBasis_prodLeavesOnlyUnplayedMatches", () => {
-    expect(FR_T16_PROD_BASIS).toContain("peut quitter un match pas encore joué");
+    expect(FR_T16_PROD_BASIS).toContain("peuvent quitter un match pas encore joué");
     expect(FR_T16_PROD_BASIS).not.toContain("à tout moment");
     expect(EN_T16_PROD_BASIS).toContain("can leave a match not yet played");
     expect(EN_T16_PROD_BASIS).not.toContain("at any time");

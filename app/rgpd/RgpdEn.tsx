@@ -1333,12 +1333,12 @@ export function RgpdEn({
             its assigned referee, acts on the match itself, like the staff does: the staff log on Discord
             notes each change of the match&apos;s referee without naming anyone and a referee removed by someone else is notified by push, none of this when a guest (a mark described below) leaves the schedule (<LocaleLink href="/rgpd/registre#t04">register,
             T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>). Likewise, when nobody
-            casts a match yet, the casters and the prod that an assignment confirmed or set by hand names for it
+            casts a match yet outside the schedule, the casters and the prod that an assignment confirmed or set by hand names for it
             are placed on it, if they meet the cast or prod requirements and do not play the match: their
             username then shows with the match like a cast signup or a placed prod (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), the prod is
             notified, a caster placed on a stream with no link yet is asked to add their channel&apos;s, and
             leaving the assignment (withdrawal, removal by hand by the staff) takes them off it, except on a
-            played match; a signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, stays. Referees, casters
+            played match; a signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, stays; these actions are noted without names in the staff log on Discord, the acting staff and the accounts concerned in the server logs. Referees, casters
             and prods are notified by Discord direct message and push notification of new slots where they
             can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of the
             withdrawal from a confirmed assignment on a slot where their own assignment is confirmed, a caster

@@ -843,6 +843,13 @@ préférences et motifs ; les autres membres lisent le motif d'une proposition d
 calcul comme « Calcul » (`visibleAssignment`). Tests :
 `tests/lib/shared/cast-planning-legal.test.ts`.
 
+Placement sur le match : base de l’intérêt légitime (comme la prod, registre
+T16 en fin de « Base légale ») — les conditions ne couvrent que le caster qui
+s’inscrit lui-même ; T05 déclare la ligne pm2 d’un geste du staff (auteur et
+comptes visés) ; entrée `2026-11-planning-place-le-cast` sans public ciblé (une
+prod sans permission `live` est placée aussi). Tests :
+`tests/lib/shared/planning-auto-cast-legal.test.ts`.
+
 ## Interface
 
 `app/(secured)/planning/` : agenda par semaine puis par jour (Paris), filtres
