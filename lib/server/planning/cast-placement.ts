@@ -96,7 +96,8 @@ export function castFreeForPlanning(
 /** Ligne pm2 du placement : le match et les comptes placés, par identifiant (jamais sur Discord). */
 export function placementAuditLine(placement: MatchPlacement): string {
   const parts: string[] = [];
-  if (placement.casterIds.length > 0) parts.push(`caster(s) ${placement.casterIds.map((id) => `#${id}`).join(", ")}`);
+  const casters = placement.casterIds.map((id) => "#" + id).join(", ");
+  if (casters !== "") parts.push(`caster(s) ${casters}`);
   if (placement.prodId !== null) parts.push(`prod #${placement.prodId}`);
   return `cast du match #${placement.matchId} posé depuis le planning : ${parts.join(" ; ")}`;
 }
@@ -188,6 +189,60 @@ async function placementStream(connection: PoolConnection, matchId: number, cast
   return Number(created.insertId);
 }
 
+/** La prod : une au plus (plus petit id), jamais un joueur du match. */
+async function pickProd(
+  connection: PoolConnection,
+  row: PlacementMatchRow,
+  prodIds: readonly number[],
+  eligible: (userId: number) => boolean,
+): Promise<number | null> {
+  for (const userId of [...prodIds].sort((a, b) => a - b)) {
+    if (!eligible(userId)) continue;
+    if (await resolveTeamParty(connection, row, userId)) continue;
+    return userId;
+  }
+  return null;
+}
+
+/** Les casters qui remplissent la condition du cast (permission de diffusion, tag Discord certifié, Battle.net en Overwatch) et ne jouent pas le match. */
+async function pickCasters(
+  connection: PoolConnection,
+  row: PlacementMatchRow,
+  pending: readonly number[],
+  game: TournamentGame,
+): Promise<number[]> {
+  const blocks = await loadCastBlocks(connection, [...pending], game, true);
+  const placed: number[] = [];
+  for (const userId of [...pending].sort((a, b) => a - b)) {
+    if (blocks.get(userId) !== null) continue;
+    if (await resolveTeamParty(connection, row, userId)) continue;
+    placed.push(userId);
+  }
+  return placed;
+}
+
+/** L'écriture : la prod si la place est encore vide, les casters sur une diffusion du match. */
+async function writePlacement(
+  connection: PoolConnection,
+  matchId: number,
+  prodId: number | null,
+  casterIds: readonly number[],
+  casterStreams: readonly number[],
+): Promise<void> {
+  if (prodId !== null) {
+    await connection.execute("UPDATE bg_matches SET prod_user_id = ? WHERE id = ? AND prod_user_id IS NULL", [prodId, matchId]);
+  }
+  if (casterIds.length === 0) return;
+  const streamId = await placementStream(connection, matchId, casterStreams);
+  for (const userId of casterIds) {
+    await connection.execute("INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, NULL)", [
+      matchId,
+      userId,
+      streamId,
+    ]);
+  }
+}
+
 /** Le placement d'un match, dans sa transaction (`placePlannedCasts`). */
 export async function placeOnMatch(
   connection: PoolConnection,
@@ -218,43 +273,18 @@ export async function placeOnMatch(
   const fit = (userId: number, role: "CASTER" | "PROD") =>
     (role === "CASTER" ? held.casterIds : held.prodIds).has(userId) && holds(userId, entry, role) === null;
 
-  // La prod : une au plus, seulement si le match n'en a pas ; jamais un caster du match ni un joueur.
-  let prodId: number | null = null;
-  if (currentProd === null) {
-    for (const userId of [...prodIds].sort((a, b) => a - b)) {
-      if (!fit(userId, "PROD") || onMatch.has(userId)) continue;
-      if (await resolveTeamParty(connection, row, userId)) continue;
-      prodId = userId;
-      break;
-    }
-  }
-
+  // La prod : seulement si le match n'en a pas ; jamais un caster du match.
+  const prodId =
+    currentProd === null
+      ? await pickProd(connection, row, prodIds, (userId) => fit(userId, "PROD") && !onMatch.has(userId))
+      : null;
   const pending = casterIds.filter(
     (userId) => !onMatch.has(userId) && fit(userId, "CASTER") && userId !== currentProd && userId !== prodId,
   );
-  // La condition du cast (permission de diffusion, tag Discord certifié, Battle.net en Overwatch), en lecture courante.
-  const blocks = await loadCastBlocks(connection, pending, game, true);
-  const placedCasters: number[] = [];
-  for (const userId of [...pending].sort((a, b) => a - b)) {
-    if (blocks.get(userId) !== null) continue;
-    if (await resolveTeamParty(connection, row, userId)) continue;
-    placedCasters.push(userId);
-  }
+  const placedCasters = await pickCasters(connection, row, pending, game);
   if (prodId === null && placedCasters.length === 0) return { skip: "NONE_ELIGIBLE" };
 
-  if (prodId !== null) {
-    await connection.execute("UPDATE bg_matches SET prod_user_id = ? WHERE id = ? AND prod_user_id IS NULL", [prodId, matchId]);
-  }
-  if (placedCasters.length > 0) {
-    const streamId = await placementStream(connection, matchId, casters.map((caster) => caster.streamId));
-    for (const userId of placedCasters) {
-      await connection.execute("INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, NULL)", [
-        matchId,
-        userId,
-        streamId,
-      ]);
-    }
-  }
+  await writePlacement(connection, matchId, prodId, placedCasters, casters.map((caster) => caster.streamId));
   return {
     placement: { matchId, casterIds: placedCasters, prodId },
     tournamentId: Number(row.tournament_id),

@@ -497,7 +497,7 @@ describe("POST /api/admin/planning/confirm", () => {
   it("confirmPost_subset_passesScope", async () => {
     const response = await confirmPost(request("POST", CONFIRM));
     expect(await response.json()).toEqual({ report: { confirmed: 1, refused: 0 } });
-    expect(confirmAssignments).toHaveBeenCalledWith(1, { entryKeys: ["m:1"] });
+    expect(confirmAssignments).toHaveBeenCalledWith(1, { entryKeys: ["m:1"] }, expect.any(Number), { id: 1, pseudo: "Joueur" });
   });
 
   it("confirmPost_emptyScope_returns400", async () => {
