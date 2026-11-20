@@ -62,7 +62,7 @@ export function PlayerRolesPanel({
   // Resynchronise la sélection locale à chaque (re)chargement du profil.
   // Clé de contenu : une relecture de la fiche qui rend les mêmes rôles (case « Invité »)
   // ne doit pas effacer les cases cochées et pas encore enregistrées.
-  const rolesKey = roles ? [...roles].sort().join(",") : null;
+  const rolesKey = roles ? [...roles].sort((a, b) => a.localeCompare(b)).join(",") : null;
   const rolesRef = useRef(roles);
   rolesRef.current = roles;
   useEffect(() => {
