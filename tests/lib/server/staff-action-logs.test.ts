@@ -500,4 +500,21 @@ describe("rediffusion au journal d'arbitrage", () => {
     info.mockRestore();
     error.mockRestore();
   });
+
+  it("announceMatchReplayChange_traceThrows_neverThrowsAndTracesOnce", async () => {
+    const info = jest.spyOn(console, "info").mockImplementation(() => {
+      throw new Error("pm2 closed");
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockRows(null);
+
+    announceMatchReplayChange(42, { change: "SET", replayUrl: VIDEO, author: "STAFF", actor });
+    await settle();
+
+    // Match disparu : une seule tentative de trace, sans message d'échec en plus.
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(error).not.toHaveBeenCalled();
+    info.mockRestore();
+    error.mockRestore();
+  });
 });

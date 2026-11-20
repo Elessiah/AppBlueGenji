@@ -10,6 +10,7 @@
  * anonymes (`lib/shared/planning-notices.ts`).
  */
 import { sendBotLog } from "@/lib/server/bot-integration";
+import { createKeyedChain } from "@/lib/server/coalescer";
 import { failureReason } from "@/lib/server/failure-reason";
 import { loadNotificationRecipients, loadStaffIds, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -110,6 +111,8 @@ export async function announceAssignments(
   }
 }
 
+const soloCasterNotices = createKeyedChain<number>();
+
 /**
  * Statut de caster autonome d'un autre membre réglé par le staff : une ligne au
  * journal (anonyme sur Discord, l'auteur nommé dans pm2 — `publishStaffAction`),
@@ -117,7 +120,7 @@ export async function announceAssignments(
  * avec le sujet). La route n'appelle ceci que pour un réglage **changé** sur le
  * compte d'un autre : ni le sien, ni une valeur reposée. Ne lève jamais.
  */
-export async function announceSoloCasterChange(targetUserId: number, solo: boolean, actor: StaffActor): Promise<void> {
+async function deliverSoloCasterChange(targetUserId: number, solo: boolean, actor: StaffActor): Promise<void> {
   // Le journal et l'avis échouent chacun de leur côté : une ligne Discord non
   // écrite ne prive pas le caster de son avis (l'auteur, écrit dans pm2 avant
   // l'envoi, y reste nommé).
@@ -144,6 +147,15 @@ export async function announceSoloCasterChange(targetUserId: number, solo: boole
   } catch (error) {
     console.error("[planning] avis du caster autonome impossible.", failureReason(error));
   }
+}
+
+/**
+ * Annonce un réglage changé, **dans l'ordre des gestes** pour un même caster
+ * (`createKeyedChain`) : activer, désactiver, activer ne laisse pas arriver un
+ * « désactivé » en dernier. Ne lève jamais.
+ */
+export function announceSoloCasterChange(targetUserId: number, solo: boolean, actor: StaffActor): Promise<void> {
+  return soloCasterNotices.chain(targetUserId, () => deliverSoloCasterChange(targetUserId, solo, actor));
 }
 
 /** Un désistement à annoncer : l'entrée, le rôle quitté, et son issue. */

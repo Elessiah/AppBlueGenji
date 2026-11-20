@@ -10,35 +10,31 @@ function affected(result: unknown): number {
 }
 
 /**
- * Lignes réellement modifiées par un `UPDATE` (`changedRows`). Si le pilote ne
- * la rend pas, `affectedRows` : l'`UPDATE` d'ici ne trouve que des lignes qui
- * diffèrent (`solo_caster <> ?`), donc trouvées = modifiées — un champ absent
- * ne fait jamais lire « rien changé ».
+ * Lignes réellement modifiées par un `UPDATE` (`changedRows`). Sans ce champ, 0 :
+ * jamais « changé » sur une réponse muette (au pire un avis de moins).
  */
 function changed(result: unknown): number {
-  const rows = result as { changedRows?: number; affectedRows?: number } | undefined;
-  return Number(rows?.changedRows ?? rows?.affectedRows ?? 0);
+  return Number((result as { changedRows?: number } | undefined)?.changedRows ?? 0);
 }
 
 /**
- * Écrit le réglage et dit s'il a **changé** : chaque instruction ne touche que
- * ce qui diffère (la réponse de la base, jamais une lecture d'avant), si bien
- * que deux gestes simultanés n'en comptent qu'un et que reposer la même valeur
- * ne change rien. Une ligne absente vaut « non » : l'éteindre ne crée rien.
+ * Écrit le réglage et dit s'il a **changé**, d'après la réponse de la base et
+ * jamais une lecture d'avant : `changedRows` d'un seul `UPDATE` par la clé, si
+ * bien que deux gestes simultanés n'en comptent qu'un et que reposer la même
+ * valeur ne change rien. Une ligne absente vaut « non » : l'éteindre ne crée
+ * rien, et l'allumer ne passe par l'`INSERT` que si l'`UPDATE` n'a trouvé
+ * aucune ligne (`affectedRows` = lignes trouvées, le pilote demandant
+ * `CLIENT_FOUND_ROWS`) — une ligne déjà « oui » ne coûte donc pas d'`INSERT`
+ * voué à la clé en double.
  */
 export async function writeSoloCaster(executor: Executor, userId: number, solo: boolean): Promise<boolean> {
-  const value = solo ? 1 : 0;
-  const [updated] = await executor.execute(
-    `UPDATE bg_planning_profiles SET solo_caster = ? WHERE user_id = ? AND solo_caster <> ?`,
-    [value, userId, value],
-  );
+  const [updated] = await executor.execute(`UPDATE bg_planning_profiles SET solo_caster = ? WHERE user_id = ?`, [solo ? 1 : 0, userId]);
   if (changed(updated) > 0) return true;
-  if (!solo) return false;
-  // Pas de ligne qui diffère : soit elle vaut déjà « oui », soit elle manque.
-  // Un `INSERT` simple ne crée que la ligne manquante ; la clé en double (la
-  // ligne existe déjà, « oui ») se lit comme « rien changé », et toute autre
-  // erreur (compte disparu, valeur refusée) remonte — `INSERT IGNORE` les
-  // aurait toutes avalées en avertissements.
+  if (!solo || affected(updated) > 0) return false;
+  // Aucune ligne trouvée : un `INSERT` simple ne crée que la ligne manquante ;
+  // la clé en double (une ligne née entre-temps, « oui ») se lit comme « rien
+  // changé », et toute autre erreur (compte disparu, valeur refusée) remonte —
+  // `INSERT IGNORE` les aurait toutes avalées en avertissements.
   try {
     const [inserted] = await executor.execute(
       `INSERT INTO bg_planning_profiles (user_id, solo_caster) VALUES (?, 1)`,

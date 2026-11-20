@@ -328,4 +328,26 @@ describe("announceSoloCasterChange", () => {
     expect(error).toHaveBeenCalledTimes(1);
     error.mockRestore();
   });
+
+  it("announceSoloCasterChange_rapidToggles_noticesArriveInGestureOrder", async () => {
+    let releaseFirst: () => void = () => undefined;
+    jest.mocked(notifyUsers).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = () => resolve({ discord: null, discordUnreachedUserIds: [], pushed: 0 });
+        }),
+    );
+
+    const first = announceSoloCasterChange(5, true, actor);
+    const second = announceSoloCasterChange(5, false, actor);
+    await new Promise((resolve) => setImmediate(resolve));
+    // Le second attend le premier : un seul envoi tant que le premier n'est pas parti.
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(notifyUsers).mock.calls[0][1].push("fr").title).toBe("Caster autonome activé");
+    expect(jest.mocked(notifyUsers).mock.calls[1][1].push("fr").title).toBe("Caster autonome désactivé");
+  });
 });

@@ -135,8 +135,9 @@ export async function deliverMatchReplayChange(matchId: number, entry: MatchRepl
     return;
   }
   const match = matchLogSubject(row);
-  // La ligne Discord et le pm2 s'écrivent ensemble (audit avant l'envoi) : une
-  // erreur ici ne doit pas laisser `announceMatchReplayChange` tracer une 2e fois.
+  // `publishStaffAction` écrit le pm2 avant l'envoi Discord : son échec ne
+  // laisse pas `announceMatchReplayChange` tracer une 2e fois. Une erreur de
+  // `matchLogSubject` ou du formatage, avant lui, passe par la trace courte.
   try {
     publishStaffAction(
       formatMatchReplayLog({ ...match, ...entry }),
@@ -148,9 +149,13 @@ export async function deliverMatchReplayChange(matchId: number, entry: MatchRepl
   }
 }
 
-/** La trace courte nominative d'un changement de rediffusion sans ligne d'arbitrage (pm2 seul). */
+/** La trace courte nominative d'un changement de rediffusion sans ligne d'arbitrage (pm2 seul). Ne lève jamais. */
 function replayAuditTrace(matchId: number, entry: MatchReplayLogChange): void {
-  auditStaffAction(`Rediff du match #${matchId} (${entry.change}) — ligne d'arbitrage non écrite`, entry.actor);
+  try {
+    auditStaffAction(`Rediff du match #${matchId} (${entry.change}) — ligne d'arbitrage non écrite`, entry.actor);
+  } catch {
+    // pm2 illisible : rien de plus à faire que le message d'échec de l'appelant.
+  }
 }
 
 /**
@@ -161,12 +166,9 @@ function replayAuditTrace(matchId: number, entry: MatchReplayLogChange): void {
 export function announceMatchReplayChange(matchId: number, entry: MatchReplayLogChange): void {
   void matchLines.chain(matchId, () =>
     deliverMatchReplayChange(matchId, entry).catch((error) => {
-      // La trace ne lève jamais ici : un rejet sans écouteur casserait la chaîne.
-      try {
-        replayAuditTrace(matchId, entry);
-      } catch {
-        // pm2 illisible : rien de plus à faire que le message d'échec ci-dessous.
-      }
+      // Relire le match ou composer la ligne a échoué avant l'écriture de
+      // `publishStaffAction` : l'auteur reste nommé par la trace courte.
+      replayAuditTrace(matchId, entry);
       console.error(`[staff-log] rediff du match #${matchId} non journalisée : ${failureDiagnostic(error)}`);
     }),
   );

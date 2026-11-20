@@ -4,7 +4,7 @@ import { fakeConnection, type SqlQuery } from "../../../helpers/sql-double";
 
 /** `writeSoloCaster` : le réglage écrit, et « changé » lu dans la réponse de la base. */
 
-/** Réponse d'un `UPDATE` : `changedRows` dit le changement réel. */
+/** Réponse d'un `UPDATE` : `changedRows` dit le changement réel, `affectedRows` les lignes trouvées. */
 const updated = (changedRows: number, affectedRows = changedRows) => [{ affectedRows, changedRows }, []];
 /** Réponse d'un `INSERT` : `affectedRows` seul. */
 const written = (affectedRows: number) => [{ affectedRows }, []];
@@ -22,10 +22,10 @@ describe("writeSoloCaster", () => {
     await expect(writeSoloCaster(fakeConnection({ execute }), 4, false)).resolves.toBe(true);
 
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls[0]).toEqual([expect.stringMatching(/WHERE user_id = \? AND solo_caster <> \?/), [0, 4, 0]]);
+    expect(execute.mock.calls[0]).toEqual([expect.stringMatching(/SET solo_caster = \? WHERE user_id = \?$/), [0, 4]]);
   });
 
-  it("writeSoloCaster_clearWithoutDifferingRow_returnsFalseWithoutInsert", async () => {
+  it("writeSoloCaster_clearNoRowOrUnchanged_returnsFalseWithoutInsert", async () => {
     execute.mockResolvedValueOnce(updated(0));
 
     await expect(writeSoloCaster(fakeConnection({ execute }), 4, false)).resolves.toBe(false);
@@ -41,7 +41,7 @@ describe("writeSoloCaster", () => {
     expect(execute.mock.calls[1]).toEqual([expect.stringMatching(/^INSERT INTO bg_planning_profiles/), [4]]);
   });
 
-  it("writeSoloCaster_setAlreadyOn_returnsFalse", async () => {
+  it("writeSoloCaster_setRowBornMeanwhile_duplicateKeyReadsAsUnchanged", async () => {
     execute
       .mockResolvedValueOnce(updated(0))
       .mockRejectedValueOnce(Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" }));
@@ -57,16 +57,23 @@ describe("writeSoloCaster", () => {
     await expect(writeSoloCaster(fakeConnection({ execute }), 4, true)).rejects.toBe(failure);
   });
 
-  it("writeSoloCaster_noChangedRowsField_fallsBackToAffectedRows", async () => {
-    // L'UPDATE ne trouve que des lignes qui diffèrent : trouvée = modifiée.
+  it("writeSoloCaster_noChangedRowsField_neverReadsAsChanged", async () => {
+    // Réponse muette sur les lignes modifiées : au pire un avis de moins, jamais un faux.
     execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
 
-    await expect(writeSoloCaster(fakeConnection({ execute }), 4, true)).resolves.toBe(true);
+    await expect(writeSoloCaster(fakeConnection({ execute }), 4, true)).resolves.toBe(false);
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  it("writeSoloCaster_foundRowsCountsUnchangedRow_returnsFalse", async () => {
-    // Sous CLIENT_FOUND_ROWS, une ligne trouvée mais inchangée compte dans affectedRows.
+  it("writeSoloCaster_setAlreadyOnRowFound_returnsFalseWithoutInsert", async () => {
+    // Ligne trouvée mais inchangée (CLIENT_FOUND_ROWS) : pas d'INSERT voué à la clé en double.
+    execute.mockResolvedValueOnce(updated(0, 1));
+
+    await expect(writeSoloCaster(fakeConnection({ execute }), 4, true)).resolves.toBe(false);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("writeSoloCaster_clearUnchangedRowFound_returnsFalse", async () => {
     execute.mockResolvedValueOnce(updated(0, 1));
 
     await expect(writeSoloCaster(fakeConnection({ execute }), 4, false)).resolves.toBe(false);
