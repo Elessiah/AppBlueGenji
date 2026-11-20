@@ -22,6 +22,15 @@ function activity(list: typeof PROCESSING_ACTIVITIES, ref: string): string {
   return JSON.stringify(found);
 }
 
+function sheet(list: typeof PROCESSING_ACTIVITIES, ref: string) {
+  const found = list.find((entry) => entry.ref === ref);
+  if (!found) throw new Error(`${ref} absente`);
+  return found;
+}
+
+const FR_T16_PROD_BASIS = "intérêt légitime de l'association (RGPD, art. 6.1.f : organiser les bénévoles qui diffusent ses tournois), comme le planning (T20), pour la prod d'un match, qui peut s'en retirer à tout moment et s'y opposer (art. 21) par le formulaire de signalement (catégorie RGPD)";
+const EN_T16_PROD_BASIS = "the association's legitimate interest (GDPR, art. 6.1.f: organising the volunteers who stream its tournaments), as for the planning (T20), for a match's prod, who can leave the match at any time and object (art. 21) through the report form (GDPR category)";
+
 const page = (path: string) => readSource(path).replace(/\s+/g, " ");
 
 describe("historique des changements — prod d'un match", () => {
@@ -88,17 +97,39 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
     expect(activity(PROCESSING_ACTIVITIES_EN, "T04")).toContain("Notifying a match's prod, by Discord direct message and by push");
   });
 
-  it("registerT03_suivre_listsCastersAndProdUsernames", () => {
-    expect(activity(PROCESSING_ACTIVITIES, "T03")).toContain("pseudos des engagés, des casters et de la prod d'un match");
-    expect(activity(PROCESSING_ACTIVITIES_EN, "T03")).toContain("usernames of the participants and of a match's casters and prod");
+  it("registerT03_suivre_avatarAndAccountNumberOnlyForParticipants", () => {
+    expect(activity(PROCESSING_ACTIVITIES, "T03")).toContain("pseudos des engagés (et, en tournoi individuel, leur avatar s'il n'est pas masqué et leur numéro de compte interne, pour la marque du podium), pseudos des casters et de la prod d'un match,");
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T03")).toContain("usernames of the participants (and, in a solo tournament, their avatar unless hidden and their internal account number, for the podium mark), usernames of a match's casters and prod,");
   });
 
-  it("registerT16_prodBasis_legitimateInterestNotContract", () => {
-    const fr = activity(PROCESSING_ACTIVITIES, "T16");
+  it("registerT04_legalBasis_prodNoticeUnderLegitimateInterestAndSwitch", () => {
+    expect(sheet(PROCESSING_ACTIVITIES, "T04").legalBasis).toContain("qui coupe tous leurs messages privés de match ; même intérêt légitime et même interrupteur pour l'avis de sa place donnée ou retirée envoyé à la prod d'un match ;");
+    expect(sheet(PROCESSING_ACTIVITIES_EN, "T04").legalBasis).toContain("that turns off all their match direct messages; the same legitimate interest and the same switch for the notice of their place given or removed sent to a match's prod;");
+  });
 
-    expect(fr).toContain("base : intérêt légitime de l'association (RGPD, art. 6.1.f : organiser les bénévoles qui diffusent ses tournois), comme le planning (T20)");
-    expect(fr).not.toContain("exécution du service auquel il s'inscrit ou qu'il accepte");
-    expect(activity(PROCESSING_ACTIVITIES_EN, "T16")).toContain("basis: the association's legitimate interest (GDPR, art. 6.1.f");
+  it("registerT04_dataSubjects_includeMatchProds", () => {
+    expect(sheet(PROCESSING_ACTIVITIES, "T04").dataSubjects).toContain("Prods des matchs");
+    expect(sheet(PROCESSING_ACTIVITIES_EN, "T04").dataSubjects).toContain("Match prods");
+  });
+
+  it("registerT16_legalBasis_endsWithProdLegitimateInterestAndObjection", () => {
+    expect(sheet(PROCESSING_ACTIVITIES, "T16").legalBasis.endsWith(` ; ${FR_T16_PROD_BASIS}`)).toBe(true);
+    expect(sheet(PROCESSING_ACTIVITIES_EN, "T16").legalBasis.endsWith(`; ${EN_T16_PROD_BASIS}`)).toBe(true);
+  });
+
+  it("registerT16_legalBasis_contractPartHasNoLegitimateInterest", () => {
+    const frContract = sheet(PROCESSING_ACTIVITIES, "T16").legalBasis.replace(` ; ${FR_T16_PROD_BASIS}`, "");
+    const enContract = sheet(PROCESSING_ACTIVITIES_EN, "T16").legalBasis.replace(`; ${EN_T16_PROD_BASIS}`, "");
+
+    expect(frContract).not.toMatch(/intérêt légitime|droit d'opposition/i);
+    expect(enContract).not.toMatch(/legitimate interest|right to object/i);
+  });
+
+  it("registerT16_subPurpose_feminineWithoutBasis", () => {
+    const fr = sheet(PROCESSING_ACTIVITIES, "T16").subPurposes.find((line) => line.startsWith("Organiser la production du direct"));
+
+    expect(fr).toContain("est prévenue quand un autre qu'elle la place ou l'en retire");
+    expect(fr).not.toContain("base :");
   });
 
   it("registerT12_prodPush_generalWithoutCaseList", () => {
@@ -124,9 +155,36 @@ describe("historique et /rgpd — base, lecteurs, journaux de la prod", () => {
     expect(en).toContain("the server logs keep the author of a staff action and the account concerned");
   });
 
-  it("rgpdPages_suivre_doesNotClaimDiscordShowsProd", () => {
-    expect(page("app/rgpd/page.tsx")).not.toContain("casters et de la prod d&apos;un match — ce que les retransmissions et Discord");
-    expect(page("app/rgpd/RgpdEn.tsx")).not.toContain("casters and prod — what streams and Discord");
+  it("rgpdPages_suivre_castersShownByStreamsOnly", () => {
+    expect(page("app/rgpd/page.tsx")).toContain("pseudos des casters d&apos;un match — ce que les retransmissions montrent déjà — et de sa prod,");
+    expect(page("app/rgpd/RgpdEn.tsx")).toContain("usernames of a match&apos;s casters — what streams already show — and of its prod,");
+  });
+
+  it("rgpdPages_prod_ownPlaceLoggedAndBasisWithObjection", () => {
+    expect(page("app/rgpd/page.tsx")).toContain("sa place prise ou quittée et ces gestes sont notés sans nom au journal du staff sur Discord");
+    expect(page("app/rgpd/page.tsx")).toContain("base : intérêt légitime, la prod pouvant s&apos;y opposer par le formulaire de signalement");
+    expect(page("app/rgpd/RgpdEn.tsx")).toContain("their place taken or left and these actions are noted without a name in the staff log on Discord");
+    expect(page("app/rgpd/RgpdEn.tsx")).toContain("basis: legitimate interest, the prod being able to object through the report form");
+  });
+
+  it("prodEntry_frAndEn_dmCutWithMatchDmsPushByTopic", () => {
+    const fr = frEntry().details.join(" ");
+    const en = PRIVACY_CHANGES_EN[ENTRY_ID].details.join(" ");
+
+    expect(fr).toContain("message privé Discord, qui se coupe avec ses autres messages privés de match, et notification push, qui se coupe par son sujet");
+    expect(fr).not.toContain("réglables dans « Mon profil »");
+    expect(en).toContain("Discord direct message, turned off with their other match direct messages, and push notification, turned off by its topic");
+    expect(en).not.toContain("both set in");
+  });
+
+  it("prodEntry_frAndEn_ownPlaceTakenOrLeftLoggedAndObjection", () => {
+    const fr = frEntry().details.join(" ");
+    const en = PRIVACY_CHANGES_EN[ENTRY_ID].details.join(" ");
+
+    expect(fr).toContain("sa place prise ou quittée et ces gestes sont notés au journal du staff sur Discord");
+    expect(fr).toContain("la prod peut s'y opposer par le formulaire de signalement (catégorie RGPD)");
+    expect(en).toContain("their place taken or left and these actions are noted in the staff log on Discord");
+    expect(en).toContain("the prod can object to it through the report form (GDPR category)");
   });
 
   it("rgpdPages_prodParagraph_namesLogsAndOnlyOthersGestures", () => {

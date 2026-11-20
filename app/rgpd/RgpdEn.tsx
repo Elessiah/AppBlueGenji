@@ -389,7 +389,7 @@ export function RgpdEn({
             <strong>Following a tournament without an account.</strong> Since October 2026, the page of a
             published tournament can also be viewed without logging in, at <code>/suivre/tournois/…</code>:
             bracket, scores, rankings, names of the teams and usernames of the players taking part, usernames of a
-            match&apos;s casters — what streams and Discord already show — and of its prod, as well as team logos and, for a solo
+            match&apos;s casters — what streams already show — and of its prod, as well as team logos and, for a solo
             tournament, the avatar of each player taking part (unless they hid it) and their internal account
             number, which carries their podium mark, and BlueGenji Survival penalties (entrant, round, points),
             without their reason or the referee who imposed them. The score of each map is shown there, and since
@@ -1268,9 +1268,9 @@ export function RgpdEn({
             member holding that role takes the match or is placed on it by the staff; their username is shown with
             the match like the casters&apos; (before the launch, as long as they meet the requirements), kept with the match and
             removed from matches not yet launched if their account loses that role, is suspended or now plays in the match,
-            and from matches not yet played if it is deleted; the prod is notified when someone other than themselves places or removes them, by the staff or automatically; these
-            actions are noted without a name in the staff log on Discord, and the author of a staff action and the account concerned in the server logs
-            (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>).{" "}
+            and from matches not yet played if it is deleted; the prod is notified when someone other than themselves places or removes them, by the staff or automatically; their place taken or left and these
+            actions are noted without a name in the staff log on Discord, and the author of a staff action and the account concerned in the server logs; basis: legitimate interest, the prod
+            being able to object through the report form (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>).{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match
             page: to the same people at the same times — parties to the match, its other casters and referees —, in an Overwatch tournament only): it is kept with their caster
