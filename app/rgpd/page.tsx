@@ -1490,9 +1490,9 @@ function RgpdFr({
             un membre qui a ce rôle s&apos;y place ou y est placé par le staff ; son pseudo est montré avec le
             match comme celui des casters (avant le lancement, tant qu&apos;il remplit les conditions), gardé avec le match et
             retiré des matchs pas encore lancés si son compte perd ce rôle, est suspendu ou joue désormais le match,
-            et des matchs pas encore joués s&apos;il est supprimé ; la prod est prévenue quand un autre qu&apos;elle la place ou l&apos;en retire, par le staff ou d&apos;office ; sa place prise ou quittée et ces gestes sont
+            et des matchs pas encore joués s&apos;il est supprimé ; la prod est prévenue (réglable dans « Mon profil ») quand un autre qu&apos;elle la place ou l&apos;en retire, par le staff ou d&apos;office ; sa place prise ou quittée et ces gestes sont
             notés sans nom au journal du staff sur Discord, l&apos;auteur d&apos;un geste du staff et le compte visé dans les journaux du serveur ; base : intérêt légitime, la prod
-            pouvant s&apos;y opposer par le formulaire de signalement (<Link href="/rgpd/registre#t16">registre, T16</Link>).{" "}
+            pouvant quitter un match pas encore joué et s&apos;y opposer par le formulaire de signalement (<Link href="/rgpd/registre#t16">registre, T16</Link>).{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
             « Contacts » et de lancement, page du match : aux mêmes personnes et aux mêmes moments — parties

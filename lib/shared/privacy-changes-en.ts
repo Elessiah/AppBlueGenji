@@ -1239,11 +1239,11 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
   },
   "2026-11-prod-match": {
-    linkLabels: ["Read record T16 of the register"],
+    linkLabels: ["Read record T16 of the register", "Read record T04 of the register", "Read record T05 of the register", "Read record T03 of the register"],
     title: "Matches: the live stream's prod",
     summary: "A match can have a prod, who handles the production of its live stream: they take the match themselves or are placed on it by the staff, and their username is shown with the match, like the casters'.",
     details: [
-      "What is kept: the prod's account with the match, for as long as the match exists; it is removed from matches not yet launched if the account loses that role, is suspended or now plays in the match, and from matches not yet played if it is deleted (before the launch, a prod who no longer meets these conditions is no longer shown), and appears in the export of their data. Basis: legitimate interest (organising the volunteers who stream the tournaments), as for the planning; the prod can object to it through the report form (GDPR category).",
+      "What is kept: the prod's account with the match, for as long as the match exists; it is removed from matches not yet launched if the account loses that role, is suspended or now plays in the match, and from matches not yet played if it is deleted (before the launch, a prod who no longer meets these conditions is no longer shown), and appears in the export of their data. Basis: legitimate interest (organising the volunteers who stream the tournaments), as for the planning; the prod can leave a match not yet played and object to it through the report form (GDPR category).",
       "Who sees it: as for casters, the readers of the tournament and of the match, including without an account. The prod is notified (Discord direct message, turned off with their other match direct messages, and push notification, turned off by its topic, from “My profile”) when someone other than themselves places or removes them, by the staff or automatically; their place taken or left and these actions are noted in the staff log on Discord without naming anyone, and the server logs keep the author of a staff action and the account concerned, according to their rotation.",
     ],
   },

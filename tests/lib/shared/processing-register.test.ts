@@ -36,6 +36,7 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-rep
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { DATA_CONTACT_NAME, LEGAL_CONTACT_DISCORD, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
+import { enT16WithoutProdBasis, frT16WithoutProdBasis } from "../../helpers/match-prod-basis";
 import { readSource } from "../../helpers/read-source";
 
 const controller = registerController();
@@ -293,8 +294,8 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
   // Conditions v11 (D53) : l'alerte passe de l'intérêt légitime à l'exécution du service.
   it("T16 donne une base à l'alerte AutoMod : exécution du service, supprimée à la main à la suppression du compte (FR et EN)", () => {
     // La base de la prod (intérêt légitime, MATCH_PROD) clôt la fiche : la part contractuelle la précède.
-    const frContract = fr("T16").legalBasis.split(" ; intérêt légitime de l'association")[0];
-    const enContract = en("T16").legalBasis.split("; the association's legitimate interest")[0];
+    const frContract = frT16WithoutProdBasis(fr("T16").legalBasis);
+    const enContract = enT16WithoutProdBasis(en("T16").legalBasis);
     expect(frContract).toMatch(/même base, prévue par la même section des conditions, pour .* et pour l'alerte AutoMod d'une annonce #live bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, où ceux-ci suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver$/);
     expect(enContract).toMatch(/same basis, provided for by the same section of the terms, for .* and for the AutoMod alert of a blocked or flagged #live announcement, kept in the moderators' alert channel, where they delete by hand, when the player's account is deleted, those they can identify, with no guarantee that all are found$/);
     // D57b : aucun régime à part pour un joueur sans compte.
@@ -608,7 +609,7 @@ describe("décisions de l'association du 2026-09-30", () => {
     // D53 : casters, liens publiés et alerte AutoMod sur la même base, sans opposition.
     expect(sheet.legalBasis).toMatch(/même base, prévue par la même section des conditions, pour ce qui touche les casters \(voix, pseudo, lien de leur chaîne, mode d'antenne\), au titre du service auquel le caster s'inscrit sur un match, ou auquel le planning l'inscrit sur une attribution confirmée ou posée à la main \(T20\), pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod d'une annonce #live bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, où ceux-ci suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver( ; intérêt légitime de l'association .*)?$/);
     // Seule la prod d'un match (MATCH_PROD) relève de l'intérêt légitime, en fin de fiche.
-    expect(sheet.legalBasis.split(" ; intérêt légitime de l'association")[0]).not.toMatch(/intérêt légitime|droit d'opposition|sans compte/i);
+    expect(frT16WithoutProdBasis(sheet.legalBasis)).not.toMatch(/intérêt légitime|droit d'opposition|sans compte/i);
     expect(sheet.dataCategories.join(" ")).toMatch(/Pseudos .* noms d'équipe/);
     expect(sheet.retention.join(" ")).toMatch(/Lien de rediffusion : conservé avec le match/);
     // Le site ne fait que lier les chaînes : seule l'annonce #live passe par Discord.
