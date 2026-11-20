@@ -37,6 +37,7 @@ import { formatPlanningNewEntriesDm, type PlanningNoticeEntry } from "@/lib/shar
 import { planningNewEntriesPush } from "@/lib/shared/push-messages";
 import { loadPlanningEntries, loadPlanningMembers, type Executor, type LoadedEntry, type LoadedMember } from "./load";
 import { noticeEntry } from "./notices";
+import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { loadEntryPlayers, playersDuring } from "./players";
 
 /** Sans nouvelle entrée depuis ce délai, la vague est close : on l'annonce. */
@@ -230,29 +231,15 @@ export async function sweepNewEntries(now: number = Date.now()): Promise<number>
   return wave.length;
 }
 
-type ClockState = { timer: ReturnType<typeof setInterval> | null; failing: boolean; running: boolean };
-const globalClock = globalThis as typeof globalThis & { __bgPlanningNotices?: ClockState };
-
-async function sweepOnce(state: ClockState): Promise<void> {
-  if (state.running) return;
-  state.running = true;
-  try {
-    await sweepNewEntries();
-    state.failing = false;
-  } catch (error) {
-    if (!state.failing) console.error("[planning] Balayage des nouvelles entrées impossible.", failureReason(error));
-    state.failing = true;
-  } finally {
-    state.running = false;
-  }
-}
+const NOTICES_CLOCK_KEY = "planning-notices";
 
 /** Lance le balayage des nouvelles entrées (une fois par processus). */
 export function startPlanningNoticesClock(): void {
-  const state = (globalClock.__bgPlanningNotices ??= { timer: null, failing: false, running: false });
-  if (state.timer) return;
-  const first = setTimeout(() => void sweepOnce(state), FIRST_SWEEP_DELAY_MS);
-  first.unref?.();
-  state.timer = setInterval(() => void sweepOnce(state), SWEEP_TICK_MS);
-  state.timer.unref?.();
+  startPeriodicClock({
+    key: NOTICES_CLOCK_KEY,
+    firstDelayMs: FIRST_SWEEP_DELAY_MS,
+    tickMs: SWEEP_TICK_MS,
+    run: () => sweepNewEntries(),
+    failureMessage: "[planning] Balayage des nouvelles entrées impossible.",
+  });
 }

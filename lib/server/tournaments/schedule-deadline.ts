@@ -50,6 +50,7 @@ import { markDeadlineForfeit } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { lockTournamentRow } from "./registration";
+import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { transact } from "./transaction";
 
 /** Verrou nommé du balayage : un seul processus balaie à la fois. */
@@ -1119,29 +1120,15 @@ function reportTotal(report: SweepReport): number {
   return report.forfeited + report.lapsed + report.retired + report.reminded;
 }
 
-type ClockState = { timer: ReturnType<typeof setInterval> | null; failing: boolean; running: boolean };
-const globalClock = globalThis as typeof globalThis & { __bgScheduleDeadlines?: ClockState };
-
-async function sweepOnce(state: ClockState): Promise<void> {
-  if (state.running) return;
-  state.running = true;
-  try {
-    await sweepScheduleDeadlines();
-    state.failing = false;
-  } catch (error) {
-    if (!state.failing) console.error("[schedule-deadline] Balayage des dates butoir impossible.", failureReason(error));
-    state.failing = true;
-  } finally {
-    state.running = false;
-  }
-}
+const DEADLINE_CLOCK_KEY = "schedule-deadlines";
 
 /** Lance le balayage des dates butoir (une fois par processus). */
 export function startScheduleDeadlineClock(): void {
-  const state = (globalClock.__bgScheduleDeadlines ??= { timer: null, failing: false, running: false });
-  if (state.timer) return;
-  const first = setTimeout(() => void sweepOnce(state), FIRST_SWEEP_DELAY_MS);
-  first.unref?.();
-  state.timer = setInterval(() => void sweepOnce(state), SWEEP_TICK_MS);
-  state.timer.unref?.();
+  startPeriodicClock({
+    key: DEADLINE_CLOCK_KEY,
+    firstDelayMs: FIRST_SWEEP_DELAY_MS,
+    tickMs: SWEEP_TICK_MS,
+    run: () => sweepScheduleDeadlines(),
+    failureMessage: "[schedule-deadline] Balayage des dates butoir impossible.",
+  });
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database", () => ({ getDatabase: jest.fn() }));
 jest.mock("@/lib/server/named-lock", () => {
@@ -25,6 +25,8 @@ import {
   MARK_CHUNK,
   parsePendingRoles,
   reopenedEntries,
+  startPlanningAutoConfirmClock,
+  stopPlanningAutoConfirmClock,
   sweepAutoConfirms,
   type AutoConfirmMarks,
 } from "@/lib/server/planning/auto-confirm";
@@ -488,5 +490,52 @@ describe("keyChunks", () => {
     const keys = Array.from({ length: KEY_CHUNK + 1 }, (_, index) => index);
 
     expect(keyChunks(keys).map((chunk) => chunk.length)).toEqual([KEY_CHUNK, 1]);
+  });
+});
+
+describe("startPlanningAutoConfirmClock / stopPlanningAutoConfirmClock", () => {
+  /** Premier balayage deux minutes après le démarrage. */
+  const FIRST_SWEEP_MS = 2 * 60 * 1000;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(async () => {
+    await stopPlanningAutoConfirmClock();
+    jest.useRealTimers();
+  });
+
+  it("stopPlanningAutoConfirmClock_neverStarted_resolves", async () => {
+    await expect(stopPlanningAutoConfirmClock()).resolves.toBeUndefined();
+  });
+
+  it("startPlanningAutoConfirmClock_afterFirstDelay_sweepsUnderTheLock", async () => {
+    startPlanningAutoConfirmClock();
+
+    await jest.advanceTimersByTimeAsync(FIRST_SWEEP_MS);
+
+    expect(withNamedLock).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(withNamedLock).mock.calls[0][1]).toBe(AUTO_CONFIRM_LOCK);
+  });
+
+  it("stopPlanningAutoConfirmClock_beforeFirstSweep_neverSweeps", async () => {
+    startPlanningAutoConfirmClock();
+
+    await stopPlanningAutoConfirmClock();
+    await jest.advanceTimersByTimeAsync(FIRST_SWEEP_MS * 3);
+
+    expect(withNamedLock).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it("stopPlanningAutoConfirmClock_afterStop_canRestart", async () => {
+    startPlanningAutoConfirmClock();
+    await stopPlanningAutoConfirmClock();
+
+    startPlanningAutoConfirmClock();
+    await jest.advanceTimersByTimeAsync(FIRST_SWEEP_MS);
+
+    expect(withNamedLock).toHaveBeenCalledTimes(1);
   });
 });

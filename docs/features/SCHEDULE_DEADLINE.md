@@ -75,6 +75,29 @@ mercredi 21:00. Le changement d'heure ne décale pas l'heure murale.
 qui, pris à la lettre, donnerait mercredi 21:00 pour dimanche 23:00 ; ses
 exemples (« la date butoir mardi 21:00 ») ont été suivis.
 
+## Horloges de fond
+
+Les balayages des dates butoir et de la confirmation d'office, comme ceux du
+planning (purge de conservation, nouvelles entrées), passent par
+`lib/server/periodic-clock.ts` : un premier passage après un délai, **puis**
+un par intervalle compté de là, jamais deux passages à la fois, une alerte par
+panne (pas une par passage), minuteurs `unref`, état sur `globalThis` par clé.
+`stopPeriodicClock(clé)` en arrête une (premier passage compris, attend le
+passage en cours, relançable ; `stopPlanningAutoConfirmClock` pour la
+confirmation d'office) ; l'arrêt propre du serveur (`bot-log-shutdown.ts`)
+coupe toutes les horloges dès le signal, pour qu'aucun passage ne démarre
+pendant la fermeture, attend les passages en cours (au plus
+`SHUTDOWN_PASS_WAIT_MS`, la moitié du délai) **puis** vide les lots dans le
+reste de `SHUTDOWN_FLUSH_TIMEOUT_MS` : les lignes posées par un passage qui
+finit (forfait, confirmation d'office) partent avec le vidage. Un passage lancé
+hors horloge (entretien de la fréquentation entraîné par une requête) s'inscrit
+par `trackBackgroundPass` et est attendu de même ; pendant l'arrêt
+(`backgroundPassesHalted()`), une requête n'en lance plus. L'entretien de la fréquentation
+(`startAudienceMaintenanceClock`) est de ces horloges. Un pas ignoré parce que le
+passage précédent dure encore se journalise une fois par passage (`console.warn`). Une suite qui appelle `register()` d'`instrumentation.ts`
+double ces horloges avec `mockPlanningClocks`
+(`tests/helpers/instrumentation-clocks.ts`), après `jest.resetModules()`.
+
 ## Échéance : double forfait ou extinction
 
 Balayage `sweepScheduleDeadlines`, chaque minute (`startScheduleDeadlineClock`,
@@ -276,3 +299,5 @@ privés passent par la remise existante.
 `tests/app/api/admin/match-schedule-deadline.test.ts`,
 `tests/app/api/admin/tournament-schedule-deadlines.test.ts`,
 `tests/app/schedule-deadline-ui-render.test.tsx` (fenêtre, pastille, câblage).
+
+Une horloge relancée pendant que son ancien passage court encore attend qu'il finisse avant son premier passage (sauter ce passage coûterait un pas entier, un jour pour la purge) ; à l'arrêt du serveur, `stopAllPeriodicClocks` les suspend, et `resumeSuspendedPeriodicClocks` les relance si le processus vit encore `SHUTDOWN_RESUME_GRACE_MS` (2 min) après le signal sans qu'aucune sortie n'ait été demandée — sous `next start`, l'écouteur de Next sort une fois le serveur fermé, les balayages ne sont donc pas réarmés pendant la fermeture. L'intervalle d'une horloge qui attend l'ancien passage n'est armé qu'avec son premier passage (aucune fausse alerte de pas ignoré). Les passages sont comptés depuis le premier : délai + n × pas, après chaque démarrage.

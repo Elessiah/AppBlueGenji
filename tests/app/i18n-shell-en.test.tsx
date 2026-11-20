@@ -41,6 +41,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import GlobalError from "@/app/global-error";
 import { GlobalErrorView, loadGlobalErrorShell } from "@/components/error-page/GlobalErrorView";
 import NotFound, { generateMetadata } from "@/app/not-found";
+import SecuredNotFound, { generateMetadata as securedMetadata } from "@/app/(secured)/not-found";
 import { AccessibilityPanel, accessibilityButtonLabel } from "@/components/accessibility/AccessibilityMenu";
 import { SkipLink } from "@/components/accessibility/SkipLink";
 import { AccountMenuPanel } from "@/components/account-menu";
@@ -234,6 +235,21 @@ describe("pages d'erreur en anglais", () => {
     expect(html).toContain("Read the rules");
     expect(html).not.toMatch(/introuvable|Retour à l/);
     await expect(generateMetadata()).resolves.toEqual({
+      title: { absolute: "Page not found · BlueGenji Esport" },
+      robots: { index: false, follow: false },
+    });
+  });
+
+  it("404 de l'espace sécurisé : même carte en anglais, sans en-tête ni pied de page propres", async () => {
+    const html = english(await SecuredNotFound());
+    expect(html).toContain("Page not found");
+    expect(html).toContain("Back to home");
+    expect(html).not.toMatch(/introuvable|Retour à l/);
+    expect(html).not.toContain("<header");
+    expect(html).not.toContain("<footer");
+    expect(html).not.toContain("<main");
+    expect(html).not.toContain("<nav");
+    await expect(securedMetadata()).resolves.toEqual({
       title: { absolute: "Page not found · BlueGenji Esport" },
       robots: { index: false, follow: false },
     });

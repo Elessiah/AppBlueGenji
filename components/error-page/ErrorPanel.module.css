@@ -4,6 +4,11 @@
   padding: 72px 16px 96px;
 }
 
+/* Dans la colonne d'une page : la gouttière et les marges verticales sont celles du gabarit. */
+.embedded {
+  padding: 24px 0 8px;
+}
+
 .card {
   width: min(560px, 100%);
   padding: 32px 28px;

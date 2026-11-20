@@ -152,7 +152,10 @@ concerné : le bot y gère lui-même la trace.
   aucun appelant ne l'attend.
 - **Arrêt propre** : `instrumentation.ts` → `installBotLogShutdownFlush`
   (`lib/server/bot-log-shutdown.ts`) envoie les lots sur `SIGINT` / `SIGTERM`,
-  borné à 1,2 s (pm2 tue après `kill_timeout`, 1,6 s par défaut). Next ferme
+  borné à 1,2 s (pm2 tue après `kill_timeout`, 1,6 s par défaut), après avoir
+  coupé les horloges de fond et attendu leurs passages en cours (au plus la
+  moitié du délai, `stopAllPeriodicClocks`, `SCHEDULE_DEADLINE.md` § Horloges
+  de fond) : les lignes de ces passages partent avec le lot. Next ferme
   le serveur sur le même signal et appelle `process.exit(0)` sans attendre :
   `holdExitUntil` retient cet appel jusqu'à la fin de l'envoi ; un appel
   suivant ne relance rien, mais un code d'échec (argument ou `process.exitCode`)

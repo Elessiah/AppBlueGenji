@@ -107,8 +107,11 @@ function prefixedTitle(title: Metadata["title"], prefix: string, budget?: number
  * Encart d'un lien de page de match : celui du tournoi (`tournamentPageMetadata`,
  * mêmes droits), adresse canonique sur la page du match et titre précédé de
  * sa manche et de son numéro. Un match introuvable (identifiant illisible, ou
- * match d'un autre tournoi) garde l'encart du tournoi **et sa canonique** —
- * celle de la vue lue (`/suivre/…` sans compte), jamais une page en 404.
+ * match d'un autre tournoi) garde ici l'encart du tournoi **et sa canonique** —
+ * celle de la vue lue (`/suivre/…` sans compte), jamais une page en 404. La
+ * page de l'espace membre ne l'appelle pas pour un match connu absent : sa mise
+ * en page rend la 404, et son onglet `notFoundMetadata` (même décision, lue
+ * une fois par requête).
  *
  * Quand le résumé public du tournoi porte le match (`loadShare`,
  * `SHARE_EMBEDS.md`), l'encart devient celui du match : « A contre B · Quart de

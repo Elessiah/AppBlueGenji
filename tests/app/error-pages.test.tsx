@@ -82,6 +82,20 @@ describe("textes des pages d'erreur", () => {
 });
 
 describe("ErrorPanel", () => {
+  it("embedded_insidePageColumn_dropsStandalonePadding", () => {
+    const html = renderToStaticMarkup(
+      <ErrorPanel copy={NOT_FOUND_COPY} referenceLabel="Référence :" embedded>
+        <button type="button">Accueil</button>
+      </ErrorPanel>,
+    );
+    expect(html).toMatch(/class="[^"]*embedded/);
+    expect(renderToStaticMarkup(
+      <ErrorPanel copy={NOT_FOUND_COPY} referenceLabel="Référence :">
+        <button type="button">Accueil</button>
+      </ErrorPanel>,
+    )).not.toMatch(/embedded/);
+  });
+
   it("nomme sa section par son titre de niveau 1 et rend les actions", () => {
     const html = renderToStaticMarkup(
       <ErrorPanel copy={NOT_FOUND_COPY} referenceLabel="Référence :">
@@ -150,12 +164,25 @@ describe("app/error.tsx", () => {
 describe("app/not-found.tsx et app/global-error.tsx", () => {
   it("la 404 passe par le gabarit de la vitrine et n'est pas indexée", () => {
     const source = readSource("app/not-found.tsx");
+    const content = readSource("components/error-page/NotFoundContent.tsx");
     expect(source).toContain("<PublicPageShell>");
-    expect(source).toContain("NOT_FOUND_LINKS");
-    expect(source).toMatch(/robots:\s*\{\s*index:\s*false/);
+    expect(source).toContain("notFoundMetadata");
+    expect(content).toContain("NOT_FOUND_LINKS");
+    expect(content).toMatch(/robots:\s*\{\s*index:\s*false/);
     // Même segment que la mise en page racine : son gabarit ne s'y applique
     // pas, le titre complet est donc posé en `absolute`.
-    expect(source).toContain("title: { absolute: errorPageTitle(notFoundCopy(t), t) }");
+    expect(content).toContain("title: { absolute: errorPageTitle(notFoundCopy(t), t) }");
+  });
+
+  it("la 404 de l'espace sécurisé n'ajoute ni en-tête ni pied de page (déjà portés par SiteShell)", () => {
+    const source = readSource("app/(secured)/not-found.tsx");
+    expect(source).toContain("NotFoundContent");
+    expect(source).toContain("notFoundMetadata");
+    // Dans la colonne de `.page-shell` : pas de gouttière ni de marges de page autonome en plus.
+    expect(source).toContain("NotFoundContent({ embedded: true })");
+    expect(source).not.toContain("PublicPageShell");
+    expect(source).not.toContain("PublicHeader");
+    expect(source).not.toContain("EnsureToastProvider");
   });
 
   it("le dernier filet rend un document complet dans la langue de l'adresse", () => {

@@ -8,9 +8,9 @@
  * Une purge par jour, lancée au démarrage (`instrumentation.ts`).
  */
 import { getDatabase } from "@/lib/server/database";
-import { failureReason } from "@/lib/server/failure-reason";
 import { PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
+import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import type { Executor } from "./load";
 
 /** Le réglage « caster autonome » ne sert qu'à un caster : il part avec ce rôle. */
@@ -51,27 +51,15 @@ export async function purgeExpiredPlanning(executor: Executor, now: number = Dat
   return removed;
 }
 
-type ClockState = { timer: ReturnType<typeof setInterval> | null; failing: boolean };
-const globalClock = globalThis as typeof globalThis & { __bgPlanningRetention?: ClockState };
+const RETENTION_CLOCK_KEY = "planning-retention";
 
-async function purgeOnce(state: ClockState): Promise<void> {
-  try {
-    const db = await getDatabase();
-    await purgeExpiredPlanning(db);
-    state.failing = false;
-  } catch (error) {
-    // Une alerte par panne, pas une par jour.
-    if (!state.failing) console.error("[planning] Purge de conservation impossible.", failureReason(error));
-    state.failing = true;
-  }
-}
-
-/** Lance la purge quotidienne (une fois par processus). */
+/** Lance la purge quotidienne (une fois par processus ; une alerte par panne, pas une par jour). */
 export function startPlanningRetentionClock(): void {
-  const state = (globalClock.__bgPlanningRetention ??= { timer: null, failing: false });
-  if (state.timer) return;
-  const first = setTimeout(() => void purgeOnce(state), FIRST_PURGE_DELAY_MS);
-  first.unref?.();
-  state.timer = setInterval(() => void purgeOnce(state), PURGE_TICK_MS);
-  state.timer.unref?.();
+  startPeriodicClock({
+    key: RETENTION_CLOCK_KEY,
+    firstDelayMs: FIRST_PURGE_DELAY_MS,
+    tickMs: PURGE_TICK_MS,
+    run: async () => purgeExpiredPlanning(await getDatabase()),
+    failureMessage: "[planning] Purge de conservation impossible.",
+  });
 }
