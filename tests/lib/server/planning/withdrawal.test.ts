@@ -1395,7 +1395,8 @@ describe("releaseGuestPlanning (`CAST_PLANNING.md` § Invités)", () => {
 
     await releaseGuestPlanning(GUEST, STAFF, EARLY);
 
-    expect(jest.mocked(assignMatchReferee).mock.calls[1]).toEqual([1, GUEST, 5, null, { refuseSuspended: true, guestRelease: true }]);
+    // Le remplaçant est posé au nom du staff qui sort l'invité, comme le retrait.
+    expect(jest.mocked(assignMatchReferee).mock.calls[1]).toEqual([1, STAFF, 5, null, { refuseSuspended: true, guestRelease: true }]);
   });
 
   it("releaseGuestPlanning_alreadyGone_skippedNotFailed", async () => {

@@ -231,6 +231,23 @@ describe("planning — invités (registre T20, PRIVACY_CHANGES, /rgpd)", () => {
     expect(entryEn?.details.join(" ")).toContain("without notifying the guest");
   });
 
+  it("rgpd_guestLeaving_noRefereeLineNorOpenSlotLine", () => {
+    expect(planningParagraph("app/rgpd/page.tsx")).toContain("rien de cela quand un invité quitte le planning");
+    expect(planningParagraph("app/rgpd/page.tsx")).toContain("sauf pour une place laissée par un invité");
+    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("none of this when a guest leaves the schedule");
+    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("except for a slot left by a guest");
+  });
+
+  it("t20_subPurposes_historyKeepsAuthorWithoutShowing", () => {
+    expect(t20(PROCESSING_ACTIVITIES).subPurposes.join(" ")).toContain("qui garde le compte de son auteur sans le montrer");
+    expect(t20(PROCESSING_ACTIVITIES_EN).subPurposes.join(" ")).toContain("which keeps its author's account without showing it");
+  });
+
+  it("t20_recipients_guestExceptionCoversReplacementAppointment", () => {
+    expect(t20(PROCESSING_ACTIVITIES).recipients.join(" ")).toContain("pour son retrait comme pour la désignation de son remplaçant");
+    expect(t20(PROCESSING_ACTIVITIES_EN).recipients.join(" ")).toContain("for its removal as for the appointment of its replacement");
+  });
+
   it("t20_recipients_exceptGuestReleaseFromDiscordLines", () => {
     expect(t20(PROCESSING_ACTIVITIES).recipients.join(" ")).toContain("(sauf celle laissée par la sortie d'un invité)");
     expect(t20(PROCESSING_ACTIVITIES_EN).recipients.join(" ")).toContain("(except one left by the removal of a guest)");

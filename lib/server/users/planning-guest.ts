@@ -28,9 +28,14 @@ export type PlanningGuestSaveResult = {
 export const PLANNING_GUEST_ON_DISCORD_LINE = "🎙️ Un compte passe invité (hors planning) par le staff.";
 export const PLANNING_GUEST_OFF_DISCORD_LINE = "🎙️ Un compte invité rejoint le planning par le staff.";
 
+/** Début commun des lignes pm2 d'une marque retirée, à la main ou avec les rôles. */
+function guestRemovedAuditHead(targetUserId: number): string {
+  return `🎙️ Compte #${targetUserId} retiré des invités`;
+}
+
 /** Ligne pm2 : le compte visé par son identifiant (l'auteur est ajouté par `staffAuditLine`). */
 export function planningGuestAuditLine(targetUserId: number, saved: PlanningGuestSaveResult): string {
-  if (!saved.guest) return `🎙️ Compte #${targetUserId} retiré des invités : de nouveau membre du planning.`;
+  if (!saved.guest) return `${guestRemovedAuditHead(targetUserId)} : de nouveau membre du planning.`;
   const release = saved.release;
   const detail = release
     ? ` — attributions à venir quittées : ${release.withdrawn}, laissées en place : ${release.failed}, disponibilités effacées : ${release.availabilityCleared}`
@@ -122,7 +127,7 @@ export async function setPlanningGuest(
 }
 
 /** Ligne Discord, anonyme : marque tombée avec un changement de rôles (`setUserRoles`). */
-export const PLANNING_GUEST_CLEARED_DISCORD_LINE = "🎙️ La marque « invité » d'un compte tombe avec ses rôles, par le staff.";
+export const PLANNING_GUEST_CLEARED_DISCORD_LINE = "🎙️ La marque « invité » d'un compte tombe avec un changement de ses rôles, par le staff.";
 
 /**
  * Publie la marque tombée avec un changement de rôles (promotion, dernier rôle
@@ -133,7 +138,7 @@ export function publishGuestFlagCleared(actor: StaffActor, targetUserId: number,
   const why = cause === "PROMOTED" ? "promu administrateur" : "dernier rôle de caster ou de prod retiré";
   try {
     publishStaffAction(PLANNING_GUEST_CLEARED_DISCORD_LINE, actor, {
-      auditLine: `🎙️ Compte #${targetUserId} retiré des invités (${why}).`,
+      auditLine: `${guestRemovedAuditHead(targetUserId)} (${why}).`,
       category: "admin",
     });
   } catch (error) {

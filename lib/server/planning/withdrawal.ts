@@ -208,25 +208,28 @@ async function findReplacement(
  * refusent (place alors à pourvoir). Arbitre de match confirmé : posé sur le
  * joueur), la ligne du planning ensuite. Une panne de la désignation peut
  * survenir après sa validation : le match relu dit si le remplaçant y est posé
- * (sa ligne s'écrit alors quand même). `actorId` : celui dont le geste
- * déclenche la pose (le désisté) ; le match ne s'en sert qu'à taire l'avis
- * d'un arbitre remplacé par lui-même — aucun ici, le match étant vide
- * (`expected` nul) — et ne le garde ni ne le publie. `guestRelease` : pose
- * due à la sortie d'un invité, sans ligne de journal par match.
+ * (sa ligne s'écrit alors quand même). `trigger` : le geste qui déclenche
+ * la pose — le désisté lui-même, ou le staff `staffActorId` qui sort un invité
+ * du planning (pose alors sans ligne de journal par match). L'auteur passé au
+ * match est ce staff, sinon le désisté ; le match ne s'en sert qu'à taire
+ * l'avis d'un arbitre remplacé par lui-même — aucun ici, le match étant vide
+ * (`expected` nul) — et ne le garde ni ne le publie.
  */
 async function placeReplacement(
   connection: PoolConnection,
   entry: LoadedEntry,
   pick: PlannedAssignment,
   confirmed: boolean,
-  actorId: number,
-  guestRelease: boolean,
+  trigger: { userId: number; staffActorId: number | null },
 ): Promise<boolean> {
   const matchReferee = entry.kind === "MATCH" && pick.role === "REFEREE" && entry.matchId !== null;
   if (matchReferee && confirmed) {
     try {
       // Suspension jugée dans la transaction même du match : posée depuis le choix, la place reste à pourvoir.
-      await assignMatchReferee(entry.matchId as number, actorId, pick.userId, null, { refuseSuspended: true, guestRelease });
+      await assignMatchReferee(entry.matchId as number, trigger.staffActorId ?? trigger.userId, pick.userId, null, {
+        refuseSuspended: true,
+        guestRelease: trigger.staffActorId !== null,
+      });
     } catch (error) {
       if (isMatchRefereeRefusal(error)) return false;
       // Panne : posé malgré elle (validation faite, réponse perdue), le remplaçant tient le rôle.
@@ -417,16 +420,16 @@ async function replaceWithdrawn(
     now: number;
     confirmed: boolean;
     userId: number;
-    /** Sortie d'un invité par le staff : remplaçant d'arbitre posé sans ligne de journal. */
-    guestRelease: boolean;
+    /** Le staff qui sort un invité du planning (remplaçant d'arbitre posé sans ligne de journal), `null` pour un désistement. */
+    staffActorId: number | null;
   },
 ): Promise<{ fresh: LoadedEntry; replacementId: number | null; coAssignedIds: number[]; hold: CasterHolds }> {
-  const { entry, data, current, now, confirmed, userId, guestRelease } = gesture;
+  const { entry, data, current, now, confirmed, userId, staffActorId } = gesture;
   const role = current.role;
   try {
     const found = await findReplacement(connection, entry.key, role, now, data.members, current, entry);
     const fresh = found.entry ?? entry;
-    const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, userId, guestRelease));
+    const placed = found.pick !== null && (await placeReplacement(connection, fresh, found.pick, confirmed, { userId, staffActorId }));
     const replacementId = placed && found.pick ? found.pick.userId : null;
     return {
       fresh,
@@ -528,7 +531,7 @@ async function withdrawMember(
       now,
       confirmed,
       userId: user.id,
-      guestRelease: user.actorId !== null,
+      staffActorId: user.actorId,
     });
     const open = confirmed && replacementId === null;
     // Inscrit sur le match, le désisté le cast encore (`selfHeld`) ; seul à tenir le rôle, rien ne change pour

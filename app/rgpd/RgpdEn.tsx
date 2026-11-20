@@ -1320,12 +1320,12 @@ export function RgpdEn({
             everyone&apos;s availability and preferences by the tournament staff only (referees and
             administrators). Through the schedule, confirming or assigning a match&apos;s referee, or removing
             its assigned referee, acts on the match itself, like the staff does: the staff log on Discord
-            notes each change of the match&apos;s referee without naming anyone and a referee removed by someone else is notified by push (<LocaleLink href="/rgpd/registre#t04">register,
+            notes each change of the match&apos;s referee without naming anyone and a referee removed by someone else is notified by push, none of this when a guest leaves the schedule (<LocaleLink href="/rgpd/registre#t04">register,
             T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>). Referees, casters
             and prods are notified by Discord direct message and push notification of new slots where they
             can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of the
             withdrawal from a confirmed assignment on a slot where their own assignment is confirmed; the
-            tournament staff, of a slot left open or a stream lost for want of a replacement (a line naming no one in the staff log on Discord; the role
+            tournament staff, of a slot left open or a stream lost for want of a replacement (a line naming no one in the staff log on Discord, except for a slot left by a guest; the role
             also appears “open” on the schedule when no one is confirmed in it any more, without the reason). None of these messages names a player or a staff
             member; each of these topics can be turned off in the notification settings of “My profile”,
             which also turns off its direct message. Everyone can withdraw from an assignment until the slot

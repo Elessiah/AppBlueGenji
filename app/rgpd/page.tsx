@@ -1548,13 +1548,13 @@ function RgpdFr({
             planning, confirmer ou désigner l&apos;arbitre d&apos;un match, ou retirer son arbitre désigné, agit
             sur le match lui-même, comme un geste du staff : le journal du staff sur Discord note chaque
             changement d&apos;arbitre du match sans nommer personne et l&apos;arbitre
-            retiré par un autre que lui en est prévenu par notification (<Link href="/rgpd/registre#t04">registre, T04</Link> et{" "}
+            retiré par un autre que lui en est prévenu par notification, rien de cela quand un invité quitte le planning (<Link href="/rgpd/registre#t04">registre, T04</Link> et{" "}
             <Link href="/rgpd/registre#t05">T05</Link>). Les arbitres, casters et prods sont prévenus en
             message privé Discord et en notification push des nouveaux créneaux où ils peuvent tenir un rôle
             (un récapitulatif par vague), de leurs affectations confirmées ou posées à la main, et du
             désistement d&apos;une attribution confirmée sur un créneau où leur propre attribution est
             confirmée ; le staff des tournois, d&apos;une place restée à pourvoir ou d&apos;une diffusion perdue faute de remplaçant (ligne sans nom au journal
-            du staff sur Discord ; le rôle paraît aussi « à pourvoir » sur le planning quand plus personne n&apos;y est confirmé, sans le motif). Aucun de ces messages ne nomme un
+            du staff sur Discord, sauf pour une place laissée par un invité ; le rôle paraît aussi « à pourvoir » sur le planning quand plus personne n&apos;y est confirmé, sans le motif). Aucun de ces messages ne nomme un
             joueur ni un membre du staff ; chacun de ces sujets se coupe dans les réglages de notifications
             de « Mon profil », ce qui coupe aussi son message privé. Chacun peut se désister d&apos;une
             attribution jusqu&apos;au début du créneau, avec un motif facultatif lu par le seul staff des

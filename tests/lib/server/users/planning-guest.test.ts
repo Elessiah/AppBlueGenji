@@ -251,6 +251,11 @@ describe("publishPlanningGuestChange", () => {
     expect(PLANNING_GUEST_OFF_DISCORD_LINE).not.toMatch(/#\d|Test_/);
     expect(PLANNING_GUEST_CLEARED_DISCORD_LINE).not.toMatch(/#\d|Test_/);
   });
+
+  it("clearedDiscordLine_wording_neutralForPromotion", () => {
+    expect(PLANNING_GUEST_CLEARED_DISCORD_LINE).toContain("avec un changement de ses rôles");
+    expect(PLANNING_GUEST_CLEARED_DISCORD_LINE).not.toContain("avec ses rôles");
+  });
 });
 
 // Revue juridique 2 : la marque tombée avec les rôles est notée comme tout geste sur elle (T20).
