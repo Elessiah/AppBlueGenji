@@ -14,7 +14,7 @@ joueur est refusé en `403`.
 
 | Fonction | Rôle |
 | --- | --- |
-| `normalizeReplayUrl` | Valide et normalise le lien. Hérite des garde-fous de `normalizeStreamUrl` (https forcé, hôte en minuscules, ni identifiants ni port, sous-domaines fermés, 255 caractères), puis n'accepte que **YouTube** et **une vidéo** : `youtube.com/watch?v=<id>`, `youtu.be/<id>`, `youtube.com/live/<id>`. La page d'une chaîne ne mène à aucune rediff ; Twitch et Kick sont refusés. |
+| `normalizeReplayUrl` | Valide et normalise le lien. Hérite des garde-fous de `normalizeStreamUrl` (https forcé, hôte en minuscules, ni identifiants ni port, sous-domaines fermés, 255 caractères), puis n'accepte que **YouTube** et **une vidéo** : `youtube.com/watch?v=<id>`, `youtu.be/<id>`, `youtube.com/live/<id>`. La page d'une chaîne ne mène à aucune rediff ; Twitch et Kick sont refusés. Ne garde que `v` et un instant de départ `t` lisible : tout autre paramètre (l'identifiant de partage `si`, lié au compte qui partage, un texte libre) et le fragment tombent, à l'écriture comme à l'affichage d'un lien plus ancien. |
 | `canHaveReplay` | Rencontre **réellement disputée** : `COMPLETED`, deux engagées, ni forfait ni double forfait. Un match nul en est une. |
 | `visibleReplayUrl` | Ce que l'écran affiche : `canHaveReplay` **et** lien revalidé. |
 
@@ -37,15 +37,19 @@ disparaître sans écriture — et le rejouer le fait revenir.
   sur un match rouvert.
 - `400 INVALID_REPLAY_URL`, `404 MATCH_NOT_FOUND`.
 - Journal d'arbitrage (`announceMatchReplayChange`, `staff-action-logs.ts`) :
-  un lien **posé**, **changé** ou **retiré** — nature lue sous le verrou du
-  match (`replay_url` d'avant, rendue par `setMatchReplayUrl` en `change`) —
+  un lien **posé**, **changé** ou **retiré** — changement et nature lus sous le verrou du
+  match (`replay_url` d'avant comparé au lien écrit, sans `changedRows` ; rendus par `setMatchReplayUrl` en `change`) —
   écrit une ligne 🎬 dans la catégorie `referees` (« Rediff ajoutée /
   modifiée / retirée », tournoi, manche, noms d'équipe — « un joueur » en
   tournoi individuel —, le lien par `discordUrl`, aucun pour un retrait), par
   « le staff » ou « un caster » ; la même ligne, avec l'auteur, dans pm2
-  (`publishStaffAction`). Match disparu ou illisible : aucune ligne Discord, une trace courte nominative dans
-  pm2 (`auditStaffAction`). Rien pour un geste sans effet ni un refus ; aucun
-  joueur ni caster n'est prévenu.
+  (`publishStaffAction`), précédée dès le commit d'une trace courte nominative
+  (`auditStaffAction`, « Rediff du match #id (SET) ») : un arrêt du serveur
+  avant la relecture du match ne laisse pas le geste sans auteur. Match disparu
+  ou illisible : aucune ligne Discord, la trace courte reste. Les gestes sur un
+  même match passent à tour de rôle dans la route (`createKeyedSerial`) : les
+  lignes suivent l'ordre des commits. Rien pour un geste sans effet ni un
+  refus ; aucun joueur ni caster n'est prévenu.
 - `publishMatchUpdatedEvent` : le lien voyage ensuite dans l'instantané du flux
   SSE (`BracketMatch.replayUrl`), comme le reste du plateau — sans vider la
   liste publique, la vitrine ni le classement, qu'une rediff ne change pas

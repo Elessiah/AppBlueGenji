@@ -134,8 +134,9 @@ texte, effacée un jour après la fin de la soirée).
 
 - **Rediffusion et caster autonome** (NOTIFY-SOLO-REDIFF) : une rediff posée,
   changée ou retirée part au journal d'arbitrage (match, noms d'équipe, « un
-  joueur » en solo, lien) sans auteur — « le staff » ou « un caster » — et
-  **nomme son auteur dans pm2** (`publishStaffAction`), caster compris : ce
+  joueur » en solo, lien réduit à la vidéo et à son instant de départ) sans
+  auteur — « le staff » ou « un caster » — et **nomme son auteur dans pm2**
+  (trace courte `auditStaffAction` dès le commit, puis `publishStaffAction`), caster compris : ce
   n'est pas un geste d'inscription de cast (exception « Casts » ci-dessus),
   mais une publication sur la fiche d'un match (`MATCH_REPLAYS.md`). Le statut
   de caster autonome d'un autre membre changé par le staff part au journal

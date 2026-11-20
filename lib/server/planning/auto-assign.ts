@@ -26,6 +26,7 @@ import {
 } from "@/lib/shared/planning-planner";
 import type { AutoAssignReport, ConfirmReport } from "@/lib/shared/planning-view";
 import {
+  affectedRows,
   coveringSoloCasterIds,
   loadPlanningData,
   loadHiddenTournamentIds,
@@ -378,10 +379,6 @@ async function writeDroppedProposals(
   }
 }
 
-function affected(result: unknown): number {
-  return Number((result as { affectedRows?: number }).affectedRows ?? 0);
-}
-
 /**
  * Lance un lot : les propositions provisoires des entrées ouvertes de la
  * fenêtre sont effacées, puis recalculées ensemble autour de tout ce qui est
@@ -448,7 +445,7 @@ export async function runAutoAssign(
         keys,
       );
       const proposed = await writeProposals(connection, kept, byKey, previous, actorId);
-      return { entries: batch.length, proposed, replaced: affected(cleared) };
+      return { entries: batch.length, proposed, replaced: affectedRows(cleared) };
     });
   });
 }
@@ -643,7 +640,7 @@ export async function confirmPendingReferees(executor: Executor): Promise<number
   );
   const [result] = await executor.execute(`UPDATE bg_planning_assignments a JOIN bg_matches m ON m.id = a.match_id
      SET a.confirmed = 1 WHERE a.role = 'REFEREE' AND a.confirmed = 0 AND m.referee_user_id = a.user_id AND ${NOT_SUSPENDED_SQL("a")}`);
-  return affected(result);
+  return affectedRows(result);
 }
 
 /**
@@ -801,13 +798,13 @@ async function writeConfirmSteps(
             "DELETE FROM bg_planning_assignments WHERE entry_key = ? AND user_id = ? AND role = ? AND confirmed = 0",
             [entry.key, step.userId, step.role],
           );
-      if (affected(removed) === 0) continue;
+      if (affectedRows(removed) === 0) continue;
       await writeEvent(connection, entry, step.userId, step.role, "REMOVED", "AUTO", actorId);
       refused += 1;
       continue;
     }
     const [result] = await connection.execute(...confirmStatement(step));
-    if (affected(result) === 0) continue;
+    if (affectedRows(result) === 0) continue;
     await writeEvent(connection, entry, step.userId, step.role, "CONFIRMED", "AUTO", actorId);
     // Confirmée par ce geste : la personne sera prévenue (`announceAssignments`), une fois l'écriture validée.
     written.push(step);

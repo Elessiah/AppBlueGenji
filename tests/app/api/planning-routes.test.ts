@@ -374,6 +374,25 @@ describe("PUT /api/planning/solo-caster", () => {
     expect(announceSoloCasterChange).toHaveBeenCalledWith(5, true, { id: 9, pseudo: arbitre.pseudo });
   });
 
+  it("soloPut_concurrentGesturesSameTarget_announcedInCommitOrder", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    let releaseFirst: () => void = () => undefined;
+    jest
+      .mocked(setSoloCaster)
+      .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = () => resolve(true))))
+      .mockResolvedValueOnce(true);
+
+    const first = soloPut(request("PUT", { solo: true, userId: 5 }));
+    const second = soloPut(request("PUT", { solo: false, userId: 5 }));
+    await new Promise((resolve) => setImmediate(resolve));
+    // Le second geste n'écrit qu'une fois le premier écrit et annoncé.
+    expect(setSoloCaster).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    expect(jest.mocked(announceSoloCasterChange).mock.calls.map(([, solo]) => solo)).toEqual([true, false]);
+  });
+
   it("soloPut_ownChange_noAnnouncement", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
 

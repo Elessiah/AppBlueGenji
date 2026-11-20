@@ -15,6 +15,7 @@ import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { rolesConflict, slotsOverlap } from "@/lib/shared/planning-planner";
 import { MATCH_REFEREE_REFUSAL_CODES, holdingRefusal, lockedHolding, withPlanningLock, writeAssignment, writeEvent } from "./auto-assign";
 import {
+  affectedRows,
   loadPlanningData,
   loadPlanningEntries,
   loadPlanningMembersByIds,
@@ -52,10 +53,6 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   // Refus de la désignation d'un arbitre de match (`assignMatchReferee`) : la liste unique.
   ...Object.fromEntries(MATCH_REFEREE_REFUSAL_CODES.map((code) => [code, code === "MATCH_NOT_FOUND" ? 404 : 409])),
 };
-
-function affectedRows(result: unknown): number {
-  return Number((result as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
-}
 
 /** Une seule entrée, lue par sa clé : sans toute la fenêtre, ni les comptes, ni les disponibilités des autres. */
 async function loadOneEntry(executor: Executor, user: AuthUser, entryKey: string, now: number): Promise<LoadedEntry> {

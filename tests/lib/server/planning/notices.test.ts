@@ -297,6 +297,16 @@ describe("announceSoloCasterChange", () => {
     expect(notification.discord?.message("fr")).not.toContain("Chef");
   });
 
+  it("announceSoloCasterChange_called_logPublishedSynchronouslyBeforeNotice", async () => {
+    const done = announceSoloCasterChange(5, true, actor);
+
+    // Écrite dans le tour même (pm2 avant toute attente), l'avis encore à venir.
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
+    expect(notifyUsers).not.toHaveBeenCalled();
+    await done;
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+  });
+
   it("announceSoloCasterChange_noRecipient_logsWithoutNotifying", async () => {
     jest.mocked(loadNotificationRecipients).mockResolvedValue([]);
 

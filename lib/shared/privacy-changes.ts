@@ -2332,7 +2332,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary: "Un caster est prévenu quand le staff change son statut de caster autonome, et l'ajout, la modification ou le retrait d'une rediffusion est noté au journal d'arbitrage, avec le lien.",
     details: [
       "Avis au caster : en message privé Discord et en notification push, sans nommer le staff ; le nouveau sujet « Caster autonome » se coupe dans les réglages de notifications de « Mon profil », message privé compris.",
-      "Journaux : ces deux gestes sont notés au journal du staff sur Discord sans nommer leur auteur ni le caster (pour une rediffusion : le match, ses noms d'équipe et le lien) ; les journaux du serveur gardent leur auteur, selon leur rotation. Base : intérêt légitime (organisation et contrôle des tournois).",
+      "Journaux : ces deux gestes sont notés sur Discord sans nommer leur auteur ni le caster — une rediffusion au journal d'arbitrage (le match, ses noms d'équipe et le lien, sans ses autres paramètres), le statut de caster autonome au journal du staff ; les journaux du serveur gardent leur auteur, selon leur rotation. Base : intérêt légitime (organisation et contrôle des tournois).",
     ],
   },
 ];

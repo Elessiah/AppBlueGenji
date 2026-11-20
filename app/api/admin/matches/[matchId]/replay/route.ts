@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { createKeyedSerial } from "@/lib/server/coalescer";
 import { fail, ok } from "@/lib/server/http";
 import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
 import { can } from "@/lib/shared/permissions";
@@ -13,6 +14,9 @@ const REPLAY_ERROR_STATUSES: Readonly<Record<string, number>> = {
   INVALID_REPLAY_URL: 400,
   MATCH_NOT_REPLAYABLE: 409,
 };
+
+/** Gestes sur un même match à tour de rôle : les lignes du journal suivent l'ordre des commits. */
+const replayWrites = createKeyedSerial<number>();
 
 function parseMatchId(raw: string): number | null {
   const matchId = Number(raw);
@@ -46,16 +50,20 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if (raw !== null && typeof raw !== "string") return fail("INVALID_REPLAY_URL", 400);
 
   try {
-    const { replayUrl, change } = await setMatchReplayUrl(matchId, raw, {
-      userId: user.id,
-      manages: can(user, "tournaments"),
+    const replayUrl = await replayWrites.run(matchId, async () => {
+      const saved = await setMatchReplayUrl(matchId, raw, {
+        userId: user.id,
+        manages: can(user, "tournaments"),
+      });
+      // Un geste sans effet (retirer un lien jamais posé, reposer le même) ne se
+      // journalise pas. Le journal d'arbitrage porte le lien ; l'auteur n'est
+      // nommé que dans pm2. Aucun joueur ni caster n'est prévenu. Mis en file
+      // ici, avant que le geste suivant sur ce match n'écrive.
+      if (saved.change !== null) {
+        announceMatchReplayChange(matchId, { ...saved.change, author: staffActionAuthor(user), actor: staffActor(user) });
+      }
+      return saved.replayUrl;
     });
-    // Un geste sans effet (retirer un lien jamais posé, reposer le même) ne se
-    // journalise pas. Le journal d'arbitrage porte le lien ; l'auteur n'est
-    // nommé que dans pm2. Aucun joueur ni caster n'est prévenu.
-    if (change !== null) {
-      announceMatchReplayChange(matchId, { ...change, author: staffActionAuthor(user), actor: staffActor(user) });
-    }
     return ok({ replayUrl });
   } catch (error) {
     const message = (error as Error).message;

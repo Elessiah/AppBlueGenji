@@ -474,19 +474,48 @@ describe("rediffusion au journal d'arbitrage", () => {
     expect(sentLines()[0]).not.toContain("Pseudo");
   });
 
-  it("deliverMatchReplayChange_matchGone_noDiscordLineButNamedAuditTrace", async () => {
+  it("deliverMatchReplayChange_matchGone_noDiscordLineNorTrace", async () => {
+    // La trace courte est écrite par `announceMatchReplayChange` avant la relecture : rien de plus ici.
     const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
     mockRows(null);
 
     await deliverMatchReplayChange(42, { change: "REMOVED", replayUrl: null, author: "STAFF", actor });
 
     expect(sendBotLog).not.toHaveBeenCalled();
-    expect(info).toHaveBeenCalledTimes(1);
-    expect(info).toHaveBeenCalledWith(expect.stringMatching(/Rediff du match #42 \(REMOVED\).*auteur : Arbitre \(#3\)/));
+    expect(info).not.toHaveBeenCalled();
     info.mockRestore();
   });
 
-  it("announceMatchReplayChange_readFails_auditsActorAndNeverThrows", async () => {
+  it("announceMatchReplayChange_called_shortNamedTraceBeforeReRead", async () => {
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    let release: () => void = () => undefined;
+    jest.mocked(getDatabase).mockReturnValue(
+      new Promise((resolve) => (release = () => resolve(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[], []]) })))),
+    );
+
+    announceMatchReplayChange(42, { change: "SET", replayUrl: VIDEO, author: "STAFF", actor });
+
+    // Écrite dans le tour même, la relecture du match encore en attente.
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(info).toHaveBeenCalledWith(expect.stringMatching(/Rediff du match #42 \(SET\).*auteur : Arbitre \(#3\)/));
+    release();
+    await settle();
+    info.mockRestore();
+  });
+
+  it("announceMatchReplayChange_matchGone_noDiscordLineSingleTrace", async () => {
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    mockRows(null);
+
+    announceMatchReplayChange(42, { change: "REMOVED", replayUrl: null, author: "STAFF", actor });
+    await settle();
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledTimes(1);
+    info.mockRestore();
+  });
+
+  it("announceMatchReplayChange_readFails_neverThrowsSingleTrace", async () => {
     const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getDatabase).mockRejectedValue(Object.assign(new Error("down"), { code: "ECONNREFUSED" }));
@@ -494,6 +523,7 @@ describe("rediffusion au journal d'arbitrage", () => {
     announceMatchReplayChange(42, { change: "SET", replayUrl: VIDEO, author: "STAFF", actor });
     await settle();
 
+    expect(info).toHaveBeenCalledTimes(1);
     expect(info).toHaveBeenCalledWith(expect.stringContaining("auteur : Arbitre (#3)"));
     expect(error).toHaveBeenCalledWith("[staff-log] rediff du match #42 non journalisée : ECONNREFUSED");
     expect(sendBotLog).not.toHaveBeenCalled();
@@ -501,19 +531,18 @@ describe("rediffusion au journal d'arbitrage", () => {
     error.mockRestore();
   });
 
-  it("announceMatchReplayChange_traceThrows_neverThrowsAndTracesOnce", async () => {
-    const info = jest.spyOn(console, "info").mockImplementation(() => {
+  it("announceMatchReplayChange_traceThrows_stillDeliversLine", async () => {
+    const info = jest.spyOn(console, "info").mockImplementationOnce(() => {
       throw new Error("pm2 closed");
     });
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    mockRows(null);
+    mockRows(matchRow());
 
-    announceMatchReplayChange(42, { change: "SET", replayUrl: VIDEO, author: "STAFF", actor });
+    expect(() => announceMatchReplayChange(42, { change: "SET", replayUrl: VIDEO, author: "STAFF", actor })).not.toThrow();
     await settle();
 
-    // Match disparu : une seule tentative de trace, sans message d'échec en plus.
-    expect(info).toHaveBeenCalledTimes(1);
-    expect(error).not.toHaveBeenCalled();
+    expect(sentLines()[0]).toContain("Rediff ajoutée");
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("trace de la rediff du match #42 impossible"));
     info.mockRestore();
     error.mockRestore();
   });

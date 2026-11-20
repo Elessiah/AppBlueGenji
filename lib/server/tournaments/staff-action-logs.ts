@@ -125,50 +125,37 @@ export type MatchReplayLogChange = MatchReplayEdit & {
 /**
  * La ligne d'arbitrage d'un changement de rediffusion : le match, ses engagés,
  * le lien (aucun pour un retrait) ; anonyme sur Discord, l'auteur nommé dans
- * pm2. Si le match n'existe plus, aucune ligne Discord mais la trace courte
- * nominative dans pm2 ({@link replayAuditTrace}). Peut lever.
+ * pm2. Si le match n'existe plus, aucune ligne (la trace courte de
+ * {@link announceMatchReplayChange} garde l'auteur). Peut lever.
  */
 export async function deliverMatchReplayChange(matchId: number, entry: MatchReplayLogChange): Promise<void> {
   const row = await loadMatchLogRow(matchId);
-  if (!row) {
-    replayAuditTrace(matchId, entry);
-    return;
-  }
+  if (!row) return;
   const match = matchLogSubject(row);
-  // `publishStaffAction` écrit le pm2 avant l'envoi Discord : son échec ne
-  // laisse pas `announceMatchReplayChange` tracer une 2e fois. Une erreur de
-  // `matchLogSubject` ou du formatage, avant lui, passe par la trace courte.
-  try {
-    publishStaffAction(
-      formatMatchReplayLog({ ...match, ...entry }),
-      entry.actor,
-      { category: "referees", tournamentId: match.tournament.id },
-    );
-  } catch (error) {
-    console.error(`[staff-log] rediff du match #${matchId} non journalisée : ${failureDiagnostic(error)}`);
-  }
-}
-
-/** La trace courte nominative d'un changement de rediffusion sans ligne d'arbitrage (pm2 seul). Ne lève jamais. */
-function replayAuditTrace(matchId: number, entry: MatchReplayLogChange): void {
-  try {
-    auditStaffAction(`Rediff du match #${matchId} (${entry.change}) — ligne d'arbitrage non écrite`, entry.actor);
-  } catch {
-    // pm2 illisible : rien de plus à faire que le message d'échec de l'appelant.
-  }
+  publishStaffAction(
+    formatMatchReplayLog({ ...match, ...entry }),
+    entry.actor,
+    { category: "referees", tournamentId: match.tournament.id },
+  );
 }
 
 /**
- * Journalise un changement de rediffusion, sans attendre ; ne lève jamais. Si
- * le match ne peut être relu, une trace courte garde l'auteur dans pm2 : la
- * trace de modération n'est pas optionnelle.
+ * Journalise un changement de rediffusion, sans attendre ; ne lève jamais.
+ *
+ * Une trace courte nominative part dans pm2 **sur-le-champ**, avant toute
+ * lecture (`auditStaffAction`) : un arrêt du serveur entre le commit et la
+ * relecture du match ne laisse pas le geste sans auteur — la trace de
+ * modération n'est pas optionnelle. La ligne détaillée suit, dans l'ordre des
+ * gestes du match.
  */
 export function announceMatchReplayChange(matchId: number, entry: MatchReplayLogChange): void {
+  try {
+    auditStaffAction(`Rediff du match #${matchId} (${entry.change})`, entry.actor);
+  } catch (error) {
+    console.error(`[staff-log] trace de la rediff du match #${matchId} impossible : ${failureDiagnostic(error)}`);
+  }
   void matchLines.chain(matchId, () =>
     deliverMatchReplayChange(matchId, entry).catch((error) => {
-      // Relire le match ou composer la ligne a échoué avant l'écriture de
-      // `publishStaffAction` : l'auteur reste nommé par la trace courte.
-      replayAuditTrace(matchId, entry);
       console.error(`[staff-log] rediff du match #${matchId} non journalisée : ${failureDiagnostic(error)}`);
     }),
   );

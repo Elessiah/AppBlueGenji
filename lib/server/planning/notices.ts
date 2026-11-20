@@ -114,22 +114,11 @@ export async function announceAssignments(
 const soloCasterNotices = createKeyedChain<number>();
 
 /**
- * Statut de caster autonome d'un autre membre réglé par le staff : une ligne au
- * journal (anonyme sur Discord, l'auteur nommé dans pm2 — `publishStaffAction`),
- * puis l'avis au caster (`PLANNING_SOLO_CASTER`, push et message privé coupés
- * avec le sujet). La route n'appelle ceci que pour un réglage **changé** sur le
- * compte d'un autre : ni le sien, ni une valeur reposée. Ne lève jamais.
+ * L'avis au caster dont le staff a changé le statut de caster autonome
+ * (`PLANNING_SOLO_CASTER`, push et message privé coupés avec le sujet). Ne lève
+ * jamais.
  */
-async function deliverSoloCasterChange(targetUserId: number, solo: boolean, actor: StaffActor): Promise<void> {
-  // Le journal et l'avis échouent chacun de leur côté : une ligne Discord non
-  // écrite ne prive pas le caster de son avis (l'auteur, écrit dans pm2 avant
-  // l'envoi, y reste nommé).
-  const line = formatSoloCasterChangeLog(solo);
-  try {
-    publishStaffAction(line, actor, { category: "casts", auditLine: `${line} (compte #${targetUserId})` });
-  } catch (error) {
-    console.error("[planning] journal du caster autonome impossible.", failureReason(error));
-  }
+async function deliverSoloCasterNotice(targetUserId: number, solo: boolean): Promise<void> {
   try {
     // Un compte suspendu n'est prévenu de rien du planning (T20), comme les autres avis.
     const recipients = await loadNotificationRecipients([targetUserId], "proven", { excludeSuspended: true, planningMembersOnly: true });
@@ -150,12 +139,27 @@ async function deliverSoloCasterChange(targetUserId: number, solo: boolean, acto
 }
 
 /**
- * Annonce un réglage changé, **dans l'ordre des gestes** pour un même caster
- * (`createKeyedChain`) : activer, désactiver, activer ne laisse pas arriver un
- * « désactivé » en dernier. Ne lève jamais.
+ * Statut de caster autonome d'un autre membre réglé par le staff. La route
+ * n'appelle ceci que pour un réglage **changé** sur le compte d'un autre — ni
+ * le sien, ni une valeur reposée —, dans le tour même de l'écriture et à tour
+ * de rôle par caster (`createKeyedSerial`) : l'ordre des appels est celui des
+ * commits.
+ *
+ * Une ligne au journal, sur-le-champ (anonyme sur Discord, l'auteur et le
+ * compte visé nommés dans pm2 — `publishStaffAction` écrit pm2 avant toute
+ * attente : un arrêt du serveur ne laisse pas le geste sans auteur), puis
+ * l'avis au caster, **dans l'ordre des gestes** (`createKeyedChain`) :
+ * activer, désactiver, activer ne laisse pas arriver un « désactivé » en
+ * dernier. Le journal et l'avis échouent chacun de leur côté. Ne lève jamais.
  */
 export function announceSoloCasterChange(targetUserId: number, solo: boolean, actor: StaffActor): Promise<void> {
-  return soloCasterNotices.chain(targetUserId, () => deliverSoloCasterChange(targetUserId, solo, actor));
+  const line = formatSoloCasterChangeLog(solo);
+  try {
+    publishStaffAction(line, actor, { category: "casts", auditLine: `${line} (compte #${targetUserId})` });
+  } catch (error) {
+    console.error("[planning] journal du caster autonome impossible.", failureReason(error));
+  }
+  return soloCasterNotices.chain(targetUserId, () => deliverSoloCasterNotice(targetUserId, solo));
 }
 
 /** Un désistement à annoncer : l'entrée, le rôle quitté, et son issue. */

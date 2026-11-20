@@ -38,12 +38,11 @@ d'une désignation à la main) : un compte suspendu, sans le rôle ou inconnu re
 le même `409 NOT_CASTER` (« ne peut pas être caster autonome »), sans rien qui
 nomme la suspension ; le **retirer** reste permis à un caster suspendu (rien n'en
 découle ; la vue des autres membres le compte encore). Un réglage **changé** par le staff sur le compte d'un **autre**
-(`writeSoloCaster` rend « changé » d'après la réponse de la base : `changedRows` d'un
-seul `UPDATE … WHERE user_id = ?`, puis `INSERT` seulement si aucune ligne n'est trouvée, la clé en double se lisant « rien changé » et toute autre erreur remontant) part au journal
+(`writeSoloCaster` rend « changé » d'après les lignes écrites : `UPDATE … WHERE user_id = ? AND solo_caster <> ?`, puis, pour l'allumer, `INSERT … SELECT … WHERE NOT EXISTS` qui ne crée que la ligne manquante ; une clé en double relit l'`UPDATE` conditionnel, toute autre erreur remonte) part au journal
 du staff sur Discord sans nommer personne (« Caster autonome activé /
 désactivé pour un caster du planning, par le staff », catégorie `casts`) et, avec
-son auteur et le numéro du compte visé, dans pm2 (`publishStaffAction`) ; le
-caster en est prévenu, dans l'ordre des gestes pour un même compte (file par clé ; sujet `PLANNING_SOLO_CASTER`, push et message privé
+son auteur et le numéro du compte visé, dans pm2 (`publishStaffAction`, sur-le-champ) ; le
+caster en est prévenu, dans l'ordre des gestes pour un même compte (la route fait passer les gestes d'un compte à tour de rôle, `createKeyedSerial`, l'annonce mise en file dans le tour de son écriture ; file par clé ; sujet `PLANNING_SOLO_CASTER`, push et message privé
 `proven` coupés avec le sujet, staff anonyme — `announceSoloCasterChange`,
 `notices.ts`). Son propre réglage, ou une valeur reposée, ne laisse ni trace ni
 avis ; un caster qui n'est plus du planning ou qui est suspendu n'est pas prévenu (la ligne de journal, elle, reste écrite) ; `bg_planning_events` ne suit toujours que les créneaux. Ce réglage ne

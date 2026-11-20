@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import {
   createCoalescer,
   createKeyedChain,
+  createKeyedSerial,
   FLUSH_ALL_BATCH,
   flushAllCoalescers,
   trackAnnouncement,
@@ -575,5 +576,65 @@ describe("flushAll — lots bornés et échéance", () => {
     trackAnnouncement(never);
 
     await expect(flushAllCoalescers(Date.now() - 1)).resolves.toBeUndefined();
+  });
+});
+
+describe("createKeyedSerial", () => {
+  beforeEach(() => {
+    jest.useRealTimers();
+  });
+
+  function gate<T>() {
+    let open: (value: T) => void = () => undefined;
+    let fail: (error: Error) => void = () => undefined;
+    const promise = new Promise<T>((resolve, reject) => {
+      open = resolve;
+      fail = reject;
+    });
+    return { promise, open, fail };
+  }
+
+  it("createKeyedSerial_sameKey_secondWaitsForFirst", async () => {
+    const { run } = createKeyedSerial<number>();
+    const first = gate<void>();
+    const second = jest.fn(async () => "second");
+    const firstDone = run(1, () => first.promise);
+    const secondDone = run(1, second);
+    await Promise.resolve();
+    expect(second).not.toHaveBeenCalled();
+
+    first.open();
+    await firstDone;
+
+    await expect(secondDone).resolves.toBe("second");
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("createKeyedSerial_task_returnsResult", async () => {
+    const { run } = createKeyedSerial<number>();
+
+    await expect(run(1, async () => 42)).resolves.toBe(42);
+  });
+
+  it("createKeyedSerial_failingTask_rejectsAndNextStillRuns", async () => {
+    const { run } = createKeyedSerial<number>();
+    const failure = new Error("NOT_CASTER");
+
+    const failed = run(1, async () => {
+      throw failure;
+    });
+    const next = run(1, async () => "next");
+
+    await expect(failed).rejects.toBe(failure);
+    await expect(next).resolves.toBe("next");
+  });
+
+  it("createKeyedSerial_otherKey_notHeld", async () => {
+    const { run } = createKeyedSerial<number>();
+    const blocked = gate<void>();
+    void run(1, () => blocked.promise);
+
+    await expect(run(2, async () => "other")).resolves.toBe("other");
+    blocked.open();
   });
 });

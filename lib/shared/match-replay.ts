@@ -37,6 +37,11 @@ import type { MatchStatus } from "./types";
  * page d'accueil d'une chaîne ne mène à aucune rediff, et le bandeau promettrait
  * alors ce que le lien ne tient pas.
  *
+ * Le lien rendu ne garde que la vidéo et son instant de départ (`v`, `t`) :
+ * tout autre paramètre et le fragment tombent — l'identifiant de partage `si`
+ * du bouton « Partager » de YouTube (lié au compte qui partage) ou un texte
+ * libre ajouté au lien ne s'affichent ni ne partent au journal d'arbitrage.
+ *
  * Renvoie `null` sur toute entrée inexploitable, jamais d'exception.
  */
 export function normalizeReplayUrl(input: unknown): string | null {
@@ -49,16 +54,27 @@ export function normalizeReplayUrl(input: unknown): string | null {
   const url = new URL(normalized);
   const segments = url.pathname.split("/").filter(Boolean);
 
-  if (platform === "youtu.be") {
-    return segments.length === 1 && isVideoId(segments[0]) ? normalized : null;
-  }
-  if (segments.length === 1 && segments[0] === "watch") {
-    return isVideoId(url.searchParams.get("v")) ? normalized : null;
-  }
-  if (segments.length === 2 && segments[0] === "live") {
-    return isVideoId(segments[1]) ? normalized : null;
-  }
-  return null;
+  const video =
+    platform === "youtu.be"
+      ? segments.length === 1 && isVideoId(segments[0])
+      : (segments.length === 1 && segments[0] === "watch" && isVideoId(url.searchParams.get("v"))) ||
+        (segments.length === 2 && segments[0] === "live" && isVideoId(segments[1]));
+  return video ? videoOnly(url) : null;
+}
+
+/** Instant de départ YouTube : secondes (`42`, `120s`) ou `1h2m3s`. */
+const START_TIME = /^(?:\d{1,6}s?|(?:\d{1,3}h)?(?:\d{1,4}m)?(?:\d{1,6}s)?)$/;
+
+/** Le lien sans rien d'autre que la vidéo (`v`) et son départ (`t`, s'il est lisible), sans fragment. */
+function videoOnly(url: URL): string {
+  const video = url.searchParams.get("v");
+  const start = url.searchParams.get("t");
+  const kept = new URLSearchParams();
+  if (video !== null) kept.set("v", video);
+  if (start && START_TIME.test(start)) kept.set("t", start);
+  url.search = kept.toString();
+  url.hash = "";
+  return url.toString();
 }
 
 /**

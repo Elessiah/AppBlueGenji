@@ -1,5 +1,6 @@
 import { PLANNING_WRITE_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
+import { createKeyedSerial } from "@/lib/server/coalescer";
 import { fail, ok } from "@/lib/server/http";
 import { setSoloCaster } from "@/lib/server/planning/actions";
 import { announceSoloCasterChange } from "@/lib/server/planning/notices";
@@ -19,7 +20,11 @@ import { can } from "@/lib/shared/permissions";
  * Un réglage **changé** sur le compte d'un autre est journalisé (anonyme sur
  * Discord, l'auteur nommé dans pm2) et annoncé au caster
  * (`PLANNING_SOLO_CASTER`) ; son propre réglage, ou une valeur reposée, rien.
+ * Les gestes sur un même compte passent à tour de rôle, l'annonce mise en file
+ * dans le tour de son écriture : les avis suivent l'ordre des commits.
  */
+const soloCasterWrites = createKeyedSerial<number>();
+
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
@@ -36,10 +41,12 @@ export async function PUT(req: Request) {
   if (target !== user.id && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   try {
-    const changed = await setSoloCaster(target, solo);
-    // Après la réponse, sans l'attendre : l'avis ne lève jamais, et un bot lent
-    // ne retarde pas le geste.
-    if (changed && target !== user.id) void announceSoloCasterChange(target, solo, staffActor(user));
+    await soloCasterWrites.run(target, async () => {
+      const changed = await setSoloCaster(target, solo);
+      // Sans l'attendre : l'avis ne lève jamais, et un bot lent ne retarde pas
+      // le geste ; mis en file ici, avant que le geste suivant n'écrive.
+      if (changed && target !== user.id) void announceSoloCasterChange(target, solo, staffActor(user));
+    });
     return ok({ saved: true });
   } catch (error) {
     return planningFailure(error, "PLANNING_SOLO_FAILED");

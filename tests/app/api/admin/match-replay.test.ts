@@ -177,6 +177,29 @@ describe("PUT /api/admin/matches/[matchId]/replay — journal d'arbitrage", () =
     ]);
   });
 
+  it("PUT_concurrentGesturesSameMatch_announcedInCommitOrder", async () => {
+    // Le second geste n'écrit qu'une fois le premier écrit et mis en file.
+    let releaseFirst: () => void = () => undefined;
+    jest
+      .mocked(setMatchReplayUrl)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseFirst = () => resolve({ replayUrl: VIDEO, change: { change: "SET", replayUrl: VIDEO } });
+          }),
+      )
+      .mockResolvedValueOnce({ replayUrl: null, change: { change: "REMOVED", replayUrl: null } });
+
+    const first = PUT(req({ replayUrl: VIDEO }), params("42"));
+    const second = PUT(req({ replayUrl: null }), params("42"));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(setMatchReplayUrl).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    expect(jest.mocked(announceMatchReplayChange).mock.calls.map(([, entry]) => entry.change)).toEqual(["SET", "REMOVED"]);
+  });
+
   it("PUT_unchanged_noLog", async () => {
     jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: VIDEO, change: null });
 

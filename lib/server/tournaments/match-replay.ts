@@ -104,7 +104,7 @@ export async function setMatchReplayUrl(
   // Le match se verrouille d'abord (seul, sans jointure : MariaDB) : le retrait
   // d'un caster (`releaseMatchCast`) prend le même verrou, et ne peut plus
   // passer entre la vérification du cast et l'écriture du lien.
-  const { row, result } = await retryOnDeadlock(() =>
+  const row = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const [rows] = await connection.execute<MatchReplayRow[]>(
         `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit,
@@ -129,14 +129,16 @@ export async function setMatchReplayUrl(
       if (replayUrl !== null && Number((written as { affectedRows?: number }).affectedRows ?? 0) === 0) {
         throw new Error("MATCH_NOT_REPLAYABLE");
       }
-      return { row: locked, result: written };
+      return locked;
     }),
   );
 
-  // « Changé » se lit dans la réponse de l'écriture (`changedRows`), pas dans la
-  // lecture d'avant : deux effacements simultanés n'en comptent qu'un, et un lien
-  // identique à celui en base ne change rien.
-  const changed = Number((result as { changedRows?: number }).changedRows ?? 0) > 0;
+  // « Changé » se lit sous le verrou du match, pris avant l'écriture et gardé
+  // jusqu'au commit : deux effacements simultanés n'en comptent qu'un (le second
+  // relit `NULL`), et un lien identique à celui en base ne change rien — sans
+  // dépendre de `changedRows`, que le pilote tire d'un texte que toute réponse
+  // ne porte pas.
+  const changed = (row.replay_url ?? null) !== replayUrl;
   if (changed) publishMatchUpdatedEvent(Number(row.tournament_id));
   return { replayUrl, change: changed ? replayEdit(row.replay_url, replayUrl) : null };
 }
