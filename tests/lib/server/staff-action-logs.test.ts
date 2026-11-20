@@ -474,12 +474,16 @@ describe("rediffusion au journal d'arbitrage", () => {
     expect(sentLines()[0]).not.toContain("Pseudo");
   });
 
-  it("deliverMatchReplayChange_matchGone_writesNothing", async () => {
+  it("deliverMatchReplayChange_matchGone_noDiscordLineButNamedAuditTrace", async () => {
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
     mockRows(null);
 
-    await deliverMatchReplayChange(42, { change: "SET", replayUrl: VIDEO, author: "STAFF", actor });
+    await deliverMatchReplayChange(42, { change: "REMOVED", replayUrl: null, author: "STAFF", actor });
 
     expect(sendBotLog).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(info).toHaveBeenCalledWith(expect.stringMatching(/Rediff du match #42 \(REMOVED\).*auteur : Arbitre \(#3\)/));
+    info.mockRestore();
   });
 
   it("announceMatchReplayChange_readFails_auditsActorAndNeverThrows", async () => {

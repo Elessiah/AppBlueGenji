@@ -118,12 +118,18 @@ export async function announceAssignments(
  * compte d'un autre : ni le sien, ni une valeur reposée. Ne lève jamais.
  */
 export async function announceSoloCasterChange(targetUserId: number, solo: boolean, actor: StaffActor): Promise<void> {
+  // Le journal et l'avis échouent chacun de leur côté : une ligne Discord non
+  // écrite ne prive pas le caster de son avis (l'auteur, écrit dans pm2 avant
+  // l'envoi, y reste nommé).
+  const line = formatSoloCasterChangeLog(solo);
   try {
-    publishStaffAction(formatSoloCasterChangeLog(solo), actor, {
-      category: "casts",
-      auditLine: `${formatSoloCasterChangeLog(solo)} (compte #${targetUserId})`,
-    });
-    const recipients = await loadNotificationRecipients([targetUserId], "proven", { planningMembersOnly: true });
+    publishStaffAction(line, actor, { category: "casts", auditLine: `${line} (compte #${targetUserId})` });
+  } catch (error) {
+    console.error("[planning] journal du caster autonome impossible.", failureReason(error));
+  }
+  try {
+    // Un compte suspendu n'est prévenu de rien du planning (T20), comme les autres avis.
+    const recipients = await loadNotificationRecipients([targetUserId], "proven", { excludeSuspended: true, planningMembersOnly: true });
     if (recipients.length === 0) return;
     const base = siteCanonicalBase();
     await notifyUsers(recipients, {

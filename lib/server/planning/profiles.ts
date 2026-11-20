@@ -10,6 +10,15 @@ function affected(result: unknown): number {
 }
 
 /**
+ * Lignes réellement modifiées par un `UPDATE` (`changedRows`), 0 si la réponse
+ * n'en dit rien. Jamais `affectedRows` : sous `CLIENT_FOUND_ROWS` (le défaut
+ * de mysql2), il compte aussi une ligne trouvée mais inchangée.
+ */
+function changed(result: unknown): number {
+  return Number((result as { changedRows?: number } | undefined)?.changedRows ?? 0);
+}
+
+/**
  * Écrit le réglage et dit s'il a **changé** : chaque instruction ne touche que
  * ce qui diffère (la réponse de la base, jamais une lecture d'avant), si bien
  * que deux gestes simultanés n'en comptent qu'un et que reposer la même valeur
@@ -21,7 +30,7 @@ export async function writeSoloCaster(executor: Executor, userId: number, solo: 
     `UPDATE bg_planning_profiles SET solo_caster = ? WHERE user_id = ? AND solo_caster <> ?`,
     [value, userId, value],
   );
-  if (affected(updated) > 0) return true;
+  if (changed(updated) > 0) return true;
   if (!solo) return false;
   // Pas de ligne qui diffère : soit elle vaut déjà « oui », soit elle manque.
   // `INSERT IGNORE` ne crée que la ligne manquante (1 ligne touchée) et laisse

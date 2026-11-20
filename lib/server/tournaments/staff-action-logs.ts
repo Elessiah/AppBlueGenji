@@ -22,7 +22,7 @@ import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
 import {
   formatMatchReplayLog,
   formatStaffMatchActionLog,
-  type MatchReplayChange,
+  type MatchReplayEdit,
   formatStaffTournamentActionLog,
   type StaffActionAuthor,
   type StaffMatchAction,
@@ -115,10 +115,7 @@ export function announceStaffMatchAction(
 }
 
 /** Un changement de rediffusion à journaliser (`announceMatchReplayChange`). */
-export type MatchReplayLogChange = {
-  change: MatchReplayChange;
-  /** Le lien posé ; `null` pour un retrait. */
-  replayUrl: string | null;
+export type MatchReplayLogChange = MatchReplayEdit & {
   /** « le staff » ou « un caster » sur Discord. */
   author: StaffActionAuthor;
   /** Nommé dans pm2 seulement. */
@@ -128,17 +125,28 @@ export type MatchReplayLogChange = {
 /**
  * La ligne d'arbitrage d'un changement de rediffusion : le match, ses engagés,
  * le lien (aucun pour un retrait) ; anonyme sur Discord, l'auteur nommé dans
- * pm2. Rien si le match n'existe plus. Peut lever.
+ * pm2. Si le match n'existe plus, aucune ligne Discord mais la trace courte
+ * nominative dans pm2 ({@link replayAuditTrace}). Peut lever.
  */
 export async function deliverMatchReplayChange(matchId: number, entry: MatchReplayLogChange): Promise<void> {
   const row = await loadMatchLogRow(matchId);
-  if (!row) return;
+  if (!row) {
+    replayAuditTrace(matchId, entry);
+    return;
+  }
   const match = matchLogSubject(row);
+  const edit: MatchReplayEdit =
+    entry.change === "REMOVED" ? { change: "REMOVED", replayUrl: null } : { change: entry.change, replayUrl: entry.replayUrl };
   publishStaffAction(
-    formatMatchReplayLog({ ...match, change: entry.change, replayUrl: entry.replayUrl, author: entry.author }),
+    formatMatchReplayLog({ ...match, ...edit, author: entry.author }),
     entry.actor,
     { category: "referees", tournamentId: match.tournament.id },
   );
+}
+
+/** La trace courte nominative d'un changement de rediffusion sans ligne d'arbitrage (pm2 seul). */
+function replayAuditTrace(matchId: number, entry: MatchReplayLogChange): void {
+  auditStaffAction(`Rediff du match #${matchId} (${entry.change}) — ligne d'arbitrage non écrite`, entry.actor);
 }
 
 /**
@@ -149,7 +157,7 @@ export async function deliverMatchReplayChange(matchId: number, entry: MatchRepl
 export function announceMatchReplayChange(matchId: number, entry: MatchReplayLogChange): void {
   void matchLines.chain(matchId, () =>
     deliverMatchReplayChange(matchId, entry).catch((error) => {
-      auditStaffAction(`Rediff du match #${matchId} (${entry.change}) — ligne d'arbitrage non écrite`, entry.actor);
+      replayAuditTrace(matchId, entry);
       console.error(`[staff-log] rediff du match #${matchId} non journalisée : ${failureDiagnostic(error)}`);
     }),
   );

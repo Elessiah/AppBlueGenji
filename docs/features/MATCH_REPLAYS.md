@@ -43,7 +43,7 @@ disparaître sans écriture — et le rejouer le fait revenir.
   modifiée / retirée », tournoi, manche, noms d'équipe — « un joueur » en
   tournoi individuel —, le lien par `discordUrl`, aucun pour un retrait), par
   « le staff » ou « un caster » ; la même ligne, avec l'auteur, dans pm2
-  (`publishStaffAction`). Match illisible : une trace courte nominative dans
+  (`publishStaffAction`). Match disparu ou illisible : aucune ligne Discord, une trace courte nominative dans
   pm2 (`auditStaffAction`). Rien pour un geste sans effet ni un refus ; aucun
   joueur ni caster n'est prévenu.
 - `publishMatchUpdatedEvent` : le lien voyage ensuite dans l'instantané du flux

@@ -285,7 +285,7 @@ describe("announceSoloCasterChange", () => {
       actor,
       { category: "casts", auditLine: "🎙️ Caster autonome activé pour un caster du planning, par le staff. (compte #5)" },
     );
-    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[5], "proven", { planningMembersOnly: true }]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[5], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
     expect(jest.mocked(notifyUsers).mock.calls[0][1]).toMatchObject({ topic: "PLANNING_SOLO_CASTER", dmFollowsTopic: true });
   });
 
@@ -304,6 +304,19 @@ describe("announceSoloCasterChange", () => {
 
     expect(publishStaffAction).toHaveBeenCalledTimes(1);
     expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("announceSoloCasterChange_logThrows_stillNotifiesCaster", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(publishStaffAction).mockImplementationOnce(() => {
+      throw new Error("bot batch");
+    });
+
+    await expect(announceSoloCasterChange(5, true, actor)).resolves.toBeUndefined();
+
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
   });
 
   it("announceSoloCasterChange_notifyFails_neverThrows", async () => {

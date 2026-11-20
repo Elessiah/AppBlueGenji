@@ -4,6 +4,9 @@ import { fakeConnection, type SqlQuery } from "../../../helpers/sql-double";
 
 /** `writeSoloCaster` : le réglage écrit, et « changé » lu dans la réponse de la base. */
 
+/** Réponse d'un `UPDATE` : `changedRows` dit le changement réel. */
+const updated = (changedRows: number, affectedRows = changedRows) => [{ affectedRows, changedRows }, []];
+/** Réponse d'un `INSERT IGNORE` : `affectedRows` seul. */
 const written = (affectedRows: number) => [{ affectedRows }, []];
 
 let execute: jest.Mock<SqlQuery>;
@@ -14,7 +17,7 @@ beforeEach(() => {
 
 describe("writeSoloCaster", () => {
   it("writeSoloCaster_differingRow_returnsTrueWithoutInsert", async () => {
-    execute.mockResolvedValueOnce(written(1));
+    execute.mockResolvedValueOnce(updated(1));
 
     await expect(writeSoloCaster(fakeConnection({ execute }), 4, false)).resolves.toBe(true);
 
@@ -23,7 +26,7 @@ describe("writeSoloCaster", () => {
   });
 
   it("writeSoloCaster_clearWithoutDifferingRow_returnsFalseWithoutInsert", async () => {
-    execute.mockResolvedValueOnce(written(0));
+    execute.mockResolvedValueOnce(updated(0));
 
     await expect(writeSoloCaster(fakeConnection({ execute }), 4, false)).resolves.toBe(false);
 
@@ -31,7 +34,7 @@ describe("writeSoloCaster", () => {
   });
 
   it("writeSoloCaster_setMissingRow_insertsAndReturnsTrue", async () => {
-    execute.mockResolvedValueOnce(written(0)).mockResolvedValueOnce(written(1));
+    execute.mockResolvedValueOnce(updated(0)).mockResolvedValueOnce(written(1));
 
     await expect(writeSoloCaster(fakeConnection({ execute }), 4, true)).resolves.toBe(true);
 
@@ -39,8 +42,15 @@ describe("writeSoloCaster", () => {
   });
 
   it("writeSoloCaster_setAlreadyOn_returnsFalse", async () => {
-    execute.mockResolvedValueOnce(written(0)).mockResolvedValueOnce(written(0));
+    execute.mockResolvedValueOnce(updated(0)).mockResolvedValueOnce(written(0));
 
     await expect(writeSoloCaster(fakeConnection({ execute }), 4, true)).resolves.toBe(false);
+  });
+
+  it("writeSoloCaster_foundRowsCountsUnchangedRow_returnsFalse", async () => {
+    // Sous CLIENT_FOUND_ROWS, une ligne trouvée mais inchangée compte dans affectedRows.
+    execute.mockResolvedValueOnce(updated(0, 1));
+
+    await expect(writeSoloCaster(fakeConnection({ execute }), 4, false)).resolves.toBe(false);
   });
 });

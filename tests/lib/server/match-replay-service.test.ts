@@ -101,7 +101,7 @@ describe("setMatchReplayUrl", () => {
       .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
     await mockDb(execute);
 
-    expect(await setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).toEqual({ replayUrl: VIDEO, changed: true, change: "SET" });
+    expect(await setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).toEqual({ replayUrl: VIDEO, change: { change: "SET", replayUrl: VIDEO } });
     // Match joué : le jeu, qui ne sert qu'à la condition du cast avant le lancement, n'est pas relu.
     expect(execute.mock.calls.some(([sql]) => String(sql).includes("FROM bg_tournaments"))).toBe(false);
     expect(execute.mock.calls[1]).toEqual([expect.stringContaining("FROM bg_match_casters"), [42, 12]]);
@@ -146,7 +146,7 @@ describe("setMatchReplayUrl", () => {
       .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
     await mockDb(execute);
 
-    expect(await setMatchReplayUrl(42, null, LIVE_ONLY_12)).toEqual({ replayUrl: null, changed: true, change: "REMOVED" });
+    expect(await setMatchReplayUrl(42, null, LIVE_ONLY_12)).toEqual({ replayUrl: null, change: { change: "REMOVED", replayUrl: null } });
   });
 
   it("setMatchReplayUrl_liveOnlyNotCasterOfMatch_throwsNotMatchCaster", async () => {
@@ -172,8 +172,7 @@ describe("setMatchReplayUrl", () => {
 
     expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ", STAFF)).toEqual({
       replayUrl: "https://youtu.be/dQw4w9WgXcQ",
-      changed: true,
-      change: "SET",
+      change: { change: "SET", replayUrl: "https://youtu.be/dQw4w9WgXcQ" },
     });
 
     const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
@@ -188,7 +187,7 @@ describe("setMatchReplayUrl", () => {
       const execute = found({ ...playedRow, status: "READY" });
       await mockDb(execute);
 
-      expect(await setMatchReplayUrl(42, raw, STAFF)).toEqual({ replayUrl: null, changed: true, change: "REMOVED" });
+      expect(await setMatchReplayUrl(42, raw, STAFF)).toEqual({ replayUrl: null, change: { change: "REMOVED", replayUrl: null } });
       const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
       expect(sql).toMatch(/SET replay_url = NULL WHERE id = \?$/);
       expect(params).toEqual([42]);
@@ -239,23 +238,22 @@ describe("setMatchReplayUrl", () => {
 });
 
 describe("setMatchReplayUrl — changement", () => {
-  it("setMatchReplayUrl_clearNeverSet_changedFalse", async () => {
+  it("setMatchReplayUrl_clearNeverSet_changeNull", async () => {
     await mockDb(found(playedRow, 1, 0));
-    expect(await setMatchReplayUrl(42, null, STAFF)).toEqual({ replayUrl: null, changed: false, change: null });
+    expect(await setMatchReplayUrl(42, null, STAFF)).toEqual({ replayUrl: null, change: null });
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
-  it("setMatchReplayUrl_concurrentClear_secondChangedFalse", async () => {
+  it("setMatchReplayUrl_concurrentClear_secondChangeNull", async () => {
     // Deux effacements simultanés : la ligne est trouvée, mais déjà vide au second.
     await mockDb(found(playedRow, 1, 0));
-    expect((await setMatchReplayUrl(42, "", STAFF)).changed).toBe(false);
+    expect((await setMatchReplayUrl(42, "", STAFF)).change).toBeNull();
   });
 
-  it("setMatchReplayUrl_sameUrl_changedFalse", async () => {
+  it("setMatchReplayUrl_sameUrl_changeNull", async () => {
     await mockDb(found(playedRow, 1, 0));
     expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ", STAFF)).toEqual({
       replayUrl: "https://youtu.be/dQw4w9WgXcQ",
-      changed: false,
       change: null,
     });
   });
@@ -263,19 +261,19 @@ describe("setMatchReplayUrl — changement", () => {
   it("setMatchReplayUrl_replacingLink_changeChanged", async () => {
     await mockDb(found({ ...playedRow, replay_url: "https://youtu.be/oldOldOld01" }));
 
-    expect((await setMatchReplayUrl(42, VIDEO, STAFF)).change).toBe("CHANGED");
+    expect((await setMatchReplayUrl(42, VIDEO, STAFF)).change).toEqual({ change: "CHANGED", replayUrl: VIDEO });
   });
 
   it("setMatchReplayUrl_firstLink_changeSet", async () => {
     await mockDb(found({ ...playedRow, replay_url: null }));
 
-    expect((await setMatchReplayUrl(42, VIDEO, STAFF)).change).toBe("SET");
+    expect((await setMatchReplayUrl(42, VIDEO, STAFF)).change).toEqual({ change: "SET", replayUrl: VIDEO });
   });
 
   it("setMatchReplayUrl_erasingLink_changeRemoved", async () => {
     await mockDb(found({ ...playedRow, replay_url: VIDEO }));
 
-    expect((await setMatchReplayUrl(42, null, STAFF)).change).toBe("REMOVED");
+    expect((await setMatchReplayUrl(42, null, STAFF)).change).toEqual({ change: "REMOVED", replayUrl: null });
   });
 
   it("setMatchReplayUrl_lockedReadSelectsPreviousLink", async () => {

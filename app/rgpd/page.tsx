@@ -1258,7 +1258,7 @@ function RgpdFr({
             T05</Link>), sauf, quand elle n&apos;a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
             Une rediffusion posée, changée ou retirée est notée au journal d&apos;arbitrage sur Discord (le match,
             ses noms d&apos;équipe, « un joueur » en tournoi individuel, et le lien) sans nommer son auteur ; le
-            statut de caster autonome d&apos;un membre du planning changé par le staff y est noté sans nommer
+            statut de caster autonome d&apos;un membre du planning changé par le staff est noté au journal du staff sur Discord sans nommer
             personne ; les journaux du serveur gardent l&apos;auteur de ces deux gestes (<Link href="/rgpd/registre#t05">registre, T05</Link>).
             Une date butoir de planification posée, changée ou retirée par le staff est notée au journal du staff sur Discord
             (le tournoi et le match) sans nommer son auteur ; les journaux du serveur gardent son auteur, comme pour un horaire de match (<Link href="/rgpd/registre#t05">registre, T05</Link>).

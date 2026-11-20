@@ -115,7 +115,7 @@ describe("gestes du staff sur un match", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(setMatchOnAir).mockResolvedValue(true);
     jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "AUTO", changed: true });
-    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: "https://youtu.be/x", changed: true, change: "SET" });
+    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: "https://youtu.be/x", change: { change: "SET", replayUrl: "https://youtu.be/x" } });
     expect((await onAirRoute(jsonReq("POST", { onAir: true }), match)).status).toBe(200);
     expect((await matchLiveRoute(jsonReq("PUT", { trigger: null }), match)).status).toBe(200);
     expect((await replayRoute(jsonReq("PUT", { replayUrl: "https://youtu.be/x" }), match)).status).toBe(200);
@@ -208,7 +208,7 @@ describe("gestes du staff sur un tournoi", () => {
 
 describe("geste sans effet : rien n'est journalisé", () => {
   it("replayRoute_unchanged_notLogged", async () => {
-    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: null, changed: false, change: null });
+    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: null, change: null });
     expect((await replayRoute(jsonReq("PUT", { replayUrl: null }), match)).status).toBe(200);
     expect(announceStaffMatchAction).not.toHaveBeenCalled();
     expect(announceMatchReplayChange).not.toHaveBeenCalled();

@@ -1057,7 +1057,7 @@ export function RgpdEn({
             T05</LocaleLink>), except, when it could not be composed, the action and the match or tournament number, without its author.
             A replay set, changed or removed is noted in the refereeing log on Discord (the match, its team
             names, “a player” in a solo tournament, and the link) without naming its author; a schedule
-            member&apos;s solo caster status changed by the staff is noted there without naming anyone; the
+            member&apos;s solo caster status changed by the staff is noted in the staff log on Discord without naming anyone; the
             server logs keep the author of both actions (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
             A scheduling deadline set, changed or removed by the staff is noted in the staff log on Discord
             (the tournament and the match) without naming its author; the server logs keep its author, as for a match time (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).

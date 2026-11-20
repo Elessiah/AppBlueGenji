@@ -182,7 +182,7 @@ describe("formatMatchReplayLog", () => {
   });
 
   it("formatMatchReplayLog_removed_noLink", () => {
-    expect(formatMatchReplayLog({ ...replay, change: "REMOVED" })).toMatch(/^🎬 Rediff retirée — .*\(#42\), par le staff\.$/);
+    expect(formatMatchReplayLog({ ...base, change: "REMOVED", replayUrl: null })).toMatch(/^🎬 Rediff retirée — .*\(#42\), par le staff\.$/);
   });
 
   it("formatMatchReplayLog_soloTournament_neverWritesPseudo", () => {

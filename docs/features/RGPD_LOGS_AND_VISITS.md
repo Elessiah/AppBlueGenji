@@ -122,7 +122,7 @@ texte, effacée un jour après la fin de la soirée).
   est injoignable (`MATCH_LOBBY_BRIEF.md`).
 
 - **Autres gestes du staff** (même décision) : résultat validé, score
-  enregistré, lancement forcé, hôte, diffusion, rediffusion, édition d'un
+  enregistré, lancement forcé, hôte, diffusion, édition d'un
   tournoi, têtes de série, étape avancée, équipes fantômes, image et lien de
   diffusion — une ligne « par le staff » au journal, sans ligne pm2
   nominative (si la ligne ne peut être rédigée, pm2 garde `[staff-log]`, le
@@ -131,6 +131,16 @@ texte, effacée un jour après la fin de la soirée).
   suspendue garde en plus la trace nominative courte de
   `dispute-self-resolution.ts` ; un score qui suspend la validation n'écrit
   au journal que le tournoi (comme l'alerte ⚠️), pas le match.
+
+- **Rediffusion et caster autonome** (NOTIFY-SOLO-REDIFF) : une rediff posée,
+  changée ou retirée part au journal d'arbitrage (match, noms d'équipe, « un
+  joueur » en solo, lien) sans auteur — « le staff » ou « un caster » — et
+  **nomme son auteur dans pm2** (`publishStaffAction`), caster compris : ce
+  n'est pas un geste d'inscription de cast (exception « Casts » ci-dessus),
+  mais une publication sur la fiche d'un match (`MATCH_REPLAYS.md`). Le statut
+  de caster autonome d'un autre membre changé par le staff part au journal
+  (catégorie casts) sans nommer personne ; pm2 nomme l'auteur et le numéro du
+  compte visé (`CAST_PLANNING.md`).
 
 - Le **motif d'une pénalité** est saisi librement par l'arbitre et repris tel
   quel : il ne doit pas nommer de joueur.

@@ -1088,6 +1088,15 @@ export function formatStaffMatchActionLog(context: {
 /** Changement du lien de rediffusion d'un match : posé, remplacé ou retiré. */
 export type MatchReplayChange = "SET" | "CHANGED" | "REMOVED";
 
+/**
+ * Un changement de rediffusion et son lien : un lien posé ou remplacé porte
+ * toujours son lien, un retrait n'en porte aucun — le type interdit une ligne
+ * « Rediff ajoutée » sans lien.
+ */
+export type MatchReplayEdit =
+  | { change: "SET" | "CHANGED"; replayUrl: string }
+  | { change: "REMOVED"; replayUrl: null };
+
 const MATCH_REPLAY_CHANGE_WORDING: Record<MatchReplayChange, string> = {
   SET: "Rediff ajoutée",
   CHANGED: "Rediff modifiée",
@@ -1110,14 +1119,11 @@ export function formatMatchReplayLog(context: {
   swiss?: boolean;
   team1: LogEntrant | null;
   team2: LogEntrant | null;
-  change: MatchReplayChange;
-  /** Le lien posé ; ignoré pour un retrait. */
-  replayUrl: string | null;
   /** Par défaut `STAFF`. */
   author?: StaffActionAuthor;
-}): string {
+} & MatchReplayEdit): string {
   const author = STAFF_ACTION_AUTHOR_LABEL[context.author ?? "STAFF"];
-  const link = context.change !== "REMOVED" && context.replayUrl ? ` : ${discordUrl(context.replayUrl)}` : "";
+  const link = context.change === "REMOVED" ? "" : ` : ${discordUrl(context.replayUrl)}`;
   return (
     `${lead("🎬", MATCH_REPLAY_CHANGE_WORDING[context.change], context.tournament)} : ` +
     `${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +

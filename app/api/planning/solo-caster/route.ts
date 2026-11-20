@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setSoloCaster } from "@/lib/server/planning/actions";
 import { announceSoloCasterChange } from "@/lib/server/planning/notices";
+import { staffActor } from "@/lib/shared/log-privacy";
 import { planningFailure } from "@/lib/server/planning/routes";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
 import { isPositiveId } from "@/lib/server/tournaments/match-launch-routes";
@@ -38,7 +39,7 @@ export async function PUT(req: Request) {
     const changed = await setSoloCaster(target, solo);
     // Après la réponse, sans l'attendre : l'avis ne lève jamais, et un bot lent
     // ne retarde pas le geste.
-    if (changed && target !== user.id) void announceSoloCasterChange(target, solo, { id: user.id, pseudo: user.pseudo });
+    if (changed && target !== user.id) void announceSoloCasterChange(target, solo, staffActor(user));
     return ok({ saved: true });
   } catch (error) {
     return planningFailure(error, "PLANNING_SOLO_FAILED");

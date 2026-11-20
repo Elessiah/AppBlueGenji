@@ -4,6 +4,7 @@ import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
 import { can } from "@/lib/shared/permissions";
 import { readOptionalJsonObject } from "@/lib/server/request-body";
 import { announceMatchReplayChange, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
+import { staffActor } from "@/lib/shared/log-privacy";
 
 /** Refus codés du service, et leur statut ; tout autre échec est un 500. */
 const REPLAY_ERROR_STATUSES: Readonly<Record<string, number>> = {
@@ -53,12 +54,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
     // journalise pas. Le journal d'arbitrage porte le lien ; l'auteur n'est
     // nommé que dans pm2. Aucun joueur ni caster n'est prévenu.
     if (change !== null) {
-      announceMatchReplayChange(matchId, {
-        change,
-        replayUrl,
-        author: staffActionAuthor(user),
-        actor: { id: user.id, pseudo: user.pseudo },
-      });
+      announceMatchReplayChange(matchId, { ...change, author: staffActionAuthor(user), actor: staffActor(user) });
     }
     return ok({ replayUrl });
   } catch (error) {

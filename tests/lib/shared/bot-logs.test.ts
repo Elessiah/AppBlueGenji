@@ -18,7 +18,7 @@ import {
   formatTournamentStartedLog,
   formatUnderfilledTournamentLog,
 } from "@/lib/shared/bot-logs";
-import { ANONYMOUS_PLAYER_LABEL, entrantLabel, staffAuditLine } from "@/lib/shared/log-privacy";
+import { ANONYMOUS_PLAYER_LABEL, entrantLabel, staffActor, staffAuditLine } from "@/lib/shared/log-privacy";
 
 const TOURNAMENT = { id: 12, name: "Coupe BlueGenji" };
 
@@ -734,5 +734,13 @@ describe("formatScheduleDeadlineLog", () => {
     const line = formatScheduleDeadlineLog({ tournament: TOURNAMENT, matchId: null, matches: 3, deadlineAt: null });
 
     expect(line).toContain("3 match(s) à planifier, retirée, par le staff.");
+  });
+});
+
+describe("staffActor", () => {
+  it("staffActor_userWithExtraFields_keepsIdAndPseudoOnly", () => {
+    const user = { id: 9, pseudo: "Chef", isAdmin: true, email: "chef@example.test" };
+
+    expect(staffActor(user)).toEqual({ id: 9, pseudo: "Chef" });
   });
 });
