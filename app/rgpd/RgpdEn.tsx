@@ -932,7 +932,7 @@ export function RgpdEn({
             A member of moderation can <strong>suspend an account</strong> contrary to the terms of use, for a fixed
             or indefinite period: all its sessions are closed and no login is possible while the suspension runs;
             if it referees, casts or produces, it is left out of the schedule&apos;s proposals, confirmations,
-            appointments, replacements and notices (new slots, assignments, withdrawals, open slots, lost streams) and can no longer be made a solo caster there; what was already
+            appointments, replacements and notices (new slots, assignments, withdrawals, open slots, lost streams, solo caster status) and can no longer be made a solo caster there; what was already
             confirmed or appointed for it stays until removed; the tournament staff and the other schedule members can
             only infer that the schedule no longer retains it, without seeing the suspension or its reasons (<LocaleLink href="/rgpd/registre#t20">register, T20</LocaleLink>).
           </p>
@@ -980,7 +980,7 @@ export function RgpdEn({
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
             tournament&apos;s kickoff, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of the scheduling deadline of a match you lead (captain, manager or owner, or player of a solo tournament) — its announcement, its reminders 24 h and 3 h before and the double forfeit that may follow if it passes with no time —, of your match times (set, changed or removed) and their reminders (24 h before; also 10 h before if the tournament has check-in), of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, in a tournament that has check-in, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
-            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission; a referee, caster or prod, of the schedule (new slots where they can hold a role, their assignments, withdrawals from confirmed assignments on their confirmed slots) and, tournament staff, of open slots and lost streams.{" "}
+            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission; a referee, caster or prod, of the schedule (new slots where they can hold a role, their assignments, withdrawals from confirmed assignments on their confirmed slots, and, for a caster, their solo caster status changed by the staff) and, tournament staff, of open slots and lost streams.{" "}
             <strong>Nothing is sent to a device you have not subscribed</strong>: notifications are turned on device by device,
             from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics. A
             topic added since you subscribed (such as “New match”) is on by default on your devices already
@@ -1055,10 +1055,10 @@ export function RgpdEn({
             solo tournament), without naming their author (“the staff”, or “a caster” for broadcasting); this line adds nothing to the server logs, where a dispute
             settled, a result corrected or a confirmation paused keeps its named trace (<LocaleLink href="/rgpd/registre#t05">register,
             T05</LocaleLink>), except, when it could not be composed, the action and the match or tournament number, without its author.
-            A replay set, changed or removed is noted in the refereeing log on Discord (the match, its team
-            names, “a player” in a solo tournament, and the link) without naming its author; a schedule
+            A replay set, changed or removed is noted in the staff log on Discord (the match, its team
+            names, “a player” in a solo tournament, and the link to the video, which is public and shows the channel that streamed it) without naming its author; a schedule
             member&apos;s solo caster status changed by the staff is noted in the staff log on Discord without naming anyone; the
-            server logs keep the author of both actions (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
+            server logs keep the author of both actions and, for the second, the account concerned (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
             A scheduling deadline set, changed or removed by the staff is noted in the staff log on Discord
             (the tournament and the match) without naming its author; the server logs keep its author, as for a match time (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
             When an administrator grants or removes a platform role (administrator, referee, caster, prod, community
@@ -1328,7 +1328,8 @@ export function RgpdEn({
             T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>). Referees, casters
             and prods are notified by Discord direct message and push notification of new slots where they
             can hold a role (one summary per wave), of their assignments confirmed or set by hand, and of the
-            withdrawal from a confirmed assignment on a slot where their own assignment is confirmed; the
+            withdrawal from a confirmed assignment on a slot where their own assignment is confirmed, a caster
+            also of their solo caster status changed by the staff; the
             tournament staff, of a slot left open or a stream lost for want of a replacement (a line naming no one in the staff log on Discord, except for a slot left by a guest; the role
             also appears “open” on the schedule when no one is confirmed in it any more, without the reason). None of these messages names a player or a staff
             member; each of these topics can be turned off in the notification settings of “My profile”,

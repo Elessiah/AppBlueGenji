@@ -221,7 +221,7 @@
       "titleOn": "Solo caster turned on",
       "titleOff": "Solo caster turned off",
       "bodyOn": "The staff turned on your solo caster status: you can stream alone, without a prod.",
-      "bodyOff": "The staff turned off your solo caster status: you now stream with a prod."
+      "bodyOff": "The staff turned off your solo caster status: you now need a prod to stream."
     },
     "withdrawal": {
       "title": "Withdrawal on your match",

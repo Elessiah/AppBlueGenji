@@ -1122,7 +1122,7 @@ function RgpdFr({
             conditions d&apos;utilisation, pour une durée déterminée ou indéterminée : toutes ses
             sessions sont fermées et aucune connexion n&apos;est possible tant que la suspension court ;
             s&apos;il arbitre, caste ou produit, il est écarté des propositions, confirmations, désignations,
-            remplacements et avis du planning (nouveaux créneaux, affectations, désistements, places à pourvoir, diffusions perdues) et ne peut plus y être dit caster autonome ; ce
+            remplacements et avis du planning (nouveaux créneaux, affectations, désistements, places à pourvoir, diffusions perdues, statut de caster autonome) et ne peut plus y être dit caster autonome ; ce
             qui lui était déjà confirmé ou désigné reste jusqu&apos;à son retrait ; le staff des tournois et les autres
             membres du planning peuvent seulement en déduire que le planning ne le retient plus, sans voir la suspension
             ni ses motifs (<Link href="/rgpd/registre#t20">registre, T20</Link>).
@@ -1173,7 +1173,7 @@ function RgpdFr({
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de la date butoir de planification d&apos;un match que vous menez (capitaine, manager ou propriétaire, ou joueur d&apos;un tournoi individuel) — son annonce, ses rappels 24 h et 3 h avant et le double forfait qui peut la suivre si elle passe sans horaire —, de l&apos;horaire de vos matchs (posé,
             changé ou retiré) et de ses rappels (24 h avant ; aussi 10 h avant si le tournoi a un check-in), du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, dans un tournoi qui a un check-in, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
-            alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage ; un arbitre, caster ou prod, du planning (nouveaux créneaux où il peut tenir un rôle, ses affectations, les désistements d&apos;attributions confirmées sur ses créneaux confirmés) et, staff des tournois, des places à pourvoir et des diffusions perdues. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
+            alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage ; un arbitre, caster ou prod, du planning (nouveaux créneaux où il peut tenir un rôle, ses affectations, les désistements d&apos;attributions confirmées sur ses créneaux confirmés, et, caster, son statut de caster autonome changé par le staff) et, staff des tournois, des places à pourvoir et des diffusions perdues. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets. Un
             sujet ajouté depuis votre abonnement (ainsi « Nouveau match ») est actif d&apos;office sur vos appareils
@@ -1256,10 +1256,10 @@ function RgpdFr({
             « un caster » pour la diffusion) ; cette ligne n&apos;ajoute rien aux journaux du serveur, où un litige tranché,
             un résultat corrigé ou une validation suspendue garde sa trace nominative (<Link href="/rgpd/registre#t05">registre,
             T05</Link>), sauf, quand elle n&apos;a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
-            Une rediffusion posée, changée ou retirée est notée au journal d&apos;arbitrage sur Discord (le match,
-            ses noms d&apos;équipe, « un joueur » en tournoi individuel, et le lien) sans nommer son auteur ; le
+            Une rediffusion posée, changée ou retirée est notée au journal du staff sur Discord (le match,
+            ses noms d&apos;équipe, « un joueur » en tournoi individuel, et le lien de la vidéo, publique, qui montre la chaîne qui l&apos;a diffusée) sans nommer son auteur ; le
             statut de caster autonome d&apos;un membre du planning changé par le staff est noté au journal du staff sur Discord sans nommer
-            personne ; les journaux du serveur gardent l&apos;auteur de ces deux gestes (<Link href="/rgpd/registre#t05">registre, T05</Link>).
+            personne ; les journaux du serveur gardent l&apos;auteur de ces deux gestes et, pour le second, le compte visé (<Link href="/rgpd/registre#t05">registre, T05</Link>).
             Une date butoir de planification posée, changée ou retirée par le staff est notée au journal du staff sur Discord
             (le tournoi et le match) sans nommer son auteur ; les journaux du serveur gardent son auteur, comme pour un horaire de match (<Link href="/rgpd/registre#t05">registre, T05</Link>).
             Quand un administrateur attribue ou retire un rôle de plateforme (administrateur, arbitre, caster, prod, community
@@ -1557,7 +1557,7 @@ function RgpdFr({
             message privé Discord et en notification push des nouveaux créneaux où ils peuvent tenir un rôle
             (un récapitulatif par vague), de leurs affectations confirmées ou posées à la main, et du
             désistement d&apos;une attribution confirmée sur un créneau où leur propre attribution est
-            confirmée ; le staff des tournois, d&apos;une place restée à pourvoir ou d&apos;une diffusion perdue faute de remplaçant (ligne sans nom au journal
+            confirmée, un caster aussi de son statut de caster autonome changé par le staff ; le staff des tournois, d&apos;une place restée à pourvoir ou d&apos;une diffusion perdue faute de remplaçant (ligne sans nom au journal
             du staff sur Discord, sauf pour une place laissée par un invité ; le rôle paraît aussi « à pourvoir » sur le planning quand plus personne n&apos;y est confirmé, sans le motif). Aucun de ces messages ne nomme un
             joueur ni un membre du staff ; chacun de ces sujets se coupe dans les réglages de notifications
             de « Mon profil », ce qui coupe aussi son message privé. Chacun peut se désister d&apos;une

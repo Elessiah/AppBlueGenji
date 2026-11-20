@@ -182,12 +182,12 @@ export function formatPlanningSoloCasterDm(solo: boolean, siteBase: string, loca
   if (locale === "en") {
     const state = solo
       ? "The staff turned on your solo caster status: you can stream alone, without a prod."
-      : "The staff turned off your solo caster status: you now stream with a prod.";
+      : "The staff turned off your solo caster status: you now need a prod to stream.";
     return `🎙️ BlueGenji — ${state}\nPlanning: ${url}`;
   }
   const state = solo
     ? "Le staff a activé ton statut de caster autonome : tu peux diffuser seul, sans prod."
-    : "Le staff a désactivé ton statut de caster autonome : tu diffuses désormais avec un prod.";
+    : "Le staff a désactivé ton statut de caster autonome : un prod doit désormais t'accompagner pour diffuser.";
   return `🎙️ BlueGenji — ${state}\nPlanning : ${url}`;
 }
 

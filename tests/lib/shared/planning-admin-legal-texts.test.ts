@@ -43,7 +43,7 @@ describe("/rgpd — planning (FR)", () => {
   });
 
   it("rgpdFr_suspension_cannotBeMadeSoloCaster", () => {
-    expect(fr).toContain("diffusions perdues) et ne peut plus y être dit caster autonome ; ce qui lui était déjà confirmé");
+    expect(fr).toContain("diffusions perdues, statut de caster autonome) et ne peut plus y être dit caster autonome ; ce qui lui était déjà confirmé");
   });
 
   it("rgpdFr_planningExport_staffActionsOnAssignments", () => {
@@ -73,7 +73,7 @@ describe("/rgpd — planning (EN)", () => {
   });
 
   it("rgpdEn_suspension_cannotBeMadeSoloCaster", () => {
-    expect(en).toContain("lost streams) and can no longer be made a solo caster there; what was already");
+    expect(en).toContain("lost streams, solo caster status) and can no longer be made a solo caster there; what was already");
   });
 
   it("rgpdEn_planningExport_staffActionsOnAssignments", () => {
@@ -111,11 +111,11 @@ describe("registre T20", () => {
   });
 
   it("registerT20_fr_suspendedCannotBeMadeSoloCaster", () => {
-    expect(activity("fr", "T20")).toContain("diffusions perdues) et ne peut plus y être dit caster autonome ;");
+    expect(activity("fr", "T20")).toContain("diffusions perdues, statut de caster autonome) et ne peut plus y être dit caster autonome ;");
   });
 
   it("registerT20_en_suspendedCannotBeMadeSoloCaster", () => {
-    expect(activity("en", "T20")).toContain("lost streams) and can no longer be made a solo caster there;");
+    expect(activity("en", "T20")).toContain("lost streams, solo caster status) and can no longer be made a solo caster there;");
   });
 
   it("registerT20_fr_exportStaffActionsOnAssignments", () => {
@@ -129,10 +129,10 @@ describe("registre T20", () => {
 
 describe("registre T11", () => {
   it("registerT11_fr_suspendedCannotBeMadeSoloCaster", () => {
-    expect(activity("fr", "T11")).toContain("diffusions perdues) et ne peut plus y être dit caster autonome ;");
+    expect(activity("fr", "T11")).toContain("diffusions perdues, statut de caster autonome) et ne peut plus y être dit caster autonome ;");
   });
 
   it("registerT11_en_suspendedCannotBeMadeSoloCaster", () => {
-    expect(activity("en", "T11")).toContain("lost streams) and can no longer be made a solo caster there;");
+    expect(activity("en", "T11")).toContain("lost streams, solo caster status) and can no longer be made a solo caster there;");
   });
 });

@@ -221,7 +221,7 @@
       "titleOn": "Caster autonome activé",
       "titleOff": "Caster autonome désactivé",
       "bodyOn": "Le staff a activé ton statut de caster autonome : tu peux diffuser seul, sans prod.",
-      "bodyOff": "Le staff a désactivé ton statut de caster autonome : tu diffuses désormais avec un prod."
+      "bodyOff": "Le staff a désactivé ton statut de caster autonome : un prod doit désormais t'accompagner pour diffuser."
     },
     "withdrawal": {
       "title": "Désistement sur ton match",

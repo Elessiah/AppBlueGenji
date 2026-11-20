@@ -341,7 +341,7 @@ describe("caster autonome réglé par le staff", () => {
 
   it("formatPlanningSoloCasterDm_turnedOffEn_englishWithEnglishLink", () => {
     expect(formatPlanningSoloCasterDm(false, "https://bluegenji.test", "en")).toBe(
-      "🎙️ BlueGenji — The staff turned off your solo caster status: you now stream with a prod.\nPlanning: https://bluegenji.test/en/planning",
+      "🎙️ BlueGenji — The staff turned off your solo caster status: you now need a prod to stream.\nPlanning: https://bluegenji.test/en/planning",
     );
   });
 
@@ -357,7 +357,7 @@ describe("caster autonome réglé par le staff", () => {
   it("planningSoloCasterPush_turnedOffEn_englishTextAndLink", () => {
     expect(planningSoloCasterPush(false, "en")).toMatchObject({
       title: "Solo caster turned off",
-      body: "The staff turned off your solo caster status: you now stream with a prod.",
+      body: "The staff turned off your solo caster status: you now need a prod to stream.",
       url: "/en/planning",
     });
   });
