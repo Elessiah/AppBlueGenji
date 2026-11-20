@@ -1461,7 +1461,7 @@ function RgpdFr({
             <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
             ou d&apos;un ou plusieurs casters : chaque caster rejoint un stream du match ou ouvre le sien,
-            avec le lien de sa chaîne (obligatoire pour l&apos;ouvrir), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
+            avec le lien de sa chaîne (obligatoire pour l&apos;ouvrir lui-même), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
             plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du
             match, par un membre de l&apos;organisation, reste au match quand ses casters s&apos;en vont. Le lien qu&apos;un caster a fourni en ouvrant
             son stream ou dans « Configurer ma diffusion » part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
@@ -1505,7 +1505,7 @@ function RgpdFr({
             l&apos;<strong>exécution du service</strong>, et non plus de l&apos;intérêt légitime : il n&apos;y a
             plus d&apos;opposition par « nom neutre ». Ce qui touche les casters (voix, pseudo, lien de leur
             chaîne, mode d&apos;antenne) et les liens de diffusion et de rediffusion publiés sur le site relève
-            de la même base, que la même section des conditions prévoit.
+            de la même base, que la même section des conditions prévoit (le caster que le planning place : intérêt légitime, comme la prod).
             Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
@@ -1560,11 +1560,10 @@ function RgpdFr({
             sur le match lui-même, comme un geste du staff : le journal du staff sur Discord note chaque
             changement d&apos;arbitre du match sans nommer personne et l&apos;arbitre
             retiré par un autre que lui en est prévenu par notification, rien de cela quand un invité (marque décrite plus bas) quitte le planning (<Link href="/rgpd/registre#t04">registre, T04</Link> et{" "}
-            <Link href="/rgpd/registre#t05">T05</Link>). De même, quand personne ne caste encore un match en dehors du planning, les
+            <Link href="/rgpd/registre#t05">T05</Link>). De même, quand personne ne tient encore le cast d&apos;un match (caster ou prod) en dehors du planning, les
             casters et la prod qu&apos;une attribution confirmée ou posée à la main y désigne y sont placés,
             s&apos;ils remplissent les conditions du cast ou de la prod et ne jouent pas le match : leur pseudo
-            paraît alors avec le match comme une inscription de cast ou une prod placée (<Link href="/rgpd/registre#t16">registre, T16</Link>), la prod en est
-            prévenue, un caster placé sur une diffusion encore sans lien est invité à donner celui de sa chaîne,
+            paraît alors avec le match comme une inscription de cast ou une prod placée (<Link href="/rgpd/registre#t16">registre, T16</Link>), un caster placé sur une diffusion encore sans lien est invité à donner celui de sa chaîne,
             et quitter l&apos;attribution (désistement, retrait à la main par le staff) les en retire, sauf sur un
             match joué ; une inscription faite par le caster lui-même, ou une prod prise par la personne ou posée par le staff depuis le match, reste ; ces gestes sont notés sans nom au journal du staff sur Discord, l&apos;auteur d&apos;un geste du staff et les comptes visés dans les journaux du serveur. Les arbitres, casters et prods sont prévenus en
             message privé Discord et en notification push des nouveaux créneaux où ils peuvent tenir un rôle

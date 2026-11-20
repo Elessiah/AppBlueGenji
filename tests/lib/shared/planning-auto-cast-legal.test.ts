@@ -38,8 +38,8 @@ describe("historique des changements — placement par le planning", () => {
   it("planningPlacementEntry_frAndEn_outsideScheduleAndLegitimateInterest", () => {
     const en = PRIVACY_CHANGES_EN[ENTRY_ID];
 
-    expect(frEntry().summary).toContain("Quand personne ne caste encore un match en dehors du planning");
-    expect(en.summary).toContain("When nobody casts a match yet outside the schedule");
+    expect(frEntry().summary).toContain("Quand personne ne tient encore le cast d'un match (caster ou prod) en dehors du planning");
+    expect(en.summary).toContain("When nobody holds a match's cast (caster or prod) yet outside the schedule");
     expect(frEntry().details.join(" ")).toContain("Base : l'intérêt légitime de l'association, comme pour le planning, avec droit d'opposition.");
     expect(en.details.join(" ")).toContain("Basis: the association's legitimate interest, as for the schedule, with a right to object.");
     expect(frEntry().details.join(" ")).not.toContain("inchangée");
@@ -90,10 +90,10 @@ describe("historique des changements — placement par le planning", () => {
 describe("registre — T16 et T20 déclarent le placement", () => {
   it("registerT20_frAndEn_placementSubPurpose", () => {
     expect(sheet(PROCESSING_ACTIVITIES, "T20").subPurposes.join(" ")).toContain(
-      "Placer sur un match que personne ne caste encore en dehors du planning",
+      "Placer sur un match dont personne ne tient encore le cast (caster ou prod) en dehors du planning",
     );
     expect(sheet(PROCESSING_ACTIVITIES_EN, "T20").subPurposes.join(" ")).toContain(
-      "Placing on a match nobody casts yet outside the schedule",
+      "Placing on a match whose cast (caster or prod) nobody holds yet outside the schedule",
     );
   });
 
@@ -172,11 +172,11 @@ describe("/rgpd — placement par le planning, en français et en anglais", () =
     const fr = page("app/rgpd/page.tsx");
     const en = page("app/rgpd/RgpdEn.tsx");
 
-    expect(fr).toContain("quand personne ne caste encore un match en dehors du planning, les casters et la prod qu&apos;une attribution confirmée ou posée à la main y désigne y sont placés");
+    expect(fr).toContain("quand personne ne tient encore le cast d&apos;un match (caster ou prod) en dehors du planning, les casters et la prod qu&apos;une attribution confirmée ou posée à la main y désigne y sont placés");
     expect(fr).toContain("ces gestes sont notés sans nom au journal du staff sur Discord, l&apos;auteur d&apos;un geste du staff et les comptes visés dans les journaux du serveur");
     expect(en).toContain("these actions are noted without names in the staff log on Discord, the author of a staff action and the accounts concerned in the server logs");
     expect(fr).toContain("une inscription faite par le caster lui-même, ou une prod prise par la personne ou posée par le staff depuis le match, reste");
-    expect(en).toContain("when nobody casts a match yet outside the schedule, the casters and the prod that an assignment confirmed or set by hand names for it are placed on it");
+    expect(en).toContain("when nobody holds a match&apos;s cast (caster or prod) yet outside the schedule, the casters and the prod that an assignment confirmed or set by hand names for it are placed on it");
     expect(en).toContain("a signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, stays");
   });
 });
@@ -198,6 +198,23 @@ describe("/rgpd — invité et prod placés par le planning", () => {
     expect(fr).toContain("l&apos;en retire, par le staff, le planning ou d&apos;office ;");
     expect(en).toContain("takes the match or is placed on it by the staff or the schedule;");
     expect(en).toContain("places or removes them, by the staff, the schedule or automatically;");
+  });
+});
+
+describe("legal review cycle 3", () => {
+  it("rgpdPages_bothLanguages_plannedCasterBasisIsLegitimateInterest", () => {
+    expect(page("app/rgpd/page.tsx")).toContain("que la même section des conditions prévoit (le caster que le planning place : intérêt légitime, comme la prod).");
+    expect(page("app/rgpd/RgpdEn.tsx")).toContain("which the same section of the terms provides for (a caster the schedule places: legitimate interest, like the prod).");
+  });
+
+  it("registerT16_mark_goesAtTheLatestWithSignup", () => {
+    expect(JSON.stringify(sheet(PROCESSING_ACTIVITIES, "T16"))).toContain("elle part au plus tard avec l'inscription ou la place");
+    expect(JSON.stringify(sheet(PROCESSING_ACTIVITIES_EN, "T16"))).toContain("it goes at the latest with the signup or the place");
+  });
+
+  it("rgpdPages_placementSentence_noUnconditionalProdNotice", () => {
+    expect(page("app/rgpd/page.tsx")).toContain("registre, T16</Link>), un caster placé sur une diffusion encore sans lien");
+    expect(page("app/rgpd/RgpdEn.tsx")).toContain("register, T16</LocaleLink>), a caster placed on a stream with no link yet");
   });
 });
 

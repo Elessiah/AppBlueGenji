@@ -1240,7 +1240,7 @@ export function RgpdEn({
           <p id="retransmission">
             <strong>Match streaming.</strong> A tournament match may be streamed live and recorded on{" "}
             <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or that of one or more
-            casters: each caster joins a stream of the match or opens their own, with their channel link (required to open it),
+            casters: each caster joins a stream of the match or opens their own, with their channel link (required to open it themselves),
             published with the match; the channel name, read from that link (often the caster&apos;s username), is its visible text. That stream goes, with its link, once no caster holds it any more; only the link
             set in the match&apos;s live configuration, by a member of the organizers, stays with the match when its casters leave. The link a
             caster provided when opening their stream or in “Configure my broadcast” also goes when their account is deleted, played
@@ -1282,7 +1282,7 @@ export function RgpdEn({
             service</strong>, and no longer under legitimate interest: there is no longer an objection through a
             “neutral name”. What concerns the casters (voice, username, link to their channel, live mode) and the
             stream and replay links published on the site falls under the same basis, which the same section
-            of the terms provides for.
+            of the terms provides for (a caster the schedule places: legitimate interest, like the prod).
             Viewers, for their part, watch the stream on the platform, which processes their data as the controller
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
@@ -1333,10 +1333,9 @@ export function RgpdEn({
             its assigned referee, acts on the match itself, like the staff does: the staff log on Discord
             notes each change of the match&apos;s referee without naming anyone and a referee removed by someone else is notified by push, none of this when a guest (a mark described below) leaves the schedule (<LocaleLink href="/rgpd/registre#t04">register,
             T04</LocaleLink> and <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>). Likewise, when nobody
-            casts a match yet outside the schedule, the casters and the prod that an assignment confirmed or set by hand names for it
+            holds a match&apos;s cast (caster or prod) yet outside the schedule, the casters and the prod that an assignment confirmed or set by hand names for it
             are placed on it, if they meet the cast or prod requirements and do not play the match: their
-            username then shows with the match like a cast signup or a placed prod (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), the prod is
-            notified, a caster placed on a stream with no link yet is asked to add their channel&apos;s, and
+            username then shows with the match like a cast signup or a placed prod (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), a caster placed on a stream with no link yet is asked to add their channel&apos;s, and
             leaving the assignment (withdrawal, removal by hand by the staff) takes them off it, except on a
             played match; a signup made by the caster themselves, or a prod taken by the person or set by the staff from the match, stays; these actions are noted without names in the staff log on Discord, the author of a staff action and the accounts concerned in the server logs. Referees, casters
             and prods are notified by Discord direct message and push notification of new slots where they
