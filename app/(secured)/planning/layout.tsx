@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { notFoundMetadata } from "@/components/error-page/NotFoundContent";
+import { permissionMetadata } from "@/components/error-page/NotFoundContent";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { getCurrentUser } from "@/lib/server/auth";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -14,11 +14,10 @@ import { can } from "@/lib/shared/permissions";
  * visiteur sans session aucun (l'espace rend « Connexion requise »).
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const user = await getCurrentUser();
-  if (!user) return {};
-  if (!can(user, "planning")) return notFoundMetadata();
-  const { planning } = messagesFor(await requestLocale());
-  return { title: segmentTitle(planning.meta.title) };
+  return permissionMetadata(await getCurrentUser(), (user) => can(user, "planning"), async () => {
+    const { planning } = messagesFor(await requestLocale());
+    return { title: segmentTitle(planning.meta.title) };
+  });
 }
 
 /**

@@ -12,6 +12,7 @@ export function ErrorPanel({
   children,
   reference,
   referenceLabel,
+  embedded = false,
 }: Readonly<{
   copy: ErrorPageCopy;
   /** Actions proposées (liens, bouton « Réessayer »). */
@@ -19,9 +20,11 @@ export function ErrorPanel({
   reference?: string | null;
   /** « Référence : », dans la langue de la page (`shell.errorPages.reference`). */
   referenceLabel: string;
+  /** Déjà dans la colonne d'une page (`.page-shell`) : ni gouttière ni marges de page autonome en plus. */
+  embedded?: boolean;
 }>) {
   return (
-    <section className={styles.wrap} aria-labelledby="error-page-title">
+    <section className={embedded ? `${styles.wrap} ${styles.embedded}` : styles.wrap} aria-labelledby="error-page-title">
       <div className={styles.card}>
         <span className="eyebrow">{copy.eyebrow}</span>
         <h1 id="error-page-title" className={styles.title}>

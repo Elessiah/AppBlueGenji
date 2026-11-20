@@ -6,7 +6,7 @@ jest.mock("@/lib/server/periodic-clock");
 
 import { flushAllBotLogBatches } from "@/lib/server/bot-integration";
 import { flushAllCoalescers } from "@/lib/server/coalescer";
-import { stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
+import { resumeSuspendedPeriodicClocks, stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
 import { flushBotLogsBeforeExit, holdExitUntil, installBotLogShutdownFlush } from "@/lib/server/bot-log-shutdown";
 import { resetBotLogShutdownState } from "@/tests/helpers/bot-log-batches";
 
@@ -191,6 +191,29 @@ describe("installBotLogShutdownFlush", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(stopAllPeriodicClocks).toHaveBeenCalledTimes(1);
+  });
+
+  it("installBotLogShutdownFlush_signalWithNextListening_resumesClocks", async () => {
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(resumeSuspendedPeriodicClocks).toHaveBeenCalledTimes(1);
+  });
+
+  it("installBotLogShutdownFlush_signalWithoutOtherListener_doesNotResumeClocks", async () => {
+    jest.spyOn(process, "listenerCount").mockReturnValue(0);
+    const kill = jest.spyOn(process, "kill").mockImplementation((() => true) as typeof process.kill);
+    installBotLogShutdownFlush();
+
+    handlers.get("SIGTERM")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(kill).toHaveBeenCalled();
+    expect(resumeSuspendedPeriodicClocks).not.toHaveBeenCalled();
   });
 
   it("installBotLogShutdownFlush_signalWithNextListening_flushesWithoutExiting", async () => {

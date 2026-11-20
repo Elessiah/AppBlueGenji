@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { notFoundMetadata } from "@/components/error-page/NotFoundContent";
 import { getCurrentUser } from "@/lib/server/auth";
 import { matchPageExists, matchPageMetadata } from "@/lib/server/match-page";
 import { can } from "@/lib/shared/permissions";
@@ -11,10 +12,11 @@ type LayoutProps = {
 /** Encart d'un lien de page de match, avec les droits du lecteur connecté (`matchPageMetadata`). */
 export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
   const { id, matchId } = await params;
-  return matchPageMetadata(id, matchId, false, async () => {
-    const user = await getCurrentUser();
-    return user ? { canManage: can(user, "tournaments") } : null;
-  });
+  const user = await getCurrentUser().catch(() => null);
+  const rights = user ? { canManage: can(user, "tournaments") } : null;
+  // Match absent : la page rend la 404 (voir la mise en page), l'onglet aussi.
+  if (rights && (await matchPageExists(id, matchId, rights)) === false) return notFoundMetadata();
+  return matchPageMetadata(id, matchId, false, async () => rights);
 }
 
 /**

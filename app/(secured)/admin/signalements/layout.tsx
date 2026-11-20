@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { notFoundMetadata } from "@/components/error-page/NotFoundContent";
+import { permissionMetadata } from "@/components/error-page/NotFoundContent";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { getCurrentUser } from "@/lib/server/auth";
 import { segmentTitle } from "@/lib/shared/page-metadata";
@@ -11,10 +11,9 @@ import { can } from "@/lib/shared/permissions";
  * celui de la page introuvable qu'il reçoit, un visiteur sans session aucun.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const user = await getCurrentUser();
-  if (!user) return {};
-  if (!can(user, "moderation")) return notFoundMetadata();
-  return { title: segmentTitle("Signalements") };
+  return permissionMetadata(await getCurrentUser(), (user) => can(user, "moderation"), () => ({
+    title: segmentTitle("Signalements"),
+  }));
 }
 
 /**

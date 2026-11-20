@@ -82,6 +82,20 @@ describe("textes des pages d'erreur", () => {
 });
 
 describe("ErrorPanel", () => {
+  it("embedded_insidePageColumn_dropsStandalonePadding", () => {
+    const html = renderToStaticMarkup(
+      <ErrorPanel copy={NOT_FOUND_COPY} referenceLabel="Référence :" embedded>
+        <button type="button">Accueil</button>
+      </ErrorPanel>,
+    );
+    expect(html).toMatch(/class="[^"]*embedded/);
+    expect(renderToStaticMarkup(
+      <ErrorPanel copy={NOT_FOUND_COPY} referenceLabel="Référence :">
+        <button type="button">Accueil</button>
+      </ErrorPanel>,
+    )).not.toMatch(/embedded/);
+  });
+
   it("nomme sa section par son titre de niveau 1 et rend les actions", () => {
     const html = renderToStaticMarkup(
       <ErrorPanel copy={NOT_FOUND_COPY} referenceLabel="Référence :">
@@ -164,6 +178,8 @@ describe("app/not-found.tsx et app/global-error.tsx", () => {
     const source = readSource("app/(secured)/not-found.tsx");
     expect(source).toContain("NotFoundContent");
     expect(source).toContain("notFoundMetadata");
+    // Dans la colonne de `.page-shell` : pas de gouttière ni de marges de page autonome en plus.
+    expect(source).toContain("NotFoundContent({ embedded: true })");
     expect(source).not.toContain("PublicPageShell");
     expect(source).not.toContain("PublicHeader");
     expect(source).not.toContain("EnsureToastProvider");

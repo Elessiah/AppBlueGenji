@@ -43,6 +43,8 @@ async function requestedDoc(params: PageProps["params"]) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  // Sans session, l'espace rend « Connexion requise » : aucun titre (layout).
+  if (!(await getCurrentUser())) return {};
   const found = await requestedDoc(params);
   // Document inconnu : la page rend la 404, son onglet le dit aussi.
   return found ? { title: found.summary.title } : notFoundMetadata();

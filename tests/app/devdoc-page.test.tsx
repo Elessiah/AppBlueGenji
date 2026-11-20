@@ -162,6 +162,12 @@ describe("DevDocLayout — titre", () => {
     expect(metadata.title).toEqual({ absolute: "Page not found · BlueGenji Esport" });
   });
 
+  it("generateMetadata_pageNoSession_noTitle", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
+    const metadata = await generatePageMetadata({ params: Promise.resolve({ path: ["site", "features", "BUSY_BUTTONS"] }) });
+    expect(metadata).toEqual({});
+  });
+
   it("generateMetadata_knownDocument_documentTitle", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ roles: ["DEV"] }));
     const metadata = await generatePageMetadata({ params: Promise.resolve({ path: ["site", "features", "BUSY_BUTTONS"] }) });

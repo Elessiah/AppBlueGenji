@@ -22,7 +22,7 @@
  */
 import { flushAllBotLogBatches } from "@/lib/server/bot-integration";
 import { flushAllCoalescers } from "@/lib/server/coalescer";
-import { stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
+import { resumeSuspendedPeriodicClocks, stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
 
 export const SHUTDOWN_FLUSH_TIMEOUT_MS = 1200;
 
@@ -142,6 +142,8 @@ export function installBotLogShutdownFlush(): void {
         // Personne d'autre n'écoute : le signal relancé sans écouteur termine le
         // processus comme Node l'aurait fait (128 + n), et non en succès.
         if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+        // Le processus survit (un autre écouteur le garde) : les balayages repartent.
+        else resumeSuspendedPeriodicClocks();
       });
     });
   }

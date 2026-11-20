@@ -291,3 +291,5 @@ privés passent par la remise existante.
 `tests/app/api/admin/match-schedule-deadline.test.ts`,
 `tests/app/api/admin/tournament-schedule-deadlines.test.ts`,
 `tests/app/schedule-deadline-ui-render.test.tsx` (fenêtre, pastille, câblage).
+
+Une horloge relancée pendant que son ancien passage court encore attend qu'il finisse avant son premier passage (sauter ce passage coûterait un pas entier, un jour pour la purge) ; à l'arrêt du serveur, `stopAllPeriodicClocks` les suspend, et `resumeSuspendedPeriodicClocks` les relance si le signal n'a pas emporté le processus. Les passages sont comptés depuis le premier : délai + n × pas, après chaque démarrage.

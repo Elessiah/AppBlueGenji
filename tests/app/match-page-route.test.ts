@@ -179,6 +179,17 @@ describe("encart du lien partagé", () => {
     });
   });
 
+  it("generateMetadata_absentMatch_notFoundTitle", async () => {
+    user.mockResolvedValue(authUser({ id: 7 }));
+    const metadata = await memberMetadata(params("12", "35"));
+    expect(metadata).toEqual({
+      title: { absolute: "Page introuvable · BlueGenji Esport" },
+      robots: { index: false, follow: false },
+    });
+    mockLocale = "en";
+    expect((await memberMetadata(params("12", "35"))).title).toEqual({ absolute: "Page not found · BlueGenji Esport" });
+  });
+
   it("sous /en, en anglais ; sans compte, page sans compte et noindex", async () => {
     mockLocale = "en";
     const metadata = await spectatorMetadata(params("12", "34"));

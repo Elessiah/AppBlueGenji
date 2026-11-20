@@ -19,8 +19,10 @@ export async function generateMetadata(): Promise<Metadata> {
  * appelle `useToast()`. Seule cette page en a besoin — les autres pages vitrine
  * restent sous le fournisseur racine, dont un oubli doit se voir.
  */
+// Appelé comme une fonction : le composant asynchrone se rend ainsi aussi en
+// balisage statique (tests), et ses erreurs remontent à cette même page.
 export default async function NotFound() {
-  const content = await NotFoundContent();
+  const content = await NotFoundContent({});
   return (
     <EnsureToastProvider>
       <PublicPageShell>

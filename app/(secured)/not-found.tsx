@@ -8,4 +8,10 @@
  * la carte et ses chemins de retour. Une URL qui ne correspond à aucune route
  * reste à `app/not-found.tsx`.
  */
-export { NotFoundContent as default, notFoundMetadata as generateMetadata } from "@/components/error-page/NotFoundContent";
+import { NotFoundContent } from "@/components/error-page/NotFoundContent";
+
+export { notFoundMetadata as generateMetadata } from "@/components/error-page/NotFoundContent";
+
+export default async function SecuredNotFound() {
+  return NotFoundContent({ embedded: true });
+}

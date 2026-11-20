@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { notFoundMetadata } from "@/components/error-page/NotFoundContent";
+import { permissionMetadata } from "@/components/error-page/NotFoundContent";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadDevDocIndex } from "@/lib/server/dev-docs";
@@ -19,11 +19,10 @@ import styles from "./devdoc.module.css";
  * visiteur sans session aucun (l'espace rend « Connexion requise »).
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const user = await getCurrentUser();
-  if (!user) return {};
-  if (!can(user, "dev")) return notFoundMetadata();
-  const { devdoc } = messagesFor(await requestLocale());
-  return { title: segmentTitle(devdoc.meta.title) };
+  return permissionMetadata(await getCurrentUser(), (user) => can(user, "dev"), async () => {
+    const { devdoc } = messagesFor(await requestLocale());
+    return { title: segmentTitle(devdoc.meta.title) };
+  });
 }
 
 /**

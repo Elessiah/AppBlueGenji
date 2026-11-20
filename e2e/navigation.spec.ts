@@ -72,17 +72,34 @@ test.describe("Barre de navigation — une copie par largeur, ordre du clavier (
 test.describe("Page introuvable de l'espace connecté — un seul en-tête", () => {
   test.skip(!authConfigured, "Définir E2E_AUTH_USER : la barre n'existe qu'en session.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
 
-  for (const path of ["/devdoc/e2e-introuvable", "/en/devdoc/e2e-introuvable"]) {
+  // Page jetant `notFound()` (devdoc) et mise en page jetant `notFound()` (match absent).
+  // `tournois/loading.tsx` diffuse la réponse avant la mise en page : statut 200, page marquée `noindex`.
+  const cases = [
+    { path: "/devdoc/e2e-introuvable", status: 404 },
+    { path: "/en/devdoc/e2e-introuvable", status: 404 },
+    { path: "/tournois/2147483000/matchs/1", status: 200 },
+    { path: "/en/tournois/2147483000/matchs/1", status: 200 },
+  ];
+  for (const { path, status } of cases) {
     test(`${path} à 375 px : 404, la barre du site seule, titre de page introuvable`, async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 900 });
       const response = await page.goto(path);
 
-      expect(response?.status()).toBe(404);
+      expect(response?.status()).toBe(status);
       await expect(page.getByRole("heading", { name: /Page introuvable|Page not found/ })).toBeVisible();
       await expect(page.getByRole("navigation", { name: /Navigation principale|Main navigation/ })).toHaveCount(1);
       // L'en-tête de la vitrine (`<header>`, repère `banner`) n'est pas rendu par-dessus `SiteShell`.
       await expect(page.getByRole("banner")).toHaveCount(0);
       await expect(page).toHaveTitle(/^(Page introuvable|Page not found) · BlueGenji Esport$/);
+      // Un seul contenu principal, qui porte la carte ; la carte tient dans la colonne de la page (pas de gouttière doublée).
+      await expect(page.getByRole("main")).toHaveCount(1);
+      const card = page.getByRole("main").getByRole("region", { name: /Page introuvable|Page not found/ });
+      const box = await card.locator("> div").boundingBox();
+      expect(box?.width ?? 0).toBeGreaterThanOrEqual(375 - 24 - 1);
+      // Clavier : les chemins de retour de la carte sont atteignables et visibles au focus.
+      const home = page.getByRole("main").getByRole("link").first();
+      await home.focus();
+      await expect(home).toBeFocused();
     });
   }
 });
