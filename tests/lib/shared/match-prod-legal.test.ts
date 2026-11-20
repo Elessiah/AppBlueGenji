@@ -45,16 +45,39 @@ describe("historique des changements — prod d'un match", () => {
     expect(PRIVACY_CHANGES_EN[ENTRY_ID].linkLabels).toHaveLength(frEntry().links?.length ?? -1);
   });
 
-  it("prodEntry_linksRegisterT16", () => {
-    expect(frEntry().links?.map((link) => link.href)).toEqual(["/rgpd/registre#t16", "/rgpd/registre#t04", "/rgpd/registre#t05"]);
+  it("prodEntry_linksRegisterT16T04T05T03", () => {
+    expect(frEntry().links?.map((link) => link.href)).toEqual([
+      "/rgpd/registre#t16",
+      "/rgpd/registre#t04",
+      "/rgpd/registre#t05",
+      "/rgpd/registre#t03",
+    ]);
   });
 
-  it("prodEntry_englishLinkLabels_nameT16T04T05", () => {
+  it("prodEntry_englishLinkLabels_nameT16T04T05T03", () => {
     expect(PRIVACY_CHANGES_EN[ENTRY_ID].linkLabels).toEqual([
       "Read record T16 of the register",
       "Read record T04 of the register",
       "Read record T05 of the register",
+      "Read record T03 of the register",
     ]);
+  });
+
+  it("registerT16_prodBasis_playedMatchKeptAsTournamentHistory", () => {
+    expect(FR_T16_PROD_BASIS.endsWith("un match joué gardant sa prod, qui fait partie de l'histoire du tournoi")).toBe(true);
+    expect(EN_T16_PROD_BASIS.endsWith("a played match keeping its prod, which is part of the tournament's history")).toBe(true);
+  });
+
+  it("registerT16_subPurpose_namesProdRoleExplicitly", () => {
+    const fr = activity(PROCESSING_ACTIVITIES, "T16");
+
+    expect(fr).toContain("membre qui a le rôle prod");
+    expect(fr).not.toContain("membre qui a ce rôle");
+  });
+
+  it("rgpdEn_prodNotice_canBeTurnedOffInMyProfile", () => {
+    expect(page("app/rgpd/RgpdEn.tsx")).toContain("the prod is notified (can be turned off in “My profile”) when");
+    expect(page("app/rgpd/RgpdEn.tsx")).not.toContain("(set in “My profile”)");
   });
 
   it("prodEntry_staffLog_namesNobody", () => {
@@ -129,8 +152,10 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
   });
 
   it("registerT16_legalBasis_prodLeavesOnlyUnplayedMatches", () => {
-    expect(sheet(PROCESSING_ACTIVITIES, "T16").legalBasis).not.toContain("à tout moment");
-    expect(sheet(PROCESSING_ACTIVITIES_EN, "T16").legalBasis).not.toContain("at any time");
+    expect(FR_T16_PROD_BASIS).toContain("peut quitter un match pas encore joué");
+    expect(FR_T16_PROD_BASIS).not.toContain("à tout moment");
+    expect(EN_T16_PROD_BASIS).toContain("can leave a match not yet played");
+    expect(EN_T16_PROD_BASIS).not.toContain("at any time");
   });
 
   it("registerT16_legalBasis_contractPartHasNoLegitimateInterest", () => {
@@ -144,7 +169,7 @@ describe("registre — la prod hors T16 (journaux, avis, /suivre)", () => {
   it("registerT16_subPurpose_feminineWithoutBasis", () => {
     const fr = sheet(PROCESSING_ACTIVITIES, "T16").subPurposes.find((line) => line.startsWith("Organiser la production du direct"));
 
-    expect(fr).toContain("la prod, membre qui a ce rôle, s'y place ou y est placée par le staff (une au plus par match), est montrée");
+    expect(fr).toContain("la prod, membre qui a le rôle prod, s'y place ou y est placée par le staff (une au plus par match), est montrée");
     expect(fr).toContain("est prévenue quand un autre qu'elle la place ou l'en retire");
     expect(fr).not.toContain("un membre qui a le rôle de prod");
     expect(fr).not.toContain("base :");
@@ -187,7 +212,7 @@ describe("historique et /rgpd — base, lecteurs, journaux de la prod", () => {
 
   it("rgpdPages_prodNotice_settableInMyProfile", () => {
     expect(page("app/rgpd/page.tsx")).toContain("la prod est prévenue (réglable dans « Mon profil ») quand");
-    expect(page("app/rgpd/RgpdEn.tsx")).toContain("the prod is notified (set in “My profile”) when");
+    expect(page("app/rgpd/RgpdEn.tsx")).toContain("the prod is notified (can be turned off in “My profile”) when");
   });
 
   it("prodEntry_frAndEn_dmCutWithMatchDmsPushByTopic", () => {
@@ -205,9 +230,9 @@ describe("historique et /rgpd — base, lecteurs, journaux de la prod", () => {
     const en = PRIVACY_CHANGES_EN[ENTRY_ID].details.join(" ");
 
     expect(fr).toContain("sa place prise ou quittée et ces gestes sont notés au journal du staff sur Discord");
-    expect(fr).toContain("la prod peut s'y opposer par le formulaire de signalement (catégorie RGPD)");
+    expect(fr).toContain("la prod peut quitter un match pas encore joué et s'y opposer par le formulaire de signalement (catégorie RGPD)");
     expect(en).toContain("their place taken or left and these actions are noted in the staff log on Discord");
-    expect(en).toContain("the prod can object to it through the report form (GDPR category)");
+    expect(en).toContain("the prod can leave a match not yet played and object to it through the report form (GDPR category)");
   });
 
   it("rgpdPages_prodParagraph_namesLogsAndOnlyOthersGestures", () => {

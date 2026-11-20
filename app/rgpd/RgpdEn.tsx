@@ -1268,7 +1268,7 @@ export function RgpdEn({
             member holding that role takes the match or is placed on it by the staff; their username is shown with
             the match like the casters&apos; (before the launch, as long as they meet the requirements), kept with the match and
             removed from matches not yet launched if their account loses that role, is suspended or now plays in the match,
-            and from matches not yet played if it is deleted; the prod is notified (set in “My profile”) when someone other than themselves places or removes them, by the staff or automatically; their place taken or left and these
+            and from matches not yet played if it is deleted; the prod is notified (can be turned off in “My profile”) when someone other than themselves places or removes them, by the staff or automatically; their place taken or left and these
             actions are noted without a name in the staff log on Discord, and the author of a staff action and the account concerned in the server logs; basis: legitimate interest, the prod
             being able to leave a match not yet played and object through the report form (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>).{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
