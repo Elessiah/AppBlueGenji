@@ -251,6 +251,6 @@ describe("textes de la prod", () => {
   it("privacyChange_prodMatch_declaresAutomaticRemovalNotice", () => {
     const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-11-prod-match");
 
-    expect(entry?.details.join(" ")).toMatch(/quand sa place lui est retirée d'office ;/);
+    expect(entry?.details.join(" ")).toMatch(/par le staff ou d'office ;/);
   });
 });
