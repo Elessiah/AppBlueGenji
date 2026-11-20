@@ -7,6 +7,7 @@ jest.mock("@/lib/server/tournaments/staff-action-logs");
 import { PUT } from "@/app/api/admin/matches/[matchId]/replay/route";
 import { getCurrentUser, type AuthUser } from "@/lib/server/auth";
 import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
+import { announceMatchReplayChange } from "@/lib/server/tournaments/staff-action-logs";
 import { authUser } from "../../../helpers/auth-user";
 
 const VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
@@ -56,7 +57,7 @@ describe("PUT /api/admin/matches/[matchId]/replay — permissions", () => {
     ["un caster", caster],
   ])("accepte %s", async (_label, user) => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: VIDEO, changed: true });
+    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: VIDEO, changed: true, change: "SET" });
 
     const res = await PUT(req({ replayUrl: VIDEO }), params("42"));
 
@@ -131,7 +132,7 @@ describe("PUT /api/admin/matches/[matchId]/replay — entrées", () => {
   });
 
   it("PUT_explicitNull_erases", async () => {
-    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: null, changed: true });
+    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: null, changed: true, change: "REMOVED" });
     expect((await PUT(req({ replayUrl: null }), params("42"))).status).toBe(200);
     expect(setMatchReplayUrl).toHaveBeenCalledWith(42, null, { userId: admin.id, manages: true });
   });
@@ -148,5 +149,51 @@ describe("PUT /api/admin/matches/[matchId]/replay — entrées", () => {
     await expect(res.json()).resolves.toMatchObject({
       error: status === 500 ? "MATCH_REPLAY_UPDATE_FAILED" : code,
     });
+  });
+});
+
+describe("PUT /api/admin/matches/[matchId]/replay — journal d'arbitrage", () => {
+  beforeEach(() => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+  });
+
+  it.each<["SET" | "CHANGED" | "REMOVED", string | null]>([
+    ["SET", VIDEO],
+    ["CHANGED", VIDEO],
+    ["REMOVED", null],
+  ])("PUT_change%s_oneRefereeLogWithActor", async (change, replayUrl) => {
+    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl, changed: true, change });
+
+    expect((await PUT(req({ replayUrl }), params("42"))).status).toBe(200);
+
+    expect(announceMatchReplayChange).toHaveBeenCalledTimes(1);
+    // `staffActionAuthor` est simulé ici : l'auteur anonyme est vérifié dans
+    // `staff-action-log-routes.test.ts`.
+    expect(jest.mocked(announceMatchReplayChange).mock.calls[0]).toEqual([
+      42,
+      expect.objectContaining({ change, replayUrl, actor: { id: 3, pseudo: arbitre.pseudo } }),
+    ]);
+  });
+
+  it("PUT_unchanged_noLog", async () => {
+    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: VIDEO, changed: false, change: null });
+
+    expect((await PUT(req({ replayUrl: VIDEO }), params("42"))).status).toBe(200);
+
+    expect(announceMatchReplayChange).not.toHaveBeenCalled();
+  });
+
+  it("PUT_invalidUrl_noLog", async () => {
+    jest.mocked(setMatchReplayUrl).mockRejectedValue(new Error("INVALID_REPLAY_URL"));
+
+    expect((await PUT(req({ replayUrl: "https://twitch.tv/x" }), params("42"))).status).toBe(400);
+
+    expect(announceMatchReplayChange).not.toHaveBeenCalled();
+  });
+
+  it("PUT_missingKey_noLog", async () => {
+    expect((await PUT(req({}), params("42"))).status).toBe(400);
+
+    expect(announceMatchReplayChange).not.toHaveBeenCalled();
   });
 });

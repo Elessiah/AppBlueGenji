@@ -2315,6 +2315,26 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : pour un compte non marqué, rien de nouveau n'est collecté.",
     ],
   },
+  {
+    // NOTIFY-SOLO-REDIFF — caster autonome réglé par le staff (avis au caster,
+    // sujet `PLANNING_SOLO_CASTER`) et rediffusion au journal d'arbitrage, avec
+    // son lien (`docs/features/CAST_PLANNING.md`, `MATCH_REPLAYS.md`). Registre
+    // T05 et T20, /rgpd (FR et EN). Datée du lendemain de la mise en ligne
+    // prévue, comme `REGISTER_UPDATED_AT` — tout avancer ensemble si elle glisse.
+    id: "2026-11-caster-autonome-rediff",
+    publishedAt: "2026-11-23",
+    title: "Staff : caster autonome et rediffusions au journal",
+    audience: "LIVE_STAFF",
+    links: [
+      { href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" },
+      { href: "/rgpd/registre#t20", label: "Lire la fiche T20 du registre" },
+    ],
+    summary: "Un caster est prévenu quand le staff change son statut de caster autonome, et l'ajout, la modification ou le retrait d'une rediffusion est noté au journal d'arbitrage, avec le lien.",
+    details: [
+      "Avis au caster : en message privé Discord et en notification push, sans nommer le staff ; le nouveau sujet « Caster autonome » se coupe dans les réglages de notifications de « Mon profil », message privé compris.",
+      "Journaux : ces deux gestes sont notés au journal du staff sur Discord sans nommer leur auteur ni le caster (pour une rediffusion : le match, ses noms d'équipe et le lien) ; les journaux du serveur gardent leur auteur, selon leur rotation. Base : intérêt légitime (organisation et contrôle des tournois).",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

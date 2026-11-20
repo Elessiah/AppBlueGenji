@@ -3,7 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
 import { can } from "@/lib/shared/permissions";
 import { readOptionalJsonObject } from "@/lib/server/request-body";
-import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
+import { announceMatchReplayChange, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
 /** Refus codés du service, et leur statut ; tout autre échec est un 500. */
 const REPLAY_ERROR_STATUSES: Readonly<Record<string, number>> = {
@@ -45,13 +45,20 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if (raw !== null && typeof raw !== "string") return fail("INVALID_REPLAY_URL", 400);
 
   try {
-    const { replayUrl, changed } = await setMatchReplayUrl(matchId, raw, {
+    const { replayUrl, change } = await setMatchReplayUrl(matchId, raw, {
       userId: user.id,
       manages: can(user, "tournaments"),
     });
-    // Un geste sans effet (retirer un lien jamais posé, reposer le même) ne se journalise pas.
-    if (changed) {
-      announceStaffMatchAction(matchId, replayUrl === null ? "REPLAY_REMOVED" : "REPLAY_SET", staffActionAuthor(user));
+    // Un geste sans effet (retirer un lien jamais posé, reposer le même) ne se
+    // journalise pas. Le journal d'arbitrage porte le lien ; l'auteur n'est
+    // nommé que dans pm2. Aucun joueur ni caster n'est prévenu.
+    if (change !== null) {
+      announceMatchReplayChange(matchId, {
+        change,
+        replayUrl,
+        author: staffActionAuthor(user),
+        actor: { id: user.id, pseudo: user.pseudo },
+      });
     }
     return ok({ replayUrl });
   } catch (error) {

@@ -36,6 +36,16 @@ disparaître sans écriture — et le rejouer le fait revenir.
   arrière passé entre la lecture et l'écriture ne laisse pas un lien se poser
   sur un match rouvert.
 - `400 INVALID_REPLAY_URL`, `404 MATCH_NOT_FOUND`.
+- Journal d'arbitrage (`announceMatchReplayChange`, `staff-action-logs.ts`) :
+  un lien **posé**, **changé** ou **retiré** — nature lue sous le verrou du
+  match (`replay_url` d'avant, rendue par `setMatchReplayUrl` en `change`) —
+  écrit une ligne 🎬 dans la catégorie `referees` (« Rediff ajoutée /
+  modifiée / retirée », tournoi, manche, noms d'équipe — « un joueur » en
+  tournoi individuel —, le lien par `discordUrl`, aucun pour un retrait), par
+  « le staff » ou « un caster » ; la même ligne, avec l'auteur, dans pm2
+  (`publishStaffAction`). Match illisible : une trace courte nominative dans
+  pm2 (`auditStaffAction`). Rien pour un geste sans effet ni un refus ; aucun
+  joueur ni caster n'est prévenu.
 - `publishMatchUpdatedEvent` : le lien voyage ensuite dans l'instantané du flux
   SSE (`BracketMatch.replayUrl`), comme le reste du plateau — sans vider la
   liste publique, la vitrine ni le classement, qu'une rediff ne change pas

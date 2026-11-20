@@ -217,6 +217,12 @@
       "titleReplacement": "Tu remplaces un désistement",
       "line": "{start} · {role} · {entry}"
     },
+    "soloCaster": {
+      "titleOn": "Caster autonome activé",
+      "titleOff": "Caster autonome désactivé",
+      "bodyOn": "Le staff a activé ton statut de caster autonome : tu peux diffuser seul, sans prod.",
+      "bodyOff": "Le staff a désactivé ton statut de caster autonome : tu diffuses désormais avec un prod."
+    },
     "withdrawal": {
       "title": "Désistement sur ton match",
       "bodyReplaced": "Un {role} s'est désisté de {entry} ({start}) : un remplaçant a été affecté.",

@@ -16,6 +16,7 @@ import { siteCanonicalBase } from "@/lib/server/site-url";
 import type { PlanningRole } from "@/lib/shared/planning";
 import {
   formatPlanningAssignedDm,
+  formatPlanningSoloCasterDm,
   formatPlanningUnfilledDm,
   formatPlanningUnfilledLine,
   formatPlanningWithdrawalDm,
@@ -23,7 +24,15 @@ import {
   type PlanningNoticeEntry,
   type PlanningWithdrawalNotice,
 } from "@/lib/shared/planning-notices";
-import { planningAssignedPush, planningUnfilledPush, planningWithdrawalPush } from "@/lib/shared/push-messages";
+import { publishStaffAction } from "@/lib/server/staff-audit";
+import { formatSoloCasterChangeLog } from "@/lib/shared/bot-logs";
+import type { StaffActor } from "@/lib/shared/log-privacy";
+import {
+  planningAssignedPush,
+  planningSoloCasterPush,
+  planningUnfilledPush,
+  planningWithdrawalPush,
+} from "@/lib/shared/push-messages";
 import type { LoadedEntry } from "./load";
 
 /** Ce qu'une notification dit d'une entrée : ni pseudo, ni membre du staff. */
@@ -98,6 +107,36 @@ export async function announceAssignments(
     }
   } catch (error) {
     console.error("[planning] annonce des affectations impossible.", failureReason(error));
+  }
+}
+
+/**
+ * Statut de caster autonome d'un autre membre réglé par le staff : une ligne au
+ * journal (anonyme sur Discord, l'auteur nommé dans pm2 — `publishStaffAction`),
+ * puis l'avis au caster (`PLANNING_SOLO_CASTER`, push et message privé coupés
+ * avec le sujet). La route n'appelle ceci que pour un réglage **changé** sur le
+ * compte d'un autre : ni le sien, ni une valeur reposée. Ne lève jamais.
+ */
+export async function announceSoloCasterChange(targetUserId: number, solo: boolean, actor: StaffActor): Promise<void> {
+  try {
+    publishStaffAction(formatSoloCasterChangeLog(solo), actor, {
+      category: "casts",
+      auditLine: `${formatSoloCasterChangeLog(solo)} (compte #${targetUserId})`,
+    });
+    const recipients = await loadNotificationRecipients([targetUserId], "proven", { planningMembersOnly: true });
+    if (recipients.length === 0) return;
+    const base = siteCanonicalBase();
+    await notifyUsers(recipients, {
+      topic: "PLANNING_SOLO_CASTER",
+      push: (locale) => planningSoloCasterPush(solo, locale),
+      discord: {
+        message: (locale) => formatPlanningSoloCasterDm(solo, base, locale),
+        context: "planning-solo-caster",
+      },
+      dmFollowsTopic: true,
+    });
+  } catch (error) {
+    console.error("[planning] avis du caster autonome impossible.", failureReason(error));
   }
 }
 

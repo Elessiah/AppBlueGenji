@@ -7,7 +7,9 @@ import { getDatabase } from "@/lib/server/database";
 import { flushAllCoalescers } from "@/lib/server/coalescer";
 import { isBotCircuitOpen, sendBotLog } from "@/lib/server/bot-integration";
 import {
+  announceMatchReplayChange,
   announceStaffMatchAction,
+  deliverMatchReplayChange,
   announceStaffTournamentAction,
   deliverStaffMatchAction,
   deliverStaffTournamentAction,
@@ -104,8 +106,8 @@ describe("staffActionAuthor", () => {
 
   it("transmet l'auteur à la ligne", async () => {
     mockRows(matchRow());
-    await deliverStaffMatchAction(42, "REPLAY_REMOVED", "CASTER");
-    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toMatch(/Rediffusion retirée .*, par un caster\.$/);
+    await deliverStaffMatchAction(42, "OFF_AIR", "CASTER");
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toMatch(/Retiré de l'antenne .*, par un caster\.$/);
   });
 });
 
@@ -303,7 +305,7 @@ describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
     jest.mocked(sendBotLog).mockImplementation(() => {
       throw new Error("bot down");
     });
-    announceStaffMatchAction(42, "REPLAY_SET");
+    announceStaffMatchAction(42, "ON_AIR");
     await settle();
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     expect(error).toHaveBeenCalledTimes(1);
@@ -431,5 +433,67 @@ describe("announceStaffTournamentAction — rafales", () => {
     await settle();
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     expect(String(jest.mocked(sendBotLog).mock.calls[0][0])).toContain("coup d'envoi");
+  });
+});
+
+describe("rediffusion au journal d'arbitrage", () => {
+  const actor = { id: 3, pseudo: "Arbitre" };
+  const VIDEO = "https://youtu.be/dQw4w9WgXcQ";
+
+  it("deliverMatchReplayChange_set_anonymousRefereeLineWithLinkAndNamedAudit", async () => {
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    mockRows(matchRow());
+
+    await deliverMatchReplayChange(42, { change: "SET", replayUrl: VIDEO, author: "STAFF", actor });
+
+    expect(sendBotLog).toHaveBeenCalledWith(
+      `🎬 Rediff ajoutée — « Coupe d'hiver » (#7) : Manche 2 — Renards vs Nova (#42) : <${VIDEO}>, par le staff.`,
+      { category: "referees", tournamentId: 7 },
+    );
+    expect(String(jest.mocked(sendBotLog).mock.calls[0][0])).not.toContain("Arbitre");
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("auteur : Arbitre (#3)"));
+    info.mockRestore();
+  });
+
+  it("deliverMatchReplayChange_removed_lineWithoutLink", async () => {
+    jest.spyOn(console, "info").mockImplementation(() => undefined);
+    mockRows(matchRow());
+
+    await deliverMatchReplayChange(42, { change: "REMOVED", replayUrl: null, author: "STAFF", actor });
+
+    expect(sentLines()).toEqual(["🎬 Rediff retirée — « Coupe d'hiver » (#7) : Manche 2 — Renards vs Nova (#42), par le staff."]);
+  });
+
+  it("deliverMatchReplayChange_soloTournament_noPseudo", async () => {
+    jest.spyOn(console, "info").mockImplementation(() => undefined);
+    mockRows(matchRow({ participant_type: "SOLO", team1_name: "PseudoA", team2_name: "PseudoB" }));
+
+    await deliverMatchReplayChange(42, { change: "CHANGED", replayUrl: VIDEO, author: "STAFF", actor });
+
+    expect(sentLines()[0]).toContain("un joueur vs un joueur");
+    expect(sentLines()[0]).not.toContain("Pseudo");
+  });
+
+  it("deliverMatchReplayChange_matchGone_writesNothing", async () => {
+    mockRows(null);
+
+    await deliverMatchReplayChange(42, { change: "SET", replayUrl: VIDEO, author: "STAFF", actor });
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("announceMatchReplayChange_readFails_auditsActorAndNeverThrows", async () => {
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(getDatabase).mockRejectedValue(Object.assign(new Error("down"), { code: "ECONNREFUSED" }));
+
+    announceMatchReplayChange(42, { change: "SET", replayUrl: VIDEO, author: "STAFF", actor });
+    await settle();
+
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("auteur : Arbitre (#3)"));
+    expect(error).toHaveBeenCalledWith("[staff-log] rediff du match #42 non journalisée : ECONNREFUSED");
+    expect(sendBotLog).not.toHaveBeenCalled();
+    info.mockRestore();
+    error.mockRestore();
   });
 });

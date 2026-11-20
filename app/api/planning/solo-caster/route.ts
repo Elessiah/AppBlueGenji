@@ -2,6 +2,7 @@ import { PLANNING_WRITE_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setSoloCaster } from "@/lib/server/planning/actions";
+import { announceSoloCasterChange } from "@/lib/server/planning/notices";
 import { planningFailure } from "@/lib/server/planning/routes";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
 import { isPositiveId } from "@/lib/server/tournaments/match-launch-routes";
@@ -13,6 +14,10 @@ import { can } from "@/lib/shared/permissions";
  * caster règle le sien (permission `planning`) ; pour un autre compte, la
  * permission `tournaments` (le staff des tournois) est requise — ce geste n'est
  * pas réservé aux administrateurs, contrairement au calcul du planning.
+ *
+ * Un réglage **changé** sur le compte d'un autre est journalisé (anonyme sur
+ * Discord, l'auteur nommé dans pm2) et annoncé au caster
+ * (`PLANNING_SOLO_CASTER`) ; son propre réglage, ou une valeur reposée, rien.
  */
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
@@ -30,7 +35,10 @@ export async function PUT(req: Request) {
   if (target !== user.id && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   try {
-    await setSoloCaster(target, solo);
+    const changed = await setSoloCaster(target, solo);
+    // Après la réponse, sans l'attendre : l'avis ne lève jamais, et un bot lent
+    // ne retarde pas le geste.
+    if (changed && target !== user.id) void announceSoloCasterChange(target, solo, { id: user.id, pseudo: user.pseudo });
     return ok({ saved: true });
   } catch (error) {
     return planningFailure(error, "PLANNING_SOLO_FAILED");

@@ -1251,11 +1251,15 @@ function RgpdFr({
             sur un match et son retrait (avec le motif d&apos;un retrait
             d&apos;office) sont notés au journal du staff sur Discord sans nommer personne (« un caster », « le staff ») ;
             les autres gestes du staff sur un match ou un tournoi (résultat validé, score enregistré, lancement forcé, hôte,
-            diffusion, rediffusion, modification du tournoi, cartes de manche et règles de ban, têtes de série, étape avancée, équipes fantômes, image) aussi, avec les noms
+            diffusion, modification du tournoi, cartes de manche et règles de ban, têtes de série, étape avancée, équipes fantômes, image) aussi, avec les noms
             d&apos;équipe du match (« un joueur » en tournoi individuel), sans nommer leur auteur (« le staff », ou
             « un caster » pour la diffusion) ; cette ligne n&apos;ajoute rien aux journaux du serveur, où un litige tranché,
             un résultat corrigé ou une validation suspendue garde sa trace nominative (<Link href="/rgpd/registre#t05">registre,
             T05</Link>), sauf, quand elle n&apos;a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
+            Une rediffusion posée, changée ou retirée est notée au journal d&apos;arbitrage sur Discord (le match,
+            ses noms d&apos;équipe, « un joueur » en tournoi individuel, et le lien) sans nommer son auteur ; le
+            statut de caster autonome d&apos;un membre du planning changé par le staff y est noté sans nommer
+            personne ; les journaux du serveur gardent l&apos;auteur de ces deux gestes (<Link href="/rgpd/registre#t05">registre, T05</Link>).
             Une date butoir de planification posée, changée ou retirée par le staff est notée au journal du staff sur Discord
             (le tournoi et le match) sans nommer son auteur ; les journaux du serveur gardent son auteur, comme pour un horaire de match (<Link href="/rgpd/registre#t05">registre, T05</Link>).
             Quand un administrateur attribue ou retire un rôle de plateforme (administrateur, arbitre, caster, prod, community
@@ -1537,7 +1541,7 @@ function RgpdFr({
             créneau (un match planifié, ou un tournoi entier quand ses matchs ne sont pas planifiés) et
             chaque rôle qu&apos;ils tiennent, ils y donnent leur disponibilité (disponible, absent, à voir) et
             leur préférence ; un caster y dit aussi s&apos;il diffuse seul (« caster autonome »), ce que le staff
-            des tournois peut régler pour lui. Un calcul propose les attributions selon ces réponses et
+            des tournois peut régler pour lui, en l&apos;en prévenant. Un calcul propose les attributions selon ces réponses et
             la charge de chacun (semaine en cours et {PLANNING_HISTORY_WEEKS} semaines précédentes) ; ses
             propositions restent provisoires jusqu&apos;à leur confirmation, par un administrateur ou d&apos;office par le site ; le staff des tournois peut, lui, désigner ou retirer quelqu&apos;un à la main, une désignation à la main étant ferme d&apos;emblée. Le site garde, avec chaque attribution, qui l&apos;a
             posée et son historique (pose, confirmation, retrait, avec le compte qui a agi par le planning, sans compte quand le site agit de lui-même). Les attributions et

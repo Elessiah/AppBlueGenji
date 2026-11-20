@@ -33,7 +33,7 @@ n'appellent l'intervention de personne.
 | `PUT /api/admin/matches/[id]/host` | `HOST_SET` / `HOST_CLEARED` | Hôte désigné / retiré (seulement quand l'hôte change) |
 | `PUT /api/admin/matches/[id]/live` | `LIVE_CONFIGURED` / `LIVE_REMOVED` (déclencheur `null`) | Diffusion réglée / retirée — rien d'annoncé si la requête n'écrit rien (`changed`) |
 | `POST /api/admin/matches/[id]/live` | `ON_AIR` / `OFF_AIR` | Mis à l'antenne / Retiré de l'antenne (seulement quand l'état change) |
-| `PUT /api/admin/matches/[id]/replay` | `REPLAY_SET` / `REPLAY_REMOVED` | Rediffusion ajoutée / retirée (seulement quand le lien change) |
+| `PUT /api/admin/matches/[id]/replay` | — (ligne 🎬 au journal d'arbitrage) | Rediff ajoutée / modifiée / retirée, avec le lien, auteur nommé dans pm2 (`MATCH_REPLAYS.md`) |
 | `PATCH /api/tournaments/[id]/edit` | `EDITED` | Tournoi modifié (ancien nom entre parenthèses quand le nom change) |
 | `PATCH /api/admin/tournaments/[id]/seeding` | `SEEDING_REORDERED` | Têtes de série réordonnées (une rafale = une ligne, voir plus bas) |
 | `POST /api/admin/tournaments/[id]/advance` | `ADVANCED` | Étape suivante avancée (ouverture des inscriptions, clôture des inscriptions ou coup d'envoi) |
@@ -48,7 +48,7 @@ pour un match, `🛠️ <Geste> — « Tournoi » (#id), par le staff.` pour un 
 l'alerte ⚠️ d'un arbitre qui joue ce match ne nomme que le tournoi, la ligne
 🛠️ ne désigne donc pas le match à côté.
 L'auteur est « le staff », ou « un caster » pour un geste de diffusion
-(`live`, rediffusion) de qui détient `live` sans `tournaments`
+(`live`) de qui détient `live` sans `tournaments`
 (`staffActionAuthor`) : la ligne ne prête pas aux arbitres le geste d'un caster.
 Les engagés passent par `entrantLabel` (« un joueur » en tournoi individuel,
 « TBD » pour une place vide) ; ni score, ni lien, ni équipe hôte : la page du

@@ -32,7 +32,7 @@ describe("/rgpd — planning (FR)", () => {
 
   it("rgpdFr_planning_soloCasterSetByCasterOrTournamentStaff", () => {
     expect(fr).not.toContain("ce qu&apos;un administrateur peut régler pour lui");
-    expect(fr).toContain("s&apos;il diffuse seul (« caster autonome »), ce que le staff des tournois peut régler pour lui.");
+    expect(fr).toContain("s&apos;il diffuse seul (« caster autonome »), ce que le staff des tournois peut régler pour lui, en l&apos;en prévenant.");
   });
 
   it("rgpdFr_planning_leadTimeAndConfirmationByAdministrator", () => {
@@ -62,7 +62,7 @@ describe("/rgpd — planning (EN)", () => {
 
   it("rgpdEn_planning_soloCasterSetByCasterOrTournamentStaff", () => {
     expect(en).not.toContain("which an administrator can set for them");
-    expect(en).toContain("whether they stream alone (“solo caster”), which the tournament staff can set for them.");
+    expect(en).toContain("whether they stream alone (“solo caster”), which the tournament staff can set for them, letting them know.");
   });
 
   it("rgpdEn_planning_leadTimeAndConfirmationByAdministrator", () => {

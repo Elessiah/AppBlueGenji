@@ -126,7 +126,7 @@ beforeEach(() => {
   jest.spyOn(console, "error").mockImplementation(() => undefined);
   jest.mocked(loadEntryPlayers).mockResolvedValue(new Map());
   jest.mocked(assignMatchReferee).mockResolvedValue(undefined);
-  jest.mocked(writeSoloCaster).mockResolvedValue(undefined);
+  jest.mocked(writeSoloCaster).mockResolvedValue(true);
   // Relecture verrouillée dans la transaction : par défaut, chacun tient tous les rôles et voit tout.
   jest.mocked(loadPlanningMembersByIds).mockImplementation(async (_executor, ids) =>
     ids.map((userId) => loadedMember({ userId, roles: ["REFEREE", "CASTER", "PROD"], seesHidden: true })),
@@ -209,6 +209,19 @@ describe("setAvailability", () => {
 });
 
 describe("setSoloCaster", () => {
+  it("setSoloCaster_writeChanged_returnsTrue", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
+
+    await expect(setSoloCaster(4, true)).resolves.toBe(true);
+  });
+
+  it("setSoloCaster_writeUnchanged_returnsFalse", async () => {
+    jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 4, roles: ["CASTER"] })]);
+    jest.mocked(writeSoloCaster).mockResolvedValue(false);
+
+    await expect(setSoloCaster(4, true)).resolves.toBe(false);
+  });
+
   it("setSoloCaster_notCaster_throwsNotCaster", async () => {
     jest.mocked(loadPlanningMembersByIds).mockResolvedValue([loadedMember({ userId: 6, roles: ["PROD"] })]);
 

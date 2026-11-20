@@ -101,7 +101,7 @@ describe("setMatchReplayUrl", () => {
       .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
     await mockDb(execute);
 
-    expect(await setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).toEqual({ replayUrl: VIDEO, changed: true });
+    expect(await setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).toEqual({ replayUrl: VIDEO, changed: true, change: "SET" });
     // Match joué : le jeu, qui ne sert qu'à la condition du cast avant le lancement, n'est pas relu.
     expect(execute.mock.calls.some(([sql]) => String(sql).includes("FROM bg_tournaments"))).toBe(false);
     expect(execute.mock.calls[1]).toEqual([expect.stringContaining("FROM bg_match_casters"), [42, 12]]);
@@ -146,7 +146,7 @@ describe("setMatchReplayUrl", () => {
       .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
     await mockDb(execute);
 
-    expect(await setMatchReplayUrl(42, null, LIVE_ONLY_12)).toEqual({ replayUrl: null, changed: true });
+    expect(await setMatchReplayUrl(42, null, LIVE_ONLY_12)).toEqual({ replayUrl: null, changed: true, change: "REMOVED" });
   });
 
   it("setMatchReplayUrl_liveOnlyNotCasterOfMatch_throwsNotMatchCaster", async () => {
@@ -173,6 +173,7 @@ describe("setMatchReplayUrl", () => {
     expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ", STAFF)).toEqual({
       replayUrl: "https://youtu.be/dQw4w9WgXcQ",
       changed: true,
+      change: "SET",
     });
 
     const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
@@ -187,7 +188,7 @@ describe("setMatchReplayUrl", () => {
       const execute = found({ ...playedRow, status: "READY" });
       await mockDb(execute);
 
-      expect(await setMatchReplayUrl(42, raw, STAFF)).toEqual({ replayUrl: null, changed: true });
+      expect(await setMatchReplayUrl(42, raw, STAFF)).toEqual({ replayUrl: null, changed: true, change: "REMOVED" });
       const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
       expect(sql).toMatch(/SET replay_url = NULL WHERE id = \?$/);
       expect(params).toEqual([42]);
@@ -240,7 +241,7 @@ describe("setMatchReplayUrl", () => {
 describe("setMatchReplayUrl — changement", () => {
   it("setMatchReplayUrl_clearNeverSet_changedFalse", async () => {
     await mockDb(found(playedRow, 1, 0));
-    expect(await setMatchReplayUrl(42, null, STAFF)).toEqual({ replayUrl: null, changed: false });
+    expect(await setMatchReplayUrl(42, null, STAFF)).toEqual({ replayUrl: null, changed: false, change: null });
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
@@ -255,6 +256,34 @@ describe("setMatchReplayUrl — changement", () => {
     expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ", STAFF)).toEqual({
       replayUrl: "https://youtu.be/dQw4w9WgXcQ",
       changed: false,
+      change: null,
     });
+  });
+
+  it("setMatchReplayUrl_replacingLink_changeChanged", async () => {
+    await mockDb(found({ ...playedRow, replay_url: "https://youtu.be/oldOldOld01" }));
+
+    expect((await setMatchReplayUrl(42, VIDEO, STAFF)).change).toBe("CHANGED");
+  });
+
+  it("setMatchReplayUrl_firstLink_changeSet", async () => {
+    await mockDb(found({ ...playedRow, replay_url: null }));
+
+    expect((await setMatchReplayUrl(42, VIDEO, STAFF)).change).toBe("SET");
+  });
+
+  it("setMatchReplayUrl_erasingLink_changeRemoved", async () => {
+    await mockDb(found({ ...playedRow, replay_url: VIDEO }));
+
+    expect((await setMatchReplayUrl(42, null, STAFF)).change).toBe("REMOVED");
+  });
+
+  it("setMatchReplayUrl_lockedReadSelectsPreviousLink", async () => {
+    const execute = found();
+    await mockDb(execute);
+
+    await setMatchReplayUrl(42, VIDEO, STAFF);
+
+    expect(String(execute.mock.calls[0][0])).toMatch(/replay_url\s+FROM bg_matches WHERE id = \? FOR UPDATE/);
   });
 });

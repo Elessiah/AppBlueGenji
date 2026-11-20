@@ -229,11 +229,18 @@ describe("dispatchPrivacyChangeNotifications", () => {
   });
 
   it("filtre en base les entrées ciblées sur leur public (compte relié à Google)", async () => {
+    // L'entrée ciblée Google sort de la fenêtre d'annonce quand le registre
+    // avance : le balayage se place juste après son délai de modale.
+    const google = PRIVACY_CHANGES.find((c) => c.audience === "GOOGLE_LINKED")!;
+    const googleCalls = fakeDb();
+    await dispatchPrivacyChangeNotifications(at(google.publishedAt, PRIVACY_DM_SETTLE_DAYS));
+    const googleSelect = googleCalls.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!;
+    expect(googleSelect.sql).toContain("u.created_at < ? AND u.google_sub IS NOT NULL AND NOT EXISTS");
+    resetPrivacyNotificationThrottle();
     const calls = fakeDb();
     await dispatchPrivacyChangeNotifications(NOW);
     const select = calls.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!;
     expect(select.sql).toContain("u.google_sub IS NOT NULL AS google_linked");
-    expect(select.sql).toContain("u.created_at < ? AND u.google_sub IS NOT NULL AND NOT EXISTS");
     expect(select.sql).toContain(`${LIVE_STAFF_SQL} AS live_staff`);
     expect(select.sql).toContain(`u.created_at < ? AND ${LIVE_STAFF_SQL} AND NOT EXISTS`);
   });

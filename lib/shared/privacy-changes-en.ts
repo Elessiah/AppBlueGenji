@@ -1229,6 +1229,15 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: for an account that is not marked, nothing new is collected.",
     ],
   },
+  "2026-11-caster-autonome-rediff": {
+    linkLabels: ["Read record T05 of the register", "Read record T20 of the register"],
+    title: "Staff: solo caster and replays in the log",
+    summary: "A caster is notified when the staff changes their solo caster status, and adding, changing or removing a replay is noted in the refereeing log, with the link.",
+    details: [
+      "Notice to the caster: by Discord direct message and push notification, without naming the staff; the new “Solo caster” topic can be turned off in the notification settings of “My profile”, direct message included.",
+      "Logs: both actions are noted in the staff log on Discord without naming their author or the caster (for a replay: the match, its team names and the link); the server logs keep their author, according to their rotation. Basis: legitimate interest (organising and overseeing tournaments).",
+    ],
+  },
 };
 
 /**

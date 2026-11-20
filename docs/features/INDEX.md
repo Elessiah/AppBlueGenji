@@ -27,7 +27,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `NEW_MATCH_NOTICE.md` — Annonce d'un nouveau match (deux engagées connues, première manche comprise ; horaire déjà posé inclus, sans « Match programmé » en double) à tous les membres des deux équipes : DM de match + push `NEW_MATCH`, adversaire, horaire, lien du match ; balayage après commit, une fois par place et affiche.
 - `CAST_NOTICES.md` — Casts : journal anonyme du staff (inscription, reprise, retrait) et avis au caster retiré (DM + push `CAST_RELEASED`, avec le motif).
 - `CAST_SETTINGS.md` — Cast d'un match par son caster : un seul bouton (« Caster ce match » → « Configurer ma diffusion »), lien de chaîne obligatoire, mode d'antenne, antenne, rediff, « Ne plus caster » et BattleTag propre à un cast.
-- `STAFF_ACTION_LOGS.md` — Gestes du staff sans trace (résultat validé, lancement forcé, hôte, diffusion, rediffusion, édition, seeding, fantômes, image) : une ligne anonyme au journal Discord, rien dans pm2.
+- `STAFF_ACTION_LOGS.md` — Gestes du staff sans trace (résultat validé, lancement forcé, hôte, diffusion, édition, seeding, fantômes, image) : une ligne anonyme au journal Discord, rien dans pm2.
 - `CERTIFICATION_PROMPT.md` — Fiche tournoi : modale d'office invitant à certifier Discord et BattleTag (manager à qui il en manque un, joueur d'une équipe sans contact), tableau fait / ne fait pas, « Ne plus voir ».
 - `MATCH_PLANNING.md` — Planification des matchs par l'arbitrage (`TO_PLAN`).
 - `SCHEDULE_DEADLINE.md` — Date butoir de planification d'un match (défaut 21:00 Paris, deux jours après) : avis 24 h / 3 h aux meneurs, double forfait si passée sans horaire, confirmation d'office du planning à `min(date butoir, début − délai)`.
@@ -204,10 +204,10 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `BOT_ACTIVITY_LOG.md` — Journal d'activité : une ligne par fait accompli.
 - `REFEREE_ALERTS.md` — Alertes au rôle arbitre.
 - `PUSH_NOTIFICATIONS.md` — Notifications push, registre `PUSH_TOPICS`, `notifyUsers` / `notifyStaff`.
-- `CAST_PLANNING.md` — Planning des casts, prods et arbitres (`/planning`) : disponibilités et préférences par créneau et par rôle, calcul par lot (provisoire puis confirmé, choix manuels verrouillés, charge répartie, pas de chevauchement), niveaux de couverture, deux casters au plus par créneau (le second en renfort), tournoi sans planification = une entrée, conservation 90 jours ; matchs passés et « calcul et confirmation » repliés par défaut, nom du tour de la fiche sur les cartes ; notifications (récapitulatif des nouvelles entrées, affectation, désistement, place à pourvoir) et désistement avec remplacement automatique ; casters et prods invités (hors planning, case « Invité » de la fiche).
+- `CAST_PLANNING.md` — Planning des casts, prods et arbitres (`/planning`) : disponibilités et préférences par créneau et par rôle, calcul par lot (provisoire puis confirmé, choix manuels verrouillés, charge répartie, pas de chevauchement), niveaux de couverture, deux casters au plus par créneau (le second en renfort), tournoi sans planification = une entrée, conservation 90 jours ; matchs passés et « calcul et confirmation » repliés par défaut, nom du tour de la fiche sur les cartes ; notifications (récapitulatif des nouvelles entrées, affectation, désistement, place à pourvoir, caster autonome réglé par le staff) et désistement avec remplacement automatique ; casters et prods invités (hors planning, case « Invité » de la fiche).
 - `LIVE_STREAMS.md` — Diffusion en direct, vocabulaire « En cours » / « En direct », annonce des lives sur Discord (#live, un message par soirée, `@everyone` pour la chaîne officielle, rôle StreamViewer sinon).
 - `MATCH_START_DATES.md` — Dates de début des matchs (saisie jour/mois/quart d'heure, mois courant et 21:00 par défaut, année déduite).
-- `MATCH_REPLAYS.md` — Rediff YouTube d'un match terminé.
+- `MATCH_REPLAYS.md` — Rediff YouTube d'un match terminé ; pose, changement ou retrait au journal d'arbitrage avec le lien (auteur dans pm2).
 
 ## Infra et outillage
 

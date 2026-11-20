@@ -1051,10 +1051,14 @@ export function RgpdEn({
             and its removal (with the reason for an automatic removal)
             are noted in the staff log on Discord without naming anyone (“a caster”, “the staff”); so are the
             staff&apos;s other actions on a match or a tournament (result confirmed, score saved, forced launch, host,
-            broadcast, replay, tournament edited, round maps and ban rules, seeding, stage brought forward, ghost teams, image), with the match&apos;s team names (“a player” in a
+            broadcast, tournament edited, round maps and ban rules, seeding, stage brought forward, ghost teams, image), with the match&apos;s team names (“a player” in a
             solo tournament), without naming their author (“the staff”, or “a caster” for broadcasting); this line adds nothing to the server logs, where a dispute
             settled, a result corrected or a confirmation paused keeps its named trace (<LocaleLink href="/rgpd/registre#t05">register,
             T05</LocaleLink>), except, when it could not be composed, the action and the match or tournament number, without its author.
+            A replay set, changed or removed is noted in the refereeing log on Discord (the match, its team
+            names, “a player” in a solo tournament, and the link) without naming its author; a schedule
+            member&apos;s solo caster status changed by the staff is noted there without naming anyone; the
+            server logs keep the author of both actions (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
             A scheduling deadline set, changed or removed by the staff is noted in the staff log on Discord
             (the tournament and the match) without naming its author; the server logs keep its author, as for a match time (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
             When an administrator grants or removes a platform role (administrator, referee, caster, prod, community
@@ -1311,7 +1315,7 @@ export function RgpdEn({
             scheduled match, or a whole tournament when its matches are not scheduled) and each role they
             hold, they give their availability (available, away, maybe) and their preference there; a caster
             also says whether they stream alone (“solo caster”), which the tournament staff can set for
-            them. A calculation proposes the assignments from these answers and everyone&apos;s load (current
+            them, letting them know. A calculation proposes the assignments from these answers and everyone&apos;s load (current
             week and the {PLANNING_HISTORY_WEEKS} previous weeks); its proposals stay provisional until confirmed, by an administrator or automatically by the site; the tournament staff can still assign or remove someone by hand, an assignment by hand being firm at once. The site keeps,
             with each assignment, who set it and its history (set, confirmed, removed, with the account that
             acted through the schedule, none when the site acts on its own). Assignments and the “solo caster” setting are read by logged-in referees, casters,
