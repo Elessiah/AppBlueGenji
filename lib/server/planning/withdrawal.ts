@@ -204,9 +204,22 @@ async function findReplacement(
 }
 
 /**
+ * L'auteur et les options d'un geste du planning sur l'arbitre d'un match :
+ * le staff `staffActorId` qui sort un invité (geste tu, `guestRelease`), sinon
+ * le membre `userId` lui-même. Une seule règle pour le retrait de l'arbitre et
+ * la pose de son remplaçant.
+ */
+export function matchGestureFor(
+  userId: number,
+  staffActorId: number | null,
+): { actor: number; options: { guestRelease: boolean } } {
+  return { actor: staffActorId ?? userId, options: { guestRelease: staffActorId !== null } };
+}
+
+/**
  * Pose le remplaçant ; rend `false` si le match ou ses rôles relus le
  * refusent (place alors à pourvoir). Arbitre de match confirmé : posé sur le
- * joueur), la ligne du planning ensuite. Une panne de la désignation peut
+ * match d'abord, la ligne du planning ensuite. Une panne de la désignation peut
  * survenir après sa validation : le match relu dit si le remplaçant y est posé
  * (sa ligne s'écrit alors quand même). `trigger` : le geste qui déclenche
  * la pose — le désisté lui-même, ou le staff `staffActorId` qui sort un invité
@@ -226,9 +239,10 @@ async function placeReplacement(
   if (matchReferee && confirmed) {
     try {
       // Suspension jugée dans la transaction même du match : posée depuis le choix, la place reste à pourvoir.
-      await assignMatchReferee(entry.matchId as number, trigger.staffActorId ?? trigger.userId, pick.userId, null, {
+      const gesture = matchGestureFor(trigger.userId, trigger.staffActorId);
+      await assignMatchReferee(entry.matchId as number, gesture.actor, pick.userId, null, {
         refuseSuspended: true,
-        guestRelease: trigger.staffActorId !== null,
+        ...gesture.options,
       });
     } catch (error) {
       if (isMatchRefereeRefusal(error)) return false;
@@ -306,7 +320,8 @@ async function releaseMatchReferee(
   const carried = await readMatchReferee(matchId);
   if (carried !== undefined && carried !== userId) return carried;
   try {
-    await assignMatchReferee(matchId, staffActorId ?? userId, null, userId, { guestRelease: staffActorId !== null });
+    const gesture = matchGestureFor(userId, staffActorId);
+    await assignMatchReferee(matchId, gesture.actor, null, userId, gesture.options);
   } catch (error) {
     await settleFailedDesignation(error, matchId, null, undo, eventIds);
     throw error;

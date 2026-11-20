@@ -232,15 +232,35 @@ describe("planning — invités (registre T20, PRIVACY_CHANGES, /rgpd)", () => {
   });
 
   it("rgpd_guestLeaving_noRefereeLineNorOpenSlotLine", () => {
-    expect(planningParagraph("app/rgpd/page.tsx")).toContain("rien de cela quand un invité quitte le planning");
+    expect(planningParagraph("app/rgpd/page.tsx")).toContain("rien de cela quand un invité (marque décrite plus bas) quitte le planning");
     expect(planningParagraph("app/rgpd/page.tsx")).toContain("sauf pour une place laissée par un invité");
-    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("none of this when a guest leaves the schedule");
+    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("none of this when a guest (a mark described below) leaves the schedule");
     expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("except for a slot left by a guest");
   });
 
   it("t20_subPurposes_historyKeepsAuthorWithoutShowing", () => {
-    expect(t20(PROCESSING_ACTIVITIES).subPurposes.join(" ")).toContain("qui garde le compte de son auteur sans le montrer");
-    expect(t20(PROCESSING_ACTIVITIES_EN).subPurposes.join(" ")).toContain("which keeps its author's account without showing it");
+    expect(t20(PROCESSING_ACTIVITIES).subPurposes.join(" ")).toContain("(il garde le compte de son auteur, sans le montrer)");
+    expect(t20(PROCESSING_ACTIVITIES_EN).subPurposes.join(" ")).toContain("(it keeps its author's account, without showing it)");
+    expect(t20(PROCESSING_ACTIVITIES).subPurposes.join(" ")).not.toContain("qui garde le compte de son auteur sans le montrer");
+  });
+
+  // Revue juridique 4 : un arbitre posé directement sur un match reste ; seules partent les attributions du planning.
+  it("t20_subPurposes_scopedToPlanningAssignments", () => {
+    expect(t20(PROCESSING_ACTIVITIES).subPurposes.join(" ")).toContain("les attributions à venir que lui donnait le planning");
+    expect(t20(PROCESSING_ACTIVITIES_EN).subPurposes.join(" ")).toContain("the upcoming assignments the schedule had given it");
+  });
+
+  it("rgpd_guestParagraph_scopedToPlanningAssignments", () => {
+    expect(planningParagraph("app/rgpd/page.tsx")).toContain("le planning ne le propose, ne le désigne ni ne le prévient plus");
+    expect(planningParagraph("app/rgpd/page.tsx")).toContain("les attributions à venir que lui donnait le planning");
+    expect(planningParagraph("app/rgpd/page.tsx")).not.toContain("ni proposé, ni désigné");
+    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("the schedule no longer proposes, assigns or notifies them");
+    expect(planningParagraph("app/rgpd/RgpdEn.tsx")).toContain("the upcoming assignments the schedule had given them");
+  });
+
+  it("planningInvites_entry_scopedToPlanningAssignments", () => {
+    expect(entry?.details.join(" ")).toContain("les attributions à venir que lui donnait le planning");
+    expect(entryEn?.details.join(" ")).toContain("the upcoming assignments the schedule had given them");
   });
 
   it("t20_recipients_guestExceptionCoversReplacementAppointment", () => {

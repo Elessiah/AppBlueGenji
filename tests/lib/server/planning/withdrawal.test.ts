@@ -38,7 +38,7 @@ import {
 import { announceWithdrawal } from "@/lib/server/planning/notices";
 import { loadEntryPlayers } from "@/lib/server/planning/players";
 import { readMatchReferee, settleFailedDesignation, snapshotGesture } from "@/lib/server/planning/planning-undo";
-import { casterHold, casterHolds, cleanWithdrawalReason, isLateWithdrawal, pickReplacement, releaseGuestPlanning, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
+import { casterHold, casterHolds, cleanWithdrawalReason, isLateWithdrawal, matchGestureFor, pickReplacement, releaseGuestPlanning, withdrawFromEntry } from "@/lib/server/planning/withdrawal";
 import { LATE_WITHDRAWAL_MS, WITHDRAWAL_REASON_MAX } from "@/lib/shared/planning";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { assignMatchReferee } from "@/lib/server/tournaments/match-launch";
@@ -1416,5 +1416,16 @@ describe("releaseGuestPlanning (`CAST_PLANNING.md` § Invités)", () => {
     await releaseGuestPlanning(GUEST, STAFF, EARLY);
 
     expect(jest.mocked(loadPlanningData).mock.calls[0][1]).toMatchObject({ availabilityOf: GUEST, includeHidden: true });
+  });
+});
+
+// Revue juridique 4 (PLANNING-GUESTS) : une seule règle pour l'auteur d'un geste sur l'arbitre d'un match.
+describe("matchGestureFor", () => {
+  it("matchGestureFor_memberWithdrawal_actorIsMemberNotSilenced", () => {
+    expect(matchGestureFor(7, null)).toEqual({ actor: 7, options: { guestRelease: false } });
+  });
+
+  it("matchGestureFor_guestReleaseByStaff_actorIsStaffSilenced", () => {
+    expect(matchGestureFor(7, 2)).toEqual({ actor: 2, options: { guestRelease: true } });
   });
 });
