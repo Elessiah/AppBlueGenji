@@ -253,10 +253,22 @@ function staffProdNotices(current: number | null, prodId: number | null, staffUs
  * commit ({@link announceProdWithdrawals}).
  */
 export async function withdrawLostProdPlaces(connection: PoolConnection, userId: number): Promise<ReleasedProdPlace[]> {
+  // Les identifiants d'abord, en lecture simple (l'index `prod_user_id` seul) :
+  // un `FOR UPDATE` filtré par `status` / `launched_at` verrouillerait aussi
+  // tous les matchs déjà joués ou lancés de la prod, et dans l'ordre de
+  // l'index. Puis seuls ces matchs, par identifiant croissant (l'ordre de
+  // l'entretien) ; la condition se rejuge sous verrou.
+  const [candidates] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_matches WHERE prod_user_id = ? AND status <> 'COMPLETED' AND launched_at IS NULL ORDER BY id`,
+    [userId],
+  );
+  if (candidates.length === 0) return [];
   const [rows] = await connection.execute<ProdMatchRow[]>(
     `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, prod_user_id
-       FROM bg_matches WHERE prod_user_id = ? AND status <> 'COMPLETED' AND launched_at IS NULL FOR UPDATE`,
-    [userId],
+       FROM bg_matches
+      WHERE id IN (${candidates.map(() => "?").join(", ")}) AND prod_user_id = ? AND status <> 'COMPLETED' AND launched_at IS NULL
+      ORDER BY id FOR UPDATE`,
+    [...candidates.map((row) => Number(row.id)), userId],
   );
   if (rows.length === 0) return [];
   await connection.execute(
@@ -267,19 +279,21 @@ export async function withdrawLostProdPlaces(connection: PoolConnection, userId:
   return rows.map((row) => ({ matchId: Number(row.id), tournamentId: Number(row.tournament_id), pairing: pairingOf(row) }));
 }
 
-/** Après le commit d'un retrait de rôle : plateaux rafraîchis, une ligne par match, l'ancienne prod prévenue du motif. */
+/** Après le commit d'un retrait de rôle : plateaux rafraîchis, une ligne par match, l'ancienne prod prévenue du motif (une seule fois). */
 export function announceProdWithdrawals(userId: number, released: readonly ReleasedProdPlace[]): void {
   for (const tournamentId of new Set(released.map((entry) => entry.tournamentId))) {
     publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   }
-  for (const entry of released) {
+  // Une ligne de journal par match, mais **un seul** avis au compte : le motif
+  // est le même (le rôle perdu), vingt matchs libérés ne font pas vingt messages.
+  released.forEach((entry, index) => {
     announceProdChange({
       matchId: entry.matchId,
       log: "INELIGIBLE",
-      notices: [{ userId, kind: "INELIGIBLE" }],
+      notices: index === 0 ? [{ userId, kind: "INELIGIBLE" }] : [],
       pairing: entry.pairing,
     });
-  }
+  });
 }
 
 /** Un compte de la fenêtre « Prod du match » ; `block` : pourquoi il ne peut pas être placé ici. */
@@ -310,38 +324,39 @@ export async function loadProdPanel(matchId: number): Promise<ProdPanel | null> 
     );
     const match = matches[0];
     if (!match) return null;
-    const [users] = await connection.execute<CandidateRow[]>(
-      `SELECT u.id, u.pseudo FROM bg_users u
-        WHERE u.is_deleted = 0 AND ${PROD_ROLE_SQL} AND NOT ${userSuspendedSql("u.id")}
-        ORDER BY u.pseudo ASC, u.id ASC`,
-    );
-    // Casters inscrits, et casters tenus au planning : la même règle que `assertProdFree`.
-    const [casterRows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
-      `SELECT user_id FROM bg_match_casters WHERE match_id = ?
-       UNION
-       SELECT user_id FROM bg_planning_assignments
-        WHERE match_id = ? AND role = 'CASTER' AND ${HELD_PLANNING_ROW_SQL}`,
-      [matchId, matchId],
-    );
-    const players = await loadMatchPlayerIds(connection, {
-      team1_id: nullableId(match.team1_id),
-      team2_id: nullableId(match.team2_id),
-    });
+    const prodId = nullableId(match.prod_user_id);
+    // Les lectures indépendantes partent ensemble (une seule connexion : leurs
+    // commandes s'enchaînent sans attendre la réponse de la précédente), et
+    // le pseudo de la prod actuelle ne se lit plus après coup.
+    const [[users], [casterRows], players, [prodRows]] = await Promise.all([
+      connection.execute<CandidateRow[]>(
+        `SELECT u.id, u.pseudo FROM bg_users u
+          WHERE u.is_deleted = 0 AND ${PROD_ROLE_SQL} AND NOT ${userSuspendedSql("u.id")}
+          ORDER BY u.pseudo ASC, u.id ASC`,
+      ),
+      // Casters inscrits, et casters tenus au planning : la même règle que `assertProdFree`.
+      connection.execute<(RowDataPacket & { user_id: number })[]>(
+        `SELECT user_id FROM bg_match_casters WHERE match_id = ?
+         UNION
+         SELECT user_id FROM bg_planning_assignments
+          WHERE match_id = ? AND role = 'CASTER' AND ${HELD_PLANNING_ROW_SQL}`,
+        [matchId, matchId],
+      ),
+      loadMatchPlayerIds(connection, { team1_id: nullableId(match.team1_id), team2_id: nullableId(match.team2_id) }),
+      prodId === null
+        ? Promise.resolve([[] as CandidateRow[]] as const)
+        : connection.execute<CandidateRow[]>(`SELECT id, pseudo FROM bg_users WHERE id = ? LIMIT 1`, [prodId]),
+    ]);
     const casters = new Set(casterRows.map((row) => Number(row.user_id)));
     const candidates = users.map((user): ProdPanelUser => {
       const userId = Number(user.id);
       return { userId, pseudo: String(user.pseudo), block: panelBlock(userId, players, casters) };
     });
-    const prodId = nullableId(match.prod_user_id);
     let prod: ProdPanel["prod"] = null;
     if (prodId !== null) {
       const known = candidates.find((candidate) => candidate.userId === prodId);
-      if (known) {
-        prod = { userId: prodId, pseudo: known.pseudo };
-      } else {
-        const [rows] = await connection.execute<CandidateRow[]>(`SELECT id, pseudo FROM bg_users WHERE id = ? LIMIT 1`, [prodId]);
-        prod = rows[0] ? { userId: prodId, pseudo: String(rows[0].pseudo) } : null;
-      }
+      if (known) prod = { userId: prodId, pseudo: known.pseudo };
+      else prod = prodRows[0] ? { userId: prodId, pseudo: String(prodRows[0].pseudo) } : null;
     }
     return { matchId, prod, candidates };
   });

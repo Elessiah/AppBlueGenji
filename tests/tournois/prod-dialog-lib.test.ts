@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { prodOptions, prodPickable, type ProdPanelView } from "@/app/(secured)/tournois/[id]/_lib/prod-dialog";
+import { panelWithProd, prodOptions, prodPickable, type ProdPanelView } from "@/app/(secured)/tournois/[id]/_lib/prod-dialog";
 
 const panel = (prodId: number | null): ProdPanelView => ({
   matchId: 1,
@@ -29,5 +29,21 @@ describe("prodOptions", () => {
 describe("prodPickable", () => {
   it("prodPickable_blockedAndCurrent_areExcluded", () => {
     expect(prodPickable(panel(2)).map((c) => c.userId)).toEqual([1]);
+  });
+});
+
+describe("panelWithProd", () => {
+  it("panelWithProd_candidate_becomesTheProd", () => {
+    expect(panelWithProd(panel(null), 1)?.prod).toEqual({ userId: 1, pseudo: "Free" });
+  });
+
+  it("panelWithProd_null_clearsTheProdAndKeepsCandidates", () => {
+    const next = panelWithProd(panel(2), null);
+    expect(next?.prod).toBeNull();
+    expect(next?.candidates).toHaveLength(4);
+  });
+
+  it("panelWithProd_unknownUser_returnsNullSoTheDialogReloads", () => {
+    expect(panelWithProd(panel(null), 99)).toBeNull();
   });
 });

@@ -244,10 +244,16 @@ async function adoptCurrentPairing(
   row: LaunchMatchRow,
   currentRead = false,
   prodAccounts?: ReadonlyMap<number, ProdAccount>,
+  prodPlayers?: ReadonlySet<number>,
 ): Promise<boolean> {
   const { reset, players } = await resetForNewPairing(connection, row, currentRead);
   // Après la remise à zéro : un appariement neuf n'est pas encore lancé.
-  const prodReleased = await releaseUnfitProd(connection, row, currentRead, { accounts: prodAccounts, players });
+  // `prodPlayers` : la réponse déjà lue pour tous les matchs de l'entretien
+  // (`prodPlayersByMatch`), reprise quand la remise à zéro n'a rien relu.
+  const prodReleased = await releaseUnfitProd(connection, row, currentRead, {
+    accounts: prodAccounts,
+    players: players ?? prodPlayers ?? null,
+  });
   return reset || prodReleased;
 }
 
@@ -792,6 +798,50 @@ async function playingUserIds(
     [...users, ...teamIds],
   );
   return new Set([...solo, ...members].map((entry) => Number(entry.user_id)));
+}
+
+/**
+ * Pour chaque match de l'entretien dont la prod tient son compte (ni effacé,
+ * ni suspendu, permission gardée), les prods qui jouent ce match — **deux**
+ * lectures courantes pour tous les matchs ensemble, au lieu de deux par match
+ * (`playingUserIds`). Un match dont la prod est déjà inéligible n'y figure
+ * pas : il la perd sans cette lecture.
+ */
+async function prodPlayersByMatch(
+  connection: PoolConnection,
+  rows: readonly LaunchMatchRow[],
+  accounts: ReadonlyMap<number, ProdAccount>,
+): Promise<Map<number, Set<number>>> {
+  const asked = rows.filter((row) => {
+    if (!holdsReleasableProd(row)) return false;
+    const account = accounts.get(Number(row.prod_user_id));
+    return account !== undefined && !account.deleted && !account.suspended && account.holdsProd;
+  });
+  const result = new Map<number, Set<number>>();
+  if (asked.length === 0) return result;
+  const users = [...new Set(asked.map((row) => Number(row.prod_user_id)))].sort((a, b) => a - b);
+  const teams = [
+    ...new Set(asked.flatMap((row) => [nullableId(row.team1_id), nullableId(row.team2_id)]).filter((id): id is number => id !== null)),
+  ].sort((a, b) => a - b);
+  if (teams.length === 0) return result;
+  const askedUsers = sqlPlaceholders(users.length);
+  const askedTeams = sqlPlaceholders(teams.length);
+  const [solo] = await connection.execute<(RowDataPacket & { user_id: number; team_id: number })[]>(
+    `SELECT solo_user_id AS user_id, id AS team_id FROM bg_teams WHERE solo_user_id IN (${askedUsers}) AND id IN (${askedTeams}) LOCK IN SHARE MODE`,
+    [...users, ...teams],
+  );
+  const [members] = await connection.execute<(RowDataPacket & { user_id: number; team_id: number })[]>(
+    `SELECT DISTINCT tm.user_id, tm.team_id FROM bg_team_members tm
+     WHERE tm.user_id IN (${askedUsers}) AND ${activeMemberSql("tm")} AND tm.team_id IN (${askedTeams}) LOCK IN SHARE MODE`,
+    [...users, ...teams],
+  );
+  const pairs = new Set([...solo, ...members].map((entry) => `${Number(entry.user_id)}:${Number(entry.team_id)}`));
+  for (const row of asked) {
+    const prodId = Number(row.prod_user_id);
+    const plays = [nullableId(row.team1_id), nullableId(row.team2_id)].some((team) => team !== null && pairs.has(`${prodId}:${team}`));
+    result.set(Number(row.id), new Set(plays ? [prodId] : []));
+  }
+  return result;
 }
 
 /**
@@ -1651,9 +1701,20 @@ async function adoptLockedPairings(
     return prodId === null || row.status === "COMPLETED" ? [] : [prodId];
   });
   const prodAccounts = await loadProdAccounts(connection, prodIds, true);
+  // Un appariement périmé relit déjà ses joueurs (`resetForNewPairing`, casters
+  // et prod ensemble) : seuls les matchs inchangés passent par la lecture groupée.
+  const prodPlayers = await prodPlayersByMatch(
+    connection,
+    locked.filter(({ stale }) => !stale).map(({ row }) => row),
+    prodAccounts,
+  );
   const adopted: { row: LaunchMatchRow; stale: boolean; adopted: boolean }[] = [];
   for (const { row, stale } of locked) {
-    adopted.push({ row, stale, adopted: await adoptCurrentPairing(connection, row, true, prodAccounts) });
+    adopted.push({
+      row,
+      stale,
+      adopted: await adoptCurrentPairing(connection, row, true, prodAccounts, prodPlayers.get(Number(row.id))),
+    });
   }
   return adopted;
 }

@@ -157,7 +157,7 @@ function fakeDb(
     if (q.startsWith("SELECT 'C' AS kind, match_id FROM bg_match_casters")) {
       return [(options.refereed ?? []).map((match) => ({ kind: "R", match_id: match.matchId }))];
     }
-    if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
+    if (q.startsWith("SELECT id, tournament_id, status, team1_id, team2_id FROM bg_matches WHERE id IN")) {
       return [(options.refereed ?? []).map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];
     }
     if (q.includes("SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at,")) {
@@ -1135,7 +1135,7 @@ describe("deleteOwnAccount — accueil et #live", () => {
     const { execute } = fakeDb(EMPTY, { refereed: [{ matchId: 4, tournamentId: 3 }] });
     const base = execute.getMockImplementation()!;
     execute.mockImplementation(async (sql: string, params: unknown[] = []) => {
-      if (String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT id, tournament_id, status FROM bg_matches")) {
+      if (String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT id, tournament_id, status, team1_id, team2_id FROM bg_matches")) {
         await base(sql, params);
         return [[{ id: 4, tournament_id: 3, status: "COMPLETED" }]];
       }

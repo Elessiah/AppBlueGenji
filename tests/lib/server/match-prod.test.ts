@@ -367,6 +367,22 @@ describe("withdrawLostProdPlaces", () => {
     expect(lost).toHaveBeenLastCalledWith(expect.stringContaining("SET prod_user_id = NULL"), [PROD_ID, 42]);
   });
 
+  it("withdrawLostProdPlaces_locksOnlyTheFilteredMatchesInIdOrder", async () => {
+    const lost = jest.fn<SqlQuery>(async (sql) => {
+      if (sql.startsWith("SELECT id FROM")) return [[{ id: 40 }, { id: 42 }], []];
+      if (sql.startsWith("SELECT")) return [[{ ...match, prod_user_id: PROD_ID }], []];
+      return [{ affectedRows: 1 }, []];
+    });
+
+    await withdrawLostProdPlaces(fakeConnection({ execute: lost }), PROD_ID);
+
+    const [ids, locking] = lost.mock.calls.map(([sql]) => sql.replace(/\s+/g, " "));
+    expect(ids).not.toContain("FOR UPDATE");
+    expect(locking).toContain("id IN (?, ?)");
+    expect(locking).toContain("ORDER BY id FOR UPDATE");
+    expect(lost.mock.calls[1][1]).toEqual([40, 42, PROD_ID]);
+  });
+
   it("withdrawLostProdPlaces_launchedMatch_notSelected", async () => {
     const lost = jest.fn<SqlQuery>(async () => [[], []]);
 
@@ -383,6 +399,19 @@ describe("announceProdWithdrawals", () => {
 
     expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("la prod n'a plus le rôle prod");
     expect(jest.mocked(notifyUsers).mock.calls[0][1].discord?.message("fr")).toContain("Tu n'as plus le rôle prod");
+  });
+
+  it("announceProdWithdrawals_manyMatches_oneLogEachButOneNoticeToTheAccount", async () => {
+    const pairing = { team1Id: 10, team2Id: 11 };
+    announceProdWithdrawals(PROD_ID, [
+      { matchId: 42, tournamentId: 7, pairing },
+      { matchId: 43, tournamentId: 7, pairing },
+      { matchId: 44, tournamentId: 8, pairing },
+    ]);
+    await settle();
+
+    expect(jest.mocked(sendBotLog)).toHaveBeenCalledTimes(3);
+    expect(jest.mocked(notifyUsers)).toHaveBeenCalledTimes(1);
   });
 
   it("withdrawLostProdPlaces_none_returnsEmptyWithoutUpdate", async () => {

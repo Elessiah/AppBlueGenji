@@ -317,7 +317,7 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
         ready: false,
       })),
       // La prod comme un caster : son pseudo, jamais son compte (`MATCH_PROD.md`).
-      prod: match.prod ? { ...match.prod, userId: SPECTATOR_HIDDEN_USER_ID } : match.prod,
+      ...(match.prod ? { prod: { ...match.prod, userId: SPECTATOR_HIDDEN_USER_ID } } : {}),
       // Le lien de rediffusion que l'interface masque (match rouvert…) ne part
       // pas non plus dans la réponse publique.
       replayUrl: visibleReplayUrl(match),

@@ -11,7 +11,7 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
-import { prodOptions, prodPickable, type ProdPanelUserView, type ProdPanelView } from "../_lib/prod-dialog";
+import { panelWithProd, prodOptions, prodPickable, type ProdPanelUserView, type ProdPanelView } from "../_lib/prod-dialog";
 import { requestJson } from "../_lib/request-json";
 import styles from "./ProdDialog.module.css";
 
@@ -95,7 +95,15 @@ export function ProdDialog({
         );
         showSuccess(success);
         window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
-        await load(false);
+        // La liste des comptes ne change pas : pas de relecture (un balayage
+        // des comptes) quand la prod placée s'y trouve.
+        const next = panelWithProd(panel, userId);
+        if (next) {
+          setPanel(next);
+          setPick("");
+        } else {
+          await load(false);
+        }
         return true;
       } catch (error) {
         const code = (error as Error).message;

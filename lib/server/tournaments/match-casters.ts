@@ -376,8 +376,13 @@ export type MatchWithdrawal = {
   releasedProdPlaces: { matchId: number; pairing: CastPairing }[];
 };
 
-type WithdrawnMatchRow = RowDataPacket & { id: number; tournament_id: number; status: string };
-type PairingRow = RowDataPacket & { id: number; team1_id: number | null; team2_id: number | null };
+type WithdrawnMatchRow = RowDataPacket & {
+  id: number;
+  tournament_id: number;
+  status: string;
+  team1_id: number | null;
+  team2_id: number | null;
+};
 
 /**
  * Efface en une fois les streams devenus orphelins (`orphanStreamIds`) de
@@ -493,7 +498,7 @@ export async function withdrawUserCasts(
   }
 
   const [locked] = await connection.execute<WithdrawnMatchRow[]>(
-    `SELECT id, tournament_id, status FROM bg_matches WHERE id IN (${placeholders(candidates)}) ORDER BY id FOR UPDATE`,
+    `SELECT id, tournament_id, status, team1_id, team2_id FROM bg_matches WHERE id IN (${placeholders(candidates)}) ORDER BY id FOR UPDATE`,
     candidates,
   );
   const matchIds = locked.map((row) => Number(row.id));
@@ -564,20 +569,15 @@ export async function withdrawUserCasts(
   // Un match non joué qui attendait encore ce « Prêt » peut partir : l'appelant
   // le relance (`relaunchAfterRefereeWithdrawal`) sur ces listes lues sous verrou.
   const unplayed = new Set(locked.filter((row) => row.status !== "COMPLETED").map((row) => Number(row.id)));
-  // Places de prod rendues sur un match à jouer : leur appariement, lu sous le
-  // verrou déjà pris, nomme le match au journal du staff (une lecture, seulement s'il y en a).
-  const releasedProdIds = prodsToDrop.filter((id) => unplayed.has(id));
-  let releasedProdPlaces: MatchWithdrawal["releasedProdPlaces"] = [];
-  if (releasedProdIds.length > 0) {
-    const [pairings] = await connection.execute<PairingRow[]>(
-      `SELECT id, team1_id, team2_id FROM bg_matches WHERE id IN (${placeholders(releasedProdIds)}) ORDER BY id`,
-      releasedProdIds,
-    );
-    releasedProdPlaces = pairings.map((row) => ({
+  // Places de prod rendues sur un match à jouer : leur appariement, lu avec le
+  // verrou du match, nomme le match au journal du staff.
+  const releasedProdIds = new Set(prodsToDrop.filter((id) => unplayed.has(id)));
+  const releasedProdPlaces: MatchWithdrawal["releasedProdPlaces"] = locked
+    .filter((row) => releasedProdIds.has(Number(row.id)))
+    .map((row) => ({
       matchId: Number(row.id),
       pairing: { team1Id: nullableId(row.team1_id ?? null), team2Id: nullableId(row.team2_id ?? null) },
     }));
-  }
   return {
     matchIds: touchedRows.map((row) => Number(row.id)),
     tournamentIds: [...new Set(touchedRows.map((row) => Number(row.tournament_id)))].sort((a, b) => a - b),

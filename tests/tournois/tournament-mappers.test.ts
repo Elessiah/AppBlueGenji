@@ -102,6 +102,21 @@ describe("mapCard — dates", () => {
   });
 });
 
+describe("mapMatch — prod", () => {
+  it("mapMatch_noProd_omitsTheProdKey", () => {
+    expect("prod" in mapMatch(matchRow())).toBe(false);
+  });
+
+  it("mapMatch_withProd_carriesUserAndPseudo", () => {
+    const match = mapMatch(matchRow({ prod_user_id: 9, prod_pseudo: "Régie", prod_is_deleted: 0 }));
+    expect(match.prod).toEqual({ userId: 9, pseudo: "Régie" });
+  });
+
+  it("mapMatch_deletedProd_omitsTheProdKey", () => {
+    expect("prod" in mapMatch(matchRow({ prod_user_id: 9, prod_pseudo: "Régie", prod_is_deleted: 1 }))).toBe(false);
+  });
+});
+
 describe("mapMatch — dates", () => {
   it("sérialise updatedAt et garde scoreDeadlineAt nul", () => {
     const match = mapMatch(matchRow());

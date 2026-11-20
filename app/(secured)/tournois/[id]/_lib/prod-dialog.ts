@@ -29,3 +29,15 @@ export function prodOptions(panel: ProdPanelView): ProdPanelUserView[] {
 export function prodPickable(panel: ProdPanelView): ProdPanelUserView[] {
   return panel.candidates.filter((candidate) => candidate.block === null && candidate.userId !== panel.prod?.userId);
 }
+
+/**
+ * La fenêtre après un placement réussi, sans la relire (la liste des comptes
+ * ne bouge pas : elle ne dépend que du match et des rôles). `null` : retrait
+ * (`userId` nul) → plus de prod ; compte absent de la liste → `null` aussi,
+ * l'appelant relit la fenêtre.
+ */
+export function panelWithProd(panel: ProdPanelView, userId: number | null): ProdPanelView | null {
+  if (userId === null) return { ...panel, prod: null };
+  const placed = panel.candidates.find((candidate) => candidate.userId === userId);
+  return placed ? { ...panel, prod: { userId, pseudo: placed.pseudo } } : null;
+}

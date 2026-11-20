@@ -418,7 +418,8 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
       })),
     liveStartedAt: toIso(row.live_started_at),
     ...mapMatchLaunch(row, extras.casters ?? [], game),
-    prod: mapMatchProd(row),
+    // Absent quand le match n'a pas de prod (presque tous) : la clé ne grossit pas chaque trame.
+    ...prodField(row),
     replayUrl: normalizeReplayUrl(row.replay_url ?? null),
   };
 }
@@ -432,6 +433,12 @@ export function mapMatchProd(row: Pick<MatchRow, "prod_user_id" | "prod_pseudo" 
   const userId = row.prod_user_id == null ? null : Number(row.prod_user_id);
   if (userId === null || Number(row.prod_is_deleted ?? 0) === 1 || row.prod_pseudo == null) return null;
   return { userId, pseudo: String(row.prod_pseudo) };
+}
+
+/** `{ prod }` quand le match en a une, sinon rien — la clé n'est portée que par les matchs qui la tiennent. */
+function prodField(row: Pick<MatchRow, "prod_user_id" | "prod_pseudo" | "prod_is_deleted">): { prod?: NonNullable<BracketMatch["prod"]> } {
+  const prod = mapMatchProd(row);
+  return prod ? { prod } : {};
 }
 
 /**

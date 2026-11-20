@@ -43,6 +43,14 @@ Sur la carte, « Plus d'actions » : « Faire la prod » / « Ne plus faire la p
 n'empêche pas de rendre la place qu'un match lancé a gardée) / « Prod du match » (fenêtre `ProdDialog`, retrait confirmé par
 `ConfirmActionDialog`). La page du match l'affiche dans ses faits clés (« Prod »).
 
+Coût : la clé `prod` n'est portée que par les matchs qui en ont une (trames
+SSE et REST) ; l'entretien relit les comptes des prods en une lecture et leurs
+appartenances aux équipes en **deux** lectures pour tous les matchs
+(`prodPlayersByMatch`) ; `ProdDialog` ne relit pas la liste des comptes après un
+placement réussi (`panelWithProd`) ; la perte du rôle libère les places en
+verrouillant seulement les matchs concernés, par id croissant, et ne prévient le
+compte qu'**une fois** (une ligne de journal par match).
+
 ## Annonces
 
 - Journal du staff (salon des casts) : une ligne **anonyme** (`formatProdChangeLog`,

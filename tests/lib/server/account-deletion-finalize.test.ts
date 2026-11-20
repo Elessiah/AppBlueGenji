@@ -76,7 +76,7 @@ function fakeDb(options: {
     if (q.startsWith("SELECT 'C' AS kind, match_id FROM bg_match_casters")) {
       return [(options.refereed ?? []).map((match) => ({ kind: "R", match_id: match.matchId }))];
     }
-    if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
+    if (q.startsWith("SELECT id, tournament_id, status, team1_id, team2_id FROM bg_matches WHERE id IN")) {
       return [(options.refereed ?? []).map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];
     }
     if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 1 AND (deletion_requested_at IS NOT NULL")) {

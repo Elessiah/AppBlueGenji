@@ -425,15 +425,15 @@ function readMatchRows(state: World, sql: string) {
  * l'appariement qui arrive) : `[...comptes, ...équipes]`.
  */
 function readBatchedParty(state: World, sql: string, params: unknown[]): unknown[] | null {
-  const solo = /^SELECT solo_user_id AS user_id FROM bg_teams WHERE solo_user_id IN \(([?, ]+)\)/.exec(sql);
-  const members = /^SELECT DISTINCT tm\.user_id FROM bg_team_members tm WHERE tm\.user_id IN \(([?, ]+)\)/.exec(sql);
+  const solo = /^SELECT solo_user_id AS user_id(?:, id AS team_id)? FROM bg_teams WHERE solo_user_id IN \(([?, ]+)\)/.exec(sql);
+  const members = /^SELECT DISTINCT tm\.user_id(?:, tm\.team_id)? FROM bg_team_members tm WHERE tm\.user_id IN \(([?, ]+)\)/.exec(sql);
   const match = solo ?? members;
   if (!match) return null;
   const count = match[1].split("?").length - 1;
   const users = params.slice(0, count).map(Number);
   const teams = params.slice(count).map(Number);
   const entries = solo ? state.soloEntries : state.memberships;
-  const rows = entries.filter((e) => users.includes(e.userId) && teams.includes(e.teamId)).map((e) => ({ user_id: e.userId }));
+  const rows = entries.filter((e) => users.includes(e.userId) && teams.includes(e.teamId)).map((e) => ({ user_id: e.userId, team_id: e.teamId }));
   return [rows, []];
 }
 
@@ -3645,6 +3645,29 @@ describe("prod retirée d'office avant le lancement", () => {
 
     expect(state.writes.some(prodClear)).toBe(true);
     expect(jest.mocked(queueProdChange).mock.calls[0]?.[1].notices).toEqual([{ userId: PROD, kind: "INELIGIBLE" }]);
+  });
+
+  it("maintainMatchLaunches_unchangedPairingWithProd_oneBatchedPartyRead", async () => {
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    const soloReads = state.issued.filter((sql) => sql.startsWith("SELECT solo_user_id AS user_id, id AS team_id"));
+    const memberReads = state.issued.filter((sql) => sql.startsWith("SELECT DISTINCT tm.user_id, tm.team_id"));
+    expect(soloReads).toHaveLength(1);
+    expect(memberReads).toHaveLength(1);
+    expect(soloReads[0]).toMatch(/LOCK IN SHARE MODE$/);
+  });
+
+  it("maintainMatchLaunches_prodAlreadyIneligible_noPartyRead", async () => {
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD });
+    state.prodAccounts = { [PROD]: { ...FIT, holds_prod: 0 } };
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.issued.some((sql) => sql.startsWith("SELECT DISTINCT tm.user_id"))).toBe(false);
   });
 
   it("maintainMatchLaunches_prodRead_currentLockedRead", async () => {

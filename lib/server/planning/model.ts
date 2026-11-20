@@ -69,17 +69,29 @@ export function entryAssignments(
     if (index === -1) out.push(signup);
     else if (out[index].provisional) out[index] = signup;
   }
-  if (entry.kind === "MATCH" && entry.matchProdId != null) {
-    const prodId = entry.matchProdId;
-    const held = out.find((row) => row.role === "PROD" && row.userId === prodId && !row.provisional);
-    const kept = out.filter(
-      (row) => row.role !== "PROD" && !(row.role === "CASTER" && row.userId === prodId && row.provisional),
-    );
-    kept.push(held ?? { userId: prodId, role: "PROD", source: "CAST", reason: "MATCH", provisional: false });
-    out.splice(0, out.length, ...kept);
+  const prodId = entry.kind === "MATCH" ? (entry.matchProdId ?? null) : null;
+  return sortedRows(prodId === null ? out : withMatchProd(out, prodId));
+}
+
+const ROLE_ORDER = { REFEREE: 0, CASTER: 1, PROD: 2 } as const;
+
+function sortedRows(rows: PlanningAssignmentView[]): PlanningAssignmentView[] {
+  return rows.sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.userId - b.userId);
+}
+
+/**
+ * La prod du match fait foi : une seule passe écarte les lignes PROD (la
+ * sienne, tenue, est gardée) et la proposition de caster de la prod, puis la pose.
+ */
+function withMatchProd(rows: readonly PlanningAssignmentView[], prodId: number): PlanningAssignmentView[] {
+  let held: PlanningAssignmentView | undefined;
+  const kept: PlanningAssignmentView[] = [];
+  for (const row of rows) {
+    if (row.role === "PROD") held ??= row.userId === prodId && !row.provisional ? row : undefined;
+    else if (!(row.role === "CASTER" && row.userId === prodId && row.provisional)) kept.push(row);
   }
-  const order = { REFEREE: 0, CASTER: 1, PROD: 2 } as const;
-  return out.sort((a, b) => order[a.role] - order[b.role] || a.userId - b.userId);
+  kept.push(held ?? { userId: prodId, role: "PROD", source: "CAST", reason: "MATCH", provisional: false });
+  return kept;
 }
 
 /** Couverture d'une entrée : les rôles tenus comptent (propositions provisoires comprises), pas les personnes. */
