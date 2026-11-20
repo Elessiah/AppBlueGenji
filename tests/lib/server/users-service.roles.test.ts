@@ -214,6 +214,24 @@ describe("setUserRoles — failures leave nothing behind", () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  it("setUserRoles_deadlockOnce_replaysAndCommits", async () => {
+    // Rendre les places de prod verrouille des matchs après le compte : un
+    // lancement qui tient le match puis lit le compte peut l'interbloquer.
+    const connection = await mockTransaction();
+    connection.execute
+      .mockResolvedValueOnce([[ACTOR_ADMIN, ARBITRE_TARGET]])
+      .mockRejectedValueOnce(Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK", errno: 1213 }))
+      .mockResolvedValueOnce([[ACTOR_ADMIN, ARBITRE_TARGET]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const result = await setUserRoles(7, [], 3);
+
+    expect(result.roles).toEqual([]);
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
   it("setUserRoles_rollbackFails_keepsOriginalErrorAndDestroysConnection", async () => {
     const connection = await mockTransaction();
     connection.execute

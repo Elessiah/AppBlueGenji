@@ -47,8 +47,8 @@ n'empêche pas de rendre la place qu'un match lancé a gardée) / « Prod du mat
 
 - Journal du staff (salon des casts) : une ligne **anonyme** (`formatProdChangeLog`,
   🎛️) — placée, retirée, placée par le staff, remplacée, retirée par le staff,
-  retirée d'office (rôle perdu, prod « plus disponible » — compte suspendu ou
-  effacé, motif tu —, prod devenue joueuse du match, compte en cours de
+  retirée d'office (rôle perdu, prod « plus disponible » — compte suspendu,
+  motif tu —, prod devenue joueuse du match, compte supprimé ou en cours de
   suppression). Aucun pseudo, staff anonyme. Les retraits vont à l'alerte du
   staff (`staff-removal`), le reste au salon des casts.
 - Avis au compte que le **staff** place ou retire, ou dont la place est rendue
@@ -80,13 +80,20 @@ de charge (`loadPlanningHistory`).
 - Rôle `prod` perdu (`setUserRoles`) : ses places sur des matchs **pas encore
   lancés** sont rendues (`withdrawLostProdPlaces`), annonce « retirée d'office » ;
   un match lancé (direct en cours) ou joué la garde, comme un caster inéligible.
+  Ce retrait verrouille les matchs **après** le compte, l'ordre inverse du
+  lancement : `setUserRoles` est rejoué sur interblocage (`retryOnDeadlock`).
 - Avant tout lancement (`releaseUnfitProd`, appelé par `adoptCurrentPairing` —
   « Prêt », lancement forcé, entretien, relance après un retrait), sous le verrou
   du match et tant qu'il n'est pas lancé : la prod qui ne peut plus l'être est
   rendue d'office — rôle perdu (`INELIGIBLE`, rattrape aussi un match lancé puis
-  réapparié), compte suspendu ou effacé (`UNAVAILABLE`), prod devenue joueuse du
-  match (`JOINED_TEAM`). Lectures courantes verrouillées quand un instantané a
-  précédé le verrou (entretien, relance) ; annoncée après le commit (`queueProdChange`).
+  réapparié), compte suspendu (`UNAVAILABLE`), compte effacé (journal
+  `ACCOUNT_DELETION`, aucun avis), prod devenue joueuse du match (`JOINED_TEAM`,
+  lu dans la même lecture d'équipes que les casters). Lectures courantes
+  verrouillées quand un instantané a précédé le verrou (entretien, relance) —
+  suspension comprise, relue à part (`lockedSuspendedUserIds`) : la sous-requête
+  d'une lecture verrouillée lirait l'instantané. L'entretien verrouille tous ses
+  matchs avant de lire, en une fois, les comptes de leurs prods. Annoncée après
+  le commit (`queueProdChange`).
 - Demande de suppression (anonymisation) : places des matchs à jouer rendues,
   une ligne « retirée d'office » au journal par match (`releasedProdPlaces`) ;
   effacement : toutes (`withdrawUserCasts`). Les tournois concernés sont rediffusés.

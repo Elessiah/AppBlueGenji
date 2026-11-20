@@ -745,6 +745,16 @@ describe("setManualAssignment — pose", () => {
     expect(callsWith("INSERT INTO bg_planning_assignments")).toHaveLength(0);
   });
 
+  it("setManualAssignment_matchProdPosedAsCaster_refusedBeforeLock", async () => {
+    // La prod du match est une ligne PROD tenue : le conflit de rôles refuse, sans relecture verrouillée.
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry({ matchProdId: 4 })], members }));
+
+    await expect(setManualAssignment(staff, { entryKey: "m:1", role: "CASTER", userId: 4, assigned: true })).rejects.toThrow(
+      "PLANNING_ROLE_CONFLICT",
+    );
+    expect(callsWith("SELECT id, prod_user_id FROM bg_matches")).toHaveLength(0);
+  });
+
   it("setManualAssignment_prodPlacedDuringGesture_throwsProdTaken", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [loadedEntry()], members }));
     routeSql({ matchProd: 4 });

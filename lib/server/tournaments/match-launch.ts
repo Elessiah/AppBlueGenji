@@ -239,39 +239,77 @@ export function rowReadiness(row: LaunchMatchRow, casters: readonly MatchCasterL
  * côtoierait en base celui de l'équipe d'avant, que la lecture rejetterait
  * pourtant — et l'empreinte neuve le ressusciterait.
  */
-async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchRow, currentRead = false): Promise<boolean> {
-  const reset = await resetForNewPairing(connection, row);
+async function adoptCurrentPairing(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  currentRead = false,
+  prodAccounts?: ReadonlyMap<number, ProdAccount>,
+): Promise<boolean> {
+  const { reset, players } = await resetForNewPairing(connection, row, currentRead);
   // Après la remise à zéro : un appariement neuf n'est pas encore lancé.
-  const prodReleased = await releaseUnfitProd(connection, row, currentRead);
+  const prodReleased = await releaseUnfitProd(connection, row, currentRead, { accounts: prodAccounts, players });
   return reset || prodReleased;
 }
 
-type ProdFitnessRow = RowDataPacket & { is_deleted: number | null; holds_prod: number | null; suspended: number | null };
+/** Ce que le lancement relit du compte de la prod (`docs/features/MATCH_PROD.md`). */
+type ProdAccount = { deleted: boolean; holdsProd: boolean; suspended: boolean };
+
+type ProdAccountRow = RowDataPacket & { id: number; is_deleted: number | null; holds_prod: number | null; suspended?: number | null };
 
 /**
- * Pourquoi la prod du match n'en est plus une (`docs/features/MATCH_PROD.md`) :
- * elle a perdu la permission `prod` (`INELIGIBLE`), son compte est suspendu ou
- * effacé (`UNAVAILABLE`, sans dire pourquoi), ou elle joue désormais le match
- * — son équipe vient d'y être placée, ou elle a rejoint une des deux équipes
- * (`JOINED_TEAM`). `null` : elle le reste. Une lecture du compte, puis, s'il
- * convient, deux de ses équipes ; `currentRead` (un instantané a précédé le
- * verrou du match) : lectures courantes, verrouillées en partage.
+ * Les comptes des prods `ids`, en **une** lecture. `currentRead` (un
+ * instantané a précédé le verrou du match) : lecture courante, verrouillée en
+ * partage, puis la suspension relue de même (`lockedSuspendedUserIds`, après
+ * les comptes — l'ordre de `suspendAccount`) ; la sous-requête `EXISTS` d'une
+ * lecture verrouillée lirait, elle, l'instantané. Sinon une lecture ordinaire,
+ * suspension comprise, toute de la même vue.
  */
-async function prodUnfitness(
+async function loadProdAccounts(
   connection: PoolConnection,
-  row: LaunchMatchRow,
-  prodId: number,
+  ids: readonly number[],
   currentRead: boolean,
-): Promise<Exclude<ProdNoticeKind, "ASSIGNED" | "RELEASED"> | null> {
-  const [accounts] = await connection.execute<ProdFitnessRow[]>(
-    `SELECT u.is_deleted, ${PROD_ROLE_SQL} AS holds_prod, ${userSuspendedSql("u.id")} AS suspended
-       FROM bg_users u WHERE u.id = ? LIMIT 1${currentRead ? " LOCK IN SHARE MODE" : ""}`,
-    [prodId],
+): Promise<Map<number, ProdAccount>> {
+  const users = [...new Set(ids)].sort((a, b) => a - b);
+  if (users.length === 0) return new Map();
+  const suspendedColumn = currentRead ? "" : `, ${userSuspendedSql("u.id")} AS suspended`;
+  const [rows] = await connection.execute<ProdAccountRow[]>(
+    `SELECT u.id, u.is_deleted, ${PROD_ROLE_SQL} AS holds_prod${suspendedColumn}
+       FROM bg_users u WHERE u.id IN (${sqlPlaceholders(users.length)})${currentRead ? " LOCK IN SHARE MODE" : ""}`,
+    users,
   );
-  const account = accounts[0];
-  if (!account || Number(account.is_deleted ?? 0) === 1 || Number(account.suspended ?? 0) === 1) return "UNAVAILABLE";
-  if (Number(account.holds_prod ?? 0) !== 1) return "INELIGIBLE";
-  return (await playingUserIds(connection, row, [prodId], currentRead)).has(prodId) ? "JOINED_TEAM" : null;
+  const suspended = currentRead ? await lockedSuspendedUserIds(connection, users) : null;
+  return new Map(
+    rows.map((account) => [
+      Number(account.id),
+      {
+        deleted: Number(account.is_deleted ?? 0) === 1,
+        holdsProd: Number(account.holds_prod ?? 0) === 1,
+        suspended: suspended ? suspended.has(Number(account.id)) : Number(account.suspended ?? 0) === 1,
+      },
+    ]),
+  );
+}
+
+/** Pourquoi la prod quitte sa place : un avis de {@link ProdNoticeKind}, ou son compte effacé (`DELETED`, sans avis). */
+type ProdUnfitness = Exclude<ProdNoticeKind, "ASSIGNED" | "RELEASED"> | "DELETED";
+
+/**
+ * Pourquoi la prod du match n'en est plus une : compte effacé (`DELETED`),
+ * suspendu (`UNAVAILABLE`, sans dire pourquoi), permission `prod` perdue
+ * (`INELIGIBLE`), ou elle joue désormais le match — son équipe vient d'y être
+ * placée, ou elle a rejoint une des deux équipes (`JOINED_TEAM`, lu par
+ * `plays` seulement si le compte convient). `null` : elle le reste.
+ */
+async function prodUnfitness(account: ProdAccount | undefined, plays: () => Promise<boolean>): Promise<ProdUnfitness | null> {
+  if (!account || account.deleted) return "DELETED";
+  if (account.suspended) return "UNAVAILABLE";
+  if (!account.holdsProd) return "INELIGIBLE";
+  return (await plays()) ? "JOINED_TEAM" : null;
+}
+
+/** Le match peut-il encore perdre sa prod d'office (ni lancé, ni joué) ? */
+function holdsReleasableProd(row: LaunchMatchRow): boolean {
+  return nullableId(row.prod_user_id ?? null) !== null && row.launched_at === null && row.status !== "COMPLETED";
 }
 
 /**
@@ -279,30 +317,54 @@ async function prodUnfitness(
  * d'office, sous le verrou du match, **avant** tout lancement : tant que le
  * match n'est ni lancé ni joué — un direct en cours n'est pas coupé, comme un
  * caster (`releaseIneligibleCasters`). Annoncé après le commit
- * (`queueProdChange` : journal du staff sans nom, avis au compte).
+ * (`queueProdChange` : journal du staff sans nom, avis au compte — aucun à un
+ * compte effacé).
+ *
+ * `known.accounts` : comptes déjà relus (entretien, une lecture par passe) ;
+ * `known.players` : les joueurs du match parmi casters et prod, déjà relus par
+ * la remise à zéro (`null` : non relus).
  *
  * Rend `true` quand la place a été rendue.
  */
-async function releaseUnfitProd(connection: PoolConnection, row: LaunchMatchRow, currentRead: boolean): Promise<boolean> {
-  const prodId = nullableId(row.prod_user_id ?? null);
-  if (prodId === null || row.launched_at !== null || row.status === "COMPLETED") return false;
-  const reason = await prodUnfitness(connection, row, prodId, currentRead);
+async function releaseUnfitProd(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  currentRead: boolean,
+  known: { accounts?: ReadonlyMap<number, ProdAccount>; players: ReadonlySet<number> | null } = { players: null },
+): Promise<boolean> {
+  if (!holdsReleasableProd(row)) return false;
+  const prodId = Number(row.prod_user_id);
+  const account = known.accounts?.has(prodId)
+    ? known.accounts.get(prodId)
+    : (await loadProdAccounts(connection, [prodId], currentRead)).get(prodId);
+  const reason = await prodUnfitness(account, async () =>
+    (known.players ?? (await playingUserIds(connection, row, [prodId], currentRead))).has(prodId),
+  );
   if (reason === null) return false;
   await connection.execute(`UPDATE bg_matches SET prod_user_id = NULL WHERE id = ? AND prod_user_id = ?`, [row.id, prodId]);
   row.prod_user_id = null;
   queueProdChange(connection, {
     matchId: Number(row.id),
-    log: reason,
-    notices: [{ userId: prodId, kind: reason }],
+    log: reason === "DELETED" ? "ACCOUNT_DELETION" : reason,
+    notices: reason === "DELETED" ? [] : [{ userId: prodId, kind: reason }],
     pairing: castPairingOf(row),
   });
   return true;
 }
 
-/** La remise à zéro de {@link adoptCurrentPairing} ; `true` quand un caster a été retiré. */
-async function resetForNewPairing(connection: PoolConnection, row: LaunchMatchRow): Promise<boolean> {
+/**
+ * La remise à zéro de {@link adoptCurrentPairing}. `reset` : un caster a été
+ * retiré ; `players` : les joueurs du match parmi casters et prod, relus une
+ * fois pour les deux contrôles (`null` : rien relu). `currentRead` : lectures
+ * courantes, verrouillées en partage, comme celles de la prod.
+ */
+async function resetForNewPairing(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  currentRead: boolean,
+): Promise<{ reset: boolean; players: ReadonlySet<number> | null }> {
   const key = launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
-  if (key === null || row.launch_pairing === key) return false;
+  if (key === null || row.launch_pairing === key) return { reset: false, players: null };
   await connection.execute(
     `UPDATE bg_matches
      SET launch_pairing = ?, lobby_opened_at = NULL, launched_at = NULL,
@@ -342,17 +404,21 @@ async function resetForNewPairing(connection: PoolConnection, row: LaunchMatchRo
     row.refereeEligible = false;
     queueRefereeChange(connection, { kind: "AUTO_RELEASED", matchId: Number(row.id), refereeId, reason: "JOINED_TEAM" });
   }
-  if (row.casters.length === 0) return false;
+  // Un caster ou la prod peut s'inscrire sur un match dont les créneaux sont
+  // encore vides — l'inscription ne peut alors rien vérifier. Si l'appariement
+  // qui arrive compte son équipe, il joue ce match : il ne peut plus le caster
+  // ni en faire la prod. Deux lectures pour casters et prod ensemble, sous le
+  // verrou du match (et non deux par compte).
+  const prodId = holdsReleasableProd(row) ? Number(row.prod_user_id) : null;
+  const asked = [...row.casters.map((caster) => caster.userId), ...(prodId === null ? [] : [prodId])];
+  if (asked.length === 0) return { reset: false, players: null };
+  const players = await playingUserIds(connection, row, asked, currentRead);
+  if (row.casters.length === 0) return { reset: false, players };
   await connection.execute(`UPDATE bg_match_casters SET ready_at = NULL WHERE match_id = ?`, [row.id]);
   for (const caster of row.casters) caster.readyAt = null;
 
-  // Un caster peut s'inscrire sur un match dont les créneaux sont encore vides
-  // — l'inscription ne peut alors rien vérifier. Si l'appariement qui arrive
-  // compte son équipe, il joue ce match : il ne peut plus le caster.
-  // Deux lectures pour tous les casters, sous le verrou du match (et non deux par caster).
-  const players = await playingUserIds(connection, row, row.casters.map((caster) => caster.userId));
   const playing = row.casters.map((caster) => caster.userId).filter((id) => players.has(id));
-  if (playing.length === 0) return false;
+  if (playing.length === 0) return { reset: false, players };
   await connection.execute(
     `DELETE FROM bg_match_casters WHERE match_id = ? AND user_id IN (${playing.map(() => "?").join(", ")})`,
     [row.id, ...playing],
@@ -373,7 +439,7 @@ async function resetForNewPairing(connection: PoolConnection, row: LaunchMatchRo
       pairing: castPairingOf(row),
     });
   }
-  return true;
+  return { reset: true, players };
 }
 
 /**
@@ -1572,6 +1638,27 @@ function enteredLaunch(row: LaunchMatchBaseRow, now: number): boolean {
 }
 
 /**
+ * L'entretien, ses matchs tous verrouillés : les comptes de leurs prods se
+ * relisent en **une** lecture courante, puis chaque match adopte son
+ * appariement (`adoptCurrentPairing`, la prod qui ne peut plus l'être rendue).
+ */
+async function adoptLockedPairings(
+  connection: PoolConnection,
+  locked: readonly { row: LaunchMatchRow; stale: boolean }[],
+): Promise<{ row: LaunchMatchRow; stale: boolean; adopted: boolean }[]> {
+  const prodIds = locked.flatMap(({ row }) => {
+    const prodId = nullableId(row.prod_user_id ?? null);
+    return prodId === null || row.status === "COMPLETED" ? [] : [prodId];
+  });
+  const prodAccounts = await loadProdAccounts(connection, prodIds, true);
+  const adopted: { row: LaunchMatchRow; stale: boolean; adopted: boolean }[] = [];
+  for (const { row, stale } of locked) {
+    adopted.push({ row, stale, adopted: await adoptCurrentPairing(connection, row, true, prodAccounts) });
+  }
+  return adopted;
+}
+
+/**
  * Entretien du lancement d'un tournoi en cours, appelé par la synchronisation
  * passive (`syncTournamentState`) dans **sa** transaction :
  *
@@ -1611,7 +1698,7 @@ export async function maintainMatchLaunches(
   const now = Date.now();
   let changed = 0;
   const undecided: NoRefereeCandidate[] = [];
-  const locked: { row: LaunchMatchRow; stale: boolean; adopted: boolean }[] = [];
+  const locked: { row: LaunchMatchRow; stale: boolean }[] = [];
   for (const candidate of rows) {
     // Les candidats sont parcourus par identifiant croissant (`ORDER BY`) : deux
     // entretiens du même tournoi — balayage passif et relève de la modale —
@@ -1631,17 +1718,17 @@ export async function maintainMatchLaunches(
     const row = await lockLaunchMatch(connection, Number(candidate.id), true, candidate);
     if (row?.status !== "READY" || !enteredLaunch(row, now)) continue;
     const stale = row.launch_pairing !== launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
-    const adopted = await adoptCurrentPairing(connection, row, true);
-    locked.push({ row, stale, adopted });
+    locked.push({ row, stale });
   }
-  // Tous les candidats sont verrouillés (par id croissant) : la condition du
-  // cast de leurs casters se relit en une fois, après les verrous des matchs
-  // — même ordre (match puis compte) que la lecture par match qu'elle remplace.
+  // Tous les candidats sont verrouillés (par id croissant) avant toute lecture
+  // de compte ou d'équipe ; la condition du cast des casters se relit, de
+  // même, en une lecture par jeu — toujours l'ordre match puis compte.
+  const adoptedRows = await adoptLockedPairings(connection, locked);
   const castBlocks = await loadMaintenanceCastBlocks(
     connection,
     locked.map((entry) => entry.row),
   );
-  for (const { row, stale, adopted } of locked) {
+  for (const { row, stale, adopted } of adoptedRows) {
     // Ni le décompte des « Prêt » ni le lancement (qui rend publics le pseudo
     // et le lien du stream) ne comptent un caster devenu inéligible.
     // Un retrait change ce que voient les lecteurs : il compte comme un

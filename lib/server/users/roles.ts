@@ -7,6 +7,7 @@ import { normalizePseudo, parseRoles } from "@/lib/server/serialization";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { releaseWithServerLockWait, rollbackKeepingError } from "@/lib/server/tournaments/lock-wait";
+import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import {
   announceProdWithdrawals,
   withdrawLostProdPlaces,
@@ -159,6 +160,19 @@ async function withdrawProdIfLost(
  * @returns les rôles enregistrés (normalisés) et ceux qu'ils remplacent.
  */
 export async function setUserRoles(
+  targetUserId: number,
+  roles: PlatformRole[],
+  actorUserId: number,
+  expected?: readonly PlatformRole[],
+): Promise<RolesSaveResult> {
+  // Rejoué sur interblocage : rendre les places de prod verrouille des matchs
+  // **après** le compte, quand le lancement d'un match relit le compte de sa
+  // prod après le verrou du match (`MATCH_PROD.md`). Rien n'est annoncé avant
+  // le commit : une tentative annulée ne laisse aucune trace.
+  return retryOnDeadlock(() => setUserRolesOnce(targetUserId, roles, actorUserId, expected));
+}
+
+async function setUserRolesOnce(
   targetUserId: number,
   roles: PlatformRole[],
   actorUserId: number,

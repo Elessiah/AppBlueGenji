@@ -209,8 +209,11 @@ function refuseManualPose({ data, entry, input, current }: Pick<ManualContext, "
     throw new Error("PLANNING_ROLE_CONFLICT");
   }
   if (current?.source === "CAST") throw new Error("PLANNING_CAST_MANAGED");
-  const prodRefusal = matchProdRefusal(entry.matchProdId, input.userId, input.role);
-  if (prodRefusal !== null) throw new Error(prodRefusal);
+  // La prod du match est déjà une ligne PROD tenue (`model.ts`) : la prod qui se pose caster tombe sur le
+  // conflit de rôles ci-dessus. Reste la place de prod tenue par un autre ; tout se relit sous verrou ensuite.
+  if (input.role === "PROD" && matchProdRefusal(entry.matchProdId, input.userId, input.role) === "PLANNING_PROD_TAKEN") {
+    throw new Error("PLANNING_PROD_TAKEN");
+  }
   if (input.role === "CASTER" && planningCastersFull(entryAssignments(entry, data), input.userId)) throw new Error("PLANNING_CASTERS_FULL");
 }
 
