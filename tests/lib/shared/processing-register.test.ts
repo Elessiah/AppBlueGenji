@@ -137,7 +137,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04En.recipients.join(" ")).toContain("caster: start of the match they cast, removal of their registration for a match");
     expect(byRef("T05").subPurposes.join(" ")).toContain("sans nommer le caster ni le staff — et sans trace dans les journaux du serveur");
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.subPurposes.join(" ")).toContain("without naming the caster or the staff — and without any trace in the server logs");
-    expect(byRef("T05").dataCategories.join(" ")).toContain("aucun membre du staff ni caster nommé (« le staff », « un caster »");
+    expect(byRef("T05").dataCategories.join(" ")).toContain("aucun membre du staff, caster ni prod nommé (« le staff », « un caster »");
     expect(byRef("T12").subPurposes.join(" ")).toContain("Retrait de son inscription de caster sur un match");
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T12")!.subPurposes.join(" ")).toContain("Removal of their caster registration for a match");
   });

@@ -136,6 +136,7 @@ de charge (`loadPlanningHistory`).
   une ligne « retirée d'office » au journal par match (`releasedProdPlaces`) ;
   effacement : toutes (`withdrawUserCasts`). Les tournois concernés sont rediffusés.
 - Export : `prodAssignments` (match, tournoi) — `RGPD_DATA_RIGHTS.md`.
+- Textes légaux : registre T16 (base : intérêt légitime, comme le planning T20 — aucune clause des conditions, qui ne couvrent que les casters), T04 (avis en message privé et push), T05 (ligne Discord sans nom ; geste du staff nommé dans pm2 avec les comptes visés), T03 (pseudo sur `/suivre`) ; `/rgpd` FR et EN ; entrée `2026-11-prod-match`.
 
 ## Seed
 

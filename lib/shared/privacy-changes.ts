@@ -2345,8 +2345,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     links: [{ href: "/rgpd/registre#t16", label: "Lire la fiche T16 du registre" }],
     summary: "Un match peut avoir une prod, qui assure la production de son direct : elle s'y place elle-même ou y est placée par le staff, et son pseudo est montré avec le match, comme celui des casters.",
     details: [
-      "Ce qui est gardé : le compte de la prod avec le match, tant que le match existe ; il est retiré des matchs pas encore lancés si le compte perd ce rôle, est suspendu ou joue désormais le match, et des matchs pas encore joués s'il est supprimé (avant le lancement, une prod qui ne remplit plus ces conditions n'est plus montrée), et figure dans l'export de ses données. Base : exécution du service, comme pour les casters.",
-      "Qui le voit : les lecteurs de la page du match, comme pour les casters. La prod est prévenue (message privé Discord et notification push, sujet « Prod d'un match », qui se coupe dans « Mon profil ») quand le staff la place ou l'en retire, ou quand sa place lui est retirée d'office ; ces gestes sont notés au journal du staff sur Discord sans nommer personne.",
+      "Ce qui est gardé : le compte de la prod avec le match, tant que le match existe ; il est retiré des matchs pas encore lancés si le compte perd ce rôle, est suspendu ou joue désormais le match, et des matchs pas encore joués s'il est supprimé (avant le lancement, une prod qui ne remplit plus ces conditions n'est plus montrée), et figure dans l'export de ses données. Base : intérêt légitime (organiser les bénévoles qui diffusent les tournois), comme le planning.",
+      "Qui le voit : comme pour les casters, les lecteurs du tournoi et du match, y compris sans compte. La prod est prévenue (message privé Discord et notification push, réglables dans « Mon profil ») quand un autre qu'elle la place ou l'en retire, par le staff ou d'office ; ces gestes sont notés au journal du staff sur Discord sans nommer personne, et les journaux du serveur gardent l'auteur d'un geste du staff et le compte visé, selon leur rotation.",
     ],
   },
 ];
