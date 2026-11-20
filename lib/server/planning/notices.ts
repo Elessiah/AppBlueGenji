@@ -65,7 +65,7 @@ export async function announceAssignments(
       byUser.set(item.userId, list);
     }
     if (byUser.size === 0) return;
-    const recipients = await loadNotificationRecipients([...byUser.keys()], "proven", { excludeSuspended: true });
+    const recipients = await loadNotificationRecipients([...byUser.keys()], "proven", { excludeSuspended: true, planningMembersOnly: true });
     const base = siteCanonicalBase();
     const replacement = options.replacement === true;
     // Les personnes qui reçoivent la même liste partent en un envoi (une
@@ -108,6 +108,13 @@ export type WithdrawalAnnouncement = {
   late: boolean;
   /** Qui s'est désisté : jamais prévenu de son propre geste. */
   withdrawnUserId: number;
+  /**
+   * Sortie d'un invité par le staff (`releaseGuestPlanning`) : les avis disent « retiré du planning », pas
+   * « s'est désisté ». Absent : faux.
+   */
+  released?: boolean;
+  /** Le staff auteur de cette sortie : jamais prévenu de son propre geste (désistement ni place à pourvoir). */
+  actorId?: number | null;
   /** Remplaçant affecté (prévenu à part, `PLANNING_ASSIGNED`), ou `null`. */
   replacementId: number | null;
   /**
@@ -152,9 +159,13 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
     stillHeld,
     streamLost: input.unfilled && input.streamLost === true,
     late: input.late,
+    ...(input.released === true ? { released: true } : {}),
   };
+  const actorId = input.actorId ?? null;
   try {
-    const others = [...new Set(input.coAssignedIds)].filter((id) => id !== input.replacementId && id !== input.withdrawnUserId);
+    const others = [...new Set(input.coAssignedIds)].filter(
+      (id) => id !== input.replacementId && id !== input.withdrawnUserId && id !== actorId,
+    );
     // Le caster qui reste ne lit pas « un autre caster reste affecté » : c'est lui ; il apprend qu'il reste.
     const groups: [number[], PlanningWithdrawalNotice][] = [
       [others.filter((id) => !stillHeldBy.has(id)), notice],
@@ -162,7 +173,7 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
     ];
     const base = siteCanonicalBase();
     // Une seule lecture des destinataires, répartis ensuite entre les deux textes.
-    const loaded = others.length === 0 ? [] : await loadNotificationRecipients(others, "proven", { excludeSuspended: true });
+    const loaded = others.length === 0 ? [] : await loadNotificationRecipients(others, "proven", { excludeSuspended: true, planningMembersOnly: true });
     for (const [ids, text] of groups) {
       const wanted = new Set(ids);
       const recipients = loaded.filter((recipient) => wanted.has(recipient.userId));
@@ -182,7 +193,10 @@ export async function announceWithdrawal(input: WithdrawalAnnouncement): Promise
     return;
   }
   const staff = input.staffUnfilled === undefined ? membersUnfilled(input) : input.staffUnfilled;
-  if (staff !== null) await announceUnfilled({ ...notice, replaced: false, stillHeld: false, streamLost: staff.streamLost }, input.withdrawnUserId);
+  if (staff !== null) {
+    const silent = actorId === null ? [input.withdrawnUserId] : [input.withdrawnUserId, actorId];
+    await announceUnfilled({ ...notice, replaced: false, stillHeld: false, streamLost: staff.streamLost }, silent);
+  }
 }
 
 /** La place telle que la lisent les membres, quand aucune lecture du staff n'est donnée. */
@@ -191,18 +205,23 @@ function membersUnfilled(input: WithdrawalAnnouncement): { streamLost: boolean }
 }
 
 /**
- * Place à pourvoir : une ligne sans nom au journal du staff sur Discord, et
+ * Place à pourvoir : une ligne sans nom au journal du staff sur Discord (aucune pour la sortie d'un invité), et
  * le staff des tournois prévenu (push **et** message privé, dans sa langue),
  * choisi par la règle de `notifyStaff` (`loadStaffIds`).
  * Ce staff voit les tournois cachés : rien n'atteint qui ne peut pas voir
  * l'entrée. Couper le sujet coupe aussi le message privé (`dmFollowsTopic`).
- * Celui qui s'est désisté n'est pas prévenu de son propre geste.
+ * Celui qui s'est désisté — et le staff qui a sorti un invité — n'est pas prévenu de son propre geste (`silent`).
  */
-async function announceUnfilled(notice: PlanningWithdrawalNotice, withdrawnUserId: number): Promise<void> {
+async function announceUnfilled(notice: PlanningWithdrawalNotice, silent: readonly number[]): Promise<void> {
   try {
     const base = siteCanonicalBase();
-    sendBotLog(formatPlanningUnfilledLine(notice, base), { tournamentId: notice.tournamentId, category: "staff-removal" });
-    const recipients = await loadNotificationRecipients(await loadStaffIds("tournaments", [withdrawnUserId]), "proven", { excludeSuspended: true });
+    // Sortie d'un invité : pas de ligne par place au journal du staff sur Discord — suivant de près la ligne
+    // anonyme « Un compte passe invité », leur rafale désignerait le compte (qui tenait ces matchs). Le staff des
+    // tournois reste prévenu ci-dessous, et la sortie est nominative dans pm2.
+    if (notice.released !== true) {
+      sendBotLog(formatPlanningUnfilledLine(notice, base), { tournamentId: notice.tournamentId, category: "staff-removal" });
+    }
+    const recipients = await loadNotificationRecipients(await loadStaffIds("tournaments", [...silent]), "proven", { excludeSuspended: true, planningMembersOnly: true });
     if (recipients.length === 0) return;
     await notifyUsers(recipients, {
       topic: "PLANNING_UNFILLED",

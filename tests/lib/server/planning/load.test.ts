@@ -320,6 +320,26 @@ describe("loadPlanningMembers", () => {
   });
 });
 
+describe("loadPlanningMembers — invités", () => {
+  it("loadPlanningMembers_sql_filtersGuests", async () => {
+    connection.execute.mockResolvedValue([[], []]);
+
+    await loadPlanningMembers(executor);
+
+    const [sql] = connection.execute.mock.calls[0];
+    expect(sql).toContain("u.is_guest_staff = 0");
+  });
+
+  it("loadPlanningMembers_guestRow_excluded", async () => {
+    jest.mocked(resolveRoles).mockReturnValue(["CASTER"]);
+    connection.execute.mockResolvedValue([[{ id: 3, pseudo: "Invité", is_admin: 0, platform_roles_json: '["CASTER"]', is_guest_staff: 1, solo_caster: null, suspended: 0 }], []]);
+
+    const members = await loadPlanningMembers(executor);
+
+    expect(members).toEqual([]);
+  });
+});
+
 describe("coveringSoloCasterIds", () => {
   const members = [
     loadedMember({ userId: 3, soloCaster: true }),
@@ -380,9 +400,32 @@ describe("loadPlanningData", () => {
     // Une seule lecture pour retraits et désistements ; les désistements sortent par date puis identifiant.
     expect(connection.execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_planning_events"))).toHaveLength(1);
     expect(data.withdrawals.map((row) => row.userId)).toEqual([4, 5]);
-    expect(data.withdrawals[0]).toEqual({ entryKey: "t:10", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, createdAt: "2026-11-20T10:00:00.000Z" });
+    expect(data.withdrawals[0]).toEqual({ entryKey: "t:10", userId: 4, role: "CASTER", reason: "Malade", late: true, confirmed: true, staffRelease: false, createdAt: "2026-11-20T10:00:00.000Z" });
     expect(data.removals).toContainEqual({ entryKey: "t:10", userId: 4, role: "CASTER" });
     expect(data.removals).toContainEqual({ entryKey: "t:10", userId: 6, role: "PROD" });
+  });
+
+  it("loadPlanningData_staffWithdrawal_notAnExclusion", async () => {
+    routeSql({ tournaments: [tournamentRow()] });
+    const plain = connection.execute.getMockImplementation();
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      if (sql.includes("kind = 'WITHDRAWN'")) {
+        return [
+          [
+            { id: 8, entry_key: "t:10", user_id: 5, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: null, late: 0, staff_release: 1, created_at: new Date("2026-11-20T10:00:00Z") },
+          ],
+          [],
+        ];
+      }
+      return plain ? plain(sql, params) : [[], []];
+    });
+
+    const data = await loadPlanningData(executor, { now: MONDAY, includeHidden: true, members: [] });
+
+    // La sortie d'un invité par le staff reste un désistement montré, sans écarter le compte des calculs suivants.
+    expect(data.withdrawals.map((row) => row.userId)).toEqual([5]);
+    expect(data.withdrawals[0].staffRelease).toBe(true);
+    expect(data.removals).toEqual([]);
   });
 
   it("loadPlanningData_reads_settingsOnce_andCarriesThem", async () => {

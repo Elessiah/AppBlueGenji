@@ -170,7 +170,15 @@ describe("setAvailability", () => {
 
     await setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "PENDING", preferred: true });
 
-    expect(execute.mock.calls[0][1]).toEqual(["m:1", 6, "PROD", 10, 1, "PENDING", 1]);
+    expect(execute.mock.calls[0][1]).toEqual(["m:1", "PROD", 10, 1, "PENDING", 1, 6]);
+  });
+
+  it("setAvailability_valid_insertsOnlyForANonGuestAccount", async () => {
+    jest.mocked(loadPlanningEntries).mockResolvedValue([loadedEntry()]);
+
+    await setAvailability(prod, { entryKey: "m:1", role: "PROD", status: "AVAILABLE", preferred: false });
+
+    expect(execute.mock.calls[0][0]).toMatch(/INSERT INTO bg_planning_availability[\s\S]*SELECT[\s\S]*FROM bg_users u WHERE u\.id = \? AND u\.is_guest_staff = 0/);
   });
 
   it("setAvailability_readsOnlyThatEntry_neverTheWholePlanning", async () => {

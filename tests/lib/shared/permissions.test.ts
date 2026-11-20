@@ -6,6 +6,7 @@ import {
   canAny,
   canComputePlanning,
   hasPermission,
+  holdsGuestEligibleRole,
   isPlatformRole,
   isStaffMember,
   permissionsForRoles,
@@ -214,5 +215,48 @@ describe("isStaffMember", () => {
   it("isStaffMember_noRoleOrNoUser_false", () => {
     expect(isStaffMember({ roles: [] })).toBe(false);
     expect(isStaffMember(null)).toBe(false);
+  });
+});
+
+describe("can — invités du planning (`CAST_PLANNING.md` § Invités)", () => {
+  it("can_planningGuestWithCaster_deniesPlanning", () => {
+    expect(can({ roles: ["CASTER"], planningGuest: true }, "planning")).toBe(false);
+  });
+
+  it("can_planningGuestWithCaster_keepsCastingAndLive", () => {
+    const guest = { roles: ["CASTER"] as PlatformRole[], planningGuest: true };
+
+    expect(can(guest, "casting")).toBe(true);
+    expect(can(guest, "live")).toBe(true);
+  });
+
+  it("can_casterNotGuest_keepsPlanning", () => {
+    expect(can({ roles: ["CASTER"], planningGuest: false }, "planning")).toBe(true);
+  });
+
+  it("can_adminPlanningGuest_keepsPlanning", () => {
+    expect(can({ isAdmin: true, roles: [], planningGuest: true }, "planning")).toBe(true);
+  });
+
+  it("canAny_planningGuest_planningOnlyDenied", () => {
+    expect(canAny({ roles: ["CASTER"], planningGuest: true }, ["planning"])).toBe(false);
+  });
+});
+
+describe("holdsGuestEligibleRole — la marque « invité » ne vise qu'un caster ou un prod", () => {
+  it("holdsGuestEligibleRole_prodJson_true", () => {
+    expect(holdsGuestEligibleRole('["PROD"]')).toBe(true);
+  });
+
+  it("holdsGuestEligibleRole_casterList_true", () => {
+    expect(holdsGuestEligibleRole(["ARBITRE", "CASTER"])).toBe(true);
+  });
+
+  it("holdsGuestEligibleRole_arbitreOnly_false", () => {
+    expect(holdsGuestEligibleRole('["ARBITRE"]')).toBe(false);
+  });
+
+  it("holdsGuestEligibleRole_invalidJson_false", () => {
+    expect(holdsGuestEligibleRole("not json")).toBe(false);
   });
 });

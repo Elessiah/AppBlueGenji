@@ -83,11 +83,14 @@ export async function createPlanningTables(db: Pool): Promise<void> {
   `);
 
   // Historique des attributions : chaque pose et chaque retrait, calculé ou
-  // manuel, et chaque désistement (`WITHDRAWN`, posé par le membre lui-même :
-  // `reason` facultatif, lu du seul staff des tournois ; `late` si moins de
-  // 24 h avant le début). Un retrait **manuel** ou un désistement écarte ce
+  // manuel, et chaque désistement (`WITHDRAWN`, posé par le membre lui-même —
+  // `actor_user_id` nul — : `reason` facultatif, lu du seul staff des tournois ;
+  // `late` si moins de 24 h avant le début ; ou, `staff_release = 1`, posé par
+  // le staff `actor_user_id` qui sort un invité du planning, `CAST_PLANNING.md`
+  // § Invités). Un retrait **manuel** ou un désistement du membre écarte ce
   // membre de ce rôle de cette entrée pour les calculs suivants (le choix du
-  // staff tient, le désisté n'est pas reproposé). Un désistement ne compte
+  // staff tient, le désisté n'est pas reproposé) ; la sortie d'un invité
+  // (`staff_release`) n'écarte personne : redevenu membre, il est reproposé. Un désistement ne compte
   // jamais comme charge (`loadPlanningHistory` ne lit que les attributions).
   // Pour `WITHDRAWN`, `source` dit l'attribution quittée : `MANUAL` si elle
   // était confirmée (place annoncée, « à pourvoir » faute de remplaçant),
@@ -105,6 +108,7 @@ export async function createPlanningTables(db: Pool): Promise<void> {
       actor_user_id BIGINT NULL,
       reason VARCHAR(300) NULL,
       late TINYINT(1) NOT NULL DEFAULT 0,
+      staff_release TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       -- Le calcul lit les retraits manuels (REMOVED, MANUAL) des entrées du lot :
       -- l'index les trouve sans filtrer, ligne à ligne, toute l'histoire d'une entrée.

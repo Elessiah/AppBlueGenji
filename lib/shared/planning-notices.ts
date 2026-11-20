@@ -51,6 +51,8 @@ export type PlanningWithdrawalNotice = PlanningNoticeEntry & {
   streamLost?: boolean;
   /** Désistement à moins de 24 h du début. */
   late: boolean;
+  /** Pas un désistement : le staff a sorti du planning un compte devenu invité (« retiré du planning »). Absent : faux. */
+  released?: boolean;
 };
 
 /** Lignes d'un message privé listées au plus : le reste se dit en nombre. */
@@ -207,8 +209,13 @@ export function formatPlanningWithdrawalDm(notice: PlanningWithdrawalNotice, sit
   const label = planningEntryLabel(notice, locale);
   const url = planningNoticeUrl(siteBase, locale);
   const outcome = WITHDRAWAL_OUTCOMES[locale](role)[withdrawalOutcome(notice)];
-  if (locale === "en") return `↩️ BlueGenji — A ${role} withdrew from ${label} (${when}, Paris time). ${outcome} ${url}`;
-  return `↩️ BlueGenji — Un ${role} s'est désisté de ${label} (${when}, heure de Paris). ${outcome} ${url}`;
+  const released = notice.released === true;
+  if (locale === "en") {
+    const gone = released ? "was removed from the schedule for" : "withdrew from";
+    return `↩️ BlueGenji — A ${role} ${gone} ${label} (${when}, Paris time). ${outcome} ${url}`;
+  }
+  const gone = released ? "a été retiré du planning pour" : "s'est désisté de";
+  return `↩️ BlueGenji — Un ${role} ${gone} ${label} (${when}, heure de Paris). ${outcome} ${url}`;
 }
 
 /**
@@ -231,9 +238,11 @@ export function formatPlanningUnfilledDm(notice: PlanningWithdrawalNotice, siteB
   if (locale === "en") {
     const late = notice.late ? " (late withdrawal, less than 24 h before)" : "";
     const open = notice.streamLost === true ? "the stream is lost (a prod or a solo caster is needed)" : "the slot is open";
-    return `⚠️ Planning — a ${role} withdrew from ${label} (${when}, Paris time)${late}: no replacement found, ${open}. ${url}`;
+    const gone = notice.released === true ? "was removed from the schedule for" : "withdrew from";
+    return `⚠️ Planning — a ${role} ${gone} ${label} (${when}, Paris time)${late}: no replacement found, ${open}. ${url}`;
   }
   const late = notice.late ? " (désistement tardif, moins de 24 h avant)" : "";
   const open = notice.streamLost === true ? "diffusion perdue (il manque un prod ou un caster autonome)" : "place à pourvoir";
-  return `⚠️ Planning — un ${role} s'est désisté de ${label} (${when}, heure de Paris)${late} : aucun remplaçant trouvé, ${open}. ${url}`;
+  const gone = notice.released === true ? "a été retiré du planning pour" : "s'est désisté de";
+  return `⚠️ Planning — un ${role} ${gone} ${label} (${when}, heure de Paris)${late} : aucun remplaçant trouvé, ${open}. ${url}`;
 }

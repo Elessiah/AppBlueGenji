@@ -184,5 +184,35 @@
       "launch": "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses contacts d'équipe (aux seules parties du match), de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».",
       "footer": "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul)."
     }
+  },
+  "planningGuest": {
+    "label": "Invité",
+    "hint": "Hors planning : garde ses droits de caster/prod mais n'apparaît pas au planning.",
+    "saved": {
+      "member": "{pseudo} rejoint le planning.",
+      "guest": "{pseudo} est invité : hors planning.",
+      "partial": "{pseudo} est invité, mais des créneaux à venir n'ont pas pu être quittés : décoche puis recoche « Invité » pour réessayer, ou retire-les depuis le planning."
+    },
+    "dialog": {
+      "title": "Passer {pseudo} en invité ?",
+      "confirm": "Passer en invité",
+      "pending": "Enregistrement…",
+      "body": "Il garde ses rôles et peut toujours caster un match, mais il sort du planning : il quitte ses créneaux à venir (un remplaçant est cherché comme pour un désistement), ses disponibilités à venir sont effacées et il n'y est plus proposé ni prévenu. Son historique reste."
+    },
+    "unreadable": "Le réglage n'a pas pu être lu : recharge la page.",
+    "busy": "Un autre envoi est en cours, réessaye.",
+    "errors": {
+      "UNAUTHORIZED": "Ta session a expiré : reconnecte-toi.",
+      "FORBIDDEN": "Tu n'as pas la permission de régler les invités.",
+      "INVALID_ID": "Ce compte est introuvable.",
+      "USER_NOT_FOUND": "Ce compte est introuvable.",
+      "CANNOT_MODIFY_SELF": "Tu ne peux pas te déclarer invité toi-même.",
+      "INVALID_PAYLOAD": "Le réglage envoyé est invalide.",
+      "PLANNING_GUEST_ADMIN": "Un administrateur garde le planning : il ne peut pas être invité.",
+      "PLANNING_GUEST_NOT_STAFF": "Seul un caster ou un prod peut être invité : attribue-lui d'abord l'un de ces rôles.",
+      "CONCURRENT_UPDATE_RETRY": "Une autre modification de ce compte est passée au même moment : rien n'a été enregistré. Réessaie.",
+      "PROFILE_RELOAD_FAILED": "La fiche n'a pas pu être relue : recharge la page.",
+      "fallback": "L'enregistrement du réglage « Invité » a échoué."
+    }
   }
 }

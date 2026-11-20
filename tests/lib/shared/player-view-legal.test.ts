@@ -33,9 +33,9 @@ function paragraphAround(path: string, marker: string): string {
 
 describe("historique des changements — vue joueur (2026-11-20)", () => {
   it("privacyChanges_legacyEntry_keptBeforeThePlanningEntries", () => {
-    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(LEGACY_ID);
-    expect(PRIVACY_CHANGES.at(-4)?.id).toBe("2026-11-planning-casts-arbitres");
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe("2026-11-planning-notifications-desistements");
+    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(LEGACY_ID);
+    expect(PRIVACY_CHANGES.at(-5)?.id).toBe("2026-11-planning-casts-arbitres");
+    expect(PRIVACY_CHANGES.at(-4)?.id).toBe("2026-11-planning-notifications-desistements");
     expect(entryFr(LEGACY_ID)?.publishedAt).toBe("2026-11-20");
   });
 
@@ -52,10 +52,12 @@ describe("historique des changements — vue joueur (2026-11-20)", () => {
 });
 
 describe("historique des changements — incarner un rôle", () => {
-  it("privacyChanges_impersonateEntry_isLastAndDated", () => {
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ENTRY_ID);
+  it("privacyChanges_impersonateEntry_followedByGuestsAndDated", () => {
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ENTRY_ID);
+    // Suivie des invités du planning (PLANNING-GUESTS, 2026-11-22).
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe("2026-11-planning-invites");
     expect(entryFr(ENTRY_ID)?.publishedAt).toBe("2026-11-21");
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-21");
+    expect(REGISTER_UPDATED_AT >= "2026-11-21").toBe(true);
     expect(entryFr(ENTRY_ID)?.audience).toBeUndefined();
     expect(entryFr(ENTRY_ID)?.asksTermsAcceptance).toBeUndefined();
   });

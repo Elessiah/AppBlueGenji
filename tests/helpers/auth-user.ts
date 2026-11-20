@@ -25,6 +25,7 @@ export function authUser(overrides: Partial<AuthUser> = {}): AuthUser {
     recruitmentModalOff: false,
     recruitmentModalBackOn: false,
     certifyPromptDue: false,
+    planningGuest: false,
     playerView: false,
     playerViewUntil: null,
     // Seul un administrateur réel peut incarner un rôle (ADMIN_ROLE_IMPERSONATION.md).

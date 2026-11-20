@@ -221,6 +221,26 @@ describe("deliverRefereeChange", () => {
     expect(en.body).toContain("staff decision");
   });
 
+  // Revue juridique 1 (PLANNING-GUESTS) : la sortie d'un invité du planning ne le prévient pas, et
+  // aucune ligne par match ne suit la ligne anonyme de la marque (la rafale désignerait le compte).
+  it("refereeReleaseNotice_releasedByStaffForGuest_returnsNull", () => {
+    expect(refereeReleaseNotice({ kind: "RELEASED", matchId: 42, refereeId: REFEREE, byStaff: true, guestRelease: true })).toBeNull();
+  });
+
+  it("deliverRefereeChange_guestRelease_sendsNoLogAndNoPush", async () => {
+    mockMatch(matchRow());
+    await deliverRefereeChange({ kind: "RELEASED", matchId: 42, refereeId: REFEREE, byStaff: true, guestRelease: true });
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("deliverRefereeChange_assignedForGuestRelease_sendsNoLog", async () => {
+    mockMatch(matchRow());
+    await deliverRefereeChange({ kind: "ASSIGNED", matchId: 42, replacedRefereeId: null, actorId: 1, guestRelease: true });
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
   it("autogestion d'une manche : `log: false` tait la ligne, l'avis à l'arbitre part", async () => {
     mockMatch(matchRow());
     await deliverRefereeChange({ kind: "SELF_MANAGED", matchId: 42, enabled: true, replacedRefereeId: REFEREE }, { log: false });

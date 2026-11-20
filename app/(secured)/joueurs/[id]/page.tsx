@@ -352,7 +352,13 @@ export default function PlayerDetailPage() {
           en « Chargement… », démontait le panneau et sa confirmation, et le
           focus tombait sur la page au lieu de revenir à « Enregistrer les rôles ». */}
       {data.viewerIsAdmin && !data.isSelf && !deleted && (
-        <PlayerRolesPanel userId={params.id} pseudo={data.profile.pseudo} roles={data.roles} onSaved={revalidate} />
+        <PlayerRolesPanel
+          userId={params.id}
+          pseudo={data.profile.pseudo}
+          roles={data.roles}
+          planningGuest={data.planningGuest}
+          onSaved={revalidate}
+        />
       )}
 
       <div className="ds-block" style={{ marginBottom: 20 }}>

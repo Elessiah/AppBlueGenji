@@ -26,7 +26,7 @@ describe("anonymizeAccount — colonnes facultatives", () => {
 
     const resets = normalized(execute).filter((sql) => sql.includes("referee_objection_at = NULL"));
     expect(resets).toEqual([
-      "UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL WHERE id = ? AND is_deleted = 1",
+      "UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL, is_guest_staff = 0 WHERE id = ? AND is_deleted = 1",
     ]);
   });
 

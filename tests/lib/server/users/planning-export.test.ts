@@ -44,6 +44,28 @@ describe("exportOwnPlanning", () => {
     ]);
   });
 
+  it("exportOwnPlanning_staffReleasedWithdrawal_flagged", async () => {
+    routeSql({
+      events: [
+        { tournament_id: 10, match_id: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: null, late: 0, staff_release: 1, created_at: new Date("2026-11-20T18:00:00.000Z") },
+      ],
+    });
+
+    const data = await exportOwnPlanning(4);
+
+    expect(data.history[0]).toEqual({
+      tournamentId: 10,
+      matchId: 1,
+      role: "CASTER",
+      kind: "WITHDRAWN",
+      source: "MANUAL",
+      createdAt: "2026-11-20T18:00:00.000Z",
+      reason: null,
+      late: false,
+      staffRelease: true,
+    });
+  });
+
   it("exportOwnPlanning_events_historyOfTheHolderWithoutActor", async () => {
     routeSql({
       events: [
@@ -110,6 +132,20 @@ describe("exportOwnPlanning", () => {
     ]);
   });
 
+  it("exportOwnPlanning_staffActionsStaffRelease_marked", async () => {
+    routeSql({
+      acted: [
+        { tournament_id: 10, match_id: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", staff_release: 1, created_at: new Date("2026-11-20T18:00:00.000Z") },
+      ],
+    });
+
+    const data = await exportOwnPlanning(4);
+
+    expect(data.staffActions).toEqual([
+      { tournamentId: 10, matchId: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", createdAt: "2026-11-20T18:00:00.000Z", staffRelease: true },
+    ]);
+  });
+
   it("exportOwnPlanning_assignmentsSet_mappedWithoutReasonOrSubject", async () => {
     routeSql({
       set: [
@@ -162,6 +198,28 @@ describe("exportOwnPlanning", () => {
     ]);
     expect(data.assignmentsSet).toEqual([
       { tournamentId: 10, matchId: 1, role: "CASTER", source: "MANUAL", confirmed: false, createdAt: "2026-11-20T18:00:00.000Z" },
+    ]);
+  });
+
+  it("exportOwnPlanning_staffReleaseColumnMissing_retriesWithoutItAndExports", async () => {
+    execute.mockImplementation(async (sql: string) => {
+      if (sql.includes("staff_release")) throw Object.assign(new Error("Unknown column 'staff_release'"), { code: "ER_BAD_FIELD_ERROR" });
+      if (sql.includes("WHERE actor_user_id = ?")) {
+        return [[{ tournament_id: 10, match_id: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", created_at: new Date("2026-11-20T18:00:00.000Z") }], []];
+      }
+      if (sql.includes("FROM bg_planning_events")) {
+        return [[{ tournament_id: 10, match_id: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: null, late: 0, created_at: new Date("2026-11-20T18:00:00.000Z") }], []];
+      }
+      return [[], []];
+    });
+
+    const exported = await exportOwnPlanning(4);
+
+    expect(exported.history).toEqual([
+      { tournamentId: 10, matchId: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", reason: null, late: false, createdAt: "2026-11-20T18:00:00.000Z" },
+    ]);
+    expect(exported.staffActions).toEqual([
+      { tournamentId: 10, matchId: 1, role: "CASTER", kind: "WITHDRAWN", source: "MANUAL", createdAt: "2026-11-20T18:00:00.000Z" },
     ]);
   });
 

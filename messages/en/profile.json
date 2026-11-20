@@ -169,6 +169,10 @@
     "enabledNotCertified": "Match and team direct messages turned on: the ones about your matches will be sent once your Discord tag is verified, the ones about your teams as soon as your Discord account is linked.",
     "disabled": "Match and team direct messages turned off."
   },
+  "planningGuest": {
+    "label": "Guest account: outside the cast and referee schedule",
+    "hint": "The staff who assigns roles marked you as a guest: you keep your other rights, but the schedule no longer proposes, assigns or notifies you. To object, contact the staff (“Privacy” page)."
+  },
   "recruitmentModal": {
     "label": "Window of urgent recruitment announcements",
     "hint": "Ticked (by default), a window shows you the urgent recruitment announcements you haven't seen yet when you arrive. Unticked, it no longer opens on its own; the announcements stay on the Recruitment page.",

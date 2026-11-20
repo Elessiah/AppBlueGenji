@@ -189,7 +189,8 @@
     "title": "Désistements",
     "late": "Tardif",
     "provisional": "Proposition",
-    "hint": "Qui s'est désisté de ce créneau, et son motif s'il en a donné un. « Tardif » : moins de 24 h avant le début. « Proposition » : il n'était que proposé par le calcul."
+    "staffRelease": "Sorti par le staff",
+    "hint": "Qui s'est désisté de ce créneau, et son motif s'il en a donné un. « Tardif » : moins de 24 h avant le début. « Proposition » : il n'était que proposé par le calcul. « Sorti par le staff » : passé invité, il ne s'est pas désisté lui-même."
   },
   "unfilled": "À pourvoir",
   "autoConfirm": {

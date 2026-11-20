@@ -175,19 +175,19 @@ describe("loadNotificationRecipients — option matchDm", () => {
   });
 
   it("loadNotificationRecipients_onlyMatchDmColumnMissing_localeStillRead", async () => {
-    // L'opposition ne peut pas être lue : la langue l'est encore, sans seconde lecture.
+    // L'opposition ne peut pas être lue : la langue l'est encore ; les lectures qui réclament la colonne absente sont écartées.
     const missing = Object.assign(new Error("Unknown column 'match_dm_enabled'"), { code: "ER_BAD_FIELD_ERROR" });
     const query = jest
       .fn<SqlQuery>()
-      .mockRejectedValueOnce(missing)
       .mockRejectedValueOnce(missing)
       .mockResolvedValueOnce([[{ ...ROWS[0], locale: "en" }], []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
 
     const [recipient] = await loadNotificationRecipients([1], "certified", { matchDm: true });
 
-    expect(String(query.mock.calls[2][0])).toMatch(/, locale\b/);
-    expect(String(query.mock.calls[2][0])).not.toMatch(/match_dm_enabled/);
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(String(query.mock.calls[1][0])).toMatch(/, locale\b/);
+    expect(String(query.mock.calls[1][0])).not.toMatch(/match_dm_enabled/);
     expect(recipient.locale).toBe("en");
   });
 

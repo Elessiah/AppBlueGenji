@@ -19,6 +19,25 @@ s'additionnent.
 `ADMIN` est un super-rôle : il débloque toutes les permissions, y compris
 `roles` (attribution des rôles à n'importe quel utilisateur).
 
+## Impact de chaque rôle
+
+| Rôle | Ce qu'il peut changer | Messages du bot | Part dans un match |
+| --- | --- | --- | --- |
+| `ADMIN` | Tout, dont les rôles des autres et la marque « invité » | Tous les avis du staff | Tout (scores, arbitre, cast, antenne) |
+| `ARBITRE` | Tournois et matchs ; ses disponibilités au planning | Avis du staff des tournois, du planning | Arbitre, scores, antenne |
+| `CASTER` | Son cast et son antenne ; ses disponibilités au planning (sauf invité) | Avis de cast, du planning (sauf invité) | Caster |
+| `PROD` | Ses disponibilités au planning (sauf invité) | Avis du planning (sauf invité) | Production du direct |
+| `COMMUNITY_MANAGER` | Site vitrine, association | Aucun | Aucune |
+| `RECRUTEUR` | Page recrutement | Aucun | Aucune |
+| `DEV` | Rien (lecture de `/devdoc`) | Aucun | Aucune |
+
+**Invité** (`bg_users.is_guest_staff`, case « Invité » du bloc « Rôles &
+permissions », permission `roles`, posée seulement sur un compte non
+administrateur qui tient `CASTER` ou `PROD`) : ce n'est pas un rôle mais une marque, qui
+retire au compte la seule permission `planning` (sauf administrateur) — il
+garde ses droits de caster ou de prod hors du planning (`CAST_PLANNING.md` §
+Invités).
+
 ## Permissions (domaines protégés)
 
 - `tournaments` — `POST /api/tournaments`, `PATCH /api/admin/matches/[id]/scores`,
@@ -34,7 +53,8 @@ s'additionnent.
   elle n'ouvre aucune écriture. `ARBITRE` l'obtient avec `tournaments`.
 - `planning` — page `/planning`, `GET /api/planning`, `PUT /api/planning/availability`
   (ses propres disponibilités) et `PUT /api/planning/solo-caster` pour soi
-  (`CAST_PLANNING.md`). Rôles `ARBITRE`, `CASTER`, `PROD` (et `ADMIN`). Les
+  (`CAST_PLANNING.md`). Rôles `ARBITRE`, `CASTER`, `PROD` (et `ADMIN`), sauf un
+  compte marqué **invité** non administrateur (`planningGuest`, lu par `can()`). Les
   gestes du staff du planning sous `/api/admin/planning/*` : l'attribution
   manuelle demande `tournaments` en plus ; hors de `/api/admin/`, le **caster
   autonome d'un autre** (section « Casters autonomes », `PUT

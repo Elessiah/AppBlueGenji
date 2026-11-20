@@ -57,6 +57,8 @@ export type PlanningWithdrawalView = {
   late: boolean;
   reason: string | null;
   confirmed: boolean;
+  /** Pas un désistement : le staff a sorti du planning ce compte devenu invité. Absent : faux. */
+  staffRelease?: true;
   createdAt: string;
 };
 
@@ -124,6 +126,9 @@ export type PlanningMember = {
   seesHidden?: boolean;
 };
 
+/** Un compte montré par la page sans être membre du planning (invité, rôle retiré) : son nom seul. */
+export type PlanningName = { userId: number; pseudo: string };
+
 export type PlanningView = {
   me: number;
   myRoles: PlanningRole[];
@@ -135,6 +140,8 @@ export type PlanningView = {
   canCompute: boolean;
   entries: PlanningEntryView[];
   members: PlanningMember[];
+  /** Noms des comptes portés par une attribution ou un désistement sans être membres ; absent s'il n'y en a pas. */
+  names?: PlanningName[];
   /** Durées estimées qui servent aux chevauchements (rendues avec `canCompute` seulement). */
   durations?: PlanningDurationSettings;
 };

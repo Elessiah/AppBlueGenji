@@ -9,7 +9,7 @@
  * un caster « autonome » (`soloCaster`) diffuse seul, les autres ont besoin
  * d'un prod ; un match diffusé sans arbitre est « à arbitrer en priorité ».
  */
-import { can, type PlatformRole } from "@/lib/shared/permissions";
+import { can, type PermissionSubject, type PlatformRole } from "@/lib/shared/permissions";
 
 /** Adresse de la page « Planning » (sans préfixe de langue). */
 export const PLANNING_PATH = "/planning";
@@ -101,12 +101,11 @@ export function isAvailabilityStatus(value: unknown): value is AvailabilityStatu
  * Les rôles du planning qu'un compte tient : arbitre avec la permission
  * `tournaments` (rôle `ARBITRE` ou administrateur — celle qui désigne un
  * arbitre de match), caster avec le rôle `CASTER`, prod avec le rôle `PROD`.
- * En vue joueur (`roles: []`, `isAdmin: false`), aucun.
+ * En vue joueur (`roles: []`, `isAdmin: false`), aucun ; un invité
+ * (`planningGuest`, sans la permission `planning`) non plus, quel que soit le rôle.
  */
-export function planningRolesOf(
-  user: { roles?: readonly PlatformRole[]; isAdmin?: boolean } | null | undefined,
-): PlanningRole[] {
-  if (!user) return [];
+export function planningRolesOf(user: PermissionSubject | null | undefined): PlanningRole[] {
+  if (!user || !can(user, "planning")) return [];
   const roles = user.roles ?? [];
   const held: PlanningRole[] = [];
   if (can(user, "tournaments")) held.push("REFEREE");

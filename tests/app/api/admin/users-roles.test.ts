@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/users/roles");
+jest.mock("@/lib/server/users/planning-guest");
 
 import { POST } from "@/app/api/admin/users/[id]/roles/route";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -10,6 +11,7 @@ import type { RolesSaveResult } from "@/lib/server/users/roles";
 import type { PlatformRole } from "@/lib/shared/permissions";
 import { authUser } from "../../../helpers/auth-user";
 import { PLAYER_VIEW_OFF_AUDIT } from "@/lib/server/player-view-audit";
+import { publishGuestFlagCleared } from "@/lib/server/users/planning-guest";
 
 const admin = authUser({ id: 1, isAdmin: true });
 const normalUser = authUser({ id: 2, isAdmin: false });
@@ -83,6 +85,26 @@ describe("POST /api/admin/users/[id]/roles", () => {
     const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
     expect(res.status).toBe(200);
     expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE"], 4, undefined);
+  });
+
+  // Revue juridique 2 : la marque « invité » tombée avec les rôles est publiée au journal du staff.
+  it("post_guestFlagClearedWithRoles_publishesGuestFlagCleared", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue({ ...saved(["ARBITRE"], ["CASTER"]), guestCleared: "ROLE_LOST" });
+
+    const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
+
+    expect(res.status).toBe(200);
+    expect(publishGuestFlagCleared).toHaveBeenCalledWith({ id: 1, pseudo: admin.pseudo }, 7, "ROLE_LOST");
+  });
+
+  it("post_rolesSavedWithoutGuestCleared_publishesNoGuestLine", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue(saved(["ARBITRE"], ["CASTER"]));
+
+    await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
+
+    expect(publishGuestFlagCleared).not.toHaveBeenCalled();
   });
 
   it("rejects invalid ids with 400", async () => {

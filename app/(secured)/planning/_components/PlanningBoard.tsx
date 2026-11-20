@@ -210,7 +210,15 @@ export function PlanningBoard({
   );
 
   const members = view?.members;
-  const names = useMemo(() => new Map((members ?? []).map((member) => [member.userId, member.pseudo])), [members]);
+  const others = view?.names;
+  const builtNames = useMemo(
+    () => new Map([...(others ?? []), ...(members ?? [])].map((member) => [member.userId, member.pseudo])),
+    [members, others],
+  );
+  // Même contenu, même Map : une relecture qui ne change aucun nom ne refait pas rendre les cartes.
+  const namesRef = useRef(builtNames);
+  if (namesRef.current !== builtNames && !sameNames(namesRef.current, builtNames)) namesRef.current = builtNames;
+  const names = namesRef.current;
   // Ce que les cartes lisent du lecteur : stable tant que ces valeurs le sont.
   const me = view?.me;
   const myRoles = view?.myRoles;
@@ -924,7 +932,7 @@ export const SoloCastersStaff = memo(function SoloCastersStaff({
 });
 
 /** Les désistements d'une entrée, au staff des tournois seul (la route ne les rend qu'à lui). */
-function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView; text: Text; names: ReadonlyMap<number, string> }>) {
+export function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView; text: Text; names: ReadonlyMap<number, string> }>) {
   const { t } = text;
   const hintId = `planning-withdrawals-${entry.key.replaceAll(/[^A-Za-z0-9_-]/g, "-")}`;
   return (
@@ -943,6 +951,7 @@ function Withdrawals({ entry, text, names }: Readonly<{ entry: PlanningEntryView
               <span>
                 <PlayerLink userId={row.userId}>{name}</PlayerLink> · {t(`roles.${row.role}`)}
               </span>
+              {row.staffRelease === true && <span className="cy-tag cy-tag-info">{t("withdrawals.staffRelease")}</span>}
               {row.late && <Pill variant="warning">{t("withdrawals.late")}</Pill>}
               {!row.confirmed && <span className="cy-tag cy-tag-accent">{t("withdrawals.provisional")}</span>}
               {row.reason && <q className={styles.withdrawalReason}>{row.reason}</q>}
@@ -1102,4 +1111,11 @@ function StaffPanel({
       </details>
     </Disclosure>
   );
+}
+
+/** Deux annuaires de pseudos disent la même chose. */
+function sameNames(a: ReadonlyMap<number, string>, b: ReadonlyMap<number, string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const [id, pseudo] of a) if (b.get(id) !== pseudo) return false;
+  return true;
 }

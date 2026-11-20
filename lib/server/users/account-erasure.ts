@@ -80,6 +80,8 @@ const ANONYMIZED_OPTIONAL_COLUMNS = [
   "discord_certify_prompt_dismissed_at = NULL",
   "certification_prompt_dismissed_at = NULL",
   "referee_objection_at = NULL",
+  // Caster ou prod invité (hors planning) : un compte anonymisé n'a plus de rôle.
+  "is_guest_staff = 0",
 ] as const;
 
 /**

@@ -1959,6 +1959,31 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     });
   });
 
+  it("assignMatchReferee_releaseWithGuestRelease_queuesReleasedWithGuestFlag", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+    await assignMatchReferee(42, OTHER_REFEREE, null, REFEREE, { guestRelease: true });
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      byStaff: true,
+      guestRelease: true,
+    });
+  });
+
+  it("assignMatchReferee_assignWithGuestRelease_queuesAssignedWithGuestFlag", async () => {
+    state.match = matchState({ referee_user_id: null });
+    await assignMatchReferee(42, OTHER_REFEREE, REFEREE, null, { guestRelease: true });
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "ASSIGNED",
+      matchId: 42,
+      replacedRefereeId: null,
+      actorId: OTHER_REFEREE,
+      guestRelease: true,
+    });
+  });
+
   it("le staff désigne ou remplace l'arbitre ; l'arbitre remplacé est nommé pour l'avis", async () => {
     state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP });
     await assignMatchReferee(42, 1, OTHER_REFEREE);

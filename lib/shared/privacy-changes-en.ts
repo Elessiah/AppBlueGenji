@@ -1218,6 +1218,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: for an account that has never been an administrator, nothing new is collected; the switches into player view made until now by the other holders of a platform role stay in the server logs, according to their rotation.",
     ],
   },
+  "2026-11-planning-invites": {
+    linkLabels: ["Read record T20 of the register"],
+    title: "Schedule: guest casters and prods",
+    summary: "The staff who assigns roles can mark a caster or a prod as a “guest”: they keep their other rights on the site, but are no longer part of the cast and referee schedule.",
+    details: [
+      "What is kept: the “guest” mark on the account, as long as the staff leaves it and the account is a caster or a prod; it is in the export of your data, is shown on “My profile” and goes with the account's deletion. Basis: the association's legitimate interest (organising its volunteers), with a right to object.",
+      "What it changes: only the schedule is taken away, the referee role included for whoever also holds it; a guest is no longer proposed, assigned or notified by the schedule, and no longer reads its page; the mark leaves the upcoming assignments the schedule had given them as a withdrawal would (a replacement is looked for as usual), without notifying the guest, and erases their upcoming availability; what is past stays.",
+      "Who sees it: the staff who assigns roles, and the guest on “My profile”. The tournament staff sees, in the schedule history, each assignment left as a removal by staff, for as long as that history is kept (T20), which also keeps its author's account without showing it; the other schedule members do not see the mark, and those assigned to the same slot only learn that a member was removed from it. Each action on the mark is noted in the staff log on Discord without naming anyone; the server logs keep its author and the account concerned (T05). The history appears in the guest's data export, without the author, and in the author's.",
+      "What does not change: for an account that is not marked, nothing new is collected.",
+    ],
+  },
 };
 
 /**

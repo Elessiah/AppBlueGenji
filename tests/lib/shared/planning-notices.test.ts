@@ -289,6 +289,41 @@ describe("push du planning", () => {
   });
 });
 
+describe("sortie d'un invité par le staff (`released`)", () => {
+  it("formatPlanningWithdrawalDm_released_saysRemovedFromSchedule", () => {
+    const notice = withdrawal({ released: true, replaced: true });
+
+    expect(formatPlanningWithdrawalDm(notice, SITE, "fr")).toContain("Un caster a été retiré du planning pour");
+    expect(formatPlanningWithdrawalDm(notice, SITE, "en")).toContain("A caster was removed from the schedule for");
+    expect(formatPlanningWithdrawalDm(notice, SITE, "fr")).not.toContain("désisté");
+  });
+
+  it("formatPlanningUnfilledDm_released_saysRemovedFromSchedule", () => {
+    const notice = withdrawal({ released: true });
+
+    expect(formatPlanningUnfilledDm(notice, SITE, "fr")).toContain("un caster a été retiré du planning pour");
+    expect(formatPlanningUnfilledDm(notice, SITE, "en")).toContain("a caster was removed from the schedule for");
+    expect(formatPlanningUnfilledLine(notice, SITE)).toContain("retiré du planning");
+  });
+
+  it("planningWithdrawalPush_released_releasedTitleAndBody", () => {
+    const notice = withdrawal({ released: true, replaced: true });
+
+    expect(planningWithdrawalPush(notice, "fr")).toMatchObject({ title: "Retrait du planning sur ton match" });
+    expect(planningWithdrawalPush(notice, "fr").body).toContain("a été retiré du planning pour");
+    expect(planningWithdrawalPush(notice, "en")).toMatchObject({ title: "Removed from the schedule on your match" });
+    expect(planningWithdrawalPush(notice, "en").body).toContain("a replacement has been assigned");
+  });
+
+  it("planningUnfilledPush_released_releasedBody", () => {
+    expect(planningUnfilledPush(withdrawal({ released: true }), "fr").body).toContain("a été retiré du planning pour");
+    expect(planningUnfilledPush(withdrawal({ released: true, streamLost: true }), "en").body).toContain(
+      "was removed from the schedule for",
+    );
+    expect(planningUnfilledPush(withdrawal({ released: true, streamLost: true }), "en").body).toContain("the stream is lost");
+  });
+});
+
 /** Les clés d'un objet de messages, à plat. */
 function keys(value: unknown, prefix = ""): string[] {
   if (typeof value !== "object" || value === null) return [prefix];

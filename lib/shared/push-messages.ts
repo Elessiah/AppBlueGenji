@@ -1239,7 +1239,7 @@ export function planningWithdrawalPush(notice: PlanningWithdrawalNotice, locale:
     start: planningNoticeTime(notice.startAt, locale),
   };
   return {
-    title: text.t("planning.withdrawal.title"),
+    title: text.t(notice.released === true ? "planning.withdrawal.released.title" : "planning.withdrawal.title"),
     body: text.t(withdrawalBody(notice), values),
     url: localeHref(PLANNING_PATH, locale),
     tag: `planning-withdrawal-${notice.key}-${notice.role}`,
@@ -1255,9 +1255,20 @@ const WITHDRAWAL_BODY_KEYS = {
   open: "planning.withdrawal.bodyOpen",
 } as const satisfies Record<WithdrawalOutcome, string>;
 
+/** Les mêmes issues, pour un invité que le staff a sorti du planning (« retiré du planning »). */
+const RELEASED_BODY_KEYS = {
+  replaced: "planning.withdrawal.released.bodyReplaced",
+  selfHeld: "planning.withdrawal.released.bodySelfHeld",
+  stillHeld: "planning.withdrawal.released.bodyStillHeld",
+  streamLost: "planning.withdrawal.released.bodyStreamLost",
+  open: "planning.withdrawal.released.bodyOpen",
+} as const satisfies Record<WithdrawalOutcome, string>;
+
 /** Texte d'un désistement : remplaçant affecté, autre caster encore affecté (ou le destinataire lui-même), ou place à pourvoir. */
-function withdrawalBody(notice: PlanningWithdrawalNotice): (typeof WITHDRAWAL_BODY_KEYS)[WithdrawalOutcome] {
-  return WITHDRAWAL_BODY_KEYS[withdrawalOutcome(notice)];
+function withdrawalBody(
+  notice: PlanningWithdrawalNotice,
+): (typeof WITHDRAWAL_BODY_KEYS)[WithdrawalOutcome] | (typeof RELEASED_BODY_KEYS)[WithdrawalOutcome] {
+  return (notice.released === true ? RELEASED_BODY_KEYS : WITHDRAWAL_BODY_KEYS)[withdrawalOutcome(notice)];
 }
 
 /** Texte d'une place à pourvoir : tardive ou non, diffusion perdue (départ d'un caster autonome) ou non. */
@@ -1267,7 +1278,11 @@ function unfilledBody(
   | "planning.unfilled.body"
   | "planning.unfilled.bodyLate"
   | "planning.unfilled.bodyStreamLost"
-  | "planning.unfilled.bodyStreamLostLate" {
+  | "planning.unfilled.bodyStreamLostLate"
+  | "planning.unfilled.released.body"
+  | "planning.unfilled.released.bodyStreamLost" {
+  // Sortie d'un invité par le staff : jamais tardive.
+  if (notice.released === true) return notice.streamLost === true ? "planning.unfilled.released.bodyStreamLost" : "planning.unfilled.released.body";
   if (notice.streamLost === true) return notice.late ? "planning.unfilled.bodyStreamLostLate" : "planning.unfilled.bodyStreamLost";
   return notice.late ? "planning.unfilled.bodyLate" : "planning.unfilled.body";
 }

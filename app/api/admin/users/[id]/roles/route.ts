@@ -6,6 +6,7 @@ import { can, isPlatformRole, type PlatformRole } from "@/lib/shared/permissions
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { PLAYER_VIEW_OFF_AUDIT, strayLiftAuditLine } from "@/lib/server/player-view-audit";
 import { auditStaffAction } from "@/lib/server/staff-audit";
+import { publishGuestFlagCleared } from "@/lib/server/users/planning-guest";
 
 /** Refus du service rendus tels quels, avec leur statut. */
 const SERVICE_ERROR_STATUS: Readonly<Record<string, number>> = {
@@ -32,6 +33,8 @@ function publishAfterCommit(actor: { id: number; pseudo: string }, targetId: num
   // levée — ligne sans nom, le seul nombre de sessions, comme le balayage du
   // démarrage ; elle suit celle du rôle accordé, qui désigne le compte
   // (registre, T05, qui le dit).
+  // Marque « invité » tombée avec les rôles : notée comme tout geste sur elle (T20).
+  if (saved.guestCleared) publishGuestFlagCleared(actor, targetId, saved.guestCleared);
   if (saved.strayImpersonationsLifted) {
     console.info(strayLiftAuditLine("promotion", saved.strayImpersonationsLifted));
   }

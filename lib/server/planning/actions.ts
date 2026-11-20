@@ -87,11 +87,15 @@ export async function setAvailability(
   await withConnection(async (connection) => {
     const entry = await loadOneEntry(connection, user, input.entryKey, now);
     if (!entry.open) throw new Error("PLANNING_ENTRY_CLOSED");
+    // Conditionnelle au drapeau « invité » relu par l'écriture même : une
+    // disponibilité partie avant que le staff le pose, et écrite après la
+    // sortie du planning (`releaseGuestPlanning`, qui l'efface), n'y revient
+    // pas — la lecture du compte attend l'écriture du drapeau, puis le voit.
     await connection.execute(
       `INSERT INTO bg_planning_availability (entry_key, user_id, role, tournament_id, match_id, status, preferred)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+       SELECT ?, u.id, ?, ?, ?, ?, ? FROM bg_users u WHERE u.id = ? AND u.is_guest_staff = 0
        ON DUPLICATE KEY UPDATE status = VALUES(status), preferred = VALUES(preferred)`,
-      [entry.key, user.id, input.role, entry.tournamentId, entry.matchId, input.status, input.preferred ? 1 : 0],
+      [entry.key, input.role, entry.tournamentId, entry.matchId, input.status, input.preferred ? 1 : 0, user.id],
     );
   });
 }

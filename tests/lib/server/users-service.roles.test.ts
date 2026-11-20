@@ -19,6 +19,8 @@ async function mockTransaction(targetRows: object[] = [{ id: 7 }]) {
   const connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
   connection.commit.mockResolvedValue(undefined);
+  // Toute écriture sans réponse dédiée : rien de changé (`affectedRows` lu par `clearGuestFlag`).
+  connection.execute.mockResolvedValue([{ affectedRows: 0 }]);
   const poolExecute = jest.fn<SqlQuery>().mockResolvedValue([targetRows]);
   const getConnection = jest.fn(async () => fakeConnection(connection));
   const { getDatabase } = await import("@/lib/server/database");
@@ -433,6 +435,107 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
     expect(connection.commit).not.toHaveBeenCalled();
   });
 
+  it("setUserRoles_promotion_clearsGuestFlagBeforeCommit", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    await setUserRoles(7, ["ADMIN"], 3);
+
+    const [guestSql, guestParams] = connection.execute.mock.calls[3] as [string, unknown[]];
+    expect(guestSql).toBe("UPDATE bg_users SET is_guest_staff = 0 WHERE id = ? AND is_deleted = 0 AND is_guest_staff = 1");
+    expect(guestParams).toEqual([7]);
+    expect(connection.execute.mock.invocationCallOrder[3]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  it("setUserRoles_promotionWithoutGuestColumn_stillCommits", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockRejectedValueOnce(Object.assign(new Error("Unknown column 'is_guest_staff'"), { code: "ER_BAD_FIELD_ERROR" }));
+
+    const result = await setUserRoles(7, ["ADMIN"], 3);
+
+    expect(result).toEqual({ roles: ["ADMIN"], previous: [] });
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("setUserRoles_promotionGuestClearFails_rollsBackAndRethrows", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]).mockRejectedValueOnce(new Error("lock wait timeout"));
+
+    await expect(setUserRoles(7, ["ADMIN"], 3)).rejects.toThrow("lock wait timeout");
+
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("setUserRoles_nonAdminRoleGranted_leavesGuestFlag", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+
+    await setUserRoles(7, ["CASTER"], 3);
+
+    expect(connection.execute.mock.calls.some(([sql]) => String(sql).includes("is_guest_staff"))).toBe(false);
+  });
+
+  // Revue juridique 1 (PLANNING-GUESTS) : la marque ne vise qu'un caster ou un prod (registre T20) ;
+  // elle tombe avec le dernier de ces rôles au lieu de rester sans objet.
+  it("setUserRoles_lastCasterRoleRemoved_clearsGuestFlagBeforeCommit", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["CASTER"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    await setUserRoles(7, ["ARBITRE"], 3);
+
+    const [guestSql, guestParams] = connection.execute.mock.calls[2] as [string, unknown[]];
+    expect(guestSql).toBe("UPDATE bg_users SET is_guest_staff = 0 WHERE id = ? AND is_deleted = 0 AND is_guest_staff = 1");
+    expect(guestParams).toEqual([7]);
+    expect(connection.execute.mock.invocationCallOrder[2]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  // Revue juridique 2 : la marque tombée est rendue à la route, qui la note au journal du staff.
+  it("setUserRoles_lastCasterRoleRemovedFlagged_returnsGuestClearedRoleLost", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["CASTER"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const result = await setUserRoles(7, ["ARBITRE"], 3);
+
+    expect(result.guestCleared).toBe("ROLE_LOST");
+  });
+
+  it("setUserRoles_promotionFlagged_returnsGuestClearedPromoted", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const result = await setUserRoles(7, ["ADMIN"], 3);
+
+    expect(result.guestCleared).toBe("PROMOTED");
+  });
+
+  it("setUserRoles_lastCasterRoleRemovedNotFlagged_noGuestCleared", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["CASTER"]' }]);
+    connection.execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
+
+    const result = await setUserRoles(7, ["ARBITRE"], 3);
+
+    expect(result).not.toHaveProperty("guestCleared");
+  });
+
+  it("setUserRoles_casterKeptProdRemoved_leavesGuestFlag", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["CASTER","PROD"]' }]);
+
+    await setUserRoles(7, ["CASTER"], 3);
+
+    expect(connection.execute.mock.calls.some(([sql]) => String(sql).includes("is_guest_staff"))).toBe(false);
+  });
+
   it("setUserRoles_nonAdminRoleGranted_doesNotTouchSessions", async () => {
     const connection = await mockTransaction();
     lockedThenWritten(connection, [ACTOR_ADMIN, TARGET]);
@@ -522,7 +625,8 @@ describe("setUserRoles — roles read under the lock (expected roles)", () => {
 
     await setUserRoles(7, ["ARBITRE"], 3, ["CASTER"]);
 
-    expect(connection.execute).toHaveBeenCalledTimes(2);
+    // Verrou, écriture, puis la marque « invité » retirée avec le dernier rôle de caster.
+    expect(connection.execute).toHaveBeenCalledTimes(3);
     expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 

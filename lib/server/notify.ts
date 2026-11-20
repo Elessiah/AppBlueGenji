@@ -283,7 +283,9 @@ export function staffHolding(
 ): number[] {
   return candidates
     .filter((candidate) => !excluded.has(candidate.userId))
-    .filter((candidate) => can({ isAdmin: candidate.isAdmin, roles: sanitizePlatformRoles(candidate.rolesJson) }, permission))
+    .filter((candidate) =>
+      can({ isAdmin: candidate.isAdmin, roles: sanitizePlatformRoles(candidate.rolesJson), planningGuest: candidate.planningGuest }, permission),
+    )
     .map((candidate) => candidate.userId);
 }
 
@@ -359,11 +361,17 @@ export function toNotificationRecipient(row: RecipientRow, reach: DiscordReach):
  * canal Discord** : il garde ses notifications push, qui ont leurs propres
  * réglages par sujet. Les envois au staff (`notifyStaff`) ne lisent jamais ce
  * réglage.
+ *
+ * `planningMembersOnly` : un avis du **planning** (affectation, désistement,
+ * place à pourvoir) ne joint que ses membres, par la règle de `can()` — un
+ * invité (`bg_users.is_guest_staff`, `CAST_PLANNING.md` § Invités) qui cast
+ * encore un match par son inscription n'est pas prévenu d'un planning qu'il ne
+ * lit plus.
  */
 export async function loadNotificationRecipients(
   userIds: readonly number[],
   reach: DiscordReach,
-  options: { matchDm?: boolean; excludeSuspended?: boolean } = {},
+  options: { matchDm?: boolean; excludeSuspended?: boolean; planningMembersOnly?: boolean } = {},
 ): Promise<NotificationRecipient[]> {
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return [];
@@ -373,9 +381,10 @@ export async function loadNotificationRecipients(
   const active = options.excludeSuspended
     ? ` AND NOT ${userSuspendedSql("bg_users.id")}`
     : "";
-  const select = (withMatchDm: boolean, withLocale: boolean) =>
-    db.query<(RecipientRow & { match_dm_enabled?: number | null })[]>(
-      `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at${withMatchDm ? ", match_dm_enabled" : ""}${withLocale ? ", locale" : ""}
+  const planningOnly = options.planningMembersOnly === true;
+  const select = (withMatchDm: boolean, withLocale: boolean, withGuest: boolean) =>
+    db.query<(RecipientRow & { match_dm_enabled?: number | null } & PlanningRightsColumns)[]>(
+      `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at${withMatchDm ? ", match_dm_enabled" : ""}${withLocale ? ", locale" : ""}${planningOnly ? ", is_admin, platform_roles_json" : ""}${planningOnly && withGuest ? ", is_guest_staff" : ""}
        FROM bg_users WHERE is_deleted = 0 AND id IN (${ids.map(() => "?").join(", ")})${active}`,
       ids,
     );
@@ -388,14 +397,50 @@ export async function loadNotificationRecipients(
   // **avant** le réglage : une langue absente ne fait jamais perdre une
   // opposition aux messages de match (RGPD, article 21).
   const matchDm = options.matchDm === true;
-  const attempts: readonly [[boolean, boolean], ...[boolean, boolean][]] = matchDm
+  const pairs: [boolean, boolean][] = matchDm
     ? [[true, true], [true, false], [false, true], [false, false]]
     : [[false, true], [false, false]];
-  const rows = await firstReadable(attempts, ([withMatchDm, withLocale]) => select(withMatchDm, withLocale));
+  // Le drapeau « invité » (colonne récente) tombe en premier : une base qui ne
+  // l'a pas encore n'a aucun invité, la relecture sans lui est donc exacte.
+  const guestReads = planningOnly ? [true, false] : [false];
+  const attempts = guestReads.flatMap((withGuest) =>
+    pairs.map(([withMatchDm, withLocale]): [boolean, boolean, boolean] => [withMatchDm, withLocale, withGuest]),
+  ) as [[boolean, boolean, boolean], ...[boolean, boolean, boolean][]];
+  const read = await firstReadable(
+    attempts,
+    ([withMatchDm, withLocale, withGuest]) => select(withMatchDm, withLocale, withGuest),
+    ([withMatchDm, withLocale, withGuest]) => [
+      ...(withMatchDm ? ["match_dm_enabled"] : []),
+      ...(withLocale ? ["locale"] : []),
+      ...(planningOnly && withGuest ? ["is_guest_staff"] : []),
+    ],
+  );
+  const rows = planningOnly ? read.filter(holdsPlanning) : read;
   return rows.map((row) => {
     const recipient = toNotificationRecipient(row, reach);
     return options.matchDm && !matchDmEnabled(row.match_dm_enabled) ? { ...recipient, discord: null } : recipient;
   });
+}
+
+/** Droits d'un compte, lus avec lui pour un avis du planning (`planningMembersOnly`). */
+type PlanningRightsColumns = { is_admin?: number | null; platform_roles_json?: unknown; is_guest_staff?: number | null };
+
+/** Le compte est membre du planning : la permission `planning` de `can()`, invité exclu. */
+function holdsPlanning(row: PlanningRightsColumns): boolean {
+  return can(
+    {
+      isAdmin: Number(row.is_admin ?? 0) === 1,
+      roles: sanitizePlatformRoles(row.platform_roles_json),
+      planningGuest: Number(row.is_guest_staff ?? 0) === 1,
+    },
+    "planning",
+  );
+}
+
+/** Nom de la colonne qu'une erreur « Unknown column » désigne (`'u.locale'` → `locale`), `null` s'il ne se lit pas. */
+function unknownColumnName(error: unknown): string | null {
+  const match = /Unknown column '(?:[^'.]*\.)?([^'.]+)'/.exec((error as { message?: unknown })?.message as string ?? "");
+  return match ? match[1] : null;
 }
 
 /**
@@ -407,15 +452,22 @@ export async function loadNotificationRecipients(
 async function firstReadable<A, T>(
   attempts: readonly [A, ...A[]],
   read: (attempt: A) => Promise<[T, unknown]>,
+  /** Les colonnes récentes que la lecture réclame : une colonne dite absente écarte d'emblée les lectures qui la réclament. */
+  columnsOf: (attempt: A) => readonly string[] = () => [],
 ): Promise<T> {
   let lastError: unknown;
-  for (const attempt of attempts) {
+  const missing = new Set<string>();
+  for (const [index, attempt] of attempts.entries()) {
+    // Une colonne déjà dite absente n'est pas redemandée (sauf par la dernière lecture, la plus nue : son échec se lève).
+    if (index < attempts.length - 1 && columnsOf(attempt).some((column) => missing.has(column))) continue;
     try {
       const [rows] = await read(attempt);
       return rows;
     } catch (error) {
       if (!isUnknownColumnError(error)) throw error;
       lastError = error;
+      const column = unknownColumnName(error);
+      if (column !== null) missing.add(column);
     }
   }
   throw lastError;

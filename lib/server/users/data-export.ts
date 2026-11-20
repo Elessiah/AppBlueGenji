@@ -34,6 +34,7 @@ const OPTIONAL_ACCOUNT_COLUMNS = [
   "certification_prompt_dismissed_at",
   "referee_objection_at",
   "overwatch_battletag_typed",
+  "is_guest_staff",
 ] as const;
 
 type OptionalAccountColumn = (typeof OPTIONAL_ACCOUNT_COLUMNS)[number];
@@ -179,6 +180,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       // L'origine du BattleTag (`overwatch_battletag_typed`, `battletag-origin.ts`) :
       // tapé à la main, il n'est jamais tenu pour vérifié — donnée détenue, rendue.
       overwatchBattletagTyped: origin.typed,
+      // Le drapeau « invité » (hors planning), posé par le staff : donnée détenue, rendue.
+      planningGuest: optional.includes("is_guest_staff") ? Number(row.is_guest_staff ?? 0) === 1 : null,
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {

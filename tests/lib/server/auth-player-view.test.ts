@@ -255,8 +255,9 @@ describe("getCurrentUser — vue joueur", () => {
     const user = await getCurrentUser();
 
     expect(user).toMatchObject({ isAdmin: true, playerView: false });
-    // Toutes les colonnes, puis l'échéance seule, puis aucune.
-    expect(execute).toHaveBeenCalledTimes(3);
+    // Toutes les colonnes (avec puis sans l'invité), puis l'échéance seule
+    // (idem), puis aucune avec l'invité.
+    expect(execute).toHaveBeenCalledTimes(5);
   });
 
   it("getCurrentUser_rolesColumnMissing_failsClosedToPlayerView", async () => {
@@ -276,9 +277,9 @@ describe("getCurrentUser — vue joueur", () => {
     const user = await getCurrentUser();
 
     expect(user).toMatchObject({ isAdmin: false, roles: [], playerView: true });
-    expect(execute).toHaveBeenCalledTimes(2);
-    expect(String(execute.mock.calls[1][0])).toContain("s.player_view_until > NOW() AS player_view");
-    expect(String(execute.mock.calls[1][0])).not.toContain("impersonated_roles_json");
+    expect(execute).toHaveBeenCalledTimes(3);
+    expect(String(execute.mock.calls[2][0])).toContain("s.player_view_until > NOW() AS player_view");
+    expect(String(execute.mock.calls[2][0])).not.toContain("impersonated_roles_json");
   });
 
   it("getCurrentUser_devBypassInPlayerView_seesNoPermission", async () => {

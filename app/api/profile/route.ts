@@ -28,7 +28,10 @@ const ACCOUNT_DELETION_REFUSALS: ReadonlySet<string> = new Set([
  */
 function withSessionPreferences(profile: FullProfileResponse, user: AuthUser): FullProfileResponse {
   const ownRoles = user.isAdmin ? { isAdmin: true, roles: user.roles } : {};
-  return { ...profile, ...ownRoles, recruitmentModalOff: user.recruitmentModalOff };
+  // Sa propre marque « invité » (`CAST_PLANNING.md` § Invités), lue avec la
+  // session : le titulaire la voit sur « Mon profil » (transparence, opposition).
+  const ownGuest = user.planningGuest === true && !user.isAdmin ? { ownPlanningGuest: true } : {};
+  return { ...profile, ...ownRoles, ...ownGuest, recruitmentModalOff: user.recruitmentModalOff };
 }
 
 export async function GET() {

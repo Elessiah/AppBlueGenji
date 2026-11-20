@@ -85,7 +85,7 @@ describe("messages privés de match — anonymisation", () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => String(sql).includes("match_dm_enabled"));
-    expect(reset).toEqual(["UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL WHERE id = ? AND is_deleted = 1", [42]]);
+    expect(reset).toEqual(["UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL, is_guest_staff = 0 WHERE id = ? AND is_deleted = 1", [42]]);
   });
 
   it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
@@ -114,7 +114,7 @@ describe("« Ne plus afficher » du recrutement — anonymisation", () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => String(sql).includes("recruitment_modal_off"));
-    expect(reset).toEqual(["UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL WHERE id = ? AND is_deleted = 1", [42]]);
+    expect(reset).toEqual(["UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL, is_guest_staff = 0 WHERE id = ? AND is_deleted = 1", [42]]);
   });
 
   it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
@@ -149,7 +149,7 @@ describe("« Ne plus voir » de la certification Discord — anonymisation", () 
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => isReset(sql));
     expect(reset && [String(reset[0]).replace(/\s+/g, " ").trim(), reset[1]]).toEqual([
-      "UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL WHERE id = ? AND is_deleted = 1",
+      "UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL, is_guest_staff = 0 WHERE id = ? AND is_deleted = 1",
       [42],
     ]);
   });
@@ -183,7 +183,7 @@ describe("« Ne plus voir » de l'invitation à certifier de la fiche tournoi �
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => isReset(sql));
     expect(reset && [String(reset[0]).replace(/\s+/g, " ").trim(), reset[1]]).toEqual([
-      "UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL WHERE id = ? AND is_deleted = 1",
+      "UPDATE bg_users SET match_dm_enabled = 1, recruitment_modal_off = 0, discord_certify_prompt_dismissed_at = NULL, certification_prompt_dismissed_at = NULL, referee_objection_at = NULL, is_guest_staff = 0 WHERE id = ? AND is_deleted = 1",
       [42],
     ]);
   });

@@ -1,6 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { isMissingTableError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import type { PersonalDataExport } from "@/lib/shared/types";
 
@@ -9,6 +9,9 @@ type AvailabilityRow = SlotRow & { status: string; preferred: number; updated_at
 type AssignmentRow = SlotRow & { source: string; confirmed: number; created_at: Date | null };
 type EventRow = SlotRow & { kind: string; source: string; created_at: Date | null };
 type Planning = PersonalDataExport["planning"];
+
+/** La colonne récente des événements (`RECENT_SCHEMA_CHANGES`), retirée de la lecture si elle manque. */
+const STAFF_RELEASE_COLUMN = ", staff_release";
 
 /** Le créneau et le rôle d'une ligne, commun à toutes les tables du planning. */
 function slotOf(row: SlotRow): { tournamentId: number; matchId: number | null; role: string } {
@@ -43,6 +46,9 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
       return rows;
     } catch (error) {
       if (isMissingTableError(error)) return [];
+      // `staff_release` (changement récent) absent : son `ALTER` a échoué ; l'export se fait sans la marque
+      // plutôt que d'échouer pour tous les comptes.
+      if (isUnknownColumnError(error) && sql.includes(STAFF_RELEASE_COLUMN)) return tolerant<T>(sql.replace(STAFF_RELEASE_COLUMN, ""));
       throw error;
     }
   };
@@ -55,12 +61,12 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
       `SELECT tournament_id, match_id, role, source, reason, confirmed, created_at
          FROM bg_planning_assignments WHERE user_id = ? ORDER BY created_at, entry_key, role`,
     ),
-    tolerant<EventRow & { reason: string | null; late: number }>(
-      `SELECT tournament_id, match_id, role, kind, source, reason, late, created_at
+    tolerant<EventRow & { reason: string | null; late: number; staff_release: number | null }>(
+      `SELECT tournament_id, match_id, role, kind, source, reason, late, staff_release, created_at
          FROM bg_planning_events WHERE user_id = ? ORDER BY created_at, id`,
     ),
-    tolerant<EventRow>(
-      `SELECT tournament_id, match_id, role, kind, source, created_at
+    tolerant<EventRow & { staff_release: number | null }>(
+      `SELECT tournament_id, match_id, role, kind, source, staff_release, created_at
          FROM bg_planning_events WHERE actor_user_id = ? ORDER BY created_at, id`,
     ),
     tolerant<AssignmentRow>(
@@ -78,9 +84,19 @@ export async function exportOwnPlanning(userId: number): Promise<PersonalDataExp
     })),
     assignments: assignments.map((row) => ({ ...mapAssignment(row), reason: row.reason })),
     history: events.map((row) =>
-      row.kind === "WITHDRAWN" ? { ...mapEvent(row), reason: row.reason, late: Boolean(row.late) } : mapEvent(row),
+      row.kind === "WITHDRAWN"
+        ? {
+            ...mapEvent(row),
+            reason: row.reason,
+            late: Boolean(row.late),
+            // Sortie du planning par le staff (compte passé invité) : pas un désistement de sa part.
+            ...(Number(row.staff_release ?? 0) === 1 ? { staffRelease: true } : {}),
+          }
+        : mapEvent(row),
     ),
-    staffActions: acted.map(mapEvent),
+    // Ses gestes de staff : la sortie d'un invité qu'il a faite porte la même marque que dans l'historique de l'invité
+    // (ce n'est pas un désistement de sa part).
+    staffActions: acted.map((row) => (Number(row.staff_release ?? 0) === 1 ? { ...mapEvent(row), staffRelease: true } : mapEvent(row))),
     assignmentsSet: set.map(mapAssignment),
     soloCaster: profiles.length > 0 ? Boolean(profiles[0].solo_caster) : null,
   };

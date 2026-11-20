@@ -54,7 +54,7 @@ describe("announceAssignments", () => {
       { actorId: 9 },
     );
 
-    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4], "proven", { excludeSuspended: true }]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[4], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
     expect(notifyUsers).toHaveBeenCalledTimes(1);
     expect(jest.mocked(notifyUsers).mock.calls[0][1]).toMatchObject({ topic: "PLANNING_ASSIGNED", dmFollowsTopic: true });
   });
@@ -131,7 +131,7 @@ describe("announceWithdrawal", () => {
   it("announceWithdrawal_stillHeldAndOthers_recipientsLoadedOnce", async () => {
     await announceWithdrawal(withdrawal({ unfilled: false, stillHeldBy: [6], coAssignedIds: [5, 6] }));
 
-    expect(jest.mocked(loadNotificationRecipients).mock.calls).toEqual([[[5, 6], "proven", { excludeSuspended: true }]]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls).toEqual([[[5, 6], "proven", { excludeSuspended: true, planningMembersOnly: true }]]);
   });
 
   it("announceWithdrawal_unfilledStreamLost_everyoneToldStreamLost", async () => {
@@ -233,15 +233,41 @@ describe("announceWithdrawal — destinataires", () => {
     expect(loadStaffIds).toHaveBeenCalledWith("tournaments", [4]);
   });
 
+  it("announceWithdrawal_unfilledStaffRelease_actorExcludedFromStaff", async () => {
+    await announceWithdrawal(withdrawal({ released: true, actorId: 1 }));
+
+    expect(loadStaffIds).toHaveBeenCalledWith("tournaments", [4, 1]);
+  });
+
+  it("announceWithdrawal_releasedUnfilled_noDiscordLineButStaffNotified", async () => {
+    await announceWithdrawal(withdrawal({ released: true, actorId: 1 }));
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(sent()).toContainEqual([expect.any(Array), "PLANNING_UNFILLED"]);
+  });
+
+  it("announceWithdrawal_actorCoAssigned_actorNotNotified", async () => {
+    await announceWithdrawal(withdrawal({ unfilled: false, released: true, actorId: 5, coAssignedIds: [3, 5] }));
+
+    expect(sent()).toEqual([[[3], "PLANNING_WITHDRAWAL"]]);
+  });
+
+  it("announceWithdrawal_released_noticeCarriesReleased", async () => {
+    await announceWithdrawal(withdrawal({ unfilled: false, released: true, actorId: 1, coAssignedIds: [3] }));
+
+    const push = jest.mocked(notifyUsers).mock.calls[0][1].push;
+    expect(push("fr").body).toContain("a été retiré du planning");
+  });
+
   it("announceWithdrawal_coAssigned_suspendedAccountsLeftOut", async () => {
     await announceWithdrawal(withdrawal({ unfilled: false, coAssignedIds: [3] }));
 
-    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[3], "proven", { excludeSuspended: true }]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[3], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
   });
 
   it("announceWithdrawal_unfilled_suspendedStaffLeftOut", async () => {
     await announceWithdrawal(withdrawal());
 
-    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[1, 2], "proven", { excludeSuspended: true }]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[1, 2], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
   });
 });

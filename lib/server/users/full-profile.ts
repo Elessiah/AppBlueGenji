@@ -7,7 +7,7 @@ import { resolveRoles } from "@/lib/server/auth";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import { visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { canSeeBattletagVerification } from "@/lib/shared/battletag-visibility";
-import { can, NON_STAFF_ROLES, type PlatformRole } from "@/lib/shared/permissions";
+import { can, holdsGuestEligibleRole, NON_STAFF_ROLES, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { getActiveSuspension } from "@/lib/server/account-suspensions";
 import type { FullProfileResponse, PublicUserProfile, UserTeamTimeline } from "@/lib/shared/types";
@@ -15,6 +15,7 @@ import { applyVisibility, mapPublicUser, type UserRow } from "./players";
 import { accountLocaleFromRow } from "./account-locale";
 import { matchDmEnabled } from "./match-dm-preference";
 import { anonymizedAccountHasNoPage } from "./profileless-players";
+import { readPlanningGuest } from "./planning-guest";
 
 /*
  * Fiche complète d'un joueur telle que la voit son lecteur — lui-même, le
@@ -113,6 +114,26 @@ async function hasNoPlayerPage(isDeleted: boolean, pending: boolean, userId: num
 /** Une donnée réservée au titulaire : `undefined` pour tout autre lecteur. */
 function onlyForSelf<T>(isSelf: boolean, value: T): T | undefined {
   return isSelf ? value : undefined;
+}
+
+/**
+ * Le drapeau « invité » (hors planning, `CAST_PLANNING.md` § Invités) : au
+ * seul staff des rôles, sur la fiche d'un autre compte vivant (`excluded` :
+ * sa propre fiche, ou un compte supprimé). Un administrateur garde le
+ * planning, et la marque ne vise qu'un caster ou un prod : à un administrateur
+ * ou à un compte sans l'un de ces rôles, la case n'est offerte que pour
+ * retirer un drapeau resté posé.
+ */
+async function planningGuestOf(
+  viewer: Parameters<typeof can>[0],
+  targetUserId: number,
+  options: { excluded: boolean; targetIsAdmin: boolean; targetRoles: readonly PlatformRole[] },
+): Promise<{ planningGuest?: boolean | null }> {
+  if (options.excluded || !can(viewer, "roles")) return {};
+  const planningGuest = await readPlanningGuest(targetUserId);
+  const eligible = !options.targetIsAdmin && holdsGuestEligibleRole(options.targetRoles);
+  if (!eligible && planningGuest !== true) return {};
+  return { planningGuest };
 }
 
 export async function getFullProfile(
@@ -281,6 +302,11 @@ export async function getFullProfile(
     // compte soit suspendu, et pourquoi, ne regarde que lui et elle.
     moderationSuspension: canModerate && !isDeleted ? await getActiveSuspension(targetUserId) : null,
     moderationSuspendable: canModerate && !isDeleted && !isSelf && !targetIsAdmin,
+    ...(await planningGuestOf(viewer, targetUserId, {
+      excluded: isSelf || isDeleted,
+      targetIsAdmin,
+      targetRoles,
+    })),
     // La langue du compte ne regarde que son titulaire (lot 9-3) : « Mon
     // profil » l'affiche et la change, aucune autre fiche ne la porte.
     ...(isSelf ? { accountLocale: accountLocaleFromRow(userRows[0].locale) } : {}),

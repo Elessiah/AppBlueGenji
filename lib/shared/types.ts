@@ -1129,6 +1129,12 @@ export type FullProfileResponse = {
    */
   moderationSuspendable: boolean;
   /**
+   * Caster ou prod **invité** (`bg_users.is_guest_staff`, `CAST_PLANNING.md`
+   * § Invités), rendu au seul staff qui tient `roles`, sur la fiche d'un autre
+   * compte vivant ; `null` si la lecture a échoué ; absent sinon.
+   */
+  planningGuest?: boolean | null;
+  /**
    * Langue du compte (lot 9-3), pour son **seul titulaire** (`isSelf`) :
    * absente de toute autre fiche.
    */
@@ -1144,6 +1150,12 @@ export type FullProfileResponse = {
    * `GET`/`PATCH /api/profile` : absent de toute autre fiche.
    */
   recruitmentModalOff?: boolean;
+  /**
+   * Sa propre marque « invité » (hors planning, `CAST_PLANNING.md` § Invités),
+   * lue avec la session par `GET`/`PATCH /api/profile` : `true` seulement pour
+   * son titulaire marqué, absente sinon et de toute autre fiche.
+   */
+  ownPlanningGuest?: boolean;
 };
 
 /**
@@ -1197,6 +1209,11 @@ export type PersonalDataExport = {
      * `null` : origine inconnue (colonne absente de la base).
      */
     overwatchBattletagTyped: boolean | null;
+    /**
+     * `bg_users.is_guest_staff` : caster ou prod invité, hors planning (`CAST_PLANNING.md` § Invités) ;
+     * `null` : colonne absente de la base.
+     */
+    planningGuest: boolean | null;
     createdAt: string;
   };
   profile: {
@@ -1328,12 +1345,23 @@ export type PersonalDataExport = {
       reason?: string | null;
       /** Désistement à moins de 24 h du début. */
       late?: boolean;
+      /** Désistement posé par le staff qui l'a sorti du planning (compte passé invité), pas par lui. */
+      staffRelease?: boolean;
     }[];
     /**
      * Ses gestes comme staff (attribution posée, confirmée, retirée) : la
      * trace qui le nomme comme auteur, sans l'identifiant de la personne visée (art. 15.4).
      */
-    staffActions: { tournamentId: number; matchId: number | null; role: string; kind: string; source: string; createdAt: string | null }[];
+    staffActions: {
+      tournamentId: number;
+      matchId: number | null;
+      role: string;
+      kind: string;
+      source: string;
+      createdAt: string | null;
+      /** Retrait (`WITHDRAWN`) d'un compte qu'il a sorti du planning (passé invité) : pas un désistement de sa part. */
+      staffRelease?: boolean;
+    }[];
     /** Attributions en cours qu'il a posées comme staff, sans l'identifiant de la personne visée. */
     assignmentsSet: { tournamentId: number; matchId: number | null; role: string; source: string; confirmed: boolean; createdAt: string | null }[];
     soloCaster: boolean | null;

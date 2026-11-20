@@ -84,6 +84,12 @@ export type AuthUser = {
    * (un compte certifié ou « Ne plus voir » depuis, ailleurs, s'y arrête).
    */
   certifyPromptDue: boolean;
+  /**
+   * Caster ou prod **invité** (`bg_users.is_guest_staff`, `CAST_PLANNING.md`
+   * § Invités) : `can(user, "planning")` est faux (sauf administrateur), ses
+   * autres droits restent entiers. Faux si la colonne manque encore.
+   */
+  planningGuest: boolean;
 };
 
 type UserRow = RowDataPacket & {
@@ -100,6 +106,7 @@ type UserRow = RowDataPacket & {
   player_view?: number | string | null;
   player_view_until?: Date | string | null;
   impersonated_roles_json?: string | null;
+  is_guest_staff?: number | null;
 };
 
 /**
@@ -161,6 +168,7 @@ function fromRow(row: UserRow): AuthUser {
     recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
     recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
     certifyPromptDue: Number(row.certify_prompt_due ?? 0) === 1,
+    planningGuest: Number(row.is_guest_staff ?? 0) === 1,
   };
 }
 
@@ -429,6 +437,7 @@ async function ensureFreshTestUser(): Promise<number> {
   }
 }
 
+
 /**
  * Lecture de l'utilisateur de la session, `bg_users.recruitment_modal_off`
  * (et, pour la session, `bg_user_sessions.certify_prompt_due`) compris.
@@ -454,20 +463,34 @@ async function ensureFreshTestUser(): Promise<number> {
 type PlayerViewColumns = "roles" | "until" | "none";
 const PLAYER_VIEW_COLUMN_LEVELS: readonly PlayerViewColumns[] = ["roles", "until", "none"];
 
-async function selectUserRows(
-  sql: (withModalOff: boolean, withCertifyPrompt: boolean, playerView: PlayerViewColumns) => string,
-  params: (string | number)[],
-): Promise<UserRow[]> {
-  const db = await getDatabase();
-  // Ordre : la colonne la plus récente tombe la première (`player_view_until`,
-  // puis `certify_prompt_due`, puis `recruitment_modal_off`).
+/**
+ * Les lectures de session, de la plus complète à la plus nue : `is_guest_staff`
+ * tombe d'abord, puis les colonnes d'incarnation (`PLAYER_VIEW_COLUMN_LEVELS`),
+ * puis `certify_prompt_due`, puis `recruitment_modal_off` (la plus récente tombe
+ * la première) — 24 variantes.
+ */
+function sessionSqlVariants(
+  sql: (withModalOff: boolean, withCertifyPrompt: boolean, playerView: PlayerViewColumns, withGuest: boolean) => string,
+): string[] {
   const variants: string[] = [];
   for (const modalOff of [true, false]) {
     for (const certifyPrompt of [true, false]) {
-      for (const playerView of PLAYER_VIEW_COLUMN_LEVELS) variants.push(sql(modalOff, certifyPrompt, playerView));
+      for (const playerView of PLAYER_VIEW_COLUMN_LEVELS) {
+        for (const guest of [true, false]) variants.push(sql(modalOff, certifyPrompt, playerView, guest));
+      }
     }
   }
-  const all = [...new Set(variants)];
+  return variants;
+}
+
+async function selectUserRows(
+  sql: (withModalOff: boolean, withCertifyPrompt: boolean, playerView: PlayerViewColumns, withGuest: boolean) => string,
+  params: (string | number)[],
+): Promise<UserRow[]> {
+  const db = await getDatabase();
+  // Ordre : la colonne la plus récente tombe la première (`is_guest_staff`,
+  // puis les colonnes d'incarnation, puis `certify_prompt_due`, puis `recruitment_modal_off`).
+  const all = [...new Set(sessionSqlVariants(sql))];
   // Une lecture déjà tombée sur une colonne absente n'est plus retentée : le
   // schéma ne se rejoue qu'au redémarrage, qui vide aussi cette mémoire.
   const attempts = all.filter((text, index) => index === all.length - 1 || !UNKNOWN_COLUMN_SQL.has(text));
@@ -542,7 +565,7 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
   }
 
   const rows = await selectUserRows(
-    (modalOff, _certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${devBypassViewColumns(playerView)}
+    (modalOff, _certifyPrompt, playerView, guest) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${guest ? ", u.is_guest_staff" : ""}${modalOff ? ", u.recruitment_modal_off" : ""}${devBypassViewColumns(playerView)}
      FROM bg_users u
      ${playerView === "none" ? "" : DEV_BYPASS_VIEW_JOIN}
      WHERE u.id = ?
@@ -573,7 +596,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
   if (!token) return null;
 
   const rows = await selectUserRows(
-    (modalOff, certifyPrompt, playerView) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}${playerView === "none" ? "" : ", s.player_view_until > NOW() AS player_view, s.player_view_until"}${playerView === "roles" ? ", s.impersonated_roles_json" : ""}
+    (modalOff, certifyPrompt, playerView, guest) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${guest ? ", u.is_guest_staff" : ""}${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}${playerView === "none" ? "" : ", s.player_view_until > NOW() AS player_view, s.player_view_until"}${playerView === "roles" ? ", s.impersonated_roles_json" : ""}
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?

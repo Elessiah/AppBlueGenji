@@ -1758,7 +1758,7 @@ export async function releaseMatchReferee(
   canManage: boolean,
   expected?: number | null,
 ): Promise<void> {
-  await releaseReferee(matchId, actingUserId(actor, "tournaments"), canManage, expected);
+  await releaseReferee(matchId, actingUserId(actor, "tournaments"), canManage, { expected });
 }
 
 /**
@@ -1770,7 +1770,7 @@ async function releaseReferee(
   matchId: number,
   userId: number | null,
   canManage: boolean,
-  expected?: number | null,
+  { expected, guestRelease = false }: { expected?: number | null; guestRelease?: boolean } = {},
 ): Promise<void> {
   const tournamentId = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
@@ -1781,7 +1781,13 @@ async function releaseReferee(
       assertExpectedReferee(current, expected);
       if (current === null) return null;
       await clearMatchReferee(connection, row, matchId);
-      queueRefereeChange(connection, { kind: "RELEASED", matchId, refereeId: current, byStaff: current !== userId });
+      queueRefereeChange(connection, {
+        kind: "RELEASED",
+        matchId,
+        refereeId: current,
+        byStaff: current !== userId,
+        ...(guestRelease ? { guestRelease: true as const } : {}),
+      });
       return Number(row.tournament_id);
     }),
   );
@@ -1810,16 +1816,19 @@ function assertExpectedReferee(current: number | null, expected: number | null |
  *
  * `options.refuseSuspended` (planning) : un compte suspendu n'est pas désigné,
  * contrôle fait **dans** la transaction qui écrit le match (`refereeSuspended`).
+ * `options.guestRelease` : geste de la sortie d'un invité du planning — retrait
+ * de l'invité ou pose de son remplaçant —, sans ligne de journal par match
+ * (`RefereeChange` `RELEASED`/`ASSIGNED`) ni avis à l'invité retiré.
  */
 export async function assignMatchReferee(
   matchId: number,
   staffUserId: number | null,
   refereeId: number | null,
   expected?: number | null,
-  options: { refuseSuspended?: boolean } = {},
+  options: { refuseSuspended?: boolean; guestRelease?: boolean } = {},
 ): Promise<void> {
   if (refereeId === null) {
-    await releaseReferee(matchId, staffUserId, true, expected);
+    await releaseReferee(matchId, staffUserId, true, { expected, guestRelease: options.guestRelease === true });
     return;
   }
   const tournamentId = await retryOnDeadlock(() =>
@@ -1833,7 +1842,13 @@ export async function assignMatchReferee(
       }
       assertExpectedReferee(current, expected);
       await writeReferee(connection, row, refereeId, options.refuseSuspended === true);
-      queueRefereeChange(connection, { kind: "ASSIGNED", matchId, replacedRefereeId: current, actorId: staffUserId ?? undefined });
+      queueRefereeChange(connection, {
+        kind: "ASSIGNED",
+        matchId,
+        replacedRefereeId: current,
+        actorId: staffUserId ?? undefined,
+        ...(options.guestRelease === true ? { guestRelease: true as const } : {}),
+      });
       return Number(row.tournament_id);
     }),
   );

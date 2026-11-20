@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BusyButton } from "@/components/ui/busy-button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
@@ -19,6 +19,7 @@ import { useBusyGuard } from "@/lib/shared/hooks/useBusyGuard";
 import { BUSY_REFUSED_MESSAGE } from "@/lib/shared/busy-refused-message";
 import { reloadSucceeded } from "@/lib/shared/reload-outcome";
 import { rolesErrorMessage } from "../_lib/roles-errors";
+import { PlanningGuestField } from "./PlanningGuestField";
 
 /**
  * Attribution des rôles de plateforme depuis la fiche d'un joueur (réservée à
@@ -37,11 +38,14 @@ export function PlayerRolesPanel({
   userId,
   pseudo,
   roles,
+  planningGuest,
   onSaved,
 }: Readonly<{
   userId: string;
   pseudo: string;
   roles: PlatformRole[] | undefined;
+  /** Drapeau « invité » (hors planning) ; `undefined` : la case n'est pas offerte ; `null` : lecture échouée, case désactivée. */
+  planningGuest?: boolean | null;
   /** Relit la fiche ; `false` : relecture échouée, les rôles affichés sont peut-être périmés. */
   onSaved: () => Promise<boolean | void> | void;
 }>) {
@@ -50,14 +54,20 @@ export function PlayerRolesPanel({
   const toastLang = staffLang ? { lang: staffLang } : undefined;
   // Un enregistrement à la fois ; pendant l'envoi, les cases gardent le focus
   // (`aria-readonly`, choix ignoré) et le bouton s'annonce occupé (`BUSY_BUTTONS.md`).
-  const { busy: rolesBusy, isBusy, run } = useBusyGuard();
+  const guard = useBusyGuard();
+  const { busy: rolesBusy, isBusy, run } = guard;
   const [selectedRoles, setSelectedRoles] = useState<PlatformRole[]>([]);
   const [pendingChange, setPendingChange] = useState<PlatformRoleChange | null>(null);
 
   // Resynchronise la sélection locale à chaque (re)chargement du profil.
+  // Clé de contenu : une relecture de la fiche qui rend les mêmes rôles (case « Invité »)
+  // ne doit pas effacer les cases cochées et pas encore enregistrées.
+  const rolesKey = roles ? [...roles].sort((a, b) => a.localeCompare(b)).join(",") : null;
+  const rolesRef = useRef(roles);
+  rolesRef.current = roles;
   useEffect(() => {
-    if (roles) setSelectedRoles(roles);
-  }, [roles]);
+    if (rolesRef.current) setSelectedRoles(rolesRef.current);
+  }, [rolesKey]);
 
   const toggleRole = (role: PlatformRole) => {
     // Ce qui est coché est ce qui part : une case changée pendant l'envoi est ignorée.
@@ -169,6 +179,9 @@ export function PlayerRolesPanel({
           Enregistrer les rôles
         </BusyButton>
       </div>
+      {planningGuest !== undefined ? (
+        <PlanningGuestField userId={userId} pseudo={pseudo} guest={planningGuest} guard={guard} onSaved={onSaved} />
+      ) : null}
       {pendingChange ? (
         <ConfirmActionDialog
           contentLang={staffLang}

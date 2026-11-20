@@ -38,13 +38,14 @@ export type Executor = Pick<PoolConnection, "execute">;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Comptes du planning : administrateurs et rôles qui accordent `planning`.
- * Les rôles sont des constantes du code (`jsonRoleLiteral`) : rien de saisi
- * n'entre dans la requête.
+ * Comptes du planning : administrateurs et rôles qui accordent `planning`,
+ * hors invités (`is_guest_staff`, `CAST_PLANNING.md` § Invités) — la règle de
+ * `can()`. Les rôles sont des constantes du code (`jsonRoleLiteral`) : rien de
+ * saisi n'entre dans la requête.
  */
-export const PLANNING_MEMBER_SQL = `(u.is_admin = 1${rolesGranting("planning")
-  .map((role) => ` OR JSON_CONTAINS(u.platform_roles_json, ${jsonRoleLiteral(role)})`)
-  .join("")})`;
+export const PLANNING_MEMBER_SQL = `(u.is_admin = 1 OR (u.is_guest_staff = 0 AND (${rolesGranting("planning")
+  .map((role) => `JSON_CONTAINS(u.platform_roles_json, ${jsonRoleLiteral(role)})`)
+  .join(" OR ")})))`;
 
 export type LoadedEntry = {
   key: string;
@@ -113,6 +114,8 @@ export type LoadedWithdrawal = {
   reason: string | null;
   late: boolean;
   confirmed: boolean;
+  /** Pas un désistement du membre : le staff l'a sorti du planning, devenu invité (`staff_release`). */
+  staffRelease: boolean;
   createdAt: string;
 };
 
@@ -352,6 +355,7 @@ type MemberRow = RowDataPacket & {
   pseudo: string;
   is_admin: number;
   platform_roles_json: string | null;
+  is_guest_staff: number | null;
   solo_caster: number | null;
   suspended: number;
 };
@@ -375,7 +379,7 @@ const MEMBER_SUSPENDED_SQL = `${userSuspendedSql("u.id")} AS suspended`;
 /** Comptes qui tiennent un rôle du planning (droits **réels**, la vue joueur n'y change rien). */
 export async function loadPlanningMembers(executor: Executor): Promise<LoadedMember[]> {
   const [rows] = await executor.execute<MemberRow[]>(
-    `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster, ${MEMBER_SUSPENDED_SQL}
+    `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, u.is_guest_staff, p.solo_caster, ${MEMBER_SUSPENDED_SQL}
        FROM bg_users u
        LEFT JOIN bg_planning_profiles p ON p.user_id = u.id
       WHERE u.is_deleted = 0 AND ${PLANNING_MEMBER_SQL}
@@ -390,6 +394,7 @@ function toMembers(rows: readonly MemberRow[]): LoadedMember[] {
       const account = {
         isAdmin: Number(row.is_admin) === 1,
         roles: resolveRoles(Number(row.is_admin) === 1, row.platform_roles_json),
+        planningGuest: Number(row.is_guest_staff ?? 0) === 1,
       };
       return {
         userId: Number(row.id),
@@ -428,11 +433,11 @@ export async function loadPlanningMembersByIds(
   // Le compte seul est verrouillé (requête sans jointure) ; le réglage autonome se lit à part.
   const [rows] = await executor.execute<MemberRow[]>(
     options.lock
-      ? `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, 0 AS solo_caster, 0 AS suspended
+      ? `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, u.is_guest_staff, 0 AS solo_caster, 0 AS suspended
            FROM bg_users u
           WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
           ORDER BY u.id LOCK IN SHARE MODE`
-      : `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, p.solo_caster, ${MEMBER_SUSPENDED_SQL}
+      : `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json, u.is_guest_staff, p.solo_caster, ${MEMBER_SUSPENDED_SQL}
            FROM bg_users u
            LEFT JOIN bg_planning_profiles p ON p.user_id = u.id
           WHERE u.id IN (${inList(ids.length)}) AND u.is_deleted = 0
@@ -488,6 +493,8 @@ type EventRow = RowDataPacket & {
   reason: string | null;
   late: number;
   source: AssignmentSource;
+  /** Désistement posé par le staff qui sort un invité du planning (`releaseGuestPlanning`) ; 0 pour celui du membre. */
+  staff_release?: number | null;
   created_at: Date | string;
 };
 
@@ -558,7 +565,7 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
     // un désistement, `source` dit si l'attribution quittée était confirmée
     // (`MANUAL`) ou une proposition provisoire (`AUTO`), `withdrawal.ts`.
     executor.execute<EventRow[]>(
-      `SELECT id, entry_key, user_id, role, kind, source, reason, late, created_at FROM bg_planning_events
+      `SELECT id, entry_key, user_id, role, kind, source, reason, late, staff_release, created_at FROM bg_planning_events
         WHERE ((kind = 'REMOVED' AND source = 'MANUAL') OR kind = 'WITHDRAWN') AND entry_key IN (${inList(keys.length)})`,
       keys,
     ),
@@ -586,7 +593,10 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
       reason: row.reason,
       confirmed: row.source === "MANUAL" || Number(row.confirmed) === 1,
     })),
-    removals: distinctRemovals(events),
+    // La sortie d'un invité (désistement posé par le staff, `releaseGuestPlanning`) n'écarte personne : redevenu
+    // membre, il peut être proposé de nouveau sur ces places. Lue par sa marque, pas par son auteur, que la
+    // suppression du compte du staff efface.
+    removals: distinctRemovals(events.filter((row) => Number(row.staff_release ?? 0) !== 1)),
     withdrawals: withdrawals.map((row) => ({
       entryKey: row.entry_key,
       userId: Number(row.user_id),
@@ -594,6 +604,7 @@ export async function loadPlanningData(executor: Executor, options: DataOptions)
       reason: row.reason,
       late: Number(row.late) === 1,
       confirmed: row.source === "MANUAL",
+      staffRelease: Number(row.staff_release ?? 0) === 1,
       createdAt: toIso(row.created_at) ?? "",
     })),
     matchCasters,
