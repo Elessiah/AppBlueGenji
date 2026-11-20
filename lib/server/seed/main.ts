@@ -131,6 +131,7 @@ async function seed(db: Pool): Promise<void> {
     specialUserIds.get("Caster") ?? null,
     specialUserIds.get("CoCaster") ?? null,
     specialUserIds.get("Arbitre") ?? null,
+    specialUserIds.get("Prod2") ?? null,
   );
   await applyTiebreakCases(db);
   await applyMapPointTargetCases(db);

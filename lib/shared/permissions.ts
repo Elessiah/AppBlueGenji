@@ -38,6 +38,9 @@ export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "PROD" | "COMMUNITY_
  *   propres disponibilités. Attribuer à la main reste à `tournaments` ;
  *   lancer le calcul, confirmer et régler les durées sont réservés aux
  *   administrateurs ({@link canComputePlanning}).
+ * - `prod` — se placer soi-même comme prod d'un match, et s'en retirer
+ *   (`docs/features/MATCH_PROD.md`) : rien d'autre (ni l'antenne, ni
+ *   l'aperçu, ni les scores). Placer un autre compte reste à `tournaments`.
  */
 export type Permission =
   | "tournaments"
@@ -48,7 +51,8 @@ export type Permission =
   | "roles"
   | "moderation"
   | "dev"
-  | "planning";
+  | "planning"
+  | "prod";
 
 /** Tous les rôles, dans un ordre d'affichage stable (ADMIN en tête). */
 export const PLATFORM_ROLES: readonly PlatformRole[] = [
@@ -77,14 +81,14 @@ export const ROLE_DESCRIPTIONS: Record<PlatformRole, string> = {
   ADMIN: "Tous les droits, dont l'attribution des rôles.",
   ARBITRE: "Créer et gérer les tournois.",
   CASTER: "Préparer et diffuser les matchs en direct (aperçu du plateau, antenne).",
-  PROD: "Assurer la production des diffusions (planning des casts).",
+  PROD: "Assurer la production des diffusions (planning des casts, prod d'un match).",
   COMMUNITY_MANAGER: "Gérer le site vitrine et l'association.",
   RECRUTEUR: "Gérer la page recrutement.",
   DEV: "Lire la documentation technique du site et du bot.",
 };
 
 const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
-  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev", "planning"],
+  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev", "planning", "prod"],
   // L'arbitre gère le tournoi : l'aperçu lui est acquis, sans rôle en plus, et
   // il ouvre aussi l'antenne — sans quoi il faudrait deux personnes pour lancer
   // un match casté.
@@ -93,9 +97,10 @@ const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
   // diffuser (écriture sur l'état de direct des matchs, et rien d'autre).
   // Le planning des casts (`CAST_PLANNING.md`) : ses disponibilités de caster.
   CASTER: ["casting", "live", "planning"],
-  // La production d'une diffusion (régie, scènes, son) : le planning seul, pour
-  // y donner ses disponibilités — ni l'antenne ni l'aperçu du plateau.
-  PROD: ["planning"],
+  // La production d'une diffusion (régie, scènes, son) : le planning, pour y
+  // donner ses disponibilités, et la place de prod d'un match (se placer, se
+  // retirer — `MATCH_PROD.md`) — ni l'antenne ni l'aperçu du plateau.
+  PROD: ["planning", "prod"],
   COMMUNITY_MANAGER: ["showcase"],
   RECRUTEUR: ["recruitment"],
   // Lecture de `/devdoc` seulement : la doc des dépôts, publiée sur GitHub,

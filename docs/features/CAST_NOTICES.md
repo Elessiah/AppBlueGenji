@@ -62,6 +62,10 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   « Configurer ma diffusion », après une confirmation (`CAST_SETTINGS.md`).
 - La case « Messages privés Discord de mes matchs et de mes équipes » (`/profil`) coupe aussi ce
   message privé : son aide (`matchDms.hint`, FR et EN) le dit.
+- **Prod d'un match** (`MATCH_PROD.md`) : même schéma — ligne anonyme au salon
+  des casts (🎛️, `formatProdChangeLog`), avis (message privé de match + push
+  `MATCH_PROD`) au compte que le staff place, remplace ou retire, ou dont la
+  place est rendue d'office ; rien à qui agit sur sa propre place.
 
 ## Confidentialité
 

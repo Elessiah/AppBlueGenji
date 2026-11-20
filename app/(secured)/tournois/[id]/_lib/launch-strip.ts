@@ -8,7 +8,7 @@ import { exposesMatchContacts, matchUnderway, readsContactsEarly, type MatchLaun
 import { isByeMatch } from "@/lib/shared/match-page";
 import type { BracketMatch } from "@/lib/shared/types";
 
-type StripMatch = Pick<BracketMatch, "status" | "team1Id" | "team2Id" | "casters">;
+type StripMatch = Pick<BracketMatch, "status" | "team1Id" | "team2Id" | "casters"> & Partial<Pick<BracketMatch, "prod">>;
 
 export type LaunchStripViewer = {
   /** Permission `live` : s'inscrire comme caster. */
@@ -69,6 +69,7 @@ export function launchStripControls(
     viewer.viewerUserId !== null && match.casters.some((caster) => caster.userId === viewer.viewerUserId);
   const isPlayer =
     viewer.myTeamId !== null && (match.team1Id === viewer.myTeamId || match.team2Id === viewer.myTeamId);
+  const isProd = viewer.viewerUserId !== null && match.prod?.userId === viewer.viewerUserId;
   const open = match.status !== "COMPLETED";
   // Inscription comme caster : sur un match à jouer, jamais sur un bye (un
   // engagé connu en face d'une case vide), et jamais par un joueur du match.
@@ -84,7 +85,8 @@ export function launchStripControls(
     // `tournaments`) les lit comme un joueur du match, dès que les deux
     // adversaires sont connus ; le caster inscrit, le temps du match seulement.
     showContacts: (early || isCaster) && exposesMatchContacts(phase, early),
-    showClaim: viewer.canManage && castable && !isCaster,
+    // La prod du match n'en est pas caster (`docs/features/MATCH_PROD.md`).
+    showClaim: viewer.canManage && castable && !isCaster && !isProd,
     showRelease:
       open && viewer.canSchedule && match.casters.some((caster) => caster.userId !== viewer.viewerUserId),
     showPlan: viewer.canSchedule && phase === "TO_PLAN",

@@ -49,6 +49,7 @@ export function tournamentViewerContext(
     canDelete: false,
     canCancelForfeit: false,
     canManageLive: false,
+    canProd: false,
     viewerUserId: 1,
     castBlock: "NOT_CASTER",
     certificationPrompt: null,

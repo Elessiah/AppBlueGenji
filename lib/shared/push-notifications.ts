@@ -130,6 +130,11 @@ export const PUSH_TOPICS = {
     description: "Ton inscription comme caster d'un match est retirée par le staff ou d'office : le motif est donné.",
     audience: "live",
   },
+  MATCH_PROD: {
+    label: "Prod d'un match",
+    description: "Le staff te place comme prod d'un match ou te retire cette place.",
+    audience: "prod",
+  },
   PLANNING_NEW_ENTRIES: {
     label: "Nouveaux créneaux au planning",
     description: "De nouveaux créneaux (matchs ou tournois entiers) viennent d'être planifiés : tous pour un caster ou un prod, ceux des jeux où tu remplis la condition d'arbitrage pour un arbitre, jamais un créneau où tu joues. Un seul récapitulatif par vague, pour poser tes disponibilités. Coupe aussi le message privé Discord.",

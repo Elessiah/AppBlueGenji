@@ -1268,6 +1268,7 @@ function TournamentSheetView({
         castBlock={detail.castBlock}
         openReplay={openMatchReplay}
         publicShare={published}
+        canProd={detail.canProd}
         refereeNames={detail.refereeNames}
       >
       {/* Le bouton **par match** suit la règle de `frozen` : le plateau affiché

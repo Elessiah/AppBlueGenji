@@ -507,7 +507,7 @@ function RgpdFr({
             <strong>Suivre un tournoi sans compte.</strong> Depuis octobre 2026, la fiche d&apos;un
             tournoi publié se consulte aussi sans se connecter, à l&apos;adresse{" "}
             <code>/suivre/tournois/…</code> : plateau, scores, classements, noms des équipes et
-            pseudos des joueurs engagés, pseudos des casters d&apos;un match — ce que les retransmissions
+            pseudos des joueurs engagés, pseudos des casters et de la prod d&apos;un match — ce que les retransmissions
             et Discord montrent déjà —, ainsi que les logos des équipes et, pour un tournoi individuel,
             l&apos;avatar de chaque joueur engagé (sauf s&apos;il l&apos;a masqué) et son numéro de compte
             interne, qui porte sa marque du podium, et les pénalités d&apos;une BlueGenji Survie (engagé, manche,
@@ -1486,6 +1486,10 @@ function RgpdFr({
             l&apos;organisation), et seuls ce staff et l&apos;arbitre le retirent (il part aussi quand le dernier caster quitte le match,
             ou que le staff l&apos;en retire, sans qu&apos;aucun stream reste). L&apos;arbitre désigné d&apos;un match peut aussi, pour ce
             seul match, modifier ou retirer le lien d&apos;un caster et configurer la diffusion de l&apos;organisation.{" "}
+            Un match peut aussi avoir une <strong>prod</strong>, qui assure la production de son direct :
+            un membre qui a ce rôle s&apos;y place ou y est placé par le staff ; son pseudo est montré avec le
+            match comme celui des casters, gardé avec le match et retiré des matchs à venir si son compte perd ce
+            rôle ou est supprimé (<Link href="/rgpd/registre#t16">registre, T16</Link>).{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
             « Contacts » et de lancement, page du match : aux mêmes personnes et aux mêmes moments — parties

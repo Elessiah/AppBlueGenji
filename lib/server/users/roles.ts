@@ -7,9 +7,15 @@ import { normalizePseudo, parseRoles } from "@/lib/server/serialization";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { releaseWithServerLockWait, rollbackKeepingError } from "@/lib/server/tournaments/lock-wait";
+import {
+  announceProdWithdrawals,
+  withdrawLostProdPlaces,
+  type ReleasedProdPlace,
+} from "@/lib/server/tournaments/match-prod";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import {
   ROLE_LABELS,
+  can,
   diffPlatformRoles,
   holdsGuestEligibleRole,
   roleChangeNeedsConfirmation,
@@ -130,6 +136,17 @@ function assertExpectedRoles(expected: readonly PlatformRole[] | undefined, prev
   if (expected !== undefined && !sameRoles(sanitizePlatformRoles(expected), previous)) throw new Error("ROLES_CHANGED");
 }
 
+/** Permission `prod` perdue par ce changement : ses places de prod à jouer sont rendues (`MATCH_PROD.md`). */
+async function withdrawProdIfLost(
+  connection: PoolConnection,
+  userId: number,
+  change: { previous: PlatformRole[]; next: PlatformRole[]; wasAdmin: boolean; isAdmin: boolean },
+): Promise<ReleasedProdPlace[]> {
+  const had = can({ isAdmin: change.wasAdmin, roles: change.previous }, "prod");
+  const keeps = can({ isAdmin: change.isAdmin, roles: change.next }, "prod");
+  return had && !keeps ? withdrawLostProdPlaces(connection, userId) : [];
+}
+
 /**
  * Remplace l'intégralité des rôles de permission d'un utilisateur.
  * Le rôle `ADMIN` est persisté via la colonne `is_admin` ; les autres rôles
@@ -166,6 +183,7 @@ export async function setUserRoles(
   let wasAdmin = false;
   let lifted = 0;
   let guestCleared: RolesSaveResult["guestCleared"];
+  let releasedProd: ReleasedProdPlace[] = [];
   try {
     await connection.beginTransaction();
     // L'**auteur** doit être encore administrateur au moment d'écrire : la
@@ -243,6 +261,9 @@ export async function setUserRoles(
       // Dernier rôle de caster ou de prod retiré : la marque, qui ne vise qu'eux,
       // n'a plus d'objet et tombe aussi (registre T20, durée de conservation).
       guestCleared = await clearGuestOnRoleChange(connection, targetUserId, { previous, next: nonAdminRoles, wasAdmin, isAdmin });
+      // Permission `prod` perdue : ses places de prod sur des matchs à jouer sont
+      // rendues (`MATCH_PROD.md`), après la ligne du compte (ordre compte puis match).
+      releasedProd = await withdrawProdIfLost(connection, targetUserId, { previous, next: nonAdminRoles, wasAdmin, isAdmin });
     }
     await connection.commit();
   } catch (error) {
@@ -260,6 +281,7 @@ export async function setUserRoles(
   // le client, et la route recalcule le contexte du lecteur sur les rôles
   // enregistrés — retrait comme ajout (`session-streams.ts`).
   if (!unchanged) closeUserStreams(targetUserId);
+  if (releasedProd.length > 0) announceProdWithdrawals(targetUserId, releasedProd);
 
   // Un seul des deux comptes, selon le sens du changement d'administration.
   const liftKey = wasAdmin ? "impersonationsCleared" : "strayImpersonationsLifted";

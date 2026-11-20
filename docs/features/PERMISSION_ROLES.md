@@ -11,7 +11,7 @@ s'additionnent.
 | `ADMIN`             | **Tous les droits**, dont l'attribution des rôles.       |
 | `ARBITRE`           | Création et gestion des tournois / matchs (`tournaments`).|
 | `CASTER`            | Aperçu du plateau avant lancement en lecture seule (`casting`), et diffusion en direct des matchs (`live`). |
-| `PROD`              | Production des diffusions : page « Planning » (`planning`), ses disponibilités et préférences. |
+| `PROD`              | Production des diffusions : page « Planning » (`planning`), ses disponibilités et préférences ; prod d'un match (`prod`). |
 | `COMMUNITY_MANAGER` | Site vitrine (sponsors) + association (`showcase`).       |
 | `RECRUTEUR`         | Page recrutement (`recruitment`).                         |
 | `DEV`               | Documentation développeur `/devdoc`, lecture seule (`dev`). |
@@ -23,10 +23,10 @@ s'additionnent.
 
 | Rôle | Ce qu'il peut changer | Messages du bot | Part dans un match |
 | --- | --- | --- | --- |
-| `ADMIN` | Tout, dont les rôles des autres et la marque « invité » | Tous les avis du staff | Tout (scores, arbitre, cast, antenne) |
-| `ARBITRE` | Tournois et matchs ; ses disponibilités au planning | Avis du staff des tournois, du planning | Arbitre, scores, antenne |
+| `ADMIN` | Tout, dont les rôles des autres et la marque « invité » | Tous les avis du staff | Tout (scores, arbitre, cast, prod, antenne) |
+| `ARBITRE` | Tournois et matchs (dont placer la prod d'un match) ; ses disponibilités au planning | Avis du staff des tournois, du planning | Arbitre, scores, antenne |
 | `CASTER` | Son cast et son antenne ; ses disponibilités au planning (sauf invité) | Avis de cast, du planning (sauf invité) | Caster |
-| `PROD` | Ses disponibilités au planning (sauf invité) | Avis du planning (sauf invité) | Production du direct |
+| `PROD` | Sa place de prod sur un match (même invité) ; ses disponibilités au planning (sauf invité) | Avis de prod d'un match, du planning (sauf invité) | Prod du match (`MATCH_PROD.md`) |
 | `COMMUNITY_MANAGER` | Site vitrine, association | Aucun | Aucune |
 | `RECRUTEUR` | Page recrutement | Aucun | Aucune |
 | `DEV` | Rien (lecture de `/devdoc`) | Aucun | Aucune |
@@ -66,6 +66,11 @@ Invités).
   scopé »). Un non-administrateur reçoit `403 PLANNING_ADMIN_ONLY` et la vue
   (`canCompute: false`) ne porte ni panneau ni durées. La vue joueur n'y donne
   aucun accès (404).
+- `prod` — se placer comme prod d'un match ou s'en retirer (`POST`/`DELETE
+  /api/matches/[id]/prod`, `MATCH_PROD.md`) : rien d'autre. Rôles `PROD` (et
+  `ADMIN`) ; un invité la garde. Placer la prod d'un **autre** demande
+  `tournaments` (`/api/admin/matches/[id]/prod`). L'InfoHint du rôle (incarnation,
+  `impersonate.json`) le dit.
 - `showcase` — `/api/landing/sponsors/*`, `/api/association/*`, `/api/benevoles/*`.
 - `recruitment` — `/api/recruitment/*`.
 - `roles` — `POST /api/admin/users/[id]/roles` (réservé `ADMIN`).
@@ -210,4 +215,4 @@ l'édition, non divulgué aux autres).
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Rôles de permission de plateforme** (cumulables, distincts des rôles d'équipe) : `ADMIN`, `ARBITRE` (tournois + diffusion), `CASTER` (aperçu du plateau en lecture seule + diffusion + planning), `PROD` (planning des casts), `COMMUNITY_MANAGER` (site vitrine + association), `RECRUTEUR` (recrutement), `DEV` (documentation `/devdoc`). Toujours protéger une route avec `can(user, "<permission>")` de `@/lib/shared/permissions` (permissions : `tournaments`, `casting`, `live`, `planning`, `showcase`, `recruitment`, `roles`, `moderation`, `dev`) — ne pas tester `user.isAdmin` directement pour un domaine scopé. `canAny(user, [...])` pour un accès ouvert à plusieurs domaines. `casting` ne donne **que** la lecture de l'aperçu ; `live` est le droit d'écriture sur l'état de diffusion. `ADMIN` a tous les droits. Voir `docs/features/PERMISSION_ROLES.md`.
+- **Rôles de permission de plateforme** (cumulables, distincts des rôles d'équipe) : `ADMIN`, `ARBITRE` (tournois + diffusion), `CASTER` (aperçu du plateau en lecture seule + diffusion + planning), `PROD` (planning des casts), `COMMUNITY_MANAGER` (site vitrine + association), `RECRUTEUR` (recrutement), `DEV` (documentation `/devdoc`). Toujours protéger une route avec `can(user, "<permission>")` de `@/lib/shared/permissions` (permissions : `tournaments`, `casting`, `live`, `planning`, `prod`, `showcase`, `recruitment`, `roles`, `moderation`, `dev`) — ne pas tester `user.isAdmin` directement pour un domaine scopé. `canAny(user, [...])` pour un accès ouvert à plusieurs domaines. `casting` ne donne **que** la lecture de l'aperçu ; `live` est le droit d'écriture sur l'état de diffusion. `ADMIN` a tous les droits. Voir `docs/features/PERMISSION_ROLES.md`.

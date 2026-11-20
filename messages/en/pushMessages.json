@@ -183,6 +183,16 @@
       "MATCH_DELETED": "the match was deleted (rolled back or round redone)"
     }
   },
+  "matchProd": {
+    "title": {
+      "ASSIGNED": "A match's prod",
+      "RELEASED": "Prod removed"
+    },
+    "body": {
+      "ASSIGNED": "The staff made you this match's prod. {pairing} · {tournament}, {round}.",
+      "RELEASED": "The staff removed you as this match's prod. {pairing} · {tournament}, {round}."
+    }
+  },
   "refereeReleased": {
     "title": "Refereeing removed",
     "body": "You no longer referee this match: {reason}. {pairing} · {tournament}, {round}.",

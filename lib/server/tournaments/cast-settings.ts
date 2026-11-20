@@ -98,7 +98,7 @@ export type SessionActor = SessionRights & { id: number };
  *
  * @throws `PLAYER_VIEW_ACTIVE` — la session incarne un rôle sans cette permission.
  */
-export function actingUserId(actor: SessionActor, permission: "live" | "tournaments"): number {
+export function actingUserId(actor: SessionActor, permission: "live" | "tournaments" | "prod"): number {
   if (!sessionHolds(actor, permission)) throw new Error("PLAYER_VIEW_ACTIVE");
   return actor.id;
 }

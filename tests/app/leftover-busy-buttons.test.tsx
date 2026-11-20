@@ -68,9 +68,10 @@ describe("méthode de l'entrée « boutons grisés restants »", () => {
       "app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx",
       "app/(secured)/tournois/[id]/_components/MatchScheduleDialog.tsx",
       "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx",
+      "app/(secured)/tournois/[id]/_components/ProdDialog.tsx",
       "app/(secured)/tournois/[id]/_components/RefereeDialog.tsx",
     ]);
-    expect(hits).toHaveLength(7);
+    expect(hits).toHaveLength(8);
   });
 
   it("busyButtonsDoc_keptDisabledFields_areJustifiedAndNoRemainderIsPointedTo", () => {

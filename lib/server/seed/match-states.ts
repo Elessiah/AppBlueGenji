@@ -230,13 +230,15 @@ export const SEED_FIRST_MAP = "Ilios";
  * seules ». L'empreinte de l'appariement est posée avec le « Prêt », sans quoi
  * il serait lu comme celui d'un autre appariement (`currentLaunchState`).
  * Chaque manche reçoit aussi son arbitrage (`SEED_REFEREE_CASES`, arbitre
- * `refereeId`).
+ * `refereeId`). La deuxième a déjà sa prod (`prodId`, `MATCH_PROD.md`) ; les
+ * autres restent libres, pour qu'une prod s'y place.
  */
 export async function applyMatchLaunchCases(
   db: Pool,
   casterId: number | null,
   coCasterId: number | null,
   refereeId: number | null = null,
+  prodId: number | null = null,
 ): Promise<void> {
   if (casterId === null) return;
   const [firsts] = await db.query<(RowDataPacket & { id: number })[]>(
@@ -262,6 +264,9 @@ export async function applyMatchLaunchCases(
     );
     await applyRefereeCase(db, matchId, SEED_REFEREE_CASES[index % SEED_REFEREE_CASES.length], refereeId);
     await applyRoundMapCase(db, matchId, SEED_ROUND_MAP_CASES[index]);
+    if (index === 1 && prodId !== null) {
+      await db.execute(`UPDATE bg_matches SET prod_user_id = ? WHERE id = ?`, [prodId, matchId]);
+    }
     const castCase = coCasterId === null ? "ONE" : SEED_CAST_CASES[index % SEED_CAST_CASES.length];
     const streamId = await seedStream(db, matchId);
     await seedCaster(db, matchId, casterId, streamId);

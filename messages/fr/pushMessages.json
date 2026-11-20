@@ -183,6 +183,16 @@
       "MATCH_DELETED": "le match a été supprimé (retour arrière ou manche refaite)"
     }
   },
+  "matchProd": {
+    "title": {
+      "ASSIGNED": "Prod d'un match",
+      "RELEASED": "Prod retirée"
+    },
+    "body": {
+      "ASSIGNED": "Le staff te place comme prod de ce match. {pairing} · {tournament}, {round}.",
+      "RELEASED": "Le staff te retire la prod de ce match. {pairing} · {tournament}, {round}."
+    }
+  },
   "refereeReleased": {
     "title": "Arbitrage retiré",
     "body": "Tu n'arbitres plus ce match : {reason}. {pairing} · {tournament}, {round}.",

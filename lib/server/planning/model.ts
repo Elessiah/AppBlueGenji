@@ -15,6 +15,9 @@ import type { LoadedEntry, PlanningData } from "./load";
  * match ne compte que tant que le match n'a pas d'arbitre. Un caster inscrit
  * sur le match sans ligne du planning tenue (confirmée ou choix du staff) vaut
  * `CAST` : son inscription l'emporte sur une simple proposition provisoire.
+ * La prod placée sur le match (`bg_matches.prod_user_id`, `MATCH_PROD.md`)
+ * vaut aussi `CAST` : une au plus, elle remplace toute proposition provisoire
+ * de prod ; une ligne PROD tenue qui la nomme en reste la provenance.
  */
 function matchRefereeRows(entry: LoadedEntry, rows: PlanningData["assignments"]): PlanningAssignmentView[] {
   if (entry.matchRefereeId === null) {
@@ -63,6 +66,15 @@ export function entryAssignments(
     const signup: PlanningAssignmentView = { userId, role: "CASTER", source: "CAST", reason: "CAST", provisional: false };
     if (index === -1) out.push(signup);
     else if (out[index].provisional) out[index] = signup;
+  }
+  if (entry.kind === "MATCH" && entry.matchProdId != null) {
+    const prodId = entry.matchProdId;
+    const held = out.findIndex((row) => row.role === "PROD" && row.userId === prodId && !row.provisional);
+    if (held === -1) {
+      const kept = out.filter((row) => !(row.role === "PROD" && row.provisional));
+      kept.push({ userId: prodId, role: "PROD", source: "CAST", reason: "CAST", provisional: false });
+      out.splice(0, out.length, ...kept);
+    }
   }
   const order = { REFEREE: 0, CASTER: 1, PROD: 2 } as const;
   return out.sort((a, b) => order[a.role] - order[b.role] || a.userId - b.userId);

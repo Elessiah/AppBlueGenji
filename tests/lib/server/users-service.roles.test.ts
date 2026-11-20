@@ -7,9 +7,17 @@ import {
   revocationMark,
   revokedSince,
 } from "@/lib/server/session-streams";
+import { announceProdWithdrawals, withdrawLostProdPlaces } from "@/lib/server/tournaments/match-prod";
 import { type SqlQuery, connectionMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
+// La prod perdue libère ses places (MATCH_PROD.md) : simulé, testé dans match-prod.test.ts.
+jest.mock("@/lib/server/tournaments/match-prod");
+
+beforeEach(() => {
+  jest.mocked(withdrawLostProdPlaces).mockReset().mockResolvedValue([]);
+  jest.mocked(announceProdWithdrawals).mockReset();
+});
 
 /**
  * `setUserRoles` : la cible lue sur le pool (`targetRows`), puis une
@@ -787,5 +795,46 @@ describe("rolesChangeAuditLine", () => {
     expect(rolesChangeAuditLine(7, { roles: [], previous: ["ARBITRE"] }, false)).toBe(
       "🛡️ Rôles de plateforme du compte #7 — accordés : aucun ; retirés : Arbitre ; enregistrés : aucun.",
     );
+  });
+});
+
+describe("setUserRoles — la prod perdue libère ses places (MATCH_PROD.md)", () => {
+  it("setUserRoles_prodRemoved_withdrawsProdPlacesUnderTransaction", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["PROD"]' }]);
+
+    await setUserRoles(7, [], 3);
+
+    expect(withdrawLostProdPlaces).toHaveBeenCalledWith(expect.anything(), 7);
+  });
+
+  it("setUserRoles_prodRemovedWithPlaces_announcesAfterCommit", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["PROD"]' }]);
+    const places = [{ matchId: 42, tournamentId: 5, pairing: { team1Id: 1, team2Id: 2 } }];
+    jest.mocked(withdrawLostProdPlaces).mockResolvedValue(places);
+
+    await setUserRoles(7, [], 3);
+
+    expect(connection.commit).toHaveBeenCalled();
+    expect(announceProdWithdrawals).toHaveBeenCalledWith(7, places);
+  });
+
+  it("setUserRoles_prodKept_leavesProdPlaces", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["PROD"]' }]);
+
+    await setUserRoles(7, ["PROD", "CASTER"], 3);
+
+    expect(withdrawLostProdPlaces).not.toHaveBeenCalled();
+  });
+
+  it("setUserRoles_prodRemovedNoPlaces_announcesNothing", async () => {
+    const connection = await mockTransaction();
+    lockedThenWritten(connection, [ACTOR_ADMIN, { id: 7, is_admin: 0, platform_roles_json: '["PROD"]' }]);
+
+    await setUserRoles(7, ["CASTER"], 3);
+
+    expect(announceProdWithdrawals).not.toHaveBeenCalled();
   });
 });

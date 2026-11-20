@@ -110,6 +110,8 @@ export type LaunchMatchBaseRow = RowDataPacket & {
   referee_user_id: number | null;
   referee_ready_at: Date | string | null;
   self_managed: number | null;
+  /** Prod du match (`docs/features/MATCH_PROD.md`) : jamais caster du même match. */
+  prod_user_id?: number | null;
   /**
    * Diffusion du match (`lib/shared/live-streams.ts`) : lues sous le verrou
    * parce qu'un caster règle le mode d'antenne en s'inscrivant, et dans la même
@@ -152,7 +154,7 @@ const LAUNCH_MATCH_COLUMNS = `
   m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
   m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
   m.team2_ready_at, m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed,
-  m.live_trigger, m.live_trigger_user_id, m.live_started_at,
+  m.prod_user_id, m.live_trigger, m.live_trigger_user_id, m.live_started_at,
   m.phase_id, m.bracket, m.round_number`;
 
 const LAUNCH_MATCH_FROM = `
@@ -355,7 +357,7 @@ const LAUNCH_MATCH_OWN_COLUMNS = `
   m.id, m.tournament_id, m.status, m.is_bye, m.team1_id, m.team2_id,
   m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
   m.team2_ready_at, m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed,
-  m.live_trigger, m.live_trigger_user_id, m.live_started_at,
+  m.prod_user_id, m.live_trigger, m.live_trigger_user_id, m.live_started_at,
   m.phase_id, m.bracket, m.round_number`;
 
 /**
@@ -598,7 +600,7 @@ async function resolvePartyOrRefusal(
 }
 
 /** Le lecteur joue-t-il ce match — appartenance en cours, ou entrée solo ? */
-async function resolveTeamParty(
+export async function resolveTeamParty(
   connection: PoolConnection,
   match: { team1_id: number | null; team2_id: number | null },
   userId: number,
@@ -1034,7 +1036,7 @@ async function releaseIneligibleCasters(
  * acquise n'en réécrit rien.
  *
  * @throws `NOT_CASTER` | `CASTER_IDENTITY_REQUIRED` | `MATCH_NOT_FOUND`
- *   | `MATCH_CAST_CLOSED` | `MATCH_NOT_LAUNCHABLE` | `CASTER_IS_PLAYER`
+ *   | `MATCH_CAST_CLOSED` | `MATCH_NOT_LAUNCHABLE` | `CASTER_IS_PLAYER` | `CASTER_IS_PROD`
  *   | `STREAM_NOT_FOUND` | `INVALID_STREAM_URL` | `STREAM_URL_REQUIRED`
  *   | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE` | `MATCH_START_AT_REQUIRED`
  *   | `INVALID_CAST_BATTLETAG` | `LIVE_TRIGGER_NOT_OWNED`
@@ -1091,6 +1093,8 @@ export async function claimMatchCast(
       // Seul **jouer** le match ferme le cast : l'arbitre désigné peut le
       // caster (`resolveMatchParty` le rendrait `MATCH_REFEREE`, à tort refusé).
       if (await resolveTeamParty(connection, row, userId)) throw new Error("CASTER_IS_PLAYER");
+      // La prod du match n'en est pas caster (`docs/features/MATCH_PROD.md`).
+      if (nullableId(row.prod_user_id ?? null) === userId) throw new Error("CASTER_IS_PROD");
 
       let streamId: number;
       if ("streamId" in castTarget) {

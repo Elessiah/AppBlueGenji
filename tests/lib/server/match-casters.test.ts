@@ -376,7 +376,7 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
     await withdrawUserCasts(w.connection, 12, false);
     expect(w.state.locked).toEqual([[42]]);
-    expect(w.execute.mock.calls[0][1]).toEqual([12, 12, 12, 12]);
+    expect(w.execute.mock.calls[0][1]).toEqual([12, 12, 12, 12, 12]);
   });
 
   it("withdrawUserCasts_anonymisation_reopenedMatchLosesCaster", async () => {
@@ -409,8 +409,8 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     const w = world([], [{ user_id: 12, stream_id: 4 }]);
     await withdrawUserCasts(w.connection, 12, true);
     const first = w.sqls()[0];
-    for (const kind of ["'C'", "'L'", "'R'", "'T'"]) expect(first).toContain(`${kind} AS kind`);
-    expect(w.execute.mock.calls[0][1]).toEqual([12, 12, 12, 12]);
+    for (const kind of ["'C'", "'L'", "'R'", "'T'", "'P'"]) expect(first).toContain(`${kind} AS kind`);
+    expect(w.execute.mock.calls[0][1]).toEqual([12, 12, 12, 12, 12]);
   });
 
   it("effacement : le cast d'un match joué part aussi", async () => {

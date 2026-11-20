@@ -1238,6 +1238,15 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Logs: both actions are noted on Discord without naming their author or the caster — a replay (the match, its team names and the link to the video, which is public and shows the channel that streamed it, without its other parameters) and the solo caster status, both in the staff log; the server logs keep their author and, for the status, the account concerned, according to their rotation. Basis: legitimate interest (organising and overseeing tournaments).",
     ],
   },
+  "2026-11-prod-match": {
+    linkLabels: ["Read record T16 of the register"],
+    title: "Matches: the live stream's prod",
+    summary: "A match can have a prod, who handles the production of its live stream: they take the match themselves or are placed on it by the staff, and their username is shown with the match, like the casters'.",
+    details: [
+      "What is kept: the prod's account with the match, for as long as the match exists; it is removed from upcoming matches if the account loses that role or is deleted, and appears in the export of their data. Basis: performance of the service, as for casters.",
+      "Who sees it: the readers of the match page, as for casters. The prod is notified (Discord direct message and push notification, “Match prod” topic, which can be turned off in “My profile”) when the staff places or removes them; these actions are noted in the staff log on Discord without naming anyone.",
+    ],
+  },
 };
 
 /**

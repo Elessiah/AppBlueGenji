@@ -193,6 +193,8 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     // Droit de diffusion : comme les autres droits, il tient à la personne et
     // non au plateau — un instantané ne peut ni l'accorder ni le retirer.
     canManageLive: state.detail.canManageLive,
+    // Prod d'un match : tient à la personne, comme le droit de diffusion.
+    canProd: state.detail.canProd,
     // Inscription comme caster : tient à l'identité du lecteur, pas au plateau.
     viewerUserId: state.detail.viewerUserId,
     castBlock: state.detail.castBlock,

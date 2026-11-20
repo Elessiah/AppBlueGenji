@@ -611,3 +611,25 @@ describe("« Partager » dans le pied d'action (SHARE_EMBEDS.md)", () => {
     expect(ids({ showMatchPage: true, showShare: true })).toEqual(["matchPage", "share"]);
   });
 });
+
+describe("matchCardActionList — prod du match (MATCH_PROD.md)", () => {
+  const prod = { isProd: false, showClaim: false, showRelease: false, showAssign: false };
+
+  it("matchCardActionList_prodClaim_offersClaimProd", () => {
+    expect(ids({ prod: { ...prod, showClaim: true } })).toEqual(["claimProd"]);
+  });
+
+  it("matchCardActionList_prodRelease_offersReleaseProd", () => {
+    expect(ids({ prod: { ...prod, isProd: true, showRelease: true } })).toEqual(["releaseProd"]);
+  });
+
+  it("matchCardActionList_prodAssign_offersStaffAssignProd", () => {
+    const actions = matchCardActionList({ ...NOTHING, prod: { ...prod, showAssign: true } });
+
+    expect(actions.map((a) => [a.id, a.tone])).toEqual([["assignProd", "staff"]]);
+  });
+
+  it("matchCardActionList_withoutProdControls_offersNoProdAction", () => {
+    expect(ids({ prod: undefined })).toEqual([]);
+  });
+});

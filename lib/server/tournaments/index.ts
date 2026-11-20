@@ -1050,6 +1050,8 @@ export type TournamentViewerRights = {
    * tirage **et** ouvre l'antenne, sans pour autant arbitrer.
    */
   canManageLive?: boolean;
+  /** Droit de se placer comme prod d'un match : permission `prod` (`MATCH_PROD.md`). */
+  canProd?: boolean;
   /**
    * Droit de supprimer définitivement le tournoi : administrateur strict, et
    * non simple porteur de la permission `tournaments` — un arbitre gère un
@@ -1245,6 +1247,7 @@ export async function getTournamentViewerContext(
     // tournoi n'a pas à porter un rôle de plus pour le lire ou le caster.
     canPreview = canManage,
     canManageLive = canManage,
+    canProd = false,
     canDelete = false,
     canCancelForfeit = false,
   } = rights;
@@ -1399,6 +1402,7 @@ export async function getTournamentViewerContext(
     canDelete,
     canCancelForfeit,
     canManageLive,
+    canProd,
     viewerUserId: userId,
     castBlock,
     matchProposals,

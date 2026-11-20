@@ -64,13 +64,16 @@ export function sessionPlatformRights(
 export type SessionRights = { playerView: boolean; roles?: readonly PlatformRole[] };
 
 /**
- * La session tient-elle les casts (`live`) ou les arbitrages (`tournaments`)
- * désignés du compte ? Hors incarnation, toujours (l'éligibilité se lit en
+ * La session tient-elle les casts (`live`), les arbitrages (`tournaments`) ou
+ * les places de prod (`prod`) du compte ? Hors incarnation, toujours (l'éligibilité se lit en
  * base) ; pendant une incarnation, seulement si les rôles incarnés ouvrent la
  * permission — un administrateur qui incarne un caster caste, en vue joueur
  * il ne tient ni cast ni arbitrage.
  */
-export function sessionHolds(session: SessionRights, permission: Extract<Permission, "live" | "tournaments">): boolean {
+export function sessionHolds(
+  session: SessionRights,
+  permission: Extract<Permission, "live" | "tournaments" | "prod">,
+): boolean {
   if (!session.playerView) return true;
   return can({ isAdmin: false, roles: session.roles ?? [] }, permission);
 }

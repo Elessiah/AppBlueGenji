@@ -35,9 +35,9 @@ const EN_PAGE = "app/rgpd/RgpdEn.tsx";
 
 describe("historique des changements — caster autonome et rediffusions", () => {
   it("soloRediffEntry_lastEntry_datedWithRegisterAndStaffAudience", () => {
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ENTRY_ID);
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ENTRY_ID);
     expect(frEntry().publishedAt).toBe("2026-11-22");
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-22");
+    expect(REGISTER_UPDATED_AT).toBe("2026-11-23");
     expect(frEntry().audience).toBe("LIVE_STAFF");
     expect(frEntry().asksTermsAcceptance).toBeUndefined();
   });

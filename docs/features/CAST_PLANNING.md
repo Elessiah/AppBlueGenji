@@ -59,6 +59,12 @@ de fin et de confirmation de chaque créneau (`endAt`, `confirmAt`) restent
 rendues à tous les membres : elles laissent déduire les durées, qui ne sont pas
 un secret — seul leur formulaire est réservé.
 
+**Prod d'un match** (`MATCH_PROD.md`) : la prod placée sur un match paraît sur
+son entrée comme une ligne `PROD` tenue (source `CAST`), comme un caster inscrit ;
+elle remplace une proposition provisoire de prod et se retire depuis le match
+(`PLANNING_CAST_MANAGED`, texte neutre : caster ou prod). Le calcul ne place pas
+de prod sur un match, pas plus qu'un caster.
+
 `planning` : rôles `ARBITRE`, `CASTER`, `PROD` (nouveau rôle de plateforme,
 production d'un direct) et `ADMIN` (`PERMISSION_ROLES.md`). Rôles du planning
 tenus (`planningRolesOf`) : arbitre = `tournaments`, caster = `CASTER`, prod =

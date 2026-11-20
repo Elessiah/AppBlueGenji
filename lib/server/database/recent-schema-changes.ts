@@ -665,6 +665,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_users ADD COLUMN is_guest_staff TINYINT(1) NOT NULL DEFAULT 0 AFTER platform_roles_json`,
     // Sortie d'un invité marquée sur son désistement : ne dépend pas de l'auteur, que sa suppression efface.
     `ALTER TABLE bg_planning_events ADD COLUMN staff_release TINYINT(1) NOT NULL DEFAULT 0 AFTER late`,
+    // Prod d'un match (`docs/features/MATCH_PROD.md`) : colonne, index et clé
+    // étrangère en une instruction, comme l'arbitre désigné.
+    `ALTER TABLE bg_matches ADD COLUMN prod_user_id BIGINT NULL AFTER referee_user_id,
+       ADD INDEX idx_bg_matches_prod (prod_user_id),
+       ADD CONSTRAINT fk_bg_matches_prod FOREIGN KEY (prod_user_id)
+         REFERENCES bg_users(id) ON DELETE SET NULL`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

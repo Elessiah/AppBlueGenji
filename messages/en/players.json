@@ -160,7 +160,7 @@
     },
     "PROD": {
       "label": "Prod",
-      "description": "Run the production of broadcasts (cast planning)."
+      "description": "Run the production of broadcasts (cast planning, a match's prod)."
     },
     "COMMUNITY_MANAGER": {
       "label": "Community Manager",

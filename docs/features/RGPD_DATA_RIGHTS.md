@@ -86,7 +86,8 @@ affichées dans le tableau « Données collectées ») :
   tournoi, stream, « Prêt », date, `castBattletag` : BattleTag donné pour ce
   cast), liens de chaîne fournis
   (`providedStreamLinks`, `bg_match_streams.link_user_id`) et arbitrages
-  désignés (`refereeAssignments`, avec le « Prêt ») —, l'origine du BattleTag
+  désignés (`refereeAssignments`, avec le « Prêt »), places de prod
+  (`prodAssignments`, `MATCH_PROD.md`) —, l'origine du BattleTag
   (`account.overwatchBattletagTyped`, `profile.battletagFromBlizzard`),
   le profil et ses réglages de visibilité, les statistiques, l'historique
   d'équipes, le palmarès, les changements de traitement dont le joueur a pris

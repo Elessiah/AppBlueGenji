@@ -68,6 +68,10 @@
       "label": "Cast removed",
       "description": "Your caster registration for a match is removed by the staff or automatically: the reason is given."
     },
+    "MATCH_PROD": {
+      "label": "A match's prod",
+      "description": "The staff makes you a match's prod or removes you from that spot."
+    },
     "PLANNING_NEW_ENTRIES": {
       "label": "New slots in the planning",
       "description": "New slots (matches or whole tournaments) were just scheduled: all of them for a caster or a prod, those of the games where you meet the refereeing requirement for a referee, never a slot where you play. One summary per wave, so you can set your availability. Also turns off the Discord direct message."

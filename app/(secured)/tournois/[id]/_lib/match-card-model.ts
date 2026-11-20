@@ -4,6 +4,7 @@ import { canConfigureLive, type MatchLiveState } from "@/lib/shared/live-streams
 import { canEditReplay, canHaveReplay, mayEditReplay } from "@/lib/shared/match-replay";
 import { offersCastSettings } from "@/lib/shared/cast-settings";
 import { canReportOwnMatch } from "@/lib/shared/match-card-viewer";
+import { prodControls } from "@/lib/shared/match-prod";
 import {
   pendingReportState,
   playerReportView,
@@ -96,6 +97,7 @@ export function useMatchCardModel(
     canSchedule,
     viewerUserId,
     publicShare,
+    canProd,
   } = useLiveControls();
   // Lu à part (`useViewerRefereesMatch`) : une relecture des pseudos ne
   // redessine que les cartes dont la réponse change.
@@ -143,6 +145,13 @@ export function useMatchCardModel(
     myTeamId,
     launchPhase: launchPhaseEnabled,
   });
+  // Prod du match (`docs/features/MATCH_PROD.md`) : même ouverture que le cast.
+  const prod = prodControls(match, {
+    canProd,
+    canSchedule,
+    viewerUserId,
+    myTeamIds: myTeamId === null ? [] : [myTeamId],
+  });
   const showCastConfig = offersCastSettings(match, launch.isCaster, canManage);
   // La diffusion de l'organisation reste au staff `tournaments` ; ses routes
   // (`/api/admin/matches/[id]/live`, rediff) demandent aussi `live` : sans les
@@ -182,6 +191,7 @@ export function useMatchCardModel(
       showMatchPage,
       // Le lien public du match, sur la carte comme sur sa page : tournoi publié, match à jouer.
       showShare: publicShare && isPublicMatch(match),
+      prod,
     },
     actionText,
   );

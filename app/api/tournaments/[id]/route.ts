@@ -36,6 +36,8 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       canManage: can(user, "tournaments"),
       canPreview: canAny(user, ["tournaments", "casting"]),
       canManageLive: can(user, "live"),
+      // Prod d'un match : par les deux portes, comme les autres droits (`MATCH_PROD.md`).
+      canProd: can(user, "prod"),
       // Suppression définitive : administrateur strict. `can(user, "tournaments")`
       // ne convient pas — un arbitre gère le tournoi, il ne l'efface pas.
       canDelete: user.isAdmin === true,

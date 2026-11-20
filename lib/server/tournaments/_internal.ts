@@ -174,6 +174,10 @@ export type MatchRow = RowDataPacket & {
   self_managed?: number | null;
   first_map?: string | null;
   map_picks?: string | null;
+  /** Prod du match (`docs/features/MATCH_PROD.md`), son pseudo public. */
+  prod_user_id?: number | null;
+  prod_pseudo?: string | null;
+  prod_is_deleted?: number | null;
   /** Pseudo de l'arbitre désigné, tel qu'en base : il entre dans l'empreinte (`refereeKey`). */
   referee_pseudo?: string | null;
   /** Condition d'arbitrage de l'arbitre désigné (`refereeKeptColumns`). */
@@ -414,8 +418,20 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
       })),
     liveStartedAt: toIso(row.live_started_at),
     ...mapMatchLaunch(row, extras.casters ?? [], game),
+    prod: mapMatchProd(row),
     replayUrl: normalizeReplayUrl(row.replay_url ?? null),
   };
+}
+
+/**
+ * La prod du match (`docs/features/MATCH_PROD.md`) : son compte et son pseudo,
+ * publics comme ceux d'un caster. Un compte effacé n'est pas montré (son
+ * effacement retire déjà ses places à venir).
+ */
+export function mapMatchProd(row: Pick<MatchRow, "prod_user_id" | "prod_pseudo" | "prod_is_deleted">): BracketMatch["prod"] {
+  const userId = row.prod_user_id == null ? null : Number(row.prod_user_id);
+  if (userId === null || Number(row.prod_is_deleted ?? 0) === 1 || row.prod_pseudo == null) return null;
+  return { userId, pseudo: String(row.prod_pseudo) };
 }
 
 /**

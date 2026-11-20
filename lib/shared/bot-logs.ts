@@ -999,6 +999,40 @@ export function formatCastChangeLog(context: {
 }
 
 /**
+ * Ce qui vient d'arriver à la prod d'un match (`docs/features/MATCH_PROD.md`,
+ * `lib/server/tournaments/match-prod.ts`). Personne n'est nommé : « une prod »,
+ * « le staff ».
+ */
+export type ProdLogChange = "CLAIMED" | "RELEASED" | "ASSIGNED" | "REPLACED" | "RELEASED_BY_STAFF" | "INELIGIBLE";
+
+const PROD_LOG_WORDING: Record<ProdLogChange, { kind: string; detail: string }> = {
+  CLAIMED: { kind: "Prod réservée", detail: "une prod se place sur le match" },
+  RELEASED: { kind: "Prod libérée", detail: "la prod se retire du match" },
+  ASSIGNED: { kind: "Prod placée", detail: `une prod est placée sur le match par ${ANONYMOUS_STAFF_LABEL}` },
+  REPLACED: { kind: "Prod changée", detail: `la prod du match est remplacée par ${ANONYMOUS_STAFF_LABEL}` },
+  RELEASED_BY_STAFF: { kind: "Prod retirée", detail: `prod du match retirée par ${ANONYMOUS_STAFF_LABEL}` },
+  INELIGIBLE: { kind: "Prod retirée d'office", detail: "la prod n'a plus le rôle prod" },
+};
+
+/** Ligne du journal du staff (salon des casts) pour un changement de prod d'un match. */
+export function formatProdChangeLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  change: ProdLogChange;
+}): string {
+  const wording = PROD_LOG_WORDING[context.change];
+  return (
+    `${lead("🎛️", wording.kind, context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
+    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), ${wording.detail}.`
+  );
+}
+
+/**
  * Gestes du staff sur un match qui ne laissaient aucune trace
  * (`docs/features/STAFF_ACTION_LOGS.md`) :
  *

@@ -21,8 +21,8 @@
       "hint": "Signs up to cast a match, sets up the cast, opens the live and reads the board preview before launch; gives availability on the schedule. No tournament management."
     },
     "PROD": {
-      "opens": "Schedule",
-      "hint": "Reads the “Schedule” page and gives availability and preferences there. No live, no board preview."
+      "opens": "Schedule, a match's prod",
+      "hint": "Reads the “Schedule” page and gives availability and preferences there; takes or leaves a match's prod spot. No live, no board preview."
     },
     "COMMUNITY_MANAGER": {
       "opens": "Showcase site and association",

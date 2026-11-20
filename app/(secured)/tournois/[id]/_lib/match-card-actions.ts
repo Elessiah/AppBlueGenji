@@ -1,4 +1,5 @@
 import type { LaunchStripControls } from "./launch-strip";
+import type { ProdControls } from "@/lib/shared/match-prod";
 import { isByeMatch } from "@/lib/shared/match-page";
 import type { BracketMatch } from "@/lib/shared/types";
 import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
@@ -30,6 +31,9 @@ export type MatchCardActionId =
   | "claimCast"
   | "castConfig"
   | "releaseCast"
+  | "claimProd"
+  | "releaseProd"
+  | "assignProd"
   | "liveConfig"
   | "replay"
   | "report";
@@ -97,6 +101,11 @@ export type MatchCardActionInput = {
    * le lien public du match (`SHARE_EMBEDS.md`). Facultatif : absent, rien.
    */
   showShare?: boolean;
+  /**
+   * Prod du match (`docs/features/MATCH_PROD.md`, `prodControls`) : se placer,
+   * se retirer, ou la fenêtre du staff. Absente : aucune entrée de prod.
+   */
+  prod?: ProdControls;
 };
 
 /**
@@ -137,6 +146,9 @@ export function matchCardActionList(
     [launch.showClaim, "claimCast", t("cardActions.claimCast"), "neutral"],
     [input.showCastConfig, "castConfig", t("cardActions.castConfig"), "neutral"],
     [launch.showRelease, "releaseCast", t("cardActions.removeCaster"), "neutral"],
+    [input.prod?.showClaim === true, "claimProd", t("cardActions.claimProd"), "neutral"],
+    [input.prod?.showRelease === true, "releaseProd", t("cardActions.releaseProd"), "neutral"],
+    [input.prod?.showAssign === true, "assignProd", t("cardActions.assignProd"), "staff"],
     [
       input.showLiveConfig,
       "liveConfig",

@@ -119,3 +119,31 @@ describe("entryAssignments — regroupement par entrée", () => {
     expect(entryAssignments(loadedEntry(), second)[0].userId).toBe(4);
   });
 });
+
+describe("entryAssignments — prod du match (MATCH_PROD.md)", () => {
+  it("entryAssignments_matchProd_addsHeldProdRow_dropsProvisionalProd", () => {
+    const data = planningData({ assignments: [loadedAssignment({ userId: 7, role: "PROD", confirmed: false })] });
+
+    expect(entryAssignments(loadedEntry({ matchProdId: 5 }), data)).toEqual([
+      { userId: 5, role: "PROD", source: "CAST", reason: "CAST", provisional: false },
+    ]);
+  });
+
+  it("entryAssignments_matchProdAlreadyHeld_keepsSingleRow", () => {
+    const data = planningData({
+      assignments: [loadedAssignment({ userId: 5, role: "PROD", confirmed: true, reason: "PREFERENCE" })],
+    });
+
+    expect(entryAssignments(loadedEntry({ matchProdId: 5 }), data)).toEqual([
+      { userId: 5, role: "PROD", source: "AUTO", reason: "PREFERENCE", provisional: false },
+    ]);
+  });
+
+  it("entryAssignments_noMatchProd_keepsProvisionalProd", () => {
+    const data = planningData({ assignments: [loadedAssignment({ userId: 7, role: "PROD", confirmed: false })] });
+
+    expect(entryAssignments(loadedEntry({ matchProdId: null }), data)).toEqual([
+      { userId: 7, role: "PROD", source: "AUTO", reason: "LOAD", provisional: true },
+    ]);
+  });
+});

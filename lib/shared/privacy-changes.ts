@@ -2335,6 +2335,20 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Journaux : ces deux gestes sont notés sur Discord sans nommer leur auteur ni le caster — une rediffusion (le match, ses noms d'équipe et le lien de la vidéo, publique, qui montre la chaîne qui l'a diffusée, sans ses autres paramètres) et le statut de caster autonome, tous deux au journal du staff ; les journaux du serveur gardent leur auteur et, pour le statut, le compte visé, selon leur rotation. Base : intérêt légitime (organisation et contrôle des tournois).",
     ],
   },
+  {
+    // MATCH-CAST-PROD — la prod d'un match (`docs/features/MATCH_PROD.md`) :
+    // registre T16, /rgpd (FR et EN). Datée comme `REGISTER_UPDATED_AT` — tout
+    // avancer ensemble si la mise en ligne glisse.
+    id: "2026-11-prod-match",
+    publishedAt: "2026-11-23",
+    title: "Matchs : la prod du direct",
+    links: [{ href: "/rgpd/registre#t16", label: "Lire la fiche T16 du registre" }],
+    summary: "Un match peut avoir une prod, qui assure la production de son direct : elle s'y place elle-même ou y est placée par le staff, et son pseudo est montré avec le match, comme celui des casters.",
+    details: [
+      "Ce qui est gardé : le compte de la prod avec le match, tant que le match existe ; il est retiré des matchs à venir si le compte perd ce rôle ou est supprimé, et figure dans l'export de ses données. Base : exécution du service, comme pour les casters.",
+      "Qui le voit : les lecteurs de la page du match, comme pour les casters. La prod est prévenue (message privé Discord et notification push, sujet « Prod d'un match », qui se coupe dans « Mon profil ») quand le staff la place ou l'en retire ; ces gestes sont notés au journal du staff sur Discord sans nommer personne.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

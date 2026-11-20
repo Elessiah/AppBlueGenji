@@ -237,6 +237,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       canManage,
       canPreview: narratesLive,
       canManageLive: can(user, "live"),
+      // Prod d'un match : par les deux portes, comme les autres droits (`MATCH_PROD.md`).
+      canProd: can(user, "prod"),
       // Suppression définitive : administrateur strict. Ce droit doit voyager par
       // les deux portes — ici et par la lecture REST de secours —, faute de quoi
       // la zone de danger n'apparaîtrait qu'après une coupure du direct.

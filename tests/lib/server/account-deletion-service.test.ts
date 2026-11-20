@@ -967,9 +967,10 @@ describe("listCastTournamentIds", () => {
     const ids = await listCastTournamentIds(fakeConnection({ execute }), 7);
 
     expect(ids).toEqual([3, 9]);
-    expect(execute.mock.calls[0][1]).toEqual([7, 7, 7, 7]);
-    // Caster, lien, arbitre et lancement du direct : les quatre que `withdrawUserCasts` verrouille.
+    expect(execute.mock.calls[0][1]).toEqual([7, 7, 7, 7, 7]);
+    // Caster, lien, arbitre, lancement du direct et prod : les cinq que `withdrawUserCasts` verrouille.
     expect(String(execute.mock.calls[0][0])).toContain("WHERE live_trigger_user_id = ?");
+    expect(String(execute.mock.calls[0][0])).toContain("WHERE prod_user_id = ?");
   });
 });
 

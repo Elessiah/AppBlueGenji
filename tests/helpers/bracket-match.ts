@@ -53,6 +53,7 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     firstMap: null,
     mapPicks: {},
     casters: [],
+    prod: null,
     lobbyOpenedAt: null,
     launchedAt: null,
     voice: null,

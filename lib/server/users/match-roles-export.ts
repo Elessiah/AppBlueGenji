@@ -5,7 +5,7 @@ import { toIso } from "@/lib/server/serialization";
 import type { PersonalDataExport } from "@/lib/shared/types";
 
 /** Ce que l'export dit des matchs où le compte a tenu un rôle (caster, arbitre). */
-export type OwnMatchRoles = Pick<PersonalDataExport, "casts" | "providedStreamLinks" | "refereeAssignments" | "liveTriggers">;
+export type OwnMatchRoles = Pick<PersonalDataExport, "casts" | "providedStreamLinks" | "refereeAssignments" | "liveTriggers" | "prodAssignments">;
 
 type Db = Awaited<ReturnType<typeof getDatabase>>;
 
@@ -65,13 +65,14 @@ async function tolerantRows<T extends RowDataPacket>(
  * liens de chaîne qu'il a fournis (`bg_match_streams.link_user_id`, registre
  * T16) et ses arbitrages désignés (`bg_matches.referee_user_id`, avec son
  * « Prêt », registre T04) et les modes d'antenne qu'il a posés
- * (`bg_matches.live_trigger_user_id`, registre T16) — ce que le site garde avec
- * le match. Quatre lectures indépendantes, chacune par l'index du compte,
+ * (`bg_matches.live_trigger_user_id`, registre T16) et ses places de prod
+ * (`bg_matches.prod_user_id`) — ce que le site garde avec
+ * le match. Cinq lectures indépendantes, chacune par l'index du compte,
  * lancées ensemble (le pool les sert en parallèle).
  */
 export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> {
   const db = await getDatabase();
-  const [casts, links, refereed, triggers] = await Promise.all([
+  const [casts, links, refereed, triggers, prods] = await Promise.all([
     tolerantRows<
     RowDataPacket & {
       match_id: number;
@@ -119,6 +120,12 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
     [{ expr: "live_trigger", alias: "live_trigger" }],
     userId,
   ),
+    tolerantRows<RowDataPacket & { id: number; tournament_id: number }>(
+    db,
+    () => `SELECT id, tournament_id FROM bg_matches WHERE prod_user_id = ? ORDER BY id`,
+    [],
+    userId,
+  ),
   ]);
   return {
     casts: casts.map((row) => ({
@@ -145,5 +152,6 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
       tournamentId: Number(row.tournament_id),
       liveTrigger: row.live_trigger ?? null,
     })),
+    prodAssignments: prods.map((row) => ({ matchId: Number(row.id), tournamentId: Number(row.tournament_id) })),
   };
 }
