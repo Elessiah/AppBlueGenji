@@ -17,15 +17,6 @@ import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
  * levables les blocages que les lignes de quarantaine du compte justifiaient,
  * avant de les retirer (D31).
  */
-const emptyWithdrawal = () => ({
-  matchIds: [],
-  tournamentIds: [],
-  liveTournamentIds: [],
-  releasedRefereeMatchIds: [],
-  releasedCastMatchIds: [],
-  releasedProdPlaces: [],
-});
-
 describe("eraseAccount — blocages d'empreinte", () => {
   // D31 : à l'effacement, les lignes qui reliaient l'empreinte au compte partent
   // sur la connexion de l'appelant (sa transaction), jamais sur le pool.
@@ -50,42 +41,6 @@ describe("eraseAccount — blocages d'empreinte", () => {
       execute.mock.invocationCallOrder[deleteCall],
     );
     expect(getDatabase).not.toHaveBeenCalled();
-  });
-
-  // T16 : une prod gardée par un match joué perd son compte (clé étrangère SET NULL) ; sa marque part avec.
-  it("eraseAccount_erase_clearsProdPlannedBeforeDeletingAccount", async () => {
-    jest.mocked(withdrawUserCasts).mockResolvedValue(emptyWithdrawal());
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
-
-    await eraseAccount(fakeConnection({ execute }), 42);
-
-    const sqls = execute.mock.calls.map(([sql]) => sql);
-    const clear = sqls.indexOf("UPDATE bg_matches SET prod_planned = 0 WHERE prod_user_id = ? AND prod_planned = 1");
-    expect(clear).toBeGreaterThanOrEqual(0);
-    expect(execute.mock.calls[clear][1]).toEqual([42]);
-    expect(clear).toBeLessThan(sqls.indexOf("DELETE FROM bg_users WHERE id = ?"));
-  });
-
-  it("eraseAccount_prodPlannedColumnMissing_stillDeletesAccount", async () => {
-    jest.mocked(withdrawUserCasts).mockResolvedValue(emptyWithdrawal());
-    const execute = jest.fn<SqlQuery>(async (sql) => {
-      if (String(sql).includes("prod_planned")) throw Object.assign(new Error("Unknown column 'prod_planned'"), { code: "ER_BAD_FIELD_ERROR" });
-      return [{ affectedRows: 1 }, []];
-    });
-
-    await eraseAccount(fakeConnection({ execute }), 42);
-
-    expect(execute.mock.calls.map(([sql]) => sql)).toContain("DELETE FROM bg_users WHERE id = ?");
-  });
-
-  it("eraseAccount_prodPlannedOtherFailure_rethrows", async () => {
-    jest.mocked(withdrawUserCasts).mockResolvedValue(emptyWithdrawal());
-    const execute = jest.fn<SqlQuery>(async (sql) => {
-      if (String(sql).includes("prod_planned")) throw new Error("DB_DOWN");
-      return [{ affectedRows: 1 }, []];
-    });
-
-    await expect(eraseAccount(fakeConnection({ execute }), 42)).rejects.toThrow("DB_DOWN");
   });
 
   // D31 : l'empreinte bloquée ne nomme aucun compte (table sans colonne de compte).

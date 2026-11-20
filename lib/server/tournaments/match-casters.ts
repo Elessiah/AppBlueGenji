@@ -526,6 +526,18 @@ export async function withdrawUserCasts(
       `UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL`,
       [userId],
     );
+    // La marque « posée par le planning » d'un cast ou d'une place de prod
+    // gardés sur un match joué (registre T16) n'a plus d'attribution à servir :
+    // elle part avec le compte, comme le BattleTag de cast (l'effacement, lui,
+    // retire déjà cast et place, marque comprise).
+    await connection.execute(`UPDATE bg_match_casters SET planned = 0 WHERE user_id = ? AND planned = 1`, [userId]);
+    const keptProds = locked.filter((row) => prods.has(Number(row.id)) && row.status === "COMPLETED").map((row) => Number(row.id));
+    if (keptProds.length > 0) {
+      await connection.execute(
+        `UPDATE bg_matches SET prod_planned = 0 WHERE prod_user_id = ? AND prod_planned = 1 AND id IN (${placeholders(keptProds)})`,
+        [userId, ...keptProds],
+      );
+    }
   }
   if (linksToDrop.length > 0) {
     await connection.execute(

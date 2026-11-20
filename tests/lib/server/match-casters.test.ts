@@ -105,7 +105,8 @@ describe("orphanStreamIds — ce qui part quand un caster s'en va", () => {
 });
 
 type WorldStream = { id: number; live_url: string | null; staff_owned?: number; link_user_id?: number | null; match_id?: number };
-type WorldCaster = { user_id: number; stream_id: number; match_id?: number };
+/** `planned` : inscription posée par le planning (`bg_match_casters.planned`, T16). */
+type WorldCaster = { user_id: number; stream_id: number; match_id?: number; planned?: number };
 type WorldMatch = {
   id: number;
   tournament_id: number;
@@ -116,6 +117,7 @@ type WorldMatch = {
   live_trigger?: string | null;
   /** Prod du match (`MATCH_PROD.md`) et son appariement. */
   prod_user_id?: number | null;
+  prod_planned?: number;
   team1_id?: number | null;
   team2_id?: number | null;
 };
@@ -148,11 +150,25 @@ function readWithdrawRows(state: WorldState, sql: string, params: unknown[]): un
 
 /** Les places de prod rendues par `withdrawUserCasts` (`MATCH_PROD.md`). */
 function applyProdWrites(state: WorldState, sql: string, params: unknown[]): unknown[] | null {
-  if (!sql.startsWith("UPDATE bg_matches SET prod_user_id = NULL, prod_planned = 0 WHERE prod_user_id = ? AND id IN")) return null;
   const [userId, ...ids] = params;
+  // La marque d'une place gardée sur un match joué (anonymisation).
+  if (sql.startsWith("UPDATE bg_matches SET prod_planned = 0 WHERE prod_user_id = ? AND prod_planned = 1 AND id IN")) {
+    const kept = state.matches.filter((m) => m.prod_user_id === userId && m.prod_planned === 1 && ids.includes(m.id));
+    for (const m of kept) m.prod_planned = 0;
+    return [{ affectedRows: kept.length }];
+  }
+  if (!sql.startsWith("UPDATE bg_matches SET prod_user_id = NULL, prod_planned = 0 WHERE prod_user_id = ? AND id IN")) return null;
   const held = state.matches.filter((m) => m.prod_user_id === userId && ids.includes(m.id));
-  for (const m of held) m.prod_user_id = null;
+  for (const m of held) Object.assign(m, { prod_user_id: null, prod_planned: 0 });
   return [{ affectedRows: held.length }];
+}
+
+/** La marque « posée par le planning » d'un cast gardé (anonymisation, registre T16). */
+function applyPlannedMarkWrites(state: WorldState, sql: string, params: unknown[]): unknown[] | null {
+  if (sql !== "UPDATE bg_match_casters SET planned = 0 WHERE user_id = ? AND planned = 1") return null;
+  const marked = state.casters.filter((c) => c.user_id === params[0] && c.planned === 1);
+  for (const c of marked) c.planned = 0;
+  return [{ affectedRows: marked.length }];
 }
 
 /** Les écritures groupées de `withdrawUserCasts` : casts, liens, arbitrages. */
@@ -235,6 +251,7 @@ function world(streams: WorldStream[], casters: WorldCaster[], completed = false
     const result =
       readWithdrawRows(state, sql, params) ??
       applyProdWrites(state, sql, params) ??
+      applyPlannedMarkWrites(state, sql, params) ??
       applyWithdrawWrites(state, sql, params) ??
       applyPruneSql(state, sql, params);
     if (result) return result;
@@ -371,6 +388,41 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     // Le cast reste sur le match joué, son BattleTag de cast part avec le compte.
     expect(w.state.casters).toEqual([{ user_id: 12, stream_id: 4 }]);
     expect(w.sqls()).toContain("UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL");
+  });
+
+  it("withdrawUserCasts_anonymisationKeptPlannedCast_clearsPlannedMark", async () => {
+    // T16 : le cast gardé sur un match joué perd sa marque « posée par le planning ».
+    const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4, planned: 1 }], true);
+    await withdrawUserCasts(w.connection, 12, false);
+    expect(w.state.casters).toEqual([{ user_id: 12, stream_id: 4, planned: 0 }]);
+  });
+
+  it("withdrawUserCasts_anonymisationKeptPlannedProd_clearsProdPlannedOnly", async () => {
+    const w = world([], [], true);
+    Object.assign(w.state.matches[0], { prod_user_id: 12, prod_planned: 1 });
+    await withdrawUserCasts(w.connection, 12, false);
+    expect(w.state.matches[0]).toMatchObject({ prod_user_id: 12, prod_planned: 0 });
+    const clear = w.execute.mock.calls.find(([sql]) => flat(sql).startsWith("UPDATE bg_matches SET prod_planned = 0"));
+    expect(clear?.[1]).toEqual([12, 42]);
+  });
+
+  it("withdrawUserCasts_anonymisationNoKeptProd_noProdPlannedUpdate", async () => {
+    // Match à jouer : la place part, marque comprise, sans seconde écriture.
+    const w = world([], []);
+    Object.assign(w.state.matches[0], { prod_user_id: 12, prod_planned: 1 });
+    await withdrawUserCasts(w.connection, 12, false);
+    expect(w.state.matches[0]).toMatchObject({ prod_user_id: null, prod_planned: 0 });
+    expect(w.sqls().some((sql) => sql.startsWith("UPDATE bg_matches SET prod_planned = 0"))).toBe(false);
+  });
+
+  it("withdrawUserCasts_erasure_noPlannedUpdate", async () => {
+    // Effacement : casts et places partent, marque comprise.
+    const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4, planned: 1 }], true);
+    Object.assign(w.state.matches[0], { prod_user_id: 12, prod_planned: 1 });
+    await withdrawUserCasts(w.connection, 12, true);
+    expect(w.state.casters).toEqual([]);
+    expect(w.state.matches[0]).toMatchObject({ prod_user_id: null, prod_planned: 0 });
+    expect(w.sqls().some((sql) => sql.includes("SET planned = 0") || sql.startsWith("UPDATE bg_matches SET prod_planned = 0"))).toBe(false);
   });
 
   it("withdrawUserCasts_erasure_noBattletagUpdate", async () => {

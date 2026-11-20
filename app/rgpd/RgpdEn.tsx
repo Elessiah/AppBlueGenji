@@ -1308,7 +1308,7 @@ export function RgpdEn({
             site: the site only keeps the trace of a match&apos;s announcement when it goes on air
             (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), which appears, in a solo tournament,
             in the export of your data — neither the text of the message nor the list of scheduled matches it gives. Your
-            caster registrations (with your “Ready” and the BattleTag you gave for that cast), the channel links you provided, the matches you are the assigned
+            caster registrations (with your “Ready” and the BattleTag you gave for that cast, and the mark of those the schedule placed), your prod places (with the same mark), the channel links you provided, the matches you are the assigned
             referee of and those whose live mode you set also appear in the export of your data. These
             announcements stay in the channel as long as the #live channel exists; when a caster&apos;s account is deleted,
             the message of an evening still under way is updated without their channel link if it keeps another link —

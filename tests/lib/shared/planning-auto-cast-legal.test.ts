@@ -212,6 +212,29 @@ describe("legal review cycle 3", () => {
     expect(JSON.stringify(sheet(PROCESSING_ACTIVITIES_EN, "T16"))).toContain("it goes at the latest with the signup or the place");
   });
 
+  it("registerT16_markRetention_goesOnAccountDeletionEvenOnPlayedMatch", () => {
+    expect(JSON.stringify(sheet(PROCESSING_ACTIVITIES, "T16").retention)).toContain(
+      "Marque « posée par le planning » d'une inscription de cast ou d'une place de prod : retirée avec l'inscription ou la place, quand la personne la fait sienne, et à la suppression du compte, même quand l'inscription ou la place reste sur un match joué",
+    );
+    expect(JSON.stringify(sheet(PROCESSING_ACTIVITIES_EN, "T16").retention)).toContain(
+      "mark of a cast signup or a prod place: removed with the signup or the place, when the person makes it their own, and when the account is deleted, even when the signup or the place stays on a played match",
+    );
+  });
+
+  it("planningPlacementEntry_frAndEn_prodNoticeNotOwnActionAndMarkGoesOnDeletion", () => {
+    const fr = frEntry().details.join(" ");
+    const en = PRIVACY_CHANGES_EN[ENTRY_ID].details.join(" ");
+    expect(fr).toContain("La prod reçoit l'avis d'une prod placée, sauf quand le geste est le sien");
+    expect(fr).toContain("cette marque part aussi à la suppression du compte");
+    expect(en).toContain("The prod receives the notice of a placed prod, unless the action is their own");
+    expect(en).toContain("this mark also goes when the account is deleted");
+  });
+
+  it("rgpdPages_exportSentence_listsProdPlacesAndPlanningMark", () => {
+    expect(page("app/rgpd/page.tsx")).toContain("et la marque de celles que le planning a posées), vos places de prod (avec la même marque)");
+    expect(page("app/rgpd/RgpdEn.tsx")).toContain("and the mark of those the schedule placed), your prod places (with the same mark)");
+  });
+
   it("rgpdPages_placementSentence_noUnconditionalProdNotice", () => {
     expect(page("app/rgpd/page.tsx")).toContain("registre, T16</Link>), un caster placé sur une diffusion encore sans lien");
     expect(page("app/rgpd/RgpdEn.tsx")).toContain("register, T16</LocaleLink>), a caster placed on a stream with no link yet");
