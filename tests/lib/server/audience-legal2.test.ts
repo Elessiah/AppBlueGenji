@@ -6,6 +6,7 @@ jest.mock("@/lib/server/named-lock", () =>
 );
 jest.mock("@/lib/server/tournaments/transaction");
 
+import { stopAllPeriodicClocks } from "@/lib/server/periodic-clock";
 import {
   MAINTENANCE_INTERVAL_MS,
   dailySalt,
@@ -162,6 +163,20 @@ describe("startAudienceMaintenanceClock", () => {
     await jest.advanceTimersByTimeAsync(MAINTENANCE_INTERVAL_MS);
 
     expect(calls(execute, "DELETE FROM bg_audience_salts")).toHaveLength(1);
+  });
+});
+
+describe("startAudienceMaintenanceClock — arrêt du serveur", () => {
+  it("stopAllPeriodicClocks_audienceClockRunning_noPassAfterwards", async () => {
+    jest.useFakeTimers({ now: new Date("2026-11-17T00:20:00Z") });
+    const execute = database();
+    mockDb(execute);
+
+    startAudienceMaintenanceClock();
+    await stopAllPeriodicClocks();
+    await jest.advanceTimersByTimeAsync(MAINTENANCE_INTERVAL_MS);
+
+    expect(calls(execute, "DELETE FROM bg_audience_salts")).toHaveLength(0);
   });
 });
 

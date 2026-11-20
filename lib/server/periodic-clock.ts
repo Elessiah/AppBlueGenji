@@ -41,6 +41,8 @@ type ClockState = {
   options: PeriodicClockOptions | null;
   /** Arrêtée par {@link stopAllPeriodicClocks} alors qu'elle tournait. */
   suspended: boolean;
+  /** Un pas ignoré (passage précédent toujours en cours) est déjà journalisé pour ce passage. */
+  skipLogged: boolean;
 };
 
 const globalClocks = globalThis as typeof globalThis & { __bgPeriodicClocks?: Map<string, ClockState> };
@@ -61,9 +63,16 @@ async function runOnce(state: ClockState, options: PeriodicClockOptions): Promis
 }
 
 function tick(state: ClockState, options: PeriodicClockOptions): void {
-  if (state.inFlight) return;
+  if (state.inFlight) {
+    // Un passage qui ne finit jamais (verrou nommé, base figée) éteindrait
+    // l'horloge sans bruit : le premier pas ignoré se journalise, une fois par passage.
+    if (!state.skipLogged) console.warn(`${options.failureMessage} (passage précédent toujours en cours, pas ignoré)`);
+    state.skipLogged = true;
+    return;
+  }
   const pass = runOnce(state, options).finally(() => {
     if (state.inFlight === pass) state.inFlight = null;
+    state.skipLogged = false;
   });
   state.inFlight = pass;
 }
@@ -73,7 +82,7 @@ export function startPeriodicClock(options: PeriodicClockOptions): void {
   const registry = clocks();
   let state = registry.get(options.key);
   if (!state) {
-    state = { first: null, timer: null, failing: false, inFlight: null, generation: 0, options: null, suspended: false };
+    state = { first: null, timer: null, failing: false, inFlight: null, generation: 0, options: null, suspended: false, skipLogged: false };
     registry.set(options.key, state);
   }
   if (state.first || state.timer) return;

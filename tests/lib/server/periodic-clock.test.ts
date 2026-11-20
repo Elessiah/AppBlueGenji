@@ -85,6 +85,29 @@ describe("startPeriodicClock", () => {
     release();
   });
 
+  it("startPeriodicClock_passHangs_warnsOnceAboutSkippedTicks", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    let release: () => void = () => undefined;
+    startPeriodicClock(clock(() => new Promise<void>((resolve) => (release = resolve))));
+
+    await jest.advanceTimersByTimeAsync(FIRST_MS + TICK_MS * 3);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain("[test] Passage impossible.");
+
+    release();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("startPeriodicClock_fastPasses_neverWarns", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    startPeriodicClock(clock(async () => undefined));
+
+    await jest.advanceTimersByTimeAsync(FIRST_MS + TICK_MS * 3);
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it("startPeriodicClock_repeatedFailures_logsOncePerOutage", async () => {
     const run = jest
       .fn<() => Promise<unknown>>()

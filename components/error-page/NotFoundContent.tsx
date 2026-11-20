@@ -3,15 +3,16 @@ import { CyberButton } from "@/components/cyber";
 import { ErrorPanel } from "@/components/error-page/ErrorPanel";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { messagesFor } from "@/lib/server/i18n-messages";
+import { requestCache } from "@/lib/server/request-cache";
 import { requestLocale } from "@/lib/server/request-locale";
 import { NOT_FOUND_LINKS, errorPageTitle, notFoundCopy } from "@/lib/shared/error-pages";
 import { shellText } from "@/lib/shared/shell-text";
 
-/** Les textes de la coquille dans la langue de la requête. */
-async function shellTranslate() {
+/** Les textes de la coquille dans la langue de la requête (mémoïsé : métadonnées et page de la même requête ne les résolvent qu'une fois). */
+const shellTranslate = requestCache(async () => {
   const locale = await requestLocale();
   return shellText(locale, messagesFor(locale).shell).t;
-}
+});
 
 /** Métadonnées d'une page introuvable : titre propre (`absolute`), jamais indexée. */
 export async function notFoundMetadata(): Promise<Metadata> {

@@ -86,7 +86,10 @@ panne (pas une par passage), minuteurs `unref`, état sur `globalThis` par clé.
 passage en cours, relançable ; `stopPlanningAutoConfirmClock` pour la
 confirmation d'office) ; l'arrêt propre du serveur (`bot-log-shutdown.ts`)
 coupe toutes les horloges dès le signal, pour qu'aucun passage ne démarre
-pendant la fermeture. Une suite qui appelle `register()` d'`instrumentation.ts`
+pendant la fermeture, et attend les passages en cours avec le vidage des lots
+(même délai borné, `SHUTDOWN_FLUSH_TIMEOUT_MS`). L'entretien de la fréquentation
+(`startAudienceMaintenanceClock`) est de ces horloges. Un pas ignoré parce que le
+passage précédent dure encore se journalise une fois par passage (`console.warn`). Une suite qui appelle `register()` d'`instrumentation.ts`
 double ces horloges avec `mockPlanningClocks`
 (`tests/helpers/instrumentation-clocks.ts`), après `jest.resetModules()`.
 

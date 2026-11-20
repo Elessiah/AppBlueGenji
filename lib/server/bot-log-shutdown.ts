@@ -71,6 +71,20 @@ export async function flushBotLogsBeforeExit(timeoutMs: number = SHUTDOWN_FLUSH_
   }
 }
 
+/** Attend `work` au plus `timeoutMs` ; ne lève jamais. */
+async function boundedWait(work: Promise<unknown>, timeoutMs: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, timeoutMs);
+    timer.unref?.();
+  });
+  try {
+    await Promise.race([work.catch(() => undefined), deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /** Un code de sortie qui signale un échec (tout sauf l'absence de code et `0`). */
 function isFailureCode(code: number | string | null | undefined): boolean {
   return code !== undefined && code !== null && Number(code) !== 0;
@@ -120,13 +134,13 @@ export function installBotLogShutdownFlush(): void {
   for (const signal of SIGNALS) {
     process.once(signal, () => {
       // Plus aucun balayage de fond ne démarre pendant la fermeture (la base
-      // s'en va) ; ceux en cours finissent ou sont coupés par la sortie.
-      void stopAllPeriodicClocks();
+      // s'en va) ; ceux en cours sont attendus avec le vidage, dans le même délai.
+      const stopped = boundedWait(stopAllPeriodicClocks(), SHUTDOWN_FLUSH_TIMEOUT_MS);
       // Un second signal rejoint le vidage en cours : ni second envoi, ni
       // second `process.exit` retenu par-dessus le premier.
       let flush = state.flush;
       if (!flush) {
-        const started = flushBotLogsBeforeExit();
+        const started = Promise.all([flushBotLogsBeforeExit(), stopped]).then(() => undefined);
         flush = started;
         state.flush = started;
         holdExitUntil(started);
