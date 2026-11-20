@@ -276,9 +276,9 @@ annoncer de l'attente.
   `tests/lib/shared/focus-rescue.test.ts`, `tests/lib/shared/use-focus-rescue.test.ts`.
 - `disabled` natif encore lié à une requête — **à dessein**, des champs et non
   des boutons, le focus étant sur le bouton qui envoie : listes de la date
-  (`MatchScheduleDialog` ×3) et de l'arbitre (`RefereeDialog` ×2, une liste
-  n'envoie pas le formulaire) ; `MapScoreList` des deux dialogues de score
+  (`MatchScheduleDialog` ×3), de l'arbitre (`RefereeDialog` ×2) et de la prod
+  (`ProdDialog`, MATCH_PROD.md) — une liste n'envoie pas le formulaire ; `MapScoreList` des deux dialogues de score
   (`AdminScoreDialog`, `PlayerScoreDialog` : Entrée n'y envoie pas). Le relevé
   de l'ancienne entrée (`disabled={…}` natif dont l'expression, sur une ou
   plusieurs lignes, nomme busy|pending|saving|loading|submitting) ne trouve
-  plus que ces 7 champs ; un nouveau doit s'y justifier.
+  plus que ces 8 champs ; un nouveau doit s'y justifier.

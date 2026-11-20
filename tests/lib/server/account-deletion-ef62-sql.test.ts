@@ -36,7 +36,7 @@ describe("listNamingTournamentIds", () => {
 
     expect(ids).toEqual([4, 9]);
     const [sql, params] = execute.mock.calls[0];
-    expect(params).toEqual([7, 7, 7, 7, 7, 7]);
+    expect(params).toEqual([7, 7, 7, 7, 7, 7, 7]);
     const q = sql.replace(/\s+/g, " ");
     expect(q).toContain("t.state <> 'FINISHED' AND t.finished_at IS NULL");
     expect(q).toContain("s.solo_user_id = ?");
@@ -45,6 +45,7 @@ describe("listNamingTournamentIds", () => {
     expect(q).toContain("st.link_user_id = ?");
     expect(q).toContain("WHERE referee_user_id = ?");
     expect(q).toContain("WHERE live_trigger_user_id = ?");
+    expect(q).toContain("WHERE prod_user_id = ?");
   });
   // Revue standard cycle 1 : une équipe quittée avant le coup d'envoi ne le nomme plus.
   it("listNamingTournamentIds_sql_boundsMembershipByTournamentStart", async () => {
@@ -68,7 +69,7 @@ describe("listNamingTournamentIds", () => {
     const ids = await listNamingTournamentIds(fakePool({ execute }), 7, [21, 22]);
 
     expect(ids).toEqual([2, 4, 9]);
-    expect(execute.mock.calls[0][1]).toEqual([7, 7, 7, 7, 7, 7]);
+    expect(execute.mock.calls[0][1]).toEqual([7, 7, 7, 7, 7, 7, 7]);
     expect(execute.mock.calls[1][1]).toEqual([21]);
     expect(execute.mock.calls[2][1]).toEqual([22]);
   });

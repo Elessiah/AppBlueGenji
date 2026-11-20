@@ -183,6 +183,26 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     expect(claimMatchCast).toHaveBeenLastCalledWith(42, expect.objectContaining({ id: 2, playerView: false }), false, link, {}, { oversees: false, manages: false });
   });
 
+  it("POST_caster_casterIsProd_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(claimMatchCast).mockRejectedValue(new Error("CASTER_IS_PROD"));
+
+    const response = await casterPost(jsonRequest("POST", { liveUrl: "https://twitch.tv/voix" }), params("42"));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: "CASTER_IS_PROD" });
+  });
+
+  it("POST_caster_casterIsPlannedProd_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(claimMatchCast).mockRejectedValue(new Error("CASTER_IS_PLANNED_PROD"));
+
+    const response = await casterPost(jsonRequest("POST", { liveUrl: "https://twitch.tv/voix" }), params("42"));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: "CASTER_IS_PLANNED_PROD" });
+  });
+
   it("transmet le stream choisi et les réglages du même geste", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(claimMatchCast).mockResolvedValue({ triggerSkipped: false });

@@ -220,6 +220,9 @@
     "castConfig": "Configurer ma diffusion",
     "stopCasting": "Ne plus caster",
     "removeCaster": "Retirer le caster",
+    "claimProd": "Faire la prod",
+    "releaseProd": "Ne plus faire la prod",
+    "assignProd": "Prod du match",
     "stopLive": "Couper le direct",
     "startLive": "Lancer le direct",
     "configureStream": "Diffusion officielle",
@@ -373,6 +376,40 @@
           "bodyIdle": "Il n'arbitre aucun match non terminé : rien ne lui est retiré. Il ne peut plus arbitrer tant que l'opposition n'est pas levée.",
           "confirm": "Retenir l'opposition"
         }
+      }
+    },
+    "prodClaimed": "Tu fais la prod de ce match.",
+    "prodReleased": "Tu ne fais plus la prod de ce match.",
+    "prodReleaseConfirm": {
+      "title": "Ne plus faire la prod de {match} ?",
+      "confirm": "Ne plus faire la prod",
+      "pending": "Retrait…",
+      "body": "La place redevient libre : une autre prod peut la prendre aussitôt."
+    },
+    "prodDialog": {
+      "title": "Prod : {match}",
+      "hintSubject": "prod du match",
+      "hint": "La prod assure la production du direct de ce match ; elle ne joue pas le match et n'en est pas caster. Le compte placé ou retiré est prévenu.",
+      "loading": "Chargement…",
+      "loadFailed": "Impossible de lire la prod de ce match. Réessaie dans un instant.",
+      "current": "Prod du match : {pseudo}.",
+      "none": "Aucune prod sur ce match.",
+      "remove": "Retirer la prod",
+      "assignLabel": "Placer une prod",
+      "replaceLabel": "Remplacer la prod par",
+      "assignPlaceholder": "Choisir un compte…",
+      "assign": "Placer",
+      "assigned": "{pseudo} fait la prod de ce match.",
+      "removed": "La prod de ce match est retirée.",
+      "blockedPlayer": "{pseudo} (joue ce match)",
+      "blockedCaster": "{pseudo} (caste ce match)",
+      "noCandidate": "Aucun autre compte prod ne peut être placé sur ce match.",
+      "close": "Fermer",
+      "pending": "Enregistrement…",
+      "removeConfirm": {
+        "title": "Retirer {pseudo} de la prod ?",
+        "confirm": "Retirer",
+        "body": "Le compte est prévenu ; la place redevient libre."
       }
     },
     "castSettings": {

@@ -46,6 +46,10 @@ type LiveControls = {
    * « Partager » (`SHARE_EMBEDS.md`). Faux hors fournisseur.
    */
   publicShare: boolean;
+  /** Permission `prod` : « Faire la prod » d'un match (`docs/features/MATCH_PROD.md`). */
+  canProd: boolean;
+  /** « Ne plus faire la prod » sur sa propre place : session hors incarnation sans `prod`. */
+  canLeaveProd: boolean;
 };
 
 const NO_REFEREE_NAMES: readonly MatchRefereeName[] = [];
@@ -116,6 +120,8 @@ const LiveContext = createContext<LiveControls>({
   castBlock: "NOT_CASTER",
   openReplay: () => undefined,
   publicShare: false,
+  canProd: false,
+  canLeaveProd: false,
 });
 
 /**
@@ -140,11 +146,15 @@ export function LiveProvider({
   castBlock,
   openReplay,
   publicShare = false,
+  canProd = false,
+  canLeaveProd = canProd,
   refereeNames = NO_REFEREE_NAMES,
   children,
 }: Readonly<
-  Omit<LiveControls, "publicShare"> & {
+  Omit<LiveControls, "publicShare" | "canProd" | "canLeaveProd"> & {
     publicShare?: boolean;
+    canProd?: boolean;
+    canLeaveProd?: boolean;
     refereeNames?: readonly MatchRefereeName[];
     children: ReactNode;
   }
@@ -165,6 +175,8 @@ export function LiveProvider({
       castBlock,
       openReplay,
       publicShare,
+      canProd,
+      canLeaveProd,
     }),
     [
       canManage,
@@ -178,6 +190,8 @@ export function LiveProvider({
       castBlock,
       openReplay,
       publicShare,
+      canProd,
+      canLeaveProd,
     ],
   );
   return (

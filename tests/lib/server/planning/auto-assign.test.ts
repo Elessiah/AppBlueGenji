@@ -34,6 +34,7 @@ import {
   holdingRefusal,
   loadExclusions,
   lockedHolding,
+  matchProdRefusal,
   preparePlanner,
   runAutoAssign,
   withPlanningLock,
@@ -79,7 +80,12 @@ type SqlRoute = {
   rows?: readonly LoadedAssignment[];
   /** Le match porte-t-il déjà l'arbitre (`MATCH_HAS_REFEREE_SQL`), lecture après lecture ; par défaut non. */
   onMatch?: boolean[];
+  /** La prod des matchs relue sous verrou (`lockedMatchProds`) ; par défaut aucune. */
+  prods?: { id: number; prod_user_id: number | null }[];
 };
+
+/** La relecture verrouillée de la prod des matchs d'une confirmation. */
+const MATCH_PRODS = "SELECT id, prod_user_id FROM bg_matches";
 
 const RECONCILE = "JOIN bg_matches m ON m.id = a.match_id";
 /** La relecture, sous le verrou, d'une proposition d'arbitre de match avant sa désignation. */
@@ -129,6 +135,7 @@ function routeSql(route: SqlRoute = {}) {
   const held = matchHeldReads(route.onMatch);
   execute.mockImplementation(async (sql: string, params?: unknown) => {
     if (sql.startsWith(MATCH_HELD)) return [held()];
+    if (sql.startsWith(MATCH_PRODS)) return [route.prods ?? []];
     if (route.failOn !== undefined && sql.includes(route.failOn)) throw new Error("ER_LOCK_DEADLOCK");
     if (sql.includes(BATCH)) return [await batchRows(params as unknown[], route.rows)];
     if (sql.includes(RECONCILE)) return [{ affectedRows: route.healed ?? 0 }];
@@ -143,7 +150,7 @@ function routeSql(route: SqlRoute = {}) {
 function writeParams(): unknown[] {
   return execute.mock.calls
     .filter(
-      ([sql]) => !sql.includes(RECONCILE) && !sql.includes(RECHECK) && !sql.includes(DROPPED) && !sql.includes(BATCH) && !sql.startsWith(MATCH_HELD),
+      ([sql]) => !sql.includes(RECONCILE) && !sql.includes(RECHECK) && !sql.includes(DROPPED) && !sql.includes(BATCH) && !sql.startsWith(MATCH_HELD) && !sql.startsWith(MATCH_PRODS),
     )
     .map(([, params]) => params);
 }
@@ -179,7 +186,7 @@ beforeEach(() => {
 function statements(): string[] {
   return execute.mock.calls
     .filter(
-      ([sql]) => !sql.includes(RECONCILE) && !sql.includes(RECHECK) && !sql.includes(DROPPED) && !sql.includes(BATCH) && !sql.startsWith(MATCH_HELD),
+      ([sql]) => !sql.includes(RECONCILE) && !sql.includes(RECHECK) && !sql.includes(DROPPED) && !sql.includes(BATCH) && !sql.startsWith(MATCH_HELD) && !sql.startsWith(MATCH_PRODS),
     )
     .map(([sql]) => sql.replace(/\s+/g, " ").trim().slice(0, 40));
 }
@@ -1144,6 +1151,37 @@ describe("confirmAssignments", () => {
     expect(assignMatchReferee).not.toHaveBeenCalled();
   });
 
+  it("confirmAssignments_prodPlacedSinceRead_refusesOtherProdProposal", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 6, role: "PROD" })] }),
+    );
+    routeSql({ prods: [{ id: 1, prod_user_id: 8 }] });
+
+    const report = await confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS);
+
+    expect(report).toEqual({ confirmed: 0, refused: 1 });
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE bg_planning_assignments SET confirmed = 1"))).toBe(false);
+    expect(execute.mock.calls.find(([sql]) => sql.startsWith(MATCH_PRODS))?.[0]).toContain("LOCK IN SHARE MODE");
+  });
+
+  it("confirmAssignments_casterProposalOfMatchProd_refused", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
+    );
+    routeSql({ prods: [{ id: 1, prod_user_id: 4 }] });
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).resolves.toEqual({ confirmed: 0, refused: 1 });
+  });
+
+  it("confirmAssignments_prodProposalOfMatchProd_confirmed", async () => {
+    jest.mocked(loadPlanningData).mockResolvedValue(
+      confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 6, role: "PROD" })] }),
+    );
+    routeSql({ prods: [{ id: 1, prod_user_id: 6 }] });
+
+    await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).resolves.toEqual({ confirmed: 1, refused: 0 });
+  });
+
   it("confirmAssignments_confirmedRow_announcedOnceWithActor", async () => {
     jest.mocked(loadPlanningData).mockResolvedValue(
       confirmData({ entries: [first], assignments: [loadedAssignment({ entryKey: "m:1", userId: 4, role: "CASTER" })] }),
@@ -1549,5 +1587,27 @@ describe("confirmAssignments", () => {
 
     await expect(confirmAssignments(9, { entryKeys: ["m:1"] }, MONDAY - HOUR_MS)).rejects.toThrow("PLANNING_BUSY");
     expect(assignMatchReferee).not.toHaveBeenCalled();
+  });
+});
+
+describe("matchProdRefusal", () => {
+  it("matchProdRefusal_noMatchProd_returnsNull", () => {
+    expect(matchProdRefusal(null, 4, "PROD")).toBeNull();
+  });
+
+  it("matchProdRefusal_prodOfOtherAccount_returnsProdTaken", () => {
+    expect(matchProdRefusal(8, 4, "PROD")).toBe("PLANNING_PROD_TAKEN");
+  });
+
+  it("matchProdRefusal_prodRowOfMatchProd_returnsNull", () => {
+    expect(matchProdRefusal(4, 4, "PROD")).toBeNull();
+  });
+
+  it("matchProdRefusal_casterRowOfMatchProd_returnsRoleConflict", () => {
+    expect(matchProdRefusal(4, 4, "CASTER")).toBe("PLANNING_ROLE_CONFLICT");
+  });
+
+  it("matchProdRefusal_casterRowOfOtherAccount_returnsNull", () => {
+    expect(matchProdRefusal(8, 4, "CASTER")).toBeNull();
   });
 });

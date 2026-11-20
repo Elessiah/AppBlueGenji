@@ -211,7 +211,7 @@
       "ADMIN": "Every right, including assigning roles.",
       "ARBITRE": "Create and manage tournaments.",
       "CASTER": "Prepare and broadcast matches live (bracket preview, on-air).",
-      "PROD": "Run the production of broadcasts (cast planning).",
+      "PROD": "Run the production of broadcasts (cast planning, a match's prod).",
       "COMMUNITY_MANAGER": "Manage the showcase site and the association.",
       "RECRUTEUR": "Manage the recruitment page.",
       "DEV": "Read the technical documentation of the site and the bot."

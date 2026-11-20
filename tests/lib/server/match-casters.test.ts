@@ -114,6 +114,10 @@ type WorldMatch = {
   referee_ready_at: string | null;
   live_trigger_user_id?: number | null;
   live_trigger?: string | null;
+  /** Prod du match (`MATCH_PROD.md`) et son appariement. */
+  prod_user_id?: number | null;
+  team1_id?: number | null;
+  team2_id?: number | null;
 };
 
 const matchOf = (row: { match_id?: number }) => row.match_id ?? 42;
@@ -131,14 +135,24 @@ function readWithdrawRows(state: WorldState, sql: string, params: unknown[]): un
         ...state.streams.filter((s) => s.link_user_id === userId).map((s) => ({ kind: "L", match_id: matchOf(s) })),
         ...state.matches.filter((m) => m.referee_user_id === userId).map((m) => ({ kind: "R", match_id: m.id })),
         ...state.matches.filter((m) => m.live_trigger_user_id === userId).map((m) => ({ kind: "T", match_id: m.id })),
+        ...state.matches.filter((m) => m.prod_user_id === userId).map((m) => ({ kind: "P", match_id: m.id })),
       ],
     ];
   }
-  if (sql.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
+  if (sql.startsWith("SELECT id, tournament_id, status, team1_id, team2_id FROM bg_matches WHERE id IN")) {
     state.locked.push(params as number[]);
     return [state.matches.filter((m) => params.includes(m.id)).sort((x, y) => x.id - y.id)];
   }
   return null;
+}
+
+/** Les places de prod rendues par `withdrawUserCasts` (`MATCH_PROD.md`). */
+function applyProdWrites(state: WorldState, sql: string, params: unknown[]): unknown[] | null {
+  if (!sql.startsWith("UPDATE bg_matches SET prod_user_id = NULL WHERE prod_user_id = ? AND id IN")) return null;
+  const [userId, ...ids] = params;
+  const held = state.matches.filter((m) => m.prod_user_id === userId && ids.includes(m.id));
+  for (const m of held) m.prod_user_id = null;
+  return [{ affectedRows: held.length }];
 }
 
 /** Les écritures groupées de `withdrawUserCasts` : casts, liens, arbitrages. */
@@ -218,7 +232,11 @@ function world(streams: WorldStream[], casters: WorldCaster[], completed = false
   const execute = jest.fn<SqlQuery>(async (rawSql, rawParams) => {
     const sql = flat(rawSql);
     const params = (rawParams ?? []) as unknown[];
-    const result = readWithdrawRows(state, sql, params) ?? applyWithdrawWrites(state, sql, params) ?? applyPruneSql(state, sql, params);
+    const result =
+      readWithdrawRows(state, sql, params) ??
+      applyProdWrites(state, sql, params) ??
+      applyWithdrawWrites(state, sql, params) ??
+      applyPruneSql(state, sql, params);
     if (result) return result;
     throw new Error(`requête inattendue : ${sql}`);
   });
@@ -376,7 +394,7 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
     await withdrawUserCasts(w.connection, 12, false);
     expect(w.state.locked).toEqual([[42]]);
-    expect(w.execute.mock.calls[0][1]).toEqual([12, 12, 12, 12]);
+    expect(w.execute.mock.calls[0][1]).toEqual([12, 12, 12, 12, 12]);
   });
 
   it("withdrawUserCasts_anonymisation_reopenedMatchLosesCaster", async () => {
@@ -385,7 +403,7 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
     const execute = w.execute.getMockImplementation()!;
     w.execute.mockImplementation(async (sql, params) => {
-      if (flat(sql).startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
+      if (flat(sql).startsWith("SELECT id, tournament_id, status, team1_id, team2_id FROM bg_matches WHERE id IN")) {
         for (const m of w.state.matches) m.status = "READY";
       }
       return execute(sql, params);
@@ -399,7 +417,7 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
     await withdrawUserCasts(w.connection, 12, false);
     const order = w.sqls();
-    const lock = order.findIndex((sql) => sql.startsWith("SELECT id, tournament_id, status FROM bg_matches"));
+    const lock = order.findIndex((sql) => sql.startsWith("SELECT id, tournament_id, status, team1_id, team2_id FROM bg_matches"));
     const clear = order.indexOf("UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL");
     expect(lock).toBeGreaterThanOrEqual(0);
     expect(clear).toBeGreaterThan(lock);
@@ -409,8 +427,8 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     const w = world([], [{ user_id: 12, stream_id: 4 }]);
     await withdrawUserCasts(w.connection, 12, true);
     const first = w.sqls()[0];
-    for (const kind of ["'C'", "'L'", "'R'", "'T'"]) expect(first).toContain(`${kind} AS kind`);
-    expect(w.execute.mock.calls[0][1]).toEqual([12, 12, 12, 12]);
+    for (const kind of ["'C'", "'L'", "'R'", "'T'", "'P'"]) expect(first).toContain(`${kind} AS kind`);
+    expect(w.execute.mock.calls[0][1]).toEqual([12, 12, 12, 12, 12]);
   });
 
   it("effacement : le cast d'un match joué part aussi", async () => {
@@ -507,7 +525,7 @@ describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", ()
     const w = world([{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }], [{ user_id: 9, stream_id: 4 }]);
     await withdrawUserCasts(w.connection, 12, true);
     const sqls = w.sqls();
-    const lock = sqls.indexOf("SELECT id, tournament_id, status FROM bg_matches WHERE id IN (?) ORDER BY id FOR UPDATE");
+    const lock = sqls.indexOf("SELECT id, tournament_id, status, team1_id, team2_id FROM bg_matches WHERE id IN (?) ORDER BY id FOR UPDATE");
     const update = sqls.findIndex((sql) => sql.startsWith("UPDATE bg_match_streams"));
     expect(lock).toBeGreaterThanOrEqual(0);
     expect(update).toBeGreaterThan(lock);
@@ -586,7 +604,33 @@ describe("withdrawUserCasts — plusieurs matchs, arbitrages", () => {
       liveTournamentIds: [],
       releasedRefereeMatchIds: [],
       releasedCastMatchIds: [],
+      releasedProdPlaces: [],
     });
+  });
+
+  it("withdrawUserCasts_openProdPlace_returnsReleasedProdPlacesWithPairing", async () => {
+    const w = world([], [], false, [{ ...other(7, 5), prod_user_id: 12, team1_id: 10, team2_id: 11 }]);
+
+    expect((await withdrawUserCasts(w.connection, 12, false)).releasedProdPlaces).toEqual([
+      { matchId: 7, pairing: { team1Id: 10, team2Id: 11 } },
+    ]);
+    expect(w.state.matches.find((m) => m.id === 7)?.prod_user_id).toBeNull();
+  });
+
+  it("withdrawUserCasts_openProdPlace_readsPairingInTheLockingRead_noSeparateQuery", async () => {
+    const w = world([], [], false, [{ ...other(7, 5), prod_user_id: 12, team1_id: 10, team2_id: 11 }]);
+
+    await withdrawUserCasts(w.connection, 12, false);
+
+    expect(w.sqls().filter((sql) => sql.startsWith("SELECT id, team1_id, team2_id FROM bg_matches"))).toEqual([]);
+    expect(w.sqls().filter((sql) => sql.includes("FOR UPDATE"))).toHaveLength(1);
+  });
+
+  it("withdrawUserCasts_completedProdPlaceOnErasure_clearedButNotReported", async () => {
+    const w = world([], [], false, [{ ...other(7, 5), status: "COMPLETED", prod_user_id: 12 }]);
+
+    expect((await withdrawUserCasts(w.connection, 12, true)).releasedProdPlaces).toEqual([]);
+    expect(w.state.matches.find((m) => m.id === 7)?.prod_user_id).toBeNull();
   });
 
   it("l'arbitrage d'un match joué part aussi à l'anonymisation", async () => {

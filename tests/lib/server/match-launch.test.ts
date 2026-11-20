@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/cast-notices");
 jest.mock("@/lib/server/tournaments/referee-notices");
+jest.mock("@/lib/server/tournaments/prod-notices");
 jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import type { PoolConnection } from "mysql2/promise";
@@ -18,10 +19,12 @@ import {
   queueCastChange,
 } from "@/lib/server/tournaments/cast-notices";
 import { announceRefereeChange, announceRefereeChanges, queueRefereeChange } from "@/lib/server/tournaments/referee-notices";
+import { queueProdChange } from "@/lib/server/tournaments/prod-notices";
 import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 import {
   assignMatchReferee,
   claimMatchCast,
+  assertMatchTournamentOpen,
   forceLaunchMatch,
   loadViewerIdentityBlocks,
   loadViewerRefereeEligible,
@@ -89,6 +92,8 @@ type MatchState = {
   live_trigger?: string | null;
   /** Le caster qui a posé le mode (`bg_matches.live_trigger_user_id`). */
   live_trigger_user_id?: number | null;
+  /** Prod du match (`bg_matches.prod_user_id`, `MATCH_PROD.md`), absente : aucune. */
+  prod_user_id?: number | null;
   /** `bg_match_casters` du match, dans l'ordre d'inscription. */
   casters: CasterState[];
   /** `bg_match_streams` du match (`staff_owned` : 1 = stream du staff). */
@@ -121,6 +126,12 @@ type World = {
   roundSlots?: string;
   /** Comptes sous une suspension qui court (`bg_account_suspensions`), aucun par défaut. */
   suspendedUsers?: number[];
+  /** Compte de la prod relu avant un lancement (`prodUnfitness`) ; par défaut, prod en règle. */
+  prodAccounts?: Record<number, { is_deleted: number; holds_prod: number; suspended: number }>;
+  /** Tournoi du match pas encore publié (`start_visibility_at` à venir) ; publié par défaut. */
+  unpublishedTournament?: boolean;
+  /** Comptes à qui le planning tient une ligne PROD sur le match, aucun par défaut. */
+  plannedProdUserIds?: number[];
 };
 
 const STAMP = "2026-09-24 20:00:00";
@@ -225,6 +236,7 @@ function matchContextRows(state: World) {
   if (!match) return [];
   return [{
     tournament_state: match.tournament_state,
+    tournament_visible_at: visibleAt(state),
     tournament_game: match.tournament_game,
     match_launch_phase: match.match_launch_phase,
     team1_is_ghost: match.team1_is_ghost,
@@ -419,16 +431,51 @@ function readMatchRows(state: World, sql: string) {
  * l'appariement qui arrive) : `[...comptes, ...équipes]`.
  */
 function readBatchedParty(state: World, sql: string, params: unknown[]): unknown[] | null {
-  const solo = /^SELECT solo_user_id AS user_id FROM bg_teams WHERE solo_user_id IN \(([?, ]+)\)/.exec(sql);
-  const members = /^SELECT DISTINCT tm\.user_id FROM bg_team_members tm WHERE tm\.user_id IN \(([?, ]+)\)/.exec(sql);
+  const solo = /^SELECT solo_user_id AS user_id(?:, id AS team_id)? FROM bg_teams WHERE solo_user_id IN \(([?, ]+)\)/.exec(sql);
+  const members = /^SELECT DISTINCT tm\.user_id(?:, tm\.team_id)? FROM bg_team_members tm WHERE tm\.user_id IN \(([?, ]+)\)/.exec(sql);
   const match = solo ?? members;
   if (!match) return null;
   const count = match[1].split("?").length - 1;
   const users = params.slice(0, count).map(Number);
   const teams = params.slice(count).map(Number);
   const entries = solo ? state.soloEntries : state.memberships;
-  const rows = entries.filter((e) => users.includes(e.userId) && teams.includes(e.teamId)).map((e) => ({ user_id: e.userId }));
+  const rows = entries.filter((e) => users.includes(e.userId) && teams.includes(e.teamId)).map((e) => ({ user_id: e.userId, team_id: e.teamId }));
   return [rows, []];
+}
+
+/** Le compte de la prod relu avant un lancement (`prodUnfitness`) ; `null` pour les autres requêtes. */
+function readProdAccount(state: World, sql: string, params: unknown[]): unknown[] | null {
+  if (!sql.includes("AS holds_prod") || !sql.includes("FROM bg_users u WHERE u.id IN (")) return null;
+  const rows = params.map((param) => ({
+    id: Number(param),
+    ...(state.prodAccounts?.[Number(param)] ?? { is_deleted: 0, holds_prod: 1, suspended: 0 }),
+  }));
+  return [rows, []];
+}
+
+/** Suspensions relues : `suspendedUsers`, plus les prods dont le compte dit `suspended: 1`. */
+function suspendedAmong(state: World, params: unknown[]): { user_id: number }[] {
+  return params
+    .map(Number)
+    .filter((id) => (state.suspendedUsers ?? []).includes(id) || state.prodAccounts?.[id]?.suspended === 1)
+    .map((id) => ({ user_id: id }));
+}
+
+/** Date de publication du tournoi du monde : passée par défaut, à venir s'il n'est pas publié. */
+function visibleAt(state: World): string {
+  return state.unpublishedTournament ? "2999-01-01T00:00:00.000Z" : "2026-01-01T00:00:00.000Z";
+}
+
+/** Publication du tournoi et ligne PROD tenue au planning (`assertMatchTournamentOpen`, `claimMatchCast`) ; `null` pour le reste. */
+function readTournamentOpenRows(state: World, sql: string, params: unknown[]): [unknown, unknown[]] | null {
+  if (sql.startsWith("SELECT state, start_visibility_at FROM bg_tournaments")) {
+    const match = state.match;
+    return [match ? [{ state: match.tournament_state, start_visibility_at: visibleAt(state) }] : [], []];
+  }
+  if (sql.includes("FROM bg_planning_assignments") && sql.includes("role = 'PROD'")) {
+    return [(state.plannedProdUserIds ?? []).includes(Number(params[1])) ? [{ 1: 1 }] : [], []];
+  }
+  return null;
 }
 
 /** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
@@ -436,7 +483,7 @@ function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
     state.issued?.push(sql);
-    const castResult = applyCastWrite(state, sql, params) ?? readCastRows(state, sql, params);
+    const castResult = applyCastWrite(state, sql, params) ?? readCastRows(state, sql, params) ?? readProdAccount(state, sql, params);
     if (castResult) return castResult;
     if (sql.startsWith("UPDATE")) {
       state.writes.push(sql);
@@ -448,7 +495,7 @@ function executeFor(state: World) {
       return [{ affectedRows: 1 }, []];
     }
     if (sql.includes("FROM bg_account_suspensions")) {
-      return [(state.suspendedUsers ?? []).includes(Number(params[0])) ? [{ user_id: Number(params[0]) }] : [], []];
+      return [suspendedAmong(state, params), []];
     }
     const userResult = readUserRows(state, sql, params);
     if (userResult) return userResult;
@@ -472,6 +519,8 @@ function executeFor(state: World) {
     }
     const refereeResult = readRefereeRows(state, sql, params);
     if (refereeResult) return refereeResult;
+    const openResult = readTournamentOpenRows(state, sql, params);
+    if (openResult) return openResult;
     if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
       return [matchContextRows(state), []];
     }
@@ -706,6 +755,34 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 
+  it("maintainMatchLaunches_prodNowPlays_clearsProdAndQueuesJoinedTeam", async () => {
+    // Prod placée sur un match aux créneaux vides, puis son équipe (TEAM1) l'atteint.
+    state.memberships.push({ userId: 77, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, prod_user_id: 77 });
+    const connection = connectionFor(state);
+    const report = { castCrewReleased: false };
+
+    await maintainMatchLaunches(connection, 7, report);
+
+    expect(state.writes).toContain("UPDATE bg_matches SET prod_user_id = NULL WHERE id = ? AND prod_user_id = ?");
+    expect(queueProdChange).toHaveBeenCalledWith(connection, {
+      matchId: 42,
+      log: "JOINED_TEAM",
+      notices: [{ userId: 77, kind: "JOINED_TEAM" }],
+      pairing: PAIRING,
+    });
+    expect(report.castCrewReleased).toBe(true);
+  });
+
+  it("maintainMatchLaunches_prodDoesNotPlay_keepsProd", async () => {
+    state.match = matchState({ launch_pairing: null, prod_user_id: 77 });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.writes.some((write) => write.includes("prod_user_id = NULL"))).toBe(false);
+    expect(queueProdChange).not.toHaveBeenCalled();
+  });
+
   it("maintainMatchLaunches_casterJoinedTeamOwnedTrigger_releasesOwnership", async () => {
     state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER, live_trigger: "AUTO", live_trigger_user_id: CASTER });
@@ -719,18 +796,18 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
   it("maintainMatchLaunches_casterJoinedTeam_reportsCastReleased", async () => {
     state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
-    const report = { castReleased: false };
+    const report = { castCrewReleased: false };
     await maintainMatchLaunches(connectionFor(state), 7, report);
-    expect(report.castReleased).toBe(true);
+    expect(report.castCrewReleased).toBe(true);
   });
 
   it("maintainMatchLaunches_noCasterRemoved_reportStaysFalse", async () => {
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
     state.users[CASTER] = ELIGIBLE_CASTER;
-    const report = { castReleased: false };
+    const report = { castCrewReleased: false };
     await maintainMatchLaunches(connectionFor(state), 7, report);
     expect(casterOf(state)).toBe(CASTER);
-    expect(report.castReleased).toBe(false);
+    expect(report.castCrewReleased).toBe(false);
   });
 
   it("adoptCurrentPairing_severalCasters_twoGroupedPartyReads", async () => {
@@ -857,6 +934,27 @@ describe("claimMatchCast", () => {
     // Une inscription neuve : l'accueil relit (un co-caster éligible peut rendre un stream visible).
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: CASTER, replacedCasterId: null, pairing: PAIRING });
+  });
+
+  it("claimMatchCast_ownUnfitProdPlace_releasesItAndRegistersCaster", async () => {
+    state.users[CASTER] = verified;
+    state.match = matchState({ prod_user_id: CASTER });
+    state.prodAccounts = { [CASTER]: { is_deleted: 0, holds_prod: 0, suspended: 0 } };
+
+    await claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM);
+
+    expect(state.writes).toContain("UPDATE bg_matches SET prod_user_id = NULL WHERE id = ? AND prod_user_id = ?");
+    expect(casterOf(state)).toBe(CASTER);
+    expect(queueProdChange).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ matchId: 42, log: "INELIGIBLE" }));
+  });
+
+  it("claimMatchCast_ownFitProdPlace_throwsCasterIsProd", async () => {
+    state.users[CASTER] = verified;
+    state.match = matchState({ prod_user_id: CASTER });
+    state.prodAccounts = { [CASTER]: { is_deleted: 0, holds_prod: 1, suspended: 0 } };
+
+    await expect(claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM)).rejects.toThrow("CASTER_IS_PROD");
+    expect(state.match?.casters).toEqual([]);
   });
 
   it("claimMatchCast_anyClaim_locksTheAccountRowFirst", async () => {
@@ -1074,6 +1172,90 @@ describe("claimMatchCast", () => {
   it("refuse un joueur du match", async () => {
     state.users[1] = verified;
     await expect(claimMatchCast(42, { id: 1, playerView: false }, true, OWN_STREAM)).rejects.toThrow("CASTER_IS_PLAYER");
+  });
+
+  it("claimMatchCast_heldPlanningProdRow_throwsCasterIsPlannedProd", async () => {
+    state.users[CASTER] = verified;
+    state.plannedProdUserIds = [CASTER];
+
+    await expect(claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM)).rejects.toThrow("CASTER_IS_PLANNED_PROD");
+    expect(state.match?.casters).toEqual([]);
+  });
+
+  it("claimMatchCast_unpublishedTournament_nonManager_throwsMatchNotFound", async () => {
+    state.users[CASTER] = verified;
+    state.unpublishedTournament = true;
+
+    await expect(claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM)).rejects.toThrow("MATCH_NOT_FOUND");
+    expect(state.match?.casters).toEqual([]);
+  });
+
+  it("claimMatchCast_unpublishedTournament_manager_registers", async () => {
+    state.users[CASTER] = verified;
+    state.unpublishedTournament = true;
+
+    await claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM, {}, { oversees: false, manages: true });
+
+    expect(casterOf(state)).toBe(CASTER);
+  });
+
+  it("assertMatchTournamentOpen_finishedTournamentRequireRunning_throwsNotLaunchable", async () => {
+    state.match = matchState({ tournament_state: "FINISHED" });
+
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, false, true)).rejects.toThrow("MATCH_NOT_LAUNCHABLE");
+  });
+
+  it("claimMatchCast_unpublishedTournament_readsVisibilityWithLaunchContext", async () => {
+    state.users[CASTER] = verified;
+    state.unpublishedTournament = true;
+    const base = executeFor(state);
+    const sqls: string[] = [];
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: async (sql: string, params: unknown[] = []) => {
+            sqls.push(sql);
+            return base(sql, params);
+          },
+          beginTransaction: async () => undefined,
+          commit: async () => undefined,
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+
+    await expect(claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM)).rejects.toThrow("MATCH_NOT_FOUND");
+    expect(sqls.some((sql) => sql.includes("AS tournament_visible_at"))).toBe(true);
+    expect(sqls.some((sql) => sql.startsWith("SELECT state, start_visibility_at FROM bg_tournaments"))).toBe(false);
+  });
+
+  it("assertMatchTournamentOpen_unpublishedNonManager_throwsNotFound", async () => {
+    state.unpublishedTournament = true;
+
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, false)).rejects.toThrow("MATCH_NOT_FOUND");
+  });
+
+  it("assertMatchTournamentOpen_unpublishedRunningNonManager_hidesStateWithNotFound", async () => {
+    state.unpublishedTournament = true;
+    state.match = matchState({ tournament_state: "FINISHED" });
+
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, false, true)).rejects.toThrow("MATCH_NOT_FOUND");
+  });
+
+  it("assertMatchTournamentOpen_unpublishedManager_passes", async () => {
+    state.unpublishedTournament = true;
+
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, true)).resolves.toBeUndefined();
+  });
+
+  it("assertMatchTournamentOpen_publishedNonManager_passes", async () => {
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, false)).resolves.toBeUndefined();
+  });
+
+  it("assertMatchTournamentOpen_missingTournament_throwsNotFound", async () => {
+    state.match = null;
+
+    await expect(assertMatchTournamentOpen(connectionFor(state), 7, true)).rejects.toThrow("MATCH_NOT_FOUND");
   });
 
   it("sans plafond : un troisième caster s'ajoute ; rejouer sa propre inscription ne change rien", async () => {
@@ -3273,7 +3455,10 @@ describe("jeu du tournoi lu sous le verrou du match (revue sécurité #545)", ()
     state.issued = [];
     await claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM);
     const context = state.issued.find((sql) => sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches"));
-    expect(context).toContain("(SELECT game FROM bg_tournaments WHERE id = ?) AS tournament_game");
+    expect(context).toContain("t.game AS tournament_game");
+    // Une seule lecture du tournoi pour tout le contexte (revue sécurité, cycle 3).
+    expect(context?.match(/bg_tournaments/g)).toHaveLength(1);
+    expect(context).toContain("t.start_visibility_at AS tournament_visible_at");
     expect(context).not.toMatch(/FOR UPDATE|LOCK IN SHARE MODE/);
     const lock = state.issued.find((sql) => sql.includes("FROM bg_matches m WHERE m.id = ?") && sql.includes("FOR UPDATE"));
     expect(lock).not.toMatch(/\bgame\b/);
@@ -3487,5 +3672,212 @@ describe("cast et arbitrage — vue joueur (ADMIN_ROLE_IMPERSONATION.md)", () =>
 
     await expect(releaseMatchCast(42, { id: CASTER, playerView: true, roles: ["ARBITRE"] }, false)).resolves.not.toThrow();
     expect(state.match?.casters).toEqual([]);
+  });
+});
+
+/**
+ * La prod qui ne peut plus l'être quitte sa place avant tout lancement
+ * (`releaseUnfitProd`, `docs/features/MATCH_PROD.md`) : compte suspendu ou
+ * effacé, rôle perdu, devenue joueuse — jamais sur un match déjà lancé.
+ */
+describe("prod retirée d'office avant le lancement", () => {
+  const PROD = 77;
+  const FIT = { is_deleted: 0, holds_prod: 1, suspended: 0 };
+  const prodClear = (sql: string) => sql.startsWith("UPDATE bg_matches SET prod_user_id = NULL");
+
+  it("maintainMatchLaunches_prodSuspended_releasesUnavailable", async () => {
+    state.match = matchState({ prod_user_id: PROD });
+    state.prodAccounts = { [PROD]: { ...FIT, suspended: 1 } };
+    const connection = connectionFor(state);
+    const report = { castCrewReleased: false };
+
+    await maintainMatchLaunches(connection, 7, report);
+
+    expect(queueProdChange).toHaveBeenCalledWith(connection, {
+      matchId: 42,
+      log: "UNAVAILABLE",
+      notices: [{ userId: PROD, kind: "UNAVAILABLE" }],
+      pairing: PAIRING,
+    });
+    expect(report.castCrewReleased).toBe(true);
+  });
+
+  it("maintainMatchLaunches_prodDeleted_logsAccountDeletionWithoutNotice", async () => {
+    state.match = matchState({ prod_user_id: PROD });
+    state.prodAccounts = { [PROD]: { ...FIT, is_deleted: 1 } };
+    const connection = connectionFor(state);
+
+    await maintainMatchLaunches(connection, 7);
+
+    expect(queueProdChange).toHaveBeenCalledWith(connection, {
+      matchId: 42,
+      log: "ACCOUNT_DELETION",
+      notices: [],
+      pairing: PAIRING,
+    });
+  });
+
+  it("maintainMatchLaunches_prodSuspended_readsSuspensionLockedAfterAccount", async () => {
+    // La sous-requête EXISTS d'une lecture verrouillée lirait l'instantané : la suspension se relit à part, verrouillée.
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD });
+    state.suspendedUsers = [PROD];
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    const accountRead = state.issued.findIndex((sql) => sql.includes("AS holds_prod"));
+    const suspensionRead = state.issued.findIndex((sql) => sql.includes("FROM bg_account_suspensions"));
+    expect(state.issued[accountRead]).not.toContain("EXISTS");
+    expect(state.issued[accountRead]).toMatch(/LOCK IN SHARE MODE$/);
+    expect(suspensionRead).toBeGreaterThan(accountRead);
+    expect(state.issued[suspensionRead]).toMatch(/LOCK IN SHARE MODE$/);
+    expect(jest.mocked(queueProdChange).mock.calls[0]?.[1].log).toBe("UNAVAILABLE");
+  });
+
+  it("setMatchReady_prodSuspended_plainReadUsesSnapshotSuspension", async () => {
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD });
+    state.prodAccounts = { [PROD]: { ...FIT, suspended: 1 } };
+
+    await setMatchReady(42, 1, true, ACCOUNT_SESSION);
+
+    const accountRead = state.issued.find((sql) => sql.includes("AS holds_prod"));
+    expect(accountRead).toContain("AS suspended");
+    expect(accountRead).not.toContain("LOCK IN SHARE MODE");
+    expect(jest.mocked(queueProdChange).mock.calls[0]?.[1].log).toBe("UNAVAILABLE");
+  });
+
+  it("maintainMatchLaunches_prodMatch_lockTakenBeforeSingleAccountRead", async () => {
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    const lock = state.issued.findIndex((sql) => sql.includes("FOR UPDATE"));
+    const accountReads = state.issued.filter((sql) => sql.includes("AS holds_prod"));
+    expect(accountReads).toHaveLength(1);
+    expect(state.issued.findIndex((sql) => sql.includes("AS holds_prod"))).toBeGreaterThan(lock);
+  });
+
+  it("maintainMatchLaunches_repairedWithCasterAndProd_sharedLockedPartyRead", async () => {
+    state.issued = [];
+    state.match = matchState({ launch_pairing: null, prod_user_id: PROD, caster_user_id: CASTER });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    const memberReads = state.issued.filter((sql) => sql.startsWith("SELECT DISTINCT tm.user_id"));
+    expect(memberReads).toHaveLength(1);
+    expect(memberReads[0]).toMatch(/LOCK IN SHARE MODE$/);
+  });
+
+  it("maintainMatchLaunches_prodLostRole_releasesIneligible", async () => {
+    state.match = matchState({ prod_user_id: PROD });
+    state.prodAccounts = { [PROD]: { ...FIT, holds_prod: 0 } };
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.writes.some(prodClear)).toBe(true);
+    expect(jest.mocked(queueProdChange).mock.calls[0]?.[1].notices).toEqual([{ userId: PROD, kind: "INELIGIBLE" }]);
+  });
+
+  it("maintainMatchLaunches_unchangedPairingWithProd_oneBatchedPartyRead", async () => {
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    const soloReads = state.issued.filter((sql) => sql.startsWith("SELECT solo_user_id AS user_id, id AS team_id"));
+    const memberReads = state.issued.filter((sql) => sql.startsWith("SELECT DISTINCT tm.user_id, tm.team_id"));
+    expect(soloReads).toHaveLength(1);
+    expect(memberReads).toHaveLength(1);
+    expect(soloReads[0]).toMatch(/LOCK IN SHARE MODE$/);
+  });
+
+  it("maintainMatchLaunches_prodAlreadyIneligible_noPartyRead", async () => {
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD });
+    state.prodAccounts = { [PROD]: { ...FIT, holds_prod: 0 } };
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.issued.some((sql) => sql.startsWith("SELECT DISTINCT tm.user_id"))).toBe(false);
+  });
+
+  it("maintainMatchLaunches_prodRead_currentLockedRead", async () => {
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    const accountRead = state.issued.find((sql) => sql.includes("AS holds_prod"));
+    const memberRead = state.issued.find((sql) => sql.startsWith("SELECT DISTINCT tm.user_id"));
+    expect(accountRead).toMatch(/LOCK IN SHARE MODE$/);
+    expect(memberRead).toMatch(/LOCK IN SHARE MODE$/);
+  });
+
+  it("maintainMatchLaunches_prodReleasedWithLaunch_clearedBeforeLaunchedAt", async () => {
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    state.prodAccounts = { [PROD]: { ...FIT, holds_prod: 0 } };
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    const cleared = state.issued.findIndex(prodClear);
+    const launched = state.issued.findIndex((sql) => sql.includes("SET launched_at = NOW()"));
+    expect(cleared).toBeGreaterThanOrEqual(0);
+    expect(launched).toBeGreaterThan(cleared);
+  });
+
+  it("maintainMatchLaunches_prodOnlyReleaseLobbyOpen_countsAsChange", async () => {
+    state.match = matchState({ prod_user_id: PROD, lobby_opened_at: new Date().toISOString() });
+    state.prodAccounts = { [PROD]: { ...FIT, suspended: 1 } };
+
+    await expect(maintainMatchLaunches(connectionFor(state), 7)).resolves.toBe(1);
+    expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("forceLaunchMatch_prodPlays_releasedBeforeLaunch", async () => {
+    state.issued = [];
+    state.memberships.push({ userId: PROD, teamId: TEAM2, roles: ["TANK"] });
+    state.match = matchState({ prod_user_id: PROD });
+
+    await forceLaunchMatch(42);
+
+    expect(jest.mocked(queueProdChange).mock.calls[0]?.[1].log).toBe("JOINED_TEAM");
+    const cleared = state.issued.findIndex(prodClear);
+    expect(state.issued.findIndex((sql) => sql.includes("SET launched_at = NOW()"))).toBeGreaterThan(cleared);
+  });
+
+  it("setMatchReady_prodLostRole_releasedPlainRead", async () => {
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD });
+    state.prodAccounts = { [PROD]: { ...FIT, holds_prod: 0 } };
+
+    await setMatchReady(42, 1, true, ACCOUNT_SESSION);
+
+    expect(jest.mocked(queueProdChange).mock.calls[0]?.[1].log).toBe("INELIGIBLE");
+    expect(state.issued.find((sql) => sql.includes("AS holds_prod"))).not.toMatch(/LOCK IN SHARE MODE$/);
+  });
+
+  it("relaunchAfterRefereeWithdrawal_prodSuspended_releasedCurrentRead", async () => {
+    state.issued = [];
+    state.match = matchState({ prod_user_id: PROD, referee_user_id: null });
+    state.prodAccounts = { [PROD]: { ...FIT, suspended: 1 } };
+
+    await relaunchAfterRefereeWithdrawal(connectionFor(state), [42]);
+
+    expect(jest.mocked(queueProdChange).mock.calls[0]?.[1].log).toBe("UNAVAILABLE");
+    expect(state.issued.find((sql) => sql.includes("AS holds_prod"))).toMatch(/LOCK IN SHARE MODE$/);
+  });
+
+  it("relaunchAfterRefereeWithdrawal_launchedMatchUnfitProd_keepsProd", async () => {
+    // Un direct en cours n'est pas coupé : la prod d'un match lancé reste.
+    state.match = matchState({ prod_user_id: PROD, launched_at: STAMP });
+    state.prodAccounts = { [PROD]: { ...FIT, suspended: 1 } };
+
+    await relaunchAfterRefereeWithdrawal(connectionFor(state), [42]);
+
+    expect(state.writes.some(prodClear)).toBe(false);
+    expect(queueProdChange).not.toHaveBeenCalled();
   });
 });

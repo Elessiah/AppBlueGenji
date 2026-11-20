@@ -1,9 +1,11 @@
+import { useMemo } from "react";
 import type { BracketMatch } from "@/lib/shared/types";
 import { SCORE_ENTRY_CLOSED_PHASES, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { canConfigureLive, type MatchLiveState } from "@/lib/shared/live-streams";
 import { canEditReplay, canHaveReplay, mayEditReplay } from "@/lib/shared/match-replay";
 import { offersCastSettings } from "@/lib/shared/cast-settings";
 import { canReportOwnMatch } from "@/lib/shared/match-card-viewer";
+import { prodControls } from "@/lib/shared/match-prod";
 import {
   pendingReportState,
   playerReportView,
@@ -24,6 +26,9 @@ import { singlePendingReport } from "./score-form";
 import { launchStripControls, type LaunchStripControls } from "./launch-strip";
 import { isPublicMatch, matchCardActionList, offersMatchPage, type MatchCardAction } from "./match-card-actions";
 import { useActionsText } from "./actions-text";
+
+/** Aucune équipe du lecteur : une seule liste vide partagée, pour ne pas en refaire une par carte. */
+const NO_TEAM_IDS: readonly number[] = [];
 
 /**
  * Libellé du bouton d'arbitrage : il dit le seul geste possible avant le
@@ -96,6 +101,8 @@ export function useMatchCardModel(
     canSchedule,
     viewerUserId,
     publicShare,
+    canProd,
+    canLeaveProd,
   } = useLiveControls();
   // Lu à part (`useViewerRefereesMatch`) : une relecture des pseudos ne
   // redessine que les cartes dont la réponse change.
@@ -143,6 +150,20 @@ export function useMatchCardModel(
     myTeamId,
     launchPhase: launchPhaseEnabled,
   });
+  // Prod du match (`docs/features/MATCH_PROD.md`) : même ouverture que le cast.
+  // Mémorisé : la carte ne refait ni l'objet ni la liste d'équipes tant que
+  // le match et le lecteur sont les mêmes (254 cartes par plateau).
+  const prod = useMemo(
+    () =>
+      prodControls(match, {
+        canProd,
+        canLeaveProd,
+        canSchedule,
+        viewerUserId,
+        myTeamIds: myTeamId === null ? NO_TEAM_IDS : [myTeamId],
+      }),
+    [match, canProd, canLeaveProd, canSchedule, viewerUserId, myTeamId],
+  );
   const showCastConfig = offersCastSettings(match, launch.isCaster, canManage);
   // La diffusion de l'organisation reste au staff `tournaments` ; ses routes
   // (`/api/admin/matches/[id]/live`, rediff) demandent aussi `live` : sans les
@@ -182,6 +203,7 @@ export function useMatchCardModel(
       showMatchPage,
       // Le lien public du match, sur la carte comme sur sa page : tournoi publié, match à jouer.
       showShare: publicShare && isPublicMatch(match),
+      prod,
     },
     actionText,
   );

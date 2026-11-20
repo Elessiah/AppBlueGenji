@@ -13,7 +13,16 @@ import { can } from "@/lib/shared/permissions";
 import { planningCastersFull, planningRolesOf, type AvailabilityStatus, type PlanningRole } from "@/lib/shared/planning";
 import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { rolesConflict, slotsOverlap } from "@/lib/shared/planning-planner";
-import { MATCH_REFEREE_REFUSAL_CODES, holdingRefusal, lockedHolding, withPlanningLock, writeAssignment, writeEvent } from "./auto-assign";
+import {
+  MATCH_REFEREE_REFUSAL_CODES,
+  holdingRefusal,
+  lockedHolding,
+  lockedMatchProds,
+  matchProdRefusal,
+  withPlanningLock,
+  writeAssignment,
+  writeEvent,
+} from "./auto-assign";
 import {
   affectedRows,
   loadPlanningData,
@@ -37,6 +46,7 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   PLANNING_ROLE_NOT_HELD: 409,
   PLANNING_HIDDEN_FOR_MEMBER: 409,
   PLANNING_ROLE_CONFLICT: 409,
+  PLANNING_PROD_TAKEN: 409,
   PLANNING_CASTERS_FULL: 409,
   PLANNING_IS_PLAYER: 409,
   PLANNING_OVERLAP: 409,
@@ -199,6 +209,13 @@ function refuseManualPose({ data, entry, input, current }: Pick<ManualContext, "
     throw new Error("PLANNING_ROLE_CONFLICT");
   }
   if (current?.source === "CAST") throw new Error("PLANNING_CAST_MANAGED");
+  // La prod du match est déjà sa ligne PROD tenue : la doubler d'une ligne à la main ferait un retrait qui ne tient pas.
+  if (input.role === "PROD" && entry.matchProdId === input.userId) throw new Error("PLANNING_CAST_MANAGED");
+  // La prod du match est déjà une ligne PROD tenue (`model.ts`) : la prod qui se pose caster tombe sur le
+  // conflit de rôles ci-dessus. Reste la place de prod tenue par un autre ; tout se relit sous verrou ensuite.
+  if (input.role === "PROD" && matchProdRefusal(entry.matchProdId, input.userId, input.role) === "PLANNING_PROD_TAKEN") {
+    throw new Error("PLANNING_PROD_TAKEN");
+  }
   if (input.role === "CASTER" && planningCastersFull(entryAssignments(entry, data), input.userId)) throw new Error("PLANNING_CASTERS_FULL");
 }
 
@@ -228,6 +245,12 @@ async function assignManually({ connection, actor, data, entry, input, current, 
     const holds = await lockedHolding(connection, [{ userId: input.userId, entry }]);
     const fresh = holds(input.userId, entry, input.role);
     if (fresh !== null) throw new Error(fresh);
+    // La prod du match relue sous verrou, après le compte : placée depuis la lecture, elle refuse le geste.
+    if (input.role !== "REFEREE" && entry.matchId !== null) {
+      const prods = await lockedMatchProds(connection, [entry.matchId]);
+      const prodConflict = matchProdRefusal(prods.get(entry.matchId), input.userId, input.role);
+      if (prodConflict !== null) throw new Error(prodConflict);
+    }
     // Chaque ligne que le geste retire s'inscrit à l'historique (`REMOVED`, `AUTO` : un retrait par
     // conséquence, qui n'écarte personne des calculs suivants), au compte du staff qui agit ;
     // ces évènements s'effacent avec le reste si la désignation du match est refusée.

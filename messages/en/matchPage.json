@@ -31,6 +31,7 @@
     "sideRight": "Right: {team}",
     "casters": "Casters",
     "noCaster": "No caster",
+    "prod": "Prod",
     "launch": "Launch"
   },
   "sections": {

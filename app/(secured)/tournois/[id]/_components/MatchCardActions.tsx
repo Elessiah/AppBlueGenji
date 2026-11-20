@@ -19,6 +19,9 @@ import {
   Scale,
   Settings,
   Share2,
+  SlidersHorizontal,
+  Clapperboard,
+  CircleSlash,
   Film,
   TriangleAlert,
   Users,
@@ -68,6 +71,11 @@ const RefereeDialog = dynamic(() => orReload(import("./RefereeDialog").then((m) 
   ssr: false,
 });
 
+// Chargée au premier clic sur « Prod du match » : seul le staff `tournaments` l'ouvre.
+const ProdDialog = dynamic(() => orReload(import("./ProdDialog").then((m) => m.ProdDialog)), {
+  ssr: false,
+});
+
 // Chargée au premier clic sur « Caster » : seul le staff `live` l'ouvre, et elle
 // embarque son CSS et ses aides d'erreur de champ.
 const CastClaimDialog = dynamic(() => orReload(import("./CastClaimDialog").then((m) => m.CastClaimDialog)), {
@@ -101,6 +109,9 @@ const ICONS: Record<MatchCardActionId, LucideIcon> = {
   claimCast: Mic,
   castConfig: Radio,
   releaseCast: MicOff,
+  claimProd: SlidersHorizontal,
+  releaseProd: CircleSlash,
+  assignProd: Clapperboard,
   liveConfig: Settings,
   replay: Film,
   report: TriangleAlert,
@@ -496,6 +507,11 @@ export function MatchCardActions({
   const [contactsOpen, setContactsOpen] = useConfirmWhile(actions.some((a) => a.id === "contacts"));
   // La fenêtre « Arbitrage » se ferme avec son action (match joué, tournoi clos).
   const [refereeOpen, setRefereeOpen] = useConfirmWhile(actions.some((a) => a.id === "referee"));
+  // La fenêtre « Prod du match » se ferme avec son action (match joué).
+  const [prodOpen, setProdOpen] = useConfirmWhile(actions.some((a) => a.id === "assignProd"));
+  // « Ne plus faire la prod » demande confirmation, comme le retrait d'un caster :
+  // la place rendue peut être prise aussitôt par une autre prod.
+  const [confirmReleaseProd, setConfirmReleaseProd] = useConfirmWhile(actions.some((a) => a.id === "releaseProd"));
   // Ouvert **et** encore quelque chose à montrer : un instantané du flux qui
   // retire le panneau ne doit pas le laisser « ouvert » en mémoire, prêt à
   // reparaître déplié sans clic au retour d'une action.
@@ -681,6 +697,11 @@ export function MatchCardActions({
     // (qui lui envoie un avis) : « Ne plus caster » vit dans « Configurer ma
     // diffusion » (`docs/features/CAST_SETTINGS.md`).
     releaseCast: () => openRelease(),
+    // Prod du match (`docs/features/MATCH_PROD.md`) : se placer ou se retirer,
+    // retrait confirmé (la place peut être reprise aussitôt) ; le staff passe par sa fenêtre.
+    claimProd: () => void run(() => request(`/api/matches/${match.id}/prod`, "POST"), t("cardActions.prodClaimed")),
+    releaseProd: () => setConfirmReleaseProd(true),
+    assignProd: () => setProdOpen(true),
     liveConfig: () => openConfig(match),
     replay: () => openReplay(match),
     report: onReport,
@@ -690,7 +711,12 @@ export function MatchCardActions({
   // `aria-disabled` + `aria-busy`, jamais `disabled` natif (le focus resterait
   // sinon sans bouton), le clic ignoré.
   const writes = (id: MatchCardActionId) =>
-    id === "hostSwap" || id === "claimCast" || id === "releaseCast" || id === "force";
+    id === "hostSwap" ||
+    id === "claimCast" ||
+    id === "releaseCast" ||
+    id === "force" ||
+    id === "claimProd" ||
+    id === "releaseProd";
 
   const renderButton = (action: MatchCardAction, inMenu: boolean) => {
     const Icon = action.readOnly ? Eye : ICONS[action.id];
@@ -822,6 +848,17 @@ export function MatchCardActions({
           )}
         </ConfirmActionDialog>
       )}
+      {confirmReleaseProd && (
+        <ConfirmActionDialog
+          title={t("cardActions.prodReleaseConfirm.title", { match: matchLabel })}
+          confirmLabel={t("cardActions.prodReleaseConfirm.confirm")}
+          pendingLabel={t("cardActions.prodReleaseConfirm.pending")}
+          onClose={() => setConfirmReleaseProd(false)}
+          onConfirm={() => run(() => request(`/api/matches/${match.id}/prod`, "DELETE"), t("cardActions.prodReleased"))}
+        >
+          <p>{t("cardActions.prodReleaseConfirm.body")}</p>
+        </ConfirmActionDialog>
+      )}
       {confirmRelease && releasedCaster !== null && (
         <ReleaseCastDialog
           match={match}
@@ -869,6 +906,7 @@ export function MatchCardActions({
           onClose={() => setRefereeOpen(false)}
         />
       )}
+      {prodOpen && <ProdDialog match={match} matchLabel={matchLabel} onClose={() => setProdOpen(false)} />}
       {contactsOpen && (
         <MatchContactsDialog
           matchId={match.id}

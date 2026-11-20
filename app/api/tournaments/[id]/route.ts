@@ -4,6 +4,7 @@ import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { getTournamentDetail } from "@/lib/server/tournaments-service";
 import { can, canAny } from "@/lib/shared/permissions";
+import { sessionHolds } from "@/lib/shared/player-view";
 
 /**
  * Détail d'un tournoi. Chemin de **secours** : en marche normale la page reçoit
@@ -36,6 +37,10 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       canManage: can(user, "tournaments"),
       canPreview: canAny(user, ["tournaments", "casting"]),
       canManageLive: can(user, "live"),
+      // Prod d'un match : par les deux portes, comme les autres droits (`MATCH_PROD.md`).
+      canProd: can(user, "prod"),
+      // Quitter sa place : la route ne demande que `sessionHolds` (rôle perdu compris).
+      canLeaveProd: sessionHolds(user, "prod"),
       // Suppression définitive : administrateur strict. `can(user, "tournaments")`
       // ne convient pas — un arbitre gère le tournoi, il ne l'efface pas.
       canDelete: user.isAdmin === true,

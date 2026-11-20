@@ -7,7 +7,7 @@ jest.mock("@/lib/server/database");
 /**
  * Les matchs où le titulaire a tenu un rôle, dans son export
  * (`docs/features/RGPD_DATA_RIGHTS.md`) : inscriptions de caster, liens de
- * chaîne fournis, arbitrages désignés, modes d'antenne posés.
+ * chaîne fournis, arbitrages désignés, modes d'antenne posés, places de prod.
  */
 
 async function mockDb(execute: SqlMock) {
@@ -16,12 +16,12 @@ async function mockDb(execute: SqlMock) {
 }
 
 /**
- * Les quatre lectures partent ensemble (`Promise.all`) : une relecture suit
- * les trois autres premières lectures. Ce double répond **par table lue**
- * (`casts`, `links`, `referee`, `triggers`), chaque entrée servant ses
+ * Les cinq lectures partent ensemble (`Promise.all`) : une relecture suit
+ * les quatre autres premières lectures. Ce double répond **par table lue**
+ * (`casts`, `links`, `referee`, `triggers`, `prod`), chaque entrée servant ses
  * réponses dans l'ordre, la dernière ensuite.
  */
-function bySql(answers: Partial<Record<"casts" | "links" | "referee" | "triggers", (unknown[] | Error)[]>>) {
+function bySql(answers: Partial<Record<"casts" | "links" | "referee" | "triggers" | "prod", (unknown[] | Error)[]>>) {
   const served: Record<string, number> = {};
   return jest.fn<SqlQuery>(async (rawSql) => {
     const sql = String(rawSql);
@@ -31,7 +31,9 @@ function bySql(answers: Partial<Record<"casts" | "links" | "referee" | "triggers
         ? "links"
         : sql.includes("referee_user_id = ?")
           ? "referee"
-          : "triggers";
+          : sql.includes("prod_user_id = ?")
+            ? "prod"
+            : "triggers";
     const list = answers[key] ?? [[]];
     const index = Math.min(served[key] ?? 0, list.length - 1);
     served[key] = index + 1;
@@ -62,7 +64,8 @@ describe("listOwnMatchRoles", () => {
         { match_id: 5, tournament_id: 2, live_url: "https://twitch.tv/voix", created_at: new Date("2026-10-20T17:00:00Z") },
       ]])
       .mockResolvedValueOnce([[{ id: 6, tournament_id: 2, referee_ready_at: null }]])
-      .mockResolvedValueOnce([[{ id: 7, tournament_id: 2, live_trigger: "MANUAL" }]]);
+      .mockResolvedValueOnce([[{ id: 7, tournament_id: 2, live_trigger: "MANUAL" }]])
+      .mockResolvedValueOnce([[{ id: 8, tournament_id: 2 }]]);
     await mockDb(execute);
 
     expect(await listOwnMatchRoles(12)).toEqual({
@@ -72,6 +75,8 @@ describe("listOwnMatchRoles", () => {
       refereeAssignments: [{ matchId: 6, tournamentId: 2, readyAt: null }],
       // Le compte qui a posé le mode d'antenne est une donnée gardée (CAST-FOLLOWUP).
       liveTriggers: [{ matchId: 7, tournamentId: 2, liveTrigger: "MANUAL" }],
+      // La place de prod tenue sur un match (MATCH_PROD.md).
+      prodAssignments: [{ matchId: 8, tournamentId: 2 }],
     });
   });
 
@@ -81,17 +86,18 @@ describe("listOwnMatchRoles", () => {
 
     await listOwnMatchRoles(12);
 
-    expect(execute.mock.calls.map(([, params]) => params)).toEqual([[12], [12], [12], [12]]);
+    expect(execute.mock.calls.map(([, params]) => params)).toEqual([[12], [12], [12], [12], [12]]);
     expect(execute.mock.calls[0][0]).toMatch(/WHERE c\.user_id = \?/);
     expect(execute.mock.calls[1][0]).toMatch(/WHERE s\.link_user_id = \?/);
     expect(execute.mock.calls[2][0]).toMatch(/WHERE referee_user_id = \?/);
     expect(execute.mock.calls[3][0]).toMatch(/WHERE live_trigger_user_id = \?/);
+    expect(execute.mock.calls[4][0]).toMatch(/WHERE prod_user_id = \?/);
   });
 
   it("listOwnMatchRoles_noRole_returnsEmptyLists", async () => {
     await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
 
-    expect(await listOwnMatchRoles(12)).toEqual({ casts: [], providedStreamLinks: [], refereeAssignments: [], liveTriggers: [] });
+    expect(await listOwnMatchRoles(12)).toEqual({ casts: [], providedStreamLinks: [], refereeAssignments: [], liveTriggers: [], prodAssignments: [] });
   });
 
   it("listOwnMatchRoles_missingTable_returnsEmptyForThatReadOnly", async () => {
@@ -100,6 +106,7 @@ describe("listOwnMatchRoles", () => {
       .mockRejectedValueOnce(missingTable())
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[{ id: 6, tournament_id: 2, referee_ready_at: null }]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
@@ -115,6 +122,7 @@ describe("listOwnMatchRoles", () => {
       .mockResolvedValueOnce([[]])
       .mockRejectedValueOnce(unknownColumn())
       .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
@@ -127,7 +135,8 @@ describe("listOwnMatchRoles", () => {
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[{ id: 6, tournament_id: 2, referee_ready_at: null }]])
-      .mockRejectedValueOnce(unknownColumn());
+      .mockRejectedValueOnce(unknownColumn())
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     const roles = await listOwnMatchRoles(12);
@@ -212,6 +221,20 @@ describe("listOwnMatchRoles", () => {
     expect(callsOn(execute, "FROM bg_match_casters")[1]).toContain("NULL AS cast_battletag");
   });
 
+  it("listOwnMatchRoles_prodColumnMissing_returnsEmptyProdOnly", async () => {
+    const execute = bySql({
+      prod: [Object.assign(new Error("Unknown column 'prod_user_id' in 'where clause'"), { code: "ER_BAD_FIELD_ERROR" })],
+      referee: [[{ id: 6, tournament_id: 2, referee_ready_at: null }]],
+    });
+    await mockDb(execute);
+
+    const roles = await listOwnMatchRoles(12);
+
+    // Migration MATCH-CAST-PROD pas encore jouée : l'export part quand même.
+    expect(roles.prodAssignments).toEqual([]);
+    expect(roles.refereeAssignments).toEqual([{ matchId: 6, tournamentId: 2, readyAt: null }]);
+  });
+
   it("listOwnMatchRoles_otherFailure_rethrows", async () => {
     await mockDb(jest.fn<SqlQuery>().mockRejectedValueOnce(new Error("DB_DOWN")));
 
@@ -220,8 +243,8 @@ describe("listOwnMatchRoles", () => {
 });
 
 describe("listOwnMatchRoles — lectures lancées ensemble", () => {
-  it("listOwnMatchRoles_fourReads_startBeforeAnyResolves", async () => {
-    // Aucune lecture n'attend la précédente : les quatre partent avant toute réponse.
+  it("listOwnMatchRoles_fiveReads_startBeforeAnyResolves", async () => {
+    // Aucune lecture n'attend la précédente : les cinq partent avant toute réponse.
     let started = 0;
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
@@ -236,8 +259,8 @@ describe("listOwnMatchRoles — lectures lancées ensemble", () => {
 
     const pending = listOwnMatchRoles(12);
     await new Promise((resolve) => setImmediate(resolve));
-    expect(started).toBe(4);
+    expect(started).toBe(5);
     release();
-    await expect(pending).resolves.toEqual({ casts: [], providedStreamLinks: [], refereeAssignments: [], liveTriggers: [] });
+    await expect(pending).resolves.toEqual({ casts: [], providedStreamLinks: [], refereeAssignments: [], liveTriggers: [], prodAssignments: [] });
   });
 });

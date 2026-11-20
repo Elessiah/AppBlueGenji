@@ -645,6 +645,16 @@ function MatchKeyFacts({
         </span>
       ),
   });
+  // La prod du match (`docs/features/MATCH_PROD.md`), distincte des casters :
+  // nommée comme eux, sans lien vers une fiche quand son compte est masqué.
+  if (match.prod) {
+    const prod = match.prod;
+    facts.push({
+      id: "prod",
+      label: page.t("facts.prod"),
+      value: prod.userId > 0 ? <PlayerLink userId={prod.userId}>{prod.pseudo}</PlayerLink> : prod.pseudo,
+    });
+  }
   if (hasLaunchPhaseBadge(match, phase)) {
     facts.push({ id: "launch", label: page.t("facts.launch"), value: <LaunchPhaseBadge match={match} phase={phase} /> });
   }

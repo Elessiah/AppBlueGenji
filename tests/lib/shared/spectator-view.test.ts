@@ -499,6 +499,7 @@ const MATCH_FIELDS = {
   bracket: "public",
   // `userId` remplacé et « Prêt » effacé ; pseudo (à l'antenne) et stream publics.
   casters: "parcouru",
+  prod: "parcouru",
   doubleForfeit: "public",
   forfeitTeamId: "public",
   hostTeamId: "public",

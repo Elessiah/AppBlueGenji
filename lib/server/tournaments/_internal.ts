@@ -174,6 +174,12 @@ export type MatchRow = RowDataPacket & {
   self_managed?: number | null;
   first_map?: string | null;
   map_picks?: string | null;
+  /** Prod du match (`docs/features/MATCH_PROD.md`), son pseudo public. */
+  prod_user_id?: number | null;
+  prod_pseudo?: string | null;
+  prod_is_deleted?: number | null;
+  /** La prod ne remplit plus la condition (rôle perdu, compte suspendu, joueuse du match) : tue avant le lancement. */
+  prod_unfit?: number | null;
   /** Pseudo de l'arbitre désigné, tel qu'en base : il entre dans l'empreinte (`refereeKey`). */
   referee_pseudo?: string | null;
   /** Condition d'arbitrage de l'arbitre désigné (`refereeKeptColumns`). */
@@ -414,8 +420,33 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
       })),
     liveStartedAt: toIso(row.live_started_at),
     ...mapMatchLaunch(row, extras.casters ?? [], game),
+    // Absent quand le match n'a pas de prod (presque tous) : la clé ne grossit pas chaque trame.
+    ...prodField(row, castBeforeLaunch(row)),
     replayUrl: normalizeReplayUrl(row.replay_url ?? null),
   };
+}
+
+type MatchProdRow = Pick<MatchRow, "prod_user_id" | "prod_pseudo" | "prod_is_deleted" | "prod_unfit">;
+
+/**
+ * La prod du match (`docs/features/MATCH_PROD.md`) : son compte et son pseudo,
+ * publics comme ceux d'un caster. Un compte effacé n'est pas montré (son
+ * effacement retire déjà ses places à venir) ; avant le lancement
+ * (`beforeLaunch`), une prod qui ne remplit plus la condition (rôle perdu,
+ * compte suspendu, joueuse du match) est tue, comme un caster inéligible
+ * (`casterWithdrawn`), jusqu'à ce que l'entretien du lancement rende sa place.
+ */
+export function mapMatchProd(row: MatchProdRow, beforeLaunch = false): BracketMatch["prod"] {
+  const userId = row.prod_user_id == null ? null : Number(row.prod_user_id);
+  if (userId === null || Number(row.prod_is_deleted ?? 0) === 1 || row.prod_pseudo == null) return null;
+  if (beforeLaunch && Number(row.prod_unfit ?? 0) === 1) return null;
+  return { userId, pseudo: String(row.prod_pseudo) };
+}
+
+/** `{ prod }` quand le match en a une montrée, sinon rien — la clé n'est portée que par les matchs qui la tiennent. */
+function prodField(row: MatchProdRow, beforeLaunch: boolean): { prod?: NonNullable<BracketMatch["prod"]> } {
+  const prod = mapMatchProd(row, beforeLaunch);
+  return prod ? { prod } : {};
 }
 
 /**

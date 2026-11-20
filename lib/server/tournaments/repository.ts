@@ -2,6 +2,8 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import type { TournamentGame, TournamentState } from "@/lib/shared/types";
 import { seedJoins } from "./match-host-seeds";
 import { playsMatchSql } from "./match-players";
+import { prodRoleSql } from "./prod-sql";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import { refereeKeptColumns } from "./cast-eligibility";
 import { forfeitMapCount, matchMaxMaps, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
@@ -374,6 +376,11 @@ export async function getMatchRows(
       m.referee_user_id,
       m.referee_ready_at,
       m.self_managed,
+      m.prod_user_id,
+      pu.pseudo AS prod_pseudo,
+      pu.is_deleted AS prod_is_deleted,
+      (m.prod_user_id IS NOT NULL AND (NOT ${prodRoleSql("pu")} OR ${userSuspendedSql("pu.id")}
+        OR ${playsMatchSql("m.prod_user_id", "m.team1_id", "m.team2_id", "pp")})) AS prod_unfit,
       m.first_map,
       m.map_picks,
       ${refereeKeptColumns("ru")},
@@ -386,6 +393,7 @@ export async function getMatchRows(
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
      LEFT JOIN bg_users ru ON ru.id = m.referee_user_id
+     LEFT JOIN bg_users pu ON pu.id = m.prod_user_id
      ${seedJoins("m")}
      LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
      WHERE m.tournament_id = ?

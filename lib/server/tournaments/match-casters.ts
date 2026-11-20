@@ -17,7 +17,9 @@ import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
 import { STREAM_URL_CANDIDATES_SEPARATOR } from "@/lib/shared/live-announcements";
 import { staffStream } from "@/lib/shared/live-streams";
 import { verifiedBattletagSql } from "@/lib/server/battletag-origin";
+import { nullableId } from "@/lib/shared/nullable-id";
 import type { CastEligibilityFields } from "./cast-eligibility";
+import type { CastPairing } from "./cast-notices";
 
 export { staffStream };
 
@@ -367,9 +369,20 @@ export type MatchWithdrawal = {
   releasedRefereeMatchIds: number[];
   /** Matchs non joués dont son cast a été retiré (lus sous verrou). */
   releasedCastMatchIds: number[];
+  /**
+   * Matchs non joués dont sa place de prod a été rendue (`MATCH_PROD.md`), avec
+   * l'appariement lu sous verrou : la demande de suppression les annonce au staff.
+   */
+  releasedProdPlaces: { matchId: number; pairing: CastPairing }[];
 };
 
-type WithdrawnMatchRow = RowDataPacket & { id: number; tournament_id: number; status: string };
+type WithdrawnMatchRow = RowDataPacket & {
+  id: number;
+  tournament_id: number;
+  status: string;
+  team1_id: number | null;
+  team2_id: number | null;
+};
 
 /**
  * Efface en une fois les streams devenus orphelins (`orphanStreamIds`) de
@@ -451,7 +464,7 @@ export async function withdrawUserCasts(
   userId: number,
   includeCompleted: boolean,
 ): Promise<MatchWithdrawal> {
-  // Les quatre listes de départ en **une** lecture (`UNION ALL`, chaque table
+  // Les cinq listes de départ en **une** lecture (`UNION ALL`, chaque table
   // seule par l'index du compte). Tous ses casts, quel que soit l'état du
   // match : celui-ci se juge **sous verrou** (un match rouvert entre cette
   // lecture et le verrou perd quand même son caster).
@@ -459,8 +472,9 @@ export async function withdrawUserCasts(
     `SELECT 'C' AS kind, match_id FROM bg_match_casters WHERE user_id = ?
      UNION ALL SELECT 'L' AS kind, match_id FROM bg_match_streams WHERE link_user_id = ?
      UNION ALL SELECT 'R' AS kind, id AS match_id FROM bg_matches WHERE referee_user_id = ?
-     UNION ALL SELECT 'T' AS kind, id AS match_id FROM bg_matches WHERE live_trigger_user_id = ?`,
-    [userId, userId, userId, userId],
+     UNION ALL SELECT 'T' AS kind, id AS match_id FROM bg_matches WHERE live_trigger_user_id = ?
+     UNION ALL SELECT 'P' AS kind, id AS match_id FROM bg_matches WHERE prod_user_id = ?`,
+    [userId, userId, userId, userId, userId],
   );
   const listOf = (kind: string) => new Set(startRows.filter((row) => row.kind === kind).map((row) => Number(row.match_id)));
   const casts = listOf("C");
@@ -469,13 +483,22 @@ export async function withdrawUserCasts(
   // Tous les matchs dont il tient le mode d'antenne, quel que soit leur état :
   // la référence à son compte part avec lui (effacement), verrouillés avec les autres.
   const triggered = listOf("T");
-  const candidates = [...new Set([...casts, ...links, ...refereed, ...triggered])].sort((a, b) => a - b);
+  // Ses places de prod (`MATCH_PROD.md`) : comme un cast, gardée sur un match joué à l'anonymisation.
+  const prods = listOf("P");
+  const candidates = [...new Set([...casts, ...links, ...refereed, ...triggered, ...prods])].sort((a, b) => a - b);
   if (candidates.length === 0) {
-    return { matchIds: [], tournamentIds: [], liveTournamentIds: [], releasedRefereeMatchIds: [], releasedCastMatchIds: [] };
+    return {
+      matchIds: [],
+      tournamentIds: [],
+      liveTournamentIds: [],
+      releasedRefereeMatchIds: [],
+      releasedCastMatchIds: [],
+      releasedProdPlaces: [],
+    };
   }
 
   const [locked] = await connection.execute<WithdrawnMatchRow[]>(
-    `SELECT id, tournament_id, status FROM bg_matches WHERE id IN (${placeholders(candidates)}) ORDER BY id FOR UPDATE`,
+    `SELECT id, tournament_id, status, team1_id, team2_id FROM bg_matches WHERE id IN (${placeholders(candidates)}) ORDER BY id FOR UPDATE`,
     candidates,
   );
   const matchIds = locked.map((row) => Number(row.id));
@@ -484,6 +507,9 @@ export async function withdrawUserCasts(
     .map((row) => Number(row.id));
   const linksToDrop = matchIds.filter((id) => links.has(id));
   const refereesToDrop = matchIds.filter((id) => refereed.has(id));
+  const prodsToDrop = locked
+    .filter((row) => prods.has(Number(row.id)) && (includeCompleted || row.status !== "COMPLETED"))
+    .map((row) => Number(row.id));
 
   if (castsToDrop.length > 0) {
     await connection.execute(
@@ -518,6 +544,12 @@ export async function withdrawUserCasts(
       [userId, ...triggersToDrop],
     );
   }
+  if (prodsToDrop.length > 0) {
+    await connection.execute(
+      `UPDATE bg_matches SET prod_user_id = NULL WHERE prod_user_id = ? AND id IN (${placeholders(prodsToDrop)})`,
+      [userId, ...prodsToDrop],
+    );
+  }
   if (refereesToDrop.length > 0) {
     await connection.execute(
       `UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL
@@ -532,11 +564,20 @@ export async function withdrawUserCasts(
   await unmarkUncastMatches(connection, pruned);
   // Seuls les matchs réellement modifiés : un cast gardé sur un match joué
   // (anonymisation) n'en fait pas partie.
-  const touched = new Set([...castsToDrop, ...linksToDrop, ...refereesToDrop, ...triggersToDrop]);
+  const touched = new Set([...castsToDrop, ...linksToDrop, ...refereesToDrop, ...triggersToDrop, ...prodsToDrop]);
   const touchedRows = locked.filter((row) => touched.has(Number(row.id)));
   // Un match non joué qui attendait encore ce « Prêt » peut partir : l'appelant
   // le relance (`relaunchAfterRefereeWithdrawal`) sur ces listes lues sous verrou.
   const unplayed = new Set(locked.filter((row) => row.status !== "COMPLETED").map((row) => Number(row.id)));
+  // Places de prod rendues sur un match à jouer : leur appariement, lu avec le
+  // verrou du match, nomme le match au journal du staff.
+  const releasedProdIds = new Set(prodsToDrop.filter((id) => unplayed.has(id)));
+  const releasedProdPlaces: MatchWithdrawal["releasedProdPlaces"] = locked
+    .filter((row) => releasedProdIds.has(Number(row.id)))
+    .map((row) => ({
+      matchId: Number(row.id),
+      pairing: { team1Id: nullableId(row.team1_id ?? null), team2Id: nullableId(row.team2_id ?? null) },
+    }));
   return {
     matchIds: touchedRows.map((row) => Number(row.id)),
     tournamentIds: [...new Set(touchedRows.map((row) => Number(row.tournament_id)))].sort((a, b) => a - b),
@@ -545,6 +586,7 @@ export async function withdrawUserCasts(
     ].sort((a, b) => a - b),
     releasedRefereeMatchIds: refereesToDrop.filter((id) => unplayed.has(id)),
     releasedCastMatchIds: castsToDrop.filter((id) => unplayed.has(id)),
+    releasedProdPlaces,
   };
 }
 

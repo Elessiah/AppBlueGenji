@@ -183,6 +183,22 @@
       "MATCH_DELETED": "le match a été supprimé (retour arrière ou manche refaite)"
     }
   },
+  "matchProd": {
+    "title": {
+      "ASSIGNED": "Prod d'un match",
+      "RELEASED": "Prod retirée",
+      "INELIGIBLE": "Prod retirée",
+      "UNAVAILABLE": "Prod retirée",
+      "JOINED_TEAM": "Prod retirée"
+    },
+    "body": {
+      "ASSIGNED": "Le staff te place comme prod de ce match. {pairing} · {tournament}, {round}.",
+      "RELEASED": "Le staff te retire la prod de ce match. {pairing} · {tournament}, {round}.",
+      "INELIGIBLE": "Tu n'as plus le rôle prod : tu ne fais plus la prod de ce match. {pairing} · {tournament}, {round}.",
+      "UNAVAILABLE": "Ton compte ne peut plus faire la prod pour le moment : tu ne fais plus la prod de ce match. {pairing} · {tournament}, {round}.",
+      "JOINED_TEAM": "Tu joues désormais ce match : tu n'en fais plus la prod. {pairing} · {tournament}, {round}."
+    }
+  },
   "refereeReleased": {
     "title": "Arbitrage retiré",
     "body": "Tu n'arbitres plus ce match : {reason}. {pairing} · {tournament}, {round}.",

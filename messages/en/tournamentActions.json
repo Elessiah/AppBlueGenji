@@ -220,6 +220,9 @@
     "castConfig": "Configure my broadcast",
     "stopCasting": "Stop casting",
     "removeCaster": "Remove the caster",
+    "claimProd": "Do the prod",
+    "releaseProd": "Stop doing the prod",
+    "assignProd": "Match prod",
     "stopLive": "End the live",
     "startLive": "Go live",
     "configureStream": "Official broadcast",
@@ -373,6 +376,40 @@
           "bodyIdle": "They referee no unfinished match: nothing is taken from them. They can no longer referee until the objection is lifted.",
           "confirm": "Uphold the objection"
         }
+      }
+    },
+    "prodClaimed": "You're doing this match's prod.",
+    "prodReleased": "You're no longer doing this match's prod.",
+    "prodReleaseConfirm": {
+      "title": "Stop doing the prod of {match}?",
+      "confirm": "Stop doing the prod",
+      "pending": "Leaving…",
+      "body": "The slot becomes free again: another prod can take it right away."
+    },
+    "prodDialog": {
+      "title": "Prod: {match}",
+      "hintSubject": "match prod",
+      "hint": "The prod runs the production of this match's broadcast; they don't play the match and don't cast it. The account placed or removed is notified.",
+      "loading": "Loading…",
+      "loadFailed": "Could not read this match's prod. Try again in a moment.",
+      "current": "Match prod: {pseudo}.",
+      "none": "No prod on this match.",
+      "remove": "Remove the prod",
+      "assignLabel": "Assign a prod",
+      "replaceLabel": "Replace the prod with",
+      "assignPlaceholder": "Choose an account…",
+      "assign": "Assign",
+      "assigned": "{pseudo} is doing this match's prod.",
+      "removed": "This match's prod has been removed.",
+      "blockedPlayer": "{pseudo} (plays this match)",
+      "blockedCaster": "{pseudo} (casts this match)",
+      "noCandidate": "No other prod account can be placed on this match.",
+      "close": "Close",
+      "pending": "Saving…",
+      "removeConfirm": {
+        "title": "Remove {pseudo} from the prod?",
+        "confirm": "Remove",
+        "body": "The account is notified; the spot becomes free again."
       }
     },
     "castSettings": {

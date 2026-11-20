@@ -763,6 +763,12 @@ export type BracketMatch = {
    * un caster devenu inéligible avant le lancement en est tu.
    */
   casters: MatchCaster[];
+  /**
+   * Prod du match (`docs/features/MATCH_PROD.md`) : une au plus, distincte des
+   * casters et jamais comptée parmi eux. Pseudo public comme celui d'un caster.
+   * Absente ou `null` : aucune.
+   */
+  prod?: { userId: number; pseudo: string } | null;
   /** Ouverture du lancement (ISO), posée à la première observation. */
   lobbyOpenedAt: string | null;
   /** Lancement du match (ISO) ; `null` = pas encore lancé. */
@@ -917,6 +923,17 @@ export type TournamentViewerContext = {
    * les contrôles de diffusion des matchs, distincts des droits d'arbitrage.
    */
   canManageLive: boolean;
+  /**
+   * Le lecteur porte-t-il la permission `prod` (ADMIN, PROD) ? Ouvre « Faire la
+   * prod » sur les matchs (`docs/features/MATCH_PROD.md`), rien d'autre.
+   */
+  canProd: boolean;
+  /**
+   * Le lecteur peut-il quitter sa propre place de prod ? Vrai hors incarnation
+   * sans `prod`, même rôle prod perdu : la place qu'un match lancé a gardée se
+   * rend encore (« Ne plus faire la prod »).
+   */
+  canLeaveProd: boolean;
   /** Identifiant du lecteur : reconnaître « c'est moi qui caste ce match ». */
   viewerUserId: number;
   /**
@@ -1321,6 +1338,8 @@ export type PersonalDataExport = {
   refereeAssignments: { matchId: number; tournamentId: number; readyAt: string | null }[];
   /** Matchs dont il a posé le mode d'antenne (`bg_matches.live_trigger_user_id`, T16). */
   liveTriggers: { matchId: number; tournamentId: number; liveTrigger: string | null }[];
+  /** Matchs dont il est la prod (`bg_matches.prod_user_id`, `MATCH_PROD.md`). */
+  prodAssignments: { matchId: number; tournamentId: number }[];
   /**
    * Planning des casts et arbitres (`docs/features/CAST_PLANNING.md`) : ses
    * disponibilités et préférences, les attributions qui le nomment, ses gestes

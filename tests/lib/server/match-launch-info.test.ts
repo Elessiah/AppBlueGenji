@@ -115,7 +115,7 @@ let state: World;
  * statut fantôme) : le tournoi est passé deux fois.
  */
 function candidateContextRows(world: World, params: unknown[]) {
-  const [tournamentId, , , , team1Id] = params.map(Number);
+  const [team1Id, , tournamentId] = params.map(Number);
   const c = world.candidates.find((x) => x.tournament_id === tournamentId && x.team1_id === team1Id);
   if (!c) return [];
   return [

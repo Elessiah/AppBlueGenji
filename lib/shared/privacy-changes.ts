@@ -2335,6 +2335,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Journaux : ces deux gestes sont notés sur Discord sans nommer leur auteur ni le caster — une rediffusion (le match, ses noms d'équipe et le lien de la vidéo, publique, qui montre la chaîne qui l'a diffusée, sans ses autres paramètres) et le statut de caster autonome, tous deux au journal du staff ; les journaux du serveur gardent leur auteur et, pour le statut, le compte visé, selon leur rotation. Base : intérêt légitime (organisation et contrôle des tournois).",
     ],
   },
+  {
+    // MATCH-CAST-PROD — la prod d'un match (`docs/features/MATCH_PROD.md`) :
+    // registre T16 (et T03, T04, T05), /rgpd (FR et EN). Datée comme `REGISTER_UPDATED_AT` — tout
+    // avancer ensemble si la mise en ligne glisse.
+    id: "2026-11-prod-match",
+    publishedAt: "2026-11-23",
+    title: "Matchs : la prod du direct",
+    links: [
+      { href: "/rgpd/registre#t16", label: "Lire la fiche T16 du registre" },
+      { href: "/rgpd/registre#t04", label: "Lire la fiche T04 du registre" },
+      { href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" },
+      { href: "/rgpd/registre#t03", label: "Lire la fiche T03 du registre" },
+    ],
+    summary: "Un match peut avoir une prod, qui assure la production de son direct : elle s'y place elle-même ou y est placée par le staff, et son pseudo est montré avec le match, comme celui des casters.",
+    details: [
+      "Ce qui est gardé : le compte de la prod avec le match, tant que le match existe ; il est retiré des matchs pas encore lancés si le compte perd ce rôle, est suspendu ou joue désormais le match, et des matchs pas encore joués s'il est supprimé (avant le lancement, une prod qui ne remplit plus ces conditions n'est plus montrée), et figure dans l'export de ses données. Base : intérêt légitime (organiser les bénévoles qui diffusent les tournois), comme le planning ; la prod peut quitter un match pas encore joué et s'y opposer par le formulaire de signalement (catégorie RGPD).",
+      "Qui le voit : comme pour les casters, les lecteurs du tournoi et du match, y compris sans compte. La prod est prévenue (message privé Discord, qui se coupe avec ses autres messages privés de match, et notification push, qui se coupe par son sujet, depuis « Mon profil ») quand un autre qu'elle la place ou l'en retire, par le staff ou d'office ; sa place prise ou quittée et ces gestes sont notés au journal du staff sur Discord sans nommer personne, et les journaux du serveur gardent l'auteur d'un geste du staff et le compte visé, selon leur rotation.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

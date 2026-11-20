@@ -32,6 +32,7 @@ import {
 } from "@/lib/shared/planning-durations";
 import type { PlanningEntrant } from "@/lib/shared/planning-view";
 import { visibleText } from "@/lib/shared/visible-text";
+import { heldPlanningRowSql } from "@/lib/server/tournaments/prod-sql";
 
 export type Executor = Pick<PoolConnection, "execute">;
 
@@ -77,6 +78,8 @@ export type LoadedEntry = {
   selfManaged: boolean;
   /** Arbitre désigné du match (`bg_matches.referee_user_id`). */
   matchRefereeId: number | null;
+  /** Prod placée sur le match (`bg_matches.prod_user_id`, `MATCH_PROD.md`) ; absente : aucune. */
+  matchProdId?: number | null;
   /**
    * Date butoir de planification du match (`bg_matches.schedule_deadline_at`,
    * `docs/features/SCHEDULE_DEADLINE.md`) : l'entrée se confirme d'office au
@@ -177,6 +180,7 @@ type MatchRow = RowDataPacket & {
   team1_solo: number | null;
   team2_solo: number | null;
   referee_user_id: number | null;
+  prod_user_id?: number | null;
   self_managed: number;
   stream_url: string | null;
   schedule_deadline_at?: Date | string | null;
@@ -281,6 +285,7 @@ function matchEntry(match: MatchRow, tournament: TournamentRow, durations: Plann
     channelUrl: match.stream_url ?? tournament.live_url,
     selfManaged: Number(match.self_managed) === 1,
     matchRefereeId: nullableNumber(match.referee_user_id),
+    matchProdId: nullableNumber(match.prod_user_id ?? null),
     deadlineAt: match.schedule_deadline_at ? time(match.schedule_deadline_at) : null,
   };
 }
@@ -342,7 +347,7 @@ export async function loadPlanningEntries(executor: Executor, options: EntriesOp
     const [matches] = await executor.execute<MatchRow[]>(
       `SELECT m.id, m.tournament_id, m.start_at, m.status, m.round_number, m.team1_id, m.team2_id,
               t1.name AS team1_name, t2.name AS team2_name, t1.solo_user_id AS team1_solo, t2.solo_user_id AS team2_solo,
-              m.referee_user_id, m.self_managed, m.schedule_deadline_at, ${firstStreamUrlSql("m")} AS stream_url
+              m.referee_user_id, m.prod_user_id, m.self_managed, m.schedule_deadline_at, ${firstStreamUrlSql("m")} AS stream_url
          FROM bg_matches m
          LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
          LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
@@ -644,7 +649,7 @@ type HistoryRow = RowDataPacket & { user_id: number; jobs: number };
 /**
  * Charge des semaines qui précèdent celle du lot (équité) : attributions du
  * planning, arbitres désignés et casters inscrits sur les entrées commencées
- * entre {@link planningHistoryStart} et le début de la semaine de `weekOf`
+ * (et prods placées sur les matchs) entre {@link planningHistoryStart} et le début de la semaine de `weekOf`
  * (un instant de la semaine du lot). Un lot calculé à l'avance compte donc
  * aussi le travail déjà tenu des semaines qui le séparent d'aujourd'hui. Seul
  * le travail tenu pèse (une attribution retirée, ou restée provisoire, n'y
@@ -659,7 +664,7 @@ export async function loadPlanningHistory(executor: Executor, weekOf: number): P
          JOIN bg_tournaments t ON t.id = a.tournament_id
          LEFT JOIN bg_matches m ON m.id = a.match_id
         WHERE NOT (a.role = 'REFEREE' AND a.match_id IS NOT NULL)
-          AND (a.source = 'MANUAL' OR a.confirmed = 1)
+          AND ${heldPlanningRowSql("a")}
           AND COALESCE(m.start_at, t.start_at) >= ? AND COALESCE(m.start_at, t.start_at) < ?
        UNION ALL
        SELECT m.referee_user_id AS user_id FROM bg_matches m
@@ -669,9 +674,15 @@ export async function loadPlanningHistory(executor: Executor, weekOf: number): P
         WHERE m.start_at >= ? AND m.start_at < ?
           AND NOT EXISTS (SELECT 1 FROM bg_planning_assignments pa
                            WHERE pa.match_id = c.match_id AND pa.user_id = c.user_id AND pa.role = 'CASTER'
-                             AND (pa.source = 'MANUAL' OR pa.confirmed = 1))
+                             AND ${heldPlanningRowSql("pa")})
+       UNION ALL
+       SELECT m.prod_user_id AS user_id FROM bg_matches m
+        WHERE m.prod_user_id IS NOT NULL AND m.start_at >= ? AND m.start_at < ?
+          AND NOT EXISTS (SELECT 1 FROM bg_planning_assignments pa
+                           WHERE pa.match_id = m.id AND pa.user_id = m.prod_user_id AND pa.role = 'PROD'
+                             AND ${heldPlanningRowSql("pa")})
      ) jobs GROUP BY user_id`,
-    [from, to, from, to, from, to],
+    [from, to, from, to, from, to, from, to],
   );
   return new Map(rows.map((row) => [Number(row.user_id), Number(row.jobs)]));
 }

@@ -111,7 +111,7 @@ function fakeDb(
         if (q.startsWith("SELECT 'C' AS kind, match_id FROM bg_match_casters")) {
           return [refereed.map((match) => ({ kind: "R", match_id: match.matchId }))];
         }
-        if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
+        if (q.startsWith("SELECT id, tournament_id, status, team1_id, team2_id FROM bg_matches WHERE id IN")) {
           return [
             refereed.map((match) => ({
               id: match.matchId,

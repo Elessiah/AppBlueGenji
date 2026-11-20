@@ -72,8 +72,8 @@ describe("permissions", () => {
       // Le caster prépare (aperçu) et diffuse (antenne) — mais ne touche ni aux
       // scores ni aux tournois.
       expect([...permissionsForRoles(["CASTER"])]).toEqual(["casting", "live", "planning"]);
-      // Le prod ne voit que le planning des casts et arbitres.
-      expect([...permissionsForRoles(["PROD"])]).toEqual(["planning"]);
+      // Le prod voit le planning des casts et arbitres, et prend la prod d'un match.
+      expect([...permissionsForRoles(["PROD"])]).toEqual(["planning", "prod"]);
       expect([...permissionsForRoles(["COMMUNITY_MANAGER"])]).toEqual(["showcase"]);
       expect([...permissionsForRoles(["RECRUTEUR"])]).toEqual(["recruitment"]);
       // Le développeur lit la documentation technique, rien d'autre.
@@ -83,7 +83,7 @@ describe("permissions", () => {
     it("grants every scope to ADMIN", () => {
       const perms = permissionsForRoles(["ADMIN"]);
       expect(perms).toEqual(
-        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev", "planning"]),
+        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation", "dev", "planning", "prod"]),
       );
     });
 

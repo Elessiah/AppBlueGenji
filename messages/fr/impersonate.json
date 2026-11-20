@@ -21,8 +21,8 @@
       "hint": "S'inscrit pour caster un match, règle son cast, ouvre l'antenne et lit l'aperçu du plateau avant le lancement ; donne ses disponibilités au planning. Aucune gestion de tournoi."
     },
     "PROD": {
-      "opens": "Planning",
-      "hint": "Lit la page « Planning » et y donne ses disponibilités et préférences. Ni antenne, ni aperçu du plateau."
+      "opens": "Planning, prod d'un match",
+      "hint": "Lit la page « Planning » et y donne ses disponibilités et préférences ; se place comme prod d'un match ou s'en retire. Ni antenne, ni aperçu du plateau."
     },
     "COMMUNITY_MANAGER": {
       "opens": "Site vitrine et association",

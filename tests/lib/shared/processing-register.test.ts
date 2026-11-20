@@ -36,6 +36,7 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-rep
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { DATA_CONTACT_NAME, LEGAL_CONTACT_DISCORD, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
+import { enT16WithoutProdBasis, frT16WithoutProdBasis } from "../../helpers/match-prod-basis";
 import { readSource } from "../../helpers/read-source";
 
 const controller = registerController();
@@ -137,7 +138,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04En.recipients.join(" ")).toContain("caster: start of the match they cast, removal of their registration for a match");
     expect(byRef("T05").subPurposes.join(" ")).toContain("sans nommer le caster ni le staff — et sans trace dans les journaux du serveur");
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.subPurposes.join(" ")).toContain("without naming the caster or the staff — and without any trace in the server logs");
-    expect(byRef("T05").dataCategories.join(" ")).toContain("aucun membre du staff ni caster nommé (« le staff », « un caster »");
+    expect(byRef("T05").dataCategories.join(" ")).toContain("aucun membre du staff, caster ni prod nommé (« le staff », « un caster »");
     expect(byRef("T12").subPurposes.join(" ")).toContain("Retrait de son inscription de caster sur un match");
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T12")!.subPurposes.join(" ")).toContain("Removal of their caster registration for a match");
   });
@@ -177,7 +178,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs et de ses équipes/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match et d'équipe : jusqu'à sa modification/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
-    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; membre d.une équipe engagée, joueur d.un tournoi individuel : nouveau match ; propriétaire ou manager d'une engagée, joueur d'un tournoi individuel : check-in d'un match en autogestion ; caster : [^;]*; arbitre désigné : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
+    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; membre d.une équipe engagée, joueur d.un tournoi individuel : nouveau match ; propriétaire ou manager d'une engagée, joueur d'un tournoi individuel : check-in d'un match en autogestion ; caster : [^;]*; prod : sa place de prod d'un match ; arbitre désigné : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
     expect(t04.subPurposes.join(" ")).toMatch(/en message privé Discord et en push l'annonce/);
     expect(t04.recipients.join(" ")).toMatch(/Staff de l'association ayant accès au canal de logs Discord/);
     expect(byRef("T05").dataCategories.join(" ")).toMatch(/Sur Discord : [^—]*horaires et manches des matchs/);
@@ -221,8 +222,8 @@ describe("PROCESSING_ACTIVITIES", () => {
     const t05 = byRef("T05").dataCategories.join(" ");
     expect(t05).toMatch(/« un membre du staff qui joue ce match », avec le seul nom du tournoi/);
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ")).toMatch(/“a staff member who plays in this match”, with the tournament name only/);
-    expect(t04.recipients.join(" ")).toMatch(/canal de logs Discord \(programme d'arbitrage, gestes d'un membre du staff qui joue le match, inscriptions et retraits des casters, arbitrage des matchs, issue des messages de test « Tester mes MP » non remis ou erreur de leur envoi, sans nommer ni casters ni arbitres ni le joueur qui teste, traitement T05\)/);
-    expect(t04En.recipients.join(" ")).toMatch(/Discord log channel \(refereeing schedule, actions of a staff member who plays in the match, casters' registrations and removals, match refereeing, outcome of undelivered “Test my DMs” test messages or error in sending them, without naming casters, referees or the player testing, processing activity T05\)/);
+    expect(t04.recipients.join(" ")).toMatch(/canal de logs Discord \(programme d'arbitrage, gestes d'un membre du staff qui joue le match, inscriptions et retraits des casters et de la prod, arbitrage des matchs, issue des messages de test « Tester mes MP » non remis ou erreur de leur envoi, sans nommer ni casters ni prods ni arbitres ni le joueur qui teste, traitement T05\)/);
+    expect(t04En.recipients.join(" ")).toMatch(/Discord log channel \(refereeing schedule, actions of a staff member who plays in the match, casters' and prod's registrations and removals, match refereeing, outcome of undelivered “Test my DMs” test messages or error in sending them, without naming casters, prods, referees or the player testing, processing activity T05\)/);
     const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ");
     expect(t05).toMatch(/pour un arbitre qui joue le match, en plus : tournoi, manche et, sauf pour une suspension, issue et noms d'équipe/);
     expect(byRef("T05").legalBasis).toMatch(/et du membre du staff auteur d'un geste, nommé dans les journaux du serveur/);
@@ -292,10 +293,13 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
 
   // Conditions v11 (D53) : l'alerte passe de l'intérêt légitime à l'exécution du service.
   it("T16 donne une base à l'alerte AutoMod : exécution du service, supprimée à la main à la suppression du compte (FR et EN)", () => {
-    expect(fr("T16").legalBasis).toMatch(/même base, prévue par la même section des conditions, pour .* et pour l'alerte AutoMod d'une annonce #live bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, où ceux-ci suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver$/);
-    expect(en("T16").legalBasis).toMatch(/same basis, provided for by the same section of the terms, for .* and for the AutoMod alert of a blocked or flagged #live announcement, kept in the moderators' alert channel, where they delete by hand, when the player's account is deleted, those they can identify, with no guarantee that all are found$/);
+    // La base de la prod (intérêt légitime, MATCH_PROD) clôt la fiche : la part contractuelle la précède.
+    const frContract = frT16WithoutProdBasis(fr("T16").legalBasis);
+    const enContract = enT16WithoutProdBasis(en("T16").legalBasis);
+    expect(frContract).toMatch(/même base, prévue par la même section des conditions, pour .* et pour l'alerte AutoMod d'une annonce #live bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, où ceux-ci suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver$/);
+    expect(enContract).toMatch(/same basis, provided for by the same section of the terms, for .* and for the AutoMod alert of a blocked or flagged #live announcement, kept in the moderators' alert channel, where they delete by hand, when the player's account is deleted, those they can identify, with no guarantee that all are found$/);
     // D57b : aucun régime à part pour un joueur sans compte.
-    expect(en("T16").legalBasis).not.toMatch(/legitimate interest|right to object|no account/i);
+    expect(enContract).not.toMatch(/legitimate interest|right to object|no account/i);
   });
 
   it("T16 dit la finalité de modération de l'alerte AutoMod (FR et EN)", () => {
@@ -603,8 +607,9 @@ describe("décisions de l'association du 2026-09-30", () => {
     // Conditions v11 (D50) : la diffusion sous le pseudo fait partie du tournoi.
     expect(sheet.legalBasis).toMatch(/pour la diffusion en direct et l'enregistrement de ses matchs sous son pseudo, avec le nom de son équipe et ses résultats et performances en jeu, qui font partie du tournoi auquel il participe — ne pas y paraître revient à ne pas y participer/);
     // D53 : casters, liens publiés et alerte AutoMod sur la même base, sans opposition.
-    expect(sheet.legalBasis).toMatch(/même base, prévue par la même section des conditions, pour ce qui touche les casters \(voix, pseudo, lien de leur chaîne, mode d'antenne\), au titre du service auquel le caster s'inscrit sur un match, pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod d'une annonce #live bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, où ceux-ci suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver$/);
-    expect(sheet.legalBasis).not.toMatch(/intérêt légitime|droit d'opposition|sans compte/i);
+    expect(sheet.legalBasis).toMatch(/même base, prévue par la même section des conditions, pour ce qui touche les casters \(voix, pseudo, lien de leur chaîne, mode d'antenne\), au titre du service auquel le caster s'inscrit sur un match, pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod d'une annonce #live bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, où ceux-ci suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver( ; intérêt légitime de l'association .*)?$/);
+    // Seule la prod d'un match (MATCH_PROD) relève de l'intérêt légitime, en fin de fiche.
+    expect(frT16WithoutProdBasis(sheet.legalBasis)).not.toMatch(/intérêt légitime|droit d'opposition|sans compte/i);
     expect(sheet.dataCategories.join(" ")).toMatch(/Pseudos .* noms d'équipe/);
     expect(sheet.retention.join(" ")).toMatch(/Lien de rediffusion : conservé avec le match/);
     // Le site ne fait que lier les chaînes : seule l'annonce #live passe par Discord.

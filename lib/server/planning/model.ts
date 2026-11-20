@@ -15,6 +15,11 @@ import type { LoadedEntry, PlanningData } from "./load";
  * match ne compte que tant que le match n'a pas d'arbitre. Un caster inscrit
  * sur le match sans ligne du planning tenue (confirmée ou choix du staff) vaut
  * `CAST` : son inscription l'emporte sur une simple proposition provisoire.
+ * La prod placée sur le match (`bg_matches.prod_user_id`, `MATCH_PROD.md`)
+ * vaut aussi `CAST` et fait foi : une seule par match, elle remplace toute
+ * autre ligne PROD (proposition provisoire ou ligne tenue d'un autre compte)
+ * et la proposition provisoire qui la ferait caster ; une ligne PROD tenue qui
+ * la nomme en reste la provenance.
  */
 function matchRefereeRows(entry: LoadedEntry, rows: PlanningData["assignments"]): PlanningAssignmentView[] {
   if (entry.matchRefereeId === null) {
@@ -64,8 +69,29 @@ export function entryAssignments(
     if (index === -1) out.push(signup);
     else if (out[index].provisional) out[index] = signup;
   }
-  const order = { REFEREE: 0, CASTER: 1, PROD: 2 } as const;
-  return out.sort((a, b) => order[a.role] - order[b.role] || a.userId - b.userId);
+  const prodId = entry.kind === "MATCH" ? (entry.matchProdId ?? null) : null;
+  return sortedRows(prodId === null ? out : withMatchProd(out, prodId));
+}
+
+const ROLE_ORDER = { REFEREE: 0, CASTER: 1, PROD: 2 } as const;
+
+function sortedRows(rows: PlanningAssignmentView[]): PlanningAssignmentView[] {
+  return rows.sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.userId - b.userId);
+}
+
+/**
+ * La prod du match fait foi : une seule passe écarte les lignes PROD (la
+ * sienne, tenue, est gardée) et la proposition de caster de la prod, puis la pose.
+ */
+function withMatchProd(rows: readonly PlanningAssignmentView[], prodId: number): PlanningAssignmentView[] {
+  let held: PlanningAssignmentView | undefined;
+  const kept: PlanningAssignmentView[] = [];
+  for (const row of rows) {
+    if (row.role === "PROD") held ??= row.userId === prodId && !row.provisional ? row : undefined;
+    else if (!(row.role === "CASTER" && row.userId === prodId && row.provisional)) kept.push(row);
+  }
+  kept.push(held ?? { userId: prodId, role: "PROD", source: "CAST", reason: "MATCH", provisional: false });
+  return kept;
 }
 
 /** Couverture d'une entrée : les rôles tenus comptent (propositions provisoires comprises), pas les personnes. */

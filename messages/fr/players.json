@@ -160,7 +160,7 @@
     },
     "PROD": {
       "label": "Prod",
-      "description": "Assurer la production des diffusions (planning des casts)."
+      "description": "Assurer la production des diffusions (planning des casts, prod d'un match)."
     },
     "COMMUNITY_MANAGER": {
       "label": "Community Manager",

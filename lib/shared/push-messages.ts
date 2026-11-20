@@ -46,6 +46,7 @@ import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales"
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
 import { castReleasedHref, castReleaseReasonKey, type CastReleasedMatch } from "./cast-notices";
+import { prodNoticeHref, type ProdNoticeMatch } from "./match-prod";
 import { lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "./lobby-brief";
 import { visibleText, withoutInvisibles } from "./visible-text";
 import { teamInviteNoticePath, type TeamInviteNoticeKind } from "./team-invite-notice";
@@ -1073,6 +1074,29 @@ export function castReleasedPush(input: CastReleasedMatch, locale: Locale = DEFA
     }),
     url: localeHref(castReleasedHref(input), locale),
     tag: `${matchTag(input.matchId)}-cast`,
+  };
+}
+
+/**
+ * À la prod d'un match que le staff place ou retire (`MATCH_PROD`,
+ * `docs/features/MATCH_PROD.md`). Mêmes noms que l'avis de cast : les équipes
+ * nommées, « Un match » en tournoi individuel.
+ */
+export function matchProdPush(input: ProdNoticeMatch, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const tbd = text.t("matchScheduled.tbd");
+  const pairingText = input.solo
+    ? text.t("castReleased.pairingSolo")
+    : text.t("pairing", { team: shownOr(input.team1Name, tbd), opponent: shownOr(input.team2Name, tbd) });
+  return {
+    title: text.t(`matchProd.title.${input.kind}`),
+    body: text.t(`matchProd.body.${input.kind}`, {
+      pairing: pairingText,
+      tournament: shown(input.tournamentName),
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
+    }),
+    url: localeHref(prodNoticeHref(input), locale),
+    tag: `${matchTag(input.matchId)}-prod`,
   };
 }
 

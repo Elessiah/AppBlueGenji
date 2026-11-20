@@ -183,6 +183,22 @@
       "MATCH_DELETED": "the match was deleted (rolled back or round redone)"
     }
   },
+  "matchProd": {
+    "title": {
+      "ASSIGNED": "A match's prod",
+      "RELEASED": "Prod removed",
+      "INELIGIBLE": "Prod removed",
+      "UNAVAILABLE": "Prod removed",
+      "JOINED_TEAM": "Prod removed"
+    },
+    "body": {
+      "ASSIGNED": "The staff made you this match's prod. {pairing} · {tournament}, {round}.",
+      "RELEASED": "The staff removed you as this match's prod. {pairing} · {tournament}, {round}.",
+      "INELIGIBLE": "You no longer hold the prod role: you are no longer this match's prod. {pairing} · {tournament}, {round}.",
+      "UNAVAILABLE": "Your account cannot be a prod for now: you are no longer this match's prod. {pairing} · {tournament}, {round}.",
+      "JOINED_TEAM": "You now play in this match: you are no longer its prod. {pairing} · {tournament}, {round}."
+    }
+  },
   "refereeReleased": {
     "title": "Refereeing removed",
     "body": "You no longer referee this match: {reason}. {pairing} · {tournament}, {round}.",

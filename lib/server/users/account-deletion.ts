@@ -237,7 +237,7 @@ export async function retryOnStaleLockSet<T>(write: (lastAttempt: boolean) => Pr
 
 /**
  * Les tournois dont un match nomme le compte (caster, lien de chaîne, arbitre,
- * lancement du direct — `live_trigger_user_id`, que `withdrawUserCasts`
+ * prod, lancement du direct — `live_trigger_user_id`, que `withdrawUserCasts`
  * verrouille aussi), par id croissant : `withdrawUserCasts` y verrouille des matchs, donc la ligne
  * du tournoi se prend **avant**, comme partout (tournoi, puis match).
  */
@@ -250,8 +250,10 @@ export async function listCastTournamentIds(runner: SqlRunner, userId: number): 
      SELECT tournament_id FROM bg_matches WHERE referee_user_id = ?
      UNION
      SELECT tournament_id FROM bg_matches WHERE live_trigger_user_id = ?
+     UNION
+     SELECT tournament_id FROM bg_matches WHERE prod_user_id = ?
      ORDER BY tournament_id`,
-    [userId, userId, userId, userId],
+    [userId, userId, userId, userId, userId],
   );
   return rows.map((row) => Number(row.tournament_id));
 }
@@ -261,7 +263,7 @@ export async function listCastTournamentIds(runner: SqlRunner, userId: number): 
  * croissant : son entrée solo inscrite, l'effectif d'une équipe engagée dont il
  * est membre ou l'était au coup d'envoi (une équipe quittée avant ne le nomme
  * plus), un match qu'il caste, dont il a fourni le lien, qu'il
- * arbitre ou dont il a lancé le direct. La demande et la réactivation changent
+ * arbitre, dont il est la prod ou dont il a lancé le direct. La demande et la réactivation changent
  * le nom sous lequel il paraît : leurs lecteurs ouverts sont rediffusés
  * (`publishUpdatedEvent`). Un tournoi terminé n'a plus de flux qui vive des
  * jours : sa page se relit au chargement.
@@ -294,10 +296,12 @@ export async function listNamingTournamentIds(
          SELECT tournament_id FROM bg_matches WHERE referee_user_id = ?
          UNION
          SELECT tournament_id FROM bg_matches WHERE live_trigger_user_id = ?
+         UNION
+         SELECT tournament_id FROM bg_matches WHERE prod_user_id = ?
        ) n
        JOIN bg_tournaments t ON t.id = n.tournament_id AND t.state <> 'FINISHED' AND t.finished_at IS NULL
       ORDER BY n.tournament_id`,
-    [userId, userId, userId, userId, userId, userId],
+    [userId, userId, userId, userId, userId, userId, userId],
   );
   const ids = rows.map((row) => Number(row.tournament_id));
   // Les équipes que la demande vient de quitter : une requête de forme fixe par

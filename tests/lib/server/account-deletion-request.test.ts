@@ -14,6 +14,7 @@ jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/match-casters");
 jest.mock("@/lib/server/tournaments/match-launch", () => ({ relaunchAfterRefereeWithdrawal: jest.fn() }));
 jest.mock("@/lib/server/tournaments/bot-logs", () => ({ flushBotLogs: jest.fn(), discardBotLogs: jest.fn() }));
+jest.mock("@/lib/server/tournaments/prod-notices", () => ({ queueProdChange: jest.fn() }));
 jest.mock("@/lib/server/teams/access");
 jest.mock("@/lib/server/teams/dissolution");
 jest.mock("@/lib/server/teams/roster");
@@ -58,6 +59,7 @@ import { listLiveAnnouncementsForDeletionLog } from "@/lib/server/users/live-ann
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
+import { queueProdChange } from "@/lib/server/tournaments/prod-notices";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { rotateHeldAvatarFile } from "@/lib/server/avatar-rotation";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
@@ -188,6 +190,7 @@ function fakeDb(options: Options) {
     liveTournamentIds: [],
     releasedRefereeMatchIds: options.refereedMatches ?? [],
     releasedCastMatchIds: options.castMatches ?? [],
+    releasedProdPlaces: [],
   });
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
@@ -254,6 +257,7 @@ beforeEach(() => {
     liveTournamentIds: [],
     releasedRefereeMatchIds: [],
     releasedCastMatchIds: [],
+    releasedProdPlaces: [],
   });
   jest.mocked(assertSoloLockSetFresh).mockResolvedValue(undefined);
   jest.mocked(rotateHeldAvatarFile).mockResolvedValue(null);
@@ -485,6 +489,40 @@ describe("requestAccountDeletion — arbitrages retirés", () => {
     const relaunchOrder = jest.mocked(relaunchAfterRefereeWithdrawal).mock.invocationCallOrder[0];
     expect(jest.mocked(withdrawUserCasts).mock.invocationCallOrder[0]).toBeLessThan(relaunchOrder);
     expect(connection.commit.mock.invocationCallOrder[0]).toBeLessThan(jest.mocked(flushBotLogs).mock.invocationCallOrder[0]);
+  });
+
+  it("requestAccountDeletion_releasedProdPlace_queuesAccountDeletionLog", async () => {
+    const { connection } = fakeDb({});
+    const pairing = { team1Id: 10, team2Id: 11 };
+    jest.mocked(withdrawUserCasts).mockResolvedValue({
+      matchIds: [42],
+      tournamentIds: [5],
+      liveTournamentIds: [5],
+      releasedRefereeMatchIds: [],
+      releasedCastMatchIds: [],
+      releasedProdPlaces: [{ matchId: 42, pairing }],
+    });
+
+    await requestAccountDeletion(7);
+
+    expect(jest.mocked(queueProdChange).mock.calls[0]?.[0]).toBe(connection);
+    expect(jest.mocked(queueProdChange).mock.calls[0]?.[1]).toEqual({ matchId: 42, log: "ACCOUNT_DELETION", notices: [], pairing });
+  });
+
+  it("requestAccountDeletion_replayWithReleasedProdPlace_queuesNothing", async () => {
+    fakeDb({});
+    jest.mocked(withdrawUserCasts).mockResolvedValue({
+      matchIds: [42],
+      tournamentIds: [5],
+      liveTournamentIds: [5],
+      releasedRefereeMatchIds: [],
+      releasedCastMatchIds: [],
+      releasedProdPlaces: [{ matchId: 42, pairing: { team1Id: 10, team2Id: 11 } }],
+    });
+
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00", replay: true });
+
+    expect(queueProdChange).not.toHaveBeenCalled();
   });
 
   it("requestAccountDeletion_noRefereeing_relaunchesNothing", async () => {
@@ -949,6 +987,7 @@ describe("requestAccountDeletion — jeu de verrous, avatar mis de côté, rejeu
       liveTournamentIds: [6],
       releasedRefereeMatchIds: [],
       releasedCastMatchIds: [],
+      releasedProdPlaces: [],
     });
 
     await requestAccountDeletion(7);
