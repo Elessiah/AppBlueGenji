@@ -137,6 +137,7 @@ beforeEach(() => {
       return [casterIds.includes(Number(values[1])) ? [{ 1: 1 }] : [], []];
     }
     if (sql.startsWith("UPDATE bg_matches SET prod_user_id")) return [{ affectedRows: 1 }, []];
+    if (sql.startsWith("UPDATE bg_matches SET prod_planned = 0")) return [{ affectedRows: 1 }, []];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(inTransaction).mockImplementation((run) => run(fakeConnection({ execute })));
@@ -190,6 +191,26 @@ describe("claimMatchProd", () => {
     expect(updatesOfProd()).toHaveLength(0);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
     expect(trackAnnouncement).not.toHaveBeenCalled();
+  });
+
+  it("claimMatchProd_ownPlannedPlace_clearsPlannedMarkOnly", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
+
+    await claimMatchProd(42, prodActor);
+
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("UPDATE bg_matches SET prod_planned = 0"))).toEqual([
+      [expect.any(String), [42]],
+    ]);
+    expect(updatesOfProd()).toHaveLength(0);
+    expect(trackAnnouncement).not.toHaveBeenCalled();
+  });
+
+  it("claimMatchProd_ownPlaceNotPlanned_noMarkWrite", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 0 };
+
+    await claimMatchProd(42, prodActor);
+
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("UPDATE bg_matches SET prod_planned"))).toHaveLength(0);
   });
 
   it("claimMatchProd_takenByOther_throwsMatchProdTaken", async () => {
@@ -583,6 +604,18 @@ describe("assignMatchProd", () => {
 
     await assignMatchProd(42, STAFF, PROD_ID, null);
 
+    expect(updatesOfProd()).toHaveLength(0);
+    expect(trackAnnouncement).not.toHaveBeenCalled();
+  });
+
+  it("assignMatchProd_samePlannedProd_clearsPlannedMarkOnly", async () => {
+    match = { ...match, prod_user_id: PROD_ID, prod_planned: 1 };
+
+    await assignMatchProd(42, STAFF, PROD_ID, null);
+
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("UPDATE bg_matches SET prod_planned = 0"))).toEqual([
+      [expect.any(String), [42]],
+    ]);
     expect(updatesOfProd()).toHaveLength(0);
     expect(trackAnnouncement).not.toHaveBeenCalled();
   });

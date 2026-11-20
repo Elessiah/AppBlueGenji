@@ -97,6 +97,26 @@ describe("announceAssignments", () => {
   });
 });
 
+describe("announceAssignments — envois concurrents", () => {
+  it("announceAssignments_twoGestures_secondSentWhileFirstPending", async () => {
+    let releaseFirst: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    jest.mocked(notifyUsers).mockImplementationOnce(async () => {
+      await gate;
+      return { discord: null, discordUnreachedUserIds: [], pushed: 0 };
+    });
+
+    const first = announceAssignments([{ userId: 4, entry: loadedEntry(), role: "CASTER" }]);
+    await announceAssignments([{ userId: 5, entry: loadedEntry(), role: "CASTER" }]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+    releaseFirst();
+    await first;
+  });
+});
+
 describe("announceCastLinkNeeded", () => {
   it("announceCastLinkNeeded_placedCasters_notifiedOnAssignedTopicWithMatchLink", async () => {
     await announceCastLinkNeeded([4, 5].map((userId) => ({ userId, entry: loadedEntry() })));
@@ -130,6 +150,27 @@ describe("announceCastLinkNeeded", () => {
       "planning-assigned",
       "planning-cast-link",
     ]);
+  });
+
+  it("announceCastLinkNeeded_otherUsersAssignmentPending_sentWithoutWaiting", async () => {
+    let releaseFirst: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    jest.mocked(notifyUsers).mockImplementationOnce(async () => {
+      await gate;
+      return { discord: null, discordUnreachedUserIds: [], pushed: 0 };
+    });
+
+    const assigned = announceAssignments([{ userId: 5, entry: loadedEntry(), role: "CASTER" }]);
+    await announceCastLinkNeeded([{ userId: 4, entry: loadedEntry() }]);
+
+    expect(jest.mocked(notifyUsers).mock.calls.map(([, notification]) => notification.discord?.context)).toEqual([
+      "planning-assigned",
+      "planning-cast-link",
+    ]);
+    releaseFirst();
+    await assigned;
   });
 
   it("announceCastLinkNeeded_sameCasterOnTwoMatches_oneNoticeListingBoth", async () => {

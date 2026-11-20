@@ -613,7 +613,7 @@ async function withdrawMember(
     // Un remplaçant confirmé (caster ou prod) va sur le match si personne ne le caste encore (`cast-placement.ts`) :
     // le désisté encore inscrit le garde tenu, rien n'est alors posé. Automatique, sans auteur nommé ; ne lève jamais.
     if (outcome.replacementId !== null) {
-      await queuePlannedCasts([{ userId: outcome.replacementId, entry: outcome.entry, role: input.role }], null);
+      void queuePlannedCasts([{ userId: outcome.replacementId, entry: outcome.entry, role: input.role }], null);
     }
   }
   return {

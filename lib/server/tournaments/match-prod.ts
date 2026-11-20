@@ -162,6 +162,12 @@ async function writeProd(connection: PoolConnection, matchId: number, userId: nu
   await connection.execute(`UPDATE bg_matches SET prod_user_id = ?, prod_planned = 0 WHERE id = ?`, [userId, matchId]);
 }
 
+/** La place posée par le planning (`prod_planned`) devient une place prise ou posée depuis le match ; rien sinon. */
+async function adoptPlannedProd(connection: PoolConnection, row: ProdMatchRow): Promise<void> {
+  if (Number(row.prod_planned ?? 0) !== 1) return;
+  await connection.execute("UPDATE bg_matches SET prod_planned = 0 WHERE id = ? AND prod_planned = 1", [row.id]);
+}
+
 /** Après le commit : le plateau se rafraîchit, puis l'annonce part sans attendre. */
 function afterCommit(result: { tournamentId: number; change: ProdChange } | null): void {
   if (result === null) return;
@@ -199,7 +205,11 @@ export async function claimMatchProd(matchId: number, actor: SessionActor, manag
       // de la suspension, du changement de rôles et de l'effacement.
       if (nullableId(row.prod_user_id) !== userId) await releaseUnfitProd(connection, row, false);
       const current = nullableId(row.prod_user_id);
-      if (current === userId) return null;
+      if (current === userId) {
+        // Prendre soi-même la place que le planning a posée la fait sienne (`prod_planned` tombe) : quitter le planning ne l'en retire plus.
+        await adoptPlannedProd(connection, row);
+        return null;
+      }
       if (current !== null) throw new Error("MATCH_PROD_TAKEN");
       await assertNoOtherPlannedProd(connection, matchId, userId);
       await assertProdFree(connection, row, userId);
@@ -287,7 +297,11 @@ export async function assignMatchProd(
       const row = await lockProdMatch(connection, matchId);
       assertProdMatchOpen(row);
       const current = nullableId(row.prod_user_id);
-      if (current === prodId) return null;
+      if (current === prodId) {
+        // La même prod posée depuis le match par le staff : la place n'est plus celle du planning.
+        if (prodId !== null) await adoptPlannedProd(connection, row);
+        return null;
+      }
       if (expected !== undefined && expected !== current) throw new Error("PROD_CHANGED");
       if (prodId !== null) await assertProdFree(connection, row, prodId);
       await writeProd(connection, matchId, prodId);

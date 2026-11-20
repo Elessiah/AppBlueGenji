@@ -1339,6 +1339,11 @@ export async function claimMatchCast(
       if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
       if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
       if (row.casters.some((caster) => caster.userId === userId)) {
+        // S'inscrire soi-même sur la place que le planning a posée la fait sienne : quitter le planning ne l'en retire plus.
+        await connection.execute("UPDATE bg_match_casters SET planned = 0 WHERE match_id = ? AND user_id = ? AND planned = 1", [
+          matchId,
+          userId,
+        ]);
         return {
           tournamentId: Number(row.tournament_id),
           claimed: false,

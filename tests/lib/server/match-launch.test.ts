@@ -1275,7 +1275,8 @@ describe("claimMatchCast", () => {
     state.match = matchState({ caster_user_id: CASTER, caster_ready_at: STAMP });
     state.writes = [];
     await claimMatchCast(42, { id: CASTER, playerView: false }, true, { liveUrl: "https://twitch.tv/autre" });
-    expect(state.writes).toEqual([]);
+    // Seule la marque « posé par le planning » tombe (aucune ligne ici) : l'inscription, elle, ne change pas.
+    expect(state.writes).toEqual(["UPDATE bg_match_casters SET planned = 0 WHERE match_id = ? AND user_id = ? AND planned = 1"]);
     // Rejouée, l'inscription ne défait pas un « Prêt » déjà donné.
     expect(casterReadyOf(state)).toBe(STAMP);
     // Ni l'inscription refusée ni l'inscription rejouée ne s'annoncent.
@@ -3149,6 +3150,17 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
     // Un double clic : rien n'est écrit, rien n'est publié.
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
     expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("claimMatchCast_alreadyCaster_clearsPlannedMarker", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+    state.issued = [];
+
+    await claimMatchCast(42, { id: CASTER, playerView: false }, true, OWN_STREAM);
+
+    expect(state.issued.filter((sql) => sql.startsWith("UPDATE bg_match_casters SET planned = 0"))).toHaveLength(1);
+    expect(state.issued.filter((sql) => sql.startsWith("INSERT INTO bg_match_casters"))).toHaveLength(0);
   });
 
   it("claimMatchCast_coCast_rereadsHoldersEligibilityCurrentAndReadsCastersPlain", async () => {

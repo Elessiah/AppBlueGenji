@@ -60,6 +60,7 @@ type MatchRowState = {
   is_bye?: number;
   launched_at?: string | null;
   prod_user_id?: number | null;
+  prod_planned?: number;
   missing?: boolean;
 };
 
@@ -81,11 +82,14 @@ function matchRow(id: number, state: MatchRowState) {
     team2_id: 200,
     launched_at: state.launched_at ?? null,
     prod_user_id: state.prod_user_id ?? null,
+    prod_planned: state.prod_planned ?? 1,
   };
 }
 
 /** Base simulée : le match (`FOR UPDATE`), les lignes tenues, le jeu du tournoi, les écritures. */
-function route(options: { match?: MatchRowState; held?: HeldRow[]; failMatchIds?: number[]; tournamentState?: string } = {}) {
+function route(
+  options: { match?: MatchRowState; held?: HeldRow[]; planned?: number[]; failMatchIds?: number[]; tournamentState?: string } = {},
+) {
   execute.mockImplementation(async (sql: string, params?: unknown) => {
     if (sql.includes("FROM bg_matches WHERE id = ?")) {
       const id = Number((params as number[])[0]);
@@ -93,6 +97,9 @@ function route(options: { match?: MatchRowState; held?: HeldRow[]; failMatchIds?
       return [options.match?.missing ? [] : [matchRow(id, options.match ?? {})]];
     }
     if (sql.includes("FROM bg_planning_assignments")) return [options.held ?? DEFAULT_HELD];
+    if (sql.includes("FROM bg_match_casters WHERE match_id = ? AND planned = 1")) {
+      return [(options.planned ?? [CASTER_A, CASTER_B]).map((user_id) => ({ user_id }))];
+    }
     if (sql.includes("SELECT game, state FROM bg_tournaments")) return [[{ game: "OW", state: options.tournamentState ?? "RUNNING" }]];
     if (sql.startsWith("INSERT INTO bg_match_streams")) return [{ affectedRows: 1, insertId: 77 }];
     return [{ affectedRows: 1 }];
@@ -163,21 +170,34 @@ describe("placementTargets", () => {
 
 describe("castFreeForPlanning", () => {
   const held = { casterIds: new Set([CASTER_A]), prodIds: new Set([PROD]) };
+  const planned = { casterIds: new Set([CASTER_A, CASTER_B]), prod: true };
 
   it("castFreeForPlanning_emptyCast_true", () => {
-    expect(castFreeForPlanning([], null, held)).toBe(true);
+    expect(castFreeForPlanning([], null, held, { casterIds: new Set(), prod: false })).toBe(true);
   });
 
-  it("castFreeForPlanning_castersAndProdAllHeld_true", () => {
-    expect(castFreeForPlanning([CASTER_A], PROD, held)).toBe(true);
+  it("castFreeForPlanning_castersAndProdPlacedAndHeld_true", () => {
+    expect(castFreeForPlanning([CASTER_A], PROD, held, planned)).toBe(true);
   });
 
   it("castFreeForPlanning_selfSignedCaster_false", () => {
-    expect(castFreeForPlanning([CASTER_B], null, held)).toBe(false);
+    expect(castFreeForPlanning([CASTER_B], null, held, planned)).toBe(false);
   });
 
   it("castFreeForPlanning_prodPlacedOutsidePlanning_false", () => {
-    expect(castFreeForPlanning([], CASTER_B, held)).toBe(false);
+    expect(castFreeForPlanning([], CASTER_B, held, planned)).toBe(false);
+  });
+
+  it("castFreeForPlanning_heldButSelfSignedCaster_false", () => {
+    expect(castFreeForPlanning([CASTER_A], null, held, { casterIds: new Set(), prod: true })).toBe(false);
+  });
+
+  it("castFreeForPlanning_plannedCasterLineGone_false", () => {
+    expect(castFreeForPlanning([CASTER_B], null, held, planned)).toBe(false);
+  });
+
+  it("castFreeForPlanning_heldProdNotPlaced_false", () => {
+    expect(castFreeForPlanning([], PROD, held, { casterIds: new Set(), prod: false })).toBe(false);
   });
 });
 
@@ -386,6 +406,33 @@ describe("placePlannedCasts", () => {
 
     expect(placed).toEqual([]);
     expect(castWrites()).toEqual([]);
+  });
+
+  it("placePlannedCasts_selfSignedCasterHoldingLine_placesNothing", async () => {
+    route({ planned: [] });
+    jest.mocked(lockMatchCasters).mockResolvedValue([caster(CASTER_A, 40)]);
+    jest.mocked(lockMatchStreams).mockResolvedValue([stream(40, false, "https://www.twitch.tv/test_caster")]);
+
+    const placed = await placePlannedCasts([line(CASTER_A, "CASTER"), line(CASTER_B, "CASTER")], STAFF);
+
+    expect(placed).toEqual([]);
+    expect(castWrites()).toEqual([]);
+  });
+
+  it("placePlannedCasts_prodTakenFromMatchByHeldProd_placesNothing", async () => {
+    route({ match: { prod_user_id: PROD, prod_planned: 0 } });
+
+    const placed = await placePlannedCasts([line(CASTER_A, "CASTER")], STAFF);
+
+    expect(placed).toEqual([]);
+    expect(castWrites()).toEqual([]);
+  });
+
+  it("placePlannedCasts_castersAndStreamsReadWithoutGapLock", async () => {
+    await placePlannedCasts([line(CASTER_A, "CASTER")], STAFF);
+
+    expect(jest.mocked(lockMatchCasters).mock.calls[0]?.slice(1)).toEqual([1, true]);
+    expect(jest.mocked(lockMatchStreams).mock.calls[0]?.slice(1)).toEqual([1, true]);
   });
 
   it("placePlannedCasts_prodSetByStaff_placesNothing", async () => {

@@ -67,6 +67,7 @@ type PlacementMatchRow = RowDataPacket & {
   team2_id: number | null;
   launched_at: Date | string | null;
   prod_user_id: number | null;
+  prod_planned: number | null;
 };
 
 type HeldLineRow = RowDataPacket & { user_id: number; role: PlanningRole };
@@ -89,17 +90,21 @@ export function placementTargets(lines: readonly PlannedCastLine[]): Map<number,
 
 /**
  * Le cast du match est-il libre pour le planning ? Oui quand chaque caster
- * inscrit et la prod placée y sont tenus par une ligne du planning du même rôle
- * — ce que le planning y a lui-même posé ; un caster inscrit de lui-même, ou une
- * prod placée hors du planning, ferme le match au placement (rien n'est ni
- * remplacé ni ajouté).
+ * inscrit et la prod placée y ont été **posés par le planning** (marques
+ * `bg_match_casters.planned`, `bg_matches.prod_planned`) et y sont encore tenus
+ * par une ligne du planning du même rôle. Un caster inscrit de lui-même — même
+ * s'il tient aussi une ligne du planning —, ou une prod prise ou posée depuis le
+ * match, ferme le match au placement (rien n'est ni remplacé ni ajouté, et
+ * personne n'est posé sur la diffusion de sa chaîne sans l'avoir demandé).
  */
 export function castFreeForPlanning(
   casterIds: readonly number[],
   prodId: number | null,
   held: { casterIds: ReadonlySet<number>; prodIds: ReadonlySet<number> },
+  planned: { casterIds: ReadonlySet<number>; prod: boolean },
 ): boolean {
-  return casterIds.every((id) => held.casterIds.has(id)) && (prodId === null || held.prodIds.has(prodId));
+  const castersPlanned = casterIds.every((id) => planned.casterIds.has(id) && held.casterIds.has(id));
+  return castersPlanned && (prodId === null || (planned.prod && held.prodIds.has(prodId)));
 }
 
 /** Ligne pm2 du placement : le match et les comptes placés, par identifiant (jamais sur Discord). */
@@ -168,8 +173,10 @@ export function queuePlannedCasts(lines: readonly PlannedCastLine[], actor: Staf
 
 /**
  * Attend que les placements mis en file soient joués : le balayage d'office le
- * fait avant de rendre la main, l'arrêt du processus aussi — un redémarrage ne
- * perd pas les placements d'une semaine confirmée.
+ * fait avant de rendre la main (l'arrêt, qui attend le passage en cours, attend
+ * donc ses placements). Les placements d'un geste du staff ou d'un désistement
+ * ne sont pas attendus à l'arrêt : un redémarrage pendant leur file perd ceux
+ * qui restent (`CAST_PLANNING.md` § Placement sur le match, limite connue).
  */
 export async function drainPlannedCasts(): Promise<void> {
   let waited: Promise<unknown>;
@@ -230,11 +237,24 @@ export async function releasePlannedSeat(
 
 async function lockPlacementMatch(connection: PoolConnection, matchId: number): Promise<PlacementMatchRow | null> {
   const [rows] = await connection.execute<PlacementMatchRow[]>(
-    `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, launched_at, prod_user_id
+    `SELECT id, tournament_id, status, is_bye, team1_id, team2_id, launched_at, prod_user_id, prod_planned
        FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
     [matchId],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Les casters du match que le planning y a posés (`planned`). Lecture ordinaire :
+ * la ligne du match est déjà verrouillée et aucune lecture ordinaire n'a précédé
+ * (toute écriture d'un caster passe par ce verrou).
+ */
+async function plannedCasterIds(connection: PoolConnection, matchId: number): Promise<Set<number>> {
+  const [rows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
+    "SELECT user_id FROM bg_match_casters WHERE match_id = ? AND planned = 1",
+    [matchId],
+  );
+  return new Set(rows.map((row) => Number(row.user_id)));
 }
 
 /** Les lignes CASTER / PROD tenues du match, en lecture courante verrouillée (un retrait validé depuis le geste est vu). */
@@ -273,7 +293,8 @@ async function placementStream(
   matchId: number,
   casterStreams: readonly number[],
 ): Promise<{ id: number; linked: boolean }> {
-  const streams = await lockMatchStreams(connection, matchId);
+  // La ligne du match est verrouillée en tête (`placeOnMatch`) : lecture ordinaire, sans verrou d'intervalle.
+  const streams = await lockMatchStreams(connection, matchId, true);
   const shared = streams.find((stream) => casterStreams.includes(stream.id));
   if (shared) return { id: shared.id, linked: shared.liveUrl !== null };
   const staff = streams.find((stream) => stream.staff);
@@ -352,10 +373,13 @@ export async function placeOnMatch(
   const row = await lockPlacementMatch(connection, matchId);
   if (!row) return { skip: "MATCH_GONE" };
   if (row.status === "COMPLETED" || Number(row.is_bye) === 1 || row.launched_at !== null) return { skip: "MATCH_CLOSED" };
-  const casters = await lockMatchCasters(connection, matchId);
+  // Ligne du match verrouillée, aucune lecture ordinaire avant (comptes et tournoi lus en partage) :
+  // lecture ordinaire des casters (`held`), sans le verrou d'intervalle que `FOR UPDATE` poserait sur un match sans caster.
+  const casters = await lockMatchCasters(connection, matchId, true);
   const currentProd = nullableId(row.prod_user_id);
   const held = await lockedHeldLines(connection, matchId);
-  if (!castFreeForPlanning(casters.map((caster) => caster.userId), currentProd, held)) return { skip: "CAST_HELD" };
+  const planned = { casterIds: await plannedCasterIds(connection, matchId), prod: Number(row.prod_planned ?? 0) === 1 };
+  if (!castFreeForPlanning(casters.map((caster) => caster.userId), currentProd, held, planned)) return { skip: "CAST_HELD" };
   const tournament = await tournamentOf(connection, Number(row.tournament_id));
   if (tournament === null) return { skip: "MATCH_GONE" };
 

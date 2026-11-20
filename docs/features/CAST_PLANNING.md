@@ -455,9 +455,15 @@ remplaçant confirmé d'un désistement. Une ligne tenue avant n'est jamais
 rejouée : qui a quitté le match n'y revient pas au geste suivant.
 
 - **Cast libre** = aucun caster ni prod sur le match, ou seulement des comptes
-  qui y tiennent une ligne tenue du même rôle (placement relancé, renfort
-  confirmé ensuite). Un caster inscrit de lui-même ou une prod posée par le
-  staff sans ligne au planning ferme le match : rien n'y est ajouté ni remplacé.
+  que le planning y a posés (marques `bg_match_casters.planned`,
+  `bg_matches.prod_planned`) et qui y tiennent encore une ligne du même rôle
+  (placement relancé, renfort confirmé ensuite). Un caster inscrit de lui-même
+  ou une prod prise ou posée depuis le match — même par un compte qui tient
+  aussi une ligne au planning — ferme le match : rien n'y est ajouté ni
+  remplacé, personne n'est posé sur la diffusion de sa chaîne. S'inscrire
+  soi-même (« Caster ce match », « Faire la prod ») sur la place que le planning
+  vous a posée la fait sienne : la marque tombe, et quitter le planning ne l'en
+  retire plus (le staff qui pose la même prod depuis le match aussi).
 - **Qui** : ligne toujours tenue (relue `LOCK IN SHARE MODE`), compte apte
   (`lockedHolding` : ni effacé, ni suspendu, rôle tenu, invité selon ses
   règles), qui ne joue pas le match, qui n'est pas déjà dessus. Caster : mêmes
@@ -467,7 +473,9 @@ rejouée : qui a quitté le match n'y revient pas au geste suivant.
   (`RUNNING`, comme « Faire la prod »).
 - **Pas** de match joué, exempté ou déjà lancé.
 - **Verrous** : comptes (partagé), match `FOR UPDATE` (sans jointure), ses
-  casters `FOR UPDATE`, lignes du planning — même ordre que « Faire la prod » ;
+  casters et streams en lecture ordinaire (le verrou du match les garde, aucune
+  lecture ordinaire avant : pas de verrou d'intervalle sur les matchs voisins
+  sans caster), lignes du planning — même ordre que « Faire la prod » ;
   une transaction par match (`retryOnDeadlock`), matchs pris par id croissant.
   Rejouer un placement n'écrit rien deux fois.
 - **Diffusion** : le caster placé rejoint la diffusion d'un caster du planning
@@ -489,11 +497,13 @@ rejouée : qui a quitté le match n'y revient pas au geste suivant.
   le lance sans l'attendre — une transaction par match ne retarde ni la réponse
   ni le balayage ; ces placements non attendus passent en file, l'un après
   l'autre (`queuePlannedCasts`) ; le choix du staff et le remplaçant d'un désistement (un seul
-  match) passent par la même file et l'attendent (jamais deux chaînes de
-  transactions sur les mêmes matchs). Le balayage d'office **attend** la file
+  match) passent par la même file sans l'attendre non plus (jamais deux chaînes
+  de transactions sur les mêmes matchs, et la réponse ne patiente pas derrière
+  un balayage chargé). Le balayage d'office **attend** la file
   (`drainPlannedCasts`) avant de finir son passage : le passage suivant ne la
   croise pas, et l'arrêt du processus, qui attend les passages en cours dans son
-  délai, laisse aux placements leur chance de finir. Limite : un arrêt qui
+  délai, laisse aux placements du balayage leur chance de finir — pas à ceux
+  d'un geste du staff ou d'un désistement. Limite : un arrêt qui
   tombe en pleine file perd les placements restants (rien n'est rejoué : une
   personne qui a quitté le match n'y serait pas reposée) ; la ligne reste tenue
   au planning, le staff place à la main.

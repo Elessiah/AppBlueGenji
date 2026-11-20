@@ -366,6 +366,7 @@ export async function setManualAssignment(actor: AuthUser, input: ManualInput, n
   // Après le verrou, sans faire attendre la page ; l'auteur qui se pose lui-même n'est pas prévenu.
   void announceAssignments([{ userId: input.userId, entry: announce, role: input.role }], { actorId: actor.id });
   // Un caster ou une prod sur un match que personne ne caste encore y est placé (`cast-placement.ts`, ne lève jamais).
-  // En file avec les placements du balayage d'office : jamais deux chaînes de transactions sur les mêmes matchs.
-  await queuePlannedCasts([{ userId: input.userId, entry: announce, role: input.role }], staffActor(actor));
+  // En file avec les placements du balayage d'office (jamais deux chaînes de transactions sur les mêmes matchs),
+  // sans la faire attendre à la réponse : le plateau se rafraîchit une fois le placement joué.
+  void queuePlannedCasts([{ userId: input.userId, entry: announce, role: input.role }], staffActor(actor));
 }

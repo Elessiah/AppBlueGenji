@@ -341,6 +341,14 @@ describe("setManualAssignment — pose", () => {
     expect(queuePlannedCasts).toHaveBeenCalledWith([{ userId: 6, entry: event, role: "PROD" }], { id: 9, pseudo: staff.pseudo });
   });
 
+  it("setManualAssignment_placementPending_returnsWithoutWaiting", async () => {
+    const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
+    jest.mocked(loadPlanningData).mockResolvedValue(planningData({ entries: [event], members: [loadedMember({ userId: 6, roles: ["PROD"] })] }));
+    jest.mocked(queuePlannedCasts).mockReturnValue(new Promise(() => undefined));
+
+    await expect(setManualAssignment(staff, { entryKey: "t:10", role: "PROD", userId: 6, assigned: true })).resolves.toBeUndefined();
+  });
+
   it("setManualAssignment_removal_notPlaced", async () => {
     const event = loadedEntry({ key: "t:10", kind: "TOURNAMENT", matchId: null });
     jest.mocked(loadPlanningData).mockResolvedValue(

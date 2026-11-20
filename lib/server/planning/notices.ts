@@ -69,11 +69,24 @@ export function announceAssignments(
   items: readonly AssignmentNotice[],
   options: { actorId?: number | null; replacement?: boolean } = {},
 ): Promise<void> {
-  // En file avec l'avis de lien (`announceCastLinkNeeded`) : l'annonce de l'affectation part toujours la première.
-  return assignedNotices.chain("assigned", () => deliverAssignments(items, options));
+  // Envoyée sans attendre les autres gestes ; l'avis de lien d'un caster (`announceCastLinkNeeded`) attend
+  // seulement les annonces d'affectation encore en route pour lui : « le planning te place » part toujours le premier.
+  const run = deliverAssignments(items, options);
+  for (const userId of new Set(items.map((item) => item.userId))) trackAssignmentNotice(userId, run);
+  return run;
 }
 
-const assignedNotices = createKeyedChain<string>();
+/** Les annonces d'affectation encore en route, par destinataire (jamais en rejet : `deliverAssignments` ne lève pas). */
+const pendingAssignmentNotices = new Map<number, Promise<void>>();
+
+function trackAssignmentNotice(userId: number, run: Promise<void>): void {
+  const prior = pendingAssignmentNotices.get(userId);
+  const pending = prior === undefined ? run : Promise.all([prior, run]).then(() => undefined);
+  pendingAssignmentNotices.set(userId, pending);
+  void pending.finally(() => {
+    if (pendingAssignmentNotices.get(userId) === pending) pendingAssignmentNotices.delete(userId);
+  });
+}
 
 async function deliverAssignments(
   items: readonly AssignmentNotice[],
@@ -135,8 +148,10 @@ export type CastLinkItem = { userId: number; entry: LoadedEntry };
  * coupé avec lui. Ne lève jamais.
  */
 export function announceCastLinkNeeded(items: readonly CastLinkItem[]): Promise<void> {
-  // Derrière l'annonce de l'affectation déjà lancée : le lien se demande après « le planning te place ».
-  return assignedNotices.chain("assigned", () => deliverCastLinkNeeded(items));
+  // Derrière les annonces d'affectation déjà lancées pour ces casters (et elles seules) : le lien se demande
+  // après « le planning te place », sans attendre les avis des autres gestes.
+  const waits = [...new Set(items.map((item) => item.userId))].flatMap((userId) => pendingAssignmentNotices.get(userId) ?? []);
+  return Promise.all(waits).then(() => deliverCastLinkNeeded(items));
 }
 
 async function deliverCastLinkNeeded(items: readonly CastLinkItem[]): Promise<void> {
