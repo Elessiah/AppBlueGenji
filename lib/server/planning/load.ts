@@ -35,6 +35,14 @@ import { visibleText } from "@/lib/shared/visible-text";
 
 export type Executor = Pick<PoolConnection, "execute">;
 
+/**
+ * Lignes touchées par une écriture (`affectedRows` de la réponse), 0 si elle
+ * n'en dit rien — le seul lecteur du dossier `planning`.
+ */
+export function affectedRows(result: unknown): number {
+  return Number((result as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**

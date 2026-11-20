@@ -37,11 +37,17 @@ poser le réglage (l'allumer ; l'éteindre reste permis) demande de tenir le rô
 d'une désignation à la main) : un compte suspendu, sans le rôle ou inconnu reçoit
 le même `409 NOT_CASTER` (« ne peut pas être caster autonome »), sans rien qui
 nomme la suspension ; le **retirer** reste permis à un caster suspendu (rien n'en
-découle ; la vue des autres membres le compte encore). Ce geste ne garde pas
-son auteur (ni pm2, ni Discord, ni `bg_planning_events`, qui ne suit que les
-créneaux) : une trace nominative serait un nouveau traitement à déclarer. Changer ce réglage ne relance aucun avis du
-planning (ni « diffusion perdue », ni message au caster) : le staff qui le change
-voit aussitôt la couverture recalculée au tableau. L'attribution
+découle ; la vue des autres membres le compte encore). Un réglage **changé** par le staff sur le compte d'un **autre**
+(`writeSoloCaster` rend « changé » d'après les lignes écrites : `UPDATE … WHERE user_id = ? AND solo_caster <> ?`, puis, pour l'allumer, `INSERT … SELECT … WHERE NOT EXISTS` qui ne crée que la ligne manquante ; une clé en double relit l'`UPDATE` conditionnel, toute autre erreur remonte) part au journal
+du staff sur Discord sans nommer personne (« Caster autonome activé /
+désactivé pour un caster du planning, par le staff », catégorie `casts`) et, avec
+son auteur et le numéro du compte visé, dans pm2 (`publishStaffAction`, sur-le-champ) ; le
+caster en est prévenu, dans l'ordre des gestes pour un même compte (la route fait passer les gestes d'un compte à tour de rôle, `createKeyedSerial`, l'annonce mise en file dans le tour de son écriture ; file par clé ; sujet `PLANNING_SOLO_CASTER`, push et message privé
+`proven` coupés avec le sujet, staff anonyme — `announceSoloCasterChange`,
+`notices.ts`). Son propre réglage, ou une valeur reposée, ne laisse ni trace ni
+avis ; un caster qui n'est plus du planning ou qui est suspendu n'est pas prévenu (la ligne de journal, elle, reste écrite) ; `bg_planning_events` ne suit toujours que les créneaux. Ce réglage ne
+relance aucun autre avis du planning (ni « diffusion perdue ») : le staff qui
+le change voit aussitôt la couverture recalculée au tableau. L'attribution
 à la main reste à `tournaments` (`canManage`) : choisir à la main une personne déjà proposée remplace la
 proposition par un choix du staff (`MANUAL`, ferme par nature), ce n'est pas
 confirmer le calcul ; la confirmation d'office (`auto-confirm`) n'est pas un geste

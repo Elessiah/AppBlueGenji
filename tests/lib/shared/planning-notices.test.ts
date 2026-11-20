@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   formatPlanningAssignedDm,
   formatPlanningNewEntriesDm,
+  formatPlanningSoloCasterDm,
   formatPlanningUnfilledDm,
   formatPlanningUnfilledLine,
   formatPlanningWithdrawalDm,
@@ -14,6 +15,7 @@ import {
 import {
   planningAssignedPush,
   planningNewEntriesPush,
+  planningSoloCasterPush,
   planningUnfilledPush,
   planningWithdrawalPush,
 } from "@/lib/shared/push-messages";
@@ -330,6 +332,37 @@ function keys(value: unknown, prefix = ""): string[] {
   return Object.entries(value).flatMap(([key, child]) => keys(child, prefix ? `${prefix}.${key}` : key));
 }
 
+describe("caster autonome réglé par le staff", () => {
+  it("formatPlanningSoloCasterDm_turnedOnFr_saysStaffAndLinksPlanning", () => {
+    expect(formatPlanningSoloCasterDm(true, "https://bluegenji.test", "fr")).toBe(
+      "🎙️ BlueGenji — Le staff a activé ton statut de caster autonome : tu peux diffuser seul, sans prod.\nPlanning : https://bluegenji.test/planning",
+    );
+  });
+
+  it("formatPlanningSoloCasterDm_turnedOffEn_englishWithEnglishLink", () => {
+    expect(formatPlanningSoloCasterDm(false, "https://bluegenji.test", "en")).toBe(
+      "🎙️ BlueGenji — The staff turned off your solo caster status: you now need a prod to stream.\nPlanning: https://bluegenji.test/en/planning",
+    );
+  });
+
+  it("planningSoloCasterPush_turnedOnFr_titleBodyAndPlanningLink", () => {
+    expect(planningSoloCasterPush(true, "fr")).toEqual({
+      title: "Caster autonome activé",
+      body: "Le staff a activé ton statut de caster autonome : tu peux diffuser seul, sans prod.",
+      url: "/planning",
+      tag: "planning-solo-caster",
+    });
+  });
+
+  it("planningSoloCasterPush_turnedOffEn_englishTextAndLink", () => {
+    expect(planningSoloCasterPush(false, "en")).toMatchObject({
+      title: "Solo caster turned off",
+      body: "The staff turned off your solo caster status: you now need a prod to stream.",
+      url: "/en/planning",
+    });
+  });
+});
+
 describe("textes FR et EN", () => {
   it("planningMessages_withdrawKeys_sameInBothLanguages", () => {
     expect(keys(enPlanning.withdraw)).toEqual(keys(frPlanning.withdraw));
@@ -344,7 +377,7 @@ describe("textes FR et EN", () => {
   it("pushTopics_planningTopics_labelledInBothLanguages", () => {
     const planningTopics = Object.keys(PUSH_TOPICS).filter((topic) => topic.startsWith("PLANNING_"));
 
-    expect(planningTopics).toEqual(["PLANNING_NEW_ENTRIES", "PLANNING_ASSIGNED", "PLANNING_WITHDRAWAL", "PLANNING_UNFILLED"]);
+    expect(planningTopics).toEqual(["PLANNING_NEW_ENTRIES", "PLANNING_ASSIGNED", "PLANNING_WITHDRAWAL", "PLANNING_SOLO_CASTER", "PLANNING_UNFILLED"]);
     expect(Object.keys(enPush.topics)).toEqual(Object.keys(frPush.topics));
   });
 });

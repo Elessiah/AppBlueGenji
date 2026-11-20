@@ -173,6 +173,24 @@ export function formatPlanningAssignedDm(
   return [head, ...lines, `Heure de Paris. Empêché ? Désiste-toi sur le planning : ${url}`].join("\n");
 }
 
+/**
+ * Message privé du statut de caster autonome réglé par le staff
+ * (`PLANNING_SOLO_CASTER`) : « le staff », jamais son nom.
+ */
+export function formatPlanningSoloCasterDm(solo: boolean, siteBase: string, locale: Locale): string {
+  const url = planningNoticeUrl(siteBase, locale);
+  if (locale === "en") {
+    const state = solo
+      ? "The staff turned on your solo caster status: you can stream alone, without a prod."
+      : "The staff turned off your solo caster status: you now need a prod to stream.";
+    return `🎙️ BlueGenji — ${state}\nPlanning: ${url}`;
+  }
+  const state = solo
+    ? "Le staff a activé ton statut de caster autonome : tu peux diffuser seul, sans prod."
+    : "Le staff a désactivé ton statut de caster autonome : un prod doit désormais t'accompagner pour diffuser.";
+  return `🎙️ BlueGenji — ${state}\nPlanning : ${url}`;
+}
+
 export type WithdrawalOutcome = "replaced" | "selfHeld" | "stillHeld" | "streamLost" | "open";
 
 /** L'issue d'un désistement, telle que la lit le destinataire (message privé et push la lisent ici). */

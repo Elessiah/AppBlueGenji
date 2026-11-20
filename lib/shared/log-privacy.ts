@@ -54,6 +54,11 @@ export interface StaffActor {
   pseudo: string;
 }
 
+/** L'auteur d'un geste tiré du compte connecté : un seul endroit où le former. */
+export function staffActor(user: { id: number; pseudo: string }): StaffActor {
+  return { id: user.id, pseudo: user.pseudo };
+}
+
 /**
  * La ligne d'audit d'un geste du staff, pour les journaux du serveur (pm2).
  *

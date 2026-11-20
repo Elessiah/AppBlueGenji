@@ -8,19 +8,27 @@
  *
  * Appelé par les routes **après** le geste réussi, sans attendre : le bot est
  * optionnel, et un envoi lent n'a pas à retarder la réponse. Ne lève jamais.
+ *
+ * Exception : la rediffusion d'un match ({@link announceMatchReplayChange}) va
+ * au journal d'arbitrage avec son lien, anonyme sur Discord et nominative dans
+ * pm2 (`publishStaffAction`), comme les autres gestes d'arbitrage.
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { createCoalescer, createKeyedChain } from "@/lib/server/coalescer";
 import { getDatabase } from "@/lib/server/database";
 import { failureDiagnostic } from "@/lib/server/failure-reason";
+import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
 import {
+  formatMatchReplayLog,
   formatStaffMatchActionLog,
+  type MatchReplayEdit,
   formatStaffTournamentActionLog,
   type StaffActionAuthor,
   type StaffMatchAction,
   type StaffTournamentAction,
 } from "@/lib/shared/bot-logs";
+import type { StaffActor } from "@/lib/shared/log-privacy";
 import { can } from "@/lib/shared/permissions";
 import type { AdvanceTarget } from "@/lib/shared/tournament-launch";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
@@ -103,6 +111,53 @@ export function announceStaffMatchAction(
     deliverStaffMatchAction(matchId, action, author, options).catch((error) =>
       console.error(`[staff-log] geste ${action} sur le match #${matchId} non journalisé : ${failureDiagnostic(error)}`),
     ),
+  );
+}
+
+/** Un changement de rediffusion à journaliser (`announceMatchReplayChange`). */
+export type MatchReplayLogChange = MatchReplayEdit & {
+  /** « le staff » ou « un caster » sur Discord. */
+  author: StaffActionAuthor;
+  /** Nommé dans pm2 seulement. */
+  actor: StaffActor;
+};
+
+/**
+ * La ligne d'arbitrage d'un changement de rediffusion : le match, ses engagés,
+ * le lien (aucun pour un retrait) ; anonyme sur Discord, l'auteur nommé dans
+ * pm2. Si le match n'existe plus, aucune ligne (la trace courte de
+ * {@link announceMatchReplayChange} garde l'auteur). Peut lever.
+ */
+export async function deliverMatchReplayChange(matchId: number, entry: MatchReplayLogChange): Promise<void> {
+  const row = await loadMatchLogRow(matchId);
+  if (!row) return;
+  const match = matchLogSubject(row);
+  publishStaffAction(
+    formatMatchReplayLog({ ...match, ...entry }),
+    entry.actor,
+    { category: "referees", tournamentId: match.tournament.id },
+  );
+}
+
+/**
+ * Journalise un changement de rediffusion, sans attendre ; ne lève jamais.
+ *
+ * Une trace courte nominative part dans pm2 **sur-le-champ**, avant toute
+ * lecture (`auditStaffAction`) : un arrêt du serveur entre le commit et la
+ * relecture du match ne laisse pas le geste sans auteur — la trace de
+ * modération n'est pas optionnelle. La ligne détaillée suit, dans l'ordre des
+ * gestes du match.
+ */
+export function announceMatchReplayChange(matchId: number, entry: MatchReplayLogChange): void {
+  try {
+    auditStaffAction(`Rediff du match #${matchId} (${entry.change})`, entry.actor);
+  } catch (error) {
+    console.error(`[staff-log] trace de la rediff du match #${matchId} impossible : ${failureDiagnostic(error)}`);
+  }
+  void matchLines.chain(matchId, () =>
+    deliverMatchReplayChange(matchId, entry).catch((error) => {
+      console.error(`[staff-log] rediff du match #${matchId} non journalisée : ${failureDiagnostic(error)}`);
+    }),
   );
 }
 

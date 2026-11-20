@@ -1,10 +1,13 @@
 import { PLANNING_WRITE_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
+import { createKeyedSerial } from "@/lib/server/coalescer";
 import { fail, ok } from "@/lib/server/http";
 import { setSoloCaster } from "@/lib/server/planning/actions";
+import { announceSoloCasterChange } from "@/lib/server/planning/notices";
 import { planningFailure } from "@/lib/server/planning/routes";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
 import { isPositiveId } from "@/lib/server/tournaments/match-launch-routes";
+import { staffActor } from "@/lib/shared/log-privacy";
 import { can } from "@/lib/shared/permissions";
 
 /**
@@ -13,7 +16,15 @@ import { can } from "@/lib/shared/permissions";
  * caster règle le sien (permission `planning`) ; pour un autre compte, la
  * permission `tournaments` (le staff des tournois) est requise — ce geste n'est
  * pas réservé aux administrateurs, contrairement au calcul du planning.
+ *
+ * Un réglage **changé** sur le compte d'un autre est journalisé (anonyme sur
+ * Discord, l'auteur nommé dans pm2) et annoncé au caster
+ * (`PLANNING_SOLO_CASTER`) ; son propre réglage, ou une valeur reposée, rien.
+ * Les gestes sur un même compte passent à tour de rôle, l'annonce mise en file
+ * dans le tour de son écriture : les avis suivent l'ordre des commits.
  */
+const soloCasterWrites = createKeyedSerial<number>();
+
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
@@ -30,7 +41,12 @@ export async function PUT(req: Request) {
   if (target !== user.id && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   try {
-    await setSoloCaster(target, solo);
+    await soloCasterWrites.run(target, async () => {
+      const changed = await setSoloCaster(target, solo);
+      // Sans l'attendre : l'avis ne lève jamais, et un bot lent ne retarde pas
+      // le geste ; mis en file ici, avant que le geste suivant n'écrive.
+      if (changed && target !== user.id) void announceSoloCasterChange(target, solo, staffActor(user));
+    });
     return ok({ saved: true });
   } catch (error) {
     return planningFailure(error, "PLANNING_SOLO_FAILED");

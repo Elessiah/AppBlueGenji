@@ -1227,6 +1227,22 @@ export function planningAssignedPush(
 }
 
 /**
+ * Statut de caster autonome réglé par le staff (`PLANNING_SOLO_CASTER`) : le
+ * staff n'est pas nommé, et l'auteur d'un réglage sur son propre compte n'est
+ * jamais prévenu (la route en juge).
+ */
+export function planningSoloCasterPush(solo: boolean, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t(solo ? "planning.soloCaster.titleOn" : "planning.soloCaster.titleOff"),
+    body: text.t(solo ? "planning.soloCaster.bodyOn" : "planning.soloCaster.bodyOff"),
+    url: localeHref(PLANNING_PATH, locale),
+    // Un réglage suivant remplace le précédent sur l'appareil.
+    tag: "planning-solo-caster",
+  };
+}
+
+/**
  * Désistement sur une entrée où le destinataire est affecté
  * (`PLANNING_WITHDRAWAL`) : « un caster », jamais son pseudo ; remplaçant
  * affecté, ou place à pourvoir.

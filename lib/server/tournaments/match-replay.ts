@@ -12,6 +12,7 @@
  * l'arbitre désigné) sur tout match (décision du 2026-11-09).
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { MatchReplayEdit } from "@/lib/shared/bot-logs";
 import { canHaveReplay, normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import type { MatchStatus, TournamentGame } from "@/lib/shared/types";
@@ -31,6 +32,7 @@ type MatchReplayRow = RowDataPacket & {
   double_forfeit: number | null;
   launched_at: Date | null;
   launch_pairing: string | null;
+  replay_url: string | null;
 };
 
 /**
@@ -78,9 +80,12 @@ function isReplayableRow(row: MatchReplayRow): boolean {
  * revanche une rencontre réellement disputée (`canHaveReplay`), sans quoi le
  * bandeau annoncerait la rediff d'un match qui n'a pas eu lieu.
  *
- * @returns le lien normalisé (`null` s'il a été effacé), et `changed` : le
- *   lien a changé — effacer un lien jamais posé, ou reposer le même, ne change
- *   rien, et le journal du staff ne le note pas.
+ * @returns le lien normalisé (`null` s'il a été effacé), et `change` : le
+ *   changement et son lien (`SET` sur un match qui n'en avait pas, `CHANGED`,
+ *   `REMOVED`), `null` si le lien n'a pas changé — effacer un lien jamais
+ *   posé, ou reposer le même, ne change rien, et le journal d'arbitrage ne le
+ *   note pas. L'ancien lien est lu sous le verrou du match : la nature ne peut
+ *   pas contredire l'écriture.
  * `actor.manages` : permission `tournaments` — tout match ; sans elle, l'acteur
  * doit caster ce match (`NOT_MATCH_CASTER`).
  *
@@ -91,7 +96,7 @@ export async function setMatchReplayUrl(
   matchId: number,
   rawUrl: string | null,
   actor: { userId: number; manages: boolean },
-): Promise<{ replayUrl: string | null; changed: boolean }> {
+): Promise<{ replayUrl: string | null; change: MatchReplayEdit | null }> {
   const blank = rawUrl === null || rawUrl.trim() === "";
   const replayUrl = blank ? null : normalizeReplayUrl(rawUrl);
   if (!blank && replayUrl === null) throw new Error("INVALID_REPLAY_URL");
@@ -99,11 +104,11 @@ export async function setMatchReplayUrl(
   // Le match se verrouille d'abord (seul, sans jointure : MariaDB) : le retrait
   // d'un caster (`releaseMatchCast`) prend le même verrou, et ne peut plus
   // passer entre la vérification du cast et l'écriture du lien.
-  const { row, result } = await retryOnDeadlock(() =>
+  const row = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const [rows] = await connection.execute<MatchReplayRow[]>(
         `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit,
-                launched_at, launch_pairing
+                launched_at, launch_pairing, replay_url
            FROM bg_matches WHERE id = ? FOR UPDATE`,
         [matchId],
       );
@@ -124,14 +129,22 @@ export async function setMatchReplayUrl(
       if (replayUrl !== null && Number((written as { affectedRows?: number }).affectedRows ?? 0) === 0) {
         throw new Error("MATCH_NOT_REPLAYABLE");
       }
-      return { row: locked, result: written };
+      return locked;
     }),
   );
 
-  // « Changé » se lit dans la réponse de l'écriture (`changedRows`), pas dans la
-  // lecture d'avant : deux effacements simultanés n'en comptent qu'un, et un lien
-  // identique à celui en base ne change rien.
-  const changed = Number((result as { changedRows?: number }).changedRows ?? 0) > 0;
+  // « Changé » se lit sous le verrou du match, pris avant l'écriture et gardé
+  // jusqu'au commit : deux effacements simultanés n'en comptent qu'un (le second
+  // relit `NULL`), et un lien identique à celui en base ne change rien — sans
+  // dépendre de `changedRows`, que le pilote tire d'un texte que toute réponse
+  // ne porte pas.
+  const changed = (row.replay_url ?? null) !== replayUrl;
   if (changed) publishMatchUpdatedEvent(Number(row.tournament_id));
-  return { replayUrl, changed };
+  return { replayUrl, change: changed ? replayEdit(row.replay_url, replayUrl) : null };
+}
+
+/** Nature d'un changement de lien, l'ancien relu sous le verrou. */
+function replayEdit(previous: string | null, next: string | null): MatchReplayEdit {
+  if (next === null) return { change: "REMOVED", replayUrl: null };
+  return { change: previous ? "CHANGED" : "SET", replayUrl: next };
 }

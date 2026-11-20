@@ -217,6 +217,12 @@
       "titleReplacement": "You replace a withdrawal",
       "line": "{start} · {role} · {entry}"
     },
+    "soloCaster": {
+      "titleOn": "Solo caster turned on",
+      "titleOff": "Solo caster turned off",
+      "bodyOn": "The staff turned on your solo caster status: you can stream alone, without a prod.",
+      "bodyOff": "The staff turned off your solo caster status: you now need a prod to stream."
+    },
     "withdrawal": {
       "title": "Withdrawal on your match",
       "bodyReplaced": "A {role} withdrew from {entry} ({start}): a replacement has been assigned.",

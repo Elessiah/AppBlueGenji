@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  formatMatchReplayLog,
+  formatSoloCasterChangeLog,
   formatStaffMatchActionLog,
   formatStaffTournamentActionLog,
   type StaffMatchAction,
@@ -15,8 +17,6 @@ const MATCH_ACTIONS: StaffMatchAction[] = [
   "LIVE_REMOVED",
   "ON_AIR",
   "OFF_AIR",
-  "REPLAY_SET",
-  "REPLAY_REMOVED",
   "VOICE_CLEARED",
 ];
 const TOURNAMENT_ACTIONS: StaffTournamentAction[] = [
@@ -102,7 +102,7 @@ describe("formatStaffMatchActionLog", () => {
       ...base,
       tournament: { id: 7, name: "@everyone" },
       team1: { name: "@here", participantType: "TEAM" },
-      action: "REPLAY_SET",
+      action: "HOST_SET",
     });
     expect(line).not.toContain("@everyone");
     expect(line).not.toContain("@here");
@@ -162,5 +162,55 @@ describe("formatStaffTournamentActionLog — précisions", () => {
     expect(formatStaffTournamentActionLog({ tournament, action: "IMAGE_REPLACED" })).toBe(
       "🛠️ Image du tournoi remplacée — « Coupe d'hiver » (#7), par le staff.",
     );
+  });
+});
+
+describe("formatMatchReplayLog", () => {
+  const replay = { ...base, replayUrl: "https://youtu.be/dQw4w9WgXcQ" };
+
+  it("formatMatchReplayLog_set_namesMatchTeamsAndLink", () => {
+    expect(formatMatchReplayLog({ ...replay, change: "SET" })).toBe(
+      "🎬 Rediff ajoutée — « Coupe d'hiver » (#7) : Manche 2 — Renards vs Nova (#42) : <https://youtu.be/dQw4w9WgXcQ>, par le staff.",
+    );
+  });
+
+  it("formatMatchReplayLog_changed_saysModifiedWithNewLink", () => {
+    const line = formatMatchReplayLog({ ...replay, change: "CHANGED" });
+
+    expect(line).toMatch(/^🎬 Rediff modifiée — /);
+    expect(line).toContain("<https://youtu.be/dQw4w9WgXcQ>");
+  });
+
+  it("formatMatchReplayLog_removed_noLink", () => {
+    expect(formatMatchReplayLog({ ...base, change: "REMOVED", replayUrl: null })).toMatch(/^🎬 Rediff retirée — .*\(#42\), par le staff\.$/);
+  });
+
+  it("formatMatchReplayLog_soloTournament_neverWritesPseudo", () => {
+    const line = formatMatchReplayLog({
+      ...replay,
+      team1: { name: "Pseudo1", participantType: "SOLO" },
+      team2: { name: "Pseudo2", participantType: "SOLO" },
+      change: "SET",
+    });
+
+    expect(line).not.toContain("Pseudo");
+    expect(line).toContain("un joueur vs un joueur");
+  });
+
+  it("formatMatchReplayLog_casterAuthor_writesUnCaster", () => {
+    expect(formatMatchReplayLog({ ...replay, change: "SET", author: "CASTER" })).toMatch(/, par un caster\.$/);
+  });
+
+  it("formatMatchReplayLog_markupInLink_encodedInsideAngleBrackets", () => {
+    const line = formatMatchReplayLog({ ...replay, replayUrl: "https://youtu.be/a)[x](https://evil", change: "SET" });
+
+    expect(line).toContain("<https://youtu.be/a%29%5Bx%5D%28https://evil>");
+  });
+});
+
+describe("formatSoloCasterChangeLog", () => {
+  it("formatSoloCasterChangeLog_onAndOff_anonymous", () => {
+    expect(formatSoloCasterChangeLog(true)).toBe("🎙️ Caster autonome activé pour un caster du planning, par le staff.");
+    expect(formatSoloCasterChangeLog(false)).toBe("🎙️ Caster autonome désactivé pour un caster du planning, par le staff.");
   });
 });

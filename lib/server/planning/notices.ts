@@ -10,12 +10,17 @@
  * anonymes (`lib/shared/planning-notices.ts`).
  */
 import { sendBotLog } from "@/lib/server/bot-integration";
+import { createKeyedChain } from "@/lib/server/coalescer";
 import { failureReason } from "@/lib/server/failure-reason";
 import { loadNotificationRecipients, loadStaffIds, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
+import { publishStaffAction } from "@/lib/server/staff-audit";
+import { formatSoloCasterChangeLog } from "@/lib/shared/bot-logs";
+import type { StaffActor } from "@/lib/shared/log-privacy";
 import type { PlanningRole } from "@/lib/shared/planning";
 import {
   formatPlanningAssignedDm,
+  formatPlanningSoloCasterDm,
   formatPlanningUnfilledDm,
   formatPlanningUnfilledLine,
   formatPlanningWithdrawalDm,
@@ -23,7 +28,12 @@ import {
   type PlanningNoticeEntry,
   type PlanningWithdrawalNotice,
 } from "@/lib/shared/planning-notices";
-import { planningAssignedPush, planningUnfilledPush, planningWithdrawalPush } from "@/lib/shared/push-messages";
+import {
+  planningAssignedPush,
+  planningSoloCasterPush,
+  planningUnfilledPush,
+  planningWithdrawalPush,
+} from "@/lib/shared/push-messages";
 import type { LoadedEntry } from "./load";
 
 /** Ce qu'une notification dit d'une entrée : ni pseudo, ni membre du staff. */
@@ -99,6 +109,57 @@ export async function announceAssignments(
   } catch (error) {
     console.error("[planning] annonce des affectations impossible.", failureReason(error));
   }
+}
+
+const soloCasterNotices = createKeyedChain<number>();
+
+/**
+ * L'avis au caster dont le staff a changé le statut de caster autonome
+ * (`PLANNING_SOLO_CASTER`, push et message privé coupés avec le sujet). Ne lève
+ * jamais.
+ */
+async function deliverSoloCasterNotice(targetUserId: number, solo: boolean): Promise<void> {
+  try {
+    // Un compte suspendu n'est prévenu de rien du planning (T20), comme les autres avis.
+    const recipients = await loadNotificationRecipients([targetUserId], "proven", { excludeSuspended: true, planningMembersOnly: true });
+    if (recipients.length === 0) return;
+    const base = siteCanonicalBase();
+    await notifyUsers(recipients, {
+      topic: "PLANNING_SOLO_CASTER",
+      push: (locale) => planningSoloCasterPush(solo, locale),
+      discord: {
+        message: (locale) => formatPlanningSoloCasterDm(solo, base, locale),
+        context: "planning-solo-caster",
+      },
+      dmFollowsTopic: true,
+    });
+  } catch (error) {
+    console.error("[planning] avis du caster autonome impossible.", failureReason(error));
+  }
+}
+
+/**
+ * Statut de caster autonome d'un autre membre réglé par le staff. La route
+ * n'appelle ceci que pour un réglage **changé** sur le compte d'un autre — ni
+ * le sien, ni une valeur reposée —, dans le tour même de l'écriture et à tour
+ * de rôle par caster (`createKeyedSerial`) : l'ordre des appels est celui des
+ * commits.
+ *
+ * Une ligne au journal, sur-le-champ (anonyme sur Discord, l'auteur et le
+ * compte visé nommés dans pm2 — `publishStaffAction` écrit pm2 avant toute
+ * attente : un arrêt du serveur ne laisse pas le geste sans auteur), puis
+ * l'avis au caster, **dans l'ordre des gestes** (`createKeyedChain`) :
+ * activer, désactiver, activer ne laisse pas arriver un « désactivé » en
+ * dernier. Le journal et l'avis échouent chacun de leur côté. Ne lève jamais.
+ */
+export function announceSoloCasterChange(targetUserId: number, solo: boolean, actor: StaffActor): Promise<void> {
+  const line = formatSoloCasterChangeLog(solo);
+  try {
+    publishStaffAction(line, actor, { category: "casts", auditLine: `${line} (compte #${targetUserId})` });
+  } catch (error) {
+    console.error("[planning] journal du caster autonome impossible.", failureReason(error));
+  }
+  return soloCasterNotices.chain(targetUserId, () => deliverSoloCasterNotice(targetUserId, solo));
 }
 
 /** Un désistement à annoncer : l'entrée, le rôle quitté, et son issue. */

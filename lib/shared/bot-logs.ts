@@ -42,7 +42,7 @@ import { participantWording, type ParticipantType } from "./participants";
 import { ANONYMOUS_STAFF_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 import { formatLabel, gameLabel } from "./tournament-labels";
 import type { TournamentFormat, TournamentGame } from "./types";
-import { discordInline, discordQuoted } from "./discord-text";
+import { discordInline, discordQuoted, discordUrl } from "./discord-text";
 import { BOT_LOG_MESSAGE_MAX_CHARS } from "./bot-log-batch";
 import { botLogHeader } from "./bot-log-category";
 
@@ -1008,7 +1008,10 @@ export function formatCastChangeLog(context: {
  * - `LIVE_CONFIGURED` / `LIVE_REMOVED` — diffusion du match réglée
  *   (déclencheur, lien) ou retirée (le match n'est plus casté) ;
  * - `ON_AIR` / `OFF_AIR` — match mis à l'antenne ou retiré de l'antenne ;
- * - `REPLAY_SET` / `REPLAY_REMOVED` — lien de rediffusion posé ou retiré.
+ * - `VOICE_CLEARED` — salon vocal d'une équipe vidé.
+ *
+ * La rediffusion a sa propre ligne, au journal d'arbitrage, avec son lien
+ * ({@link formatMatchReplayLog}).
  */
 export type StaffMatchAction =
   | "SCORES_SAVED"
@@ -1019,8 +1022,6 @@ export type StaffMatchAction =
   | "LIVE_REMOVED"
   | "ON_AIR"
   | "OFF_AIR"
-  | "REPLAY_SET"
-  | "REPLAY_REMOVED"
   | "VOICE_CLEARED";
 
 const STAFF_MATCH_ACTION_WORDING: Record<StaffMatchAction, string> = {
@@ -1032,8 +1033,6 @@ const STAFF_MATCH_ACTION_WORDING: Record<StaffMatchAction, string> = {
   LIVE_REMOVED: "Diffusion retirée",
   ON_AIR: "Mis à l'antenne",
   OFF_AIR: "Retiré de l'antenne",
-  REPLAY_SET: "Rediffusion ajoutée",
-  REPLAY_REMOVED: "Rediffusion retirée",
   VOICE_CLEARED: "Salon vocal d'une équipe vidé",
 };
 
@@ -1084,6 +1083,62 @@ export function formatStaffMatchActionLog(context: {
     `${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
     `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), par ${author}.`
   );
+}
+
+/** Changement du lien de rediffusion d'un match : posé, remplacé ou retiré. */
+export type MatchReplayChange = "SET" | "CHANGED" | "REMOVED";
+
+/**
+ * Un changement de rediffusion et son lien : un lien posé ou remplacé porte
+ * toujours son lien, un retrait n'en porte aucun — le type interdit une ligne
+ * « Rediff ajoutée » sans lien.
+ */
+export type MatchReplayEdit =
+  | { change: "SET" | "CHANGED"; replayUrl: string }
+  | { change: "REMOVED"; replayUrl: null };
+
+const MATCH_REPLAY_CHANGE_WORDING: Record<MatchReplayChange, string> = {
+  SET: "Rediff ajoutée",
+  CHANGED: "Rediff modifiée",
+  REMOVED: "Rediff retirée",
+};
+
+/**
+ * Rediffusion d'un match posée, remplacée ou retirée — au journal d'arbitrage
+ * (`docs/features/MATCH_REPLAYS.md`) : le match, ses engagés (« un joueur » en
+ * tournoi individuel, `entrantLabel`) et le lien — un retrait n'en porte
+ * aucun. L'auteur n'est pas nommé (« le staff » ou « un caster ») ; la même
+ * ligne, avec son nom, part dans pm2 (`publishStaffAction`). Le lien, saisi,
+ * passe par `discordUrl` : un seul lien, sans aperçu ni balisage.
+ */
+export function formatMatchReplayLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  /** Par défaut `STAFF`. */
+  author?: StaffActionAuthor;
+} & MatchReplayEdit): string {
+  const author = STAFF_ACTION_AUTHOR_LABEL[context.author ?? "STAFF"];
+  const link = context.change === "REMOVED" ? "" : ` : ${discordUrl(context.replayUrl)}`;
+  return (
+    `${lead("🎬", MATCH_REPLAY_CHANGE_WORDING[context.change], context.tournament)} : ` +
+    `${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
+    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId})${link}, par ${author}.`
+  );
+}
+
+/**
+ * Statut de caster autonome d'un membre du planning réglé par le staff
+ * (`docs/features/CAST_PLANNING.md`) : personne n'est nommé sur Discord — ni
+ * le caster, ni l'auteur ; pm2 reçoit la même ligne avec l'auteur et le
+ * numéro du compte visé (`announceSoloCasterChange`).
+ */
+export function formatSoloCasterChangeLog(solo: boolean): string {
+  return `🎙️ Caster autonome ${solo ? "activé" : "désactivé"} pour un caster du planning, par ${ANONYMOUS_STAFF_LABEL}.`;
 }
 
 /**

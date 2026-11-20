@@ -15,6 +15,7 @@ import type { PlanningAssignmentView } from "@/lib/shared/planning-view";
 import { rolesConflict, slotsOverlap } from "@/lib/shared/planning-planner";
 import { MATCH_REFEREE_REFUSAL_CODES, holdingRefusal, lockedHolding, withPlanningLock, writeAssignment, writeEvent } from "./auto-assign";
 import {
+  affectedRows,
   loadPlanningData,
   loadPlanningEntries,
   loadPlanningMembersByIds,
@@ -52,10 +53,6 @@ export const PLANNING_STATUSES: Readonly<Record<string, number>> = {
   // Refus de la désignation d'un arbitre de match (`assignMatchReferee`) : la liste unique.
   ...Object.fromEntries(MATCH_REFEREE_REFUSAL_CODES.map((code) => [code, code === "MATCH_NOT_FOUND" ? 404 : 409])),
 };
-
-function affectedRows(result: unknown): number {
-  return Number((result as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
-}
 
 /** Une seule entrée, lue par sa clé : sans toute la fenêtre, ni les comptes, ni les disponibilités des autres. */
 async function loadOneEntry(executor: Executor, user: AuthUser, entryKey: string, now: number): Promise<LoadedEntry> {
@@ -113,16 +110,19 @@ export async function setAvailability(
  * laisse au pire un réglage posé sur un compte suspendu, sans effet pour le calcul
  * (ses droits sont écartés à la lecture), et verrouiller coûterait quatre
  * allers-retours de plus par clic.
+ *
+ * @returns `true` si le réglage a changé (`writeSoloCaster`) : reposer la même
+ *   valeur ne change rien, et la route n'en prévient ni n'en journalise rien.
  */
-export async function setSoloCaster(targetUserId: number, solo: boolean): Promise<void> {
-  await withConnection(async (connection) => {
+export async function setSoloCaster(targetUserId: number, solo: boolean): Promise<boolean> {
+  return withConnection(async (connection) => {
     // Le seul compte visé, relu par sa clé : ses rôles du moment.
     const [member] = await loadPlanningMembersByIds(connection, [targetUserId]);
     const clearsHeldCasterFlag = !solo && member?.roles.includes("CASTER") === true;
     if (!clearsHeldCasterFlag && holdingRefusal(member, { hidden: false }, "CASTER") !== null) {
       throw new Error("NOT_CASTER");
     }
-    await writeSoloCaster(connection, targetUserId, solo);
+    return writeSoloCaster(connection, targetUserId, solo);
   });
 }
 

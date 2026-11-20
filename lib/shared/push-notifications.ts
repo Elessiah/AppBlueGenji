@@ -145,6 +145,11 @@ export const PUSH_TOPICS = {
     description: "Un membre affecté et confirmé sur le même créneau que toi (toi aussi confirmé) s'est désisté, sans être nommé : son remplaçant éventuel, l'autre caster qui reste affecté, la diffusion perdue ou la place à pourvoir. Rien pour une simple proposition. Coupe aussi le message privé Discord.",
     audience: "planning",
   },
+  PLANNING_SOLO_CASTER: {
+    label: "Caster autonome",
+    description: "Le staff active ou désactive ton statut de caster autonome. Coupe aussi le message privé Discord.",
+    audience: "planning",
+  },
   PLANNING_UNFILLED: {
     label: "Places à pourvoir",
     description: "Après le désistement d'une affectation confirmée, aucun remplaçant n'a été trouvé : la place est à pourvoir, ou la diffusion du créneau est perdue. Coupe aussi le message privé Discord.",

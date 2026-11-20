@@ -251,3 +251,33 @@ function startNow(run: () => Promise<void>): Promise<void> {
     run().then(resolve, reject);
   });
 }
+
+/**
+ * Tour de rôle par clé, pour une écriture **suivie** de l'annonce qu'elle
+ * déclenche : chaque tâche d'une clé attend la fin de la précédente, si bien
+ * qu'écritures et annonces mises en file dans la tâche se suivent dans l'ordre
+ * des commits — deux gestes simultanés sur un même compte ou un même match ne
+ * peuvent plus annoncer le premier en dernier. Les autres clés ne sont pas
+ * retenues. `run` rend le résultat de la tâche ou sa levée ; un échec ne bloque
+ * pas la suivante. En mémoire du processus, comme les autres files du journal.
+ */
+export function createKeyedSerial<K>(): {
+  run: <T>(key: K, task: () => Promise<T>) => Promise<T>;
+} {
+  const tails = new Map<K, Promise<unknown>>();
+  return {
+    run<T>(key: K, task: () => Promise<T>): Promise<T> {
+      const previous = tails.get(key) ?? Promise.resolve();
+      const current = previous.then(task);
+      const settled = current.then(
+        () => undefined,
+        () => undefined,
+      );
+      tails.set(key, settled);
+      void settled.then(() => {
+        if (tails.get(key) === settled) tails.delete(key);
+      });
+      return current;
+    },
+  };
+}

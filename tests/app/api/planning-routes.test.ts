@@ -14,6 +14,10 @@ jest.mock("@/lib/server/planning/auto-assign", () => ({
   confirmAssignments: jest.fn(),
 }));
 jest.mock("@/lib/server/planning/view");
+jest.mock("@/lib/server/planning/notices", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/planning/notices")>("@/lib/server/planning/notices"),
+  announceSoloCasterChange: jest.fn(),
+}));
 jest.mock("@/lib/server/planning/withdrawal", () => ({
   ...jest.requireActual<typeof import("@/lib/server/planning/withdrawal")>("@/lib/server/planning/withdrawal"),
   withdrawFromEntry: jest.fn(),
@@ -39,6 +43,7 @@ import { setAvailability, setManualAssignment, setSoloCaster } from "@/lib/serve
 import { confirmAssignments, runAutoAssign } from "@/lib/server/planning/auto-assign";
 import { writeDurationSettings } from "@/lib/server/planning/load";
 import { loadPlanningView } from "@/lib/server/planning/view";
+import { announceSoloCasterChange } from "@/lib/server/planning/notices";
 import { withdrawFromEntry } from "@/lib/server/planning/withdrawal";
 import { WITHDRAWAL_REASON_MAX } from "@/lib/shared/planning";
 import { resetRateLimit } from "@/lib/server/rate-limit";
@@ -121,7 +126,8 @@ beforeEach(() => {
   jest.mocked(loadPlanningView).mockResolvedValue(VIEW);
   jest.mocked(withdrawFromEntry).mockResolvedValue({ late: false, replaced: true, unfilled: false, streamLost: false, stillSignedUp: false });
   jest.mocked(setAvailability).mockResolvedValue(undefined);
-  jest.mocked(setSoloCaster).mockResolvedValue(undefined);
+  jest.mocked(setSoloCaster).mockResolvedValue(true);
+  jest.mocked(announceSoloCasterChange).mockResolvedValue(undefined);
   jest.mocked(setManualAssignment).mockResolvedValue(undefined);
   jest.mocked(runAutoAssign).mockResolvedValue({ entries: 1, proposed: 2, replaced: 0 });
   jest.mocked(confirmAssignments).mockResolvedValue({ confirmed: 1, refused: 0 });
@@ -358,6 +364,58 @@ describe("PUT /api/planning/solo-caster", () => {
   it("soloPut_badUserId_returns400", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     expect(await errorOf(await soloPut(request("PUT", { solo: true, userId: -1 })))).toBe("INVALID_USER_ID");
+  });
+
+  it("soloPut_staffChangesOther_announcesWithActor", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+
+    expect((await soloPut(request("PUT", { solo: true, userId: 5 }))).status).toBe(200);
+
+    expect(announceSoloCasterChange).toHaveBeenCalledWith(5, true, { id: 9, pseudo: arbitre.pseudo });
+  });
+
+  it("soloPut_concurrentGesturesSameTarget_announcedInCommitOrder", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    let releaseFirst: () => void = () => undefined;
+    jest
+      .mocked(setSoloCaster)
+      .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = () => resolve(true))))
+      .mockResolvedValueOnce(true);
+
+    const first = soloPut(request("PUT", { solo: true, userId: 5 }));
+    const second = soloPut(request("PUT", { solo: false, userId: 5 }));
+    await new Promise((resolve) => setImmediate(resolve));
+    // Le second geste n'écrit qu'une fois le premier écrit et annoncé.
+    expect(setSoloCaster).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    expect(jest.mocked(announceSoloCasterChange).mock.calls.map(([, solo]) => solo)).toEqual([true, false]);
+  });
+
+  it("soloPut_ownChange_noAnnouncement", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    expect((await soloPut(request("PUT", { solo: true, userId: 1 }))).status).toBe(200);
+
+    expect(announceSoloCasterChange).not.toHaveBeenCalled();
+  });
+
+  it("soloPut_otherNoOp_noAnnouncement", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(setSoloCaster).mockResolvedValue(false);
+
+    expect((await soloPut(request("PUT", { solo: false, userId: 5 }))).status).toBe(200);
+
+    expect(announceSoloCasterChange).not.toHaveBeenCalled();
+  });
+
+  it("soloPut_nonStaffForAnother_returns403WithoutAnnouncement", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+
+    expect((await soloPut(request("PUT", { solo: true, userId: 5 }))).status).toBe(403);
+
+    expect(announceSoloCasterChange).not.toHaveBeenCalled();
   });
 
   it("soloPut_notCaster_returns409", async () => {

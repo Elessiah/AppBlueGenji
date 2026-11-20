@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/notify");
 jest.mock("@/lib/server/bot-integration");
+jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://bluegenji.test" }));
 
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { loadNotificationRecipients, loadStaffIds, notifyUsers } from "@/lib/server/notify";
-import { announceAssignments, announceWithdrawal, noticeEntry } from "@/lib/server/planning/notices";
+import { announceAssignments, announceSoloCasterChange, announceWithdrawal, noticeEntry } from "@/lib/server/planning/notices";
+import { publishStaffAction } from "@/lib/server/staff-audit";
 import { loadedEntry } from "../../../helpers/planning";
 
 /** Annonces du planning (`CAST_PLANNING.md` § Notifications) : à qui, sur quel sujet, sans nommer personne. */
@@ -269,5 +271,93 @@ describe("announceWithdrawal — destinataires", () => {
     await announceWithdrawal(withdrawal());
 
     expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[1, 2], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
+  });
+});
+
+describe("announceSoloCasterChange", () => {
+  const actor = { id: 1, pseudo: "Chef" };
+
+  it("announceSoloCasterChange_reachable_logsAnonymouslyAndNotifiesCaster", async () => {
+    await announceSoloCasterChange(5, true, actor);
+
+    expect(publishStaffAction).toHaveBeenCalledWith(
+      "🎙️ Caster autonome activé pour un caster du planning, par le staff.",
+      actor,
+      { category: "casts", auditLine: "🎙️ Caster autonome activé pour un caster du planning, par le staff. (compte #5)" },
+    );
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[5], "proven", { excludeSuspended: true, planningMembersOnly: true }]);
+    expect(jest.mocked(notifyUsers).mock.calls[0][1]).toMatchObject({ topic: "PLANNING_SOLO_CASTER", dmFollowsTopic: true });
+  });
+
+  it("announceSoloCasterChange_turnedOff_pushSaysDisabledWithoutStaffName", async () => {
+    await announceSoloCasterChange(5, false, actor);
+
+    const notification = jest.mocked(notifyUsers).mock.calls[0][1];
+    expect(notification.push("fr").title).toBe("Caster autonome désactivé");
+    expect(notification.discord?.message("fr")).not.toContain("Chef");
+  });
+
+  it("announceSoloCasterChange_called_logPublishedSynchronouslyBeforeNotice", async () => {
+    const done = announceSoloCasterChange(5, true, actor);
+
+    // Écrite dans le tour même (pm2 avant toute attente), l'avis encore à venir.
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
+    expect(notifyUsers).not.toHaveBeenCalled();
+    await done;
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("announceSoloCasterChange_noRecipient_logsWithoutNotifying", async () => {
+    jest.mocked(loadNotificationRecipients).mockResolvedValue([]);
+
+    await announceSoloCasterChange(5, true, actor);
+
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("announceSoloCasterChange_logThrows_stillNotifiesCaster", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(publishStaffAction).mockImplementationOnce(() => {
+      throw new Error("bot batch");
+    });
+
+    await expect(announceSoloCasterChange(5, true, actor)).resolves.toBeUndefined();
+
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
+
+  it("announceSoloCasterChange_notifyFails_neverThrows", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(notifyUsers).mockRejectedValue(new Error("ECONNREFUSED"));
+
+    await expect(announceSoloCasterChange(5, true, actor)).resolves.toBeUndefined();
+
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
+
+  it("announceSoloCasterChange_rapidToggles_noticesArriveInGestureOrder", async () => {
+    let releaseFirst: () => void = () => undefined;
+    jest.mocked(notifyUsers).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = () => resolve({ discord: null, discordUnreachedUserIds: [], pushed: 0 });
+        }),
+    );
+
+    const first = announceSoloCasterChange(5, true, actor);
+    const second = announceSoloCasterChange(5, false, actor);
+    await new Promise((resolve) => setImmediate(resolve));
+    // Le second attend le premier : un seul envoi tant que le premier n'est pas parti.
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(notifyUsers).mock.calls[0][1].push("fr").title).toBe("Caster autonome activé");
+    expect(jest.mocked(notifyUsers).mock.calls[1][1].push("fr").title).toBe("Caster autonome désactivé");
   });
 });

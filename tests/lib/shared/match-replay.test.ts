@@ -33,6 +33,16 @@ describe("normalizeReplayUrl", () => {
     ["https://youtu.be/dQw4w9WgXcQ", "https://youtu.be/dQw4w9WgXcQ"],
     ["  https://youtu.be/dQw4w9WgXcQ?t=42  ", "https://youtu.be/dQw4w9WgXcQ?t=42"],
     ["https://www.youtube.com/live/dQw4w9WgXcQ", "https://www.youtube.com/live/dQw4w9WgXcQ"],
+    // Seuls la vidéo et son départ restent : l'identifiant de partage `si`, un
+    // texte libre et le fragment tombent.
+    ["https://youtu.be/dQw4w9WgXcQ?si=AbCdEf123", "https://youtu.be/dQw4w9WgXcQ"],
+    [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ&note=hello&t=90s#comments",
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=90s",
+    ],
+    ["https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=abc", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"],
+    ["https://youtu.be/dQw4w9WgXcQ?t=1h2m3s", "https://youtu.be/dQw4w9WgXcQ?t=1h2m3s"],
+    ["https://www.youtube.com/live/dQw4w9WgXcQ?si=XyZ&feature=share", "https://www.youtube.com/live/dQw4w9WgXcQ"],
   ])("accepte et normalise %s", (input, expected) => {
     expect(normalizeReplayUrl(input)).toBe(expected);
     expect(isValidReplayUrl(input)).toBe(true);

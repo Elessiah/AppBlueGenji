@@ -34,7 +34,11 @@ const playedRow = {
   double_forfeit: 0,
   launched_at: "2026-01-01 20:00:00",
   launch_pairing: "1:2",
+  replay_url: null,
 };
+
+/** Le même match, qui porte déjà un lien de rediff. */
+const withReplay = { ...playedRow, replay_url: "https://youtu.be/oldOldOld01" };
 
 /** Le jeu du tournoi, relu pour juger la condition du cast d'un porteur de la seule `live`. */
 const GAME = [[{ game: "OW" }]];
@@ -53,14 +57,14 @@ const ELIGIBLE = {
 };
 
 /**
- * Lecture du match, puis `UPDATE` qui trouve `affectedRows` lignes et en
- * modifie `changedRows` (MySQL / MariaDB : une valeur identique ne compte pas).
+ * Lecture du match sous verrou, puis `UPDATE` qui trouve `affectedRows` lignes —
+ * le changement se lit dans le lien relu sous le verrou, jamais dans `changedRows`.
  */
-function found(row: Record<string, unknown> = playedRow, affectedRows = 1, changedRows = affectedRows) {
+function found(row: Record<string, unknown> = playedRow, affectedRows = 1) {
   return jest
     .fn<SqlQuery>()
     .mockResolvedValueOnce([[row]])
-    .mockResolvedValue([{ affectedRows, changedRows }]);
+    .mockResolvedValue([{ affectedRows }]);
 }
 
 beforeEach(() => {
@@ -98,10 +102,10 @@ describe("setMatchReplayUrl", () => {
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[playedRow]])
       .mockResolvedValueOnce([[ELIGIBLE]])
-      .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
+      .mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
-    expect(await setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).toEqual({ replayUrl: VIDEO, changed: true });
+    expect(await setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).toEqual({ replayUrl: VIDEO, change: { change: "SET", replayUrl: VIDEO } });
     // Match joué : le jeu, qui ne sert qu'à la condition du cast avant le lancement, n'est pas relu.
     expect(execute.mock.calls.some(([sql]) => String(sql).includes("FROM bg_tournaments"))).toBe(false);
     expect(execute.mock.calls[1]).toEqual([expect.stringContaining("FROM bg_match_casters"), [42, 12]]);
@@ -137,16 +141,16 @@ describe("setMatchReplayUrl", () => {
   });
 
   it("setMatchReplayUrl_shownCasterOnReopenedMatch_clearsLink", async () => {
-    const reopened = { ...playedRow, status: "READY", launched_at: null, launch_pairing: null };
+    const reopened = { ...withReplay, status: "READY", launched_at: null, launch_pairing: null };
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[reopened]])
       .mockResolvedValueOnce(GAME)
       .mockResolvedValueOnce([[ELIGIBLE]])
-      .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
+      .mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
-    expect(await setMatchReplayUrl(42, null, LIVE_ONLY_12)).toEqual({ replayUrl: null, changed: true });
+    expect(await setMatchReplayUrl(42, null, LIVE_ONLY_12)).toEqual({ replayUrl: null, change: { change: "REMOVED", replayUrl: null } });
   });
 
   it("setMatchReplayUrl_liveOnlyNotCasterOfMatch_throwsNotMatchCaster", async () => {
@@ -172,7 +176,7 @@ describe("setMatchReplayUrl", () => {
 
     expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ", STAFF)).toEqual({
       replayUrl: "https://youtu.be/dQw4w9WgXcQ",
-      changed: true,
+      change: { change: "SET", replayUrl: "https://youtu.be/dQw4w9WgXcQ" },
     });
 
     const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
@@ -184,10 +188,10 @@ describe("setMatchReplayUrl", () => {
   it.each<[string | null]>([[null], [""], ["   "]])(
     "efface le lien sur %p, sans condition d'état",
     async (raw) => {
-      const execute = found({ ...playedRow, status: "READY" });
+      const execute = found({ ...withReplay, status: "READY" });
       await mockDb(execute);
 
-      expect(await setMatchReplayUrl(42, raw, STAFF)).toEqual({ replayUrl: null, changed: true });
+      expect(await setMatchReplayUrl(42, raw, STAFF)).toEqual({ replayUrl: null, change: { change: "REMOVED", replayUrl: null } });
       const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
       expect(sql).toMatch(/SET replay_url = NULL WHERE id = \?$/);
       expect(params).toEqual([42]);
@@ -238,23 +242,70 @@ describe("setMatchReplayUrl", () => {
 });
 
 describe("setMatchReplayUrl — changement", () => {
-  it("setMatchReplayUrl_clearNeverSet_changedFalse", async () => {
-    await mockDb(found(playedRow, 1, 0));
-    expect(await setMatchReplayUrl(42, null, STAFF)).toEqual({ replayUrl: null, changed: false });
+  it("setMatchReplayUrl_clearNeverSet_changeNull", async () => {
+    await mockDb(found(playedRow));
+    expect(await setMatchReplayUrl(42, null, STAFF)).toEqual({ replayUrl: null, change: null });
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
-  it("setMatchReplayUrl_concurrentClear_secondChangedFalse", async () => {
-    // Deux effacements simultanés : la ligne est trouvée, mais déjà vide au second.
-    await mockDb(found(playedRow, 1, 0));
-    expect((await setMatchReplayUrl(42, "", STAFF)).changed).toBe(false);
+  it("setMatchReplayUrl_concurrentClear_secondChangeNull", async () => {
+    // Deux effacements simultanés : le second attend le verrou et relit un lien déjà vide.
+    await mockDb(found(playedRow));
+    expect((await setMatchReplayUrl(42, "", STAFF)).change).toBeNull();
   });
 
-  it("setMatchReplayUrl_sameUrl_changedFalse", async () => {
-    await mockDb(found(playedRow, 1, 0));
+  it("setMatchReplayUrl_sameUrl_changeNull", async () => {
+    await mockDb(found({ ...playedRow, replay_url: "https://youtu.be/dQw4w9WgXcQ" }));
     expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ", STAFF)).toEqual({
       replayUrl: "https://youtu.be/dQw4w9WgXcQ",
-      changed: false,
+      change: null,
     });
+  });
+
+  it("setMatchReplayUrl_replacingLink_changeChanged", async () => {
+    await mockDb(found(withReplay));
+
+    expect((await setMatchReplayUrl(42, VIDEO, STAFF)).change).toEqual({ change: "CHANGED", replayUrl: VIDEO });
+  });
+
+  it("setMatchReplayUrl_firstLink_changeSet", async () => {
+    await mockDb(found({ ...playedRow, replay_url: null }));
+
+    expect((await setMatchReplayUrl(42, VIDEO, STAFF)).change).toEqual({ change: "SET", replayUrl: VIDEO });
+  });
+
+  it("setMatchReplayUrl_erasingLink_changeRemoved", async () => {
+    await mockDb(found({ ...playedRow, replay_url: VIDEO }));
+
+    expect((await setMatchReplayUrl(42, null, STAFF)).change).toEqual({ change: "REMOVED", replayUrl: null });
+  });
+
+  it("setMatchReplayUrl_sameUrlAsLocked_noChangeWhateverChangedRowsSays", async () => {
+    // Le changement se lit sous le verrou : un `changedRows` trompeur n'y change rien.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ ...playedRow, replay_url: VIDEO }]])
+      .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
+    await mockDb(execute);
+
+    expect((await setMatchReplayUrl(42, VIDEO, STAFF)).change).toBeNull();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchReplayUrl_differentFromLockedWithoutChangedRows_changeChanged", async () => {
+    // Réponse sans texte d'information (aucun `changedRows`) : le changement est vu quand même.
+    await mockDb(found(withReplay));
+
+    expect((await setMatchReplayUrl(42, VIDEO, STAFF)).change).toEqual({ change: "CHANGED", replayUrl: VIDEO });
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("setMatchReplayUrl_lockedReadSelectsPreviousLink", async () => {
+    const execute = found();
+    await mockDb(execute);
+
+    await setMatchReplayUrl(42, VIDEO, STAFF);
+
+    expect(String(execute.mock.calls[0][0])).toMatch(/replay_url\s+FROM bg_matches WHERE id = \? FOR UPDATE/);
   });
 });
