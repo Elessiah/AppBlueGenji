@@ -181,13 +181,21 @@ remplacement (`assertRefereeable`, retrait compris).
 ## Hôte et premier ban
 
 `matchHostTeamId` : l'hôte choisi par le staff s'il joue encore le match ;
-sinon, en **BlueGenji Survie, phase finale**, la meilleure tête de série (rang
-d'endurance, `match-host-seeds.ts`, jointures partagées par l'instantané et la
-modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
-**bannit la première** (`firstBanTeamId`, `null` tant qu'un adversaire manque).
+sinon l'équipe 1, celle affichée en haut. L'hôte joue à **gauche** ; l'autre
+équipe **bannit la première** (`firstBanTeamId`, `null` tant qu'un adversaire
+manque).
+
+**BlueGenji Survie, phase finale : l'ordre de l'arbre, pas le classement.** Le
+règlement veut que « l'équipe affichée au-dessus » prenne le side gauche ;
+l'arbre pose le vainqueur du match 1 en équipe 1 de sa demi-finale
+(`planNextPlayoffRound`), il joue donc à gauche même s'il était moins bien
+classé que son adversaire. La règle d'origine donnait la gauche à la meilleure
+tête de série (rang d'endurance) et contredisait l'arbre affiché : elle est
+retirée, et les jointures `bg_endurance_standings` des lectures (instantané,
+modale de lancement, check-in) avec elle.
 
 **Quand un arbitre désigné crée la partie** (CAST-FOLLOWUP), l'équipe qui
-n'est **pas** la meilleure tête de série bannit la première, quelle que soit
+ne joue **pas** à gauche (l'équipe 2) bannit la première, quelle que soit
 la règle de ban du tournoi (`refereeHostedFirstBanTeamId`,
 `lib/shared/match-referee.ts`, posé dans l'instantané par `_internal.ts` ;
 `applyMapRules` garde ce choix pour un match `refereeAssigned`). La page du

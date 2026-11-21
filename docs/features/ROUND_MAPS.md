@@ -171,7 +171,7 @@ BO 5 à égalités ouvertes sans format de play-offs propre (« 6ᵉ map »).
 ## Préséance
 
 Match avec arbitre désigné : l'ordre du premier ban ne suit pas
-`first_ban_rule` — la non-tête de série bannit la première
+`first_ban_rule` — l'équipe 2 (côté droit) bannit la première
 (`MATCH_REFEREE.md` § Hôte et premier ban).
 
 - Une carte 1 **imposée** l'emporte sur `first_map` à l'affichage

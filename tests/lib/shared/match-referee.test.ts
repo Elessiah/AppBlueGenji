@@ -86,12 +86,13 @@ describe("matchHostTeamId / firstBanTeamId", () => {
     expect(matchHostTeamId(30, 10, 20)).toBe(10);
   });
 
-  it("BlueGenji Survie : la meilleure tête de série héberge (rang le plus petit)", () => {
-    expect(matchHostTeamId(null, 10, 20, { team1: 4, team2: 1 })).toBe(20);
-    expect(matchHostTeamId(null, 10, 20, { team1: 1, team2: 4 })).toBe(10);
-    // Rang inconnu : l'équipe 1, comme ailleurs. Le choix du staff passe devant le rang.
-    expect(matchHostTeamId(null, 10, 20, { team1: null, team2: 1 })).toBe(10);
-    expect(matchHostTeamId(10, 10, 20, { team1: 4, team2: 1 })).toBe(10);
+  it("matchHostTeamId_noStoredHost_team1HostsWhateverItsRank", () => {
+    // BlueGenji Survie, phase finale : l'ordre de l'arbre, pas le classement.
+    // Le vainqueur du match 1 (8ᵉ) est l'équipe 1 de sa demi-finale contre la
+    // 2ᵉ : il joue à gauche.
+    expect(matchHostTeamId(null, 10, 20)).toBe(10);
+    expect(matchHostTeamId(null, 10, null)).toBe(10);
+    expect(matchHostTeamId(null, null, null)).toBeNull();
   });
 
   it("l'autre équipe bannit la première ; personne tant qu'un adversaire manque", () => {

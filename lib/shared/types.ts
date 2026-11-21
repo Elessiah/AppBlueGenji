@@ -720,8 +720,8 @@ export type BracketMatch = {
   liveStartedAt: string | null;
   /**
    * Équipe qui héberge la partie (côté gauche), **résolue** : celle que
-   * l'arbitrage a désignée, sinon — BlueGenji Survie, phase finale — la
-   * meilleure tête de série, sinon l'équipe 1 (`matchHostTeamId`,
+   * l'arbitrage a désignée, sinon l'équipe 1 — en BlueGenji Survie, phase
+   * finale, l'ordre de l'arbre et non le classement (`matchHostTeamId`,
    * `lib/shared/match-referee.ts`).
    */
   hostTeamId: number | null;

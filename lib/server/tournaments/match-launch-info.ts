@@ -67,7 +67,6 @@ import {
 } from "./match-launch";
 import { castEligibilityBlock, refereeEligibilityBlock } from "./cast-eligibility";
 import { matchHostTeamId, type NoRefereeCandidate } from "@/lib/shared/match-referee";
-import { seedJoins } from "./match-host-seeds";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { isUnsettled, rollbackKeepingError } from "./lock-wait";
@@ -106,9 +105,6 @@ type CandidateBaseRow = LaunchMatchBaseRow & {
   team2_logo_url: string | null;
   team1_solo_user_id: number | null;
   team2_solo_user_id: number | null;
-  /** Rang de chaque engagée au classement d'endurance (BlueGenji Survie, phase finale) ; `null` ailleurs. */
-  team1_seed: number | null;
-  team2_seed: number | null;
 };
 
 type CandidateRow = CandidateBaseRow & {
@@ -240,7 +236,6 @@ async function loadCandidates(
        m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
        m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at, m.team2_ready_at,
        m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed,
-       es1.\`rank\` AS team1_seed, es2.\`rank\` AS team2_seed,
        t.name AS tournament_name, t.game AS tournament_game,
        t1.name AS team1_name, t2.name AS team2_name,
        t1.logo_url AS team1_logo_url, t2.logo_url AS team2_logo_url,
@@ -249,7 +244,6 @@ async function loadCandidates(
      JOIN bg_tournaments t ON t.id = m.tournament_id
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-     ${seedJoins("m")}
      WHERE t.state = 'RUNNING'
        AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
@@ -1159,9 +1153,5 @@ function candidateHostTeamId(row: CandidateRow): number | null {
     row.host_team_id === null ? null : Number(row.host_team_id),
     Number(row.team1_id),
     Number(row.team2_id),
-    {
-      team1: row.team1_seed === null ? null : Number(row.team1_seed),
-      team2: row.team2_seed === null ? null : Number(row.team2_seed),
-    },
   );
 }

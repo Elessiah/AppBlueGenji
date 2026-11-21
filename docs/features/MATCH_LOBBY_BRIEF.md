@@ -171,8 +171,8 @@ messages Discord. Vu de l'engagée du destinataire :
   « Salons vocaux d'équipe » du tournoi, ni entrée solo, ni fantôme —
   `MATCH_VOICE.md` ; sinon le bot n'ouvrira aucun salon et l'annoncer serait
   faux) ; **gauche (hôte) et droite** (`matchHostTeamId` : choisi par le staff,
-  sinon la meilleure tête de série en BlueGenji Survie, phase finale, sinon
-  l'équipe 1) ; puis **qui crée la partie** — en autogestion, l'hôte la crée et
+  sinon
+  l'équipe 1, ordre de l'arbre en BlueGenji Survie, phase finale) ; puis **qui crée la partie** — en autogestion, l'hôte la crée et
   l'autre **vérifie les paramètres** ; avec un arbitre désigné (encore
   éligible, `loadEligibleRefereeIds`), c'est lui qui invite ; **sans décision,
   aucune ligne** (charger l'hôte trancherait à la place du staff). Un arbitre
