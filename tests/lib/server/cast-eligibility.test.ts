@@ -223,11 +223,11 @@ describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATC
 
   it("mapMatch_completedRefereedMatch_noFirstBan", () => {
     // L'ordre réellement suivi n'est pas gardé : un match joué n'en affirme aucun.
-    expect(mapMatch(row({ ...eligible, status: "COMPLETED", team1_seed: 1, team2_seed: 4 })).firstBanTeamId).toBeNull();
+    expect(mapMatch(row({ ...eligible, status: "COMPLETED" })).firstBanTeamId).toBeNull();
   });
 
-  it("mapMatch_pendingRefereedMatch_lowerSeedBansFirst", () => {
-    expect(mapMatch(row({ ...eligible, status: "PENDING", team1_seed: 1, team2_seed: 4 })).firstBanTeamId).toBe(2);
+  it("mapMatch_pendingRefereedMatch_team2BansFirst", () => {
+    expect(mapMatch(row({ ...eligible, status: "PENDING" })).firstBanTeamId).toBe(2);
   });
 
   it("mapMatchLaunch_pendingMatch_hasRefereeKey", () => {
@@ -272,12 +272,12 @@ describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATC
     expect(match.refereeAssigned).toBe(true);
   });
 
-  it("hôte à gauche, premier ban à l'autre ; en BlueGenji Survie la meilleure tête de série héberge", () => {
+  it("hôte à gauche (équipe 1, ordre de l'arbre), premier ban à l'autre ; le choix du staff passe devant", () => {
     expect(mapMatch(row()).hostTeamId).toBe(1);
     expect(mapMatch(row()).firstBanTeamId).toBe(2);
-    const seeded = mapMatch(row({ team1_seed: 5, team2_seed: 2 }));
-    expect(seeded.hostTeamId).toBe(2);
-    expect(seeded.firstBanTeamId).toBe(1);
+    const chosen = mapMatch(row({ host_team_id: 2 }));
+    expect(chosen.hostTeamId).toBe(2);
+    expect(chosen.firstBanTeamId).toBe(1);
   });
 
   it("autogestion et première carte passent telles quelles, la carte en texte visible", () => {

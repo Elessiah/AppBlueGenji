@@ -14,9 +14,9 @@
  *   l'éteint, l'allumer retire l'arbitre. Sans l'un ni l'autre, le match reste
  *   « sans décision » : rien ne bascule d'office (le staff est seulement averti
  *   au lancement).
- * - **Hôte** : celui que le staff a choisi, sinon — en BlueGenji Survie, phase
- *   finale — la meilleure tête de série, sinon l'équipe 1. Il prend le côté
- *   gauche ; l'autre équipe bannit la première.
+ * - **Hôte** : celui que le staff a choisi, sinon l'équipe 1 (ordre de l'arbre
+ *   en BlueGenji Survie, phase finale). Il prend le côté gauche ; l'autre
+ *   équipe bannit la première.
  */
 import { identityBlockIsDiscordOnly, identityComplete, type CasterIdentity } from "./match-launch";
 import { visibleText } from "./visible-text";
@@ -89,22 +89,19 @@ export function normalizeFirstMap(raw: unknown): string | null {
 }
 
 /**
- * Équipe hôte du match : celle que le staff a désignée (si elle joue encore
- * le match), sinon la meilleure tête de série quand le format en donne
- * (`seedOf`, rang 1 = meilleure — BlueGenji Survie, phase finale), sinon
- * l'équipe 1. `seeds` : rang de chaque engagée (`null` hors de ce cas).
+ * Équipe hôte du match (côté gauche en jeu) : celle que le staff a désignée
+ * (si elle joue encore le match), sinon l'équipe 1 — l'engagée affichée en
+ * haut. En BlueGenji Survie, phase finale, c'est donc l'**ordre de l'arbre**
+ * qui décide, pas le classement : le vainqueur du match 1 joue à gauche de sa
+ * demi-finale même s'il était moins bien classé (règlement, phase éliminatoire).
  */
 export function matchHostTeamId(
   storedHostTeamId: number | null,
   team1Id: number | null,
   team2Id: number | null,
-  seeds?: { team1: number | null; team2: number | null },
 ): number | null {
   if (storedHostTeamId !== null && (storedHostTeamId === team1Id || storedHostTeamId === team2Id)) {
     return storedHostTeamId;
-  }
-  if (seeds && team2Id !== null && seeds.team1 !== null && seeds.team2 !== null && seeds.team2 < seeds.team1) {
-    return team2Id;
   }
   return team1Id;
 }
@@ -120,18 +117,13 @@ export function firstBanTeamId(
 }
 
 /**
- * Premier ban d'un match **dont l'arbitre désigné crée la partie** : l'équipe
- * qui n'est pas la meilleure tête de série (`matchHostTeamId` sans l'hôte choisi
- * par le staff — rang d'endurance en BlueGenji Survie, phase finale, sinon
- * l'équipe 1), quelle que soit la règle de premier ban du tournoi : aucune
- * équipe n'héberge. `null` tant qu'un adversaire manque.
+ * Premier ban d'un match **dont l'arbitre désigné crée la partie** : l'équipe 2
+ * (en bas de l'arbre), même si le staff lui a donné l'hôte (`matchHostTeamId`
+ * sans l'hôte choisi), quelle que soit la règle de premier ban du tournoi :
+ * aucune équipe n'héberge. `null` tant qu'un adversaire manque.
  */
-export function refereeHostedFirstBanTeamId(
-  team1Id: number | null,
-  team2Id: number | null,
-  seeds?: { team1: number | null; team2: number | null },
-): number | null {
-  return firstBanTeamId(matchHostTeamId(null, team1Id, team2Id, seeds), team1Id, team2Id);
+export function refereeHostedFirstBanTeamId(team1Id: number | null, team2Id: number | null): number | null {
+  return firstBanTeamId(matchHostTeamId(null, team1Id, team2Id), team1Id, team2Id);
 }
 
 /** Un match entré en lancement sans arbitre ni autogestion, avant son alerte. */

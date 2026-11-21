@@ -1,6 +1,5 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { TournamentGame, TournamentState } from "@/lib/shared/types";
-import { seedJoins } from "./match-host-seeds";
 import { playsMatchSql } from "./match-players";
 import { prodRoleSql } from "./prod-sql";
 import { userSuspendedSql } from "@/lib/server/suspension-sql";
@@ -385,8 +384,6 @@ export async function getMatchRows(
       m.map_picks,
       ${refereeKeptColumns("ru")},
       (m.referee_user_id IS NOT NULL AND ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "r")}) AS referee_plays_match,
-      es1.\`rank\` AS team1_seed,
-      es2.\`rank\` AS team2_seed,
       m.replay_url,
       p.position AS phase_position
      FROM bg_matches m
@@ -394,7 +391,6 @@ export async function getMatchRows(
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
      LEFT JOIN bg_users ru ON ru.id = m.referee_user_id
      LEFT JOIN bg_users pu ON pu.id = m.prod_user_id
-     ${seedJoins("m")}
      LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
      WHERE m.tournament_id = ?
      ORDER BY

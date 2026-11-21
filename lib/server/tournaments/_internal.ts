@@ -195,9 +195,6 @@ export type MatchRow = RowDataPacket & {
   referee_objection_at?: Date | string | null;
   /** `1` si l'arbitre désigné joue l'un des deux engagés (membre en cours ou entrée solo). */
   referee_plays_match?: number | null;
-  /** Rang d'endurance des engagées (BlueGenji Survie, phase finale ; `./match-host-seeds`). */
-  team1_seed?: number | null;
-  team2_seed?: number | null;
   /** NULL = aucune rediff (cf. `lib/shared/match-replay.ts`). */
   replay_url?: string | null;
 };
@@ -545,9 +542,8 @@ function refereeFirstBan(
   status: MatchRow["status"],
   team1Id: number | null,
   team2Id: number | null,
-  seeds: { team1: number | null; team2: number | null },
 ): number | null {
-  return status === "COMPLETED" ? null : refereeHostedFirstBanTeamId(team1Id, team2Id, seeds);
+  return status === "COMPLETED" ? null : refereeHostedFirstBanTeamId(team1Id, team2Id);
 }
 
 /** Champs du lancement d'un match (`lib/shared/match-launch.ts`). */
@@ -577,18 +573,17 @@ function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[], ga
     casters: casters.map((caster) => ({ userId: caster.userId, readyAt: current ? toIso(caster.readyAt) : null })),
     referee: referee ? { readyAt: current ? toIso(row.referee_ready_at ?? null) : null } : null,
   });
-  const seeds = { team1: nullableId(row.team1_seed), team2: nullableId(row.team2_seed) };
-  const hostTeamId = matchHostTeamId(nullableId(row.host_team_id), team1Id, team2Id, seeds);
+  const hostTeamId = matchHostTeamId(nullableId(row.host_team_id), team1Id, team2Id);
   const firstMap = row.first_map ? visibleText(row.first_map) : "";
   return {
     hostTeamId,
-    // L'arbitre désigné crée la partie : la moins bonne tête de série bannit la
+    // L'arbitre désigné crée la partie : l'équipe 2 (en bas de l'arbre) bannit la
     // première, quelle que soit la règle du tournoi (`applyMapRules` la garde).
     // Un match arbitré déjà joué n'en dit rien : rien ne garde l'ordre
     // réellement suivi (la règle a changé avec l'arbitre hôte), et la page
     // n'affirme pas un ordre qui n'a peut-être pas été appliqué.
     firstBanTeamId: referee
-      ? refereeFirstBan(row.status, team1Id, team2Id, seeds)
+      ? refereeFirstBan(row.status, team1Id, team2Id)
       : firstBanTeamId(hostTeamId, team1Id, team2Id),
     refereeAssigned: referee,
     // Empreinte de la désignation, jusqu'à la fin du match : la fenêtre

@@ -5,24 +5,18 @@ import { bracketMatch } from "../../helpers/bracket-match";
 
 /**
  * Premier ban d'un match dont l'arbitre désigné crée la partie
- * (`docs/features/MATCH_REFEREE.md`) : la non-tête de série bannit la
- * première, quelle que soit la règle du tournoi.
+ * (`docs/features/MATCH_REFEREE.md`) : l'équipe de droite (équipe 2) bannit
+ * la première, quelle que soit la règle du tournoi — en BlueGenji Survie,
+ * phase finale, l'ordre de l'arbre, pas le classement.
  */
 describe("refereeHostedFirstBanTeamId", () => {
-  it("refereeHostedFirstBanTeamId_team2BetterSeed_team1BansFirst", () => {
-    expect(refereeHostedFirstBanTeamId(10, 20, { team1: 4, team2: 1 })).toBe(10);
-  });
-
-  it("refereeHostedFirstBanTeamId_team1BetterSeed_team2BansFirst", () => {
-    expect(refereeHostedFirstBanTeamId(10, 20, { team1: 1, team2: 4 })).toBe(20);
-  });
-
-  it("refereeHostedFirstBanTeamId_noSeeds_team2BansFirst", () => {
+  it("refereeHostedFirstBanTeamId_twoEntrants_team2BansFirst", () => {
     expect(refereeHostedFirstBanTeamId(10, 20)).toBe(20);
   });
 
   it("refereeHostedFirstBanTeamId_missingOpponent_null", () => {
-    expect(refereeHostedFirstBanTeamId(10, null, { team1: 4, team2: null })).toBeNull();
+    expect(refereeHostedFirstBanTeamId(10, null)).toBeNull();
+    expect(refereeHostedFirstBanTeamId(null, 20)).toBeNull();
   });
 });
 

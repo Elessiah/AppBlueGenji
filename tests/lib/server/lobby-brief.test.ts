@@ -57,8 +57,6 @@ const MATCH = {
   voice_tracked: 0,
   stream_urls: null,
   host_team_id: null,
-  team1_seed: null,
-  team2_seed: null,
   first_map: "Ilios",
   // Le check-in ne part qu'en autogestion (décision du 2026-11-05).
   self_managed: 1,
@@ -233,6 +231,13 @@ describe("dispatchLobbyBriefs", () => {
     expect(sql).toMatch(/n\.phase = 'LOBBY_BRIEF_1' AND n\.pairing LIKE CONCAT\(m\.team1_id, ':%'\)/);
     expect(sql).toMatch(/n\.phase = 'LOBBY_BRIEF_2' AND n\.pairing LIKE CONCAT\('%:', m\.team2_id\)/);
     expect(sql).not.toMatch(/< 2/);
+  });
+
+  it("dispatchLobbyBriefs_dueSql_readsNoEnduranceRank", async () => {
+    const { query } = mockDb([]);
+    await dispatchLobbyBriefs();
+    // L'hôte suit l'ordre de l'arbre (équipe 1), jamais le classement d'endurance.
+    expect(String(query.mock.calls[0][0])).not.toMatch(/bg_endurance_standings/);
   });
 
   it("dispatchLobbyBriefs_sweep_skipsSideWithDurableMark", async () => {
@@ -824,11 +829,13 @@ describe("dispatchLobbyBriefs", () => {
     expect(peak).toBeLessThanOrEqual(LOBBY_BRIEF_CONCURRENCY);
   });
 
-  it("suit l'hôte choisi, la tête de série en BG Survie et le cast", async () => {
+  it("suit l'hôte choisi, l'ordre de l'arbre (équipe 1 à gauche) et le cast", async () => {
     jest.mocked(readMatchCasters).mockResolvedValue(new Map([[40, [7]]]));
+    // Match 41 : demi-finale BG Survie, l'équipe 1 (« Nova ») est la moins bien
+    // classée mais vient du match 1 de l'arbre — elle joue à gauche.
     mockDb([
       { ...MATCH, host_team_id: 2 },
-      { ...MATCH, id: 41, team1_seed: 4, team2_seed: 1 },
+      { ...MATCH, id: 41, round_number: 1001, team1_id: 2, team2_id: 1, team1_name: "Nova", team2_name: "Renards", launch_pairing: "2:1", brief_pairing: "2:1" },
     ]);
     await dispatchLobbyBriefs();
     // Les matchs sont briefés en parallèle : chaque envoi se retrouve par son lien.

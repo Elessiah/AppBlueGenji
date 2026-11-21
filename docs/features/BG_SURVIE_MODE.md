@@ -203,7 +203,7 @@ et non le seeding classique :
 | 3 | 1ʳᵉ contre 5ᵉ |
 | 4 | 3ᵉ contre 7ᵉ |
 
-L'équipe du haut prend le side gauche. Une **petite finale** départage la 3ᵉ
+L'équipe du haut prend le side gauche — à chaque tour, ordre de l'arbre et non du classement : le vainqueur du match 1 joue à gauche de sa demi-finale (`MATCH_REFEREE.md` § Hôte et premier ban). Une **petite finale** départage la 3ᵉ
 place en parallèle de la finale — à l'écran, une carte sous la finale, annoncée
 dès l'ouverture des play-offs (`ENDURANCE_ROUND_PANELS.md`).
 

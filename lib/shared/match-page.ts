@@ -81,8 +81,8 @@ export type MatchPageSide = {
 
 /**
  * Les deux côtés de la partie, **hôte à gauche** : l'équipe résolue par
- * `hostTeamId` (désignée par l'arbitrage, meilleure tête de série en phase
- * finale de BlueGenji Survie, sinon l'équipe 1), l'autre à droite. Sans hôte
+ * `hostTeamId` (désignée par l'arbitrage, sinon l'équipe 1 — ordre de l'arbre
+ * en phase finale de BlueGenji Survie), l'autre à droite. Sans hôte
  * connu (adversaire manquant), l'ordre du plateau.
  */
 export function matchPageSides(

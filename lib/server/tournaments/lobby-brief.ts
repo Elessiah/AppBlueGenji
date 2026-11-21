@@ -96,7 +96,6 @@ import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { streamUrlCandidatesSql } from "./match-casters";
 import { firstAnnounceableUrl } from "@/lib/shared/live-announcements";
 import { formatLobbyBriefDm } from "./lobby-brief-dm";
-import { seedJoins } from "./match-host-seeds";
 import { readMatchCasters } from "./player-pushes";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -202,8 +201,6 @@ export type LobbyBriefRow = RowDataPacket & {
    */
   stream_urls?: string | null;
   host_team_id: number | null;
-  team1_seed: number | null;
-  team2_seed: number | null;
   first_map: string | null;
   self_managed: number;
   referee_user_id: number | null;
@@ -331,7 +328,7 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
             m.team1_id, m.team2_id, t1.name AS team1_name, t2.name AS team2_name,
             t1.is_ghost AS team1_ghost, t2.is_ghost AS team2_ghost,
             m.launch_pairing, CONCAT(m.team1_id, ':', m.team2_id) AS brief_pairing,
-            m.launched_at, m.host_team_id, es1.rank AS team1_seed, es2.rank AS team2_seed,
+            m.launched_at, m.host_team_id,
             CASE WHEN m.start_at IS NULL OR m.start_at > NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
                    THEN 'UNSCHEDULED'
                  WHEN m.start_at > NOW() THEN 'SOON' ELSE 'PASSED' END
@@ -357,8 +354,7 @@ const BRIEF_FROM = `FROM bg_matches m
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
        LEFT JOIN bg_tournament_round_maps rm ON rm.tournament_id = m.tournament_id AND rm.phase_id = m.phase_id
-         AND rm.bracket = m.bracket AND rm.round_number = m.round_number
-       ${seedJoins("m")}`;
+         AND rm.bracket = m.bracket AND rm.round_number = m.round_number`;
 
 /**
  * Option « Check-in des matchs » du tournoi (`MATCH_CHECK_IN_SETTING.md`),
@@ -598,10 +594,7 @@ export function lobbyBriefSides(
 ): { teamId: number; side: LobbyBriefSide }[] {
   const team1Id = Number(row.team1_id);
   const team2Id = Number(row.team2_id);
-  const hostTeamId = matchHostTeamId(row.host_team_id === null ? null : Number(row.host_team_id), team1Id, team2Id, {
-    team1: row.team1_seed === null ? null : Number(row.team1_seed),
-    team2: row.team2_seed === null ? null : Number(row.team2_seed),
-  });
+  const hostTeamId = matchHostTeamId(row.host_team_id === null ? null : Number(row.host_team_id), team1Id, team2Id);
   const slots = parseStoredSlots(row.round_slots_json);
   const storedFirstMap = row.first_map === null || row.first_map === "" ? null : String(row.first_map);
   const banFirstTeamId = firstBanTeamFor(parseFirstBanRule(row.first_ban_rule), hostTeamId, team1Id, team2Id);
