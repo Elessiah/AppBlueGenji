@@ -720,7 +720,7 @@ function MapsSection({
   let banOrderValue: ReactNode = <Muted>{t("matchPage.opponentsPending")}</Muted>;
   if (banKnown) {
     const value = rm.t("page.banOrderValue", { first: banName, second: otherName });
-    // L'arbitre crée la partie : l'équipe 2 (affichée en bas) bannit la
+    // L'arbitre crée la partie : l'équipe 2 (en bas de l'arbre) bannit la
     // première, quelle que soit la règle du tournoi.
     banOrderValue = match.refereeAssigned ? (
       <DecisionValue value={value} subject={rm.t("page.banOrder")} hintId={`${titleId}-ban`} hint={rm.t("page.refereeHostBan")} />

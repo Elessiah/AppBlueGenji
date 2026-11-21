@@ -118,7 +118,7 @@ export function firstBanTeamId(
 
 /**
  * Premier ban d'un match **dont l'arbitre désigné crée la partie** : l'équipe 2
- * (affichée en bas), même si le staff lui a donné l'hôte (`matchHostTeamId`
+ * (en bas de l'arbre), même si le staff lui a donné l'hôte (`matchHostTeamId`
  * sans l'hôte choisi), quelle que soit la règle de premier ban du tournoi :
  * aucune équipe n'héberge. `null` tant qu'un adversaire manque.
  */

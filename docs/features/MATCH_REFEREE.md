@@ -195,7 +195,7 @@ retirée, et les jointures `bg_endurance_standings` des lectures (instantané,
 modale de lancement, check-in) avec elle.
 
 **Quand un arbitre désigné crée la partie** (CAST-FOLLOWUP), l'équipe 2
-(affichée en bas) bannit la première — même si le staff lui a donné l'hôte —, quelle que soit
+(en bas de l'arbre) bannit la première — même si le staff lui a donné l'hôte —, quelle que soit
 la règle de ban du tournoi (`refereeHostedFirstBanTeamId`,
 `lib/shared/match-referee.ts`, posé dans l'instantané par `_internal.ts` ;
 `applyMapRules` garde ce choix pour un match `refereeAssigned`). La page du

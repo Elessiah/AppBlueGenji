@@ -577,7 +577,7 @@ function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[], ga
   const firstMap = row.first_map ? visibleText(row.first_map) : "";
   return {
     hostTeamId,
-    // L'arbitre désigné crée la partie : l'équipe 2 (affichée en bas) bannit la
+    // L'arbitre désigné crée la partie : l'équipe 2 (en bas de l'arbre) bannit la
     // première, quelle que soit la règle du tournoi (`applyMapRules` la garde).
     // Un match arbitré déjà joué n'en dit rien : rien ne garde l'ordre
     // réellement suivi (la règle a changé avec l'arbitre hôte), et la page
