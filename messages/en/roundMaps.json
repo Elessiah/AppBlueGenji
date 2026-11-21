@@ -19,7 +19,7 @@
     "resetConfirmBody": "This round's maps are removed for all its matches: the map is entered match by match again. Picks already made on matches stay.",
     "tiebreak": "Tiebreak map",
     "tiebreakHint": "Playoff round: one extra map, played only if both sides are one map away from winning (drawn maps included). Bans follow the next-maps rule.",
-    "refereeHostBan": "The designated referee creates the game: the team on the right bans first."
+    "refereeHostBan": "The designated referee creates the game: the team shown below bans first."
   },
   "sheet": {
     "title": "Maps and bans",

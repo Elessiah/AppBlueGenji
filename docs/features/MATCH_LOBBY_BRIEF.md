@@ -171,8 +171,7 @@ messages Discord. Vu de l'engagée du destinataire :
   « Salons vocaux d'équipe » du tournoi, ni entrée solo, ni fantôme —
   `MATCH_VOICE.md` ; sinon le bot n'ouvrira aucun salon et l'annoncer serait
   faux) ; **gauche (hôte) et droite** (`matchHostTeamId` : choisi par le staff,
-  sinon
-  l'équipe 1, ordre de l'arbre en BlueGenji Survie, phase finale) ; puis **qui crée la partie** — en autogestion, l'hôte la crée et
+  sinon l'équipe 1, ordre de l'arbre en BlueGenji Survie, phase finale) ; puis **qui crée la partie** — en autogestion, l'hôte la crée et
   l'autre **vérifie les paramètres** ; avec un arbitre désigné (encore
   éligible, `loadEligibleRefereeIds`), c'est lui qui invite ; **sans décision,
   aucune ligne** (charger l'hôte trancherait à la place du staff). Un arbitre
@@ -406,7 +405,7 @@ entrée de `PRIVACY_CHANGES`),
 `tests/lib/server/lobby-brief.test.ts` (requête, destinataires lus une fois,
 réservation par côté puis envoi avant le côté suivant, relecture des réglages
 et de l'arbitre, relecture en panne, fantôme, équipe sans joueur actif dite une
-fois, arbitre qui joue, solo, hôte/tête de série, cast, arbitre inéligible, lien
+fois, arbitre qui joue, solo, hôte/ordre de l'arbre, cast, arbitre inéligible, lien
 tu, personne joint, bot injoignable, envoi qui lève, réservation interrompue
 rendue par sa clé, rendu par id **puis second balayage où seul ce côté est
 rebriefé**, relances plafonnées, étranglement), `throttled-sweep.test.ts`,

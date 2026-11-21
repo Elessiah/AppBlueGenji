@@ -14,9 +14,9 @@
  *   l'éteint, l'allumer retire l'arbitre. Sans l'un ni l'autre, le match reste
  *   « sans décision » : rien ne bascule d'office (le staff est seulement averti
  *   au lancement).
- * - **Hôte** : celui que le staff a choisi, sinon — en BlueGenji Survie, phase
- *   finale — la meilleure tête de série, sinon l'équipe 1. Il prend le côté
- *   gauche ; l'autre équipe bannit la première.
+ * - **Hôte** : celui que le staff a choisi, sinon l'équipe 1 (ordre de l'arbre
+ *   en BlueGenji Survie, phase finale). Il prend le côté gauche ; l'autre
+ *   équipe bannit la première.
  */
 import { identityBlockIsDiscordOnly, identityComplete, type CasterIdentity } from "./match-launch";
 import { visibleText } from "./visible-text";
@@ -117,9 +117,9 @@ export function firstBanTeamId(
 }
 
 /**
- * Premier ban d'un match **dont l'arbitre désigné crée la partie** : l'équipe
- * qui ne joue pas à gauche (`matchHostTeamId` sans l'hôte choisi par le
- * staff : l'équipe 2), quelle que soit la règle de premier ban du tournoi :
+ * Premier ban d'un match **dont l'arbitre désigné crée la partie** : l'équipe 2
+ * (affichée en bas), même si le staff lui a donné l'hôte (`matchHostTeamId`
+ * sans l'hôte choisi), quelle que soit la règle de premier ban du tournoi :
  * aucune équipe n'héberge. `null` tant qu'un adversaire manque.
  */
 export function refereeHostedFirstBanTeamId(team1Id: number | null, team2Id: number | null): number | null {

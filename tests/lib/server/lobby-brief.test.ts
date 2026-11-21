@@ -233,6 +233,13 @@ describe("dispatchLobbyBriefs", () => {
     expect(sql).not.toMatch(/< 2/);
   });
 
+  it("dispatchLobbyBriefs_dueSql_readsNoEnduranceRank", async () => {
+    const { query } = mockDb([]);
+    await dispatchLobbyBriefs();
+    // L'hôte suit l'ordre de l'arbre (équipe 1), jamais le classement d'endurance.
+    expect(String(query.mock.calls[0][0])).not.toMatch(/bg_endurance_standings/);
+  });
+
   it("dispatchLobbyBriefs_sweep_skipsSideWithDurableMark", async () => {
     const { query } = mockDb([]);
     await dispatchLobbyBriefs();

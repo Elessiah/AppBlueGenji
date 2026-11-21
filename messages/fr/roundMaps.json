@@ -19,7 +19,7 @@
     "resetConfirmBody": "Les cartes de ce tour sont retirées pour tous ses matchs : la carte se saisit de nouveau match par match. Les choix déjà faits sur les matchs restent.",
     "tiebreak": "Map de départage",
     "tiebreakHint": "Tour de play-offs : une map de plus, jouée seulement si chaque camp est à une map de la victoire (maps nulles comprises). Les bans suivent la règle des cartes suivantes.",
-    "refereeHostBan": "L'arbitre désigné crée la partie : l'équipe de droite bannit la première."
+    "refereeHostBan": "L'arbitre désigné crée la partie : l'équipe affichée en bas bannit la première."
   },
   "sheet": {
     "title": "Cartes et bans",
