@@ -30,7 +30,7 @@
     "followsRanking": "Sorted by the site ranking: each registration takes its place by rating, and the order follows ratings until the launch. Reorder the list to lock it: your order then takes precedence.",
     "followsFrozenDraw": "Ranks locked at kickoff from the site ranking: the draw's ranks, even if ratings have changed since.",
     "randomPending": "Starting order drawn at random when registration closes: until then the list shows the registration order, and the first-round preview waits for the draw.",
-    "randomDrawn": "Starting order drawn at random when registration closed: this is the order that will be played.",
+    "randomDrawn": "Starting order drawn at random: this is the first-round order.",
     "reordered": "Order updated.",
     "newRank": "New rank for {name}: {rank} of {total}.",
     "moveUpAria": "Move {name} up one rank",

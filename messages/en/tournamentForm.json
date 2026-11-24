@@ -212,7 +212,7 @@
     },
     "randomSeeding": {
       "label": "Random starting order",
-      "description": "On: when registration closes, the starting order is drawn at random (true randomness) instead of following the registration order or the site ranking. It sets the first-round pairings; the first-round preview only appears after the draw, and the order can no longer be changed with the arrows.",
+      "description": "On: when registration closes, the starting order is drawn at random and replaces the registration order, the ranking or an order set by hand. The first-round preview only appears after the draw, and the order can no longer be changed with the arrows.",
       "scope": "Can be changed until the tournament starts, then locked. Turned on after registration has closed, the draw happens on save.",
       "locked": "The tournament has started: this option can no longer be changed."
     },

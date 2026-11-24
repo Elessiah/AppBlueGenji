@@ -30,7 +30,7 @@ import {
   type ValidatedTournamentInput,
 } from "./validation";
 import { insertPhases } from "./phases-repository";
-import { drawRandomSeedingIfDue } from "./random-seeding";
+import { drawRandomSeedingIfDue, writeSeedOrder } from "./random-seeding";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
@@ -682,12 +682,11 @@ async function applyRandomSeedingChange(
        FOR UPDATE`,
       [tournamentId],
     );
-    for (let index = 0; index < registrations.length; index += 1) {
-      await connection.execute(
-        `UPDATE bg_tournament_registrations SET seed = ? WHERE tournament_id = ? AND team_id = ?`,
-        [index + 1, tournamentId, Number(registrations[index]!.team_id)],
-      );
-    }
+    await writeSeedOrder(
+      connection,
+      tournamentId,
+      registrations.map((registration) => Number(registration.team_id)),
+    );
     await connection.execute(
       `UPDATE bg_tournaments SET manual_seeding = 0, random_seeding_drawn_at = NULL WHERE id = ?`,
       [tournamentId],

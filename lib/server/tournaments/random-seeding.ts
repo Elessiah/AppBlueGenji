@@ -65,15 +65,30 @@ export async function drawRandomSeedingIfDue(
     registrations.map((registration) => Number(registration.team_id)),
     pick,
   );
-  for (let index = 0; index < drawn.length; index += 1) {
-    await connection.execute(
-      `UPDATE bg_tournament_registrations SET seed = ? WHERE tournament_id = ? AND team_id = ?`,
-      [index + 1, tournamentId, drawn[index]],
-    );
-  }
+  await writeSeedOrder(connection, tournamentId, drawn);
   await connection.execute(
     `UPDATE bg_tournaments SET manual_seeding = 1, random_seeding_drawn_at = ? WHERE id = ?`,
     [now, tournamentId],
   );
   return true;
+}
+
+/**
+ * Écrit l'ordre `teamIds` dans `seed` (1 à N) en **une** instruction
+ * (`CASE team_id`) : le tirage et son extinction ne paient pas un aller-retour
+ * par engagée sous le verrou du tournoi. Rien à écrire sur une liste vide.
+ */
+export async function writeSeedOrder(
+  connection: PoolConnection,
+  tournamentId: number,
+  teamIds: readonly number[],
+): Promise<void> {
+  if (teamIds.length === 0) return;
+  const cases = teamIds.map(() => "WHEN ? THEN ?").join(" ");
+  const placeholders = teamIds.map(() => "?").join(", ");
+  await connection.execute(
+    `UPDATE bg_tournament_registrations SET seed = CASE team_id ${cases} END
+     WHERE tournament_id = ? AND team_id IN (${placeholders})`,
+    [...teamIds.flatMap((teamId, index) => [teamId, index + 1]), tournamentId, ...teamIds],
+  );
 }

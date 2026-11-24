@@ -26,10 +26,20 @@ function setup(tournament: TournamentState | null, options: { matches?: number; 
 
 const pending: TournamentState = { state: "UPCOMING", random_seeding: 1, random_seeding_drawn_at: null };
 
+/**
+ * Écritures d'ordre, une ligne `[seed, tournoi, équipe]` par engagée, décodées
+ * de l'unique `UPDATE … SET seed = CASE team_id …` (`writeSeedOrder`).
+ */
+function decodeSeedOrder(params: readonly unknown[]): unknown[][] {
+  const count = (params.length - 1) / 3;
+  const tournamentId = params[2 * count];
+  return Array.from({ length: count }, (_, index) => [params[2 * index + 1], tournamentId, params[2 * index]]);
+}
+
 function seedWrites(connection: ReturnType<typeof connectionMock>) {
   return connection.execute.mock.calls
-    .filter(([sql]) => sql.includes("SET seed = ?"))
-    .map(([, params]) => params);
+    .filter(([sql]) => sql.includes("SET seed = CASE team_id"))
+    .flatMap(([, params]) => decodeSeedOrder(params as unknown[]));
 }
 
 describe("drawRandomSeedingIfDue", () => {
@@ -50,6 +60,15 @@ describe("drawRandomSeedingIfDue", () => {
     ]);
     const flag = connection.execute.mock.calls.find(([sql]) => sql.includes("manual_seeding = 1"));
     expect(flag?.[1]).toEqual([AFTER_CLOSE, 5]);
+  });
+
+  it("écrit l'ordre en une seule instruction, bornée au tournoi et à ses engagées", async () => {
+    const connection = setup(pending);
+    await drawRandomSeedingIfDue(fakeConnection(connection), 5, AFTER_CLOSE, () => 0);
+    const writes = connection.execute.mock.calls.filter(([sql]) => sql.includes("SET seed = CASE team_id"));
+    expect(writes).toHaveLength(1);
+    expect(writes[0]![0]).toMatch(/WHERE tournament_id = \? AND team_id IN \(\?, \?, \?\)/);
+    expect(writes[0]![1]).toEqual([12, 1, 13, 2, 11, 3, 5, 12, 13, 11]);
   });
 
   it("verrouille le tournoi puis les inscriptions, en lecture verrouillante", async () => {

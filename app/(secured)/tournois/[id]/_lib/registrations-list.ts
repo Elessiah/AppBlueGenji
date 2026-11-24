@@ -92,14 +92,17 @@ export function registrationsRankingHintKey(
 /**
  * Explication du tirage au sort, derrière le « i » de la ligne d'état du staff
  * (`docs/features/RANDOM_SEEDING.md`) : à venir (la liste montre l'ordre
- * d'inscription) ou fait (la liste montre l'ordre tiré). `null` option éteinte
- * ou liste vide.
+ * d'inscription) ou fait (la liste montre l'ordre tiré). `null` option éteinte,
+ * liste vide ou tournoi lancé (`lockReason` autre que le tirage) : l'ordre n'est
+ * plus « à venir » et la phrase du verrou dit déjà pourquoi il est figé.
  */
 export function randomDrawHintKey(
   status: RandomDrawStatus,
   rowCount: number,
+  lockReason: SeedingLockReason = null,
 ): "registrations.randomPending" | "registrations.randomDrawn" | null {
   if (rowCount === 0 || status === "OFF") return null;
+  if (lockReason !== null && lockReason !== "RANDOM_DRAW") return null;
   return status === "DRAWN" ? "registrations.randomDrawn" : "registrations.randomPending";
 }
 

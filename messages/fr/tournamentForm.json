@@ -212,7 +212,7 @@
     },
     "randomSeeding": {
       "label": "Tirage au sort de l'ordre de départ",
-      "description": "Allumé : à la clôture des inscriptions, l'ordre de départ est tiré au sort (vrai aléa), au lieu de suivre l'ordre d'inscription ou le classement du site. Il fait les appariements du premier tour ; l'aperçu du premier tour n'apparaît qu'après le tirage, et l'ordre ne se règle plus aux flèches.",
+      "description": "Allumé : à la clôture des inscriptions, l'ordre de départ est tiré au sort (vrai aléa) et écrase l'ordre d'inscription, le classement ou un ordre fixé à la main. L'aperçu du premier tour n'apparaît qu'après le tirage, et l'ordre ne se règle plus aux flèches.",
       "scope": "Modifiable jusqu'au début du tournoi, puis figé. Allumé après la clôture, le tirage se fait à l'enregistrement.",
       "locked": "Le tournoi a commencé : l'option n'est plus modifiable."
     },

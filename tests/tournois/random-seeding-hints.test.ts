@@ -12,6 +12,13 @@ describe("randomDrawHintKey", () => {
     expect(randomDrawHintKey("DRAWN", 3)).toBe("registrations.randomDrawn");
   });
 
+  it("se tait une fois le tournoi lancé : le verrou dit déjà pourquoi l'ordre est figé", () => {
+    expect(randomDrawHintKey("DRAWN", 3, "STARTED")).toBeNull();
+    expect(randomDrawHintKey("DRAWN", 3, "SCORES_ENTERED")).toBeNull();
+    expect(randomDrawHintKey("DRAWN", 3, "FINISHED")).toBeNull();
+    expect(randomDrawHintKey("DRAWN", 3, "RANDOM_DRAW")).toBe("registrations.randomDrawn");
+  });
+
   it("ne dit rien option éteinte ou liste vide", () => {
     expect(randomDrawHintKey("OFF", 3)).toBeNull();
     expect(randomDrawHintKey("PENDING", 0)).toBeNull();

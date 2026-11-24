@@ -652,9 +652,21 @@ describe("updateTournament — format Duel / Arcade", () => {
   });
 });
 
+/**
+ * Écritures d'ordre, une ligne `[seed, tournoi, équipe]` par engagée, décodées
+ * de l'unique `UPDATE … SET seed = CASE team_id …` (`writeSeedOrder`).
+ */
+function decodeSeedOrder(params: readonly unknown[]): unknown[][] {
+  const count = (params.length - 1) / 3;
+  const tournamentId = params[2 * count];
+  return Array.from({ length: count }, (_, index) => [params[2 * index + 1], tournamentId, params[2 * index]]);
+}
+
 describe("updateTournament — tirage au sort (RANDOM_SEEDING.md)", () => {
   const seedWrites = () =>
-    executed.filter((q) => /UPDATE bg_tournament_registrations SET seed = \?/.test(q.sql)).map((q) => q.params);
+    executed
+      .filter((q) => /UPDATE bg_tournament_registrations SET seed = CASE team_id/.test(q.sql))
+      .flatMap((q) => decodeSeedOrder(q.params));
   /** Visible, inscriptions closes, départ à venir : fenêtre RESTRICTED. */
   const closedRow = (over: Record<string, unknown> = {}) =>
     hiddenRow({

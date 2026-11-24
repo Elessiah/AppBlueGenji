@@ -156,7 +156,7 @@ export {
 } from "./phases";
 
 // Public API functions
-import { syncTournamentState, writesRegistrations } from "./state";
+import { syncTournamentState } from "./state";
 import {
   registerCurrentUserTeam as registerTeamInternal,
   registerTeamsByIds as registerTeamsByIdsInternal,
@@ -199,7 +199,7 @@ import { dispatchNewMatchNotices } from "./new-match-notices";
 import { dispatchLiveAnnouncements } from "./live-announcements";
 import { purgeExpiredConnectionLogs } from "@/lib/server/connection-logs";
 import { maintainSiteVisitRetention } from "@/lib/server/site-visits-service";
-import { findTournamentsNeedingSync } from "./sync-scope";
+import { findSyncCandidates, type SyncCandidate } from "./sync-scope";
 import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
 import { earliestReport, isScoreDisputed, type ReportInstant } from "@/lib/shared/score-dispute";
 import type { StaffActor } from "@/lib/shared/log-privacy";
@@ -248,24 +248,19 @@ const SYNC_ATTEMPTS = 3;
  */
 async function syncOneTournament(
   connection: PoolConnection,
-  tournamentId: number,
+  { id: tournamentId, lockFirst }: SyncCandidate,
 ): Promise<"changed" | "launches" | "none" | "failed"> {
   for (let attempt = 1; ; attempt += 1) {
     const startedAt = Date.now();
     try {
+      await connection.beginTransaction();
       // Avant le départ, l'entretien lit puis écrit les inscrites (tirage au
       // sort, semis au coup d'envoi) : verrou du tournoi **en toute première
       // instruction** (CLAUDE.md), sans quoi deux passes concurrentes
       // figeraient un instantané d'avant le travail de l'autre
-      // (`RANDOM_SEEDING.md`). L'état se lit hors transaction (`writesRegistrations`).
+      // (`RANDOM_SEEDING.md`). L'état vient du repérage (`SyncCandidate`).
       // L'entretien d'un tournoi en cours garde son ordre (matchs d'abord) : le
       // verrou du tournoi en tête y croiserait les gestes des joueurs.
-      const [stateRows] = await connection.execute<(RowDataPacket & { state: TournamentState })[]>(
-        `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
-        [tournamentId],
-      );
-      const lockFirst = stateRows[0] !== undefined && writesRegistrations(stateRows[0].state);
-      await connection.beginTransaction();
       if (lockFirst) await lockTournamentRow(connection, tournamentId);
       const { stateChanged, contentChanged, launchesChanged } = await syncTournamentState(connection, tournamentId);
       await connection.commit();
@@ -336,10 +331,11 @@ export async function syncVisibleTournaments(): Promise<void> {
     try {
       // Hors transaction : c'est une lecture de repérage, et l'ouvrir dans une
       // transaction rendrait à la première la durée qu'on vient de lui retirer.
-      const candidates = await findTournamentsNeedingSync(connection);
+      const candidates = await findSyncCandidates(connection);
 
-      for (const tournamentId of candidates) {
-        const outcome = await syncOneTournament(connection, tournamentId);
+      for (const candidate of candidates) {
+        const tournamentId = candidate.id;
+        const outcome = await syncOneTournament(connection, candidate);
         if (outcome === "changed") changedIds.push(tournamentId);
         else if (outcome === "launches") launchIds.push(tournamentId);
         // Transaction peut-être encore ouverte : le `START TRANSACTION` du

@@ -3,6 +3,7 @@ import type { PoolConnection } from "mysql2/promise";
 import {
   BOTH_REPORTED_SQL,
   SINGLE_REPORT_SQL,
+  findSyncCandidates,
   findTournamentsNeedingSync,
 } from "@/lib/server/tournaments/sync-scope";
 import { STALLED_ALERT_KEY } from "@/lib/server/tournaments/bot-logs";
@@ -148,6 +149,18 @@ describe("findTournamentsNeedingSync — tirage au sort dû (RANDOM_SEEDING.md)"
   it("ignore un tirage déjà fait, ou l'option éteinte", async () => {
     expect(await findTournamentsNeedingSync(makeConn([waiting({ random_seeding_drawn_at: at(-0.5) })], []))).toEqual([]);
     expect(await findTournamentsNeedingSync(makeConn([waiting({ random_seeding: 0 })], []))).toEqual([]);
+  });
+
+  it("marque « verrou d'abord » les candidats d'avant le départ, pas ceux en cours", async () => {
+    const conn = makeConn(
+      [waiting(), settledRow({ id: 3, state: "REGISTRATION", registration_close_at: at(-2), start_at: at(-1) })],
+      [{ id: 5 }],
+    );
+    expect(await findSyncCandidates(conn)).toEqual([
+      { id: 3, lockFirst: true },
+      { id: 5, lockFirst: false },
+      { id: 9, lockFirst: true },
+    ]);
   });
 
   it("lit l'option et la date du tirage avec les dates", async () => {

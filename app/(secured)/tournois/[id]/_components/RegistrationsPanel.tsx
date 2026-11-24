@@ -406,7 +406,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     registrationCloseAt: detail.card.registrationCloseAt,
   });
   const rankingHint =
-    randomDrawHintKey(drawStatus, rows.length) ??
+    randomDrawHintKey(drawStatus, rows.length, lockReason) ??
     registrationsRankingHintKey(followsRanking, followsFrozenDraw, rows.length);
 
   const hiddenCount = hiddenRegistrationCount(rows.length);

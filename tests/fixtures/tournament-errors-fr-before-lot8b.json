@@ -79,7 +79,7 @@
     "INVALID_PHASE_SWISS_ROUNDS": "Nombre de manches ronde suisse invalide : 1 à 20 attendues.",
     "INVALID_QUALIFIER_COUNT": "Les qualifications en nombre fixe doivent décroître entre les phases.",
     "INVALID_QUALIFIER_VALUE": "Qualification invalide : au moins une équipe en nombre fixe, ou de 1 à 99 % en pourcentage.",
-    "INVALID_RANDOM_SEEDING": "Valeur invalide pour le tirage au sort de l'ordre de départ.",
+    "INVALID_RANDOM_SEEDING": "Valeur invalide pour le tirage au sort de l'ordre de départ : cochez ou décochez la case.",
     "INVALID_REFEREE_OBJECTION": "Choix invalide pour l'opposition de l'arbitre.",
     "INVALID_REFEREE_SCHEDULING": "Valeur invalide pour la planification par l'arbitrage.",
     "INVALID_REPLAY_URL": "Lien de rediff non reconnu : colle le lien d'une vidéo YouTube (youtube.com/watch?v=… ou youtu.be/…).",
