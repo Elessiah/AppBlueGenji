@@ -74,8 +74,9 @@ describe("workflow de bump de version", () => {
     expect(workflow).toContain("--generate-notes");
   });
 
-  it("épingle les actions sur les mêmes versions majeures que le CI", () => {
-    const ci = readSource(".github/workflows/ci.yml");
+  it("épingle les actions sur les mêmes SHA de commit que le CI", () => {
+    // Le CI installe Node par son action commune : les deux fichiers comptent.
+    const ci = readSource(".github/workflows/ci.yml") + readSource(".github/actions/setup/action.yml");
     for (const action of workflow.match(/uses: \S+/g) ?? []) {
       expect(ci).toContain(action);
     }

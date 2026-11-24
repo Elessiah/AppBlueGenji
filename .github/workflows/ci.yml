@@ -1,82 +1,213 @@
+# CI — voir docs/features/CI.md.
+#
+# Sur une PR : chaque job ne tourne que si les fichiers modifiés le concernent
+# (job `changes`), une nouvelle poussée annule l'exécution précédente, et tous
+# les outils lisent un cache (node_modules, ESLint, Next, Jest, Chromium).
+#
+# Sur `main` (fusion) : lint, build et tests rejouent le code fusionné et
+# **remplissent les caches** — une PR ne lit que les caches de sa propre branche
+# et de `main`, jamais ceux d'une autre PR. Les poussées de documentation seule
+# ne déclenchent rien ; le commit de version porte `[skip ci]`.
 name: CI
 
 on:
   pull_request:
     branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'ERREUR.txt'
+      - 'LICENSE'
+      - 'NOTICE'
+
+# Aucun droit par défaut : chaque job déclare les siens (lecture seule).
+permissions: {}
+
+# Sur une PR, une poussée annule la précédente ; sur main, les fusions
+# s'enchaînent sans s'annuler (chacune remplit les caches).
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
 
 jobs:
+  # Décide quels jobs tournent. Toute incertitude (API injoignable, PR de plus
+  # de 3 000 fichiers, workflow ou dépendances modifiés) fait tout tourner :
+  # ce job ne doit jamais laisser passer au vert une PR qu'il n'a pas lue.
+  changes:
+    name: Changes
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read  # liste des fichiers de la PR
+    outputs:
+      lint: ${{ steps.filter.outputs.lint }}
+      build: ${{ steps.filter.outputs.build }}
+      e2e: ${{ steps.filter.outputs.e2e }}
+    steps:
+      # Seul le script de tri est extrait, et depuis la **base** de la PR : une PR
+      # qui le modifie ne choisit pas elle-même ce qu'elle doit passer (et le
+      # modifier fait tout jouer, `RUN_ALL`).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          sparse-checkout: scripts/ci-changed-jobs.cjs
+          sparse-checkout-cone-mode: false
+      - name: Classer les fichiers modifiés
+        id: filter
+        shell: bash  # -eo pipefail : un script en erreur fait échouer le pas, malgré `tee`
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            files='".github/workflows/ci.yml"'
+          elif ! files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
+              --jq '.[] | .filename, (.previous_filename // empty) | @json'); then
+            echo "::warning::Liste des fichiers de la PR illisible : tous les jobs tournent."
+            files='".github/workflows/ci.yml"'
+          fi
+          # Base sans script (la PR qui l'ajoute, ou un renommage) : tout joue.
+          if [ -f scripts/ci-changed-jobs.cjs ]; then
+            node scripts/ci-changed-jobs.cjs <<< "$files" | tee -a "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Script de tri absent de la base : tous les jobs tournent."
+            printf 'lint=true\nbuild=true\ne2e=true\n' | tee -a "$GITHUB_OUTPUT"
+          fi
+
+  # Portes en `!= 'false'` : un `changes` réussi mais sans sortie fait jouer le
+  # job. Un `changes` en échec écarte tous les jobs mais laisse la PR en rouge.
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.lint != 'false'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-      - name: Lint
-        run: npm run lint
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup
+        id: setup
       # `next build` ne vérifie que le code de l'application : `tests/` est
       # exclu de `tsconfig.json`, et ts-jest ne fait que transpiler. Sans ce
       # contrôle, un test peut contredire les types qu'il exerce sans rien dire.
+      # Joué avant le lint : 10 s, et l'erreur la plus fréquente.
       - name: Typecheck (app + tests)
         run: npm run typecheck
+      # Cache ESLint par contenu (un checkout neuf change toutes les dates, la
+      # stratégie par défaut ne retrouverait rien). Aucune règle ne lit les
+      # types d'un autre fichier : un fichier inchangé garde son verdict.
+      # La clé suit le verrou et la config ; ESLint invalide aussi de lui-même
+      # quand sa configuration change.
+      - name: Restaurer le cache ESLint
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .next/cache/eslint
+          key: eslint-${{ steps.setup.outputs.deps-hash }}-${{ hashFiles('eslint.config.mjs', 'eslint-rules/**') }}-${{ github.sha }}
+          restore-keys: eslint-${{ steps.setup.outputs.deps-hash }}-${{ hashFiles('eslint.config.mjs', 'eslint-rules/**') }}-
+      - name: Lint
+        run: npm run lint -- --cache-strategy content
 
   build:
     name: Build
+    needs: changes
+    if: needs.changes.outputs.build != 'false'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup
+        id: setup
+      - name: Restaurer le cache Next
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          node-version: '20'
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
+          path: .next/cache
+          key: next-${{ steps.setup.outputs.deps-hash }}-${{ github.sha }}
+          restore-keys: next-${{ steps.setup.outputs.deps-hash }}-
+      # `--no-lint` : le job Lint passe déjà ESLint (et sur plus de dossiers) ;
+      # `next build` le rejouait en entier. La vérification de types de Next
+      # (TypeScript 5) reste jouée ici.
       - name: Build
-        run: npm run build
+        run: npm run build -- --no-lint
 
   test:
-    name: Test
+    name: Test (${{ matrix.shard }}/2)
+    needs: changes
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup
+        id: setup
+      # Cache de transformation ts-jest, indexé par contenu : sûr à réutiliser.
+      - name: Restaurer le cache Jest
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          node-version: '20'
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
+          path: ${{ runner.temp }}/jest-cache
+          key: jest-${{ matrix.shard }}-${{ steps.setup.outputs.deps-hash }}-${{ hashFiles('jest.config.cjs', 'tsconfig*.json') }}-${{ github.sha }}
+          restore-keys: jest-${{ matrix.shard }}-${{ steps.setup.outputs.deps-hash }}-${{ hashFiles('jest.config.cjs', 'tsconfig*.json') }}-
       - name: Run tests
-        run: npm test
+        run: npm test -- --shard=${{ matrix.shard }}/2 --cacheDirectory="$RUNNER_TEMP/jest-cache"
 
   e2e:
     name: E2E
+    needs: changes
+    if: needs.changes.outputs.e2e != 'false'
     runs-on: ubuntu-24.04  # Playwright 1.60 ne gère pas encore ubuntu-latest (26.04)
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup
+        id: setup
+      - name: Version de Playwright
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      # Sur `main`, on ne fait que remplir ce cache (lookup-only : rien n'est
+      # téléchargé s'il existe déjà) ; les tests ne tournent que sur une PR.
+      - name: Restaurer Chromium
+        id: browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          node-version: '20'
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
+          path: ~/.cache/ms-playwright
+          key: playwright-ubuntu-24.04-${{ steps.playwright.outputs.version }}
+          lookup-only: ${{ github.event_name != 'pull_request' }}
       # --with-deps installe aussi les libs système Linux requises par Chromium.
       # Repli sans --with-deps si le miroir apt du runner est injoignable (panne
-      # DNS azure.archive.ubuntu.com du 2026-11-11) : l'image ubuntu-latest porte
-      # déjà les bibliothèques de Chromium, seul le navigateur manque.
+      # DNS azure.archive.ubuntu.com du 2026-11-11) : l'image ubuntu-24.04 porte
+      # déjà les bibliothèques de Chromium, seul le navigateur manque — c'est
+      # aussi pourquoi un navigateur restauré du cache se passe d'apt.
       - name: Install Playwright browser
+        if: steps.browsers.outputs.cache-hit != 'true'
         run: |
-          ./node_modules/.bin/playwright install --with-deps chromium             || { echo "::warning::apt injoignable, installation de Chromium sans --with-deps"; ./node_modules/.bin/playwright install chromium; }
+          ./node_modules/.bin/playwright install --with-deps chromium \
+            || { echo "::warning::apt injoignable, installation de Chromium sans --with-deps"; ./node_modules/.bin/playwright install chromium; }
       # Pas de DB en CI : seuls les tests auth (sans prérequis) s'exécutent ;
       # le parcours authentifié reste skippé tant que E2E_AUTH_USER n'est pas défini.
       - name: Run E2E tests
+        if: github.event_name == 'pull_request'
         run: npm run test:e2e
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: playwright-report
           path: playwright-report/

@@ -21,7 +21,7 @@ Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à c
 - Si une erreur ne peut pas être corrigée automatiquement, l'expliquer clairement et proposer une piste de résolution.
 
 ### CI / Qualité
-- Le CI GitHub Actions (`.github/workflows/ci.yml`) vérifie à chaque PR : lint (+ `npm run typecheck`) → build → tests (dans cet ordre, enchaînés via `needs:`).
+- Le CI GitHub Actions (`.github/workflows/ci.yml`) vérifie à chaque PR, en parallèle : lint (+ `npm run typecheck`), build, tests (deux moitiés), E2E — chacun seulement si les fichiers modifiés le concernent (`docs/features/CI.md`).
 - `npm run lint` passe aussi **`eslint-plugin-sonarjs`** (config `recommended`, `sonarjs/cognitive-complexity` à 15) sur `app/`, `components/`, `lib/` et `tests/` : la CI refuse tout nouveau constat de type SonarQube. Les règles écartées le sont dans `eslint.config.mjs`, chacune avec sa raison ; un `// NOSONAR` ne vaut pas pour ESLint — y joindre un `// eslint-disable-next-line <règle> -- <raison>`.
 - Ne pas merger si le CI est rouge.
 
