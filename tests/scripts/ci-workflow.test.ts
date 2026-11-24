@@ -36,9 +36,15 @@ describe("classifyChangedFiles", () => {
     expect(classifyChangedFiles(["tests/lib/shared/foo.test.ts"])).toEqual({ lint: true, build: false, e2e: false });
   });
 
-  it("joue l'E2E sans build pour un scénario Playwright", () => {
-    expect(classifyChangedFiles(["e2e/auth.spec.ts"])).toEqual({ lint: true, build: false, e2e: true });
+  it("joue l'E2E sans build pour un fichier non compilé du dossier e2e", () => {
     expect(classifyChangedFiles(["e2e/README.md"])).toEqual({ lint: false, build: false, e2e: true });
+  });
+
+  it("joue le build pour tout .ts hors tests/, que `next build` type-vérifie", () => {
+    expect(classifyChangedFiles(["e2e/auth.spec.ts"])).toEqual(ALL);
+    expect(classifyChangedFiles(["playwright.config.ts"])).toEqual(ALL);
+    expect(classifyChangedFiles(["scripts/tool.ts"])).toEqual({ lint: true, build: true, e2e: true });
+    expect(classifyChangedFiles(["middleware.ts"])).toEqual(ALL);
   });
 
   it("ne joue que les tests pour de la documentation", () => {
@@ -59,6 +65,8 @@ describe("classifyChangedFiles", () => {
     [".github/actions/setup/action.yml"],
     ["package.json"],
     ["package-lock.json"],
+    ["scripts/ci-changed-jobs.cjs"],
+    ["scripts/ci-deps-hash.cjs"],
   ])("joue tout quand %s change", (file) => {
     expect(classifyChangedFiles(["docs/x.md", file])).toEqual(ALL);
   });
@@ -81,6 +89,12 @@ describe("classifyChangedFiles", () => {
   it("ne confond pas un chemin voisin avec un dossier compilé", () => {
     expect(classifyChangedFiles(["docs/app/notes.md", "scripts/lib.sh"])).toEqual(NONE);
   });
+
+  it("compte l'ancien chemin d'un fichier renommé", () => {
+    // Le workflow passe `filename` et `previous_filename` : sortir un fichier
+    // de `lib/` vers `docs/` doit encore jouer le build.
+    expect(classifyChangedFiles(["docs/old.ts.md", "lib/old.ts"])).toEqual(ALL);
+  });
 });
 
 describe("script en ligne de commande", () => {
@@ -102,11 +116,25 @@ describe("workflow CI", () => {
     expect(ci).toMatch(/concurrency:\n\s+group: ci-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}\n\s+cancel-in-progress: true/);
   });
 
-  it("branche chaque job conditionnel sur la sortie du tri", () => {
+  it("branche chaque job conditionnel sur la sortie du tri, une sortie absente faisant jouer le job", () => {
     for (const job of ["lint", "build", "e2e"]) {
-      expect(ci).toContain(`if: needs.changes.outputs.${job} == 'true'`);
+      expect(ci).toContain(`if: needs.changes.outputs.${job} != 'false'`);
     }
+    expect(ci).not.toMatch(/needs\.changes\.outputs\.\w+ == 'true'/);
     expect(ci).toContain("node scripts/ci-changed-jobs.cjs");
+  });
+
+  it("fait échouer le tri si le script échoue, malgré `tee`", () => {
+    expect(ci).toMatch(/id: filter\n\s+shell: bash/);
+  });
+
+  it("trie avec le script de la base de la PR, pas celui qu'elle apporte", () => {
+    expect(ci).toContain("ref: ${{ github.event.pull_request.base.sha || github.sha }}");
+  });
+
+  it("lit les anciens chemins des renommages, 100 fichiers par page", () => {
+    expect(ci).toContain("files?per_page=100");
+    expect(ci).toContain(".filename, (.previous_filename // empty)");
   });
 
   it("joue tout si la liste des fichiers est illisible", () => {
@@ -133,11 +161,17 @@ describe("workflow CI", () => {
     expect(ci).toContain("if: github.event_name == 'pull_request'\n        run: npm run test:e2e");
   });
 
-  it("indexe node_modules sur le verrou et n'installe qu'en cas d'absence", () => {
+  it("indexe node_modules sur l'empreinte des dépendances et n'installe qu'en cas d'absence", () => {
     expect(setup).toContain("path: node_modules");
-    expect(setup).toContain("hashFiles('package-lock.json')");
+    expect(setup).toContain("node20-${{ steps.deps.outputs.hash }}");
+    expect(setup).toMatch(/hash=\$\(node scripts\/ci-deps-hash\.cjs\)\n\s+echo "hash=\$hash"/);
     expect(setup).toContain("if: steps.node-modules.outputs.cache-hit != 'true'");
     expect(setup).toContain("run: npm ci --ignore-scripts");
+  });
+
+  it("reprend l'empreinte des dépendances dans toutes les clés, jamais le verrou brut", () => {
+    expect(ci).not.toContain("hashFiles('package-lock.json'");
+    expect(ci.match(/steps\.setup\.outputs\.deps-hash/g)).toHaveLength(6);
   });
 
   it("borne la durée de chaque job", () => {
@@ -146,5 +180,39 @@ describe("workflow CI", () => {
     const timeouts = jobs.match(/^ {4}timeout-minutes: \d+$/gm) ?? [];
     expect(declared.length).toBeGreaterThan(0);
     expect(timeouts).toHaveLength(declared.length);
+  });
+});
+
+describe("depsHash", () => {
+  const HASH_SCRIPT = join(__dirname, "..", "..", "scripts", "ci-deps-hash.cjs");
+  const { depsHash } = require(HASH_SCRIPT) as { depsHash: (pkg: string, lock: string) => string };
+  const pkg = (version: string, deps: Record<string, string> = { next: "^15" }) =>
+    JSON.stringify({ name: "x", version, dependencies: deps });
+  const lock = (version: string, next = "15.5.27") =>
+    JSON.stringify({ name: "x", version, packages: { "": { version }, "node_modules/next": { version: next } } });
+
+  it("ignore le numéro de version que réécrit le bump à la fusion", () => {
+    expect(depsHash(pkg("1.0.0"), lock("1.0.0"))).toBe(depsHash(pkg("1.0.1"), lock("1.0.1")));
+  });
+
+  it("change quand une dépendance change dans package.json, même sans verrou à jour", () => {
+    expect(depsHash(pkg("1.0.0"), lock("1.0.0"))).not.toBe(depsHash(pkg("1.0.0", { next: "^16" }), lock("1.0.0")));
+  });
+
+  it("change quand le verrou résout une autre version", () => {
+    expect(depsHash(pkg("1.0.0"), lock("1.0.0"))).not.toBe(depsHash(pkg("1.0.0"), lock("1.0.0", "15.5.28")));
+  });
+
+  it("tolère un verrou sans racine", () => {
+    expect(depsHash(pkg("1"), JSON.stringify({ version: "1" }))).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("refuse un fichier illisible au lieu de rendre une empreinte", () => {
+    expect(() => depsHash("{", lock("1"))).toThrow();
+  });
+
+  it("lit les fichiers du dépôt en ligne de commande", () => {
+    const out = execFileSync(process.execPath, [HASH_SCRIPT], { cwd: join(__dirname, "..", ".."), encoding: "utf8" });
+    expect(out).toMatch(/^[0-9a-f]{64}\n$/);
   });
 });

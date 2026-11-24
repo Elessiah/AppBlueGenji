@@ -14,11 +14,16 @@
 /** Plafond de l'API `pulls/{n}/files` : au-delà, la liste est tronquée. */
 const API_FILE_LIMIT = 3000;
 
-const RUN_ALL = /^(\.github\/|package\.json$|package-lock\.json$)/;
+/** Le CI lui-même (workflows, action commune, scripts du CI) et les dépendances. */
+const RUN_ALL = /^(\.github\/|scripts\/ci-|package\.json$|package-lock\.json$)/;
 const LINTED = /\.(ts|tsx|js|jsx|mjs|cjs|json)$|^eslint-rules\//;
+/**
+ * Ce que `next build` compile ou type-vérifie (TypeScript 5) : `tsconfig.json`
+ * inclut **tout** `.ts`/`.tsx` hors `tests/` — `e2e/`, `scripts/` compris.
+ */
 const BUILT =
-  /^(app|components|lib|messages|public)\/|^(middleware\.ts|instrumentation\.ts|next\.config\.ts|next-env\.d\.ts|tsconfig\.json)$|^postcss\.config\.|\.css$/;
-const E2E_ONLY = /^e2e\/|^playwright\.config\.ts$/;
+  /^(app|components|lib|messages|public)\/|^(?!tests\/).*\.tsx?$|^(tsconfig\.json)$|^postcss\.config\.|\.css$/;
+const E2E_ONLY = /^e2e\//;
 
 /**
  * @param {readonly string[]} files chemins relatifs à la racine du dépôt

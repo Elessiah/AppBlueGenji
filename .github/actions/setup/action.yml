@@ -1,11 +1,17 @@
 # Node + dépendances, commun à tous les jobs du CI — voir docs/features/CI.md.
 #
-# `node_modules` est mis en cache tel quel, indexé sur `package-lock.json` :
-# installé avec `--ignore-scripts`, il ne dépend que du verrou, de l'OS et de la
-# version majeure de Node. Un cache trouvé évite `npm ci` (~50 s par job) ; un
-# cache manqué (verrou modifié) installe puis enregistre.
+# `node_modules` est mis en cache tel quel, indexé sur l'empreinte des
+# dépendances (`scripts/ci-deps-hash.cjs` : `package.json` + verrou, numéro de
+# version du paquet retiré). Installé avec `--ignore-scripts`, il ne dépend que
+# de ces fichiers, de l'OS et de la version majeure de Node. Un cache trouvé
+# évite `npm ci` (~50 s par job) ; un cache manqué installe puis enregistre.
 name: Setup Node et dépendances
 description: Node 20 et node_modules depuis le cache, sinon npm ci.
+
+outputs:
+  deps-hash:
+    description: Empreinte des dépendances, à reprendre dans les autres clés de cache.
+    value: ${{ steps.deps.outputs.hash }}
 
 runs:
   using: composite
@@ -14,12 +20,21 @@ runs:
       with:
         node-version: '20'
 
+    - name: Empreinte des dépendances
+      id: deps
+      shell: bash
+      # Affectation à part : une erreur du script arrête le pas, au lieu d'une
+      # clé vide commune à tous les verrous.
+      run: |
+        hash=$(node scripts/ci-deps-hash.cjs)
+        echo "hash=$hash" >> "$GITHUB_OUTPUT"
+
     - name: Restaurer node_modules
       id: node-modules
       uses: actions/cache@v4
       with:
         path: node_modules
-        key: node-modules-${{ runner.os }}-${{ runner.arch }}-node20-${{ hashFiles('package-lock.json') }}
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-node20-${{ steps.deps.outputs.hash }}
 
     - name: Install dependencies
       if: steps.node-modules.outputs.cache-hit != 'true'

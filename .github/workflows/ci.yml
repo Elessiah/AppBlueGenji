@@ -48,13 +48,17 @@ jobs:
       build: ${{ steps.filter.outputs.build }}
       e2e: ${{ steps.filter.outputs.e2e }}
     steps:
-      # Seul le script de tri est extrait : quelques secondes, sans node_modules.
+      # Seul le script de tri est extrait, et depuis la **base** de la PR : une PR
+      # qui le modifie ne choisit pas elle-même ce qu'elle doit passer (et le
+      # modifier fait tout jouer, `RUN_ALL`).
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
           sparse-checkout: scripts/ci-changed-jobs.cjs
           sparse-checkout-cone-mode: false
       - name: Classer les fichiers modifiés
         id: filter
+        shell: bash  # -eo pipefail : un script en erreur fait échouer le pas, malgré `tee`
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
@@ -62,22 +66,24 @@ jobs:
         run: |
           if [ "$EVENT" != "pull_request" ]; then
             files=".github/workflows/ci.yml"
-          elif ! files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+          elif ! files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
               --jq '.[] | .filename, (.previous_filename // empty)'); then
             echo "::warning::Liste des fichiers de la PR illisible : tous les jobs tournent."
             files=".github/workflows/ci.yml"
           fi
           node scripts/ci-changed-jobs.cjs <<< "$files" | tee -a "$GITHUB_OUTPUT"
 
+  # Portes en `!= 'false'` : une sortie absente fait jouer le job, jamais l'écarter.
   lint:
     name: Lint
     needs: changes
-    if: needs.changes.outputs.lint == 'true'
+    if: needs.changes.outputs.lint != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+        id: setup
       # `next build` ne vérifie que le code de l'application : `tests/` est
       # exclu de `tsconfig.json`, et ts-jest ne fait que transpiler. Sans ce
       # contrôle, un test peut contredire les types qu'il exerce sans rien dire.
@@ -93,26 +99,27 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .next/cache/eslint
-          key: eslint-${{ hashFiles('package-lock.json', 'eslint.config.mjs', 'eslint-rules/**') }}-${{ github.sha }}
-          restore-keys: eslint-${{ hashFiles('package-lock.json', 'eslint.config.mjs', 'eslint-rules/**') }}-
+          key: eslint-${{ steps.setup.outputs.deps-hash }}-${{ hashFiles('eslint.config.mjs', 'eslint-rules/**') }}-${{ github.sha }}
+          restore-keys: eslint-${{ steps.setup.outputs.deps-hash }}-${{ hashFiles('eslint.config.mjs', 'eslint-rules/**') }}-
       - name: Lint
         run: npm run lint -- --cache-strategy content
 
   build:
     name: Build
     needs: changes
-    if: needs.changes.outputs.build == 'true'
+    if: needs.changes.outputs.build != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+        id: setup
       - name: Restaurer le cache Next
         uses: actions/cache@v4
         with:
           path: .next/cache
-          key: next-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-          restore-keys: next-${{ hashFiles('package-lock.json') }}-
+          key: next-${{ steps.setup.outputs.deps-hash }}-${{ github.sha }}
+          restore-keys: next-${{ steps.setup.outputs.deps-hash }}-
       # `--no-lint` : le job Lint passe déjà ESLint (et sur plus de dossiers) ;
       # `next build` le rejouait en entier. La vérification de types de Next
       # (TypeScript 5) reste jouée ici.
@@ -131,25 +138,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+        id: setup
       # Cache de transformation ts-jest, indexé par contenu : sûr à réutiliser.
       - name: Restaurer le cache Jest
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/jest-cache
-          key: jest-${{ matrix.shard }}-${{ hashFiles('package-lock.json', 'jest.config.cjs', 'tsconfig*.json') }}-${{ github.sha }}
-          restore-keys: jest-${{ matrix.shard }}-${{ hashFiles('package-lock.json', 'jest.config.cjs', 'tsconfig*.json') }}-
+          key: jest-${{ matrix.shard }}-${{ steps.setup.outputs.deps-hash }}-${{ hashFiles('jest.config.cjs', 'tsconfig*.json') }}-${{ github.sha }}
+          restore-keys: jest-${{ matrix.shard }}-${{ steps.setup.outputs.deps-hash }}-${{ hashFiles('jest.config.cjs', 'tsconfig*.json') }}-
       - name: Run tests
         run: npm test -- --shard=${{ matrix.shard }}/2 --cacheDirectory="$RUNNER_TEMP/jest-cache"
 
   e2e:
     name: E2E
     needs: changes
-    if: needs.changes.outputs.e2e == 'true'
+    if: needs.changes.outputs.e2e != 'false'
     runs-on: ubuntu-24.04  # Playwright 1.60 ne gère pas encore ubuntu-latest (26.04)
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+        id: setup
       - name: Version de Playwright
         id: playwright
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
