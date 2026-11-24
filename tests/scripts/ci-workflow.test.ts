@@ -110,6 +110,12 @@ describe("chemins encodés en JSON", () => {
     expect(classifyChangedFiles(["docs/a.md\u0007"])).toEqual(ALL);
   });
 
+  it("voit un caractère de contrôle en tête ou en fin, que `trim()` effacerait", () => {
+    expect(classifyChangedFiles(["\ttests/a.ts"])).toEqual(ALL);
+    expect(classifyChangedFiles([decodeLine(JSON.stringify("\ntests/a.ts"))])).toEqual(ALL);
+    expect(classifyChangedFiles(["tests/a.ts\u0000"])).toEqual(ALL);
+  });
+
   it("fait tout jouer pour une ligne illisible ou qui n'est pas une chaîne", () => {
     for (const line of ['"foo', "docs/a.md", "42", "null", '["lib/a.ts"]']) {
       expect(classifyChangedFiles(["docs/x.md", decodeLine(line)])).toEqual(ALL);

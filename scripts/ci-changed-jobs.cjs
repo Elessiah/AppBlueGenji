@@ -50,11 +50,15 @@ function decodeLine(line) {
  * @returns {{ lint: boolean, build: boolean, e2e: boolean }}
  */
 function classifyChangedFiles(files) {
-  const paths = files.map((f) => f.trim()).filter(Boolean);
+  // Caractères de contrôle cherchés **avant** `trim()`, qui en retirerait un en
+  // tête ou en fin (`"\ttests/a.ts"` deviendrait `tests/a.ts`).
+  const raw = files.filter((f) => !/^ *$/.test(f));
+  const paths = raw.map((f) => f.trim()).filter(Boolean);
   if (
     paths.length === 0 ||
     paths.length >= API_FILE_LIMIT ||
-    paths.some((f) => CONTROL_CHAR.test(f) || RUN_ALL.test(f))
+    raw.some((f) => CONTROL_CHAR.test(f)) ||
+    paths.some((f) => RUN_ALL.test(f))
   ) {
     return { lint: true, build: true, e2e: true };
   }
