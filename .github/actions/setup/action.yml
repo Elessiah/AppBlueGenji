@@ -1,0 +1,27 @@
+# Node + dépendances, commun à tous les jobs du CI — voir docs/features/CI.md.
+#
+# `node_modules` est mis en cache tel quel, indexé sur `package-lock.json` :
+# installé avec `--ignore-scripts`, il ne dépend que du verrou, de l'OS et de la
+# version majeure de Node. Un cache trouvé évite `npm ci` (~50 s par job) ; un
+# cache manqué (verrou modifié) installe puis enregistre.
+name: Setup Node et dépendances
+description: Node 20 et node_modules depuis le cache, sinon npm ci.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Restaurer node_modules
+      id: node-modules
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-node20-${{ hashFiles('package-lock.json') }}
+
+    - name: Install dependencies
+      if: steps.node-modules.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci --ignore-scripts

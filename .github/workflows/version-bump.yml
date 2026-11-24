@@ -35,6 +35,7 @@ concurrency:
 jobs:
   bump:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
     steps:

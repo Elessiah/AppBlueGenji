@@ -216,6 +216,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `DEVDOC.md` — Documentation développeur `/devdoc` (permission `dev`, rôle `DEV`) : Markdown du site et du bot relus à chaud par liste blanche, arborescence, recherche, liens entre documents réécrits.
 - `MIGRATION_LOCK.md` — Migrations sous verrou nommé.
 - `VERSIONING.md` — Bump, tag et release automatiques à la fusion.
+- `CI.md` — CI GitHub Actions : jobs joués selon les fichiers modifiés, caches (node_modules, ESLint, Next, Jest, Chromium) remplis depuis `main`, tests répartis sur deux machines.
 - `DEPENDENCY_RISKS.md` — Avis npm audit restants (`braces`, `deepmerge`), surcharges (`uri-js`, `sprintf-js`) et règle du lockfile Windows.
 - `I18N.md` — Site bilingue : réécriture `/en` du middleware, liste blanche des routes traduites, `next-intl` sans routage, `LocaleLink`, sélecteur, `hreflang`/sitemap, garde-fous, glossaire ; textes de la fiche tournoi chargés par morceau (EF-17).
 - `I18N_MIGRATION_PLAN.md` — Site bilingue FR/EN (`/en/...`) : mesure, choix technique, lots et décisions prises (lots 0 à 8 livrés).
