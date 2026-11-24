@@ -108,6 +108,7 @@ export interface TournamentDef extends ReportStateCounts {
    */
   refereeScheduling?: boolean;
   launchPhase?: boolean; // phase de lancement des matchs (absent = éteinte, le défaut de la colonne)
+  randomSeeding?: boolean; // tirage au sort de l'ordre de départ, RANDOM_SEEDING.md (absent = éteint)
   matchCheckIn?: boolean; // check-in des matchs, MATCH_CHECK_IN_SETTING.md (absent = allumé, le défaut de la colonne)
   /**
    * Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : points qui gagnent
@@ -188,6 +189,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "11 Équipes + Petite Finale", game: "OW", state: "REGISTRATION", format: "SINGLE", hasThirdPlaceMatch: true, teamCount: 11, maxTeams: 16, daysOffset: 18 },
   { name: "Survie Inscriptions Impaires", game: "MR", state: "REGISTRATION", format: "SURVIVAL", teamCount: 9, maxTeams: 16, daysOffset: 16, survivalRoundsPerCut: 2 },
   { name: "Suisse Inscriptions", game: "OW", state: "REGISTRATION", format: "SWISS", teamCount: 10, maxTeams: 16, daysOffset: 20, swissTotalRounds: 4 },
+  { name: "Tirage au Sort (inscriptions)", randomSeeding: true, game: "OW", state: "REGISTRATION", format: "SINGLE", teamCount: 6, maxTeams: 8, daysOffset: 11, teamOffset: 10 },
   // Les deux bords des conditions d'inscription : aucune exigence, puis
   // l'exigence maximale (tous les joueurs certifiés, roster complet). Le seed
   // insère ses inscriptions directement, donc ces tournois se remplissent quand

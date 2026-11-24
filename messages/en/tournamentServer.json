@@ -14,7 +14,8 @@
     "seeding": {
       "MANUAL": "Set by the referees",
       "RANKING": "Site ranking",
-      "REGISTRATION": "Registration order"
+      "REGISTRATION": "Registration order",
+      "RANDOM": "Random draw"
     },
     "requirement": {
       "NONE": "No player",

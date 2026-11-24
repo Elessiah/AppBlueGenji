@@ -1,3 +1,4 @@
+import type { RandomDrawStatus } from "@/lib/shared/random-seeding";
 import type { SeedingLockReason } from "@/lib/shared/seeding";
 import type { EntrantRemovalBlockReason } from "@/lib/shared/entrant-removal";
 
@@ -86,4 +87,41 @@ export function registrationsRankingHintKey(
   if (rowCount === 0) return null;
   if (followsFrozenDraw) return "registrations.followsFrozenDraw";
   return followsRanking ? "registrations.followsRanking" : null;
+}
+
+/**
+ * Explication du tirage au sort, derrière le « i » de la ligne d'état du staff
+ * (`docs/features/RANDOM_SEEDING.md`) : à venir (la liste montre l'ordre
+ * d'inscription) ou fait (la liste montre l'ordre tiré). `null` option éteinte,
+ * liste vide ou tournoi lancé (`lockReason` autre que le tirage) : l'ordre n'est
+ * plus « à venir » et la phrase du verrou dit déjà pourquoi il est figé.
+ */
+export function randomDrawHintKey(
+  status: RandomDrawStatus,
+  rowCount: number,
+  lockReason: SeedingLockReason = null,
+): "registrations.randomPending" | "registrations.randomDrawn" | null {
+  if (rowCount === 0 || status === "OFF") return null;
+  if (lockReason !== null && lockReason !== "RANDOM_DRAW") return null;
+  return status === "DRAWN" ? "registrations.randomDrawn" : "registrations.randomPending";
+}
+
+/** Clé du verrou de l'ordre (`registrations.lock.*`). */
+const LOCK_KEYS = {
+  FINISHED: "registrations.lock.FINISHED",
+  SCORES_ENTERED: "registrations.lock.SCORES_ENTERED",
+  STARTED: "registrations.lock.STARTED",
+  RANDOM_DRAW: "registrations.lock.RANDOM_DRAW",
+} as const satisfies Record<NonNullable<SeedingLockReason>, string>;
+
+/**
+ * Phrase du verrou de l'ordre. Le tirage au sort dit « à la clôture » tant
+ * qu'il est à venir, et « tiré » une fois fait (`RANDOM_SEEDING.md`).
+ */
+export function seedingLockKey(
+  reason: NonNullable<SeedingLockReason>,
+  draw: RandomDrawStatus,
+): (typeof LOCK_KEYS)[keyof typeof LOCK_KEYS] | "registrations.lock.RANDOM_DRAWN" {
+  if (reason === "RANDOM_DRAW" && draw === "DRAWN") return "registrations.lock.RANDOM_DRAWN";
+  return LOCK_KEYS[reason];
 }

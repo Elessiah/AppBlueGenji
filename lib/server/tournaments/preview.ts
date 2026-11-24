@@ -22,6 +22,7 @@ import {
   type PreviewSeedingSource,
   type TournamentPreview,
 } from "@/lib/shared/tournament-preview";
+import { randomDrawStatus } from "@/lib/shared/random-seeding";
 import { isPreLaunchState, seedingSource } from "@/lib/shared/seeding";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import type { TournamentRow } from "./_internal";
@@ -120,7 +121,21 @@ export async function loadTournamentPreview(
 ): Promise<TournamentPreview | null> {
   if (!isPreviewableState(tournament.state)) return null;
 
-  const source = seedingSource(tournament.format, Number(tournament.manual_seeding ?? 0) === 1);
+  const randomSeeding = Number(tournament.random_seeding ?? 0) === 1;
+  // Tirage au sort à venir (`docs/features/RANDOM_SEEDING.md`) : un aperçu
+  // montrerait un premier tour que le sort va défaire — aucun d'ici le tirage.
+  // Fait, l'ordre tiré est dans `seed` : l'aperçu le montre tel qu'il sera joué.
+  if (
+    randomDrawStatus({
+      enabled: randomSeeding,
+      drawnAt: tournament.random_seeding_drawn_at ?? null,
+      registrationCloseAt: tournament.registration_close_at,
+    }) === "PENDING"
+  ) {
+    return null;
+  }
+
+  const source = seedingSource(tournament.format, Number(tournament.manual_seeding ?? 0) === 1, randomSeeding);
   const entrants = await loadOrderedEntrants(connection, tournament.id, source);
 
   const [settings] = await connection.execute<PreviewSettingsRow[]>(

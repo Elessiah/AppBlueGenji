@@ -30,6 +30,7 @@ import {
   type ValidatedTournamentInput,
 } from "./validation";
 import { insertPhases } from "./phases-repository";
+import { drawRandomSeedingIfDue, writeSeedOrder } from "./random-seeding";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
@@ -72,6 +73,8 @@ export type EditableTournamentValues = {
   enduranceEarlyExit: boolean;
   /** Phase de lancement des matchs (option, éteinte par défaut). */
   launchPhase: boolean;
+  /** Tirage au sort de l'ordre de départ (option, éteinte par défaut — `RANDOM_SEEDING.md`). */
+  randomSeeding: boolean;
   matchFormat: MatchFormat | null;
   /**
    * Format Duel / Arcade : points qui gagnent une carte (`null` = éteint,
@@ -117,7 +120,7 @@ async function loadEditRow(
       endurance_playoff_format_type, endurance_playoff_format_value,
       registration_discord_requirement, registration_blizzard_requirement,
       registration_min_players, referee_scheduling, match_launch_phase,
-      team_voice_channels, match_check_in, map_point_target
+      team_voice_channels, match_check_in, map_point_target, random_seeding
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -163,6 +166,7 @@ function toValues(
     enduranceMaxRounds: num(row.endurance_max_rounds),
     enduranceEarlyExit: Number(row.endurance_early_exit) === 1,
     launchPhase: Number(row.match_launch_phase) === 1,
+    randomSeeding: Number(row.random_seeding) === 1,
     mapPointTarget: parseStoredMapPointTarget(row.map_point_target),
     matchFormat: parseMatchFormat(
       row.match_format_type,
@@ -487,7 +491,7 @@ async function roundFitter(
 export function updateTournament(
   tournamentId: number,
   patch: Partial<EditableTournamentValues>,
-): Promise<{ previousName: string; name: string }> {
+): Promise<TournamentUpdateResult> {
   // Le contrôle `MAP_POINTS_LOCKED` verrouille les matchs du tournoi : face à un
   // report en cours, l'ordre des verrous peut s'inverser. L'interblocage se
   // rejoue (transaction annulée en entier) plutôt que de rendre un 500 au staff.
@@ -497,12 +501,13 @@ export function updateTournament(
 async function applyTournamentUpdate(
   tournamentId: number,
   patch: Partial<EditableTournamentValues>,
-): Promise<{ previousName: string; name: string }> {
+): Promise<TournamentUpdateResult> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   let previousName: string;
   let name: string;
   let roundPointsPruned = false;
+  let randomDraw: RandomDrawChange = null;
 
   try {
     await connection.beginTransaction();
@@ -556,7 +561,8 @@ async function applyTournamentUpdate(
         match_format_max_maps = ?, match_format_draws = ?,
         endurance_playoff_format_type = ?, endurance_playoff_format_value = ?,
         registration_discord_requirement = ?, registration_blizzard_requirement = ?,
-        registration_min_players = ?, match_launch_phase = ?, map_point_target = ?
+        registration_min_players = ?, match_launch_phase = ?, map_point_target = ?,
+        random_seeding = ?
        WHERE id = ?`,
       [
         valid.name,
@@ -593,9 +599,11 @@ async function applyTournamentUpdate(
         valid.registrationFilters.minPlayers,
         valid.launchPhase ? 1 : 0,
         valid.mapPointTarget,
+        Number(valid.randomSeeding),
         tournamentId,
       ],
     );
+    randomDraw = await applyRandomSeedingChange(connection, tournamentId, current.randomSeeding, valid.randomSeeding);
 
     // Les phases ne sont reposées à neuf que si le patch les concerne — soit
     // directement, soit par un changement de format qui les rend caduques.
@@ -636,7 +644,83 @@ async function applyTournamentUpdate(
   invalidateSpectatorSnapshot(tournamentId);
   publishUpdatedEvent(tournamentId);
   scheduleRoundPointsNotice(roundPointsPruned);
-  return { previousName, name };
+  return updateResult(previousName, name, randomDraw);
+}
+
+/** `randomDraw` n'apparaît qu'avec un effet : une édition ordinaire rend `{ previousName, name }`. */
+function updateResult(previousName: string, name: string, randomDraw: RandomDrawChange): TournamentUpdateResult {
+  return randomDraw === null ? { previousName, name } : { previousName, name, randomDraw };
+}
+
+/** Effet d'une bascule du tirage : tiré, tirage annulé, ou rien. */
+type RandomDrawChange = "DRAWN" | "RESET" | null;
+
+/**
+ * Résultat d'une édition. `randomDraw` (absent sans effet) dit qu'un tirage a
+ * été fait ou annulé par ce geste : la route le journalise à part, pour qu'un
+ * nouveau tirage du staff (éteindre puis rallumer) se voie dans les journaux.
+ */
+export type TournamentUpdateResult = {
+  previousName: string;
+  name: string;
+  randomDraw?: Exclude<RandomDrawChange, null>;
+};
+
+/**
+ * Suites d'une bascule du tirage au sort (`docs/features/RANDOM_SEEDING.md`),
+ * dans la transaction de l'édition (ligne du tournoi déjà verrouillée).
+ *
+ * - **Éteint** après un tirage : le tournoi revient à l'ordre par défaut de son
+ *   format (seeds remis dans l'ordre d'inscription, `manual_seeding` à 0 :
+ *   ordre d'inscription ou classement du site) — l'ordre tiré n'est pas un ordre fixé par le staff, et
+ *   le garder l'afficherait comme tel. Le staff le règle ensuite aux flèches.
+ *   Éteint avant tout tirage : rien ne bouge (un ordre manuel antérieur reste).
+ *   Rallumer l'option fera un nouveau tirage.
+ * - **Allumé** après la clôture des inscriptions : le tirage se fait tout de
+ *   suite (aucun entretien n'aurait de raison de repasser avant le coup
+ *   d'envoi). Avant la clôture, rien : il aura lieu à la clôture.
+ */
+async function applyRandomSeedingChange(
+  connection: PoolConnection,
+  tournamentId: number,
+  before: boolean,
+  after: boolean,
+): Promise<RandomDrawChange> {
+  if (before === after) return null;
+  if (!after) return (await resetRandomDraw(connection, tournamentId)) ? "RESET" : null;
+  return (await drawRandomSeedingIfDue(connection, tournamentId)) ? "DRAWN" : null;
+}
+
+/**
+ * Annule un tirage fait (option éteinte) : seeds remis dans l'ordre
+ * d'inscription, `manual_seeding` à 0, date du tirage effacée.
+ * @returns `true` si un tirage était posé et a été annulé.
+ */
+async function resetRandomDraw(connection: PoolConnection, tournamentId: number): Promise<boolean> {
+  const [rows] = await connection.execute<(RowDataPacket & { drawn: number })[]>(
+    `SELECT random_seeding_drawn_at IS NOT NULL AS drawn FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  if (Number(rows[0]?.drawn ?? 0) !== 1) return false;
+  // Seeds réécrits dans l'ordre d'inscription (une inscription prend
+  // `seed = effectif + 1`, jamais `NULL`) : l'ordre par défaut des plateaux.
+  const [registrations] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
+    `SELECT team_id FROM bg_tournament_registrations
+     WHERE tournament_id = ?
+     ORDER BY registered_at ASC, team_id ASC
+     FOR UPDATE`,
+    [tournamentId],
+  );
+  await writeSeedOrder(
+    connection,
+    tournamentId,
+    registrations.map((registration) => Number(registration.team_id)),
+  );
+  await connection.execute(
+    `UPDATE bg_tournaments SET manual_seeding = 0, random_seeding_drawn_at = NULL WHERE id = ?`,
+    [tournamentId],
+  );
+  return true;
 }
 
 /** Points de tour effacés par l'édition : leur annonce part une fois le commit fait. */
@@ -673,6 +757,7 @@ function validateEditedValues(next: EditableTournamentValues): {
     enduranceMaxRounds: next.enduranceMaxRounds ?? undefined,
     enduranceEarlyExit: next.enduranceEarlyExit,
     launchPhase: next.launchPhase,
+    randomSeeding: next.randomSeeding,
     mapPointTarget: next.mapPointTarget,
     matchFormatType: next.matchFormat?.type ?? null,
     matchFormatValue: next.matchFormat?.value ?? null,

@@ -172,7 +172,7 @@ export async function loadSeedingBoard(tournamentId: number): Promise<SeedingBoa
 
     return {
       entries,
-      lockReason: seedingLockReason(windowState(tournament), matches),
+      lockReason: seedingLockReason(windowState(tournament), matches, Number(tournament.random_seeding ?? 0) === 1),
       manualSeeding: Number(tournament.manual_seeding ?? 0) === 1,
     };
   } finally {
@@ -199,7 +199,7 @@ export async function loadSeedingBoard(tournamentId: number): Promise<SeedingBoa
  * visible si le rejeu n'en vient pas à bout : aucun score n'est perdu en
  * silence.
  *
- * @throws TOURNAMENT_NOT_FOUND | SEEDING_LOCKED | SEEDING_LOCKED_STARTED | SEEDING_LOCKED_FINISHED | INVALID_SEED_ORDER
+ * @throws TOURNAMENT_NOT_FOUND | SEEDING_LOCKED | SEEDING_LOCKED_STARTED | SEEDING_LOCKED_FINISHED | SEEDING_LOCKED_RANDOM_DRAW | INVALID_SEED_ORDER
  */
 export async function reorderSeeding(tournamentId: number, orderedTeamIds: number[]): Promise<void> {
   await retryOnDeadlock(() => reorderSeedingOnce(tournamentId, orderedTeamIds));
@@ -231,10 +231,16 @@ async function reorderSeedingOnce(tournamentId: number, orderedTeamIds: number[]
     const entries = await loadEntries(connection, tournamentId);
     const matchRows = await getMatchRows(connection, tournamentId);
 
-    const lockReason = seedingLockReason(windowState(tournament), toScoreStates(matchRows));
+    const lockReason = seedingLockReason(
+      windowState(tournament),
+      toScoreStates(matchRows),
+      Number(tournament.random_seeding ?? 0) === 1,
+    );
     if (lockReason === "FINISHED") throw new Error("SEEDING_LOCKED_FINISHED");
     if (lockReason === "STARTED") throw new Error("SEEDING_LOCKED_STARTED");
     if (lockReason === "SCORES_ENTERED") throw new Error("SEEDING_LOCKED");
+    // Tirage au sort allumé : l'ordre est celui du sort (`RANDOM_SEEDING.md`).
+    if (lockReason === "RANDOM_DRAW") throw new Error("SEEDING_LOCKED_RANDOM_DRAW");
     // Invariant : un plateau ne naît qu'au coup d'envoi, que la fenêtre vient de
     // refuser. Des matchs ici décriraient un tirage déjà fait — on refuse plutôt
     // que de le détruire et d'amorcer les manches d'un tournoi non lancé.

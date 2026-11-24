@@ -55,22 +55,27 @@ let phaseRowsToReturn: Record<string, unknown>[] = [];
 /** Matchs lus par le verrou des points par carte (`assertMapPointsUnlocked`). */
 let matchRowsToReturn: Record<string, unknown>[] = [];
 let roundMapRowsToReturn: Record<string, unknown>[] = [];
+/** Inscrites relues par le tirage au sort et son extinction (`RANDOM_SEEDING.md`). */
+let registrationRowsToReturn: Record<string, unknown>[] = [];
 
 const connection = {
   beginTransaction: jest.fn(async () => undefined),
   commit: jest.fn(async () => undefined),
   rollback: jest.fn(async () => undefined),
   release: jest.fn(() => undefined),
-  execute: jest.fn(async (sql: string, params: unknown[] = []) => {
-    executed.push({ sql, params });
-    if (/^\s*SELECT[\s\S]*FROM bg_tournament_round_maps/i.test(sql)) return [roundMapRowsToReturn];
-    if (/FROM bg_tournaments/i.test(sql)) return [rowToReturn ? [rowToReturn] : []];
-    if (/FROM bg_tournament_phases/i.test(sql)) return [phaseRowsToReturn];
-    if (/FROM bg_match_maps/i.test(sql)) return [[]];
-    if (/FROM bg_matches/i.test(sql)) return [matchRowsToReturn];
-    return [{ affectedRows: 1, insertId: 1 }];
-  }),
+  execute: jest.fn(defaultExecute),
 };
+
+async function defaultExecute(sql: string, params: unknown[] = []): Promise<unknown[]> {
+  executed.push({ sql, params });
+  if (/^\s*SELECT[\s\S]*FROM bg_tournament_round_maps/i.test(sql)) return [roundMapRowsToReturn];
+  if (/^\s*SELECT team_id FROM bg_tournament_registrations/i.test(sql)) return [registrationRowsToReturn];
+  if (/FROM bg_tournaments/i.test(sql)) return [rowToReturn ? [rowToReturn] : []];
+  if (/FROM bg_tournament_phases/i.test(sql)) return [phaseRowsToReturn];
+  if (/FROM bg_match_maps/i.test(sql)) return [[]];
+  if (/FROM bg_matches/i.test(sql)) return [matchRowsToReturn];
+  return [{ affectedRows: 1, insertId: 1 }];
+}
 
 beforeEach(() => {
   executed.length = 0;
@@ -78,6 +83,7 @@ beforeEach(() => {
   phaseRowsToReturn = [];
   matchRowsToReturn = [];
   roundMapRowsToReturn = [];
+  registrationRowsToReturn = [];
   jest.clearAllMocks();
   jest.mocked(getDatabase).mockResolvedValue(fakePool({
     getConnection: async () => connection,
@@ -643,5 +649,88 @@ describe("updateTournament — format Duel / Arcade", () => {
     rowToReturn = hiddenRow({ map_point_target: 5 });
 
     expect((await loadEditableTournament(1))?.values.mapPointTarget).toBe(5);
+  });
+});
+
+/**
+ * Écritures d'ordre, une ligne `[seed, tournoi, équipe]` par engagée, décodées
+ * de l'unique `UPDATE … SET seed = CASE team_id …` (`writeSeedOrder`).
+ */
+function decodeSeedOrder(params: readonly unknown[]): unknown[][] {
+  const count = (params.length - 1) / 3;
+  const tournamentId = params[2 * count];
+  return Array.from({ length: count }, (_, index) => [params[2 * index + 1], tournamentId, params[2 * index]]);
+}
+
+describe("updateTournament — tirage au sort (RANDOM_SEEDING.md)", () => {
+  const seedWrites = () =>
+    executed
+      .filter((q) => /UPDATE bg_tournament_registrations SET seed = CASE team_id/.test(q.sql))
+      .flatMap((q) => decodeSeedOrder(q.params));
+  /** Visible, inscriptions closes, départ à venir : fenêtre RESTRICTED. */
+  const closedRow = (over: Record<string, unknown> = {}) =>
+    hiddenRow({
+      start_visibility_at: new Date(past.getTime() - HOUR),
+      registration_open_at: past,
+      registration_close_at: new Date(Date.now() - HOUR),
+      start_at: future,
+      ...over,
+    });
+
+  it("allumée avant la clôture : écrit l'option, ne tire rien", async () => {
+    expect((await updateTournament(1, { randomSeeding: true })).randomDraw).toBeUndefined();
+    expect(executed.some((q) => /random_seeding = \?/.test(q.sql))).toBe(true);
+    expect(seedWrites()).toEqual([]);
+    expect(executed.some((q) => /SET manual_seeding = 1/.test(q.sql))).toBe(false);
+  });
+
+  it("allumée après la clôture : tire tout de suite, dans la transaction de l'édition", async () => {
+    rowToReturn = closedRow({ random_seeding: 0, random_seeding_drawn_at: null });
+    registrationRowsToReturn = [{ team_id: 11 }, { team_id: 12 }, { team_id: 13 }];
+    // L'édition écrit l'option : la relecture verrouillante du tirage la voit allumée.
+    connection.execute.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      executed.push({ sql, params });
+      if (/random_seeding = \?/.test(sql) && rowToReturn) rowToReturn = { ...rowToReturn, random_seeding: 1 };
+      if (/^\s*SELECT team_id FROM bg_tournament_registrations/i.test(sql)) return [registrationRowsToReturn];
+      if (/FROM bg_tournaments/i.test(sql)) return [rowToReturn ? [rowToReturn] : []];
+      if (/FROM bg_matches/i.test(sql)) return [[]];
+      return [{ affectedRows: 1, insertId: 1 }];
+    });
+    try {
+      expect((await updateTournament(1, { randomSeeding: true })).randomDraw).toBe("DRAWN");
+    } finally {
+      connection.execute.mockImplementation(defaultExecute);
+    }
+    const writes = seedWrites();
+    expect(writes.map((params) => (params as number[])[0])).toEqual([1, 2, 3]);
+    expect(writes.map((params) => (params as number[])[2]).sort((a, b) => a - b)).toEqual([11, 12, 13]);
+    expect(executed.some((q) => /SET manual_seeding = 1, random_seeding_drawn_at = \?/.test(q.sql))).toBe(true);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("éteinte après un tirage : revient à l'ordre d'inscription et à l'ordre par défaut", async () => {
+    rowToReturn = closedRow({ random_seeding: 1, random_seeding_drawn_at: new Date(), drawn: 1 });
+    registrationRowsToReturn = [{ team_id: 21 }, { team_id: 22 }];
+    expect((await updateTournament(1, { randomSeeding: false })).randomDraw).toBe("RESET");
+    const reread = executed.find((q) => /SELECT team_id FROM bg_tournament_registrations/.test(q.sql));
+    expect(reread?.sql).toMatch(/ORDER BY registered_at ASC, team_id ASC\s+FOR UPDATE/);
+    expect(seedWrites()).toEqual([
+      [1, 1, 21],
+      [2, 1, 22],
+    ]);
+    expect(executed.some((q) => /SET manual_seeding = 0, random_seeding_drawn_at = NULL/.test(q.sql))).toBe(true);
+  });
+
+  it("éteinte avant tout tirage : ne touche ni l'ordre ni le drapeau manuel", async () => {
+    rowToReturn = hiddenRow({ random_seeding: 1, random_seeding_drawn_at: null, drawn: 0 });
+    expect(await updateTournament(1, { randomSeeding: false })).not.toHaveProperty("randomDraw");
+    expect(seedWrites()).toEqual([]);
+    expect(executed.some((q) => /manual_seeding = 0/.test(q.sql))).toBe(false);
+  });
+
+  it("refuse une valeur non booléenne", async () => {
+    await expect(updateTournament(1, { randomSeeding: "oui" as unknown as boolean })).rejects.toThrow(
+      "INVALID_RANDOM_SEEDING",
+    );
   });
 });

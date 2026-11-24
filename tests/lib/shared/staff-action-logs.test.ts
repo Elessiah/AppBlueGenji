@@ -34,6 +34,8 @@ const TOURNAMENT_ACTIONS: StaffTournamentAction[] = [
   "TEAM_VOICE_OFF",
   "MATCH_CHECK_IN_ON",
   "MATCH_CHECK_IN_OFF",
+  "RANDOM_SEEDING_DRAWN",
+  "RANDOM_SEEDING_RESET",
 ];
 
 const tournament = { id: 7, name: "Coupe d'hiver" };

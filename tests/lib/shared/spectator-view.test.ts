@@ -644,6 +644,9 @@ const CARD_FIELDS = {
   survivalRoundsPerCut: "public",
   teamVoiceChannels: "public",
   matchCheckIn: "public",
+  // Règle du tournoi et date du tirage au sort (RANDOM_SEEDING.md) : publiques.
+  randomSeeding: "public",
+  randomSeedingDrawnAt: "public",
 } as const satisfies Record<keyof TournamentCard, Disposition>;
 
 const PHASE_FIELDS = {

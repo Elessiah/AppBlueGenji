@@ -43,6 +43,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `DUEL_ARCADE.md` — Format Duel / Arcade : chaque carte au premier à N points (tournoi, remplaçable par tour puis carte par carte), contrôlé à chaque saisie de score, figé dès qu'un match concerné porte un score ; points affichés partout.
 - `TOURNAMENT_PREVIEW.md` — Aperçu du plateau pendant les inscriptions (staff et cast), sans écriture.
 - `SEEDING_ORDER.md` — Ordre de seeding aux flèches ↑ / ↓, figé au coup d'envoi.
+- `RANDOM_SEEDING.md` — Option « Tirage au sort de l'ordre de départ » (décochée par défaut, modifiable jusqu'au coup d'envoi) : ordre tiré au sort (`crypto.randomInt`) à la clôture des inscriptions, aucun aperçu du premier tour avant le tirage, flèches retirées.
 - `ENTRANT_REMOVAL.md` — Retrait d'un engagé, jusqu'au coup d'envoi seulement.
 - `TOURNAMENT_EDITING.md` — Édition après création : fenêtres `FULL` / `RESTRICTED` / `LOCKED`.
 - `EARLY_TOURNAMENT_LAUNCH.md` — Avancer le tournoi d'une étape : on ne fait jamais avancer une date, seulement la reculer.

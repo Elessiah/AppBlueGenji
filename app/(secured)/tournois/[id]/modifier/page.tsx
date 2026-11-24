@@ -71,6 +71,7 @@ const LABELED_FIELDS = [
   "registrationBlizzardRequirement",
   "registrationMinPlayers",
   "launchPhase",
+  "randomSeeding",
   "mapPointTarget",
   "phases",
 ] as const satisfies readonly TournamentField[];

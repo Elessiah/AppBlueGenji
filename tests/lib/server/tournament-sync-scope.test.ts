@@ -3,6 +3,7 @@ import type { PoolConnection } from "mysql2/promise";
 import {
   BOTH_REPORTED_SQL,
   SINGLE_REPORT_SQL,
+  findSyncCandidates,
   findTournamentsNeedingSync,
 } from "@/lib/server/tournaments/sync-scope";
 import { STALLED_ALERT_KEY } from "@/lib/server/tournaments/bot-logs";
@@ -133,6 +134,42 @@ describe("findTournamentsNeedingSync — jalons de calendrier", () => {
       .find((text) => text.includes("registration_open_at, registration_close_at"))!;
     expect(sql).toContain("state <> 'FINISHED'");
     expect(sql).not.toContain("NOW()");
+  });
+});
+
+describe("findTournamentsNeedingSync — tirage au sort dû (RANDOM_SEEDING.md)", () => {
+  /** Clôture passée, départ à venir, état stocké déjà `UPCOMING` : aucun jalon franchi. */
+  const waiting = (overrides: Row = {}) =>
+    settledRow({ id: 9, state: "UPCOMING", registration_close_at: at(-1), random_seeding: 1, random_seeding_drawn_at: null, ...overrides });
+
+  it("retient un tirage dû sans changement d'état (clôture avancée dans le passé)", async () => {
+    expect(await findTournamentsNeedingSync(makeConn([waiting()], []))).toEqual([9]);
+  });
+
+  it("ignore un tirage déjà fait, ou l'option éteinte", async () => {
+    expect(await findTournamentsNeedingSync(makeConn([waiting({ random_seeding_drawn_at: at(-0.5) })], []))).toEqual([]);
+    expect(await findTournamentsNeedingSync(makeConn([waiting({ random_seeding: 0 })], []))).toEqual([]);
+  });
+
+  it("marque « verrou d'abord » les candidats d'avant le départ, pas ceux en cours", async () => {
+    const conn = makeConn(
+      [waiting(), settledRow({ id: 3, state: "REGISTRATION", registration_close_at: at(-2), start_at: at(-1) })],
+      [{ id: 5 }],
+    );
+    expect(await findSyncCandidates(conn)).toEqual([
+      { id: 3, lockFirst: true },
+      { id: 5, lockFirst: false },
+      { id: 9, lockFirst: true },
+    ]);
+  });
+
+  it("lit l'option et la date du tirage avec les dates", async () => {
+    const conn = makeConn([], []);
+    await findTournamentsNeedingSync(conn);
+    const sql = conn.execute.mock.calls
+      .map((call) => String(call[0]))
+      .find((text) => text.includes("registration_open_at, registration_close_at"))!;
+    expect(sql).toContain("random_seeding, random_seeding_drawn_at");
   });
 });
 

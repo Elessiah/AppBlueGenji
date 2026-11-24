@@ -11,9 +11,9 @@ import {
   seedingLockReason,
   seedingReorderNeedsConfirmation,
   seedingWindowState,
-  type SeedingLockReason,
 } from "@/lib/shared/seeding";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
+import { randomDrawStatus } from "@/lib/shared/random-seeding";
 import { entrantRemovalBlockReason } from "@/lib/shared/entrant-removal";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { toParticipantType } from "@/lib/shared/participants";
@@ -29,6 +29,8 @@ import {
   hiddenRegistrationCount,
   mustExpandToShow,
   registrationActionsColumn,
+  randomDrawHintKey,
+  seedingLockKey,
   registrationsRankingHintKey,
   removalNotice,
   visibleRegistrationCount,
@@ -178,13 +180,6 @@ interface RegistrationsPanelProps {
   onChanged: () => void;
 }
 
-/** Clé du verrou de l'ordre (`registrations.lock.*`). */
-const LOCK_KEYS = {
-  FINISHED: "registrations.lock.FINISHED",
-  SCORES_ENTERED: "registrations.lock.SCORES_ENTERED",
-  STARTED: "registrations.lock.STARTED",
-} as const satisfies Record<NonNullable<SeedingLockReason>, string>;
-
 /** Intitulé de la colonne d'actions (`registrationActionsColumn`) → sa clé. */
 const COLUMN_KEYS = {
   Actions: "registrations.column.actions",
@@ -263,6 +258,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const lockReason = seedingLockReason(
     seedingWindowState(detail.card, now),
     detail.matches.map(fromBracketMatch),
+    detail.card.randomSeeding,
   );
   const staff = detail.isAdmin && canAct;
   const reorderable = staff && lockReason === null && detail.registrations.length > 1;
@@ -403,7 +399,15 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     : a(`registrations.seedingHintWaiting.${toParticipantType(detail.card.participantType)}`);
 
   // Pourquoi l'ordre est celui-là, quand il suit le classement du site.
-  const rankingHint = registrationsRankingHintKey(followsRanking, followsFrozenDraw, rows.length);
+  // Tirage au sort : à venir ou fait (`RANDOM_SEEDING.md`) — prime sur le classement.
+  const drawStatus = randomDrawStatus({
+    enabled: detail.card.randomSeeding,
+    drawnAt: detail.card.randomSeedingDrawnAt,
+    registrationCloseAt: detail.card.registrationCloseAt,
+  });
+  const rankingHint =
+    randomDrawHintKey(drawStatus, rows.length, lockReason) ??
+    registrationsRankingHintKey(followsRanking, followsFrozenDraw, rows.length);
 
   const hiddenCount = hiddenRegistrationCount(rows.length);
   const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
@@ -422,7 +426,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
           <div className={styles.hintRow}>
             <InfoHintRow>
               <p className={styles.hint}>
-                {lockReason !== null ? a(LOCK_KEYS[lockReason]) : seedingHint}
+                {lockReason !== null ? a(seedingLockKey(lockReason, drawStatus)) : seedingHint}
               </p>
               {rankingHint !== null && (
                 <InfoHint id="registrations-seeding-more" subject={a(`registrations.seedingSource.${source}`)}>

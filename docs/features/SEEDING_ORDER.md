@@ -177,6 +177,11 @@ dirait le même fait (`removalNotice`).
 Tant que personne n'a réordonné, chaque format garde donc exactement le
 comportement qu'il avait.
 
+L'option **tirage au sort** (`bg_tournaments.random_seeding`, `RANDOM_SEEDING.md`)
+passe avant tout : la source vaut `RANDOM`, les flèches sont retirées
+(`RANDOM_DRAW`, refus `SEEDING_LOCKED_RANDOM_DRAW`), et le tirage, fait à la
+clôture des inscriptions, écrit `seed` et pose `manual_seeding = 1`.
+
 ## Refermer un trou : `resequenceSeeds`
 
 Retirer un engagé du plateau (`docs/features/ENTRANT_REMOVAL.md`) efface une

@@ -71,10 +71,14 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   if (Object.keys(patch).length === 0) return fail("EMPTY_PATCH", 400);
 
   try {
-    const { previousName, name } = await updateTournament(checked.id, patch);
+    const { previousName, name, randomDraw } = await updateTournament(checked.id, patch);
     // La ligne nomme le tournoi sous le nom que ce geste a écrit (pas celui d'un
     // renommage qui le suivrait) ; un renommage cite aussi l'ancien.
     announceStaffTournamentAction(checked.id, "EDITED", patch.name === undefined ? { name } : { previousName, name });
+    // Un tirage fait ou annulé par ce geste a sa propre ligne : éteindre puis
+    // rallumer l'option pour retirer l'ordre se lit dans les journaux.
+    if (randomDraw === "DRAWN") announceStaffTournamentAction(checked.id, "RANDOM_SEEDING_DRAWN", { name });
+    if (randomDraw === "RESET") announceStaffTournamentAction(checked.id, "RANDOM_SEEDING_RESET", { name });
     return ok({ success: true });
   } catch (error) {
     return updateFailureResponse(error);

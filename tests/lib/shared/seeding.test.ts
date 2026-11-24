@@ -198,7 +198,7 @@ describe("seedingSource", () => {
   });
 
   it("a un libellé pour chaque provenance", () => {
-    expect(Object.keys(SEEDING_SOURCE_LABELS).sort()).toEqual(["MANUAL", "RANKING", "REGISTRATION"]);
+    expect(Object.keys(SEEDING_SOURCE_LABELS).sort()).toEqual(["MANUAL", "RANDOM", "RANKING", "REGISTRATION"]);
   });
 });
 
@@ -330,5 +330,33 @@ describe("orderByFrozenSeeds", () => {
   it("ne modifie pas les lignes reçues", () => {
     orderByFrozenSeeds(rows, new Map([[3, 1]]));
     expect(rows[2].seed).toBe(3);
+  });
+});
+
+describe("tirage au sort de l'ordre de départ (RANDOM_SEEDING.md)", () => {
+  it("seedingSource rend RANDOM avant tout, ordre manuel compris", () => {
+    const formats: TournamentFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "MULTI", "BG_SURVIE"];
+    for (const format of formats) {
+      expect(seedingSource(format, true, true)).toBe("RANDOM");
+      expect(seedingSource(format, false, true)).toBe("RANDOM");
+    }
+    expect(SEEDING_SOURCE_LABELS.RANDOM).toBe("Tirage au sort");
+  });
+
+  it("l'ordre tiré est celui qui sera joué : ni classement avant, ni rangs figés après", () => {
+    expect(isSeedOrderEffective("RANDOM")).toBe(true);
+    expect(registrationsFollowRanking("RANDOM", "REGISTRATION")).toBe(false);
+    expect(registrationsFollowFrozenDraw("RANDOM", "RUNNING")).toBe(false);
+  });
+
+  it("seedingLockReason rend RANDOM_DRAW avant le coup d'envoi, option allumée", () => {
+    expect(seedingLockReason("REGISTRATION", [], true)).toBe("RANDOM_DRAW");
+    expect(seedingLockReason("UPCOMING", [], true)).toBe("RANDOM_DRAW");
+    expect(seedingLockReason("REGISTRATION", [], false)).toBeNull();
+  });
+
+  it("garde les raisons plus précises devant RANDOM_DRAW", () => {
+    expect(seedingLockReason("RUNNING", [], true)).toBe("STARTED");
+    expect(seedingLockReason("FINISHED", [], true)).toBe("FINISHED");
   });
 });

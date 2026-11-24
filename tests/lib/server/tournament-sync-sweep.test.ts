@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
  */
 
 type Connection = {
-  execute: jest.Mock;
+  execute: jest.Mock<(sql: string, params?: unknown[]) => Promise<unknown>>;
   beginTransaction: jest.Mock;
   commit: jest.Mock;
   rollback: jest.Mock;
@@ -37,6 +37,8 @@ async function runSweep(options: {
   rollbackFails?: boolean;
   /** Tentatives en échec par tournoi, sous un code du serveur (interblocage…). */
   failWithCode?: Record<number, { code: string; times: number }>;
+  /** État stocké vu par le repérage, par tournoi (`RUNNING` par défaut). */
+  states?: Record<number, string>;
 }): Promise<{
   connection: Connection;
   synced: number[];
@@ -52,7 +54,12 @@ async function runSweep(options: {
 
   await jest.isolateModulesAsync(async () => {
     jest.doMock("@/lib/server/tournaments/sync-scope", () => ({
-      findTournamentsNeedingSync: jest.fn(async () => options.candidates),
+      findSyncCandidates: jest.fn(async () =>
+        options.candidates.map((id) => ({
+          id,
+          lockFirst: ["UPCOMING", "REGISTRATION"].includes(options.states?.[id] ?? "RUNNING"),
+        })),
+      ),
     }));
 
     jest.doMock("@/lib/server/tournaments/notifications", () => ({
@@ -88,7 +95,7 @@ async function runSweep(options: {
 
     jest.doMock("@/lib/server/database", () => {
       connection = {
-        execute: jest.fn(async () => [[], undefined]),
+        execute: jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(async () => [[], undefined]),
         beginTransaction: jest.fn(async () => undefined),
         commit: jest.fn(async () => undefined),
         rollback: jest.fn(async () => {
@@ -128,6 +135,20 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
     expect(connection.beginTransaction).toHaveBeenCalledTimes(3);
     expect(connection.commit).toHaveBeenCalledTimes(3);
     expect(connection.rollback).not.toHaveBeenCalled();
+  });
+
+  // Tirage au sort et semis au coup d'envoi (`RANDOM_SEEDING.md`) : avant le
+  // départ, verrou du tournoi en première instruction de la transaction.
+  it("verrouille le tournoi en tête de transaction avant le départ, pas en cours", async () => {
+    const { connection } = await runSweep({ candidates: [3, 7], states: { 3: "UPCOMING", 7: "RUNNING" } });
+
+    const locks = connection.execute.mock.calls.filter((call) => /FOR UPDATE/.test(String(call[0])));
+    expect(locks.map((call) => (call[1] as unknown[])[0])).toEqual([3]);
+    // Première instruction de la transaction du tournoi 3 : avant son entretien.
+    const lockIndex = connection.execute.mock.calls.findIndex((call) => /FOR UPDATE/.test(String(call[0])));
+    const lockOrder = connection.execute.mock.invocationCallOrder[lockIndex]!;
+    expect(connection.beginTransaction.mock.invocationCallOrder[0]).toBeLessThan(lockOrder);
+    expect(connection.commit.mock.invocationCallOrder[0]).toBeGreaterThan(lockOrder);
   });
 
   it("n'ouvre aucune transaction quand il n'y a rien à faire", async () => {
@@ -311,9 +332,9 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
       let connection!: Connection;
 
       jest.doMock("@/lib/server/tournaments/sync-scope", () => ({
-        findTournamentsNeedingSync: jest.fn(async () => {
+        findSyncCandidates: jest.fn(async () => {
           openWhenScoped = connection.beginTransaction.mock.calls.length;
-          return [1];
+          return [{ id: 1, lockFirst: false }];
         }),
       }));
       jest.doMock("@/lib/server/tournaments/state", () => ({
@@ -356,7 +377,7 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
     await expect(
       jest.isolateModulesAsync(async () => {
         jest.doMock("@/lib/server/tournaments/sync-scope", () => ({
-          findTournamentsNeedingSync: jest.fn(async () => {
+          findSyncCandidates: jest.fn(async () => {
             throw new Error("DB DOWN");
           }),
         }));
@@ -393,9 +414,9 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
 
     await jest.isolateModulesAsync(async () => {
       jest.doMock("@/lib/server/tournaments/sync-scope", () => ({
-        findTournamentsNeedingSync: jest.fn(
+        findSyncCandidates: jest.fn(
           () =>
-            new Promise<number[]>((resolve) => {
+            new Promise<{ id: number; lockFirst: boolean }[]>((resolve) => {
               sweepStarted();
               releaseSweep = () => resolve([]);
             }),

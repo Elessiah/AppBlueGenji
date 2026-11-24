@@ -48,6 +48,7 @@ export const ALL_TOURNAMENT_FIELDS = [
   "registrationBlizzardRequirement",
   "registrationMinPlayers",
   "launchPhase",
+  "randomSeeding",
   "mapPointTarget",
   "phases",
 ] as const;
@@ -85,6 +86,10 @@ export const RESTRICTED_FIELDS: readonly TournamentField[] = [
   // ferait rentrer en lancement des matchs que la règle tenait déjà pour
   // lancés, ou l'inverse (`docs/features/MATCH_LAUNCH.md`).
   "launchPhase",
+  // Le tirage au sort de l'ordre de départ, de même : aucun plateau n'existe
+  // avant le coup d'envoi, et le tirage se fait à la clôture des inscriptions
+  // (ou à l'enregistrement, si on l'allume après) — `docs/features/RANDOM_SEEDING.md`.
+  "randomSeeding",
   // Format de match et format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) :
   // modifiables jusqu'au départ, même avec des inscrites — aucun match n'existe
   // avant, aucun score n'est donc jugé par l'ancienne règle. Un BO9 qui était

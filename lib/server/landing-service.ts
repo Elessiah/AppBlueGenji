@@ -123,6 +123,7 @@ type LiveMatchRow = RowDataPacket & {
   team1_seed: number | null;
   team2_seed: number | null;
   manual_seeding: number | null;
+  random_seeding: number | null;
   start_at: Date | string | null;
   live_trigger: MatchLiveTrigger | null;
   live_url: string | null;
@@ -246,6 +247,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         r1.seed AS team1_seed,
         r2.seed AS team2_seed,
         t.manual_seeding,
+        t.random_seeding,
         m.start_at,
         m.live_trigger,
         ${firstStreamUrlSql("m")} AS live_url,
@@ -308,7 +310,11 @@ async function loadLandingLive(): Promise<LandingLive | null> {
     // (tournois à classement) et les joueurs sans fiche.
     const [frozenSeeds, profilelessIds] = await Promise.all([
       firstRow !== null &&
-      seedingSource(tournament.format, Number(firstRow.manual_seeding ?? 0) === 1) === "RANKING"
+      seedingSource(
+        tournament.format,
+        Number(firstRow.manual_seeding ?? 0) === 1,
+        Number(firstRow.random_seeding ?? 0) === 1,
+      ) === "RANKING"
         ? loadFrozenRankingSeeds(db, tournament.id, tournament.format)
         : Promise.resolve(null),
       loadProfilelessPlayerIds(),

@@ -199,7 +199,7 @@ import { dispatchNewMatchNotices } from "./new-match-notices";
 import { dispatchLiveAnnouncements } from "./live-announcements";
 import { purgeExpiredConnectionLogs } from "@/lib/server/connection-logs";
 import { maintainSiteVisitRetention } from "@/lib/server/site-visits-service";
-import { findTournamentsNeedingSync } from "./sync-scope";
+import { findSyncCandidates, type SyncCandidate } from "./sync-scope";
 import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
 import { earliestReport, isScoreDisputed, type ReportInstant } from "@/lib/shared/score-dispute";
 import type { StaffActor } from "@/lib/shared/log-privacy";
@@ -248,12 +248,20 @@ const SYNC_ATTEMPTS = 3;
  */
 async function syncOneTournament(
   connection: PoolConnection,
-  tournamentId: number,
+  { id: tournamentId, lockFirst }: SyncCandidate,
 ): Promise<"changed" | "launches" | "none" | "failed"> {
   for (let attempt = 1; ; attempt += 1) {
     const startedAt = Date.now();
     try {
       await connection.beginTransaction();
+      // Avant le départ, l'entretien lit puis écrit les inscrites (tirage au
+      // sort, semis au coup d'envoi) : verrou du tournoi **en toute première
+      // instruction** (CLAUDE.md), sans quoi deux passes concurrentes
+      // figeraient un instantané d'avant le travail de l'autre
+      // (`RANDOM_SEEDING.md`). L'état vient du repérage (`SyncCandidate`).
+      // L'entretien d'un tournoi en cours garde son ordre (matchs d'abord) : le
+      // verrou du tournoi en tête y croiserait les gestes des joueurs.
+      if (lockFirst) await lockTournamentRow(connection, tournamentId);
       const { stateChanged, contentChanged, launchesChanged } = await syncTournamentState(connection, tournamentId);
       await connection.commit();
       flushBotLogs(connection);
@@ -323,10 +331,11 @@ export async function syncVisibleTournaments(): Promise<void> {
     try {
       // Hors transaction : c'est une lecture de repérage, et l'ouvrir dans une
       // transaction rendrait à la première la durée qu'on vient de lui retirer.
-      const candidates = await findTournamentsNeedingSync(connection);
+      const candidates = await findSyncCandidates(connection);
 
-      for (const tournamentId of candidates) {
-        const outcome = await syncOneTournament(connection, tournamentId);
+      for (const candidate of candidates) {
+        const tournamentId = candidate.id;
+        const outcome = await syncOneTournament(connection, candidate);
         if (outcome === "changed") changedIds.push(tournamentId);
         else if (outcome === "launches") launchIds.push(tournamentId);
         // Transaction peut-être encore ouverte : le `START TRANSACTION` du
@@ -408,6 +417,8 @@ export async function createTournament(
     refereeScheduling?: boolean | null;
     /** Phase de lancement des matchs ; absente = option éteinte (le défaut). */
     launchPhase?: boolean | null;
+    /** Tirage au sort de l'ordre de départ ; absent = option éteinte (le défaut). */
+    randomSeeding?: boolean | null;
     /** Salons vocaux d'équipe ; absents = option éteinte (le défaut). */
     teamVoiceChannels?: boolean | null;
     /** Check-in des matchs ; absent = allumé (le défaut), seul `false` l'éteint. */
@@ -546,8 +557,9 @@ export async function createTournament(
         match_launch_phase,
         team_voice_channels,
         match_check_in,
-        map_point_target
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        map_point_target,
+        random_seeding
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -597,6 +609,7 @@ export async function createTournament(
         Number(payload.teamVoiceChannels === true),
         Number(payload.matchCheckIn !== false),
         payload.mapPointTarget ?? null,
+        Number(payload.randomSeeding === true),
       ],
     );
 
@@ -832,6 +845,8 @@ async function loadTournamentBuckets(
       t.map_point_target,
       t.team_voice_channels,
       t.match_check_in,
+      t.random_seeding,
+      t.random_seeding_drawn_at,
       t.live_url,
       t.image_url,
       t.image_fit,

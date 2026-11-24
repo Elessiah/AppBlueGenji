@@ -134,6 +134,28 @@ describe("gestes du staff sur un match", () => {
     expect(announceStaffMatchAction).not.toHaveBeenCalled();
   });
 
+  it.each<["DRAWN" | "RESET", StaffTournamentAction, boolean]>([
+    ["DRAWN", "RANDOM_SEEDING_DRAWN", true],
+    ["RESET", "RANDOM_SEEDING_RESET", false],
+  ])(
+    "tirage %s par l'édition : ligne propre après « tournoi modifié »",
+    async (randomDraw, action, randomSeeding) => {
+      jest.mocked(updateTournament).mockResolvedValue({ previousName: "Coupe", name: "Coupe", randomDraw });
+      const res = await editRoute(jsonReq("PATCH", { randomSeeding }), tournament);
+      expect(res.status).toBeLessThan(300);
+      expect(jest.mocked(announceStaffTournamentAction).mock.calls).toEqual([
+        [7, "EDITED", { name: "Coupe" }],
+        [7, action, { name: "Coupe" }],
+      ]);
+    },
+  );
+
+  it("édition sans effet sur le tirage : la seule ligne « tournoi modifié »", async () => {
+    jest.mocked(updateTournament).mockResolvedValue({ previousName: "Coupe", name: "Coupe" });
+    await editRoute(jsonReq("PATCH", { randomSeeding: true }), tournament);
+    expect(jest.mocked(announceStaffTournamentAction).mock.calls).toEqual([[7, "EDITED", { name: "Coupe" }]]);
+  });
+
   it("n'écrit rien quand le geste échoue", async () => {
     jest.mocked(forceLaunchMatch).mockRejectedValue(new Error("MATCH_ALREADY_LAUNCHED"));
     jest.mocked(setMatchOnAir).mockRejectedValue(new Error("MATCH_NOT_FOUND"));

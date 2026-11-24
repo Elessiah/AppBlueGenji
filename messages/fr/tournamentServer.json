@@ -14,7 +14,8 @@
     "seeding": {
       "MANUAL": "Fixé par l'arbitrage",
       "RANKING": "Classement du site",
-      "REGISTRATION": "Ordre des inscriptions"
+      "REGISTRATION": "Ordre des inscriptions",
+      "RANDOM": "Tirage au sort"
     },
     "requirement": {
       "NONE": "Aucun joueur",

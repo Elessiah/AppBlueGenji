@@ -48,7 +48,8 @@ import {
   getTournamentListRow,
   loadTournamentRow,
 } from "@/lib/server/tournaments/repository";
-import { hasPendingStateTransition, syncTournamentState } from "@/lib/server/tournaments/state";
+import { hasPendingStateTransition, syncTournamentState, writesRegistrations } from "@/lib/server/tournaments/state";
+import * as live from "@/lib/server/live";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import { invalidateLandingAggregates, invalidateLandingLive } from "@/lib/server/landing-cache";
 import { invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
@@ -124,6 +125,8 @@ const connection = {
   beginTransaction: jest.fn(async () => undefined),
   commit: jest.fn(async () => undefined),
   rollback: jest.fn(async () => undefined),
+  // Verrou du tournoi pris en première instruction de l'entretien.
+  execute: jest.fn(async (_sql: string) => [[{ id: 1 }]]),
 };
 let expiredRows: unknown[] = [];
 
@@ -251,6 +254,72 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
     expect(syncTournamentState).toHaveBeenCalled();
+  });
+
+  // Tirage au sort (`RANDOM_SEEDING.md`) : dû sans changement d'état.
+  describe("tirage au sort", () => {
+    const HOUR = 3_600_000;
+    const waitingRow = () =>
+      runningRow({
+        state: "UPCOMING",
+        registration_close_at: new Date(Date.now() - HOUR),
+        start_at: new Date(Date.now() + HOUR),
+        random_seeding: 1,
+        random_seeding_drawn_at: null,
+      });
+
+    beforeEach(() => {
+      jest.mocked(writesRegistrations).mockImplementation((state) => state === "UPCOMING" || state === "REGISTRATION");
+    });
+
+    it("entretient un tirage dû, verrou du tournoi en première instruction", async () => {
+      jest.mocked(loadTournamentRow).mockResolvedValue(waitingRow());
+      const order: string[] = [];
+      connection.execute.mockImplementation(async (sql: string) => {
+        order.push(/FOR UPDATE/.test(sql) ? "lock" : sql);
+        return [[{ id: 1 }]];
+      });
+      jest.mocked(syncTournamentState).mockImplementation(async () => {
+        order.push("sync");
+        return { row: waitingRow(), stateChanged: false, contentChanged: true, launchesChanged: false, randomDrawn: true };
+      });
+      const publish = jest.spyOn(live, "publishTournamentEvent");
+
+      await getTournamentSnapshotFrame(TOURNAMENT_ID);
+
+      expect(order).toEqual(["lock", "sync"]);
+      // Les flux ouverts relisent l'aperçu, sans jeter l'instantané en cours.
+      expect(publish).toHaveBeenCalledWith(expect.objectContaining({ type: "updated", tournamentId: TOURNAMENT_ID }));
+      expect(getTournamentListRow).toHaveBeenCalledTimes(1);
+    });
+
+    it("ne prévient personne quand l'entretien n'a rien tiré", async () => {
+      jest.mocked(loadTournamentRow).mockResolvedValue(waitingRow());
+      const publish = jest.spyOn(live, "publishTournamentEvent");
+
+      await getTournamentSnapshotFrame(TOURNAMENT_ID);
+
+      expect(syncTournamentState).toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it("n'entretient rien pour un tirage déjà fait", async () => {
+      jest.mocked(loadTournamentRow).mockResolvedValue(
+        runningRow({ ...waitingRow(), random_seeding_drawn_at: new Date() }),
+      );
+      await getTournamentSnapshotFrame(TOURNAMENT_ID);
+      expect(syncTournamentState).not.toHaveBeenCalled();
+    });
+
+    it("ne prend pas le verrou du tournoi en tête de l'entretien d'un tournoi en cours", async () => {
+      jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ bracket_size: null }));
+      connection.execute.mockClear();
+
+      await getTournamentSnapshotFrame(TOURNAMENT_ID);
+
+      expect(syncTournamentState).toHaveBeenCalled();
+      expect(connection.execute).not.toHaveBeenCalled();
+    });
   });
 
   it("construit le plateau manquant d'un tournoi en cours", async () => {

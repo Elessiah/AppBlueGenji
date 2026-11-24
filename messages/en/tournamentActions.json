@@ -7,12 +7,15 @@
     "seedingSource": {
       "MANUAL": "Order set by the staff",
       "RANKING": "Site ranking",
-      "REGISTRATION": "Registration order"
+      "REGISTRATION": "Registration order",
+      "RANDOM": "Random draw"
     },
     "lock": {
       "FINISHED": "Tournament finished: the order no longer has any effect.",
       "SCORES_ENTERED": "A score has been entered: the order is now locked.",
-      "STARTED": "The tournament has started: the seeding order is now locked."
+      "STARTED": "The tournament has started: the seeding order is now locked.",
+      "RANDOM_DRAW": "Random draw is on: the starting order will be drawn at random when registration closes. Turn the option off to set it by hand.",
+      "RANDOM_DRAWN": "Starting order drawn at random: it can't be set by hand. Turning the option off restores the default order (registration or ranking)."
     },
     "column": {
       "actions": "Actions",
@@ -26,6 +29,8 @@
     },
     "followsRanking": "Sorted by the site ranking: each registration takes its place by rating, and the order follows ratings until the launch. Reorder the list to lock it: your order then takes precedence.",
     "followsFrozenDraw": "Ranks locked at kickoff from the site ranking: the draw's ranks, even if ratings have changed since.",
+    "randomPending": "Starting order drawn at random when registration closes: until then the list shows the registration order, and the first-round preview waits for the draw.",
+    "randomDrawn": "Starting order drawn at random: this is the first-round order.",
     "reordered": "Order updated.",
     "newRank": "New rank for {name}: {rank} of {total}.",
     "moveUpAria": "Move {name} up one rank",

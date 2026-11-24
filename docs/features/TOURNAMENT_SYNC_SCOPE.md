@@ -40,6 +40,11 @@ natures :
   partagée avec le client. On lit les seules colonnes de date des tournois non
   terminés (table courte, une requête) et on tranche **en mémoire** : réécrire
   la règle en SQL en ferait une seconde, et les deux finiraient par diverger.
+  Même lecture, même test en mémoire : un **tirage au sort de l'ordre de
+  départ** dû (`isRandomDrawDue`) retient le tournoi même sans changement
+  d'état (`RANDOM_SEEDING.md`). `findSyncCandidates` rend en plus, par
+  candidat, `lockFirst` — état stocké d'avant le départ : la passe prend alors
+  le verrou du tournoi en première instruction de sa transaction.
 - **Un entretien de tournoi en cours est dû.** Chacune des tâches de la branche
   `RUNNING` de `syncTournamentState` a une précondition qui, elle, s'écrit en
   SQL et ne coûte qu'un `EXISTS` indexé :

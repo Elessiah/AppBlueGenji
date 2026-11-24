@@ -676,6 +676,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_match_casters ADD COLUMN planned TINYINT(1) NOT NULL DEFAULT 0 AFTER cast_battletag`,
     // Prod placée par le planning : l'attribution quittée la retire, une prod prise ou posée autrement reste.
     `ALTER TABLE bg_matches ADD COLUMN prod_planned TINYINT(1) NOT NULL DEFAULT 0 AFTER prod_user_id`,
+    // Tirage au sort de l'ordre de départ, à la clôture des inscriptions
+    // (`docs/features/RANDOM_SEEDING.md`) : éteint partout au départ.
+    `ALTER TABLE bg_tournaments ADD COLUMN random_seeding TINYINT(1) NOT NULL DEFAULT 0 AFTER manual_seeding`,
+    `ALTER TABLE bg_tournaments ADD COLUMN random_seeding_drawn_at DATETIME NULL AFTER random_seeding`,
   ];
 
   for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);

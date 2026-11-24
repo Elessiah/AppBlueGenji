@@ -35,6 +35,7 @@ n'appellent l'intervention de personne.
 | `POST /api/admin/matches/[id]/live` | `ON_AIR` / `OFF_AIR` | Mis à l'antenne / Retiré de l'antenne (seulement quand l'état change) |
 | `PUT /api/admin/matches/[id]/replay` | — (ligne 🎬 au journal d'arbitrage) | Rediff ajoutée / modifiée / retirée, avec le lien, auteur nommé dans pm2 (`MATCH_REPLAYS.md`) |
 | `PATCH /api/tournaments/[id]/edit` | `EDITED` | Tournoi modifié (ancien nom entre parenthèses quand le nom change) |
+| `PATCH /api/tournaments/[id]/edit` (tirage fait / annulé par ce geste) | `RANDOM_SEEDING_DRAWN` / `RANDOM_SEEDING_RESET` | Ordre de départ tiré au sort / Tirage au sort de l'ordre de départ annulé (en plus d'`EDITED`, `RANDOM_SEEDING.md`) |
 | `PATCH /api/admin/tournaments/[id]/seeding` | `SEEDING_REORDERED` | Têtes de série réordonnées (une rafale = une ligne, voir plus bas) |
 | `POST /api/admin/tournaments/[id]/advance` | `ADVANCED` | Étape suivante avancée (ouverture des inscriptions, clôture des inscriptions ou coup d'envoi) |
 | `POST /api/admin/tournaments/[id]/ghost-registrations` | `GHOST_TEAMS_REGISTERED` (nombre) | Équipes fantômes inscrites (N) |

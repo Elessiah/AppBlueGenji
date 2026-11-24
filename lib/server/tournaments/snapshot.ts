@@ -65,9 +65,13 @@ import { invalidateLandingAggregates, invalidateLandingLive } from "@/lib/server
 import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
+import { isRandomDrawDue, randomDrawInputOf } from "@/lib/shared/random-seeding";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { DUE_LAUNCH_SQL } from "./sync-scope";
+import { invalidateTournamentPreview } from "./preview-cache";
+import { publishTournamentEvent } from "@/lib/server/live";
+import { writesRegistrations } from "./state";
 import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
@@ -269,6 +273,9 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
 
   const needsSync =
     (await hasPendingStateTransition(tournamentRow)) ||
+    // Tirage au sort dû sans changement d'état (clôture avancée dans le passé
+    // alors que le tournoi attend déjà son départ) : `RANDOM_SEEDING.md`.
+    isRandomDrawDue(randomDrawInputOf(tournamentRow)) ||
     (tournamentRow.state === "RUNNING" &&
       (missingBracket || (await hasDueRunningMaintenance(db, tournamentId))));
 
@@ -277,6 +284,16 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
+    // Verrou du tournoi **en toute première instruction** (`lockTournamentRow`,
+    // CLAUDE.md, écrit ici pour ne pas importer `./registration`) quand
+    // l'entretien peut écrire les inscrites — avant le départ : tirage au sort,
+    // semis au coup d'envoi. Une lecture avant le verrou figerait un état
+    // d'avant le travail d'une passe concurrente. L'entretien d'un tournoi en
+    // cours garde son ordre (matchs d'abord) : le verrou du tournoi en tête y
+    // croiserait les gestes des joueurs, qui verrouillent le match avant lui.
+    if (writesRegistrations(tournamentRow.state)) {
+      await connection.execute(`SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE`, [tournamentId]);
+    }
     const syncResult = await syncTournamentState(connection, tournamentId);
     await connection.commit();
     // Cette bascule-là aussi peut lancer ou clore un tournoi : le journal
@@ -330,6 +347,15 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
       // PNG d'aperçu au plus une fois par fenêtre, comme les scores (`invalidateTeamRankingForScore`).
       invalidateTeamRankingForScore();
       invalidateStats();
+    }
+    // Un tirage au sort change l'aperçu des lecteurs autorisés, qui ne part pas
+    // avec l'instantané (`RANDOM_SEEDING.md`) : l'aperçu est oublié et les flux
+    // ouverts sont prévenus. L'instantané, lui, n'est pas invalidé — celui qui
+    // se construit lit déjà le tirage validé, et les flux le reçoivent de ce
+    // même calcul.
+    if (syncResult.randomDrawn) {
+      invalidateTournamentPreview(tournamentId);
+      publishTournamentEvent({ type: "updated", tournamentId, emittedAt: new Date().toISOString() });
     }
 
     return syncResult.row;
@@ -578,7 +604,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     };
     const swiss = await loadSwiss();
 
-    const source = seedingSource(card.format, Number(tournament.manual_seeding ?? 0) === 1);
+    const source = seedingSource(card.format, Number(tournament.manual_seeding ?? 0) === 1, card.randomSeeding);
     const registrationRows: TournamentSnapshot["registrations"] = registrations.map((row) => ({
       teamId: Number(row.team_id),
       teamName: row.team_name,

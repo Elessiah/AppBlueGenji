@@ -2,7 +2,9 @@ import type { PoolConnection } from "mysql2/promise";
 import type { TournamentState } from "@/lib/shared/types";
 import { computeTournamentState as sharedComputeTournamentState } from "@/lib/shared/tournament-state";
 import { TournamentRow } from "./_internal";
+import { isRandomDrawDue, randomDrawInputOf } from "@/lib/shared/random-seeding";
 import { queueBotLog } from "./bot-logs";
+import { drawRandomSeedingIfDue } from "./random-seeding";
 import {
   loadTournamentRow,
   updateTournamentState,
@@ -48,16 +50,51 @@ export type TournamentSyncResult = {
   stateChanged: boolean;
   contentChanged: boolean;
   launchesChanged: boolean;
+  /** Ordre de départ tiré au sort par cet entretien (`RANDOM_SEEDING.md`). */
+  randomDrawn?: boolean;
 };
+
+/**
+ * L'entretien de ce tournoi peut-il écrire les inscrites ? Oui tant qu'il n'est
+ * pas lancé (tirage au sort, semis du format au coup d'envoi) : la transaction
+ * doit alors prendre le verrou du tournoi **en première instruction**
+ * (CLAUDE.md). L'état est lu hors transaction ; un tournoi lancé ne revient
+ * jamais avant le départ, si bien qu'une lecture périmée ne fait que verrouiller
+ * pour rien.
+ */
+export function writesRegistrations(state: TournamentState): boolean {
+  return state === "UPCOMING" || state === "REGISTRATION";
+}
 
 export async function syncTournamentState(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<TournamentSyncResult> {
-  const tournament = await loadTournamentRow(connection, tournamentId);
-  if (!tournament) {
+  const loaded = await loadTournamentRow(connection, tournamentId);
+  if (!loaded) {
     return { row: null, stateChanged: false, contentChanged: false, launchesChanged: false };
   }
+  // Tirage au sort de l'ordre de départ, à la clôture des inscriptions et au
+  // plus tard **avant** que le coup d'envoi ne pose le premier tour
+  // (`docs/features/RANDOM_SEEDING.md`). Le pré-contrôle se fait sur la lecture
+  // ordinaire : le verrou du tournoi n'est pris que si un tirage semble dû, et
+  // `drawRandomSeedingIfDue` rejuge tout sous ce verrou. Le tirage passe
+  // `manual_seeding` à 1 : la ligne est relue pour que les moteurs le voient.
+  let drawn = false;
+  let tournament = loaded;
+  if (isRandomDrawDue(randomDrawInputOf(loaded))) {
+    drawn = await drawRandomSeedingIfDue(connection, tournamentId);
+    if (drawn) tournament = (await loadTournamentRow(connection, tournamentId)) ?? loaded;
+  }
+  const result = await syncLoadedTournament(connection, tournamentId, tournament);
+  return drawn ? { ...result, contentChanged: true, randomDrawn: true } : result;
+}
+
+async function syncLoadedTournament(
+  connection: PoolConnection,
+  tournamentId: number,
+  tournament: TournamentRow,
+): Promise<TournamentSyncResult> {
 
   // Retenu pour la comparaison finale : l'entretien qui suit peut clore le
   // tournoi de son côté, et ses appelants s'appuient sur `stateChanged` pour

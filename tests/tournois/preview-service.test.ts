@@ -98,6 +98,34 @@ describe("loadTournamentPreview", () => {
     expect(connection.execute).not.toHaveBeenCalled();
   });
 
+  // Tirage au sort (`RANDOM_SEEDING.md`) : aucun aperçu avant le tirage.
+  it("ne montre aucun aperçu tant que le tirage au sort est à venir", async () => {
+    mockQueries(entrantRows(["Alpha", "Beta", "Gamma"]));
+    const pending = tournament({
+      random_seeding: 1,
+      random_seeding_drawn_at: null,
+      registration_close_at: new Date("2026-05-10T10:00:00.000Z"),
+    });
+    expect(await run(pending)).toBeNull();
+    expect(connection.execute).not.toHaveBeenCalled();
+    // Tirage antérieur à la clôture (inscriptions rouvertes) : toujours à venir.
+    expect(await run({ ...pending, random_seeding_drawn_at: new Date("2026-05-01T10:00:00.000Z") })).toBeNull();
+  });
+
+  it("montre l'ordre tiré une fois le tirage fait, annoncé comme tirage au sort", async () => {
+    mockQueries(entrantRows(["Gamma", "Alpha", "Beta"]));
+    const preview = await run(
+      tournament({
+        manual_seeding: 1,
+        random_seeding: 1,
+        random_seeding_drawn_at: new Date("2026-05-10T10:00:00.000Z"),
+        registration_close_at: new Date("2026-05-10T10:00:00.000Z"),
+      }),
+    );
+    expect(preview?.seedingSource).toBe("RANDOM");
+    expect(preview?.entrants.map((entrant) => entrant.teamName)).toEqual(["Gamma", "Alpha", "Beta"]);
+  });
+
   it("ordonne un bracket par la colonne seed et l'annonce comme ordre d'inscription", async () => {
     mockQueries(entrantRows(["Alpha", "Beta", "Gamma"]));
 

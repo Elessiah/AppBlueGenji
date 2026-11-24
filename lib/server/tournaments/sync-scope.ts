@@ -38,7 +38,8 @@ import {
   BOTH_REPORTED_SQL,
   SINGLE_REPORT_SQL,
 } from "./score-report-sql";
-import { computeTournamentState } from "./state";
+import { isRandomDrawDue, randomDrawInputOf } from "@/lib/shared/random-seeding";
+import { computeTournamentState, writesRegistrations } from "./state";
 import type { TournamentRow } from "./_internal";
 
 /** Prédicats de report (`./score-report-sql`), réexportés pour les appelants existants. */
@@ -64,23 +65,32 @@ export const DUE_LAUNCH_SQL = `(m.status = 'READY'
 type ScheduleRow = RowDataPacket &
   Pick<
     TournamentRow,
-    "id" | "state" | "finished_at" | "registration_open_at" | "registration_close_at" | "start_at"
+    | "id"
+    | "state"
+    | "finished_at"
+    | "registration_open_at"
+    | "registration_close_at"
+    | "start_at"
+    | "random_seeding"
+    | "random_seeding_drawn_at"
   >;
 
 /**
  * Tournois dont l'état stocké ne correspond plus à leurs dates : ouverture des
- * inscriptions, clôture, coup d'envoi.
+ * inscriptions, clôture, coup d'envoi — et ceux dont le tirage au sort de
+ * l'ordre de départ est dû (`isRandomDrawDue`, `RANDOM_SEEDING.md`), même sans
+ * changement d'état : une clôture avancée dans le passé alors que le tournoi
+ * attend déjà son départ.
  */
-async function findCrossedMilestones(connection: PoolConnection): Promise<number[]> {
+async function findCrossedMilestones(connection: PoolConnection): Promise<ScheduleRow[]> {
   const [rows] = await connection.execute<ScheduleRow[]>(
-    `SELECT id, state, finished_at, registration_open_at, registration_close_at, start_at
+    `SELECT id, state, finished_at, registration_open_at, registration_close_at, start_at,
+            random_seeding, random_seeding_drawn_at
      FROM bg_tournaments
      WHERE state <> 'FINISHED'`,
   );
 
-  return rows
-    .filter((row) => computeTournamentState(row) !== row.state)
-    .map((row) => Number(row.id));
+  return rows.filter((row) => computeTournamentState(row) !== row.state || isRandomDrawDue(randomDrawInputOf(row)));
 }
 
 /**
@@ -157,10 +167,33 @@ async function findDueMaintenance(connection: PoolConnection): Promise<number[]>
 export async function findTournamentsNeedingSync(
   connection: PoolConnection,
 ): Promise<number[]> {
+  return (await findSyncCandidates(connection)).map((candidate) => candidate.id);
+}
+
+/** Un tournoi à visiter, et si son entretien doit verrouiller le tournoi d'abord. */
+export type SyncCandidate = {
+  id: number;
+  /**
+   * État stocké d'avant le départ (`writesRegistrations`) : l'entretien peut
+   * écrire les inscrites (tirage au sort, semis au coup d'envoi) et prend le
+   * verrou du tournoi en première instruction. Lu ici, pas relu : un tournoi
+   * lancé ne revient jamais avant le départ.
+   */
+  lockFirst: boolean;
+};
+
+/** {@link findTournamentsNeedingSync}, avec ce qu'en sait déjà le repérage. */
+export async function findSyncCandidates(connection: PoolConnection): Promise<SyncCandidate[]> {
   // En série : les deux lectures partagent la connexion de l'appelant, qui ne
   // sert qu'une requête à la fois.
   const milestones = await findCrossedMilestones(connection);
   const maintenance = await findDueMaintenance(connection);
 
-  return [...new Set([...milestones, ...maintenance])].sort((a, b) => a - b);
+  const lockFirst = new Map<number, boolean>();
+  for (const row of milestones) lockFirst.set(Number(row.id), writesRegistrations(row.state));
+  // L'entretien dû ne vise que des tournois `RUNNING` : aucun verrou en tête.
+  for (const id of maintenance) if (!lockFirst.has(id)) lockFirst.set(id, false);
+  return [...lockFirst.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([id, lock]) => ({ id, lockFirst: lock }));
 }

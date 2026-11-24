@@ -1211,7 +1211,10 @@ export function formatSoloCasterChangeLog(solo: boolean): string {
  * - `TEAM_VOICE_ON` / `TEAM_VOICE_OFF` — option « Salons vocaux d'équipe »
  *   (`docs/features/MATCH_VOICE.md`) ;
  * - `MATCH_CHECK_IN_ON` / `MATCH_CHECK_IN_OFF` — option « Check-in des matchs »
- *   (`docs/features/MATCH_CHECK_IN_SETTING.md`).
+ *   (`docs/features/MATCH_CHECK_IN_SETTING.md`) ;
+ * - `RANDOM_SEEDING_DRAWN` / `RANDOM_SEEDING_RESET` — ordre de départ tiré au
+ *   sort par l'édition, ou tirage annulé en éteignant l'option
+ *   (`docs/features/RANDOM_SEEDING.md`) : un nouveau tirage du staff se voit.
  */
 export type StaffTournamentAction =
   | "EDITED"
@@ -1227,7 +1230,9 @@ export type StaffTournamentAction =
   | "TEAM_VOICE_ON"
   | "TEAM_VOICE_OFF"
   | "MATCH_CHECK_IN_ON"
-  | "MATCH_CHECK_IN_OFF";
+  | "MATCH_CHECK_IN_OFF"
+  | "RANDOM_SEEDING_DRAWN"
+  | "RANDOM_SEEDING_RESET";
 
 const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
   EDITED: "Tournoi modifié",
@@ -1244,6 +1249,8 @@ const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
   TEAM_VOICE_OFF: "Salons vocaux d'équipe désactivés",
   MATCH_CHECK_IN_ON: "Check-in des matchs activé",
   MATCH_CHECK_IN_OFF: "Check-in des matchs désactivé",
+  RANDOM_SEEDING_DRAWN: "Ordre de départ tiré au sort",
+  RANDOM_SEEDING_RESET: "Tirage au sort de l'ordre de départ annulé",
 };
 
 /** Étape franchie par « Avancer l'étape suivante » (`ADVANCED`), telle que la ligne la nomme. */

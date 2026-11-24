@@ -38,6 +38,7 @@ import { RefereeSchedulingField } from "./RefereeSchedulingField";
 import { TeamVoiceChannelsField } from "./TeamVoiceChannelsField";
 import { MatchCheckInField } from "./MatchCheckInField";
 import { LAUNCH_PHASE_FIELD_ID, LAUNCH_PHASE_HINT_ID, LAUNCH_PHASE_MORE_ID, LaunchPhaseField } from "./LaunchPhaseField";
+import { RANDOM_SEEDING_FIELD_ID, RANDOM_SEEDING_HINT_ID, RANDOM_SEEDING_MORE_ID, RandomSeedingField } from "./RandomSeedingField";
 import {
   DUEL_ARCADE_FIELD_ID,
   DuelArcadeField,
@@ -84,6 +85,7 @@ const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
   startAt: "start-at",
   enduranceEarlyExit: EARLY_EXIT_FIELD_ID,
   launchPhase: LAUNCH_PHASE_FIELD_ID,
+  randomSeeding: RANDOM_SEEDING_FIELD_ID,
   mapPointTarget: MAP_POINT_TARGET_FIELD_ID,
 };
 
@@ -813,6 +815,14 @@ export function TournamentForm({
             aria={fieldAttrs("launchPhase", LAUNCH_PHASE_MORE_ID, LAUNCH_PHASE_HINT_ID)}
             error={fieldErrors.message("launchPhase")}
             onChange={(checked) => set("launchPhase", checked)}
+          />
+
+          <RandomSeedingField
+            checked={values.randomSeeding}
+            locked={locked("randomSeeding")}
+            aria={fieldAttrs("randomSeeding", RANDOM_SEEDING_MORE_ID, RANDOM_SEEDING_HINT_ID)}
+            error={fieldErrors.message("randomSeeding")}
+            onChange={(checked) => set("randomSeeding", checked)}
           />
 
           <TeamVoiceChannelsField
