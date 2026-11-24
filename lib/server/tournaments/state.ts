@@ -54,6 +54,18 @@ export type TournamentSyncResult = {
   randomDrawn?: boolean;
 };
 
+/**
+ * L'entretien de ce tournoi peut-il écrire les inscrites ? Oui tant qu'il n'est
+ * pas lancé (tirage au sort, semis du format au coup d'envoi) : la transaction
+ * doit alors prendre le verrou du tournoi **en première instruction**
+ * (CLAUDE.md). L'état est lu hors transaction ; un tournoi lancé ne revient
+ * jamais avant le départ, si bien qu'une lecture périmée ne fait que verrouiller
+ * pour rien.
+ */
+export function writesRegistrations(state: TournamentState): boolean {
+  return state === "UPCOMING" || state === "REGISTRATION";
+}
+
 export async function syncTournamentState(
   connection: PoolConnection,
   tournamentId: number,

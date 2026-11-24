@@ -15,7 +15,7 @@
       "SCORES_ENTERED": "Un score a été saisi : l'ordre est désormais figé.",
       "STARTED": "Le tournoi a commencé : l'ordre de départ est désormais figé.",
       "RANDOM_DRAW": "Tirage au sort allumé : l'ordre de départ sera tiré au sort à la clôture des inscriptions. Éteins l'option pour le fixer à la main.",
-      "RANDOM_DRAWN": "Ordre de départ tiré au sort : il ne se règle pas à la main. Éteins l'option pour le régler aux flèches."
+      "RANDOM_DRAWN": "Ordre de départ tiré au sort : il ne se règle pas à la main. Éteindre l'option rend l'ordre par défaut (inscription ou classement)."
     },
     "column": {
       "actions": "Actions",

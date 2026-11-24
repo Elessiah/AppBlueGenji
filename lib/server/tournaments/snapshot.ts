@@ -69,6 +69,9 @@ import { isRandomDrawDue, randomDrawInputOf } from "@/lib/shared/random-seeding"
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { DUE_LAUNCH_SQL } from "./sync-scope";
+import { invalidateTournamentPreview } from "./preview-cache";
+import { publishTournamentEvent } from "@/lib/server/live";
+import { writesRegistrations } from "./state";
 import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
@@ -282,11 +285,15 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
   try {
     await connection.beginTransaction();
     // Verrou du tournoi **en toute première instruction** (`lockTournamentRow`,
-    // CLAUDE.md, écrit ici pour ne pas importer `./registration`) : l'entretien
-    // lit puis écrit les inscrites (tirage au sort, semis au coup d'envoi), et
-    // une lecture avant le verrou figerait un état d'avant le travail d'une
-    // passe concurrente.
-    await connection.execute(`SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE`, [tournamentId]);
+    // CLAUDE.md, écrit ici pour ne pas importer `./registration`) quand
+    // l'entretien peut écrire les inscrites — avant le départ : tirage au sort,
+    // semis au coup d'envoi. Une lecture avant le verrou figerait un état
+    // d'avant le travail d'une passe concurrente. L'entretien d'un tournoi en
+    // cours garde son ordre (matchs d'abord) : le verrou du tournoi en tête y
+    // croiserait les gestes des joueurs, qui verrouillent le match avant lui.
+    if (writesRegistrations(tournamentRow.state)) {
+      await connection.execute(`SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE`, [tournamentId]);
+    }
     const syncResult = await syncTournamentState(connection, tournamentId);
     await connection.commit();
     // Cette bascule-là aussi peut lancer ou clore un tournoi : le journal
@@ -342,15 +349,13 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
       invalidateStats();
     }
     // Un tirage au sort change l'aperçu des lecteurs autorisés, qui ne part pas
-    // avec l'instantané : un `updated` (qui oublie aussi l'aperçu) part une fois
-    // cet instantané reconstruit, pour que les flux ouverts le relisent
-    // (`RANDOM_SEEDING.md`). Une fois par tournoi : le coût d'une reconstruction.
+    // avec l'instantané (`RANDOM_SEEDING.md`) : l'aperçu est oublié et les flux
+    // ouverts sont prévenus. L'instantané, lui, n'est pas invalidé — celui qui
+    // se construit lit déjà le tirage validé, et les flux le reçoivent de ce
+    // même calcul.
     if (syncResult.randomDrawn) {
-      setTimeout(() => {
-        void import("./notifications")
-          .then(({ publishUpdatedEvent }) => publishUpdatedEvent(tournamentId))
-          .catch(() => undefined);
-      }, 0);
+      invalidateTournamentPreview(tournamentId);
+      publishTournamentEvent({ type: "updated", tournamentId, emittedAt: new Date().toISOString() });
     }
 
     return syncResult.row;

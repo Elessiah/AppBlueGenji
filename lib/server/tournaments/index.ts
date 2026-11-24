@@ -156,7 +156,7 @@ export {
 } from "./phases";
 
 // Public API functions
-import { syncTournamentState } from "./state";
+import { syncTournamentState, writesRegistrations } from "./state";
 import {
   registerCurrentUserTeam as registerTeamInternal,
   registerTeamsByIds as registerTeamsByIdsInternal,
@@ -253,13 +253,20 @@ async function syncOneTournament(
   for (let attempt = 1; ; attempt += 1) {
     const startedAt = Date.now();
     try {
+      // Avant le départ, l'entretien lit puis écrit les inscrites (tirage au
+      // sort, semis au coup d'envoi) : verrou du tournoi **en toute première
+      // instruction** (CLAUDE.md), sans quoi deux passes concurrentes
+      // figeraient un instantané d'avant le travail de l'autre
+      // (`RANDOM_SEEDING.md`). L'état se lit hors transaction (`writesRegistrations`).
+      // L'entretien d'un tournoi en cours garde son ordre (matchs d'abord) : le
+      // verrou du tournoi en tête y croiserait les gestes des joueurs.
+      const [stateRows] = await connection.execute<(RowDataPacket & { state: TournamentState })[]>(
+        `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+        [tournamentId],
+      );
+      const lockFirst = stateRows[0] !== undefined && writesRegistrations(stateRows[0].state);
       await connection.beginTransaction();
-      // Verrou du tournoi **en toute première instruction** (CLAUDE.md) :
-      // l'entretien lit puis écrit les inscrites (tirage au sort, semis du
-      // classement au coup d'envoi). Sans lui, deux passes concurrentes
-      // figeraient un instantané d'avant le travail de l'autre et le referaient
-      // dessus (`RANDOM_SEEDING.md`).
-      await lockTournamentRow(connection, tournamentId);
+      if (lockFirst) await lockTournamentRow(connection, tournamentId);
       const { stateChanged, contentChanged, launchesChanged } = await syncTournamentState(connection, tournamentId);
       await connection.commit();
       flushBotLogs(connection);

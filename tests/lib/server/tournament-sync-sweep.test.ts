@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
  */
 
 type Connection = {
-  execute: jest.Mock;
+  execute: jest.Mock<(sql: string, params?: unknown[]) => Promise<unknown>>;
   beginTransaction: jest.Mock;
   commit: jest.Mock;
   rollback: jest.Mock;
@@ -37,6 +37,8 @@ async function runSweep(options: {
   rollbackFails?: boolean;
   /** Tentatives en échec par tournoi, sous un code du serveur (interblocage…). */
   failWithCode?: Record<number, { code: string; times: number }>;
+  /** État stocké relu hors transaction, par tournoi (`RUNNING` par défaut). */
+  states?: Record<number, string>;
 }): Promise<{
   connection: Connection;
   synced: number[];
@@ -69,6 +71,7 @@ async function runSweep(options: {
     jest.doMock("@/lib/server/tournaments/state", () => ({
       computeTournamentState: () => "UPCOMING",
       hasPendingStateTransition: async () => false,
+      writesRegistrations: (state: string) => state === "UPCOMING" || state === "REGISTRATION",
       syncTournamentState: jest.fn(async (_conn: unknown, tournamentId: number) => {
         synced.push(tournamentId);
         if (options.failOn?.includes(tournamentId)) throw new Error("boom on pseudo Nova");
@@ -88,7 +91,12 @@ async function runSweep(options: {
 
     jest.doMock("@/lib/server/database", () => {
       connection = {
-        execute: jest.fn(async () => [[], undefined]),
+        execute: jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(async (sql, params = []) => {
+          if (/^SELECT state FROM bg_tournaments/.test(sql)) {
+            return [[{ state: options.states?.[Number(params[0])] ?? "RUNNING" }], undefined];
+          }
+          return [[], undefined];
+        }),
         beginTransaction: jest.fn(async () => undefined),
         commit: jest.fn(async () => undefined),
         rollback: jest.fn(async () => {
@@ -128,6 +136,22 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
     expect(connection.beginTransaction).toHaveBeenCalledTimes(3);
     expect(connection.commit).toHaveBeenCalledTimes(3);
     expect(connection.rollback).not.toHaveBeenCalled();
+  });
+
+  // Tirage au sort et semis au coup d'envoi (`RANDOM_SEEDING.md`) : avant le
+  // départ, verrou du tournoi en première instruction de la transaction.
+  it("verrouille le tournoi en tête de transaction avant le départ, pas en cours", async () => {
+    const { connection } = await runSweep({ candidates: [3, 7], states: { 3: "UPCOMING", 7: "RUNNING" } });
+
+    const calls = connection.execute.mock.calls.map((call) => String(call[0]));
+    const locks = connection.execute.mock.calls.filter((call) => /FOR UPDATE/.test(String(call[0])));
+    expect(locks.map((call) => (call[1] as unknown[])[0])).toEqual([3]);
+    // Le verrou suit l'ouverture de la transaction, et la lecture d'état la précède.
+    const lockIndex = calls.findIndex((sql) => /FOR UPDATE/.test(sql));
+    expect(calls[lockIndex - 1]).toMatch(/^SELECT state FROM bg_tournaments/);
+    expect(connection.beginTransaction.mock.invocationCallOrder[0]).toBeLessThan(
+      connection.execute.mock.invocationCallOrder[lockIndex]!,
+    );
   });
 
   it("n'ouvre aucune transaction quand il n'y a rien à faire", async () => {

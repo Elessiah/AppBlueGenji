@@ -47,9 +47,11 @@ Règles pures : `lib/shared/random-seeding.ts`. Écriture :
   caduc, et un nouveau tirage a lieu à la nouvelle clôture. La comparaison se
   fait **à la seconde** (`DATETIME` sans fraction, tronqué par MariaDB) : un
   tirage fait dans la seconde même de la clôture compte.
-- **Sous verrou** : les transactions d'entretien (balayage de fond,
-  reconstruction de l'instantané) prennent le verrou du tournoi **en première
-  instruction**, puis le tournoi et les inscriptions sont relus en lecture
+- **Sous verrou** : avant le départ (`writesRegistrations` : état stocké
+  `UPCOMING`/`REGISTRATION`, lu hors transaction), les transactions d'entretien
+  (balayage de fond, reconstruction de l'instantané) prennent le verrou du
+  tournoi **en première instruction** — un tournoi en cours garde l'ordre de son
+  entretien (matchs d'abord), qui croiserait sinon les gestes des joueurs — puis le tournoi et les inscriptions sont relus en lecture
   verrouillante (`FOR UPDATE`, table seule) : deux entretiens concurrents ne
   tirent jamais deux fois, et aucun ne poursuit sur un instantané d'avant le
   tirage de l'autre. Le pré-contrôle de
@@ -80,9 +82,10 @@ tirage à l'enregistrement.
   409 `SEEDING_LOCKED_RANDOM_DRAW`.
 - **Après le tirage** : la phrase du verrou (`registrations.lock.RANDOM_DRAWN`,
   `seedingLockKey`) et le texte d'attente du plateau (`page.preLaunch.randomDrawn`)
-  disent l'ordre tiré, non plus « à la clôture ». Un tirage fait par la
-  reconstruction de l'instantané publie un `updated` : les flux ouverts relisent
-  l'aperçu.
+  disent l'ordre tiré, non plus « à la clôture » ; la phrase du verrou prévient
+  qu'éteindre l'option rend l'ordre par défaut. Un tirage fait par la
+  reconstruction de l'instantané oublie l'aperçu et prévient les flux ouverts
+  (`updated`, sans jeter l'instantané en cours, qui lit déjà le tirage).
 - **Explication** derrière le « i » de la liste : tirage à venir
   (`registrations.randomPending` — la liste montre l'ordre d'inscription d'ici
   là) ou fait (`registrations.randomDrawn`).

@@ -38,6 +38,7 @@ import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
 import { canOpenPlayerScoreDialog } from "@/lib/shared/player-score-report";
 import { isPreLaunchState } from "@/lib/shared/seeding";
 import { randomDrawStatus, type RandomDrawStatus } from "@/lib/shared/random-seeding";
+import { preLaunchRandomKey } from "../_lib/random-draw-text";
 import { planRoundRollback } from "@/lib/shared/tournament-rollback";
 import { canCancelForfeits, canForfeitTeam, requestForfeitCancellation } from "../_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
@@ -205,8 +206,8 @@ function preLaunchBoardText(
   randomDraw: RandomDrawStatus,
 ): string {
   // Tirage au sort (`RANDOM_SEEDING.md`) : rien du plateau n'est connu avant lui.
-  if (randomDraw === "DRAWN") return text.t("page.preLaunch.randomDrawn");
-  if (seedingSource === "RANDOM") return text.t("page.preLaunch.random");
+  const randomKey = preLaunchRandomKey(seedingSource, randomDraw);
+  if (randomKey !== null) return text.t(randomKey);
   if (formatForBracket === "SURVIVAL") return text.t("page.preLaunch.survival");
   if (format === "BG_SURVIE") {
     return seedingSource === "MANUAL" ? text.t("page.preLaunch.bgSurvieManual") : text.t("page.preLaunch.bgSurvieRanking");
