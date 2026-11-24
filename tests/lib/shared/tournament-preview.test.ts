@@ -395,6 +395,7 @@ describe("métadonnées", () => {
   it("a un libellé pour chaque provenance d'ordre", () => {
     expect(Object.keys(SEEDING_SOURCE_LABELS).sort()).toEqual([
       "MANUAL",
+      "RANDOM",
       "RANKING",
       "REGISTRATION",
     ]);

@@ -288,6 +288,7 @@ export type TournamentFormField =
   | "startAt"
   | "enduranceEarlyExit"
   | "launchPhase"
+  | "randomSeeding"
   | "mapPointTarget";
 
 export const TOURNAMENT_FIELD_ERRORS: FieldErrorMap<TournamentFormField> = {
@@ -297,6 +298,7 @@ export const TOURNAMENT_FIELD_ERRORS: FieldErrorMap<TournamentFormField> = {
   INVALID_MATCH_FORMAT: "matchFormatValue",
   INVALID_ENDURANCE_EARLY_EXIT: "enduranceEarlyExit",
   INVALID_LAUNCH_PHASE: "launchPhase",
+  INVALID_RANDOM_SEEDING: "randomSeeding",
   INVALID_MAP_POINT_TARGET: "mapPointTarget",
   MAP_POINTS_LOCKED: "mapPointTarget",
 };

@@ -341,8 +341,9 @@ describe("route et référencement", () => {
     for (const part of TOURNAMENT_VIEW_PARTS) expect(messages?.page).not.toHaveProperty(part);
     expect(Object.keys(messages?.actions ?? {}).sort()).toEqual(["actions", "errors"]);
     // 20 500 : « Arbitre : <pseudo> » (MATCH-UI-NAMES) a passé l'ancien plafond de 20 000 de quelques
-    // octets ; sans les vues (EF-17), l'espace de la fiche redescend sous 15 000.
-    expect(JSON.stringify(messages?.page).length).toBeLessThan(15_000);
+    // octets ; sans les vues (EF-17), l'espace de la fiche redescend sous 15 000. 15 200 : la phrase
+    // d'attente du tirage au sort (`page.preLaunch.random`, RANDOM_SEEDING.md) l'a passé de ~120 octets.
+    expect(JSON.stringify(messages?.page).length).toBeLessThan(15_200);
     const sheetText = (props: unknown) => TournamentSheetText(props as Parameters<typeof TournamentSheetText>[0]);
     expect(renderToStaticMarkup(sheetText(layout.props))).toContain("Loading the tournament…");
     // Réponse du routeur (navigation, `router.refresh()`) : rien n'est sérialisé.

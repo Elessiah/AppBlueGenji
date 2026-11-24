@@ -30,6 +30,7 @@ import {
   type ValidatedTournamentInput,
 } from "./validation";
 import { insertPhases } from "./phases-repository";
+import { drawRandomSeedingIfDue } from "./random-seeding";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
@@ -72,6 +73,8 @@ export type EditableTournamentValues = {
   enduranceEarlyExit: boolean;
   /** Phase de lancement des matchs (option, éteinte par défaut). */
   launchPhase: boolean;
+  /** Tirage au sort de l'ordre de départ (option, éteinte par défaut — `RANDOM_SEEDING.md`). */
+  randomSeeding: boolean;
   matchFormat: MatchFormat | null;
   /**
    * Format Duel / Arcade : points qui gagnent une carte (`null` = éteint,
@@ -117,7 +120,7 @@ async function loadEditRow(
       endurance_playoff_format_type, endurance_playoff_format_value,
       registration_discord_requirement, registration_blizzard_requirement,
       registration_min_players, referee_scheduling, match_launch_phase,
-      team_voice_channels, match_check_in, map_point_target
+      team_voice_channels, match_check_in, map_point_target, random_seeding
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -163,6 +166,7 @@ function toValues(
     enduranceMaxRounds: num(row.endurance_max_rounds),
     enduranceEarlyExit: Number(row.endurance_early_exit) === 1,
     launchPhase: Number(row.match_launch_phase) === 1,
+    randomSeeding: Number(row.random_seeding) === 1,
     mapPointTarget: parseStoredMapPointTarget(row.map_point_target),
     matchFormat: parseMatchFormat(
       row.match_format_type,
@@ -556,7 +560,8 @@ async function applyTournamentUpdate(
         match_format_max_maps = ?, match_format_draws = ?,
         endurance_playoff_format_type = ?, endurance_playoff_format_value = ?,
         registration_discord_requirement = ?, registration_blizzard_requirement = ?,
-        registration_min_players = ?, match_launch_phase = ?, map_point_target = ?
+        registration_min_players = ?, match_launch_phase = ?, map_point_target = ?,
+        random_seeding = ?
        WHERE id = ?`,
       [
         valid.name,
@@ -593,9 +598,11 @@ async function applyTournamentUpdate(
         valid.registrationFilters.minPlayers,
         valid.launchPhase ? 1 : 0,
         valid.mapPointTarget,
+        Number(valid.randomSeeding),
         tournamentId,
       ],
     );
+    await applyRandomSeedingChange(connection, tournamentId, current.randomSeeding, valid.randomSeeding);
 
     // Les phases ne sont reposées à neuf que si le patch les concerne — soit
     // directement, soit par un changement de format qui les rend caduques.
@@ -639,6 +646,31 @@ async function applyTournamentUpdate(
   return { previousName, name };
 }
 
+/**
+ * Suites d'une bascule du tirage au sort (`docs/features/RANDOM_SEEDING.md`),
+ * dans la transaction de l'édition (ligne du tournoi déjà verrouillée).
+ *
+ * - **Éteint** : le tirage passé est oublié (`random_seeding_drawn_at` à
+ *   `NULL`) — l'ordre tiré reste en place, réglable aux flèches ; rallumer
+ *   l'option fera un nouveau tirage.
+ * - **Allumé** après la clôture des inscriptions : le tirage se fait tout de
+ *   suite (aucun entretien n'aurait de raison de repasser avant le coup
+ *   d'envoi). Avant la clôture, rien : il aura lieu à la clôture.
+ */
+async function applyRandomSeedingChange(
+  connection: PoolConnection,
+  tournamentId: number,
+  before: boolean,
+  after: boolean,
+): Promise<void> {
+  if (before === after) return;
+  if (!after) {
+    await connection.execute(`UPDATE bg_tournaments SET random_seeding_drawn_at = NULL WHERE id = ?`, [tournamentId]);
+    return;
+  }
+  await drawRandomSeedingIfDue(connection, tournamentId);
+}
+
 /** Points de tour effacés par l'édition : leur annonce part une fois le commit fait. */
 function scheduleRoundPointsNotice(pruned: boolean): void {
   if (pruned) scheduleRoundMapsNotice();
@@ -673,6 +705,7 @@ function validateEditedValues(next: EditableTournamentValues): {
     enduranceMaxRounds: next.enduranceMaxRounds ?? undefined,
     enduranceEarlyExit: next.enduranceEarlyExit,
     launchPhase: next.launchPhase,
+    randomSeeding: next.randomSeeding,
     mapPointTarget: next.mapPointTarget,
     matchFormatType: next.matchFormat?.type ?? null,
     matchFormatValue: next.matchFormat?.value ?? null,

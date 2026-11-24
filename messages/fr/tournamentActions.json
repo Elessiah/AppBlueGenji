@@ -7,12 +7,14 @@
     "seedingSource": {
       "MANUAL": "Ordre fixé par le staff",
       "RANKING": "Classement du site",
-      "REGISTRATION": "Ordre d'inscription"
+      "REGISTRATION": "Ordre d'inscription",
+      "RANDOM": "Tirage au sort"
     },
     "lock": {
       "FINISHED": "Tournoi terminé : l'ordre n'a plus d'effet.",
       "SCORES_ENTERED": "Un score a été saisi : l'ordre est désormais figé.",
-      "STARTED": "Le tournoi a commencé : l'ordre de départ est désormais figé."
+      "STARTED": "Le tournoi a commencé : l'ordre de départ est désormais figé.",
+      "RANDOM_DRAW": "Tirage au sort allumé : l'ordre de départ sera tiré au sort à la clôture des inscriptions. Éteins l'option pour le fixer à la main."
     },
     "column": {
       "actions": "Actions",
@@ -26,6 +28,8 @@
     },
     "followsRanking": "Rangées selon le classement du site : chaque inscription prend sa place selon sa cote, et l'ordre suit les cotes jusqu'au lancement. Réordonne la liste pour le figer : ton ordre fera foi.",
     "followsFrozenDraw": "Rangs figés au coup d'envoi selon le classement du site : ceux du tirage, même si les cotes ont bougé depuis.",
+    "randomPending": "Ordre de départ tiré au sort à la clôture des inscriptions : la liste montre l'ordre d'inscription d'ici là, et l'aperçu du premier tour attend le tirage.",
+    "randomDrawn": "Ordre de départ tiré au sort à la clôture des inscriptions : c'est celui-ci qui sera joué.",
     "reordered": "Ordre mis à jour.",
     "newRank": "Nouveau rang de {name} : {rank} sur {total}.",
     "moveUpAria": "Monter {name} d'un rang",

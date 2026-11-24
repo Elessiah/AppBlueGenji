@@ -190,6 +190,8 @@ export type TournamentInputBody = {
   refereeScheduling?: boolean | null;
   /** Phase de lancement des matchs ; absente = option éteinte (le défaut). */
   launchPhase?: boolean | null;
+  /** Tirage au sort de l'ordre de départ (`docs/features/RANDOM_SEEDING.md`) ; absent = éteint. */
+  randomSeeding?: boolean | null;
   /** Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) ; absent = éteint. */
   teamVoiceChannels?: boolean | null;
   /** Check-in des matchs (`docs/features/MATCH_CHECK_IN_SETTING.md`) ; absent = allumé. */
@@ -252,6 +254,8 @@ export type ValidatedTournamentInput = {
   refereeScheduling: boolean;
   /** Phase de lancement des matchs — « Prêt », modale (`docs/features/MATCH_LAUNCH.md`). */
   launchPhase: boolean;
+  /** Tirage au sort de l'ordre de départ à la clôture des inscriptions (`docs/features/RANDOM_SEEDING.md`). */
+  randomSeeding: boolean;
   /** Salons vocaux d'équipe avant chaque match (`docs/features/MATCH_VOICE.md`). */
   teamVoiceChannels: boolean;
   /** Check-in des matchs à H-15 et rappel 10 h (`docs/features/MATCH_CHECK_IN_SETTING.md`). */
@@ -340,6 +344,7 @@ export function validateTournamentInput(
       registrationFilters: registration.value,
       refereeScheduling: body.refereeScheduling === true,
       launchPhase: body.launchPhase === true,
+      randomSeeding: body.randomSeeding === true,
       teamVoiceChannels: body.teamVoiceChannels === true,
       // Allumé sauf refus explicite : le défaut est le comportement d'avant.
       matchCheckIn: body.matchCheckIn !== false,
@@ -484,6 +489,9 @@ function validateRegistrationSettings(body: TournamentInputBody): Checked<Regist
   }
   if (body.launchPhase !== undefined && body.launchPhase !== null && typeof body.launchPhase !== "boolean") {
     return { error: "INVALID_LAUNCH_PHASE" };
+  }
+  if (body.randomSeeding !== undefined && body.randomSeeding !== null && typeof body.randomSeeding !== "boolean") {
+    return { error: "INVALID_RANDOM_SEEDING" };
   }
   if (
     body.teamVoiceChannels !== undefined &&

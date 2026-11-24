@@ -28,6 +28,11 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       state ENUM('UPCOMING', 'REGISTRATION', 'RUNNING', 'FINISHED') NOT NULL DEFAULT 'UPCOMING',
       has_third_place_match TINYINT(1) NOT NULL DEFAULT 0,
       manual_seeding TINYINT(1) NOT NULL DEFAULT 0,
+      -- Tirage au sort de l'ordre de départ à la clôture des inscriptions ;
+      -- \`random_seeding_drawn_at\` = instant du tirage, valable s'il suit la
+      -- clôture (\`docs/features/RANDOM_SEEDING.md\`).
+      random_seeding TINYINT(1) NOT NULL DEFAULT 0,
+      random_seeding_drawn_at DATETIME NULL,
       registration_discord_requirement
         ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'ANY_PLAYER',
       -- Le défaut \`NONE\` de la condition Blizzard n'est pas une prudence de

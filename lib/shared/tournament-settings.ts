@@ -57,6 +57,7 @@ const SEEDING_LABELS: Record<SeedingSource, string> = {
   MANUAL: "Fixé par l'arbitrage",
   RANKING: "Classement du site",
   REGISTRATION: "Ordre des inscriptions",
+  RANDOM: "Tirage au sort",
 };
 
 function plural(count: number, singular: string, pluralForm = `${singular}s`): string {

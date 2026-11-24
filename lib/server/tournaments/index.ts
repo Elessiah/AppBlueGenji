@@ -408,6 +408,8 @@ export async function createTournament(
     refereeScheduling?: boolean | null;
     /** Phase de lancement des matchs ; absente = option éteinte (le défaut). */
     launchPhase?: boolean | null;
+    /** Tirage au sort de l'ordre de départ ; absent = option éteinte (le défaut). */
+    randomSeeding?: boolean | null;
     /** Salons vocaux d'équipe ; absents = option éteinte (le défaut). */
     teamVoiceChannels?: boolean | null;
     /** Check-in des matchs ; absent = allumé (le défaut), seul `false` l'éteint. */
@@ -546,8 +548,9 @@ export async function createTournament(
         match_launch_phase,
         team_voice_channels,
         match_check_in,
-        map_point_target
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        map_point_target,
+        random_seeding
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -597,6 +600,7 @@ export async function createTournament(
         Number(payload.teamVoiceChannels === true),
         Number(payload.matchCheckIn !== false),
         payload.mapPointTarget ?? null,
+        Number(payload.randomSeeding === true),
       ],
     );
 
@@ -832,6 +836,8 @@ async function loadTournamentBuckets(
       t.map_point_target,
       t.team_voice_channels,
       t.match_check_in,
+      t.random_seeding,
+      t.random_seeding_drawn_at,
       t.live_url,
       t.image_url,
       t.image_fit,

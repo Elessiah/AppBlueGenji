@@ -22,6 +22,7 @@ export const SEEDING_SOURCE_LABELS: Record<SeedingSource, string> = {
   MANUAL: "Ordre fixé par le staff",
   RANKING: "Classement du site",
   REGISTRATION: "Ordre d'inscription",
+  RANDOM: "Tirage au sort",
 };
 
 /**
@@ -36,11 +37,19 @@ const REGISTRATION_ORDER_FORMATS: ReadonlySet<TournamentFormat> = new Set<Tourna
 /**
  * Quelle source l'ordre de seeding suit-il aujourd'hui ?
  *
- * Un ordre fixé à la main l'emporte sur tout ; sinon le format décide. Cette
+ * Le tirage au sort l'emporte sur tout, puis un ordre fixé à la main ; sinon
+ * le format décide. Cette
  * fonction est l'unique définition de la règle : l'aperçu du plateau et la liste
  * des inscriptions s'en servent pour dire la même chose que le moteur.
  */
-export function seedingSource(format: TournamentFormat, manualSeeding: boolean): SeedingSource {
+export function seedingSource(
+  format: TournamentFormat,
+  manualSeeding: boolean,
+  randomSeeding: boolean = false,
+): SeedingSource {
+  // Le tirage au sort l'emporte : il réécrit l'ordre à la clôture des
+  // inscriptions, même fixé à la main avant (`docs/features/RANDOM_SEEDING.md`).
+  if (randomSeeding) return "RANDOM";
   if (manualSeeding) return "MANUAL";
   return REGISTRATION_ORDER_FORMATS.has(format) ? "REGISTRATION" : "RANKING";
 }
@@ -193,7 +202,7 @@ export type SeedingEntry = {
   seed: number;
 };
 
-export type SeedingLockReason = "FINISHED" | "SCORES_ENTERED" | "STARTED" | null;
+export type SeedingLockReason = "FINISHED" | "SCORES_ENTERED" | "STARTED" | "RANDOM_DRAW" | null;
 
 /**
  * État qui juge la fenêtre du seeding : le stocké **ou** celui de l'horloge.
@@ -229,14 +238,18 @@ export function seedingWindowState(
  * - `STARTED` : tournoi lancé (`RUNNING`). Dès le coup d'envoi, les matchs de
  *   la première manche sont `READY` et les joueurs les voient : réordonner
  *   régénérerait sous leurs yeux un plateau déjà annoncé, même sans score.
+ * - `RANDOM_DRAW` : tirage au sort allumé — l'ordre est celui du sort, pas du
+ *   staff (`docs/features/RANDOM_SEEDING.md`) ; éteindre l'option rend les flèches.
  */
 export function seedingLockReason(
   state: TournamentState,
   matches: MatchScoreState[],
+  randomSeeding: boolean = false,
 ): SeedingLockReason {
   if (state === "FINISHED") return "FINISHED";
   if (matches.some(hasScoreInput)) return "SCORES_ENTERED";
   if (state === "RUNNING") return "STARTED";
+  if (randomSeeding) return "RANDOM_DRAW";
   return null;
 }
 

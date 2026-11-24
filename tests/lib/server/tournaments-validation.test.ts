@@ -734,6 +734,26 @@ describe("validateTournamentInput — phase de lancement des matchs", () => {
   });
 });
 
+describe("validateTournamentInput — tirage au sort de l'ordre de départ", () => {
+  it("éteint quand il est absent, nul ou faux (le défaut)", () => {
+    for (const randomSeeding of [undefined, null, false]) {
+      const result = validateTournamentInput({ ...base, randomSeeding });
+      expect("value" in result && result.value.randomSeeding).toBe(false);
+    }
+  });
+
+  it("allumé sur un `true` strict", () => {
+    const result = validateTournamentInput({ ...base, randomSeeding: true });
+    expect("value" in result && result.value.randomSeeding).toBe(true);
+  });
+
+  it.each(["true", 1, "1", {}])("refuse une valeur qui n'est pas un booléen (%j)", (raw) => {
+    const body: Parameters<typeof validateTournamentInput>[0] = { ...base };
+    Object.assign(body, { randomSeeding: raw });
+    expect(validateTournamentInput(body)).toEqual({ error: "INVALID_RANDOM_SEEDING" });
+  });
+});
+
 describe("validateTournamentInput — salons vocaux d'équipe", () => {
   it("validateTournamentInput_teamVoiceChannelsAbsent_defaultsOff", () => {
     const result = validateTournamentInput({ ...base });

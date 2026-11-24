@@ -1,3 +1,4 @@
+import type { RandomDrawStatus } from "@/lib/shared/random-seeding";
 import type { SeedingLockReason } from "@/lib/shared/seeding";
 import type { EntrantRemovalBlockReason } from "@/lib/shared/entrant-removal";
 
@@ -86,4 +87,18 @@ export function registrationsRankingHintKey(
   if (rowCount === 0) return null;
   if (followsFrozenDraw) return "registrations.followsFrozenDraw";
   return followsRanking ? "registrations.followsRanking" : null;
+}
+
+/**
+ * Explication du tirage au sort, derrière le « i » de la ligne d'état du staff
+ * (`docs/features/RANDOM_SEEDING.md`) : à venir (la liste montre l'ordre
+ * d'inscription) ou fait (la liste montre l'ordre tiré). `null` option éteinte
+ * ou liste vide.
+ */
+export function randomDrawHintKey(
+  status: RandomDrawStatus,
+  rowCount: number,
+): "registrations.randomPending" | "registrations.randomDrawn" | null {
+  if (rowCount === 0 || status === "OFF") return null;
+  return status === "DRAWN" ? "registrations.randomDrawn" : "registrations.randomPending";
 }

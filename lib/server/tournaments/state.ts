@@ -2,7 +2,9 @@ import type { PoolConnection } from "mysql2/promise";
 import type { TournamentState } from "@/lib/shared/types";
 import { computeTournamentState as sharedComputeTournamentState } from "@/lib/shared/tournament-state";
 import { TournamentRow } from "./_internal";
+import { isRandomDrawDue } from "@/lib/shared/random-seeding";
 import { queueBotLog } from "./bot-logs";
+import { drawRandomSeedingIfDue } from "./random-seeding";
 import {
   loadTournamentRow,
   updateTournamentState,
@@ -54,10 +56,41 @@ export async function syncTournamentState(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<TournamentSyncResult> {
-  const tournament = await loadTournamentRow(connection, tournamentId);
-  if (!tournament) {
+  const loaded = await loadTournamentRow(connection, tournamentId);
+  if (!loaded) {
     return { row: null, stateChanged: false, contentChanged: false, launchesChanged: false };
   }
+  // Tirage au sort de l'ordre de départ, à la clôture des inscriptions et au
+  // plus tard **avant** que le coup d'envoi ne pose le premier tour
+  // (`docs/features/RANDOM_SEEDING.md`). Le pré-contrôle se fait sur la lecture
+  // ordinaire : le verrou du tournoi n'est pris que si un tirage semble dû, et
+  // `drawRandomSeedingIfDue` rejuge tout sous ce verrou. Le tirage passe
+  // `manual_seeding` à 1 : la ligne est relue pour que les moteurs le voient.
+  let drawn = false;
+  let tournament = loaded;
+  if (isRandomDrawDue(randomDrawInputOf(loaded))) {
+    drawn = await drawRandomSeedingIfDue(connection, tournamentId);
+    if (drawn) tournament = (await loadTournamentRow(connection, tournamentId)) ?? loaded;
+  }
+  const result = await syncLoadedTournament(connection, tournamentId, tournament);
+  return drawn ? { ...result, contentChanged: true } : result;
+}
+
+/** Entrée de la règle du tirage, depuis la ligne du tournoi. */
+function randomDrawInputOf(row: TournamentRow) {
+  return {
+    state: row.state,
+    enabled: Number(row.random_seeding ?? 0) === 1,
+    drawnAt: row.random_seeding_drawn_at ?? null,
+    registrationCloseAt: row.registration_close_at,
+  };
+}
+
+async function syncLoadedTournament(
+  connection: PoolConnection,
+  tournamentId: number,
+  tournament: TournamentRow,
+): Promise<TournamentSyncResult> {
 
   // Retenu pour la comparaison finale : l'entretien qui suit peut clore le
   // tournoi de son côté, et ses appelants s'appuient sur `stateChanged` pour

@@ -1,5 +1,5 @@
 {
-  "count": 249,
+  "count": 251,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -79,6 +79,7 @@
     "INVALID_PHASE_SWISS_ROUNDS": "Nombre de manches ronde suisse invalide : 1 à 20 attendues.",
     "INVALID_QUALIFIER_COUNT": "Les qualifications en nombre fixe doivent décroître entre les phases.",
     "INVALID_QUALIFIER_VALUE": "Qualification invalide : au moins une équipe en nombre fixe, ou de 1 à 99 % en pourcentage.",
+    "INVALID_RANDOM_SEEDING": "Valeur invalide pour le tirage au sort de l'ordre de départ.",
     "INVALID_REFEREE_OBJECTION": "Choix invalide pour l'opposition de l'arbitre.",
     "INVALID_REFEREE_SCHEDULING": "Valeur invalide pour la planification par l'arbitrage.",
     "INVALID_REPLAY_URL": "Lien de rediff non reconnu : colle le lien d'une vidéo YouTube (youtube.com/watch?v=… ou youtu.be/…).",
@@ -179,6 +180,7 @@
     "SCORE_SUBMIT_FAILED": "Le score n'a pas pu être envoyé. Réessaie.",
     "SEEDING_LOCKED": "Un score a été saisi : l'ordre de départ est désormais figé.",
     "SEEDING_LOCKED_FINISHED": "Tournoi terminé : l'ordre de départ n'a plus d'effet.",
+    "SEEDING_LOCKED_RANDOM_DRAW": "Le tirage au sort est allumé : l'ordre de départ ne se règle pas à la main.",
     "SEEDING_LOCKED_STARTED": "Le tournoi a commencé : l'ordre de départ est désormais figé.",
     "SEEDING_REORDER_FAILED": "Erreur lors de l'enregistrement du nouvel ordre.",
     "SOLO_ENTRY_NAME_UNAVAILABLE": "Ton pseudo est déjà utilisé comme nom d'équipe : change-le avant de t'inscrire.",

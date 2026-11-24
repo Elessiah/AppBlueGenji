@@ -421,12 +421,14 @@ export type TeamHistoryRow = {
  *
  * - `MANUAL` — ordre fixé à la main par le staff, il fait autorité partout ;
  * - `RANKING` — classement du site (survie, ronde suisse, BG Survie, multi-phases) ;
- * - `REGISTRATION` — ordre d'arrivée des inscriptions (formats à plateau).
+ * - `REGISTRATION` — ordre d'arrivée des inscriptions (formats à plateau) ;
+ * - `RANDOM` — tirage au sort à la clôture des inscriptions (`random_seeding`),
+ *   prioritaire sur tout le reste.
  *
  * La règle qui le calcule vit dans `lib/shared/seeding.ts` ; le type est ici
  * parce que l'instantané du tournoi le transporte.
  */
-export type SeedingSource = "MANUAL" | "RANKING" | "REGISTRATION";
+export type SeedingSource = "MANUAL" | "RANKING" | "REGISTRATION" | "RANDOM";
 
 export type TournamentCard = {
   id: number;
@@ -506,6 +508,14 @@ export type TournamentCard = {
    * moment jusqu'à la clôture.
    */
   matchCheckIn: boolean;
+  /**
+   * Tirage au sort de l'ordre de départ à la clôture des inscriptions
+   * (`docs/features/RANDOM_SEEDING.md`). Éteint par défaut ; modifiable jusqu'au
+   * coup d'envoi. Public : c'est une règle du tournoi.
+   */
+  randomSeeding: boolean;
+  /** Instant du dernier tirage (`randomDrawStatus` dit s'il vaut encore). */
+  randomSeedingDrawnAt: string | null;
   /**
    * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
    * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).

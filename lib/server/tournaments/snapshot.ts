@@ -578,7 +578,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     };
     const swiss = await loadSwiss();
 
-    const source = seedingSource(card.format, Number(tournament.manual_seeding ?? 0) === 1);
+    const source = seedingSource(card.format, Number(tournament.manual_seeding ?? 0) === 1, card.randomSeeding);
     const registrationRows: TournamentSnapshot["registrations"] = registrations.map((row) => ({
       teamId: Number(row.team_id),
       teamName: row.team_name,

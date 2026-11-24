@@ -140,6 +140,11 @@ export type TournamentFormValues = {
    */
   launchPhase: boolean;
   /**
+   * Tirage au sort de l'ordre de départ à la clôture des inscriptions
+   * (`docs/features/RANDOM_SEEDING.md`). Décoché par défaut.
+   */
+  randomSeeding: boolean;
+  /**
    * Format Duel / Arcade (`docs/features/DUEL_ARCADE.md`) : case, et points qui
    * gagnent une carte — gardés quand la case se décoche, pour la recocher sans
    * ressaisir. Seul `mapPointTarget` part (`null` case décochée).
@@ -180,6 +185,7 @@ export type TournamentApiValues = {
   enduranceMaxRounds: number | null;
   enduranceEarlyExit: boolean;
   launchPhase: boolean;
+  randomSeeding: boolean;
   /** Points par carte du format Duel / Arcade ; `null` = éteint. */
   mapPointTarget: number | null;
   matchFormat: MatchFormat | null;
@@ -236,6 +242,8 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     registrationMinPlayers: DEFAULT_REGISTRATION_FILTERS.minPlayers,
     // Éteinte : la phase de lancement n'est pas proposée d'office.
     launchPhase: false,
+    // Éteint : l'ordre de départ suit l'inscription ou le classement du site.
+    randomSeeding: false,
     // Format Duel / Arcade éteint ; « premier à 5 » proposé quand on le coche.
     duelArcade: false,
     mapPointTarget: DEFAULT_MAP_POINT_TARGET,
@@ -355,6 +363,8 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // Toujours envoyé (jamais `undefined`) : décocher doit éteindre l'option,
     // la liste blanche de l'édition ignorant un champ absent.
     launchPhase: values.launchPhase,
+    // Même règle : décocher doit éteindre le tirage au sort.
+    randomSeeding: values.randomSeeding,
     // `null` (jamais `undefined`) case décochée : l'édition doit pouvoir
     // éteindre le format Duel / Arcade.
     mapPointTarget: values.duelArcade ? values.mapPointTarget : null,
@@ -406,6 +416,7 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
         : defaults.enduranceMaxRounds,
     enduranceEarlyExit: apiValues.format === "BG_SURVIE" && apiValues.enduranceEarlyExit,
     launchPhase: apiValues.launchPhase,
+    randomSeeding: apiValues.randomSeeding,
     duelArcade: apiValues.mapPointTarget !== null,
     mapPointTarget: apiValues.mapPointTarget ?? defaults.mapPointTarget,
     // Même règle pour les égalités : hors BG Survie, la valeur stockée est

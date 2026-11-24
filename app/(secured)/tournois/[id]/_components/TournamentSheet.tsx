@@ -202,6 +202,8 @@ function preLaunchBoardText(
   format: TournamentFormat,
   seedingSource: string,
 ): string {
+  // Tirage au sort (`RANDOM_SEEDING.md`) : rien du plateau n'est connu avant lui.
+  if (seedingSource === "RANDOM") return text.t("page.preLaunch.random");
   if (formatForBracket === "SURVIVAL") return text.t("page.preLaunch.survival");
   if (format === "BG_SURVIE") {
     return seedingSource === "MANUAL" ? text.t("page.preLaunch.bgSurvieManual") : text.t("page.preLaunch.bgSurvieRanking");

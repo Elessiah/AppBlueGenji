@@ -108,6 +108,14 @@ describe("loadSeedingBoard", () => {
     expect((await loadSeedingBoard(5))?.lockReason).toBe("STARTED");
   });
 
+  it("signale le tirage au sort allumé comme verrou de l'ordre", async () => {
+    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ random_seeding: 1 }));
+    connection.execute.mockResolvedValue(registrationRows());
+    jest.mocked(getMatchRows).mockResolvedValue([]);
+
+    expect((await loadSeedingBoard(5))?.lockReason).toBe("RANDOM_DRAW");
+  });
+
   it("renvoie null pour un tournoi inconnu", async () => {
     jest.mocked(loadTournamentRow).mockResolvedValue(null);
     expect(await loadSeedingBoard(5)).toBeNull();
@@ -144,6 +152,15 @@ describe("reorderSeeding", () => {
     expect(publishUpdatedEvent).toHaveBeenCalledWith(5);
     // Aucun match généré : rien à reconstruire.
     expect(deleteAllMatches).not.toHaveBeenCalled();
+  });
+
+  it("refuse tout réordonnancement tant que le tirage au sort est allumé", async () => {
+    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ random_seeding: 1 }));
+    jest.mocked(getMatchRows).mockResolvedValue([]);
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow(/^SEEDING_LOCKED_RANDOM_DRAW$/);
+    expect(connection.execute.mock.calls.some(([sql]) => String(sql).includes("SET seed = ?"))).toBe(false);
+    expect(connection.commit).not.toHaveBeenCalled();
   });
 
   it("refuse un plateau resté avant le coup d'envoi, sans le détruire", async () => {

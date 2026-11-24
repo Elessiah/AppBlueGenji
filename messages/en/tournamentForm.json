@@ -67,6 +67,7 @@
       "registrationBlizzardRequirement": "Blizzard account at registration",
       "registrationMinPlayers": "Minimum players on the team",
       "launchPhase": "Match launch phase",
+      "randomSeeding": "Random starting order",
       "mapPointTarget": "Duel / Arcade format",
       "phases": "Tournament stages"
     },
@@ -207,6 +208,12 @@
       "label": "Match launch phase",
       "description": "On: at its start time, each match waits for both teams (and each of its casters) to click “Ready”; a referee can force it, and it starts automatically after {launchDelay} minutes. Off (default): a match starts at its time or, with no time, as soon as both its opponents are known (unless referees schedule the matches).",
       "scope": "Can be changed until the tournament starts, then locked.",
+      "locked": "The tournament has started: this option can no longer be changed."
+    },
+    "randomSeeding": {
+      "label": "Random starting order",
+      "description": "On: when registration closes, the starting order is drawn at random (true randomness) instead of following the registration order or the site ranking. It sets the first-round pairings; the first-round preview only appears after the draw, and the order can no longer be changed with the arrows.",
+      "scope": "Can be changed until the tournament starts, then locked. Turned on after registration has closed, the draw happens on save.",
       "locked": "The tournament has started: this option can no longer be changed."
     },
     "games": {

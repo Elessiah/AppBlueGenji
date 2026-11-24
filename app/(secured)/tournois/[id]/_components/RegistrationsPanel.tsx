@@ -14,6 +14,7 @@ import {
   type SeedingLockReason,
 } from "@/lib/shared/seeding";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
+import { randomDrawStatus } from "@/lib/shared/random-seeding";
 import { entrantRemovalBlockReason } from "@/lib/shared/entrant-removal";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { toParticipantType } from "@/lib/shared/participants";
@@ -29,6 +30,7 @@ import {
   hiddenRegistrationCount,
   mustExpandToShow,
   registrationActionsColumn,
+  randomDrawHintKey,
   registrationsRankingHintKey,
   removalNotice,
   visibleRegistrationCount,
@@ -183,6 +185,7 @@ const LOCK_KEYS = {
   FINISHED: "registrations.lock.FINISHED",
   SCORES_ENTERED: "registrations.lock.SCORES_ENTERED",
   STARTED: "registrations.lock.STARTED",
+  RANDOM_DRAW: "registrations.lock.RANDOM_DRAW",
 } as const satisfies Record<NonNullable<SeedingLockReason>, string>;
 
 /** Intitulé de la colonne d'actions (`registrationActionsColumn`) → sa clé. */
@@ -263,6 +266,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const lockReason = seedingLockReason(
     seedingWindowState(detail.card, now),
     detail.matches.map(fromBracketMatch),
+    detail.card.randomSeeding,
   );
   const staff = detail.isAdmin && canAct;
   const reorderable = staff && lockReason === null && detail.registrations.length > 1;
@@ -403,7 +407,16 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     : a(`registrations.seedingHintWaiting.${toParticipantType(detail.card.participantType)}`);
 
   // Pourquoi l'ordre est celui-là, quand il suit le classement du site.
-  const rankingHint = registrationsRankingHintKey(followsRanking, followsFrozenDraw, rows.length);
+  // Tirage au sort : à venir ou fait (`RANDOM_SEEDING.md`) — prime sur le classement.
+  const rankingHint =
+    randomDrawHintKey(
+      randomDrawStatus({
+        enabled: detail.card.randomSeeding,
+        drawnAt: detail.card.randomSeedingDrawnAt,
+        registrationCloseAt: detail.card.registrationCloseAt,
+      }),
+      rows.length,
+    ) ?? registrationsRankingHintKey(followsRanking, followsFrozenDraw, rows.length);
 
   const hiddenCount = hiddenRegistrationCount(rows.length);
   const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
