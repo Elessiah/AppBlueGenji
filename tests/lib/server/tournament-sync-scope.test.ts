@@ -136,6 +136,30 @@ describe("findTournamentsNeedingSync — jalons de calendrier", () => {
   });
 });
 
+describe("findTournamentsNeedingSync — tirage au sort dû (RANDOM_SEEDING.md)", () => {
+  /** Clôture passée, départ à venir, état stocké déjà `UPCOMING` : aucun jalon franchi. */
+  const waiting = (overrides: Row = {}) =>
+    settledRow({ id: 9, state: "UPCOMING", registration_close_at: at(-1), random_seeding: 1, random_seeding_drawn_at: null, ...overrides });
+
+  it("retient un tirage dû sans changement d'état (clôture avancée dans le passé)", async () => {
+    expect(await findTournamentsNeedingSync(makeConn([waiting()], []))).toEqual([9]);
+  });
+
+  it("ignore un tirage déjà fait, ou l'option éteinte", async () => {
+    expect(await findTournamentsNeedingSync(makeConn([waiting({ random_seeding_drawn_at: at(-0.5) })], []))).toEqual([]);
+    expect(await findTournamentsNeedingSync(makeConn([waiting({ random_seeding: 0 })], []))).toEqual([]);
+  });
+
+  it("lit l'option et la date du tirage avec les dates", async () => {
+    const conn = makeConn([], []);
+    await findTournamentsNeedingSync(conn);
+    const sql = conn.execute.mock.calls
+      .map((call) => String(call[0]))
+      .find((text) => text.includes("registration_open_at, registration_close_at"))!;
+    expect(sql).toContain("random_seeding, random_seeding_drawn_at");
+  });
+});
+
 describe("findTournamentsNeedingSync — entretien dû", () => {
   it("remonte les tournois désignés par la requête d'entretien", async () => {
     const conn = makeConn([], [{ id: 12 }, { id: 15 }]);

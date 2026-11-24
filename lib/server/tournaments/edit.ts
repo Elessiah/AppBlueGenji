@@ -650,9 +650,12 @@ async function applyTournamentUpdate(
  * Suites d'une bascule du tirage au sort (`docs/features/RANDOM_SEEDING.md`),
  * dans la transaction de l'édition (ligne du tournoi déjà verrouillée).
  *
- * - **Éteint** : le tirage passé est oublié (`random_seeding_drawn_at` à
- *   `NULL`) — l'ordre tiré reste en place, réglable aux flèches ; rallumer
- *   l'option fera un nouveau tirage.
+ * - **Éteint** après un tirage : le tournoi revient à l'ordre par défaut de son
+ *   format (seeds remis dans l'ordre d'inscription, `manual_seeding` à 0 :
+ *   ordre d'inscription ou classement du site) — l'ordre tiré n'est pas un ordre fixé par le staff, et
+ *   le garder l'afficherait comme tel. Le staff le règle ensuite aux flèches.
+ *   Éteint avant tout tirage : rien ne bouge (un ordre manuel antérieur reste).
+ *   Rallumer l'option fera un nouveau tirage.
  * - **Allumé** après la clôture des inscriptions : le tirage se fait tout de
  *   suite (aucun entretien n'aurait de raison de repasser avant le coup
  *   d'envoi). Avant la clôture, rien : il aura lieu à la clôture.
@@ -665,7 +668,30 @@ async function applyRandomSeedingChange(
 ): Promise<void> {
   if (before === after) return;
   if (!after) {
-    await connection.execute(`UPDATE bg_tournaments SET random_seeding_drawn_at = NULL WHERE id = ?`, [tournamentId]);
+    const [rows] = await connection.execute<(RowDataPacket & { drawn: number })[]>(
+      `SELECT random_seeding_drawn_at IS NOT NULL AS drawn FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      [tournamentId],
+    );
+    if (Number(rows[0]?.drawn ?? 0) !== 1) return;
+    // Seeds réécrits dans l'ordre d'inscription (une inscription prend
+    // `seed = effectif + 1`, jamais `NULL`) : l'ordre par défaut des plateaux.
+    const [registrations] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
+      `SELECT team_id FROM bg_tournament_registrations
+       WHERE tournament_id = ?
+       ORDER BY registered_at ASC, team_id ASC
+       FOR UPDATE`,
+      [tournamentId],
+    );
+    for (let index = 0; index < registrations.length; index += 1) {
+      await connection.execute(
+        `UPDATE bg_tournament_registrations SET seed = ? WHERE tournament_id = ? AND team_id = ?`,
+        [index + 1, tournamentId, Number(registrations[index]!.team_id)],
+      );
+    }
+    await connection.execute(
+      `UPDATE bg_tournaments SET manual_seeding = 0, random_seeding_drawn_at = NULL WHERE id = ?`,
+      [tournamentId],
+    );
     return;
   }
   await drawRandomSeedingIfDue(connection, tournamentId);

@@ -28,7 +28,10 @@ Règles pures : `lib/shared/random-seeding.ts`. Écriture :
   (`now > registration_close_at`) et le tournoi pas encore lancé (état stocké
   `UPCOMING` ou `REGISTRATION`) — `isRandomDrawDue`. Il se fait :
   - à l'entretien qui suit la clôture (`syncTournamentState` : la clôture est un
-    jalon de calendrier, le balayage le visite — `TOURNAMENT_SYNC_SCOPE.md`) ;
+    jalon de calendrier, le balayage le visite — `TOURNAMENT_SYNC_SCOPE.md` ;
+    un tirage dû sans changement d'état, clôture avancée dans le passé, est
+    lui aussi visité : `findCrossedMilestones` et la reconstruction de
+    l'instantané testent `isRandomDrawDue`) ;
   - au plus tard au coup d'envoi, **avant** que le premier tour soit posé (même
     appel, en tête de `syncTournamentState`) ;
   - à l'enregistrement de l'édition, quand l'option est allumée **après** la
@@ -41,11 +44,15 @@ Règles pures : `lib/shared/random-seeding.ts`. Écriture :
 - **Une seule fois** : `random_seeding_drawn_at` date le tirage. Un tirage ne
   vaut que s'il **suit** la clôture (`randomDrawStatus` : `OFF` / `PENDING` /
   `DRAWN`) : une clôture repoussée après lui (inscriptions rouvertes) le rend
-  caduc, et un nouveau tirage a lieu à la nouvelle clôture.
-- **Sous verrou** : le tournoi puis les inscriptions sont relus en lecture
-  verrouillante (`FOR UPDATE`, table seule) — elle voit le dernier état validé
-  même après une lecture ordinaire de la transaction : deux entretiens
-  concurrents ne tirent jamais deux fois. Le pré-contrôle de
+  caduc, et un nouveau tirage a lieu à la nouvelle clôture. La comparaison se
+  fait **à la seconde** (`DATETIME` sans fraction, tronqué par MariaDB) : un
+  tirage fait dans la seconde même de la clôture compte.
+- **Sous verrou** : les transactions d'entretien (balayage de fond,
+  reconstruction de l'instantané) prennent le verrou du tournoi **en première
+  instruction**, puis le tournoi et les inscriptions sont relus en lecture
+  verrouillante (`FOR UPDATE`, table seule) : deux entretiens concurrents ne
+  tirent jamais deux fois, et aucun ne poursuit sur un instantané d'avant le
+  tirage de l'autre. Le pré-contrôle de
   `syncTournamentState` se fait sur la lecture ordinaire, pour ne prendre le
   verrou du tournoi que si un tirage semble dû. Un plateau déjà présent arrête
   tout : on ne réécrit jamais l'ordre d'un tirage joué.
@@ -54,9 +61,14 @@ Règles pures : `lib/shared/random-seeding.ts`. Écriture :
 
 ## Éteindre l'option
 
-Éteindre efface `random_seeding_drawn_at` : l'ordre déjà tiré reste en place,
-mais redevient un ordre manuel, réglable aux flèches. La rallumer après la
-clôture refait un tirage à l'enregistrement.
+Éteindre après un tirage ramène le tournoi à l'ordre par défaut de son format :
+seeds remis dans l'ordre d'inscription, `manual_seeding` à 0 (ordre
+d'inscription pour l'élimination, classement du site pour les formats à
+classement) et `random_seeding_drawn_at` effacé — l'ordre tiré n'est pas un
+ordre fixé par le staff, et le garder l'afficherait « Ordre fixé par le
+staff ». Il se règle ensuite aux flèches. Éteindre avant tout tirage ne change
+rien (un ordre manuel antérieur reste). La rallumer après la clôture refait un
+tirage à l'enregistrement.
 
 ## Ce que l'écran montre
 
@@ -66,6 +78,11 @@ clôture refait un tirage à l'enregistrement.
 - **Flèches** : retirées tant que l'option est allumée (`seedingLockReason` →
   `RANDOM_DRAW`, phrase `registrations.lock.RANDOM_DRAW`) ; le serveur refuse en
   409 `SEEDING_LOCKED_RANDOM_DRAW`.
+- **Après le tirage** : la phrase du verrou (`registrations.lock.RANDOM_DRAWN`,
+  `seedingLockKey`) et le texte d'attente du plateau (`page.preLaunch.randomDrawn`)
+  disent l'ordre tiré, non plus « à la clôture ». Un tirage fait par la
+  reconstruction de l'instantané publie un `updated` : les flux ouverts relisent
+  l'aperçu.
 - **Explication** derrière le « i » de la liste : tirage à venir
   (`registrations.randomPending` — la liste montre l'ordre d'inscription d'ici
   là) ou fait (`registrations.randomDrawn`).

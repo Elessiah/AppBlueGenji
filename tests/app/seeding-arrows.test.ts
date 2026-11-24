@@ -16,6 +16,8 @@ const ROOT = join(__dirname, "..", "..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
 const PANEL = "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx";
+// Les phrases du verrou vivent dans `seedingLockKey` (RANDOM_SEEDING.md).
+const LIST = "app/(secured)/tournois/[id]/_lib/registrations-list.ts";
 const PANEL_CSS = "app/(secured)/tournois/[id]/_components/RegistrationsPanel.module.css";
 
 function stripComments(code: string): string {
@@ -90,7 +92,8 @@ describe("Ordre de départ — flèches seules", () => {
     expect(panel).toMatch(
       /const reorderable = staff && lockReason === null && detail\.registrations\.length > 1;/,
     );
-    expect(panel).toMatch(/STARTED: "registrations\.lock\.STARTED"/);
+    expect(panel).toMatch(/a\(seedingLockKey\(lockReason, drawStatus\)\)/);
+    expect(stripComments(read(LIST))).toMatch(/STARTED: "registrations\.lock\.STARTED"/);
     expect(frActions.registrations.lock.STARTED).toBe("Le tournoi a commencé : l'ordre de départ est désormais figé.");
   });
 });
@@ -106,7 +109,7 @@ describe("Refus d'un réordonnancement après le coup d'envoi", () => {
     expect(ERROR_MESSAGES.SEEDING_LOCKED_FINISHED).toBeDefined();
     expect(mapError("SEEDING_LOCKED_FINISHED")).toMatch(/^Tournoi terminé/);
     expect(mapError("SEEDING_LOCKED_FINISHED")).not.toMatch(/score/);
-    expect(stripComments(read(PANEL))).toMatch(/FINISHED: "registrations\.lock\.FINISHED"/);
+    expect(stripComments(read(LIST))).toMatch(/FINISHED: "registrations\.lock\.FINISHED"/);
     expect(frActions.registrations.lock.FINISHED).toBe("Tournoi terminé : l'ordre n'a plus d'effet.");
   });
 });

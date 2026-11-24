@@ -14,7 +14,8 @@
       "FINISHED": "Tournament finished: the order no longer has any effect.",
       "SCORES_ENTERED": "A score has been entered: the order is now locked.",
       "STARTED": "The tournament has started: the seeding order is now locked.",
-      "RANDOM_DRAW": "Random draw is on: the starting order will be drawn at random when registration closes. Turn the option off to set it by hand."
+      "RANDOM_DRAW": "Random draw is on: the starting order will be drawn at random when registration closes. Turn the option off to set it by hand.",
+      "RANDOM_DRAWN": "Starting order drawn at random: it can't be set by hand. Turn the option off to adjust it with the arrows."
     },
     "column": {
       "actions": "Actions",

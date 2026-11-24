@@ -254,6 +254,12 @@ async function syncOneTournament(
     const startedAt = Date.now();
     try {
       await connection.beginTransaction();
+      // Verrou du tournoi **en toute première instruction** (CLAUDE.md) :
+      // l'entretien lit puis écrit les inscrites (tirage au sort, semis du
+      // classement au coup d'envoi). Sans lui, deux passes concurrentes
+      // figeraient un instantané d'avant le travail de l'autre et le referaient
+      // dessus (`RANDOM_SEEDING.md`).
+      await lockTournamentRow(connection, tournamentId);
       const { stateChanged, contentChanged, launchesChanged } = await syncTournamentState(connection, tournamentId);
       await connection.commit();
       flushBotLogs(connection);

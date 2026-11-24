@@ -102,3 +102,23 @@ export function randomDrawHintKey(
   if (rowCount === 0 || status === "OFF") return null;
   return status === "DRAWN" ? "registrations.randomDrawn" : "registrations.randomPending";
 }
+
+/** Clé du verrou de l'ordre (`registrations.lock.*`). */
+const LOCK_KEYS = {
+  FINISHED: "registrations.lock.FINISHED",
+  SCORES_ENTERED: "registrations.lock.SCORES_ENTERED",
+  STARTED: "registrations.lock.STARTED",
+  RANDOM_DRAW: "registrations.lock.RANDOM_DRAW",
+} as const satisfies Record<NonNullable<SeedingLockReason>, string>;
+
+/**
+ * Phrase du verrou de l'ordre. Le tirage au sort dit « à la clôture » tant
+ * qu'il est à venir, et « tiré » une fois fait (`RANDOM_SEEDING.md`).
+ */
+export function seedingLockKey(
+  reason: NonNullable<SeedingLockReason>,
+  draw: RandomDrawStatus,
+): (typeof LOCK_KEYS)[keyof typeof LOCK_KEYS] | "registrations.lock.RANDOM_DRAWN" {
+  if (reason === "RANDOM_DRAW" && draw === "DRAWN") return "registrations.lock.RANDOM_DRAWN";
+  return LOCK_KEYS[reason];
+}

@@ -29,7 +29,8 @@
       "bgSurvieRanking": "The starting seeding is the site ranking, in the order of the registrations below; the endurance rounds will be generated when the tournament starts.",
       "swiss": "The starting seeding and the first round will be generated when the tournament starts.",
       "bracket": "The bracket will be generated automatically when the tournament starts.",
-      "random": "The starting order is drawn at random when registration closes; the board will be generated when the tournament starts."
+      "random": "Starting order drawn at random when registration closes; board generated at start.",
+      "randomDrawn": "Starting order drawn at random; board generated at start."
     },
     "fatal": {
       "expiredTitle": "Session expired",

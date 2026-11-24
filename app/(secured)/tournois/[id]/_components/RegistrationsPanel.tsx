@@ -11,7 +11,6 @@ import {
   seedingLockReason,
   seedingReorderNeedsConfirmation,
   seedingWindowState,
-  type SeedingLockReason,
 } from "@/lib/shared/seeding";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
 import { randomDrawStatus } from "@/lib/shared/random-seeding";
@@ -31,6 +30,7 @@ import {
   mustExpandToShow,
   registrationActionsColumn,
   randomDrawHintKey,
+  seedingLockKey,
   registrationsRankingHintKey,
   removalNotice,
   visibleRegistrationCount,
@@ -179,14 +179,6 @@ interface RegistrationsPanelProps {
    */
   onChanged: () => void;
 }
-
-/** Clé du verrou de l'ordre (`registrations.lock.*`). */
-const LOCK_KEYS = {
-  FINISHED: "registrations.lock.FINISHED",
-  SCORES_ENTERED: "registrations.lock.SCORES_ENTERED",
-  STARTED: "registrations.lock.STARTED",
-  RANDOM_DRAW: "registrations.lock.RANDOM_DRAW",
-} as const satisfies Record<NonNullable<SeedingLockReason>, string>;
 
 /** Intitulé de la colonne d'actions (`registrationActionsColumn`) → sa clé. */
 const COLUMN_KEYS = {
@@ -408,15 +400,14 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
 
   // Pourquoi l'ordre est celui-là, quand il suit le classement du site.
   // Tirage au sort : à venir ou fait (`RANDOM_SEEDING.md`) — prime sur le classement.
+  const drawStatus = randomDrawStatus({
+    enabled: detail.card.randomSeeding,
+    drawnAt: detail.card.randomSeedingDrawnAt,
+    registrationCloseAt: detail.card.registrationCloseAt,
+  });
   const rankingHint =
-    randomDrawHintKey(
-      randomDrawStatus({
-        enabled: detail.card.randomSeeding,
-        drawnAt: detail.card.randomSeedingDrawnAt,
-        registrationCloseAt: detail.card.registrationCloseAt,
-      }),
-      rows.length,
-    ) ?? registrationsRankingHintKey(followsRanking, followsFrozenDraw, rows.length);
+    randomDrawHintKey(drawStatus, rows.length) ??
+    registrationsRankingHintKey(followsRanking, followsFrozenDraw, rows.length);
 
   const hiddenCount = hiddenRegistrationCount(rows.length);
   const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
@@ -435,7 +426,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
           <div className={styles.hintRow}>
             <InfoHintRow>
               <p className={styles.hint}>
-                {lockReason !== null ? a(LOCK_KEYS[lockReason]) : seedingHint}
+                {lockReason !== null ? a(seedingLockKey(lockReason, drawStatus)) : seedingHint}
               </p>
               {rankingHint !== null && (
                 <InfoHint id="registrations-seeding-more" subject={a(`registrations.seedingSource.${source}`)}>

@@ -124,6 +124,8 @@ const connection = {
   beginTransaction: jest.fn(async () => undefined),
   commit: jest.fn(async () => undefined),
   rollback: jest.fn(async () => undefined),
+  // Verrou du tournoi pris en première instruction de l'entretien.
+  execute: jest.fn(async () => [[{ id: 1 }]]),
 };
 let expiredRows: unknown[] = [];
 

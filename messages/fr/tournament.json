@@ -29,7 +29,8 @@
       "bgSurvieRanking": "Le classement de départ est celui du site, dans l'ordre des inscriptions ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi.",
       "swiss": "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi.",
       "bracket": "Le bracket sera généré automatiquement au démarrage du tournoi.",
-      "random": "L'ordre de départ est tiré au sort à la clôture des inscriptions ; le plateau sera généré au démarrage du tournoi."
+      "random": "Ordre de départ tiré au sort à la clôture des inscriptions ; plateau généré au départ.",
+      "randomDrawn": "Ordre de départ tiré au sort ; plateau généré au départ."
     },
     "fatal": {
       "expiredTitle": "Session expirée",

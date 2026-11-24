@@ -4,7 +4,7 @@
  */
 import { randomInt } from "node:crypto";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { isRandomDrawDue, shuffleOrder } from "@/lib/shared/random-seeding";
+import { isRandomDrawDue, randomDrawInputOf, shuffleOrder } from "@/lib/shared/random-seeding";
 import type { TournamentState } from "@/lib/shared/types";
 
 type DrawRow = RowDataPacket & {
@@ -46,16 +46,7 @@ export async function drawRandomSeedingIfDue(
   );
   const row = rows[0];
   if (!row) return false;
-  const due = isRandomDrawDue(
-    {
-      state: row.state,
-      enabled: Number(row.random_seeding ?? 0) === 1,
-      drawnAt: row.random_seeding_drawn_at,
-      registrationCloseAt: row.registration_close_at,
-    },
-    now.getTime(),
-  );
-  if (!due) return false;
+  if (!isRandomDrawDue(randomDrawInputOf(row), now.getTime())) return false;
 
   const [matches] = await connection.execute<RowDataPacket[]>(
     `SELECT id FROM bg_matches WHERE tournament_id = ? LIMIT 1`,

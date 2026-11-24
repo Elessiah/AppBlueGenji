@@ -83,6 +83,17 @@ describe("drawRandomSeedingIfDue", () => {
     expect(seedWrites(connection)).toEqual([]);
   });
 
+  it("ne refait pas un tirage de la seconde de clôture, relu tronqué", async () => {
+    const connection = setup({ ...pending, random_seeding_drawn_at: CLOSE });
+    expect(await drawRandomSeedingIfDue(fakeConnection(connection), 5, AFTER_CLOSE, () => 0)).toBe(false);
+    expect(seedWrites(connection)).toEqual([]);
+  });
+
+  it("retire après une clôture repoussée au-delà du tirage", async () => {
+    const connection = setup({ ...pending, random_seeding_drawn_at: new Date(CLOSE.getTime() - 86_400_000) });
+    expect(await drawRandomSeedingIfDue(fakeConnection(connection), 5, AFTER_CLOSE, () => 0)).toBe(true);
+  });
+
   it("ne tire rien option éteinte, tournoi lancé ou inconnu", async () => {
     for (const row of [{ ...pending, random_seeding: 0 }, { ...pending, state: "RUNNING" }, null]) {
       const connection = setup(row);

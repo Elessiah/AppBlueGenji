@@ -65,6 +65,7 @@ import { invalidateLandingAggregates, invalidateLandingLive } from "@/lib/server
 import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
+import { isRandomDrawDue, randomDrawInputOf } from "@/lib/shared/random-seeding";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { DUE_LAUNCH_SQL } from "./sync-scope";
@@ -269,6 +270,9 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
 
   const needsSync =
     (await hasPendingStateTransition(tournamentRow)) ||
+    // Tirage au sort dû sans changement d'état (clôture avancée dans le passé
+    // alors que le tournoi attend déjà son départ) : `RANDOM_SEEDING.md`.
+    isRandomDrawDue(randomDrawInputOf(tournamentRow)) ||
     (tournamentRow.state === "RUNNING" &&
       (missingBracket || (await hasDueRunningMaintenance(db, tournamentId))));
 
@@ -277,6 +281,12 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
+    // Verrou du tournoi **en toute première instruction** (`lockTournamentRow`,
+    // CLAUDE.md, écrit ici pour ne pas importer `./registration`) : l'entretien
+    // lit puis écrit les inscrites (tirage au sort, semis au coup d'envoi), et
+    // une lecture avant le verrou figerait un état d'avant le travail d'une
+    // passe concurrente.
+    await connection.execute(`SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE`, [tournamentId]);
     const syncResult = await syncTournamentState(connection, tournamentId);
     await connection.commit();
     // Cette bascule-là aussi peut lancer ou clore un tournoi : le journal
@@ -330,6 +340,17 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
       // PNG d'aperçu au plus une fois par fenêtre, comme les scores (`invalidateTeamRankingForScore`).
       invalidateTeamRankingForScore();
       invalidateStats();
+    }
+    // Un tirage au sort change l'aperçu des lecteurs autorisés, qui ne part pas
+    // avec l'instantané : un `updated` (qui oublie aussi l'aperçu) part une fois
+    // cet instantané reconstruit, pour que les flux ouverts le relisent
+    // (`RANDOM_SEEDING.md`). Une fois par tournoi : le coût d'une reconstruction.
+    if (syncResult.randomDrawn) {
+      setTimeout(() => {
+        void import("./notifications")
+          .then(({ publishUpdatedEvent }) => publishUpdatedEvent(tournamentId))
+          .catch(() => undefined);
+      }, 0);
     }
 
     return syncResult.row;

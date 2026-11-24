@@ -2,7 +2,7 @@ import type { PoolConnection } from "mysql2/promise";
 import type { TournamentState } from "@/lib/shared/types";
 import { computeTournamentState as sharedComputeTournamentState } from "@/lib/shared/tournament-state";
 import { TournamentRow } from "./_internal";
-import { isRandomDrawDue } from "@/lib/shared/random-seeding";
+import { isRandomDrawDue, randomDrawInputOf } from "@/lib/shared/random-seeding";
 import { queueBotLog } from "./bot-logs";
 import { drawRandomSeedingIfDue } from "./random-seeding";
 import {
@@ -50,6 +50,8 @@ export type TournamentSyncResult = {
   stateChanged: boolean;
   contentChanged: boolean;
   launchesChanged: boolean;
+  /** Ordre de départ tiré au sort par cet entretien (`RANDOM_SEEDING.md`). */
+  randomDrawn?: boolean;
 };
 
 export async function syncTournamentState(
@@ -73,17 +75,7 @@ export async function syncTournamentState(
     if (drawn) tournament = (await loadTournamentRow(connection, tournamentId)) ?? loaded;
   }
   const result = await syncLoadedTournament(connection, tournamentId, tournament);
-  return drawn ? { ...result, contentChanged: true } : result;
-}
-
-/** Entrée de la règle du tirage, depuis la ligne du tournoi. */
-function randomDrawInputOf(row: TournamentRow) {
-  return {
-    state: row.state,
-    enabled: Number(row.random_seeding ?? 0) === 1,
-    drawnAt: row.random_seeding_drawn_at ?? null,
-    registrationCloseAt: row.registration_close_at,
-  };
+  return drawn ? { ...result, contentChanged: true, randomDrawn: true } : result;
 }
 
 async function syncLoadedTournament(

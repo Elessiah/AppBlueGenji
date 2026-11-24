@@ -28,6 +28,11 @@ function timeOf(value: string | Date): number {
  * Où en est le tirage ? Un tirage ne vaut que s'il **suit** la clôture des
  * inscriptions : une clôture repoussée après lui (inscriptions rouvertes) le
  * rend caduc, et un nouveau tirage aura lieu à la nouvelle clôture.
+ *
+ * Comparaison **à la seconde** : les deux dates sont des `DATETIME` sans
+ * fraction, et MariaDB tronque (MySQL arrondit) les millisecondes. Un tirage
+ * fait dans la seconde même de la clôture (10:00:00,300 pour 10:00:00) est
+ * relu 10:00:00 : il compte, sinon il serait refait à chaque entretien.
  */
 export function randomDrawStatus(input: RandomDrawInput): RandomDrawStatus {
   if (!input.enabled) return "OFF";
@@ -35,7 +40,25 @@ export function randomDrawStatus(input: RandomDrawInput): RandomDrawStatus {
   const drawn = timeOf(input.drawnAt);
   const close = timeOf(input.registrationCloseAt);
   if (!Number.isFinite(drawn) || !Number.isFinite(close)) return "PENDING";
-  return drawn > close ? "DRAWN" : "PENDING";
+  return Math.floor(drawn / 1000) >= Math.floor(close / 1000) ? "DRAWN" : "PENDING";
+}
+
+/** Colonnes SQL du tirage, telles que les lit une ligne `bg_tournaments`. */
+export type RandomDrawColumns = {
+  state: TournamentState;
+  random_seeding?: number | null;
+  random_seeding_drawn_at?: string | Date | null;
+  registration_close_at: string | Date;
+};
+
+/** Entrée de {@link isRandomDrawDue}, depuis une ligne `bg_tournaments`. */
+export function randomDrawInputOf(row: RandomDrawColumns): RandomDrawInput & { state: TournamentState } {
+  return {
+    state: row.state,
+    enabled: Number(row.random_seeding ?? 0) === 1,
+    drawnAt: row.random_seeding_drawn_at ?? null,
+    registrationCloseAt: row.registration_close_at,
+  };
 }
 
 /**

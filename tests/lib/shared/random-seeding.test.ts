@@ -17,8 +17,14 @@ describe("randomDrawStatus", () => {
     expect(randomDrawStatus({ enabled: true, drawnAt: new Date(CLOSE_MS + 1), registrationCloseAt: CLOSE })).toBe("DRAWN");
   });
 
-  it("rend PENDING pour un tirage antérieur ou égal à la clôture (inscriptions rouvertes)", () => {
-    expect(randomDrawStatus({ enabled: true, drawnAt: CLOSE, registrationCloseAt: CLOSE })).toBe("PENDING");
+  it("rend DRAWN pour un tirage fait dans la seconde de la clôture, relu tronqué", () => {
+    // Tiré à 10:00:00,300, stocké en DATETIME sans fraction : relu 10:00:00.
+    expect(randomDrawStatus({ enabled: true, drawnAt: CLOSE, registrationCloseAt: CLOSE })).toBe("DRAWN");
+    expect(randomDrawStatus({ enabled: true, drawnAt: new Date(CLOSE_MS + 300), registrationCloseAt: CLOSE })).toBe("DRAWN");
+  });
+
+  it("rend PENDING pour un tirage antérieur à la clôture (inscriptions rouvertes)", () => {
+    expect(randomDrawStatus({ enabled: true, drawnAt: new Date(CLOSE_MS - 1000), registrationCloseAt: CLOSE })).toBe("PENDING");
     expect(randomDrawStatus({ enabled: true, drawnAt: new Date(CLOSE_MS - 1), registrationCloseAt: CLOSE })).toBe("PENDING");
   });
 
@@ -43,6 +49,11 @@ describe("isRandomDrawDue", () => {
   it("n'est jamais dû une fois le tournoi lancé ou terminé", () => {
     expect(isRandomDrawDue({ ...base, state: "RUNNING" }, CLOSE_MS + 1)).toBe(false);
     expect(isRandomDrawDue({ ...base, state: "FINISHED" }, CLOSE_MS + 1)).toBe(false);
+  });
+
+  it("n'est plus dû après un tirage fait dans la seconde de la clôture", () => {
+    // Le tirage de 10:00:00,300 relu 10:00:00 : aucun second tirage plus tard.
+    expect(isRandomDrawDue({ ...base, drawnAt: CLOSE, state: "UPCOMING" }, CLOSE_MS + 60_000)).toBe(false);
   });
 
   it("n'est pas dû option éteinte ni tirage déjà fait", () => {
