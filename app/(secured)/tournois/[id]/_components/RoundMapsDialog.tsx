@@ -474,7 +474,7 @@ const TIEBREAK_FIELD_ERRORS = { INVALID_TIEBREAK_MAP: "tiebreak", TIEBREAK_NOT_A
 /** Toutes les cartes de la liste d'Overwatch, pour la suggestion du champ. */
 const OVERWATCH_MAP_NAMES: readonly string[] = filterOverwatchMaps("").flatMap((group) => group.maps);
 
-/** Suggestions du champ de départage : une quarantaine d'options, rendues une seule fois. */
+/** Suggestions du champ de départage : une cinquantaine d'options, rendues une seule fois. */
 const MapNamesDatalist = memo(function MapNamesDatalist({ id }: Readonly<{ id: string }>) {
   return (
     <datalist id={id}>

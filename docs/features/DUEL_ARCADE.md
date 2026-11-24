@@ -111,6 +111,12 @@ matchs) est rejoué par `retryOnDeadlock`.
 | `INVALID_ROUND` | 400 | tour hors du tournoi (phase, tableau, ou tour absent d'un arbre créé) |
 | `MAP_POINTS_INVALID` | 400 | carte qui ne respecte pas « premier à N » |
 
+## Cartes proposées
+
+La liste des cartes de la fenêtre « Cartes par tour » comprend les arènes des
+modes arcade (groupe `ARCADE`, `lib/shared/overwatch-maps.ts`), proposées à **tous** les tournois, individuels
+ou par équipes → `ROUND_MAPS.md`.
+
 ## Contrôle des scores
 
 Toutes les portes passent par `checkMapList(…, { pointTarget, pointTargets })`

@@ -24,7 +24,10 @@ Sans réglage, rien ne change : première carte libre posée par le staff
 (`bg_matches.first_map`, `MATCH_REFEREE.md`).
 
 **Choisir les cartes** — chaque créneau ouvre la **liste d'Overwatch** rangée par
-mode (Contrôle, Escorte, Hybride, Offensive, Flashpoint, Affrontement), avec une
+mode (Contrôle, Escorte, Hybride, Offensive, Flashpoint, Affrontement, Arcade
+— arènes de Match à mort et d'Élimination : Ayutthaya, Black Forest, Castillo,
+Château Guillard, Ecopoint: Antarctica, Kanezaka, Malevento, Necropolis, Petra,
+surtout utiles aux duels 1v1 mais proposées à tous les tournois), avec une
 recherche sans casse ni accents (`filterOverwatchMaps`) et des cases à cocher
 (groupe `data-tap-zone`) ; une carte absente se **saisit à la main** (64
 caractères, `visibleText`). Les cartes retenues paraissent en pastilles qu'un ✕

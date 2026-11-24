@@ -79,7 +79,8 @@
       "HYBRID": "Hybrid",
       "PUSH": "Push",
       "FLASHPOINT": "Flashpoint",
-      "CLASH": "Clash"
+      "CLASH": "Clash",
+      "ARCADE": "Arcade (Deathmatch, Elimination)"
     },
     "maxMaps": "{max} maps at most per match (tournament format).",
     "overMaxMaps": "This round has more maps than the format plays ({max} at most).",

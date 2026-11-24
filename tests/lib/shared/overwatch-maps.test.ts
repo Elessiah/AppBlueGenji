@@ -13,6 +13,14 @@ describe("filterOverwatchMaps", () => {
     expect(filterOverwatchMaps("").map((group) => group.mode)).toEqual([...OVERWATCH_MAP_MODES]);
   });
 
+  it("filterOverwatchMaps_emptyQuery_includesArcadeLast", () => {
+    expect(filterOverwatchMaps("").at(-1)?.mode).toBe("ARCADE");
+  });
+
+  it("filterOverwatchMaps_arcadeMapWithoutAccents_matchesAccentedMap", () => {
+    expect(filterOverwatchMaps("chateau")).toEqual([{ mode: "ARCADE", maps: ["Château Guillard"] }]);
+  });
+
   it("filterOverwatchMaps_queryWithoutAccents_matchesAccentedMap", () => {
     expect(filterOverwatchMaps("grimsvotn")).toEqual([{ mode: "ESCORT", maps: ["Watchpoint: Grímsvötn"] }]);
   });
@@ -27,6 +35,10 @@ describe("filterOverwatchMaps", () => {
 });
 
 describe("isOverwatchMap", () => {
+  it("isOverwatchMap_arcadeMap_returnsTrue", () => {
+    expect(isOverwatchMap("ecopoint: antarctica")).toBe(true);
+  });
+
   it("isOverwatchMap_knownNameOtherCase_returnsTrue", () => {
     expect(isOverwatchMap("king's row")).toBe(true);
   });
@@ -40,5 +52,19 @@ describe("OVERWATCH_MAPS", () => {
   it("OVERWATCH_MAPS_names_areUniqueAcrossModes", () => {
     const names = OVERWATCH_MAP_MODES.flatMap((mode) => OVERWATCH_MAPS[mode]);
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("OVERWATCH_MAPS_arcade_listsEveryArenaMap", () => {
+    expect(OVERWATCH_MAPS.ARCADE).toEqual([
+      "Ayutthaya",
+      "Black Forest",
+      "Castillo",
+      "Château Guillard",
+      "Ecopoint: Antarctica",
+      "Kanezaka",
+      "Malevento",
+      "Necropolis",
+      "Petra",
+    ]);
   });
 });

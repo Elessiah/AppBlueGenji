@@ -79,7 +79,8 @@
       "HYBRID": "Hybride",
       "PUSH": "Offensive",
       "FLASHPOINT": "Flashpoint",
-      "CLASH": "Affrontement"
+      "CLASH": "Affrontement",
+      "ARCADE": "Arcade (Match à mort, Élimination)"
     },
     "maxMaps": "{max} cartes au plus par match (format du tournoi).",
     "overMaxMaps": "Ce tour a plus de cartes que le format n'en joue ({max} au plus).",

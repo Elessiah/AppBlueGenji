@@ -8,11 +8,15 @@
  * pu être vérifiée carte par carte (décision consignée), et l'arbitrage comme
  * les joueurs connaissent ces noms.
  *
+ * Les cartes des modes **arcade** (arènes de Match à mort et d'Élimination),
+ * utiles aux duels 1v1 (`docs/features/DUEL_ARCADE.md`), sont proposées à tous
+ * les tournois.
+ *
  * Marvel Rivals n'a pas de liste : saisie libre seulement.
  */
 
 /** Modes de jeu des cartes, dans l'ordre d'affichage. */
-export const OVERWATCH_MAP_MODES = ["CONTROL", "ESCORT", "HYBRID", "PUSH", "FLASHPOINT", "CLASH"] as const;
+export const OVERWATCH_MAP_MODES = ["CONTROL", "ESCORT", "HYBRID", "PUSH", "FLASHPOINT", "CLASH", "ARCADE"] as const;
 
 export type OverwatchMapMode = (typeof OVERWATCH_MAP_MODES)[number];
 
@@ -34,6 +38,18 @@ export const OVERWATCH_MAPS: Readonly<Record<OverwatchMapMode, readonly string[]
   PUSH: ["Colosseo", "Esperança", "New Queen Street", "Runasapi"],
   FLASHPOINT: ["Aatlis", "New Junk City", "Suravasa"],
   CLASH: ["Hanaoka", "Throne of Anubis"],
+  /** Arènes des modes arcade (Match à mort, Élimination), absentes des modes classés. */
+  ARCADE: [
+    "Ayutthaya",
+    "Black Forest",
+    "Castillo",
+    "Château Guillard",
+    "Ecopoint: Antarctica",
+    "Kanezaka",
+    "Malevento",
+    "Necropolis",
+    "Petra",
+  ],
 };
 
 /** Clé de comparaison d'un nom : sans casse ni accents (« paraiso » trouve « Paraíso »). */
