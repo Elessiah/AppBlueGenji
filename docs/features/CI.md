@@ -6,7 +6,7 @@
 
 - **PR vers `main`/`develop`** (ouverte, poussée, rouverte, sortie de brouillon) : la vérification. Une PR en brouillon ne joue rien.
 - **Push sur `main`** (fusion) : lint, build et tests rejouent le code fusionné et **remplissent les caches** ; le job E2E n'y fait que remplir celui de Chromium, sans lancer de test. GitHub ne laisse une PR lire que les caches de sa branche et de `main` — jamais ceux d'une autre PR : sans ce passage, la première exécution de chaque PR partirait à froid. Une poussée de documentation seule (`docs/**`, `*.md`, `ERREUR.txt`, `LICENSE`, `NOTICE`) ne déclenche rien ; le commit de version porte `[skip ci]`.
-- `concurrency` : une nouvelle poussée annule l'exécution en cours de la même PR.
+- `concurrency` : une nouvelle poussée annule l'exécution en cours de la même PR ; sur `main`, les exécutions s'enchaînent sans s'annuler.
 
 ## Jobs joués selon les fichiers modifiés
 
@@ -19,7 +19,7 @@ Le job `changes` lit la liste des fichiers de la PR (API GitHub, anciens chemins
 | E2E | ce qui joue le build, plus `e2e/` |
 | Test (Jest) | toujours — les tests lisent aussi la documentation |
 
-**Tout joue** dès qu'une incertitude se présente : `.github/`, `scripts/ci-*`, `package.json` ou `package-lock.json` modifiés, liste illisible (API en panne), vide, ou au plafond de 3 000 fichiers de l'API. Le tri ne doit jamais laisser passer au vert ce qu'il n'a pas lu : un script en erreur fait échouer le job `changes` (`shell: bash`, donc `pipefail`), et les portes sont écrites `!= 'false'` — une sortie absente fait jouer le job. Un job écarté apparaît « Skipped » sur la PR. Ajouter un dossier compilé par Next ou lu par l'E2E = l'ajouter au script et à son test (`tests/scripts/ci-workflow.test.ts`).
+**Tout joue** dès qu'une incertitude se présente : `.github/`, `scripts/ci-*`, `package.json` ou `package-lock.json` modifiés, liste illisible (API en panne), vide, ou au plafond de 3 000 fichiers de l'API. Le tri ne doit jamais laisser passer au vert ce qu'il n'a pas lu : un script en erreur fait échouer le job `changes` (`shell: bash`, donc `pipefail`), et les portes sont écrites `!= 'false'` — un `changes` réussi sans sortie fait jouer le job. Un `changes` **en échec** écarte tous les jobs (Test compris) mais la PR reste rouge : aucun contrôle n'est requis par le ruleset de `main`, il faut donc lire ce rouge avant de fusionner. Les chemins passent en JSON (`@json`), un nom à saut de ligne ou caractère de contrôle fait tout jouer. Une base sans script de tri (la PR qui l'ajoute, un renommage) fait tout jouer aussi. Un job écarté apparaît « Skipped » sur la PR. Ajouter un dossier compilé par Next ou lu par l'E2E = l'ajouter au script et à son test (`tests/scripts/ci-workflow.test.ts`).
 
 ## Caches et doublons
 
@@ -30,3 +30,10 @@ Le job `changes` lit la liste des fichiers de la PR (API GitHub, anciens chemins
 - `next build --no-lint` : le job Lint passe déjà ESLint (sur plus de dossiers). La vérification TypeScript 5 de Next reste dans le build.
 - Tests Jest répartis sur deux machines (`--shard`, `fail-fast: false` : une moitié rouge n'interrompt pas l'autre).
 - Chaque job a un `timeout-minutes`.
+
+## Sécurité
+
+- Une PR (même venue d'un fork) ne lit que les caches de sa branche et de `main`, et n'écrit que dans les siens ; seul le push sur `main`, code fusionné, écrit ceux de `main`. C'est ce qui permet de restaurer `node_modules` (et les caches Jest/Next, du code transformé) sans la vérification d'intégrité de `npm ci`.
+- En conséquence, **l'action `.github/actions/setup` et ces caches ne s'utilisent jamais depuis un déclencheur privilégié** (`pull_request_target`, `workflow_run`, `issue_comment`…) : du contenu non fiable écrirait alors dans la portée de `main`.
+- Risque accepté : une PR peut remplir le quota de 10 Go de caches du dépôt et évincer ceux de `main` (les PR suivantes repartent à froid, sans atteinte à l'intégrité).
+- `permissions: contents: read, pull-requests: read` ; aucun secret n'est exposé au CI. Les actions sont épinglées par SHA de commit, version en commentaire — mettre à jour les deux workflows ensemble (`version-bump-wiring.test.ts` l'exige).

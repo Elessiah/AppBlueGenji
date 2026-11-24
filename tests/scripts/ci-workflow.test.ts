@@ -14,8 +14,9 @@ import { readSource } from "../helpers/read-source";
 
 type Jobs = { lint: boolean; build: boolean; e2e: boolean };
 const SCRIPT = join(__dirname, "..", "..", "scripts", "ci-changed-jobs.cjs");
-const { classifyChangedFiles, formatOutputs, API_FILE_LIMIT } = require(SCRIPT) as {
+const { classifyChangedFiles, decodeLine, formatOutputs, API_FILE_LIMIT } = require(SCRIPT) as {
   classifyChangedFiles: (files: readonly string[]) => Jobs;
+  decodeLine: (line: string) => string;
   formatOutputs: (jobs: Jobs) => string;
   API_FILE_LIMIT: number;
 };
@@ -97,14 +98,38 @@ describe("classifyChangedFiles", () => {
   });
 });
 
+describe("chemins encodés en JSON", () => {
+  it("décode une ligne `@json` de jq", () => {
+    expect(decodeLine('"lib/a b.ts"')).toBe("lib/a b.ts");
+    expect(decodeLine('"e2e/Sc\\u00e9nario.md"')).toBe("e2e/Scénario.md");
+    expect(decodeLine("  ")).toBe("");
+  });
+
+  it("fait tout jouer pour un nom à saut de ligne, qui coupé échapperait aux motifs", () => {
+    expect(classifyChangedFiles(["docs/a.md", decodeLine(JSON.stringify("foo\ntests/x.ts"))])).toEqual(ALL);
+    expect(classifyChangedFiles(["docs/a.md\u0007"])).toEqual(ALL);
+  });
+
+  it("fait tout jouer pour une ligne illisible ou qui n'est pas une chaîne", () => {
+    for (const line of ['"foo', "docs/a.md", "42", "null", '["lib/a.ts"]']) {
+      expect(classifyChangedFiles(["docs/x.md", decodeLine(line)])).toEqual(ALL);
+    }
+  });
+});
+
 describe("script en ligne de commande", () => {
   it("écrit les sorties au format de $GITHUB_OUTPUT", () => {
     expect(formatOutputs({ lint: true, build: false, e2e: true })).toBe("lint=true\nbuild=false\ne2e=true\n");
   });
 
   it("lit les chemins sur l'entrée standard", () => {
-    const out = execFileSync(process.execPath, [SCRIPT], { input: "tests/a.test.ts\ndocs/b.md\n", encoding: "utf8" });
+    const out = execFileSync(process.execPath, [SCRIPT], { input: '"tests/a.test.ts"\n"docs/b.md"\n', encoding: "utf8" });
     expect(out).toBe("lint=true\nbuild=false\ne2e=false\n");
+  });
+
+  it("joue tout pour une entrée qui n'est pas en JSON", () => {
+    const out = execFileSync(process.execPath, [SCRIPT], { input: "docs/b.md\n", encoding: "utf8" });
+    expect(out).toBe("lint=true\nbuild=true\ne2e=true\n");
   });
 });
 
@@ -112,8 +137,20 @@ describe("workflow CI", () => {
   const ci = readSource(".github/workflows/ci.yml");
   const setup = readSource(".github/actions/setup/action.yml");
 
-  it("annule l'exécution précédente d'une même PR", () => {
-    expect(ci).toMatch(/concurrency:\n\s+group: ci-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}\n\s+cancel-in-progress: true/);
+  it("annule l'exécution précédente d'une même PR, jamais une fusion sur main", () => {
+    expect(ci).toMatch(/concurrency:\n\s+group: ci-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}\n\s+cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
+  });
+
+  it("fait tout jouer quand la base de la PR n'a pas encore le script de tri", () => {
+    expect(ci).toMatch(/if \[ -f scripts\/ci-changed-jobs\.cjs \]; then[\s\S]+?else[\s\S]+?printf 'lint=true\\nbuild=true\\ne2e=true\\n'/);
+  });
+
+  it("épingle chaque action tierce sur un SHA de commit", () => {
+    for (const source of [ci, setup, readSource(".github/workflows/version-bump.yml")]) {
+      for (const use of source.match(/uses: [^\s.]\S*/g) ?? []) {
+        expect(use).toMatch(/@[0-9a-f]{40}$/);
+      }
+    }
   });
 
   it("branche chaque job conditionnel sur la sortie du tri, une sortie absente faisant jouer le job", () => {
@@ -134,11 +171,11 @@ describe("workflow CI", () => {
 
   it("lit les anciens chemins des renommages, 100 fichiers par page", () => {
     expect(ci).toContain("files?per_page=100");
-    expect(ci).toContain(".filename, (.previous_filename // empty)");
+    expect(ci).toContain(".filename, (.previous_filename // empty) | @json");
   });
 
   it("joue tout si la liste des fichiers est illisible", () => {
-    expect(ci).toMatch(/elif ! files=\$\(gh api --paginate[\s\S]+?files="\.github\/workflows\/ci\.yml"/);
+    expect(ci).toMatch(/elif ! files=\$\(gh api --paginate[\s\S]+?files='"\.github\/workflows\/ci\.yml"'/);
   });
 
   it("ne rejoue pas ESLint dans le build", () => {

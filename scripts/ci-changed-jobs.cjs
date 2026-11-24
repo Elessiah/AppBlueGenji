@@ -8,6 +8,10 @@
  *
  * Toute incertitude joue tout : un workflow, une action ou les dépendances
  * modifiés, ou une liste vide ou tronquée (l'API plafonne à 3 000 fichiers).
+ *
+ * Chaque ligne est un chemin **encodé en JSON** (`@json` de jq) : Git admet un
+ * saut de ligne dans un nom, et `foo\ntests/x.ts` coupé en deux échapperait à
+ * tout motif. Une ligne illisible, ou un chemin à caractère de contrôle, joue tout.
  */
 "use strict";
 
@@ -22,8 +26,24 @@ const LINTED = /\.(ts|tsx|js|jsx|mjs|cjs|json)$|^eslint-rules\//;
  * inclut **tout** `.ts`/`.tsx` hors `tests/` — `e2e/`, `scripts/` compris.
  */
 const BUILT =
-  /^(app|components|lib|messages|public)\/|^(?!tests\/).*\.tsx?$|^(tsconfig\.json)$|^postcss\.config\.|\.css$/;
+  /^(app|components|lib|messages|public)\/|^(?!tests\/).*\.tsx?$|^tsconfig\.json$|^postcss\.config\.|\.css$/;
 const E2E_ONLY = /^e2e\//;
+// eslint-disable-next-line no-control-regex -- c'est précisément ce qu'on cherche
+const CONTROL_CHAR = /[\u0000-\u001f\u007f]/;
+/** Rendu d'une ligne illisible : caractère de contrôle que `trim()` garde (un `\n` y disparaîtrait). */
+const UNREADABLE = "\u0000";
+
+/** Ligne de jq `@json` → chemin ; ligne illisible → `UNREADABLE`, qui fait tout jouer. */
+function decodeLine(line) {
+  const text = line.trim();
+  if (text === "") return "";
+  try {
+    const value = JSON.parse(text);
+    return typeof value === "string" ? value : UNREADABLE;
+  } catch {
+    return UNREADABLE;
+  }
+}
 
 /**
  * @param {readonly string[]} files chemins relatifs à la racine du dépôt
@@ -31,7 +51,11 @@ const E2E_ONLY = /^e2e\//;
  */
 function classifyChangedFiles(files) {
   const paths = files.map((f) => f.trim()).filter(Boolean);
-  if (paths.length === 0 || paths.length >= API_FILE_LIMIT || paths.some((f) => RUN_ALL.test(f))) {
+  if (
+    paths.length === 0 ||
+    paths.length >= API_FILE_LIMIT ||
+    paths.some((f) => CONTROL_CHAR.test(f) || RUN_ALL.test(f))
+  ) {
     return { lint: true, build: true, e2e: true };
   }
   const build = paths.some((f) => BUILT.test(f));
@@ -47,9 +71,9 @@ function formatOutputs(jobs) {
   return `lint=${jobs.lint}\nbuild=${jobs.build}\ne2e=${jobs.e2e}\n`;
 }
 
-module.exports = { classifyChangedFiles, formatOutputs, API_FILE_LIMIT };
+module.exports = { classifyChangedFiles, decodeLine, formatOutputs, API_FILE_LIMIT };
 
 if (require.main === module) {
   const input = require("node:fs").readFileSync(0, "utf8");
-  process.stdout.write(formatOutputs(classifyChangedFiles(input.split("\n"))));
+  process.stdout.write(formatOutputs(classifyChangedFiles(input.split("\n").map(decodeLine))));
 }
