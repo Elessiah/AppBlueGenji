@@ -32,7 +32,7 @@ function depsHash(packageJson, packageLock) {
 module.exports = { depsHash };
 
 if (require.main === module) {
-  const root = process.argv[2] ?? process.cwd();
-  const read = (file) => readFileSync(join(root, file), "utf8");
+  // Toujours le dossier courant (racine du dépôt) : aucun chemin reçu en argument.
+  const read = (file) => readFileSync(join(process.cwd(), file), "utf8");
   process.stdout.write(`${depsHash(read("package.json"), read("package-lock.json"))}\n`);
 }

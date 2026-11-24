@@ -217,6 +217,15 @@ describe("workflow CI", () => {
     expect(ci.match(/steps\.setup\.outputs\.deps-hash/g)).toHaveLength(6);
   });
 
+  it("n'accorde aucun droit au niveau du workflow, chaque job déclarant les siens en lecture", () => {
+    expect(ci).toContain("\npermissions: {}\n");
+    const jobs = ci.split("\njobs:\n")[1] ?? "";
+    const declared = jobs.match(/^ {2}[a-z0-9-]+:$/gm) ?? [];
+    expect(jobs.match(/^ {4}permissions:\n {6}contents: read$/gm)).toHaveLength(declared.length);
+    expect(jobs).not.toMatch(/: write/);
+    expect(jobs.match(/pull-requests: read/g)).toHaveLength(1);
+  });
+
   it("borne la durée de chaque job", () => {
     const jobs = ci.split("\njobs:\n")[1] ?? "";
     const declared = jobs.match(/^ {2}[a-z0-9-]+:$/gm) ?? [];

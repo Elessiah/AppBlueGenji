@@ -23,9 +23,8 @@ on:
       - 'LICENSE'
       - 'NOTICE'
 
-permissions:
-  contents: read
-  pull-requests: read
+# Aucun droit par défaut : chaque job déclare les siens (lecture seule).
+permissions: {}
 
 # Sur une PR, une poussée annule la précédente ; sur main, les fusions
 # s'enchaînent sans s'annuler (chacune remplit les caches).
@@ -45,6 +44,9 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read  # liste des fichiers de la PR
     outputs:
       lint: ${{ steps.filter.outputs.lint }}
       build: ${{ steps.filter.outputs.build }}
@@ -89,6 +91,8 @@ jobs:
     if: needs.changes.outputs.lint != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
@@ -119,6 +123,8 @@ jobs:
     if: needs.changes.outputs.build != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
@@ -140,6 +146,8 @@ jobs:
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -164,6 +172,8 @@ jobs:
     if: needs.changes.outputs.e2e != 'false'
     runs-on: ubuntu-24.04  # Playwright 1.60 ne gère pas encore ubuntu-latest (26.04)
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
