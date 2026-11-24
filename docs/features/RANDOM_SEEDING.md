@@ -72,6 +72,12 @@ staff ». Il se règle ensuite aux flèches. Éteindre avant tout tirage ne chan
 rien (un ordre manuel antérieur reste). La rallumer après la clôture refait un
 tirage à l'enregistrement.
 
+Chacun de ces deux effets a sa ligne du journal du staff, en plus de « Tournoi
+modifié » (`RANDOM_SEEDING_DRAWN`, `RANDOM_SEEDING_RESET` — `STAFF_ACTION_LOGS.md`) :
+un nouveau tirage obtenu en éteignant puis rallumant l'option se voit. Le
+tirage de la clôture, fait par l'entretien, n'est pas un geste du staff et n'en
+écrit pas.
+
 ## Ce que l'écran montre
 
 - **Ordre de départ** : `seedingSource` rend `RANDOM` (prioritaire sur `MANUAL`)

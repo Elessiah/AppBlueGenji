@@ -678,7 +678,7 @@ describe("updateTournament — tirage au sort (RANDOM_SEEDING.md)", () => {
     });
 
   it("allumée avant la clôture : écrit l'option, ne tire rien", async () => {
-    await updateTournament(1, { randomSeeding: true });
+    expect((await updateTournament(1, { randomSeeding: true })).randomDraw).toBeUndefined();
     expect(executed.some((q) => /random_seeding = \?/.test(q.sql))).toBe(true);
     expect(seedWrites()).toEqual([]);
     expect(executed.some((q) => /SET manual_seeding = 1/.test(q.sql))).toBe(false);
@@ -697,7 +697,7 @@ describe("updateTournament — tirage au sort (RANDOM_SEEDING.md)", () => {
       return [{ affectedRows: 1, insertId: 1 }];
     });
     try {
-      await updateTournament(1, { randomSeeding: true });
+      expect((await updateTournament(1, { randomSeeding: true })).randomDraw).toBe("DRAWN");
     } finally {
       connection.execute.mockImplementation(defaultExecute);
     }
@@ -711,7 +711,7 @@ describe("updateTournament — tirage au sort (RANDOM_SEEDING.md)", () => {
   it("éteinte après un tirage : revient à l'ordre d'inscription et à l'ordre par défaut", async () => {
     rowToReturn = closedRow({ random_seeding: 1, random_seeding_drawn_at: new Date(), drawn: 1 });
     registrationRowsToReturn = [{ team_id: 21 }, { team_id: 22 }];
-    await updateTournament(1, { randomSeeding: false });
+    expect((await updateTournament(1, { randomSeeding: false })).randomDraw).toBe("RESET");
     const reread = executed.find((q) => /SELECT team_id FROM bg_tournament_registrations/.test(q.sql));
     expect(reread?.sql).toMatch(/ORDER BY registered_at ASC, team_id ASC\s+FOR UPDATE/);
     expect(seedWrites()).toEqual([
@@ -723,7 +723,7 @@ describe("updateTournament — tirage au sort (RANDOM_SEEDING.md)", () => {
 
   it("éteinte avant tout tirage : ne touche ni l'ordre ni le drapeau manuel", async () => {
     rowToReturn = hiddenRow({ random_seeding: 1, random_seeding_drawn_at: null, drawn: 0 });
-    await updateTournament(1, { randomSeeding: false });
+    expect(await updateTournament(1, { randomSeeding: false })).not.toHaveProperty("randomDraw");
     expect(seedWrites()).toEqual([]);
     expect(executed.some((q) => /manual_seeding = 0/.test(q.sql))).toBe(false);
   });
