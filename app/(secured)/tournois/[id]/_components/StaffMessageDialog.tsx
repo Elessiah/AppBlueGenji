@@ -26,6 +26,7 @@ import {
   staffMessageLength,
   staffMessageRenderedTooLong,
   staffMessageRequestCategories,
+  staffMessageSendMayHaveGoneOut,
   staffMessageSendOutcome,
   STAFF_MESSAGE_COUNT_DEBOUNCE_MS,
   STAFF_MESSAGE_FIELD_ERRORS,
@@ -171,7 +172,7 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
       return true;
     } catch (error) {
       const code = errorCode(error) ?? "STAFF_MESSAGE_FAILED";
-      if (code === STAFF_MESSAGE_OUTCOME_UNKNOWN) {
+      if (staffMessageSendMayHaveGoneOut(code)) {
         // Peut-être parti : la fenêtre se ferme, pour qu'on ne renvoie pas d'un clic.
         showError(t("staffMessage.outcomeUnknown"));
         onClose();

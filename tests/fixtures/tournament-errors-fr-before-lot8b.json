@@ -256,7 +256,7 @@
     "STAFF_MESSAGE_EMPTY": "Écris un message avant de l'envoyer.",
     "STAFF_MESSAGE_TOO_LONG": "Message trop long pour un message privé Discord : raccourcis-le.",
     "NO_RECIPIENTS": "Personne à prévenir avec ces catégories.",
-    "STAFF_MESSAGE_QUOTA_EXCEEDED": "Plafond d'envois atteint pour ce tournoi : réessaie dans une heure au plus.",
+    "STAFF_MESSAGE_QUOTA_EXCEEDED": "Tu as atteint ton plafond d'envois pour ce tournoi : réessaie dans une heure au plus.",
     "TOURNAMENT_NOT_OPEN_FOR_MESSAGES": "Les messages aux participants ne partent que pendant les inscriptions ou le tournoi en cours.",
     "INVALID_RECIPIENT_CATEGORIES": "Coche au moins une catégorie de destinataires.",
     "INVALID_STAFF_MESSAGE_REQUEST": "Demande de message invalide : recharge la page et réessaie.",

@@ -377,15 +377,15 @@ describe("reserveStaffMessageSend", () => {
 describe("sendTournamentStaffMessage — délai de réponse", () => {
   /** Un envoi qui ne finit qu'à la demande du test. */
   function slowDelivery() {
-    let finish: (value: Awaited<ReturnType<typeof notifyUsers>>) => void = () => undefined;
-    let fail: (error: Error) => void = () => undefined;
+    type Report = Awaited<ReturnType<typeof notifyUsers>>;
+    const controls: { finish?: (value: Report) => void; fail?: (error: Error) => void } = {};
     jest.mocked(notifyUsers).mockReturnValue(
-      new Promise((resolve, reject) => {
-        finish = resolve;
-        fail = reject;
+      new Promise<Report>((resolve, reject) => {
+        controls.finish = resolve;
+        controls.fail = reject;
       }),
     );
-    return { finish: (value: Awaited<ReturnType<typeof notifyUsers>>) => finish(value), fail: (error: Error) => fail(error) };
+    return { finish: (value: Report) => controls.finish?.(value), fail: (error: Error) => controls.fail?.(error) };
   }
 
   it("sendTournamentStaffMessage_deliveryOutlastsDeadline_returnsPendingWithZeroCounts", async () => {

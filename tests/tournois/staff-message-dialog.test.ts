@@ -5,6 +5,7 @@ import {
   staffMessageLength,
   staffMessageRenderedTooLong,
   staffMessageRequestCategories,
+  staffMessageSendMayHaveGoneOut,
   staffMessageSendOutcome,
   toggleStaffMessageCategory,
 } from "@/app/(secured)/tournois/[id]/_lib/staff-message-dialog";
@@ -122,5 +123,15 @@ describe("staffMessageSendOutcome", () => {
 
   it("staffMessageSendOutcome_delivered_returnsSent", () => {
     expect(staffMessageSendOutcome(delivery)).toBe("sent");
+  });
+});
+
+describe("staffMessageSendMayHaveGoneOut", () => {
+  it("staffMessageSendMayHaveGoneOut_unreadableOrServerError_returnsTrue", () => {
+    expect([staffMessageSendMayHaveGoneOut("STAFF_MESSAGE_OUTCOME_UNKNOWN"), staffMessageSendMayHaveGoneOut("INTERNAL_ERROR")]).toEqual([true, true]);
+  });
+
+  it("staffMessageSendMayHaveGoneOut_definiteRefusal_returnsFalse", () => {
+    expect(staffMessageSendMayHaveGoneOut("STAFF_MESSAGE_QUOTA_EXCEEDED")).toBe(false);
   });
 });

@@ -134,3 +134,12 @@ export function staffMessageSendOutcome(delivery: StaffMessageDelivery): StaffMe
  * `502`/`504` du serveur frontal) : le message a pu partir.
  */
 export const STAFF_MESSAGE_OUTCOME_UNKNOWN = "STAFF_MESSAGE_OUTCOME_UNKNOWN";
+
+/**
+ * L'envoi a-t-il pu partir malgré l'échec ? Réponse illisible, ou panne du
+ * serveur (`INTERNAL_ERROR`) qui a pu survenir en plein envoi : la fenêtre se
+ * ferme sur « peut-être parti », pour qu'on ne renvoie pas d'un clic.
+ */
+export function staffMessageSendMayHaveGoneOut(code: string): boolean {
+  return code === STAFF_MESSAGE_OUTCOME_UNKNOWN || code === "INTERNAL_ERROR";
+}
