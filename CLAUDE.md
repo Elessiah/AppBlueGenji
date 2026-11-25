@@ -47,7 +47,7 @@ Formats `SINGLE`, `DOUBLE`, `SWISS`, `SURVIVAL`, `MULTI`, `BG_SURVIE`. États `U
 SSE : `TournamentSnapshot` (commun) + `TournamentViewerContext` (lecteur) — **tout droit du lecteur se câble sur les deux portes** (flux et REST de secours). **Toute animation infinie lit `var(--deco-anim-state)`**, toute boucle JS lit `useClientPower()`/`useClock()` (`CLIENT_POWER_MODES.md`).
 
 ### Bot → `BOT_INTEGRATION.md`
-Appels toujours app → bot, dégradation si injoignable.
+Appels toujours app → bot, dégradation si injoignable — seule exception, `/message-tournoi` (bot → site, `SITE_INTERNAL_TOKEN`) → `TOURNAMENT_STAFF_MESSAGE.md`.
 
 ## Environnement, dev, seed
 - Variables → `docs/ENVIRONMENT.md`.
