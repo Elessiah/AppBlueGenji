@@ -37,7 +37,10 @@ portes appellent **le même service** : `lib/server/tournament-staff-message.ts`
   refusé (`STAFF_MESSAGE_EMPTY`).
 - **Envoi par lots** : `notifyUsers` découpe les destinataires par 100
   (`BOT_DM_RECIPIENTS_PER_CALL`, plafond de `/internal/notify/dm`) et par 25 ici,
-  délai 120 s par appel, sans le coupe-circuit (`DirectMessageDelivery`). Un lot
+  délai 120 s par appel, sans le coupe-circuit (`DirectMessageDelivery`) ; un
+  lot sans bilan (issue incertaine) n'y compte pas non plus d'échec
+  (`recordUndeliveredCall`) : un bot lent ne suspend pas les rappels de match.
+  Un lot
   qui atteint le bot sans rendre de bilan (délai écoulé, connexion coupée en
   route, `200` illisible, panne `5xx` hors `503` : `onUncertain`) n'arrête pas
   les suivants (`uncertainIsNotLost`) ; ses comptes sont rendus à part
@@ -71,7 +74,9 @@ idempotent, puis `UPDATE … SET sends = IF(fenêtre échue, 1, sends + 1) … W
 sends < ? OR fenêtre échue` et `affectedRows` — deux passes au plus, la purge
 pouvant effacer entre les deux une ligne dont la fenêtre vient d'échoir. Un
 envoi dont rien n'est parti à coup sûr (bot injoignable, aucun push) est rendu
-au plafond. Lignes purgées une fois la fenêtre échue par une horloge de fond
+au plafond — dans **sa** fenêtre seulement (début relu après la réservation,
+`AND window_started_at = ?`) : un envoi long dont la fenêtre a échu ne décompte
+pas l'envoi qui en a ouvert une nouvelle. Lignes purgées une fois la fenêtre échue par une horloge de fond
 (`startStaffMessageQuotaPurgeClock`, `instrumentation.ts`, toutes les 15
 minutes), en cascade avec le tournoi, et à la suppression du compte
 (`anonymizeAccount` : la ligne `bg_users` reste, la cascade ne joue pas).
@@ -90,7 +95,15 @@ texte. Le texte n'est enregistré nulle part (registre T04, T08).
 Seule exception au sens app → bot (`BOT_INTEGRATION.md`) : le bot **appelle le
 site**, `POST /api/internal/tournament-message`, jeton `SITE_INTERNAL_TOKEN`
 (en-tête `x-internal-token`, comparaison à temps constant sur empreintes
-SHA-256, `503 SITE_INTERNAL_TOKEN_NOT_CONFIGURED` sans jeton, `401` sinon).
+SHA-256, `503 SITE_INTERNAL_TOKEN_NOT_CONFIGURED` sans jeton, avec un jeton de
+moins de 32 caractères ou égal à `BOT_INTERNAL_TOKEN`, `401` sinon).
+**Boucle locale seulement** : la route est joignable derrière nginx comme toute
+route `/api/`, mais un appel qui y est passé est refusé avant le jeton
+(`403 INTERNAL_ROUTE_LOOPBACK_ONLY`) — nginx ajoute en dernier à
+`X-Forwarded-For` l'adresse de son client (une entrée forgée ne peut que la
+précéder), Next pose l'adresse de la socket quand l'en-tête manque ; refusé
+quand cette dernière entrée, ou un `X-Real-IP`, n'est pas en boucle locale
+(`cameThroughPublicProxy`). Personne n'essaie donc le jeton depuis Internet.
 Pas de contrôle de provenance : la route est de serveur à serveur, sans cookie
 ni session — un navigateur n'a pas le jeton, et le bot n'envoie pas d'`Origin`.
 Corps `{ mode: "preview" | "send", discordId, tournamentId, categories, message }` ;
@@ -98,6 +111,12 @@ le site retrouve le compte rattaché à ce Discord (`DISCORD_ACCOUNT_NOT_LINKED`
 sinon) et vérifie `tournaments` (`FORBIDDEN`). Réponse : des **nombres**
 (`total`, `reachable`, `withoutDiscord`, `optedOut` ; au bilan `sent`, `failed`,
 `unconfirmed`, `skipped`, `pushed`, `botUnreachable`, `pending`), jamais un nom ni un identifiant.
+L'aperçu rend en plus `quoted` (la citation neutralisée du message privé,
+`discordQuote` : le bot l'affiche telle quelle, l'aperçu montre ce qui partira)
+et `linkBase` (`APP_URL` ou `null` : le bot refuse un lien `tournoi` vers un
+autre hôte, `www.` mis à part). Côté bot, **Envoyer** ne part pas tant que la
+dernière sélection n'a pas été comptée (« clique de nouveau dans un instant ») ;
+une valeur de menu inconnue ne change pas la sélection (jamais « tous » par défaut).
 
 Côté bot (dépôt `blueGenjiBot`, `src/commandsHandlers/messageTournoi.ts`) :
 réponse éphémère, menu à choix multiples (Joueurs, Managers, Capitaines,

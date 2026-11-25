@@ -578,3 +578,45 @@ describe("pushDiscordDirectMessages — issue incertaine (onUncertain)", () => {
     expect(onUncertain).not.toHaveBeenCalled();
   });
 });
+
+// Coupe-circuit partagé du module : chaque cas avance l'horloge au-delà du
+// refroidissement de tout coupe-circuit ouvert avant lui.
+describe("pushDiscordDirectMessages — issue incertaine et coupe-circuit", () => {
+  const recipients = [{ discordId: "555000111", handle: "kiro", label: "Kiro" }];
+  const reported = () => Response.json({ sent: 1, unresolved: [], failed: [] });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  it("pushDiscordDirectMessages_uncertainTimeoutsOnExplicitSend_doNotOpenTheCircuit", async () => {
+    jest.useFakeTimers({ now: Date.now() + 3_600_000, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+    const fetchMock = jest.spyOn(global, "fetch").mockRejectedValue(Object.assign(new Error("délai"), { name: "TimeoutError" }));
+    for (let i = 0; i < 3; i++) {
+      await pushDiscordDirectMessages("Staff", recipients, "ctx", { honourCircuit: false, onUncertain: jest.fn() });
+    }
+    fetchMock.mockReset().mockResolvedValue(reported());
+
+    const actual = await pushDiscordDirectMessages("Rappel", recipients, "match-reminder");
+
+    expect(actual).toEqual({ sent: 1, unresolved: [], failed: [] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("pushDiscordDirectMessages_refusedConnectionsOnExplicitSend_stillOpenTheCircuit", async () => {
+    jest.useFakeTimers({ now: Date.now() + 7_200_000, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+    const fetchMock = jest
+      .spyOn(global, "fetch")
+      .mockRejectedValue(Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } }));
+    for (let i = 0; i < 3; i++) {
+      await pushDiscordDirectMessages("Staff", recipients, "ctx", { honourCircuit: false, onUncertain: jest.fn() });
+    }
+    fetchMock.mockReset().mockResolvedValue(reported());
+
+    const actual = await pushDiscordDirectMessages("Rappel", recipients, "match-reminder");
+
+    expect(actual).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

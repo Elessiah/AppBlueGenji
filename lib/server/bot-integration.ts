@@ -543,10 +543,9 @@ async function postDiscordNotification(
     });
 
     if (!response.ok) {
-      recordFailure();
       // Une panne du bot en pleine distribution (`500`) a pu survenir après des
       // envois ; `503` (serveur BlueGenji introuvable) dit que rien n'est parti.
-      if (response.status >= 500 && response.status !== 503) options.onUncertain?.();
+      recordUndeliveredCall(options, response.status >= 500 && response.status !== 503);
       await discardBody(response);
       return null;
     }
@@ -555,12 +554,23 @@ async function postDiscordNotification(
     else recordBypassSuccess();
     return { ...emptyDelivery(), ...((await response.json()) as Partial<DiscordDeliveryReport>) };
   } catch (error) {
-    recordFailure();
     // La requête a atteint le bot (délai écoulé pendant l'envoi, connexion
     // coupée en route, bilan `200` illisible) : des messages ont pu partir.
-    if (response?.ok || isTimeoutError(error) || !failedBeforeSending(error)) options.onUncertain?.();
+    recordUndeliveredCall(options, Boolean(response?.ok) || isTimeoutError(error) || !failedBeforeSending(error));
     return null;
   }
+}
+
+/**
+ * Un appel sans bilan. Il compte au coupe-circuit, sauf l'issue **incertaine**
+ * d'un geste explicite qui l'écoute (`onUncertain` sans `honourCircuit`, le
+ * message du staff) : un lot de vingt-cinq messages privés qui dépasse ses
+ * deux minutes dit un bot lent, pas tombé — le compter suspendrait tout le
+ * trafic de fond (rappels de match) pendant le refroidissement.
+ */
+function recordUndeliveredCall(options: { honourCircuit: boolean; onUncertain?: () => void }, uncertain: boolean): void {
+  if (!(uncertain && options.onUncertain && !options.honourCircuit)) recordFailure();
+  if (uncertain) options.onUncertain?.();
 }
 
 /**

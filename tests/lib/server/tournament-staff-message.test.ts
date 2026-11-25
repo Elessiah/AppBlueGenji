@@ -40,6 +40,8 @@ let entrantRows: Rows;
 let quotaAffectedRows: number[];
 let quotaMissing: boolean;
 let purgedRows: number;
+/** Début de fenêtre relu après la réservation (`[]` : ligne disparue). */
+let windowRows: Rows;
 const execute = jest.fn<SqlQuery>();
 
 function missingTable(): Error {
@@ -58,6 +60,7 @@ async function route(sql: string): Promise<unknown> {
       return [{ affectedRows }];
     }
     if (sql.startsWith("DELETE FROM bg_tournament_staff_message_quota")) return [{ affectedRows: purgedRows }];
+    if (sql.startsWith("SELECT DATE_FORMAT(window_started_at")) return [windowRows];
     return [{ affectedRows: 1 }];
   }
   throw new Error(`requête inattendue : ${sql}`);
@@ -97,6 +100,7 @@ beforeEach(() => {
   quotaAffectedRows = [1];
   quotaMissing = false;
   purgedRows = 0;
+  windowRows = [{ window_started: "2026-11-25 20:00:00" }];
   execute.mockImplementation(route);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   jest.mocked(loadNotificationRecipients).mockImplementation(async (ids) =>
@@ -336,6 +340,27 @@ describe("sendTournamentStaffMessage", () => {
     expect(execute.mock.calls.some(([sql]) => sql.includes("SET sends = GREATEST(sends - 1, 0)"))).toBe(true);
   });
 
+  it("sendTournamentStaffMessage_nothingDelivered_refundsOnlyTheReservedWindow", async () => {
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [1], pushed: 0 });
+
+    await sendTournamentStaffMessage(request());
+
+    const refund = execute.mock.calls.find(([sql]) => sql.includes("GREATEST(sends - 1, 0)"));
+    expect(refund?.[0]).toContain("AND window_started_at = ?");
+    expect(refund?.[1]).toEqual([12, 9, "2026-11-25 20:00:00"]);
+  });
+
+  it("sendTournamentStaffMessage_windowUnreadAndNothingDelivered_refundsWithoutWindowCondition", async () => {
+    windowRows = [];
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [1], pushed: 0 });
+
+    await sendTournamentStaffMessage(request());
+
+    const refund = execute.mock.calls.find(([sql]) => sql.includes("GREATEST(sends - 1, 0)"));
+    expect(refund?.[0]).not.toContain("window_started_at");
+    expect(refund?.[1]).toEqual([12, 9]);
+  });
+
   it("sendTournamentStaffMessage_pushReachedDespiteBot_keepsTheReservedSend", async () => {
     jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [1], pushed: 2 });
 
@@ -359,14 +384,20 @@ describe("sendTournamentStaffMessage", () => {
 });
 
 describe("reserveStaffMessageSend", () => {
-  it("reserveStaffMessageSend_placeLeft_returnsTrue", async () => {
-    await expect(reserveStaffMessageSend(12, 9)).resolves.toBe(true);
+  it("reserveStaffMessageSend_placeLeft_returnsReservedWindow", async () => {
+    await expect(reserveStaffMessageSend(12, 9)).resolves.toEqual({ windowStartedAt: "2026-11-25 20:00:00" });
   });
 
-  it("reserveStaffMessageSend_windowFull_returnsFalse", async () => {
+  it("reserveStaffMessageSend_rowGoneBeforeWindowRead_returnsReservationWithoutWindow", async () => {
+    windowRows = [];
+
+    await expect(reserveStaffMessageSend(12, 9)).resolves.toEqual({ windowStartedAt: null });
+  });
+
+  it("reserveStaffMessageSend_windowFull_returnsNull", async () => {
     quotaAffectedRows = [0];
 
-    await expect(reserveStaffMessageSend(12, 9)).resolves.toBe(false);
+    await expect(reserveStaffMessageSend(12, 9)).resolves.toBeNull();
   });
 
   it("reserveStaffMessageSend_reservesInOneConditionalUpdate", async () => {
@@ -514,7 +545,7 @@ describe("reserveStaffMessageSend — seconde passe", () => {
 
     const actual = await reserveStaffMessageSend(12, 9);
 
-    expect(actual).toBe(true);
+    expect(actual).not.toBeNull();
     const inserts = execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT INTO bg_tournament_staff_message_quota"));
     expect(inserts).toHaveLength(2);
   });
@@ -524,7 +555,7 @@ describe("reserveStaffMessageSend — seconde passe", () => {
 
     const actual = await reserveStaffMessageSend(12, 9);
 
-    expect(actual).toBe(false);
+    expect(actual).toBeNull();
     const updates = execute.mock.calls.filter(([sql]) => sql.startsWith("UPDATE bg_tournament_staff_message_quota\n"));
     expect(updates).toHaveLength(2);
   });

@@ -2,6 +2,7 @@ import { enforceRateLimit } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { rejectWithoutSiteInternalToken } from "@/lib/server/internal-token";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
+import { siteBaseUrl } from "@/lib/server/site-url";
 import {
   previewTournamentStaffMessage,
   sendTournamentStaffMessage,
@@ -9,6 +10,7 @@ import {
   StaffMessageError,
   type StaffMessageRequest,
 } from "@/lib/server/tournament-staff-message";
+import { discordQuote } from "@/lib/shared/discord-text";
 import {
   parseDiscordUserId,
   parseStaffMessageDraft,
@@ -34,8 +36,13 @@ function parseRequest(
  * `POST /api/internal/tournament-message` — appelé par le bot seul
  * (`/message-tournoi`), jeton `SITE_INTERNAL_TOKEN` exigé. Sans session ni
  * cookie : la provenance du middleware ne s'y oppose pas (aucun `Origin` côté
- * serveur), et un navigateur n'a pas le jeton. Rend des **nombres** — jamais un
- * nom ni un identifiant de destinataire.
+ * serveur), et un navigateur n'a pas le jeton ; un appel passé par nginx est
+ * refusé avant le jeton (`rejectWithoutSiteInternalToken`). Rend des
+ * **nombres** — jamais un nom ni un identifiant de destinataire. L'aperçu rend
+ * en plus le texte tel que les participants le liront (`quoted`, la citation
+ * neutralisée du message privé) et la racine publique du site (`linkBase`,
+ * `APP_URL` ou `null`) : le bot montre ce qui partira, et refuse un lien vers
+ * un autre site.
  */
 export async function POST(req: Request) {
   const refused = rejectWithoutSiteInternalToken(req);
@@ -51,7 +58,8 @@ export async function POST(req: Request) {
 
   try {
     if (parsed.mode === "preview") {
-      return ok({ mode: "preview", ...(await previewTournamentStaffMessage(parsed.request)) });
+      const preview = await previewTournamentStaffMessage(parsed.request);
+      return ok({ mode: "preview", ...preview, quoted: discordQuote(parsed.request.message), linkBase: siteBaseUrl() });
     }
     return ok({ mode: "send", ...(await sendTournamentStaffMessage(parsed.request)) });
   } catch (error) {

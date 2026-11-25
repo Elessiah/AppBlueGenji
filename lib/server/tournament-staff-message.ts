@@ -312,8 +312,12 @@ export async function previewTournamentStaffMessage(request: StaffMessageRequest
  * Deux passes au plus : la purge peut effacer, entre l'insertion et l'`UPDATE`,
  * une ligne dont la fenêtre vient d'échoir — l'`UPDATE` ne trouve alors rien,
  * et la seconde passe la recrée. Une fenêtre pleine refuse aux deux passes.
+ *
+ * Rend la réservation (le début de sa fenêtre, relu juste après : `null` si la
+ * ligne a disparu entre-temps), ou `null` si le plafond est atteint. Le
+ * remboursement ({@link refundStaffMessageSend}) ne touche que cette fenêtre-là.
  */
-export async function reserveStaffMessageSend(tournamentId: number, userId: number): Promise<boolean> {
+export async function reserveStaffMessageSend(tournamentId: number, userId: number): Promise<StaffMessageReservation | null> {
   const db = await getDatabase();
   for (let attempt = 0; attempt < 2; attempt += 1) {
     await db.execute(
@@ -339,17 +343,48 @@ export async function reserveStaffMessageSend(tournamentId: number, userId: numb
         STAFF_MESSAGE_WINDOW_MINUTES,
       ],
     );
-    if (Number((result as { affectedRows?: number }).affectedRows ?? 0) === 1) return true;
+    if (Number((result as { affectedRows?: number }).affectedRows ?? 0) === 1) {
+      return { windowStartedAt: await readReservedWindow(tournamentId, userId) };
+    }
   }
-  return false;
+  return null;
 }
 
-/** Rend l'envoi réservé quand rien n'est parti à coup sûr (aucun message privé ni push, aucun lot sans bilan). */
-async function refundStaffMessageSend(tournamentId: number, userId: number): Promise<void> {
+/** Une place prise au plafond : la fenêtre où elle compte. */
+export type StaffMessageReservation = { windowStartedAt: string | null };
+
+type WindowRow = RowDataPacket & { window_started: string | null };
+
+/**
+ * Début de la fenêtre que la réservation vient de compter, en texte
+ * (`AAAA-MM-JJ hh:mm:ss`, la précision de la colonne) : relu tel quel par le
+ * remboursement, sans conversion de fuseau. Une fenêtre ne roule qu'une heure
+ * après son ouverture : rien ne la change entre l'`UPDATE` et cette lecture.
+ */
+async function readReservedWindow(tournamentId: number, userId: number): Promise<string | null> {
   const db = await getDatabase();
-  await db.execute(
-    `UPDATE bg_tournament_staff_message_quota SET sends = GREATEST(sends - 1, 0) WHERE tournament_id = ? AND user_id = ?`,
+  const [rows] = await db.execute<WindowRow[]>(
+    `SELECT DATE_FORMAT(window_started_at, '%Y-%m-%d %H:%i:%s') AS window_started
+       FROM bg_tournament_staff_message_quota
+      WHERE tournament_id = ? AND user_id = ?`,
     [tournamentId, userId],
+  );
+  const value = rows[0]?.window_started;
+  return typeof value === "string" ? value : null;
+}
+
+/**
+ * Rend l'envoi réservé quand rien n'est parti à coup sûr (aucun message privé
+ * ni push, aucun lot sans bilan) — dans **sa** fenêtre seulement : un envoi
+ * long dont la fenêtre a échu entre-temps ne décompte pas l'envoi qui en a
+ * ouvert une nouvelle (le plafond annoncé resterait sinon dépassable).
+ */
+async function refundStaffMessageSend(tournamentId: number, userId: number, reservation: StaffMessageReservation): Promise<void> {
+  const db = await getDatabase();
+  const sameWindow = reservation.windowStartedAt === null ? "" : " AND window_started_at = ?";
+  await db.execute(
+    `UPDATE bg_tournament_staff_message_quota SET sends = GREATEST(sends - 1, 0) WHERE tournament_id = ? AND user_id = ?${sameWindow}`,
+    reservation.windowStartedAt === null ? [tournamentId, userId] : [tournamentId, userId, reservation.windowStartedAt],
   );
 }
 
@@ -407,6 +442,7 @@ type DeliveryContext = {
   notified: NotificationRecipient[];
   categories: readonly StaffMessageCategory[];
   message: string;
+  reservation: StaffMessageReservation;
 };
 
 /** Début de la ligne du journal du staff : le tournoi et les catégories, jamais un nom. */
@@ -472,7 +508,7 @@ async function deliverStaffMessage(context: DeliveryContext): Promise<StaffMessa
   // Rien n'est parti à coup sûr (bot injoignable, messages privés tous refusés,
   // aucun appareil) : l'envoi ne compte pas au plafond.
   if (sent === 0 && report.pushed === 0 && unconfirmed === 0) {
-    await refundStaffMessageSend(tournament.id, staff.id).catch((error: unknown) => {
+    await refundStaffMessageSend(tournament.id, staff.id, context.reservation).catch((error: unknown) => {
       console.error("[staff-message] envoi non rendu au plafond", failureReason(error));
     });
   }
@@ -529,7 +565,7 @@ export async function sendTournamentStaffMessage(
   const { counts, notified } = await resolveAudience(tournament.id, request.categories);
   if (notified.length === 0) throw new StaffMessageError(STAFF_MESSAGE_ERRORS.noRecipients, 409);
 
-  let reserved: boolean;
+  let reserved: StaffMessageReservation | null;
   try {
     reserved = await reserveStaffMessageSend(tournament.id, staff.id);
   } catch (error) {
@@ -546,6 +582,7 @@ export async function sendTournamentStaffMessage(
     notified,
     categories: request.categories,
     message: request.message,
+    reservation: reserved,
   };
   const stopListening = onBackgroundHalt(() => publishStaffMessageLine(context, staffMessageInterruptedLine(context)));
   const work = deliverStaffMessage(context);

@@ -15,7 +15,8 @@ import {
 
 /** `POST /api/internal/tournament-message` : jeton, forme du corps, codes seuls, nombres seuls. */
 
-const saved = process.env.SITE_INTERNAL_TOKEN;
+const TOKEN = "s".repeat(40);
+const saved = { token: process.env.SITE_INTERNAL_TOKEN, appUrl: process.env.APP_URL };
 const preview = {
   tournament: { id: 12, name: "Coupe" },
   recipients: { total: 2, reachable: 1, withoutDiscord: 1, optedOut: 0 },
@@ -32,9 +33,10 @@ function body(overrides: Record<string, unknown> = {}): Record<string, unknown> 
   };
 }
 
-function call(payload: unknown, options: { token?: string | null; contentType?: string } = {}) {
+function call(payload: unknown, options: { token?: string | null; contentType?: string; forwardedFor?: string } = {}) {
   const headers: Record<string, string> = { "content-type": options.contentType ?? "application/json" };
-  if (options.token !== null) headers["x-internal-token"] = options.token ?? "secret";
+  if (options.token !== null) headers["x-internal-token"] = options.token ?? TOKEN;
+  if (options.forwardedFor) headers["x-forwarded-for"] = options.forwardedFor;
   return POST(
     new Request("http://127.0.0.1:3000/api/internal/tournament-message", {
       method: "POST",
@@ -47,7 +49,8 @@ function call(payload: unknown, options: { token?: string | null; contentType?: 
 beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit();
-  process.env.SITE_INTERNAL_TOKEN = "secret";
+  process.env.SITE_INTERNAL_TOKEN = TOKEN;
+  process.env.APP_URL = "https://bluegenji.test";
   jest.mocked(previewTournamentStaffMessage).mockResolvedValue(preview);
   jest.mocked(sendTournamentStaffMessage).mockResolvedValue({
     ...preview,
@@ -56,8 +59,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (saved === undefined) delete process.env.SITE_INTERNAL_TOKEN;
-  else process.env.SITE_INTERNAL_TOKEN = saved;
+  if (saved.token === undefined) delete process.env.SITE_INTERNAL_TOKEN;
+  else process.env.SITE_INTERNAL_TOKEN = saved.token;
+  if (saved.appUrl === undefined) delete process.env.APP_URL;
+  else process.env.APP_URL = saved.appUrl;
 });
 
 describe("POST /api/internal/tournament-message — jeton", () => {
@@ -80,6 +85,14 @@ describe("POST /api/internal/tournament-message — jeton", () => {
     const actual = await call(body(), { token: "nope" });
 
     expect(actual.status).toBe(401);
+    expect(previewTournamentStaffMessage).not.toHaveBeenCalled();
+  });
+
+  it("POST_throughPublicProxy_returns403WithoutCallingTheService", async () => {
+    const actual = await call(body(), { forwardedFor: "203.0.113.5" });
+
+    expect(actual.status).toBe(403);
+    await expect(actual.json()).resolves.toEqual({ error: "INTERNAL_ROUTE_LOOPBACK_ONLY" });
     expect(previewTournamentStaffMessage).not.toHaveBeenCalled();
   });
 });
@@ -118,13 +131,33 @@ describe("POST /api/internal/tournament-message — issues", () => {
     const actual = await call(body());
 
     expect(actual.status).toBe(200);
-    await expect(actual.json()).resolves.toEqual({ mode: "preview", ...preview });
+    await expect(actual.json()).resolves.toEqual({
+      mode: "preview",
+      ...preview,
+      quoted: "> Check\\-in à 20 h",
+      linkBase: "https://bluegenji.test",
+    });
     expect(previewTournamentStaffMessage).toHaveBeenCalledWith({
       author: { discordId: "100000000000000009" },
       tournamentId: 12,
       categories: ["ALL"],
       message: "Check-in à 20 h",
     });
+  });
+
+  it("POST_previewWithMention_quotesItNeutralised", async () => {
+    const actual = await call(body({ message: "@everyone check-in\n**vite**" }));
+
+    const json = (await actual.json()) as { quoted: string };
+    expect(json.quoted.split("\n")).toEqual(["> @​everyone check\\-in", "> \\*\\*vite\\*\\*"]);
+  });
+
+  it("POST_previewWithoutAppUrl_returnsNullLinkBase", async () => {
+    delete process.env.APP_URL;
+
+    const actual = await call(body());
+
+    await expect(actual.json()).resolves.toMatchObject({ linkBase: null });
   });
 
   it("POST_send_returnsDelivery", async () => {
