@@ -190,9 +190,9 @@ describe("lectures serveur — ce qui garde le cache utile", () => {
     // `/tournois` alors que le cache tenait une liste servable ; et l'attendre
     // faisait payer la passe entière, toutes les 15 s, à la lecture qui tombait
     // dessus.
-    expect(index).toContain("void syncVisibleTournaments().catch(() => undefined);");
+    expect(index).toContain('inBackground("sync", () => syncVisibleTournaments().catch(() => undefined));');
     expect(index).not.toContain("await syncVisibleTournaments()");
-    expect(index.indexOf("void syncVisibleTournaments().catch(")).toBeLessThan(
+    expect(index.indexOf('inBackground("sync", () => syncVisibleTournaments().catch(')).toBeLessThan(
       index.indexOf('cachedTournamentList("public"'),
     );
   });

@@ -596,6 +596,40 @@ describe("rollUpExpiredSiteVisits", () => {
     expect(getConnection).toHaveBeenCalledTimes(2);
   });
 
+  // La promesse rendue sert au suivi des entretiens de la liste (EF-74) :
+  // déjà tenue quand la cadence étrangle, jamais rejetée sinon.
+  it("maintainSiteVisitRetention_withinTheHour_returnsResolvedPromise", async () => {
+    const connection = rollUpConnection();
+    const getConnection = jest.fn(async () => fakeConnection(connection));
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>(), getConnection }));
+    resetSiteVisitRetentionThrottle();
+    await maintainSiteVisitRetention(200_000_000);
+
+    const throttled = maintainSiteVisitRetention(200_000_000 + 30 * 60 * 1000);
+
+    await expect(throttled).resolves.toBeUndefined();
+    expect(getConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it("maintainSiteVisitRetention_rollUpFails_promiseResolvesAndLogs", async () => {
+    const getConnection = jest.fn(async () => {
+      throw new Error("DB DOWN");
+    });
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>(), getConnection }));
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    resetSiteVisitRetentionThrottle();
+
+    await expect(maintainSiteVisitRetention(300_000_000)).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[site-visits] Entretien des durées de conservation impossible.",
+      expect.anything(),
+    );
+    errorSpy.mockRestore();
+  });
+
   it("borne l'empreinte à vingt-cinq mois, la durée retenue par la CNIL", () => {
     expect(SITE_VISITOR_RETENTION_MONTHS).toBe(25);
   });

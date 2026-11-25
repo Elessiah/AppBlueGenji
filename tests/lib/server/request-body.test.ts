@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import {
   IMAGE_UPLOAD_BODY_MAX_BYTES,
@@ -174,11 +174,55 @@ describe("readImageUploadForm", () => {
     expect(form).toBeInstanceOf(FormData);
   });
 
+  /**
+   * Le même envoi, déjà sérialisé en octets : la lecture bornée annule alors un
+   * simple flux d'octets, et non le générateur multipart d'undici, que certaines
+   * versions de Node (24.14) refermaient deux fois (« ReadableStream is already
+   * closed », ERREUR.txt EF-74) — le test ne dépend plus de la version locale.
+   */
+  async function serializedUpload(size: number): Promise<Request> {
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array(size)], "a.png", { type: "image/png" }));
+    const encoded = new Response(form);
+    return new Request("http://localhost/api/test", {
+      method: "POST",
+      body: await encoded.arrayBuffer(),
+      headers: { "content-type": encoded.headers.get("content-type") ?? "" },
+    });
+  }
+
   it("dit IMAGE_TOO_LARGE d'un corps au-delà de la borne, sans le lire", async () => {
-    const response = await readImageUploadForm(upload(IMAGE_UPLOAD_BODY_MAX_BYTES + 1), 7);
+    const response = await readImageUploadForm(await serializedUpload(IMAGE_UPLOAD_BODY_MAX_BYTES + 1), 7);
     expect(response).toBeInstanceOf(Response);
     expect((response as Response).status).toBe(400);
     await expect((response as Response).json()).resolves.toEqual({ error: "IMAGE_TOO_LARGE" });
+  });
+
+  it("readImageUploadForm_streamedMultipartOverLimit_returnsImageTooLarge", async () => {
+    const response = await readImageUploadForm(upload(IMAGE_UPLOAD_BODY_MAX_BYTES + 1), 7);
+
+    expect((response as Response).status).toBe(400);
+    await expect((response as Response).json()).resolves.toEqual({ error: "IMAGE_TOO_LARGE" });
+  });
+
+  it("readImageUploadForm_chunkedStreamOverLimit_cancelsWithoutReadingTheRest", async () => {
+    const chunk = new Uint8Array(IMAGE_UPLOAD_BODY_MAX_BYTES);
+    const pull = jest.fn((controller: ReadableStreamDefaultController<Uint8Array>) => controller.enqueue(chunk));
+    const cancel = jest.fn<() => void>();
+    const body = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 });
+    const init: RequestInit & { duplex: "half" } = {
+      method: "POST",
+      body,
+      headers: { "content-type": "multipart/form-data; boundary=x" },
+      duplex: "half",
+    };
+
+    const response = await readImageUploadForm(new Request("http://localhost/api/test", init), 7);
+
+    expect((response as Response).status).toBe(400);
+    await expect((response as Response).json()).resolves.toEqual({ error: "IMAGE_TOO_LARGE" });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(pull).toHaveBeenCalledTimes(2);
   });
 
   it("dit FILE_MISSING d'un corps illisible", async () => {

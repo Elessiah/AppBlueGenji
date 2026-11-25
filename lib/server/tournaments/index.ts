@@ -675,6 +675,81 @@ export type TournamentListScope = {
 };
 
 /**
+ * Entretiens d'arrière-plan lancés par une lecture de la liste
+ * (`listTournamentBuckets`) : jamais attendus par la lecture, mais suivis, pour
+ * qu'un test puisse les laisser finir ({@link settleTournamentListMaintenanceForTests})
+ * au lieu de les voir survivre à sa fin — un balayage tardif lisait alors une
+ * base factice déjà remise à zéro et journalisait après la suite.
+ */
+const listMaintenance = new Map<Promise<unknown>, string>();
+
+/** Cadence minimale entre deux journaux de rejet imprévu d'un même entretien. */
+const STRAY_LOG_INTERVAL_MS = 60_000;
+/** Dernier journal de rejet, **par entretien** : l'échec répété de l'un ne tait pas celui d'un autre. */
+const lastStrayLogAt = new Map<string, number>();
+
+/**
+ * Lance un entretien sans l'attendre. Hors tests, rien n'est suivi (pas d'ensemble
+ * qui grossirait sur le trafic d'une liste, ni d'entrée gardée par un entretien
+ * pendu) : seul un rejet imprévu se dit dans pm2, nommé, au plus une fois par
+ * minute et par entretien. Sous Jest (`NODE_ENV=test`), l'entretien est aussi suivi.
+ * Un entretien qui lève avant de rendre sa promesse, ou n'en rend pas, ne fait
+ * jamais échouer la lecture qui l'a lancé.
+ */
+function inBackground(label: string, start: () => unknown): void {
+  let work: Promise<unknown>;
+  try {
+    work = Promise.resolve(start());
+  } catch (error: unknown) {
+    work = Promise.reject(error);
+  }
+  const tracked = process.env.NODE_ENV === "test";
+  if (tracked) listMaintenance.set(work, label);
+  const done = () => {
+    if (tracked) listMaintenance.delete(work);
+  };
+  void work.then(done, (error: unknown) => {
+    done();
+    // Chaque entretien rattrape d'ordinaire ses échecs ; un rejet qui passe
+    // quand même se dit dans pm2 plutôt que d'être avalé par le suivi.
+    const now = Date.now();
+    if (now - (lastStrayLogAt.get(label) ?? -Infinity) < STRAY_LOG_INTERVAL_MS) return;
+    lastStrayLogAt.set(label, now);
+    console.error(`[tournaments] entretien de la liste en échec (${label})`, failureDiagnostic(error));
+  });
+}
+
+/** Délai au-delà duquel {@link settleTournamentListMaintenanceForTests} renonce. */
+const SETTLE_TIMEOUT_MS = 4_000;
+
+/**
+ * Attend la fin des entretiens d'arrière-plan lancés par les lectures de la
+ * liste, y compris ceux lancés pendant l'attente. **Tests seulement** : le suivi
+ * n'existe que sous Jest, ailleurs l'ensemble reste vide et l'appel rend la main
+ * aussitôt. Rejette au-delà de {@link SETTLE_TIMEOUT_MS} si un double de test ne
+ * se résout jamais (en nommant le temps écoulé), et **oublie** alors les
+ * entretiens pendus pour ne pas faire échouer les suites suivantes du même
+ * processus.
+ */
+export async function settleTournamentListMaintenanceForTests(timeoutMs: number = SETTLE_TIMEOUT_MS): Promise<void> {
+  const startedAt = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const stuck = [...new Set(listMaintenance.values())].join(", ");
+      const count = listMaintenance.size;
+      listMaintenance.clear();
+      reject(new Error(`${count} entretien(s) de la liste jamais terminé(s) après ${Date.now() - startedAt} ms : ${stuck}`));
+    }, timeoutMs);
+  });
+  try {
+    while (listMaintenance.size > 0) await Promise.race([Promise.allSettled([...listMaintenance.keys()]), expired]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Paniers de tournois, par état.
  *
  * La liste publique (sans portée ni recherche) est **mutualisée** : c'est de
@@ -706,7 +781,7 @@ export async function listTournamentBuckets(
   // comptant les invalidations. Son échec n'emporte rien non plus : un verrou
   // ou une panne passagère de MySQL viderait sinon `/tournois` alors qu'il n'y
   // avait rien à en faire.
-  void syncVisibleTournaments().catch(() => undefined);
+  inBackground("sync", () => syncVisibleTournaments().catch(() => undefined));
 
   // Les rappels de match n'ont pas d'ordonnanceur : c'est le trafic qui les
   // entraîne, comme la bascule d'état juste au-dessus. Étranglé à une minute et
@@ -714,36 +789,36 @@ export async function listTournamentBuckets(
   // liste, et le prochain passage rattrapera ce qui reste dû.
   // Un passage en échec (fenêtre, destinataires) rend ses réservations et se
   // dit dans pm2 : sans trace, des rappels pourraient manquer en silence.
-  void dispatchDueMatchReminders().catch((error: unknown) => {
+  inBackground("match-reminders", () => dispatchDueMatchReminders().catch((error: unknown) => {
     // Table absente (création avalée au démarrage) : rien à dire à chaque lecture.
     if (!isMissingTableError(error)) console.error("[match-reminders] balayage en échec", failureDiagnostic(error));
-  });
+  }));
   // Même raison pour les départs de match : un lancement ouvert par l'horloge
   // n'a pas toujours d'écriture derrière lui pour déclencher son annonce.
-  void dispatchMatchStartNotices().catch(() => undefined);
+  inBackground("match-start", () => dispatchMatchStartNotices().catch(() => undefined));
   // Et l'annonce unique des cartes de manche, une fois la fenêtre de silence échue.
-  void dispatchDueRoundMapsNotices().catch(() => undefined);
+  inBackground("round-maps", () => dispatchDueRoundMapsNotices().catch(() => undefined));
   // Et le check-in du match (`./lobby-brief`), 15 minutes avant l'horaire (ou à
   // l'ouverture du salon d'un match sans horaire), à tous les joueurs.
-  void dispatchLobbyBriefs().catch(() => undefined);
+  inBackground("lobby-brief", () => dispatchLobbyBriefs().catch(() => undefined));
   // Et l'annonce des nouveaux matchs (`./new-match-notices`) : une avancée
   // passée par l'entretien passif n'a pas toujours d'évènement derrière elle.
-  void dispatchNewMatchNotices().catch(() => undefined);
+  inBackground("new-matches", () => dispatchNewMatchNotices().catch(() => undefined));
   // Et les salons vocaux d'équipe (`./match-voice`) : création à T−15,
   // libération après le score.
-  void dispatchMatchVoiceChannels();
+  inBackground("match-voice", () => dispatchMatchVoiceChannels());
   // Et pour l'annonce des lives : le mode `START_TIME` passe à l'antenne à
   // l'heure dite, sans aucune écriture.
-  void dispatchLiveAnnouncements().catch(() => undefined);
+  inBackground("live-announcements", () => dispatchLiveAnnouncements().catch(() => undefined));
   // Le journal des connexions se purge aussi sur ce trafic, pas seulement aux
   // connexions : une période sans connexion (sessions de 30 jours) garderait
   // sinon des lignes au-delà de la durée légale annoncée. Étranglée à l'heure.
-  void purgeExpiredConnectionLogs().catch(() => undefined);
+  inBackground("connection-logs", () => purgeExpiredConnectionLogs().catch(() => undefined));
   // Même raison pour la mesure d'audience : son entretien suit aussi les
   // signalements de visite, qu'un visiteur opposé n'envoie pas. Sans cette
   // seconde entrée, un site où tout le monde s'oppose ne tiendrait plus les
   // durées annoncées. Étranglé à l'heure, jamais levé.
-  maintainSiteVisitRetention();
+  inBackground("site-visits", () => maintainSiteVisitRetention());
 
   // Seule la liste publique est mutualisée : celle des tournois pas encore
   // visibles est réservée au staff, elle est courte et bien plus rarement lue.

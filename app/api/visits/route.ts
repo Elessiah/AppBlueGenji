@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   // Entretien des durées de conservation, que la visite soit enregistrée ou
   // non : sinon les durées annoncées ne tiendraient plus sans visite comptée.
-  maintainSiteVisitRetention();
+  void maintainSiteVisitRetention();
 
   // Opposition (GPC, DNT ou choix fait sur `/rgpd#audience`) : relue ici, le
   // serveur ne se fiant pas au seul navigateur. Rien n'est calculé ni écrit —
