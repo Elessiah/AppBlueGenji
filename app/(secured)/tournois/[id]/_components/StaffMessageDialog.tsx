@@ -44,6 +44,9 @@ interface StaffMessageDialogProps {
   onClose: () => void;
 }
 
+/** Notifications qui portent un « ne le renvoie pas » : lues jusqu'au bout (la fenêtre se ferme juste après). */
+const WARNING_TOAST = { durationMs: 15_000 } as const;
+
 type StaffMessageResponse = {
   error?: string;
   recipients?: StaffMessageRecipientCounts;
@@ -99,7 +102,7 @@ function counterKey(
  * désigne le texte y est aussi rattaché (`useFieldErrors`).
  */
 export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Readonly<StaffMessageDialogProps>) {
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showInfo } = useToast();
   const mapError = useMapError();
   const { t } = useDialogsText();
   const ids = useId();
@@ -139,7 +142,7 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
         .catch((error: unknown) => {
           if (seq !== countSeq.current) return;
           setCountFailed(requestKey);
-          showError(mapError(errorCode(error) ?? "STAFF_MESSAGE_FAILED"));
+          showError(mapError(errorCode(error) ?? "STAFF_MESSAGE_FAILED"), { once: true });
         });
     }, STAFF_MESSAGE_COUNT_DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -174,18 +177,20 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
       const outcome = delivery ? staffMessageSendOutcome(delivery) : "pending";
       if (outcome === "nothingDelivered") {
         // Bot injoignable, aucun push : rien n'est parti, l'envoi est rendu au plafond — réessayer plus tard a un sens.
-        showError(t("staffMessage.nothingDelivered"));
+        showError(t("staffMessage.nothingDelivered"), WARNING_TOAST);
         setConfirming(false);
         return false;
       }
       const sent = delivery?.sent ?? 0;
       const pushed = delivery?.pushed ?? 0;
       // Personne d'atteignable : rendu au plafond, mais le renvoyer n'y changerait rien.
-      if (outcome === "nobodyReached") showError(t("staffMessage.nobodyReached"));
-      else if (outcome === "pending") showSuccess(t("staffMessage.sentPending"));
+      // Les bilans « ne le renvoie pas » ou incomplets ne sont pas des succès francs :
+      // ton neutre et durée longue, la fenêtre se ferme juste après.
+      if (outcome === "nobodyReached") showError(t("staffMessage.nobodyReached"), WARNING_TOAST);
+      else if (outcome === "pending") showInfo(t("staffMessage.sentPending"), WARNING_TOAST);
       else if (outcome === "unconfirmed") {
-        showSuccess(t("staffMessage.sentUnconfirmed", { sent, unconfirmed: delivery?.unconfirmed ?? 0, pushed }));
-      } else if (outcome === "botUnreachable") showSuccess(t("staffMessage.sentBotUnreachable", { pushed }));
+        showInfo(t("staffMessage.sentUnconfirmed", { sent, unconfirmed: delivery?.unconfirmed ?? 0, pushed }), WARNING_TOAST);
+      } else if (outcome === "botUnreachable") showInfo(t("staffMessage.sentBotUnreachable", { pushed }), WARNING_TOAST);
       else showSuccess(t("staffMessage.sent", { sent, pushed }));
       onClose();
       return true;
@@ -193,7 +198,7 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
       const code = errorCode(error) ?? "STAFF_MESSAGE_FAILED";
       if (staffMessageSendMayHaveGoneOut(code)) {
         // Peut-être parti : la fenêtre se ferme, pour qu'on ne renvoie pas d'un clic.
-        showError(t("staffMessage.outcomeUnknown"));
+        showError(t("staffMessage.outcomeUnknown"), WARNING_TOAST);
         onClose();
         return true;
       }
@@ -235,7 +240,7 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
           <fieldset className={s.categories} data-tap-zone>
             <legend className={s.legend}>{t("staffMessage.categoriesLegend")}</legend>
             {STAFF_MESSAGE_CATEGORIES.map((category) => (
-              <label key={category} className={s.category}>
+              <label key={category} className={s.category} data-busy={busy || undefined}>
                 <input
                   type="checkbox"
                   checked={categories.has(category)}
@@ -289,7 +294,15 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
             <BusyButton busy={busy} type="button" className="btn ghost" onClick={() => { if (!busy) onClose(); }}>
               {t("score.cancel")}
             </BusyButton>
-            <BusyButton busy={busy} blocked={blocker !== null} type="submit" className="btn">
+            <BusyButton
+              busy={busy}
+              blocked={blocker !== null}
+              onBlockedClick={() => {
+                if (blocker !== null) showError(t(`staffMessage.blocked.${blocker}`), { once: true });
+              }}
+              type="submit"
+              className="btn"
+            >
               {t("staffMessage.send")}
             </BusyButton>
           </div>

@@ -133,7 +133,17 @@ la demande avec ses textes (`tournamentDialogs.json` § `staffMessage`).
   la fenêtre se ferme ; bilan `pending` : « envoi en cours, ne le renvoie pas » ;
   `unconfirmed` : le bilan, avec « sans bilan du bot (peut-être remis), ne le
   renvoie pas » ; réponse illisible (`502`, `504`, réseau) : « peut-être parti »,
-  la fenêtre se ferme.
+  la fenêtre se ferme. Les bilans qui disent « ne le renvoie pas » ou « incomplet »
+  (`pending`, `unconfirmed`, bot injoignable avec push, « peut-être parti ») sont
+  des notifications neutres (`showInfo`) ou d'erreur, gardées 15 s
+  (`WARNING_TOAST`) : la fenêtre se ferme juste après. « Envoyer » retenu
+  explique pourquoi quand on l'active (`onBlockedClick`, `staffMessage.blocked.*`) ;
+  un décompte en échec ne s'empile qu'une fois (`once`) ; pendant l'envoi, les
+  cases sont ternies (`data-busy`).
+
+Côté bot, « Tous » (coché à l'ouverture du menu) est retiré dès qu'on coche une
+autre catégorie (« seulement celles-ci ») ; un envoi qui n'a rien remis à coup sûr
+n'a ni coche verte ni « envoyé » (comme la fenêtre du site).
 
 Route : `POST /api/tournaments/[id]/staff-message` — session, provenance
 vérifiée par le middleware, `can(user, "tournaments")`, corps

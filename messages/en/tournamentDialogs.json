@@ -510,6 +510,13 @@
     "nothingDelivered": "No message was delivered: the Discord bot was unreachable and no push notification went out. The sending does not count towards your cap: try again later.",
     "nobodyReached": "No participant could be reached: direct messages closed or accounts not found on Discord, and no push device. The sending does not count towards your cap, but sending it again would not change anything.",
     "sentUnconfirmed": "Message sent: {sent, plural, one {# direct message delivered} other {# direct messages delivered}}, {unconfirmed, plural, one {# without the bot's report (maybe delivered)} other {# without the bot's report (maybe delivered)}}, {pushed, plural, one {# push notification} other {# push notifications}}. Do not send it again.",
-    "outcomeUnknown": "The site did not confirm the sending: the message may have gone out. Do not send it again before checking the staff log."
+    "outcomeUnknown": "The site did not confirm the sending: the message may have gone out. Do not send it again before checking the staff log.",
+    "blocked": {
+      "noCategory": "Tick at least one recipient category.",
+      "empty": "Write a message before sending it.",
+      "tooLong": "Shorten the message before sending it.",
+      "counting": "Recipients are still being counted: wait a moment.",
+      "nobody": "Nobody to notify with these categories."
+    }
   }
 }

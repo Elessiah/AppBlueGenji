@@ -510,6 +510,13 @@
     "nothingDelivered": "Aucun message n'a été remis : le bot Discord était injoignable et aucune notification push n'est partie. L'envoi ne compte pas dans ton plafond : réessaie plus tard.",
     "nobodyReached": "Aucun participant n'a pu être joint : messages privés fermés ou comptes introuvables sur Discord, et aucun appareil en push. L'envoi ne compte pas dans ton plafond, mais le renvoyer n'y changerait rien.",
     "sentUnconfirmed": "Message envoyé : {sent, plural, one {# message privé remis} other {# messages privés remis}}, {unconfirmed, plural, one {# sans bilan du bot (peut-être remis)} other {# sans bilan du bot (peut-être remis)}}, {pushed, plural, one {# notification push} other {# notifications push}}. Ne le renvoie pas.",
-    "outcomeUnknown": "Le site n'a pas confirmé l'envoi : le message est peut-être parti. Ne le renvoie pas avant d'avoir vérifié le journal du staff."
+    "outcomeUnknown": "Le site n'a pas confirmé l'envoi : le message est peut-être parti. Ne le renvoie pas avant d'avoir vérifié le journal du staff.",
+    "blocked": {
+      "noCategory": "Coche au moins une catégorie de destinataires.",
+      "empty": "Écris un message avant de l'envoyer.",
+      "tooLong": "Raccourcis le message avant de l'envoyer.",
+      "counting": "Le décompte des destinataires est en cours : patiente un instant.",
+      "nobody": "Personne à prévenir avec ces catégories."
+    }
   }
 }

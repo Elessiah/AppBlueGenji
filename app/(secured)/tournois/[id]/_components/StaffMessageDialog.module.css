@@ -5,6 +5,7 @@
 }
 
 .subtitle {
+  overflow-wrap: anywhere;
   margin: 6px 0 0;
   font-size: 13px;
   color: var(--ink-quiet);
@@ -35,6 +36,11 @@
   color: var(--ink-soft);
   cursor: pointer;
   user-select: none;
+}
+
+.category[data-busy] {
+  color: var(--ink-quiet);
+  cursor: default;
 }
 
 .counts {
