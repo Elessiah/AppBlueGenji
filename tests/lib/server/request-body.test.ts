@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import {
   IMAGE_UPLOAD_BODY_MAX_BYTES,
@@ -196,6 +196,33 @@ describe("readImageUploadForm", () => {
     expect(response).toBeInstanceOf(Response);
     expect((response as Response).status).toBe(400);
     await expect((response as Response).json()).resolves.toEqual({ error: "IMAGE_TOO_LARGE" });
+  });
+
+  it("readImageUploadForm_streamedMultipartOverLimit_returnsImageTooLarge", async () => {
+    const response = await readImageUploadForm(upload(IMAGE_UPLOAD_BODY_MAX_BYTES + 1), 7);
+
+    expect((response as Response).status).toBe(400);
+    await expect((response as Response).json()).resolves.toEqual({ error: "IMAGE_TOO_LARGE" });
+  });
+
+  it("readImageUploadForm_chunkedStreamOverLimit_cancelsWithoutReadingTheRest", async () => {
+    const chunk = new Uint8Array(IMAGE_UPLOAD_BODY_MAX_BYTES);
+    const pull = jest.fn((controller: ReadableStreamDefaultController<Uint8Array>) => controller.enqueue(chunk));
+    const cancel = jest.fn<() => void>();
+    const body = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 });
+    const init: RequestInit & { duplex: "half" } = {
+      method: "POST",
+      body,
+      headers: { "content-type": "multipart/form-data; boundary=x" },
+      duplex: "half",
+    };
+
+    const response = await readImageUploadForm(new Request("http://localhost/api/test", init), 7);
+
+    expect((response as Response).status).toBe(400);
+    await expect((response as Response).json()).resolves.toEqual({ error: "IMAGE_TOO_LARGE" });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(pull).toHaveBeenCalledTimes(2);
   });
 
   it("dit FILE_MISSING d'un corps illisible", async () => {

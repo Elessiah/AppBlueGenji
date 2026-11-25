@@ -470,7 +470,7 @@ qu'elle publie invalideraient la liste qu'elle vient de rendre correcte — et s
 échec est avalé : c'est un entretien d'arrière-plan, pas une condition pour
 servir une liste que le cache tient peut-être déjà prête.
 
-Pour la même raison, elle n'est **pas attendue** (`inBackground(syncVisibleTournaments())`) :
+Pour la même raison, elle n'est **pas attendue** (`inBackground("sync", () => syncVisibleTournaments())`) :
 toutes les 15 s, la lecture qui tombait sur la passe — rendu serveur de `/`,
 `GET /api/tournaments` — l'attendait, et toutes celles qui arrivaient pendant
 attendaient la même promesse (`pendingSync`). Rien de l'affichage n'en dépend :
@@ -488,7 +488,10 @@ vocaux, purge des connexions, repli de la mesure d'audience) passent par
 entretiens pendus) au lieu de les voir survivre à sa fin sur une base factice
 déjà remise à zéro. En production, rien n'est suivi : pas d'ensemble qui grossisse
 sur le trafic ni qu'un entretien pendu retienne. Un rejet non rattrapé par
-l'entretien lui-même se dit dans pm2, au plus une fois par minute.
+l'entretien lui-même se dit dans pm2, nommé, au plus une fois par minute **et par
+entretien** (l'échec répété de l'un ne tait pas celui d'un autre) ; un entretien
+qui lève avant de rendre sa promesse ne fait pas échouer la lecture. À l'échéance,
+l'attente de test nomme les entretiens pendus.
 
 ### Plafonds de débit — `lib/server/rate-limit.ts` + `lib/server/api-guard.ts`
 
