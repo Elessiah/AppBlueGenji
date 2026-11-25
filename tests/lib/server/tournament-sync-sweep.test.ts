@@ -395,13 +395,13 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
           withConnection: jest.fn(),
         }));
 
-        const { listTournamentBuckets, settleTournamentListMaintenance } = await import("@/lib/server/tournaments");
+        const { listTournamentBuckets, settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
         const { clearCache } = await import("@/lib/server/cache");
         clearCache();
         const buckets = await listTournamentBuckets(null);
         clearCache();
         expect(buckets).toBeDefined();
-        await settleTournamentListMaintenance();
+        await settleTournamentListMaintenanceForTests();
       }),
     ).resolves.toBeUndefined();
   });
@@ -437,7 +437,7 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
         withConnection: jest.fn(),
       }));
 
-      const { listTournamentBuckets, settleTournamentListMaintenance } = await import("@/lib/server/tournaments");
+      const { listTournamentBuckets, settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
       const { clearCache } = await import("@/lib/server/cache");
       clearCache();
       const buckets = await listTournamentBuckets(null);
@@ -447,7 +447,7 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
       // La passe est bien partie, et la liste a été servie avant qu'elle finisse.
       expect(sweepStarted).toHaveBeenCalledTimes(1);
       releaseSweep();
-      await settleTournamentListMaintenance();
+      await settleTournamentListMaintenanceForTests();
     });
   });
 });
@@ -455,7 +455,15 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
 // Les entretiens lancés par une lecture de la liste ne sont pas attendus par
 // elle, mais suivis : un test les laisse finir au lieu de les voir journaliser
 // après sa fin sur une base factice remise à zéro (ERREUR.txt, EF-74).
-describe("settleTournamentListMaintenance — fin des entretiens d'une lecture", () => {
+describe("settleTournamentListMaintenanceForTests — fin des entretiens d'une lecture", () => {
+  // `jest.doMock` survit à `isolateModulesAsync` : un double resté en place
+  // (entretien jamais réglé) fausserait le cas suivant.
+  afterEach(() => {
+    jest.dontMock("@/lib/server/tournaments/sync-scope");
+    jest.dontMock("@/lib/server/tournaments/match-voice");
+    jest.dontMock("@/lib/server/site-visits-service");
+  });
+
   /** Base factice qui répond à tout par un résultat vide. */
   function emptyDatabase() {
     return {
@@ -476,9 +484,9 @@ describe("settleTournamentListMaintenance — fin des entretiens d'une lecture",
   it("settleTournamentListMaintenance_nothingLaunched_resolvesImmediately", async () => {
     await jest.isolateModulesAsync(async () => {
       jest.doMock("@/lib/server/database", () => emptyDatabase());
-      const { settleTournamentListMaintenance } = await import("@/lib/server/tournaments");
+      const { settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
 
-      await expect(settleTournamentListMaintenance()).resolves.toBeUndefined();
+      await expect(settleTournamentListMaintenanceForTests()).resolves.toBeUndefined();
     });
   });
 
@@ -495,14 +503,14 @@ describe("settleTournamentListMaintenance — fin des entretiens d'une lecture",
         ),
       }));
       jest.doMock("@/lib/server/database", () => emptyDatabase());
-      const { listTournamentBuckets, settleTournamentListMaintenance } = await import("@/lib/server/tournaments");
+      const { listTournamentBuckets, settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
       const { clearCache } = await import("@/lib/server/cache");
       clearCache();
       await listTournamentBuckets(null);
       clearCache();
       const settled = jest.fn();
 
-      const settling = settleTournamentListMaintenance().then(settled);
+      const settling = settleTournamentListMaintenanceForTests().then(settled);
       await new Promise((resolve) => setImmediate(resolve));
       expect(settled).not.toHaveBeenCalled();
       releaseSweep();
@@ -511,4 +519,147 @@ describe("settleTournamentListMaintenance — fin des entretiens d'une lecture",
       expect(settled).toHaveBeenCalledTimes(1);
     });
   });
+
+  it("settleTournamentListMaintenanceForTests_afterRelease_secondCallResolvesImmediately", async () => {
+    let releaseSweep!: () => void;
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("@/lib/server/tournaments/sync-scope", () => ({
+        findSyncCandidates: jest.fn(
+          () =>
+            new Promise<{ id: number; lockFirst: boolean }[]>((resolve) => {
+              releaseSweep = () => resolve([]);
+            }),
+        ),
+      }));
+      jest.doMock("@/lib/server/database", () => emptyDatabase());
+      const { listTournamentBuckets, settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
+      const { clearCache } = await import("@/lib/server/cache");
+      clearCache();
+      await listTournamentBuckets(null);
+      clearCache();
+      releaseSweep();
+      await settleTournamentListMaintenanceForTests();
+
+      // Rien ne reste suivi : même un délai nul ne peut pas expirer.
+      await expect(settleTournamentListMaintenanceForTests(0)).resolves.toBeUndefined();
+    });
+  });
+
+  it("settleTournamentListMaintenanceForTests_jobStartedDuringWait_waitsForItToo", async () => {
+    const releases: (() => void)[] = [];
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("@/lib/server/tournaments/match-voice", () => ({
+        ...jest.requireActual<typeof import("@/lib/server/tournaments/match-voice")>("@/lib/server/tournaments/match-voice"),
+        dispatchMatchVoiceChannels: jest.fn(
+          () =>
+            new Promise<void>((resolve) => {
+              releases.push(resolve);
+            }),
+        ),
+      }));
+      jest.doMock("@/lib/server/database", () => emptyDatabase());
+      const { listTournamentBuckets, settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
+      const { clearCache } = await import("@/lib/server/cache");
+      clearCache();
+      await listTournamentBuckets(null);
+      clearCache();
+      const settled = jest.fn();
+      const settling = settleTournamentListMaintenanceForTests().then(settled);
+
+      // Une seconde lecture lance un nouvel entretien pendant l'attente, puis le premier se termine.
+      await listTournamentBuckets(null);
+      clearCache();
+      releases[0]();
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(settled).not.toHaveBeenCalled();
+      releases[1]();
+      await settling;
+
+      expect(settled).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("settleTournamentListMaintenanceForTests_retentionRollUpRunning_waitsForIt", async () => {
+    let releaseRetention!: () => void;
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("@/lib/server/site-visits-service", () => ({
+        maintainSiteVisitRetention: jest.fn(
+          () =>
+            new Promise<void>((resolve) => {
+              releaseRetention = resolve;
+            }),
+        ),
+      }));
+      jest.doMock("@/lib/server/database", () => emptyDatabase());
+      const { listTournamentBuckets, settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
+      const { clearCache } = await import("@/lib/server/cache");
+      clearCache();
+      await listTournamentBuckets(null);
+      clearCache();
+      const settled = jest.fn();
+
+      const settling = settleTournamentListMaintenanceForTests().then(settled);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(settled).not.toHaveBeenCalled();
+      releaseRetention();
+      await settling;
+
+      expect(settled).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("listTournamentBuckets_backgroundJobRejects_logsAndUntracks", async () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("@/lib/server/tournaments/match-voice", () => ({
+        ...jest.requireActual<typeof import("@/lib/server/tournaments/match-voice")>("@/lib/server/tournaments/match-voice"),
+        dispatchMatchVoiceChannels: jest.fn(async () => {
+          throw new Error("BOT DOWN");
+        }),
+      }));
+      jest.doMock("@/lib/server/database", () => emptyDatabase());
+      const { listTournamentBuckets, settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
+      const { clearCache } = await import("@/lib/server/cache");
+      clearCache();
+
+      await listTournamentBuckets(null);
+      clearCache();
+      await settleTournamentListMaintenanceForTests();
+
+      expect(errorSpy).toHaveBeenCalledWith("[tournaments] entretien de la liste en échec", expect.any(String));
+      await expect(settleTournamentListMaintenanceForTests(0)).resolves.toBeUndefined();
+    });
+    errorSpy.mockRestore();
+  });
+
+  it("settleTournamentListMaintenanceForTests_jobNeverSettles_rejectsAfterTimeout", async () => {
+    let releaseSweep!: () => void;
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("@/lib/server/tournaments/sync-scope", () => ({
+        findSyncCandidates: jest.fn(
+          () =>
+            new Promise<{ id: number; lockFirst: boolean }[]>((resolve) => {
+              releaseSweep = () => resolve([]);
+            }),
+        ),
+      }));
+      jest.doMock("@/lib/server/database", () => emptyDatabase());
+      const { listTournamentBuckets, settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
+      const { clearCache } = await import("@/lib/server/cache");
+      clearCache();
+      await listTournamentBuckets(null);
+      clearCache();
+
+      await expect(settleTournamentListMaintenanceForTests(20)).rejects.toThrow("jamais terminé(s)");
+
+      releaseSweep();
+      await settleTournamentListMaintenanceForTests();
+    });
+  });
 });
+

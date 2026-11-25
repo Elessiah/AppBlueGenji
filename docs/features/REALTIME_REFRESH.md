@@ -481,10 +481,12 @@ invalidations (`lib/server/cache.ts`) et jette une valeur lue avant l'une
 d'elles.
 
 Elle et les autres entretiens que la lecture lance (rappels, annonces, salons
-vocaux, purge des connexions) passent par `inBackground` : jamais attendus par
-la lecture, mais suivis, pour qu'un test les laisse finir
-(`settleTournamentListMaintenance()`) au lieu de les voir survivre à sa fin sur
-une base factice déjà remise à zéro.
+vocaux, purge des connexions, repli de la mesure d'audience) passent par
+`inBackground` : jamais attendus par la lecture, mais suivis, pour qu'un test
+les laisse finir (`settleTournamentListMaintenanceForTests()`, bornée à 4 s)
+au lieu de les voir survivre à sa fin sur une base factice déjà remise à zéro.
+Un rejet non rattrapé par l'entretien lui-même se dit dans pm2. Chaque promesse
+quitte le suivi dès qu'elle se règle : l'ensemble ne grossit pas.
 
 ### Plafonds de débit — `lib/server/rate-limit.ts` + `lib/server/api-guard.ts`
 

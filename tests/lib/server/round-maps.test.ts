@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 // Simulé pour toute la suite (`tests/setup-env.cjs`) : ici, le vrai (map de départage du brief).
 jest.unmock("@/lib/server/tournaments/lobby-brief");
@@ -29,7 +29,7 @@ import {
 } from "@/lib/server/tournaments/round-maps";
 import { briefPointTarget, briefPointTargets, briefTiebreakMap, type LobbyBriefRow } from "@/lib/server/tournaments/lobby-brief";
 import { ROUND_NUMBER_MAX } from "@/lib/shared/round-maps";
-import { roundMapsFingerprint } from "@/lib/server/tournaments/round-maps-notice";
+import { resetRoundMapsNoticeState, roundMapsFingerprint } from "@/lib/server/tournaments/round-maps-notice";
 import { connectionMock, fakeConnection, fakePool, poolBackedWithConnection, type SqlMock } from "../../helpers/sql-double";
 import type { RowOverrides } from "../../helpers/row-overrides";
 
@@ -94,6 +94,13 @@ function route(execute: SqlMock, table: { pattern: RegExp; rows: Rows }[]) {
 function writes(pattern: RegExp) {
   return connection.execute.mock.calls.filter(([sql]) => pattern.test(sql));
 }
+
+// Un changement de cartes arme le minuteur de fin de fenêtre (60 s, `unref`) :
+// laissé en place, il balayait 61 s plus tard, dans le même processus de Jest,
+// une base factice remise à zéro (« Cannot log after tests are done », EF-74).
+afterEach(() => {
+  resetRoundMapsNoticeState();
+});
 
 beforeEach(() => {
   jest.clearAllMocks();

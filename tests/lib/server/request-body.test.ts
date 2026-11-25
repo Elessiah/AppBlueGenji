@@ -174,8 +174,25 @@ describe("readImageUploadForm", () => {
     expect(form).toBeInstanceOf(FormData);
   });
 
+  /**
+   * Le même envoi, déjà sérialisé en octets : la lecture bornée annule alors un
+   * simple flux d'octets, et non le générateur multipart d'undici, que certaines
+   * versions de Node (24.14) refermaient deux fois (« ReadableStream is already
+   * closed », ERREUR.txt EF-74) — le test ne dépend plus de la version locale.
+   */
+  async function serializedUpload(size: number): Promise<Request> {
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array(size)], "a.png", { type: "image/png" }));
+    const encoded = new Response(form);
+    return new Request("http://localhost/api/test", {
+      method: "POST",
+      body: await encoded.arrayBuffer(),
+      headers: { "content-type": encoded.headers.get("content-type") ?? "" },
+    });
+  }
+
   it("dit IMAGE_TOO_LARGE d'un corps au-delà de la borne, sans le lire", async () => {
-    const response = await readImageUploadForm(upload(IMAGE_UPLOAD_BODY_MAX_BYTES + 1), 7);
+    const response = await readImageUploadForm(await serializedUpload(IMAGE_UPLOAD_BODY_MAX_BYTES + 1), 7);
     expect(response).toBeInstanceOf(Response);
     expect((response as Response).status).toBe(400);
     await expect((response as Response).json()).resolves.toEqual({ error: "IMAGE_TOO_LARGE" });

@@ -677,7 +677,7 @@ export type TournamentListScope = {
 /**
  * Entretiens d'arrière-plan lancés par une lecture de la liste
  * (`listTournamentBuckets`) : jamais attendus par la lecture, mais suivis, pour
- * qu'un test puisse les laisser finir ({@link settleTournamentListMaintenance})
+ * qu'un test puisse les laisser finir ({@link settleTournamentListMaintenanceForTests})
  * au lieu de les voir survivre à sa fin — un balayage tardif lisait alors une
  * base factice déjà remise à zéro et journalisait après la suite.
  */
@@ -686,15 +686,37 @@ const listMaintenance = new Set<Promise<unknown>>();
 function inBackground(work: Promise<unknown>): void {
   listMaintenance.add(work);
   const done = () => listMaintenance.delete(work);
-  void work.then(done, done);
+  void work.then(done, (error: unknown) => {
+    done();
+    // Chaque entretien rattrape d'ordinaire ses échecs ; un rejet qui passe
+    // quand même se dit dans pm2 plutôt que d'être avalé par le suivi.
+    console.error("[tournaments] entretien de la liste en échec", failureDiagnostic(error));
+  });
 }
+
+/** Délai au-delà duquel {@link settleTournamentListMaintenanceForTests} renonce. */
+const SETTLE_TIMEOUT_MS = 4_000;
 
 /**
  * Attend la fin des entretiens d'arrière-plan lancés par les lectures de la
- * liste, y compris ceux lancés pendant l'attente. Réservé aux tests.
+ * liste, y compris ceux lancés pendant l'attente. **Tests seulement** : jamais
+ * appelée par le code servi, elle ferait attendre une requête derrière tous les
+ * balayages. Rejette au-delà de {@link SETTLE_TIMEOUT_MS} si un double de test
+ * ne se résout jamais, plutôt que de laisser le test atteindre le délai de Jest
+ * sans désigner la cause.
  */
-export async function settleTournamentListMaintenance(): Promise<void> {
-  while (listMaintenance.size > 0) await Promise.allSettled([...listMaintenance]);
+export async function settleTournamentListMaintenanceForTests(timeoutMs: number = SETTLE_TIMEOUT_MS): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${listMaintenance.size} entretien(s) de la liste jamais terminé(s)`));
+    }, timeoutMs);
+  });
+  try {
+    while (listMaintenance.size > 0) await Promise.race([Promise.allSettled([...listMaintenance]), expired]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -766,7 +788,8 @@ export async function listTournamentBuckets(
   // signalements de visite, qu'un visiteur opposé n'envoie pas. Sans cette
   // seconde entrée, un site où tout le monde s'oppose ne tiendrait plus les
   // durées annoncées. Étranglé à l'heure, jamais levé.
-  maintainSiteVisitRetention();
+  const retention = maintainSiteVisitRetention();
+  if (retention) inBackground(retention);
 
   // Seule la liste publique est mutualisée : celle des tournois pas encore
   // visibles est réservée au staff, elle est courte et bien plus rarement lue.

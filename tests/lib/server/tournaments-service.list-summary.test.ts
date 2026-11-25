@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { clearCache } from "@/lib/server/cache";
-import { settleTournamentListMaintenance } from "@/lib/server/tournaments";
+import { settleTournamentListMaintenanceForTests } from "@/lib/server/tournaments";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { tournamentListRow } from "../../helpers/tournament-rows";
 
@@ -56,7 +56,7 @@ beforeEach(() => {
 afterEach(async () => {
   // Les entretiens lancés par la lecture finissent avant la remise à zéro des
   // doubles : sinon ils liraient une base factice vide après la fin du test.
-  await settleTournamentListMaintenance();
+  await settleTournamentListMaintenanceForTests();
   clearCache();
   jest.restoreAllMocks();
 });

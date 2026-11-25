@@ -778,7 +778,11 @@ describe("dispatchLobbyBriefs", () => {
       } else if (!firstPending) {
         // Le bot tarde sur le match 40 : il ne répond qu'une fois le match 41 entamé.
         firstPending = true;
-        await Promise.race([firstHeld, new Promise((resolve) => setTimeout(resolve, 1_000))]);
+        // Le filet d'une seconde est levé dès la relâche : laissé armé, il gardait
+        // le processus de Jest en vie après la suite (« worker … force exited », EF-74).
+        let safety: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([firstHeld, new Promise((resolve) => (safety = setTimeout(resolve, 1_000)))]);
+        clearTimeout(safety);
         firstPending = false;
       }
       return { discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 };
