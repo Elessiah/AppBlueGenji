@@ -102,7 +102,7 @@
     },
     "body": {
       "TEAM": "L'équipe quitte la liste des engagés et libère sa place. Elle pourra se réinscrire tant que les inscriptions restent ouvertes et qu'il reste une place.",
-      "SOLO": "Tu quittes la liste des engagés et libères ta place. Tu pourras te réinscrire tant que les inscriptions restent ouvertes et qu'il reste une place."
+      "SOLO": "Tu quittes la liste des engagés et tu libères ta place. Tu pourras te réinscrire tant que les inscriptions restent ouvertes et qu'il reste une place."
     },
     "bodyClosed": {
       "TEAM": "Les inscriptions sont closes : l'équipe quitte la liste des engagés et ne pourra plus se réinscrire à ce tournoi.",

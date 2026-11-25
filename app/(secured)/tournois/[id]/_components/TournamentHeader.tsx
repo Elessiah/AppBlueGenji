@@ -291,6 +291,7 @@ export function TournamentHeader({
             <CyberButton
               variant="primary"
               onClick={onRegister}
+              aria-haspopup="dialog"
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
               {a(`wording.${entrantType}.registerCta`)}

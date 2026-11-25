@@ -56,16 +56,6 @@ export function registerBlockedNotice(
 }
 
 /**
- * Le bouton « Se désinscrire » mène-t-il quelque part ?
- *
- * Vrai quand le lecteur a un engagé **inscrit** à ce tournoi, qu'il a qualité
- * pour agir en son nom (`OWNER`/`MANAGER` en tournoi par équipes, toujours en
- * individuel) et que le coup d'envoi n'est pas passé — la fenêtre même du
- * retrait par le staff (`lib/shared/entrant-removal.ts`). Le serveur rejoue la
- * règle sous verrou (`withdrawOwnRegistration`) : ceci ne fait que cacher un
- * bouton qui ne mènerait nulle part (`docs/features/SELF_WITHDRAWAL.md`).
- */
-/**
  * Texte de la confirmation de désinscription : tant que les inscriptions sont
  * ouvertes, l'engagé pourra revenir ; après leur clôture (et jusqu'au coup
  * d'envoi), la place rendue ne se reprend plus.
@@ -74,6 +64,17 @@ export function withdrawalBodyKey(state: TournamentDetail["card"]["state"]): "wi
   return state === "REGISTRATION" ? "withdraw.body" : "withdraw.bodyClosed";
 }
 
+/**
+ * Le bouton de désinscription (« Désinscrire mon équipe », « Me désinscrire »)
+ * mène-t-il quelque part ?
+ *
+ * Vrai quand le lecteur a un engagé **inscrit** à ce tournoi, qu'il a qualité
+ * pour agir en son nom (`OWNER`/`MANAGER` en tournoi par équipes, toujours en
+ * individuel) et que le coup d'envoi n'est pas passé — la fenêtre même du
+ * retrait par le staff (`lib/shared/entrant-removal.ts`). Le serveur rejoue la
+ * règle sous verrou (`withdrawOwnRegistration`) : ceci ne fait que cacher un
+ * bouton qui ne mènerait nulle part (`docs/features/SELF_WITHDRAWAL.md`).
+ */
 export function canWithdrawOwnEntry(
   detail: Pick<TournamentDetail, "card" | "canRegisterEntrant" | "myTeamId" | "registrations">,
   now: number = Date.now(),
