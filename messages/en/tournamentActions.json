@@ -104,9 +104,13 @@
       "TEAM": "The team leaves the list of entrants and frees its spot. It can register again while registration stays open and a spot remains.",
       "SOLO": "You leave the list of entrants and free your spot. You can register again while registration stays open and a spot remains."
     },
+    "bodyClosed": {
+      "TEAM": "Registration is closed: the team leaves the list of entrants and won't be able to register for this tournament again.",
+      "SOLO": "Registration is closed: you leave the list of entrants and won't be able to register for this tournament again."
+    },
     "confirm": "Unregister",
     "pending": "Unregistering…",
-    "success": "You're unregistered."
+    "success": "Registration withdrawn."
   },
   "header": {
     "imageAria": "Tournament image",

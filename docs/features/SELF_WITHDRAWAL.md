@@ -45,10 +45,16 @@ Deux ajouts, avant la première lecture ordinaire :
    transaction, comme l'inscription) est verrouillée — ordre tournoi → équipe,
    celui de l'inscription. Les rôles sont donc relus à l'instant de l'écriture :
    un manager rétrogradé pendant l'attente ne retire plus rien. Une équipe active
-   qui a changé entre-temps rend `NO_ACTIVE_TEAM`.
+   qui a changé entre-temps rend `CONCURRENT_UPDATE_RETRY` (409) : le joueur a
+   une équipe, un nouvel essai tranche.
+
+Un `ROLLBACK` raté garde l'erreur d'origine et détruit la connexion au lieu de
+la rendre au pool avec le verrou du tournoi (`rollbackKeepingError`,
+`releaseWithServerLockWait`) — pour le retrait par le staff comme pour celui-ci.
 
 Codes : `NO_ACTIVE_TEAM` (400), `NOT_TEAM_MANAGER` (403), `TOURNAMENT_NOT_FOUND`
-/ `TEAM_NOT_IN_TOURNAMENT` (404), `ENTRANT_REMOVAL_TOURNAMENT_*` (409),
+/ `TEAM_NOT_IN_TOURNAMENT` (404), `ENTRANT_REMOVAL_TOURNAMENT_*` et
+`CONCURRENT_UPDATE_RETRY` (409),
 `WITHDRAWAL_FAILED` (500, sans le texte de l'erreur).
 
 ## Journal Discord
@@ -57,7 +63,9 @@ Après le commit, au meilleur effort, une ligne dans la catégorie
 `registrations` (`formatEntrantWithdrawnLog`) :
 `➖ Désinscription — « Tournoi » (#id) : Team Nova se retire. 15/16 équipes.`
 En individuel, l'engagé y est « un joueur » (`entrantLabel`) : aucun pseudo ne
-part sur Discord.
+part sur Discord. Le registre (T05) nomme les désinscriptions parmi les faits
+journalisés ; aucune donnée, aucun destinataire ni aucune durée nouvelle,
+donc pas d'entrée `PRIVACY_CHANGES`.
 
 ## L'interface
 
@@ -70,8 +78,10 @@ coup d'envoi pas encore passé — et jamais sur une page figée. Ces champs son
 déjà portés par les deux portes du contexte du lecteur (flux et REST).
 
 Le clic ouvre un `ConfirmActionDialog` (ton `danger`) qui dit que la place est
-libérée et qu'on peut se réinscrire tant que c'est ouvert ; le succès et les
-refus passent par les toasts.
+libérée et qu'on peut se réinscrire tant que les inscriptions sont ouvertes —
+ou, une fois closes (la fenêtre court jusqu'au coup d'envoi), que la
+désinscription est définitive (`withdrawalBodyKey`) ; le succès et les refus
+passent par les toasts.
 
 La confirmation d'inscription annonce désormais la désinscription possible
 jusqu'au coup d'envoi (FR et EN).

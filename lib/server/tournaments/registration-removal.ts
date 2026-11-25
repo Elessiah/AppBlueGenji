@@ -28,10 +28,12 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { entrantRemovalBlockReason } from "@/lib/shared/entrant-removal";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { publishUpdatedEvent } from "./notifications";
 import type { TournamentRow } from "./_internal";
 import { lockTournamentRow, resolveUserEntrant } from "./registration";
@@ -100,7 +102,9 @@ export async function removeTournamentEntrant(
  *
  * @throws `TOURNAMENT_NOT_FOUND` — identifiant inconnu.
  * @throws `NO_ACTIVE_TEAM` — rien à désinscrire (aucune équipe, aucune entrée
- *   solo), ou l'équipe active a changé pendant l'attente du verrou.
+ *   solo).
+ * @throws `CONCURRENT_UPDATE_RETRY` — l'équipe active a changé pendant
+ *   l'attente du verrou : un nouvel essai tranche.
  * @throws `NOT_TEAM_MANAGER` — le joueur n'a pas la charge de son équipe.
  * @throws `TEAM_NOT_IN_TOURNAMENT` — son engagé n'est pas inscrit.
  * @throws le code d'`EntrantRemovalBlockReason` — le tournoi a commencé.
@@ -138,8 +142,9 @@ export async function withdrawOwnRegistration(
       if (entrant.teamId === null) throw new Error("NO_ACTIVE_TEAM");
       // Relue sous le verrou : un joueur qui a changé d'équipe entre la lecture
       // sur le pool et le verrou ne retire rien — sa nouvelle équipe n'est pas
-      // sous verrou ; un nouvel essai la retire.
-      if (!solo && entrant.teamId !== candidateTeamId) throw new Error("NO_ACTIVE_TEAM");
+      // sous verrou ; un nouvel essai la retire. « Réessaie », et non « crée
+      // une équipe » : il en a une.
+      if (!solo && entrant.teamId !== candidateTeamId) throw new Error(CONCURRENT_UPDATE_RETRY);
       if (!entrant.canActForEntrant) throw new Error("NOT_TEAM_MANAGER");
       return entrant.teamId;
     },
@@ -230,10 +235,13 @@ async function runEntrantRemoval(
       participantType: toParticipantType(tournament.participant_type),
     };
   } catch (error) {
-    await connection.rollback();
+    // L'erreur d'origine survit à un `ROLLBACK` raté (contention rendue en
+    // 409, pas en 500), et une connexion restée en transaction est détruite
+    // au lieu de revenir au pool avec le verrou du tournoi (`./lock-wait`).
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }

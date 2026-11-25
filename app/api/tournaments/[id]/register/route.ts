@@ -5,6 +5,7 @@ import { fail, ok } from "@/lib/server/http";
 import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { withdrawOwnRegistration } from "@/lib/server/tournaments/registration-removal";
 import { registerCurrentUserTeam } from "@/lib/server/tournaments-service";
+import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { formatEntrantWithdrawnLog } from "@/lib/shared/bot-logs";
 import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
 import { isRegistrationFilterError } from "@/lib/shared/registration-filters";
@@ -49,6 +50,8 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     const message = (error as Error).message;
     if (message === "NOT_TEAM_MANAGER") return fail(message, 403);
     if (message === "NO_ACTIVE_TEAM") return fail(message, 400);
+    // L'équipe active a changé pendant l'attente du verrou : réessayer tranche.
+    if (message === CONCURRENT_UPDATE_RETRY) return fail(message, 409);
     if (message === "TOURNAMENT_NOT_FOUND" || message === "TEAM_NOT_IN_TOURNAMENT") {
       return fail(message, 404);
     }

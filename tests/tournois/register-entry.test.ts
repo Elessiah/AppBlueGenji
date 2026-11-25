@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import type { TournamentDetail } from "@/lib/shared/types";
-import { canWithdrawOwnEntry, registerBlockedNotice } from "@/app/(secured)/tournois/[id]/_lib/register-entry";
+import { canWithdrawOwnEntry, registerBlockedNotice, withdrawalBodyKey } from "@/app/(secured)/tournois/[id]/_lib/register-entry";
 import { tournamentCard } from "../helpers/tournament-card";
 import { tournamentDetail } from "../helpers/tournament-detail";
 import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
@@ -154,5 +154,15 @@ describe("canWithdrawOwnEntry", () => {
     expect(
       canWithdrawOwnEntry(withdrawable({ card: tournamentCard({ id: 7, state: "FINISHED" }) }), BEFORE_KICKOFF),
     ).toBe(false);
+  });
+});
+
+describe("withdrawalBodyKey", () => {
+  it("withdrawalBodyKey_registrationOpen_promisesReRegistration", () => {
+    expect(withdrawalBodyKey("REGISTRATION")).toBe("withdraw.body");
+  });
+
+  it("withdrawalBodyKey_registrationClosedBeforeKickoff_saysWithdrawalIsFinal", () => {
+    expect(withdrawalBodyKey("UPCOMING")).toBe("withdraw.bodyClosed");
   });
 });

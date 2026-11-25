@@ -180,24 +180,72 @@ describe("withdrawOwnRegistration", () => {
     expect(connection.rollback).toHaveBeenCalledTimes(1);
   });
 
-  it("withdrawOwnRegistration_activeTeamChangedWhileWaitingForLock_throwsNoActiveTeam", async () => {
+  it("withdrawOwnRegistration_activeTeamChangedWhileWaitingForLock_throwsConcurrentUpdateRetry", async () => {
     jest.mocked(getUserActiveTeam)
       .mockResolvedValueOnce(activeTeam(102, ["MANAGER"]))
       .mockResolvedValueOnce(activeTeam(103, ["MANAGER"]));
     const { sqls } = mockConnection(registrationRow());
 
-    await expect(withdrawOwnRegistration(7, USER_ID)).rejects.toThrow("NO_ACTIVE_TEAM");
+    // « Réessaie », pas « crée une équipe » : le joueur en a une.
+    await expect(withdrawOwnRegistration(7, USER_ID)).rejects.toThrow("CONCURRENT_UPDATE_RETRY");
 
     expect(deletes(sqls)).toEqual([]);
   });
 
+  it("withdrawOwnRegistration_soloTournamentWithActiveTeam_neverLocksTheTeam", async () => {
+    jest.mocked(getUserActiveTeam).mockResolvedValue(activeTeam(102, ["MANAGER"]));
+    jest.mocked(findSoloEntry).mockResolvedValue(900);
+    const { sqls } = mockConnection(registrationRow({ participant_type: "SOLO" }), {
+      participantType: "SOLO",
+      entrantName: "Solo 900",
+    });
+
+    const removed = await withdrawOwnRegistration(7, USER_ID);
+
+    expect(removed.teamId).toBe(900);
+    expect(sqls.some((sql) => /bg_teams WHERE id = \? FOR UPDATE/.test(sql))).toBe(false);
+  });
+
+  it("withdrawOwnRegistration_kickoffPassedWhileStoredInRegistration_throwsStarted", async () => {
+    jest.mocked(getUserActiveTeam).mockResolvedValue(activeTeam(102, ["MANAGER"]));
+    const { sqls } = mockConnection(registrationRow({
+      registration_close_at: new Date(Date.now() - 2 * HOUR),
+      start_at: new Date(Date.now() - HOUR),
+    }));
+
+    await expect(withdrawOwnRegistration(7, USER_ID)).rejects.toThrow("ENTRANT_REMOVAL_TOURNAMENT_STARTED");
+
+    expect(deletes(sqls)).toEqual([]);
+  });
+
+  it("withdrawOwnRegistration_tournamentFinished_throwsFinished", async () => {
+    jest.mocked(getUserActiveTeam).mockResolvedValue(activeTeam(102, ["MANAGER"]));
+    mockConnection(registrationRow({ state: "FINISHED" }));
+
+    await expect(withdrawOwnRegistration(7, USER_ID)).rejects.toThrow("ENTRANT_REMOVAL_TOURNAMENT_FINISHED");
+  });
+
+  it("withdrawOwnRegistration_rollbackFails_keepsOriginalErrorAndDestroysConnection", async () => {
+    jest.mocked(getUserActiveTeam).mockResolvedValue(activeTeam(102, ["DPS"]));
+    const { connection } = mockConnection(registrationRow());
+    connection.rollback.mockRejectedValue(new Error("connection lost"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(withdrawOwnRegistration(7, USER_ID)).rejects.toThrow("NOT_TEAM_MANAGER");
+
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+    jest.mocked(console.error).mockRestore();
+  });
+
   it("withdrawOwnRegistration_entrantNotRegistered_throwsTeamNotInTournament", async () => {
     jest.mocked(getUserActiveTeam).mockResolvedValue(activeTeam(102, ["MANAGER"]));
-    const { sqls } = mockConnection(registrationRow(), { entrantName: null });
+    const { connection, sqls } = mockConnection(registrationRow(), { entrantName: null });
 
     await expect(withdrawOwnRegistration(7, USER_ID)).rejects.toThrow("TEAM_NOT_IN_TOURNAMENT");
 
     expect(deletes(sqls)).toEqual([]);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
   });
 
   it("withdrawOwnRegistration_tournamentStarted_throwsStartedBeforeCheckingRights", async () => {

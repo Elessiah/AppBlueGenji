@@ -65,6 +65,15 @@ export function registerBlockedNotice(
  * règle sous verrou (`withdrawOwnRegistration`) : ceci ne fait que cacher un
  * bouton qui ne mènerait nulle part (`docs/features/SELF_WITHDRAWAL.md`).
  */
+/**
+ * Texte de la confirmation de désinscription : tant que les inscriptions sont
+ * ouvertes, l'engagé pourra revenir ; après leur clôture (et jusqu'au coup
+ * d'envoi), la place rendue ne se reprend plus.
+ */
+export function withdrawalBodyKey(state: TournamentDetail["card"]["state"]): "withdraw.body" | "withdraw.bodyClosed" {
+  return state === "REGISTRATION" ? "withdraw.body" : "withdraw.bodyClosed";
+}
+
 export function canWithdrawOwnEntry(
   detail: Pick<TournamentDetail, "card" | "canRegisterEntrant" | "myTeamId" | "registrations">,
   now: number = Date.now(),

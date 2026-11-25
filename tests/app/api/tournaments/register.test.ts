@@ -202,6 +202,7 @@ describe("DELETE /api/tournaments/[id]/register", () => {
     ["DELETE_teamNotInTournament_returns404", "TEAM_NOT_IN_TOURNAMENT", 404],
     ["DELETE_tournamentStarted_returns409", "ENTRANT_REMOVAL_TOURNAMENT_STARTED", 409],
     ["DELETE_tournamentFinished_returns409", "ENTRANT_REMOVAL_TOURNAMENT_FINISHED", 409],
+    ["DELETE_activeTeamChangedDuringLock_returns409", "CONCURRENT_UPDATE_RETRY", 409],
   ])("%s", async (_name, code, status) => {
     withdrawalRejectsWith(code);
 

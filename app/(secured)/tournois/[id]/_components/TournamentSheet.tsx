@@ -29,6 +29,7 @@ import { useMapError, useMapParticipantError } from "../_lib/error-map";
 import { focusRowAfterChange } from "./ForfeitRowAction";
 import { advanceSuccessText, rollbackStageText, useActionsText } from "../_lib/actions-text";
 import { withDialogsText } from "../_lib/dialogs-text";
+import { withdrawalBodyKey } from "../_lib/register-entry";
 import { ENGLISH_ENDURANCE, ENGLISH_VIEWS, withViewText } from "../_lib/view-loaders";
 import { registrationConfirmText } from "../_lib/registration-confirm";
 import { formatLocalDateTime } from "@/lib/shared/dates";
@@ -1039,7 +1040,9 @@ function TournamentSheetView({
   const withdrawEntry = () => {
     setPendingConfirm({
       title: a(`withdraw.title.${entrantType}`, { name: detail.card.name }),
-      body: [a(`withdraw.body.${entrantType}`)],
+      // Inscriptions closes (la fenêtre court jusqu'au coup d'envoi) : la place
+      // rendue ne se reprend plus, la modale le dit.
+      body: [a(`${withdrawalBodyKey(detail.card.state)}.${entrantType}`)],
       confirmLabel: a("withdraw.confirm"),
       pendingLabel: a("withdraw.pending"),
       run: performWithdraw,
