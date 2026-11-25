@@ -103,10 +103,20 @@ export type DirectMessageDelivery = {
    * Un appel qui a atteint le bot sans rendre de bilan (délai écoulé, connexion
    * coupée en route) n'arrête pas les lots suivants : le bot est lent, pas
    * tombé, et ses messages ont pu partir. Le bilan le dit
-   * ({@link NotificationReport.discordUncertain}).
+   * ({@link NotificationReport.discordUncertainUserIds}). Au-delà de
+   * {@link MAX_CONSECUTIVE_UNCERTAIN_CALLS} appels de suite sans bilan, le bot
+   * est tenu pour figé : les lots restants ne partent pas (chacun coûterait
+   * son délai entier et une panne au coupe-circuit).
    */
   uncertainIsNotLost?: true;
 };
+
+/**
+ * Appels de suite sans bilan (`uncertainIsNotLost`) au-delà desquels le bot est
+ * tenu pour figé : un bot qui accepte les connexions sans jamais répondre ne
+ * reçoit pas tous les lots d'un envoi nombreux, chacun après son délai entier.
+ */
+export const MAX_CONSECUTIVE_UNCERTAIN_CALLS = 2;
 
 export type NotificationReport = {
   /**
@@ -123,11 +133,11 @@ export type NotificationReport = {
   /** Appareils atteints. */
   pushed: number;
   /**
-   * Posé (envoi réglé par `uncertainIsNotLost`) quand un appel au bot a été
-   * perdu **après** l'avoir atteint : ses messages ont pu partir, ses comptes
-   * sont pourtant comptés dans {@link discordUnreachedUserIds}.
+   * Posé (envoi réglé par `uncertainIsNotLost`, jamais vide) quand un appel au
+   * bot a été perdu **après** l'avoir atteint : les comptes de ces appels, dont
+   * le message a pu partir. Ils sont aussi dans {@link discordUnreachedUserIds}.
    */
-  discordUncertain?: true;
+  discordUncertainUserIds?: number[];
 };
 
 /**
@@ -159,7 +169,7 @@ export async function notifyUsers(
     // Personne à joindre sur Discord : aucun appel au bot, un bilan vide.
     message && groups
       ? sendLocalizedDirectMessages(groups, message.context, message.delivery)
-      : Promise.resolve({ report: { sent: 0, unresolved: [], failed: [] }, unreached: [], uncertain: false }),
+      : Promise.resolve({ report: { sent: 0, unresolved: [], failed: [] }, unreached: [], uncertain: [] }),
     // Un sujet réservé à une permission ne part qu'à qui la détient encore, non
     // suspendu : `pushToUsers` en juge sur les lignes d'abonnement qu'il lit
     // déjà — aucune lecture de plus, et aucune sans configuration push.
@@ -171,7 +181,7 @@ export async function notifyUsers(
     discord: discord.report,
     discordUnreachedUserIds: discord.unreached,
     pushed,
-    ...(discord.uncertain ? { discordUncertain: true as const } : {}),
+    ...(discord.uncertain.length > 0 ? { discordUncertainUserIds: discord.uncertain } : {}),
   };
 }
 
@@ -265,6 +275,12 @@ function deliveryCallOptions(
   return Object.keys(options).length > 0 ? [options] : [];
 }
 
+/** Appels de suite sans bilan après un appel : remis à zéro par un bilan, avancé par un appel incertain. */
+function nextUncertainRun(run: number, reported: boolean, uncertain: boolean): number {
+  if (reported) return 0;
+  return uncertain ? run + 1 : run;
+}
+
 /**
  * Un appel au bot par langue : chaque destinataire reçoit le message dans la
  * langue de son compte, bilingue s'il n'a pas pu être lue. Le bot distribue
@@ -275,7 +291,7 @@ async function sendLocalizedDirectMessages(
   groups: readonly LocaleGroup[],
   context: string,
   delivery: DirectMessageDelivery = {},
-): Promise<{ report: DiscordDeliveryReport | null; unreached: number[]; uncertain: boolean }> {
+): Promise<{ report: DiscordDeliveryReport | null; unreached: number[]; uncertain: number[] }> {
   // Les langues partent **l'une après l'autre**, et un appel perdu arrête les
   // suivants : un bot lent ou tombé ne reçoit qu'un appel par notification,
   // comme avant le découpage par langue. Lancés ensemble, les appels d'un seul
@@ -286,10 +302,11 @@ async function sendLocalizedDirectMessages(
   // appel : une langue plus nombreuse part en plusieurs appels, à la suite,
   // sous la même règle (un appel perdu arrête les suivants) — sauf, pour un
   // envoi réglé par `uncertainIsNotLost`, un appel qui a atteint le bot sans
-  // bilan : il a pu écrire, le bot n'est pas tombé, les lots suivants partent.
-  const sends: { group: ReachableRecipient[]; report: DiscordDeliveryReport | null }[] = [];
+  // bilan : il a pu écrire, le bot n'est pas tombé, les lots suivants partent
+  // (jusqu'à `MAX_CONSECUTIVE_UNCERTAIN_CALLS` de suite : au-delà, il est figé).
+  const sends: { group: ReachableRecipient[]; report: DiscordDeliveryReport | null; uncertain: boolean }[] = [];
   let botLost = false;
-  let uncertain = false;
+  let uncertainInARow = 0;
   for (const { text, group: whole } of groups) {
     for (const group of deliveryBatches(whole, delivery.batchSize)) {
       let report: DiscordDeliveryReport | null = null;
@@ -300,11 +317,12 @@ async function sendLocalizedDirectMessages(
         });
         report = await pushDiscordDirectMessages(text, group.map((recipient) => recipient.discord), context, ...options);
       }
-      if (report === null && callUncertain) uncertain = true;
-      else if (report === null) botLost = true;
-      sends.push({ group, report });
+      uncertainInARow = nextUncertainRun(uncertainInARow, report !== null, callUncertain);
+      if (report === null && (!callUncertain || uncertainInARow >= MAX_CONSECUTIVE_UNCERTAIN_CALLS)) botLost = true;
+      sends.push({ group, report, uncertain: callUncertain && report === null });
     }
   }
+  const uncertain = sends.flatMap(({ group, uncertain: lost }) => (lost ? group.map((r) => r.userId) : []));
   const unreached = sends.flatMap(({ group, report }) => (report === null ? group.map((r) => r.userId) : []));
   const reached = sends.flatMap(({ report }) => (report === null ? [] : [report]));
   if (reached.length === 0) return { report: null, unreached, uncertain };

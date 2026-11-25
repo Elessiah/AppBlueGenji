@@ -87,24 +87,35 @@ export const STAFF_MESSAGE_COUNT_DEBOUNCE_MS = 300;
 /**
  * Le message privé rendu (citation, échappement, en-tête, liens) dépasserait-il
  * le plafond du bot dans l'une des deux langues ? Même règle que le serveur
- * (`staffMessageRefusal`), les liens bâtis sur l'adresse du site ouvert : un
- * texte sous 1 200 caractères mais fait de lignes courtes ou de caractères
- * échappés est retenu avant l'envoi, au lieu d'un refus après confirmation.
+ * (`staffMessageRefusal`), les liens bâtis sur **sa** racine (`linkBase`, rendue
+ * par le décompte ; `null` : le serveur n'en met pas) : un texte sous 1 200
+ * caractères mais fait de lignes courtes ou de caractères échappés est retenu
+ * avant l'envoi, au lieu d'un refus après confirmation.
  */
 export function staffMessageRenderedTooLong(
   message: string,
   tournament: { id: number; name: string },
-  origin: string,
+  linkBase: string | null,
 ): boolean {
   const text = normalizeStaffMessage(message) ?? "";
   if (text.length === 0) return false;
   const refusal = staffMessageRefusal({
     tournamentName: tournament.name,
     message: text,
-    tournamentUrl: `${origin}/tournois/${tournament.id}`,
-    settingsUrl: `${origin}${MATCH_DM_SETTINGS_PATH}`,
+    tournamentUrl: linkBase === null ? null : `${linkBase}/tournois/${tournament.id}`,
+    settingsUrl: linkBase === null ? null : `${linkBase}${MATCH_DM_SETTINGS_PATH}`,
   });
   return refusal === STAFF_MESSAGE_ERRORS.messageTooLong;
+}
+
+/**
+ * Racine des liens rendue par le décompte : une chaîne (sans barre finale) ou
+ * `null` ; tout autre contenu est ignoré (`undefined` : pas encore connue).
+ */
+export function staffMessageLinkBase(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  if (typeof value === "string" && /^https?:\/\/[^\s]+$/.test(value)) return value.replace(/\/+$/, "");
+  return undefined;
 }
 
 /** Refus du serveur qui désignent le champ du texte (`useFieldErrors`). */
@@ -115,18 +126,19 @@ export const STAFF_MESSAGE_FIELD_ERRORS = {
 
 /**
  * Ce que dit la notification après un envoi :
- * - `pending` — l'envoi continue (ou un lot reste sans réponse du bot) : ne pas renvoyer ;
- * - `nothingDelivered` — rien n'a été remis (ni message privé, ni push) : une erreur, pas un succès ;
- * - `botUnreachable` — bot injoignable, des push sont partis ;
+ * - `pending` — l'envoi continue en arrière-plan : ne pas renvoyer ;
+ * - `unconfirmed` — fini, mais des messages privés sont restés sans bilan du bot (peut-être remis) : ne pas renvoyer ;
+ * - `botUnreachable` — bot injoignable : rien n'est parti en message privé (avec des push, un succès ; sans, une erreur, l'envoi est rendu au plafond) ;
+ * - `nobodyReached` — le bot a répondu, mais personne n'a été atteint (messages privés fermés ou introuvables, aucun appareil) : une erreur, l'envoi est rendu au plafond, réessayer n'y changerait rien ;
  * - `sent` — le bilan ordinaire.
  */
-export type StaffMessageSendOutcome = "pending" | "nothingDelivered" | "botUnreachable" | "sent";
+export type StaffMessageSendOutcome = "pending" | "unconfirmed" | "botUnreachable" | "nothingDelivered" | "nobodyReached" | "sent";
 
 export function staffMessageSendOutcome(delivery: StaffMessageDelivery): StaffMessageSendOutcome {
   if (delivery.pending) return "pending";
-  if (delivery.sent + delivery.pushed === 0) return "nothingDelivered";
-  if (delivery.botUnreachable) return "botUnreachable";
-  return "sent";
+  if (delivery.unconfirmed > 0) return "unconfirmed";
+  if (delivery.sent + delivery.pushed > 0) return delivery.botUnreachable ? "botUnreachable" : "sent";
+  return delivery.botUnreachable ? "nothingDelivered" : "nobodyReached";
 }
 
 /**

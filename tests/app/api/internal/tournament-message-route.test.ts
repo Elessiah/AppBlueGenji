@@ -51,7 +51,7 @@ beforeEach(() => {
   jest.mocked(previewTournamentStaffMessage).mockResolvedValue(preview);
   jest.mocked(sendTournamentStaffMessage).mockResolvedValue({
     ...preview,
-    delivery: { sent: 1, failed: 0, skipped: 1, pushed: 2, botUnreachable: false, pending: false },
+    delivery: { sent: 1, failed: 0, unconfirmed: 0, skipped: 1, pushed: 2, botUnreachable: false, pending: false },
   });
 });
 

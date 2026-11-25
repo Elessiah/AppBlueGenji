@@ -5,13 +5,17 @@ jest.mock("@/lib/server/notify", () => ({ loadNotificationRecipients: jest.fn(),
 jest.mock("@/lib/server/push-subscriptions", () => ({ usersWithTopicDisabled: jest.fn() }));
 jest.mock("@/lib/server/staff-audit", () => ({ publishStaffAction: jest.fn() }));
 jest.mock("@/lib/server/site-url", () => ({ siteUrl: jest.fn((path: string) => `https://bluegenji.test${path}`) }));
-jest.mock("@/lib/server/periodic-clock", () => ({ startPeriodicClock: jest.fn(), trackBackgroundPass: jest.fn() }));
+jest.mock("@/lib/server/periodic-clock", () => ({
+  onBackgroundHalt: jest.fn(() => () => undefined),
+  startPeriodicClock: jest.fn(),
+  trackBackgroundPass: jest.fn(),
+}));
 
 import { getDatabase } from "@/lib/server/database";
 import { loadNotificationRecipients, notifyUsers, type NotificationRecipient } from "@/lib/server/notify";
 import { usersWithTopicDisabled } from "@/lib/server/push-subscriptions";
 import { publishStaffAction } from "@/lib/server/staff-audit";
-import { startPeriodicClock } from "@/lib/server/periodic-clock";
+import { onBackgroundHalt, startPeriodicClock } from "@/lib/server/periodic-clock";
 import {
   countTournamentStaffMessageRecipients,
   previewTournamentStaffMessage,
@@ -312,7 +316,7 @@ describe("sendTournamentStaffMessage", () => {
   it("sendTournamentStaffMessage_ok_returnsCountedDelivery", async () => {
     const actual = await sendTournamentStaffMessage(request());
 
-    expect(actual.delivery).toEqual({ sent: 1, failed: 0, skipped: 1, pushed: 3, botUnreachable: false, pending: false });
+    expect(actual.delivery).toEqual({ sent: 1, failed: 0, unconfirmed: 0, skipped: 1, pushed: 3, botUnreachable: false, pending: false });
   });
 
   it("sendTournamentStaffMessage_dmUndelivered_countsItFailed", async () => {
@@ -393,7 +397,7 @@ describe("sendTournamentStaffMessage — délai de réponse", () => {
 
     const actual = await sendTournamentStaffMessage(request(), { replyDeadlineMs: 5 });
 
-    expect(actual.delivery).toEqual({ sent: 0, failed: 0, skipped: 1, pushed: 0, botUnreachable: false, pending: true });
+    expect(actual.delivery).toEqual({ sent: 0, failed: 0, unconfirmed: 0, skipped: 1, pushed: 0, botUnreachable: false, pending: true });
   });
 
   it("sendTournamentStaffMessage_deliveryOutlastsDeadline_publishesStaffLogWhenItFinishes", async () => {
@@ -425,13 +429,70 @@ describe("sendTournamentStaffMessage — délai de réponse", () => {
     await expect(sendTournamentStaffMessage(request())).rejects.toThrow("rédacteur en panne");
   });
 
-  it("sendTournamentStaffMessage_discordUncertain_returnsPendingWithoutRefund", async () => {
-    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [1], pushed: 0, discordUncertain: true });
+  it("sendTournamentStaffMessage_discordUncertain_returnsUnconfirmedWithoutRefund", async () => {
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [1], pushed: 0, discordUncertainUserIds: [1] });
 
     const actual = await sendTournamentStaffMessage(request());
 
-    expect(actual.delivery).toMatchObject({ botUnreachable: false, pending: true });
+    expect(actual.delivery).toMatchObject({ botUnreachable: false, pending: false, unconfirmed: 1 });
     expect(execute.mock.calls.some(([sql]) => sql.includes("GREATEST(sends - 1, 0)"))).toBe(false);
+  });
+});
+
+describe("sendTournamentStaffMessage — lots sans bilan et plafond rendu", () => {
+  it("sendTournamentStaffMessage_partlyUncertain_countsUnconfirmedApartFromFailed", async () => {
+    entrantRows = [
+      { user_id: 1, roles_json: JSON.stringify(["TANK"]), solo: 0 },
+      { user_id: 3, roles_json: JSON.stringify(["DPS"]), solo: 0 },
+      { user_id: 4, roles_json: JSON.stringify(["HEAL"]), solo: 0 },
+    ];
+    jest.mocked(notifyUsers).mockResolvedValue({
+      discord: { sent: 1, unresolved: [], failed: [] },
+      discordUnreachedUserIds: [3],
+      pushed: 0,
+      discordUncertainUserIds: [3],
+    });
+
+    const actual = await sendTournamentStaffMessage(request());
+
+    expect(actual.delivery).toMatchObject({ sent: 1, unconfirmed: 1, failed: 1, pending: false });
+    expect(jest.mocked(publishStaffAction).mock.calls[0][0]).toContain(
+      "1 message(s) privé(s) remis, 1 sans bilan du bot (peut-être remis), 1 non remis",
+    );
+  });
+
+  it("sendTournamentStaffMessage_botAnsweredButNothingDelivered_refunds", async () => {
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: { sent: 0, unresolved: [], failed: ["p1"] }, discordUnreachedUserIds: [], pushed: 0 });
+
+    const actual = await sendTournamentStaffMessage(request());
+
+    expect(actual.delivery.botUnreachable).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET sends = GREATEST(sends - 1, 0)"))).toBe(true);
+  });
+});
+
+describe("sendTournamentStaffMessage — arrêt du serveur", () => {
+  it("sendTournamentStaffMessage_haltDuringSend_publishesInterruptedLine", async () => {
+    jest.mocked(notifyUsers).mockReturnValue(new Promise(() => undefined));
+    await sendTournamentStaffMessage(request({ message: "Texte secret" }), { replyDeadlineMs: 5 });
+    const [halt] = jest.mocked(onBackgroundHalt).mock.calls[0];
+
+    halt();
+
+    const [line] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(line).toContain("le site s'arrête pendant l'envoi (2 visé(s))");
+    expect(line).not.toContain("Texte secret");
+    expect(line).not.toContain("Arbitre");
+  });
+
+  it("sendTournamentStaffMessage_sendSettled_unsubscribesHaltListener", async () => {
+    const stopListening = jest.fn();
+    jest.mocked(onBackgroundHalt).mockReturnValueOnce(stopListening);
+
+    await sendTournamentStaffMessage(request());
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(stopListening).toHaveBeenCalledTimes(1);
   });
 });
 

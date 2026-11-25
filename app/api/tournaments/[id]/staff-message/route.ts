@@ -2,6 +2,7 @@ import { enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { readJsonObject, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
+import { siteBaseUrl } from "@/lib/server/site-url";
 import {
   countTournamentStaffMessageRecipients,
   previewTournamentStaffMessage,
@@ -33,7 +34,8 @@ function parseSiteRequest(body: Record<string, unknown>): SiteRequest | string {
  * participants » de la fiche d'un tournoi : la porte du site de
  * `/message-tournoi`. Session exigée, provenance vérifiée par le middleware
  * (écriture sous `/api/`), permission `tournaments`. Corps :
- * `{ mode: "count", categories }` (décompte en direct de la fenêtre) ou
+ * `{ mode: "count", categories }` (décompte en direct de la fenêtre, avec la
+ * racine des liens du message privé, `linkBase`) ou
  * `{ mode: "preview" | "send", categories, message }`. Même service que la
  * route interne du bot (`lib/server/tournament-staff-message.ts`) : mêmes
  * destinataires, même plafond, même journal. Rend des **nombres** — jamais un
@@ -60,7 +62,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const author = { userId: user.id };
   try {
     if (parsed.mode === "count") {
-      return ok({ mode: "count", ...(await countTournamentStaffMessageRecipients({ author, tournamentId, categories: parsed.categories })) });
+      // `linkBase` : la racine des liens du message privé (`APP_URL`, `null` sans
+      // elle) — la fenêtre mesure le message rendu sur la même base que le serveur.
+      const counted = await countTournamentStaffMessageRecipients({ author, tournamentId, categories: parsed.categories });
+      return ok({ mode: "count", ...counted, linkBase: siteBaseUrl() });
     }
     const request = { author, tournamentId, categories: parsed.categories, message: parsed.message };
     if (parsed.mode === "preview") {

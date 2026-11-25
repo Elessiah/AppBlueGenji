@@ -233,6 +233,12 @@ export type StaffMessageDelivery = {
   sent: number;
   /** Messages privés non remis (absents des serveurs, messages privés fermés, bot injoignable). */
   failed: number;
+  /**
+   * Messages privés d'un lot resté sans bilan du bot (délai écoulé, connexion
+   * coupée, panne en plein envoi) : peut-être remis. Ni comptés dans `failed`,
+   * ni rendus au plafond — les renvoyer doublerait le message de qui l'a reçu.
+   */
+  unconfirmed: number;
   /** Non tentés : sujet coupé ou sans Discord. */
   skipped: number;
   /** Appareils atteints en push. */
@@ -240,10 +246,9 @@ export type StaffMessageDelivery = {
   /** Le bot n'a pas répondu (aucun message privé n'a pu être confirmé). */
   botUnreachable: boolean;
   /**
-   * Bilan incomplet : l'envoi continue en arrière-plan (réponse rendue avant
-   * sa fin, les nombres sont alors à zéro), ou un lot de messages privés est
-   * resté sans réponse du bot et a pu partir. Ne pas renvoyer : le bilan final
-   * est au journal du staff.
+   * L'envoi continue en arrière-plan : la réponse est rendue avant sa fin, les
+   * nombres d'envoi sont alors à zéro. Ne pas renvoyer : le bilan final est au
+   * journal du staff.
    */
   pending: boolean;
 };

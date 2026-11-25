@@ -544,6 +544,10 @@ async function postDiscordNotification(
 
     if (!response.ok) {
       recordFailure();
+      // Une panne du bot en pleine distribution (`500`) a pu survenir après des
+      // envois ; `503` (serveur BlueGenji introuvable) dit que rien n'est parti.
+      if (response.status >= 500 && response.status !== 503) options.onUncertain?.();
+      await discardBody(response);
       return null;
     }
 
@@ -572,7 +576,8 @@ async function postDiscordNotification(
  *   refermer le coupe-circuit si elle réussit. `timeoutMs` : délai de l'appel
  *   (défaut 15 s), plus long pour un envoi qui enchaîne beaucoup de destinataires.
  *   `onUncertain` : appelé quand l'appel échoue **après** avoir atteint le bot
- *   (délai écoulé, connexion coupée, bilan illisible) — des messages ont pu partir.
+ *   (délai écoulé, connexion coupée, bilan illisible, panne `5xx` hors `503`) —
+ *   des messages ont pu partir.
  * @returns Le bilan du bot, ou `null` s'il est injoignable.
  */
 export async function pushDiscordDirectMessages(

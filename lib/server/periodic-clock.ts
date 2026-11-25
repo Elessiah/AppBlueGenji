@@ -46,7 +46,7 @@ type ClockState = {
 };
 
 /** Passages de fond lancés hors d'une horloge (entretien entraîné par le trafic), et l'arrêt du serveur. */
-type BackgroundState = { halted: boolean; passes: Set<Promise<unknown>> };
+type BackgroundState = { halted: boolean; passes: Set<Promise<unknown>>; haltListeners?: Set<() => void> };
 
 const globalClocks = globalThis as typeof globalThis & {
   __bgPeriodicClocks?: Map<string, ClockState>;
@@ -83,6 +83,23 @@ export function trackBackgroundPass(pass: Promise<unknown>): void {
     passes.delete(pass);
   };
   pass.then(settled, settled);
+}
+
+/**
+ * Écoute l'arrêt du serveur ({@link stopAllPeriodicClocks}) : `listener` est
+ * appelé **sur-le-champ**, avant l'attente bornée des passages et le vidage du
+ * journal — un passage trop long pour finir à temps y pose sa dernière ligne.
+ * Rend de quoi se désinscrire (à la fin du passage). Une erreur de l'écouteur
+ * est avalée : l'arrêt ne s'interrompt pas.
+ */
+export function onBackgroundHalt(listener: () => void): () => void {
+  const state = background();
+  state.haltListeners ??= new Set();
+  const listeners = state.haltListeners;
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 async function runOnce(state: ClockState, options: PeriodicClockOptions): Promise<void> {
@@ -179,6 +196,13 @@ export async function stopPeriodicClock(key: string): Promise<void> {
 export function stopAllPeriodicClocks(): Promise<void> {
   const state = background();
   state.halted = true;
+  for (const listener of [...(state.haltListeners ?? [])]) {
+    try {
+      listener();
+    } catch {
+      // Un écouteur en panne n'empêche ni les autres ni l'arrêt.
+    }
+  }
   return Promise.all([
     ...[...clocks().values()].map((clock) => {
       if (clock.first || clock.timer) clock.suspended = true;

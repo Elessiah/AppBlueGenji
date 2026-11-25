@@ -24,6 +24,7 @@ import {
   staffMessageAudience,
   staffMessageBlocker,
   staffMessageLength,
+  staffMessageLinkBase,
   staffMessageRenderedTooLong,
   staffMessageRequestCategories,
   staffMessageSendMayHaveGoneOut,
@@ -47,6 +48,8 @@ type StaffMessageResponse = {
   error?: string;
   recipients?: StaffMessageRecipientCounts;
   delivery?: StaffMessageDelivery;
+  /** Décompte : racine des liens du message privé côté serveur (`null` : aucun lien). */
+  linkBase?: unknown;
 };
 
 /**
@@ -111,6 +114,9 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
   // Cases dont le décompte a échoué : dit, avec de quoi le relancer.
   const [countFailed, setCountFailed] = useState<string | null>(null);
   const [countRetry, setCountRetry] = useState(0);
+  // Racine des liens du message privé selon le serveur, apprise au décompte
+  // (`undefined` : pas encore connue, l'adresse du site ouvert en tient lieu).
+  const [linkBase, setLinkBase] = useState<string | null | undefined>(undefined);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const countSeq = useRef(0);
@@ -126,6 +132,8 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
     const timer = setTimeout(() => {
       postStaffMessage(tournamentId, { mode: "count", categories: requestKey.split(",") })
         .then((payload) => {
+          const base = staffMessageLinkBase(payload.linkBase);
+          if (base !== undefined) setLinkBase(base);
           if (seq === countSeq.current && payload.recipients) setCounted({ key: requestKey, counts: payload.recipients });
         })
         .catch((error: unknown) => {
@@ -137,9 +145,14 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
     return () => clearTimeout(timer);
   }, [tournamentId, requestKey, countRetry, showError, mapError]);
 
-  // Les liens du message privé, bâtis comme le serveur les bâtit (même site).
+  // Les liens du message privé, bâtis sur la racine du serveur (en attendant
+  // le premier décompte, l'adresse du site ouvert).
   const origin = useMemo(() => (typeof window === "undefined" ? "" : window.location.origin), []);
-  const renderedTooLong = staffMessageRenderedTooLong(message, { id: tournamentId, name: tournamentName }, origin);
+  const renderedTooLong = staffMessageRenderedTooLong(
+    message,
+    { id: tournamentId, name: tournamentName },
+    linkBase === undefined ? origin : linkBase,
+  );
   const blocker = staffMessageBlocker({ message, categories, counts, renderedTooLong });
   const length = staffMessageLength(message);
   const countUnavailable = counts === null && countFailed !== null && countFailed === requestKey;
@@ -160,14 +173,20 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
       const delivery = payload.delivery;
       const outcome = delivery ? staffMessageSendOutcome(delivery) : "pending";
       if (outcome === "nothingDelivered") {
-        // Rien n'est parti (le serveur rend l'envoi au plafond quand le bot était injoignable).
+        // Bot injoignable, aucun push : rien n'est parti, l'envoi est rendu au plafond — réessayer plus tard a un sens.
         showError(t("staffMessage.nothingDelivered"));
         setConfirming(false);
         return false;
       }
-      if (outcome === "pending") showSuccess(t("staffMessage.sentPending"));
-      else if (outcome === "botUnreachable") showSuccess(t("staffMessage.sentBotUnreachable", { pushed: delivery?.pushed ?? 0 }));
-      else showSuccess(t("staffMessage.sent", { sent: delivery?.sent ?? 0, pushed: delivery?.pushed ?? 0 }));
+      const sent = delivery?.sent ?? 0;
+      const pushed = delivery?.pushed ?? 0;
+      // Personne d'atteignable : rendu au plafond, mais le renvoyer n'y changerait rien.
+      if (outcome === "nobodyReached") showError(t("staffMessage.nobodyReached"));
+      else if (outcome === "pending") showSuccess(t("staffMessage.sentPending"));
+      else if (outcome === "unconfirmed") {
+        showSuccess(t("staffMessage.sentUnconfirmed", { sent, unconfirmed: delivery?.unconfirmed ?? 0, pushed }));
+      } else if (outcome === "botUnreachable") showSuccess(t("staffMessage.sentBotUnreachable", { pushed }));
+      else showSuccess(t("staffMessage.sent", { sent, pushed }));
       onClose();
       return true;
     } catch (error) {

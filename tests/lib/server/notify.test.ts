@@ -698,7 +698,7 @@ describe("notifyUsers — envoi par lots", () => {
     expect(actual.discordUnreachedUserIds).toEqual([3, 4, 5]);
   });
 
-  it("notifyUsers_uncertainBatchWithUncertainIsNotLost_sendsLaterBatchesAndFlagsUncertain", async () => {
+  it("notifyUsers_uncertainBatchWithUncertainIsNotLost_sendsLaterBatchesAndNamesUncertainAccounts", async () => {
     jest
       .mocked(pushDiscordDirectMessages)
       .mockImplementationOnce(async (_text, _recipients, _context, options) => {
@@ -714,9 +714,48 @@ describe("notifyUsers — envoi par lots", () => {
     });
 
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(2);
-    expect(actual.discordUncertain).toBe(true);
+    expect(actual.discordUncertainUserIds).toEqual([1]);
     expect(actual.discord).toEqual({ sent: 1, unresolved: [], failed: [] });
     expect(actual.discordUnreachedUserIds).toEqual([1]);
+  });
+
+  /** Un appel qui atteint le bot sans bilan : `onUncertain`, puis `null`. */
+  const uncertainCall: typeof pushDiscordDirectMessages = async (_text, _recipients, _context, options) => {
+    options?.onUncertain?.();
+    return null;
+  };
+
+  it("notifyUsers_twoUncertainBatchesInARow_stopsLaterBatches", async () => {
+    jest.mocked(pushDiscordDirectMessages).mockImplementationOnce(uncertainCall).mockImplementationOnce(uncertainCall);
+
+    const actual = await notifyUsers(many(3), {
+      topic: "TEAM_JOIN_REQUEST",
+      push: PUSH,
+      discord: { message: DM, context: "ctx", delivery: { batchSize: 1, uncertainIsNotLost: true } },
+    });
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(2);
+    expect(actual.discordUncertainUserIds).toEqual([1, 2]);
+    expect(actual.discordUnreachedUserIds).toEqual([1, 2, 3]);
+  });
+
+  it("notifyUsers_uncertainThenReportThenUncertain_keepsSending", async () => {
+    jest
+      .mocked(pushDiscordDirectMessages)
+      .mockImplementationOnce(uncertainCall)
+      .mockResolvedValueOnce({ sent: 1, unresolved: [], failed: [] })
+      .mockImplementationOnce(uncertainCall)
+      .mockResolvedValueOnce({ sent: 1, unresolved: [], failed: [] });
+
+    const actual = await notifyUsers(many(4), {
+      topic: "TEAM_JOIN_REQUEST",
+      push: PUSH,
+      discord: { message: DM, context: "ctx", delivery: { batchSize: 1, uncertainIsNotLost: true } },
+    });
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(4);
+    expect(actual.discordUncertainUserIds).toEqual([1, 3]);
+    expect(actual.discord).toEqual({ sent: 2, unresolved: [], failed: [] });
   });
 
   it("notifyUsers_unreachableBatchWithUncertainIsNotLost_stopsLaterBatches", async () => {
@@ -729,7 +768,7 @@ describe("notifyUsers — envoi par lots", () => {
     });
 
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
-    expect(actual.discordUncertain).toBeUndefined();
+    expect(actual.discordUncertainUserIds).toBeUndefined();
     expect(actual.discord).toBeNull();
   });
 });

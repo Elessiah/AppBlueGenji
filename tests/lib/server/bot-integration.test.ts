@@ -550,6 +550,25 @@ describe("pushDiscordDirectMessages — issue incertaine (onUncertain)", () => {
     expect(onUncertain).not.toHaveBeenCalled();
   });
 
+  it("pushDiscordDirectMessages_bot500_callsOnUncertainAndReturnsNull", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: "NOTIFICATION_DELIVERY_FAILED" }), { status: 500 }));
+    const onUncertain = jest.fn();
+
+    const actual = await pushDiscordDirectMessages("Message", recipients, "ctx", { honourCircuit: false, onUncertain });
+
+    expect(actual).toBeNull();
+    expect(onUncertain).toHaveBeenCalledTimes(1);
+  });
+
+  it("pushDiscordDirectMessages_bot400_doesNotCallOnUncertain", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: "INVALID_NOTIFICATION_PAYLOAD" }), { status: 400 }));
+    const onUncertain = jest.fn();
+
+    await pushDiscordDirectMessages("Message", recipients, "ctx", { honourCircuit: false, onUncertain });
+
+    expect(onUncertain).not.toHaveBeenCalled();
+  });
+
   it("pushDiscordDirectMessages_non2xx_doesNotCallOnUncertain", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 503 }));
     const onUncertain = jest.fn();

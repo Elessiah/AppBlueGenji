@@ -51,7 +51,7 @@ beforeEach(() => {
   jest.mocked(previewTournamentStaffMessage).mockResolvedValue(counts);
   jest.mocked(sendTournamentStaffMessage).mockResolvedValue({
     ...counts,
-    delivery: { sent: 2, failed: 0, skipped: 2, pushed: 3, botUnreachable: false, pending: false },
+    delivery: { sent: 2, failed: 0, unconfirmed: 0, skipped: 2, pushed: 3, botUnreachable: false, pending: false },
   });
 });
 
@@ -88,12 +88,37 @@ describe("POST /api/tournaments/[id]/staff-message — temps", () => {
     const actual = await call({ mode: "count", categories: ["OWNERS", "PLAYERS"] });
 
     expect(actual.status).toBe(200);
-    await expect(actual.json()).resolves.toEqual({ mode: "count", ...counts });
+    await expect(actual.json()).resolves.toMatchObject({ mode: "count", ...counts });
     expect(countTournamentStaffMessageRecipients).toHaveBeenCalledWith({
       author: { userId: 7 },
       tournamentId: 12,
       categories: ["PLAYERS", "OWNERS"],
     });
+  });
+
+  it("POST_countWithAppUrl_returnsLinkBase", async () => {
+    const previous = process.env.APP_URL;
+    process.env.APP_URL = "https://bluegenji.test/";
+    try {
+      const actual = await call({ mode: "count", categories: ["ALL"] });
+
+      await expect(actual.json()).resolves.toMatchObject({ linkBase: "https://bluegenji.test" });
+    } finally {
+      if (previous === undefined) delete process.env.APP_URL;
+      else process.env.APP_URL = previous;
+    }
+  });
+
+  it("POST_countWithoutAppUrl_returnsNullLinkBase", async () => {
+    const previous = process.env.APP_URL;
+    delete process.env.APP_URL;
+    try {
+      const actual = await call({ mode: "count", categories: ["ALL"] });
+
+      await expect(actual.json()).resolves.toMatchObject({ linkBase: null });
+    } finally {
+      if (previous !== undefined) process.env.APP_URL = previous;
+    }
   });
 
   it("POST_countBadCategories_returns400", async () => {

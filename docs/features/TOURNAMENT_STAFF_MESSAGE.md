@@ -39,16 +39,24 @@ portes appellent **le même service** : `lib/server/tournament-staff-message.ts`
   (`BOT_DM_RECIPIENTS_PER_CALL`, plafond de `/internal/notify/dm`) et par 25 ici,
   délai 120 s par appel, sans le coupe-circuit (`DirectMessageDelivery`). Un lot
   qui atteint le bot sans rendre de bilan (délai écoulé, connexion coupée en
-  route, `200` illisible : `onUncertain`) n'arrête pas les suivants
-  (`uncertainIsNotLost`) et rend le bilan **incomplet** (`discordUncertain`) :
-  ni « bot injoignable », ni envoi rendu au plafond — le renvoyer doublerait le
-  message de ceux qui l'ont reçu.
+  route, `200` illisible, panne `5xx` hors `503` : `onUncertain`) n'arrête pas
+  les suivants (`uncertainIsNotLost`) ; ses comptes sont rendus à part
+  (`discordUncertainUserIds`) et comptés `unconfirmed` (« sans bilan du bot,
+  peut-être remis ») : ni « non remis », ni « bot injoignable », ni envoi rendu
+  au plafond — le renvoyer doublerait le message de ceux qui l'ont reçu. Deux
+  lots de suite sans bilan (`MAX_CONSECUTIVE_UNCERTAIN_CALLS`) : le bot est
+  tenu pour figé, les lots restants ne partent pas.
+- **Plafond rendu** quand rien n'est parti à coup sûr : aucun message privé
+  remis, aucun push, aucun lot sans bilan (bot injoignable, messages privés
+  tous refusés, personne d'atteignable).
 - **Réponse sous 40 s** (`STAFF_MESSAGE_REPLY_DEADLINE_MS`) : nginx coupe une
   requête du navigateur à 60 s. Passé ce délai, la route répond
   `delivery.pending: true` (nombres d'envoi à zéro) et l'envoi continue en
-  arrière-plan (`trackBackgroundPass`, attendu par l'arrêt du serveur) ; son
-  bilan final part au journal du staff. `pending` vaut aussi pour un bilan
-  incomplet. Les deux portes disent alors « ne le renvoie pas ».
+  arrière-plan (`trackBackgroundPass`) ; son bilan final part au journal du
+  staff. L'arrêt du serveur n'attend les passages de fond qu'un instant : s'il
+  survient pendant l'envoi, `onBackgroundHalt` pose sur-le-champ au journal une
+  ligne « le site s'arrête pendant l'envoi », avant son vidage. Les deux portes
+  disent « ne le renvoie pas » pour `pending` comme pour `unconfirmed`.
 
 ## Plafond
 
@@ -86,7 +94,7 @@ Corps `{ mode: "preview" | "send", discordId, tournamentId, categories, message 
 le site retrouve le compte rattaché à ce Discord (`DISCORD_ACCOUNT_NOT_LINKED`
 sinon) et vérifie `tournaments` (`FORBIDDEN`). Réponse : des **nombres**
 (`total`, `reachable`, `withoutDiscord`, `optedOut` ; au bilan `sent`, `failed`,
-`skipped`, `pushed`, `botUnreachable`, `pending`), jamais un nom ni un identifiant.
+`unconfirmed`, `skipped`, `pushed`, `botUnreachable`, `pending`), jamais un nom ni un identifiant.
 
 Côté bot (dépôt `blueGenjiBot`, `src/commandsHandlers/messageTournoi.ts`) :
 réponse éphémère, menu à choix multiples (Joueurs, Managers, Capitaines,
@@ -114,14 +122,18 @@ la demande avec ses textes (`tournamentDialogs.json` § `staffMessage`).
 - Décompte en échec : dit, avec un bouton « Recompter ».
 - Compteur du texte (1 200), envoi retenu tant que le texte est vide ou trop
   long — y compris une fois rendu en message privé (`staffMessageRenderedTooLong`,
-  même règle que le serveur, liens bâtis sur l'adresse du site) —, le décompte
+  même règle que le serveur, liens bâtis sur la racine que rend le décompte,
+  `linkBase` = `APP_URL` ou `null`) —, le décompte
   absent ou personne à prévenir.
 - Envoi confirmé par `ConfirmActionDialog` (sans retour possible) ; bilan et
   refus en notification (`useToast`) ; un refus du texte (`STAFF_MESSAGE_EMPTY`,
   `STAFF_MESSAGE_TOO_LONG`) est aussi rattaché au champ (`useFieldErrors`). Rien
-  de remis (ni message privé, ni push) : une erreur, pas un succès ; bilan
-  `pending` : « envoi en cours, ne le renvoie pas » ; réponse illisible (`502`,
-  `504`, réseau) : « peut-être parti », la fenêtre se ferme.
+  de remis, bot injoignable : une erreur, « réessaie plus tard » ; rien de remis,
+  bot joint (personne d'atteignable) : une erreur sans invitation à renvoyer,
+  la fenêtre se ferme ; bilan `pending` : « envoi en cours, ne le renvoie pas » ;
+  `unconfirmed` : le bilan, avec « sans bilan du bot (peut-être remis), ne le
+  renvoie pas » ; réponse illisible (`502`, `504`, réseau) : « peut-être parti »,
+  la fenêtre se ferme.
 
 Route : `POST /api/tournaments/[id]/staff-message` — session, provenance
 vérifiée par le middleware, `can(user, "tournaments")`, corps

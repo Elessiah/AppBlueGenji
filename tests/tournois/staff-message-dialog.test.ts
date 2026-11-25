@@ -3,6 +3,7 @@ import {
   initialStaffMessageCategories,
   staffMessageBlocker,
   staffMessageLength,
+  staffMessageLinkBase,
   staffMessageRenderedTooLong,
   staffMessageRequestCategories,
   staffMessageSendMayHaveGoneOut,
@@ -100,6 +101,36 @@ describe("staffMessageRenderedTooLong", () => {
   });
 });
 
+describe("staffMessageRenderedTooLong — racine des liens", () => {
+  const tournament = { id: 12, name: "Coupe d'hiver" };
+
+  it("staffMessageRenderedTooLong_nullLinkBase_measuresWithoutLinks", () => {
+    expect(staffMessageRenderedTooLong("*".repeat(738), tournament, null)).toBe(false);
+  });
+
+  it("staffMessageRenderedTooLong_sameTextWithLinks_returnsTrue", () => {
+    expect(staffMessageRenderedTooLong("*".repeat(738), tournament, "https://bluegenji.test")).toBe(true);
+  });
+});
+
+describe("staffMessageLinkBase", () => {
+  it("staffMessageLinkBase_url_returnsItWithoutTrailingSlash", () => {
+    expect(staffMessageLinkBase("https://bluegenji.test/")).toBe("https://bluegenji.test");
+  });
+
+  it("staffMessageLinkBase_null_returnsNull", () => {
+    expect(staffMessageLinkBase(null)).toBeNull();
+  });
+
+  it("staffMessageLinkBase_notAnHttpUrl_returnsUndefined", () => {
+    expect(staffMessageLinkBase("javascript:alert(1)")).toBeUndefined();
+  });
+
+  it("staffMessageLinkBase_missing_returnsUndefined", () => {
+    expect(staffMessageLinkBase(undefined)).toBeUndefined();
+  });
+});
+
 describe("staffMessageBlocker — message privé rendu", () => {
   it("staffMessageBlocker_renderedTooLong_returnsTooLong", () => {
     expect(staffMessageBlocker({ message: "Salut", categories: set("ALL"), counts, renderedTooLong: true })).toBe("tooLong");
@@ -107,7 +138,7 @@ describe("staffMessageBlocker — message privé rendu", () => {
 });
 
 describe("staffMessageSendOutcome", () => {
-  const delivery = { sent: 2, failed: 0, skipped: 0, pushed: 1, botUnreachable: false, pending: false };
+  const delivery = { sent: 2, failed: 0, unconfirmed: 0, skipped: 0, pushed: 1, botUnreachable: false, pending: false };
 
   it("staffMessageSendOutcome_pending_returnsPending", () => {
     expect(staffMessageSendOutcome({ ...delivery, sent: 0, pushed: 0, pending: true })).toBe("pending");
@@ -119,6 +150,14 @@ describe("staffMessageSendOutcome", () => {
 
   it("staffMessageSendOutcome_botUnreachableWithPush_returnsBotUnreachable", () => {
     expect(staffMessageSendOutcome({ ...delivery, sent: 0, botUnreachable: true })).toBe("botUnreachable");
+  });
+
+  it("staffMessageSendOutcome_unconfirmed_returnsUnconfirmed", () => {
+    expect(staffMessageSendOutcome({ ...delivery, sent: 0, pushed: 0, unconfirmed: 3 })).toBe("unconfirmed");
+  });
+
+  it("staffMessageSendOutcome_botReachedNothingDelivered_returnsNobodyReached", () => {
+    expect(staffMessageSendOutcome({ ...delivery, sent: 0, pushed: 0, failed: 2 })).toBe("nobodyReached");
   });
 
   it("staffMessageSendOutcome_delivered_returnsSent", () => {

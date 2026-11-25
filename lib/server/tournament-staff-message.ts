@@ -20,7 +20,7 @@ import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { loadNotificationRecipients, notifyUsers, type NotificationRecipient } from "@/lib/server/notify";
-import { startPeriodicClock, trackBackgroundPass } from "@/lib/server/periodic-clock";
+import { onBackgroundHalt, startPeriodicClock, trackBackgroundPass } from "@/lib/server/periodic-clock";
 import { usersWithTopicDisabled } from "@/lib/server/push-subscriptions";
 import { parseRoles } from "@/lib/server/serialization";
 import { siteUrl } from "@/lib/server/site-url";
@@ -344,7 +344,7 @@ export async function reserveStaffMessageSend(tournamentId: number, userId: numb
   return false;
 }
 
-/** Rend l'envoi réservé quand rien n'est parti (bot injoignable et aucun appareil atteint). */
+/** Rend l'envoi réservé quand rien n'est parti à coup sûr (aucun message privé ni push, aucun lot sans bilan). */
 async function refundStaffMessageSend(tournamentId: number, userId: number): Promise<void> {
   const db = await getDatabase();
   await db.execute(
@@ -409,9 +409,25 @@ type DeliveryContext = {
   message: string;
 };
 
+/** Début de la ligne du journal du staff : le tournoi et les catégories, jamais un nom. */
+function staffLogLead(context: Pick<DeliveryContext, "tournament" | "categories">): string {
+  const categories = context.categories.map((category) => CATEGORY_LOG_LABELS[category]).join(", ");
+  return `📣 Message du staff aux participants du tournoi ${discordQuoted(context.tournament.name, "fr")} (${categories})`;
+}
+
+/** Publie une ligne au journal du staff (anonyme sur Discord, nominatif dans pm2), sans le texte. */
+function publishStaffMessageLine(context: DeliveryContext, line: string): void {
+  publishStaffAction(line, context.staff, {
+    category: "tournament",
+    tournamentId: context.tournament.id,
+    auditLine: `${line} (tournoi #${context.tournament.id}, ${[...context.message].length} caractères, texte non gardé)`,
+  });
+}
+
 /**
  * L'envoi lui-même, puis son bilan : rendu au plafond si rien n'est parti à
- * coup sûr (bot injoignable, aucun appareil), noté au journal du staff.
+ * coup sûr (aucun message privé ni push, aucun lot resté sans bilan du bot),
+ * noté au journal du staff.
  */
 async function deliverStaffMessage(context: DeliveryContext): Promise<StaffMessageDelivery> {
   const { staff, tournament, input, counts, notified } = context;
@@ -428,36 +444,48 @@ async function deliverStaffMessage(context: DeliveryContext): Promise<StaffMessa
   });
 
   // Un lot sans réponse du bot à temps (ou coupé en route) a pu partir : ni
-  // « bot injoignable », ni envoi rendu au plafond — le renvoyer doublerait
-  // le message de ceux qui l'ont reçu.
-  const uncertain = report.discordUncertain === true;
-  const botUnreachable = report.discord === null && counts.reachable > 0 && !uncertain;
+  // « bot injoignable », ni « non remis », ni envoi rendu au plafond — le
+  // renvoyer doublerait le message de ceux qui l'ont reçu.
+  const unconfirmed = report.discordUncertainUserIds?.length ?? 0;
+  const botUnreachable = report.discord === null && counts.reachable > 0 && unconfirmed === 0;
   const sent = report.discord?.sent ?? 0;
   const delivery: StaffMessageDelivery = {
     sent,
-    failed: Math.max(0, counts.reachable - sent),
+    failed: Math.max(0, counts.reachable - sent - unconfirmed),
+    unconfirmed,
     skipped: counts.optedOut + counts.withoutDiscord,
     pushed: report.pushed,
     botUnreachable,
-    pending: uncertain,
+    pending: false,
   };
-  if (sent === 0 && report.pushed === 0 && botUnreachable) {
+  // Rien n'est parti à coup sûr (bot injoignable, messages privés tous refusés,
+  // aucun appareil) : l'envoi ne compte pas au plafond.
+  if (sent === 0 && report.pushed === 0 && unconfirmed === 0) {
     await refundStaffMessageSend(tournament.id, staff.id).catch((error: unknown) => {
       console.error("[staff-message] envoi non rendu au plafond", failureReason(error));
     });
   }
 
-  const categories = context.categories.map((category) => CATEGORY_LOG_LABELS[category]).join(", ");
-  const incomplete = uncertain ? " (bilan incomplet : un lot de messages privés sans réponse du bot)" : "";
-  const line =
-    `📣 Message du staff aux participants du tournoi ${discordQuoted(tournament.name, "fr")} (${categories}) : ` +
-    `${counts.total} visé(s), ${sent} message(s) privé(s) remis, ${delivery.failed} non remis, ${delivery.skipped} sans message privé, ${report.pushed} appareil(s) en push${incomplete} — par le staff.`;
-  publishStaffAction(line, staff, {
-    category: "tournament",
-    tournamentId: tournament.id,
-    auditLine: `${line} (tournoi #${tournament.id}, ${[...context.message].length} caractères, texte non gardé)`,
-  });
+  const doubt = unconfirmed > 0 ? `${unconfirmed} sans bilan du bot (peut-être remis), ` : "";
+  publishStaffMessageLine(
+    context,
+    `${staffLogLead(context)} : ` +
+      `${counts.total} visé(s), ${sent} message(s) privé(s) remis, ${doubt}${delivery.failed} non remis, ${delivery.skipped} sans message privé, ${report.pushed} appareil(s) en push — par le staff.`,
+  );
   return delivery;
+}
+
+/**
+ * Le serveur s'arrête pendant un envoi : son arrêt n'attend qu'un instant les
+ * passages de fond, et l'envoi n'aurait pas de bilan. Une ligne le dit au
+ * journal du staff, posée avant le vidage du journal — le staff, à qui l'on a
+ * dit de ne pas renvoyer, apprend que des participants ont pu ne rien recevoir.
+ */
+function staffMessageInterruptedLine(context: DeliveryContext): string {
+  return (
+    `${staffLogLead(context)} : le site s'arrête pendant l'envoi (${context.counts.total} visé(s)) — ` +
+    `s'il ne reprend pas, une partie des participants ne recevra pas le message, et aucun autre bilan ne suivra — par le staff.`
+  );
 }
 
 /** Résout `null` après `ms`, sans retenir le processus ; `cancel` arrête le minuteur. */
@@ -477,8 +505,10 @@ function replyDeadline(ms: number): { reached: Promise<null>; cancel: () => void
  * Discord, nominatif dans pm2 —, sans le texte du message.
  *
  * Un envoi qui dépasse {@link STAFF_MESSAGE_REPLY_DEADLINE_MS} continue en
- * arrière-plan (l'arrêt du serveur l'attend) : la réponse porte alors
- * `delivery.pending`, sans nombres d'envoi, et le bilan final va au journal.
+ * arrière-plan : la réponse porte alors `delivery.pending`, sans nombres
+ * d'envoi, et le bilan final va au journal. Un arrêt du serveur pendant
+ * l'envoi (qui n'attend qu'un instant les passages de fond) y pose une ligne
+ * qui le dit ({@link onBackgroundHalt}).
  */
 export async function sendTournamentStaffMessage(
   request: StaffMessageRequest,
@@ -497,7 +527,7 @@ export async function sendTournamentStaffMessage(
   }
   if (!reserved) throw new StaffMessageError(STAFF_MESSAGE_ERRORS.quotaExceeded, 429);
 
-  const work = deliverStaffMessage({
+  const context: DeliveryContext = {
     staff,
     tournament,
     input,
@@ -505,8 +535,11 @@ export async function sendTournamentStaffMessage(
     notified,
     categories: request.categories,
     message: request.message,
-  });
+  };
+  const stopListening = onBackgroundHalt(() => publishStaffMessageLine(context, staffMessageInterruptedLine(context)));
+  const work = deliverStaffMessage(context);
   trackBackgroundPass(work);
+  work.then(stopListening, stopListening);
   let answered = false;
   // Une panne après la réponse n'a plus d'appelant pour l'entendre : journalisée.
   work.catch((error: unknown) => {
@@ -526,6 +559,7 @@ export async function sendTournamentStaffMessage(
     delivery: {
       sent: 0,
       failed: 0,
+      unconfirmed: 0,
       skipped: counts.optedOut + counts.withoutDiscord,
       pushed: 0,
       botUnreachable: false,
