@@ -138,6 +138,7 @@ Conservation
 Résultats et palmarès : aucune durée de conservation définie, conservés tant que le site existe ; anonymisés à la suppression du compte (pseudo d'emprunt)
 Inscriptions à un tournoi individuel pas encore commencé, sans match : retirées du tournoi dès la demande de suppression du compte (T01)
 Inscription à un tournoi pas encore commencé : effacée dès que l'engagé s'en désinscrit (son propriétaire ou un manager, ou le joueur lui-même en tournoi individuel) ou que le staff la retire
+Inscriptions et désinscriptions : en mémoire seulement, le numéro du compte et l'heure de chaque geste, pour leurs plafonds — dix minutes au plus, remis à zéro quand le site redémarre
 Codes de replay : gardés avec le résultat qu'ils documentent (un détail qui ne l'explique plus est effacé) ; le lien vers le compte qui les a saisis est effacé à la suppression du compte, les codes restent (la partie est conservée par l'éditeur du jeu)
 Droit d'opposition ouvert sur demande
 Adresse IP de ces lecteurs, pour ces plafonds et la mesure de charge : en mémoire seulement, deux minutes au plus après sa dernière requête

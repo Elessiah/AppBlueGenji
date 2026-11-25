@@ -13,8 +13,10 @@
  * 1. **La ligne d'inscription est effacée**, pas marquée. Il n'y a rien à
  *    conserver : avant le coup d'envoi, une inscription n'a produit ni match ni
  *    classement, et la garder « retirée » obligerait chacune des requêtes du
- *    moteur à l'écarter. La trace part au journal Discord, où l'auteur est
- *    nommé (voir la route).
+ *    moteur à l'écarter. La trace part au journal Discord, où personne n'est
+ *    nommé : « le staff » pour un retrait, le nom de l'équipe ou « un joueur »
+ *    pour l'engagé (voir les routes) ; le staff auteur ne l'est que dans les
+ *    journaux du serveur (`publishStaffAction`).
  * 2. **Aucune équipe n'est supprimée.** Ni la fantôme qu'on vient de retirer du
  *    plateau — elle resservira au prochain tournoi —, ni l'entrée solo d'un
  *    joueur, qui est son identité d'engagé et non une inscription. Même règle
