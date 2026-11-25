@@ -63,6 +63,10 @@ beforeEach(() => {
   jest.mocked(loadDurationSettings).mockResolvedValue(DEFAULT_PLANNING_DURATIONS);
   jest.mocked(runAutoAssign).mockResolvedValue({ entries: 0, proposed: 0, replaced: 0 });
   jest.mocked(confirmAssignments).mockResolvedValue({ confirmed: 0, refused: 0 });
+  // Sans remise à zéro, la dernière entrée simulée (un mercredi de novembre 2026)
+  // devenait due à l'heure réelle et le balayage de l'horloge restait pendu.
+  jest.mocked(loadPlanningEntries).mockResolvedValue([]);
+  jest.mocked(drainPlannedCasts).mockResolvedValue(undefined);
 });
 
 function insertedKeys(): unknown[] {
