@@ -33,6 +33,7 @@ import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import {
+  BOT_DM_RECIPIENTS_PER_CALL,
   pushDiscordDirectMessages,
   type DiscordDeliveryReport,
   type DiscordRecipient,
@@ -70,7 +71,7 @@ export type UserNotification = {
    * langue du compte de chaque destinataire (`bg_users.locale`), bilingue si
    * elle n'a pas pu être lue (`docs/features/BOT_DM_LANGUAGE.md`).
    */
-  discord?: { message: LocalizedDm; context: string };
+  discord?: { message: LocalizedDm; context: string; delivery?: DirectMessageDelivery };
   pushOptions?: PushOptions;
   /**
    * Message privé seul, sans push : la **reprise** d'un message privé que le
@@ -85,6 +86,19 @@ export type UserNotification = {
    * réglages : aucun message privé (on ne passe pas outre une opposition).
    */
   dmFollowsTopic?: true;
+};
+
+/**
+ * Réglages de l'envoi au bot, pour une notification qui n'est pas du trafic de
+ * fond : un geste du staff qui attend son bilan (`/message-tournoi`).
+ */
+export type DirectMessageDelivery = {
+  /** Destinataires par appel au bot (borné par {@link BOT_DM_RECIPIENTS_PER_CALL}). */
+  batchSize?: number;
+  /** Délai de chaque appel au bot. */
+  timeoutMs?: number;
+  /** Respecter le coupe-circuit (défaut `true`) ; `false` pour un geste explicite. */
+  honourCircuit?: boolean;
 };
 
 export type NotificationReport = {
@@ -131,7 +145,7 @@ export async function notifyUsers(
   const [discord, pushed] = await Promise.all([
     // Personne à joindre sur Discord : aucun appel au bot, un bilan vide.
     message && groups
-      ? sendLocalizedDirectMessages(groups, message.context)
+      ? sendLocalizedDirectMessages(groups, message.context, message.delivery)
       : Promise.resolve({ report: { sent: 0, unresolved: [], failed: [] }, unreached: [] }),
     // Un sujet réservé à une permission ne part qu'à qui la détient encore, non
     // suspendu : `pushToUsers` en juge sur les lignes d'abonnement qu'il lit
@@ -212,6 +226,23 @@ async function loadAccountLocales(userIds: readonly number[]): Promise<Map<numbe
   return locales;
 }
 
+/** Lots d'au plus `batchSize` destinataires (borné au plafond du bot), dans l'ordre. */
+function deliveryBatches<T>(items: readonly T[], batchSize: number | undefined): T[][] {
+  const size = Math.max(1, Math.min(batchSize ?? BOT_DM_RECIPIENTS_PER_CALL, BOT_DM_RECIPIENTS_PER_CALL));
+  const batches: T[][] = [];
+  for (let start = 0; start < items.length; start += size) batches.push(items.slice(start, start + size));
+  return batches;
+}
+
+/** Les options d'appel posées seulement : un appel sans réglage garde ses trois arguments. */
+function deliveryCallOptions(delivery: DirectMessageDelivery): [] | [{ honourCircuit?: boolean; timeoutMs?: number }] {
+  const options = {
+    ...(delivery.honourCircuit === undefined ? {} : { honourCircuit: delivery.honourCircuit }),
+    ...(delivery.timeoutMs === undefined ? {} : { timeoutMs: delivery.timeoutMs }),
+  };
+  return Object.keys(options).length > 0 ? [options] : [];
+}
+
 /**
  * Un appel au bot par langue : chaque destinataire reçoit le message dans la
  * langue de son compte, bilingue s'il n'a pas pu être lue. Le bot distribue
@@ -221,6 +252,7 @@ async function loadAccountLocales(userIds: readonly number[]): Promise<Map<numbe
 async function sendLocalizedDirectMessages(
   groups: readonly LocaleGroup[],
   context: string,
+  delivery: DirectMessageDelivery = {},
 ): Promise<{ report: DiscordDeliveryReport | null; unreached: number[] }> {
   // Les langues partent **l'une après l'autre**, et un appel perdu arrête les
   // suivants : un bot lent ou tombé ne reçoit qu'un appel par notification,
@@ -228,18 +260,21 @@ async function sendLocalizedDirectMessages(
   // match (deux camps, deux langues) atteindraient d'un coup le seuil du
   // coupe-circuit et suspendraient tout le trafic de fond pour une seule
   // notification ; les comptes non tentés sont rendus comme non joints.
+  // Le bot ignore les destinataires au-delà de `BOT_DM_RECIPIENTS_PER_CALL` par
+  // appel : une langue plus nombreuse part en plusieurs appels, à la suite,
+  // sous la même règle (un appel perdu arrête les suivants).
   const sends: { group: ReachableRecipient[]; report: DiscordDeliveryReport | null }[] = [];
+  const options = deliveryCallOptions(delivery);
   let botLost = false;
-  for (const { text, group } of groups) {
-    const report = botLost
-      ? null
-      : await pushDiscordDirectMessages(
-          text,
-          group.map((recipient) => recipient.discord),
-          context,
-        );
-    if (report === null) botLost = true;
-    sends.push({ group, report });
+  for (const { text, group: whole } of groups) {
+    for (const group of deliveryBatches(whole, delivery.batchSize)) {
+      let report: DiscordDeliveryReport | null = null;
+      if (!botLost) {
+        report = await pushDiscordDirectMessages(text, group.map((recipient) => recipient.discord), context, ...options);
+      }
+      if (report === null) botLost = true;
+      sends.push({ group, report });
+    }
   }
   const unreached = sends.flatMap(({ group, report }) => (report === null ? group.map((r) => r.userId) : []));
   const reached = sends.flatMap(({ report }) => (report === null ? [] : [report]));

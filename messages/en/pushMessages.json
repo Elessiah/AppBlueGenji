@@ -67,6 +67,10 @@
     "title": "The tournament is starting",
     "body": "{tournament} has started. Find your first match on the tournament page."
   },
+  "tournamentStaffMessage": {
+    "title": "Message from the tournament staff",
+    "body": "{tournament}: {message}"
+  },
   "teamJoinRequest": {
     "title": "Join request",
     "body": "A player is asking to join {team}. Answer from the team's page."

@@ -198,6 +198,7 @@ import { dispatchLobbyBriefs } from "./lobby-brief";
 import { dispatchNewMatchNotices } from "./new-match-notices";
 import { dispatchLiveAnnouncements } from "./live-announcements";
 import { purgeExpiredConnectionLogs } from "@/lib/server/connection-logs";
+import { purgeExpiredStaffMessageQuotas } from "@/lib/server/tournament-staff-message";
 import { maintainSiteVisitRetention } from "@/lib/server/site-visits-service";
 import { findSyncCandidates, type SyncCandidate } from "./sync-scope";
 import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
@@ -739,6 +740,9 @@ export async function listTournamentBuckets(
   // connexions : une période sans connexion (sessions de 30 jours) garderait
   // sinon des lignes au-delà de la durée légale annoncée. Étranglée à l'heure.
   void purgeExpiredConnectionLogs().catch(() => undefined);
+  // Et les compteurs du plafond des messages du staff (`/message-tournoi`) :
+  // une fenêtre échue ne sert plus, un aperçu ne vient pas toujours la purger.
+  void purgeExpiredStaffMessageQuotas();
   // Même raison pour la mesure d'audience : son entretien suit aussi les
   // signalements de visite, qu'un visiteur opposé n'envoie pas. Sans cette
   // seconde entrée, un site où tout le monde s'oppose ne tiendrait plus les

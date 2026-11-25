@@ -1,0 +1,446 @@
+/**
+ * Message du staff d'un tournoi à ses engagés, demandé par le bot
+ * (`/message-tournoi`, `docs/features/TOURNAMENT_STAFF_MESSAGE.md`).
+ *
+ * Seule route où le bot appelle le site (`BOT_INTEGRATION.md`, exception
+ * décidée le 2026-11-25) : le site reste **seul juge** — il retrouve le compte
+ * rattaché à l'identifiant Discord de l'auteur de la commande, exige la
+ * permission `tournaments`, relit le tournoi et ses engagés à chaque appel, et
+ * envoie par le chemin commun des notifications (`notifyUsers` : sujet coupé,
+ * langue du compte, push). Rien du texte n'est gardé : il transite.
+ *
+ * Deux temps, une même lecture :
+ * - `preview` — les destinataires **comptés** (jamais un nom ni un
+ *   identifiant), pour l'aperçu éphémère du bot ;
+ * - `send` — la même sélection, relue, puis l'envoi, sous un plafond par
+ *   membre du staff et par tournoi réservé en **une** instruction.
+ */
+import type { RowDataPacket } from "mysql2/promise";
+import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
+import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { loadNotificationRecipients, notifyUsers, type NotificationRecipient } from "@/lib/server/notify";
+import { usersWithTopicDisabled } from "@/lib/server/push-subscriptions";
+import { parseRoles } from "@/lib/server/serialization";
+import { siteUrl } from "@/lib/server/site-url";
+import type { RateLimitRule } from "@/lib/server/rate-limit";
+import { publishStaffAction } from "@/lib/server/staff-audit";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
+import { MATCH_DM_SETTINGS_PATH } from "@/lib/shared/discord-notifications";
+import { discordQuoted } from "@/lib/shared/discord-text";
+import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
+import { tournamentStaffMessagePush } from "@/lib/shared/push-messages";
+import {
+  matchesStaffMessageCategories,
+  STAFF_MESSAGE_ERRORS,
+  STAFF_MESSAGE_SENDS_PER_WINDOW,
+  STAFF_MESSAGE_STATES,
+  STAFF_MESSAGE_WINDOW_MINUTES,
+  staffMessageDm,
+  staffMessageRefusal,
+  type StaffMessageCategory,
+  type StaffMessageDelivery,
+  type StaffMessageDmInput,
+  type StaffMessageRecipientCounts,
+} from "@/lib/shared/tournament-staff-message";
+import type { TournamentState } from "@/lib/shared/types";
+
+/** Sujet de la notification : coupé dans « Mon profil », il coupe aussi le message privé. */
+const TOPIC = "TOURNAMENT_STAFF_MESSAGE" as const;
+
+/** Étiquette côté bot : journalisée en nombres seulement, jamais un nom. */
+export const STAFF_MESSAGE_CONTEXT = "tournament-staff-message";
+
+/**
+ * Envoi au bot : par lots de 25, chacun sous deux minutes. Le bot écrit à un
+ * destinataire après l'autre (recherche du membre, puis message) ; le délai
+ * ordinaire (15 s pour 100) couperait un plateau entier en plein envoi.
+ * Geste explicite du staff, qui attend son bilan : le coupe-circuit des flux
+ * de fond ne le refuse pas sans essayer.
+ */
+const DELIVERY = { batchSize: 25, timeoutMs: 120_000, honourCircuit: false } as const;
+
+/**
+ * Appels de la route par auteur de la commande (identifiant Discord), aperçus
+ * et envois confondus : chaque aperçu relit le tournoi et ses engagés. Les
+ * envois ont en plus leur plafond en base, par tournoi
+ * ({@link reserveStaffMessageSend}).
+ */
+export const STAFF_MESSAGE_CALL_RULE: RateLimitRule = {
+  name: "tournament-staff-message",
+  limit: 60,
+  windowMs: 10 * 60_000,
+};
+
+/** Même plafond d'appels pour la fiche du site, compté par compte de session. */
+export const STAFF_MESSAGE_SITE_CALL_RULE: RateLimitRule = {
+  name: "tournament-staff-message-site",
+  // Le décompte se relit à chaque case cochée : plus large que celui du bot.
+  limit: 120,
+  windowMs: 10 * 60_000,
+};
+
+/** Refus du service : un code et son statut HTTP, rien d'autre ne sort. */
+export class StaffMessageError extends Error {
+  constructor(
+    code: string,
+    readonly status: number,
+    options?: ErrorOptions,
+  ) {
+    super(code, options);
+    this.name = "StaffMessageError";
+  }
+}
+
+/**
+ * Auteur du message : un compte Discord (commande `/message-tournoi`, le site
+ * retrouve le compte qui lui est rattaché) ou un compte du site (bouton
+ * « Message aux participants » de la fiche, session). Dans les deux cas le
+ * compte est relu ici, permission et suspension comprises.
+ */
+export type StaffMessageAuthor = { discordId: string } | { userId: number };
+
+export type StaffMessageRequest = {
+  author: StaffMessageAuthor;
+  tournamentId: number;
+  categories: readonly StaffMessageCategory[];
+  message: string;
+};
+
+export type StaffMessagePreview = {
+  tournament: { id: number; name: string };
+  recipients: StaffMessageRecipientCounts;
+};
+
+export type StaffMessageSendResult = StaffMessagePreview & { delivery: StaffMessageDelivery };
+
+type StaffRow = RowDataPacket & {
+  id: number;
+  pseudo: string;
+  is_admin: number | null;
+  platform_roles_json: unknown;
+  suspended: number;
+};
+
+type TournamentRow = RowDataPacket & { id: number; name: string; state: TournamentState };
+
+type EntrantRow = RowDataPacket & { user_id: number; roles_json: unknown; solo: number };
+
+/**
+ * Le compte de l'auteur (rattaché à ce Discord, ou celui de la session), qui
+ * doit détenir la permission `tournaments`.
+ */
+async function loadStaffAccount(author: StaffMessageAuthor): Promise<{ id: number; pseudo: string }> {
+  const db = await getDatabase();
+  const byDiscord = "discordId" in author;
+  const [rows] = await db.execute<StaffRow[]>(
+    `SELECT u.id, u.pseudo, u.is_admin, u.platform_roles_json,
+            ${userSuspendedSql("u.id")} AS suspended
+       FROM bg_users u
+      WHERE ${byDiscord ? "u.discord_id" : "u.id"} = ? AND u.is_deleted = 0
+      LIMIT 1`,
+    [byDiscord ? author.discordId : author.userId],
+  );
+  const row = rows[0];
+  // Sans compte rattaché, le Discord n'est pas lié ; un compte de session
+  // disparu entre-temps n'a simplement plus le droit.
+  if (!row) throw new StaffMessageError(byDiscord ? STAFF_MESSAGE_ERRORS.notLinked : STAFF_MESSAGE_ERRORS.forbidden, 403);
+  // Un compte suspendu n'a plus de droit effectif (même règle que la session).
+  const allowed =
+    Number(row.suspended) !== 1 &&
+    can({ isAdmin: Number(row.is_admin ?? 0) === 1, roles: sanitizePlatformRoles(row.platform_roles_json) }, "tournaments");
+  if (!allowed) throw new StaffMessageError(STAFF_MESSAGE_ERRORS.forbidden, 403);
+  return { id: Number(row.id), pseudo: String(row.pseudo) };
+}
+
+async function loadTournament(tournamentId: number): Promise<{ id: number; name: string }> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<TournamentRow[]>(
+    `SELECT id, name, state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  const row = rows[0];
+  if (!row) throw new StaffMessageError(STAFF_MESSAGE_ERRORS.tournamentNotFound, 404);
+  if (!STAFF_MESSAGE_STATES.includes(row.state)) throw new StaffMessageError(STAFF_MESSAGE_ERRORS.tournamentClosed, 409);
+  return { id: Number(row.id), name: String(row.name) };
+}
+
+/**
+ * L'engagée a abandonné le tournoi : `FORFEIT` dans l'un des classements
+ * rejoués (Survie, ronde suisse, BG Survie, toute phase d'un multi-phases).
+ * Une engagée éliminée reste une participante ; une équipe désinscrite n'a
+ * plus de ligne d'inscription.
+ */
+const NOT_FORFEITED = ["bg_swiss_standings", "bg_survival_standings", "bg_endurance_standings"]
+  .map(
+    (table) =>
+      `NOT EXISTS (SELECT 1 FROM ${table} st WHERE st.tournament_id = r.tournament_id AND st.team_id = r.team_id AND st.status = 'FORFEIT')`,
+  )
+  .join("\n        AND ");
+
+/**
+ * Membres actuels des équipes inscrites (rôles compris) et joueurs des entrées
+ * solo, hors fantômes (personne derrière), équipes dissoutes et engagées qui
+ * ont abandonné.
+ */
+async function loadEntrants(tournamentId: number): Promise<EntrantRow[]> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<EntrantRow[]>(
+    `SELECT tm.user_id, tm.roles_json, 0 AS solo
+       FROM bg_tournament_registrations r
+       JOIN bg_teams t ON t.id = r.team_id
+       JOIN bg_team_members tm ON tm.team_id = t.id AND tm.left_at IS NULL
+      WHERE r.tournament_id = ?
+        AND t.is_ghost = 0 AND t.solo_user_id IS NULL AND t.deleted_at IS NULL
+        AND ${NOT_FORFEITED}
+     UNION ALL
+     SELECT t.solo_user_id AS user_id, NULL AS roles_json, 1 AS solo
+       FROM bg_tournament_registrations r
+       JOIN bg_teams t ON t.id = r.team_id
+      WHERE r.tournament_id = ?
+        AND t.is_ghost = 0 AND t.solo_user_id IS NOT NULL AND t.deleted_at IS NULL
+        AND ${NOT_FORFEITED}`,
+    [tournamentId, tournamentId],
+  );
+  return rows;
+}
+
+/** Comptes visés par les catégories, chacun une fois (un membre de deux équipes inscrites compte une fois). */
+export function selectRecipientIds(rows: readonly EntrantRow[], categories: readonly StaffMessageCategory[]): number[] {
+  const ids = new Set<number>();
+  for (const row of rows) {
+    const solo = Number(row.solo) === 1;
+    if (matchesStaffMessageCategories({ roles: solo ? [] : parseRoles(row.roles_json), solo }, categories)) {
+      ids.add(Number(row.user_id));
+    }
+  }
+  return [...ids];
+}
+
+/** Sujet coupé : la table absente (création avalée) n'a rien coupé. */
+async function loadOptOuts(userIds: readonly number[]): Promise<Set<number>> {
+  try {
+    return await usersWithTopicDisabled(userIds, TOPIC);
+  } catch (error) {
+    if (isMissingTableError(error)) return new Set();
+    throw error;
+  }
+}
+
+type Audience = {
+  counts: StaffMessageRecipientCounts;
+  /** Destinataires à prévenir : sujet non coupé (Discord ou non). */
+  notified: NotificationRecipient[];
+};
+
+/** Destinataires de la demande, comptés : relus à chaque appel. */
+async function resolveAudience(tournamentId: number, categories: readonly StaffMessageCategory[]): Promise<Audience> {
+  const ids = selectRecipientIds(await loadEntrants(tournamentId), categories);
+  // Comptes supprimés écartés par le chargeur ; un compte suspendu n'est plus sollicité.
+  const recipients = await loadNotificationRecipients(ids, "proven", { excludeSuspended: true });
+  const optOuts = await loadOptOuts(recipients.map((recipient) => recipient.userId));
+  const notified = recipients.filter((recipient) => !optOuts.has(recipient.userId));
+  const reachable = notified.filter((recipient) => recipient.discord !== null).length;
+  return {
+    counts: {
+      total: recipients.length,
+      reachable,
+      withoutDiscord: notified.length - reachable,
+      optedOut: recipients.length - notified.length,
+    },
+    notified,
+  };
+}
+
+function dmInput(tournament: { id: number; name: string }, message: string): StaffMessageDmInput {
+  return {
+    tournamentName: tournament.name,
+    message,
+    tournamentUrl: siteUrl(`/tournois/${tournament.id}`),
+    settingsUrl: siteUrl(MATCH_DM_SETTINGS_PATH),
+  };
+}
+
+/** Compte, tournoi et texte : les contrôles communs aux deux temps. */
+async function authorize(request: StaffMessageRequest) {
+  const staff = await loadStaffAccount(request.author);
+  const tournament = await loadTournament(request.tournamentId);
+  const input = dmInput(tournament, request.message);
+  const refusal = staffMessageRefusal(input);
+  if (refusal) throw new StaffMessageError(refusal, 400);
+  return { staff, tournament, input };
+}
+
+/**
+ * Comptage seul, sans texte : le décompte en direct de la fenêtre de la fiche,
+ * relu à chaque catégorie cochée. Mêmes droits et même état du tournoi que
+ * l'aperçu ; rien n'est envoyé ni réservé.
+ */
+export async function countTournamentStaffMessageRecipients(
+  request: Omit<StaffMessageRequest, "message">,
+): Promise<StaffMessagePreview> {
+  await loadStaffAccount(request.author);
+  const tournament = await loadTournament(request.tournamentId);
+  const { counts } = await resolveAudience(tournament.id, request.categories);
+  return { tournament, recipients: counts };
+}
+
+/** Aperçu : qui recevrait le message, compté. Rien n'est envoyé ni réservé. */
+export async function previewTournamentStaffMessage(request: StaffMessageRequest): Promise<StaffMessagePreview> {
+  const { tournament } = await authorize(request);
+  void purgeExpiredStaffMessageQuotas().catch(() => undefined);
+  const { counts } = await resolveAudience(tournament.id, request.categories);
+  return { tournament, recipients: counts };
+}
+
+/**
+ * Réserve un envoi du plafond (membre du staff, tournoi) en **une**
+ * instruction : la ligne existe (insertion idempotente), puis l'`UPDATE`
+ * conditionnel compte l'envoi s'il reste de la place, ou ouvre une nouvelle
+ * fenêtre si la précédente est échue. `affectedRows` dit si la place est prise
+ * — jamais une lecture suivie d'une écriture.
+ */
+export async function reserveStaffMessageSend(tournamentId: number, userId: number): Promise<boolean> {
+  const db = await getDatabase();
+  await db.execute(
+    `INSERT INTO bg_tournament_staff_message_quota (tournament_id, user_id, window_started_at, sends)
+     VALUES (?, ?, NOW(), 0)
+     ON DUPLICATE KEY UPDATE sends = sends`,
+    [tournamentId, userId],
+  );
+  // `sends` d'abord : son expression lit l'ancienne `window_started_at`, que la
+  // seconde affectation relit aussi telle quelle (elle ne dépend pas de `sends`).
+  const [result] = await db.execute(
+    `UPDATE bg_tournament_staff_message_quota
+        SET sends = IF(window_started_at <= NOW() - INTERVAL ? MINUTE, 1, sends + 1),
+            window_started_at = IF(window_started_at <= NOW() - INTERVAL ? MINUTE, NOW(), window_started_at)
+      WHERE tournament_id = ? AND user_id = ?
+        AND (sends < ? OR window_started_at <= NOW() - INTERVAL ? MINUTE)`,
+    [
+      STAFF_MESSAGE_WINDOW_MINUTES,
+      STAFF_MESSAGE_WINDOW_MINUTES,
+      tournamentId,
+      userId,
+      STAFF_MESSAGE_SENDS_PER_WINDOW,
+      STAFF_MESSAGE_WINDOW_MINUTES,
+    ],
+  );
+  return Number((result as { affectedRows?: number }).affectedRows ?? 0) === 1;
+}
+
+/** Rend l'envoi réservé quand rien n'est parti (bot injoignable et aucun appareil atteint). */
+async function refundStaffMessageSend(tournamentId: number, userId: number): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(
+    `UPDATE bg_tournament_staff_message_quota SET sends = GREATEST(sends - 1, 0) WHERE tournament_id = ? AND user_id = ?`,
+    [tournamentId, userId],
+  );
+}
+
+/** Purge étranglée à l'heure (par processus), comme le journal des connexions. */
+const PURGE_INTERVAL_MS = 60 * 60_000;
+let lastPurgeAt = 0;
+let purgeInFlight: Promise<number> | null = null;
+
+/**
+ * Efface les compteurs dont la fenêtre est échue : ils ne servent plus au
+ * plafond. Appelée par l'entretien de la liste des tournois et par chaque
+ * aperçu ; jamais plus d'une passe par heure.
+ */
+export function purgeExpiredStaffMessageQuotas(now: number = Date.now()): Promise<number> {
+  if (purgeInFlight) return purgeInFlight;
+  if (now - lastPurgeAt < PURGE_INTERVAL_MS) return Promise.resolve(0);
+  const purge = (async () => {
+    const db = await getDatabase();
+    const [result] = await db.execute(
+      `DELETE FROM bg_tournament_staff_message_quota WHERE window_started_at <= NOW() - INTERVAL ? MINUTE`,
+      [STAFF_MESSAGE_WINDOW_MINUTES],
+    );
+    lastPurgeAt = now;
+    return Number((result as { affectedRows?: number }).affectedRows ?? 0);
+  })()
+    .catch((error: unknown) => {
+      if (!isMissingTableError(error)) console.error("[staff-message] purge impossible", failureReason(error));
+      return 0;
+    })
+    .finally(() => {
+      if (purgeInFlight === purge) purgeInFlight = null;
+    });
+  purgeInFlight = purge;
+  return purge;
+}
+
+/** Réservé aux tests : oublie l'heure de la dernière purge. */
+export function resetStaffMessagePurgeClock(): void {
+  lastPurgeAt = 0;
+  purgeInFlight = null;
+}
+
+/** Libellés français des catégories, pour la ligne du journal (jamais un nom). */
+const CATEGORY_LOG_LABELS: Readonly<Record<StaffMessageCategory, string>> = {
+  PLAYERS: "joueurs",
+  MANAGERS: "managers",
+  CAPTAINS: "capitaines",
+  OWNERS: "propriétaires",
+  ALL: "tous",
+};
+
+/**
+ * Envoi : tout est relu (compte, permission, état du tournoi, destinataires),
+ * puis un envoi est réservé au plafond, puis le message part par
+ * `notifyUsers`. Le geste est publié au journal du staff — anonyme sur
+ * Discord, nominatif dans pm2 —, sans le texte du message.
+ */
+export async function sendTournamentStaffMessage(request: StaffMessageRequest): Promise<StaffMessageSendResult> {
+  const { staff, tournament, input } = await authorize(request);
+  const { counts, notified } = await resolveAudience(tournament.id, request.categories);
+  if (notified.length === 0) throw new StaffMessageError(STAFF_MESSAGE_ERRORS.noRecipients, 409);
+
+  let reserved: boolean;
+  try {
+    reserved = await reserveStaffMessageSend(tournament.id, staff.id);
+  } catch (error) {
+    if (isMissingTableError(error)) throw new StaffMessageError(STAFF_MESSAGE_ERRORS.unavailable, 503, { cause: error });
+    throw error;
+  }
+  if (!reserved) throw new StaffMessageError(STAFF_MESSAGE_ERRORS.quotaExceeded, 429);
+
+  const sentAt = Date.now();
+  const report = await notifyUsers(notified, {
+    topic: TOPIC,
+    push: (locale) =>
+      tournamentStaffMessagePush(
+        { tournamentId: tournament.id, tournamentName: tournament.name, message: request.message, sentAt },
+        locale,
+      ),
+    discord: { message: staffMessageDm(input), context: STAFF_MESSAGE_CONTEXT, delivery: DELIVERY },
+    dmFollowsTopic: true,
+  });
+
+  const botUnreachable = report.discord === null && counts.reachable > 0;
+  const sent = report.discord?.sent ?? 0;
+  const delivery: StaffMessageDelivery = {
+    sent,
+    failed: Math.max(0, counts.reachable - sent),
+    skipped: counts.optedOut + counts.withoutDiscord,
+    pushed: report.pushed,
+    botUnreachable,
+  };
+  if (sent === 0 && report.pushed === 0 && botUnreachable) {
+    await refundStaffMessageSend(tournament.id, staff.id).catch((error: unknown) => {
+      console.error("[staff-message] envoi non rendu au plafond", failureReason(error));
+    });
+  }
+
+  const categories = request.categories.map((category) => CATEGORY_LOG_LABELS[category]).join(", ");
+  const line =
+    `📣 Message du staff aux participants du tournoi ${discordQuoted(tournament.name, "fr")} (${categories}) : ` +
+    `${counts.total} visé(s), ${sent} message(s) privé(s) remis, ${delivery.failed} non remis, ${delivery.skipped} sans message privé, ${report.pushed} appareil(s) en push — par le staff.`;
+  publishStaffAction(line, staff, {
+    category: "tournament",
+    tournamentId: tournament.id,
+    auditLine: `${line} (tournoi #${tournament.id}, ${[...request.message].length} caractères, texte non gardé)`,
+  });
+
+  return { tournament, recipients: counts, delivery };
+}

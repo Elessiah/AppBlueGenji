@@ -16,6 +16,10 @@
       "label": "Tournament kickoff",
       "description": "A tournament your team is registered for has just started."
     },
+    "TOURNAMENT_STAFF_MESSAGE": {
+      "label": "Tournament staff messages",
+      "description": "The staff of a tournament you take part in (member of a registered team, or player of a solo tournament) writes to its participants from Discord. Also turns off the Discord direct message."
+    },
     "NEW_MATCH": {
       "label": "New match",
       "description": "The opponent of your next match (a team you belong to, or your solo tournament) is known: who you face (not named in a solo tournament), the time if it is set (then not repeated by “Match times and reminders” before the reminders), and the match link."

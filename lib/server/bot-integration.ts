@@ -565,22 +565,30 @@ async function postDiscordNotification(
  * @param options `honourCircuit` : respecter le coupe-circuit (défaut `true`,
  *   flux d'arrière-plan) ; `false` pour une action explicite d'un joueur qui
  *   attend la réponse (« Tester mes MP ») — elle mérite sa tentative, sans
- *   refermer le coupe-circuit si elle réussit.
+ *   refermer le coupe-circuit si elle réussit. `timeoutMs` : délai de l'appel
+ *   (défaut 15 s), plus long pour un envoi qui enchaîne beaucoup de destinataires.
  * @returns Le bilan du bot, ou `null` s'il est injoignable.
  */
 export async function pushDiscordDirectMessages(
   message: string,
   recipients: DiscordRecipient[],
   context: string,
-  options: { honourCircuit?: boolean } = {},
+  options: { honourCircuit?: boolean; timeoutMs?: number } = {},
 ): Promise<DiscordDeliveryReport | null> {
   if (recipients.length === 0) return emptyDelivery();
   return postDiscordNotification(
     "/internal/notify/dm",
     { message, recipients, context },
-    { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: options.honourCircuit ?? true },
+    { timeoutMs: options.timeoutMs ?? BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: options.honourCircuit ?? true },
   );
 }
+
+/**
+ * Destinataires que le bot accepte par appel à `/internal/notify/dm`
+ * (`MAX_RECIPIENTS` de blueGenjiBot) : il **ignore** ceux qui suivent. Un envoi
+ * plus large part donc en plusieurs appels (`notifyUsers`).
+ */
+export const BOT_DM_RECIPIENTS_PER_CALL = 100;
 
 /**
  * Alerte les arbitres : canal de logs du bot **et** message privé à chaque
