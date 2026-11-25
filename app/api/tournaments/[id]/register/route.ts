@@ -1,9 +1,65 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
+import { sendBotLog } from "@/lib/server/bot-integration";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
+import { withdrawOwnRegistration } from "@/lib/server/tournaments/registration-removal";
 import { registerCurrentUserTeam } from "@/lib/server/tournaments-service";
+import { formatEntrantWithdrawnLog } from "@/lib/shared/bot-logs";
+import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
 import { isRegistrationFilterError } from "@/lib/shared/registration-filters";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
+
+/**
+ * Désinscription par le joueur lui-même, tant que le tournoi n'a pas commencé
+ * (`docs/features/SELF_WITHDRAWAL.md`) : son équipe active s'il en a la charge
+ * (`OWNER`/`MANAGER`), son entrée solo en tournoi individuel.
+ */
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return fail("UNAUTHORIZED", 401);
+
+  const { id } = await context.params;
+  const tournamentId = Number(id);
+  if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
+    return fail("INVALID_TOURNAMENT_ID", 400);
+  }
+
+  // Tournoi non publié : même 404 qu'un identifiant inexistant (`write-visibility.ts`).
+  if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
+
+  try {
+    const removed = await withdrawOwnRegistration(tournamentId, user.id);
+
+    // Après le commit, au meilleur effort : la ligne d'inscription est déjà
+    // effacée, et le canal est le seul endroit où la trace subsiste. Aucun
+    // pseudo n'y part (« un joueur » en individuel).
+    sendBotLog(
+      formatEntrantWithdrawnLog({
+        tournament: { id: removed.tournamentId, name: removed.tournamentName },
+        entrant: { name: removed.entrantName, participantType: removed.participantType },
+        registeredTeams: removed.registeredTeams,
+        maxTeams: removed.maxTeams,
+      }),
+      { category: "registrations", tournamentId: removed.tournamentId },
+    );
+
+    return ok({ success: true });
+  } catch (error) {
+    const message = (error as Error).message;
+    if (message === "NOT_TEAM_MANAGER") return fail(message, 403);
+    if (message === "NO_ACTIVE_TEAM") return fail(message, 400);
+    if (message === "TOURNAMENT_NOT_FOUND" || message === "TEAM_NOT_IN_TOURNAMENT") {
+      return fail(message, 404);
+    }
+    // `Object.hasOwn` et non `in` : voir la route de retrait par le staff.
+    if (Object.hasOwn(ENTRANT_REMOVAL_BLOCK_MESSAGES, message)) return fail(message, 409);
+    return fail(
+      unexpectedFailureCode(error, "WITHDRAWAL_FAILED", `[tournaments] désinscription du tournoi ${tournamentId} échouée`),
+      500,
+    );
+  }
+}
 
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();

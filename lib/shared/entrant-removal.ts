@@ -1,5 +1,7 @@
 /**
- * Retrait d'un engagé du plateau par le staff — logique pure, partagée.
+ * Retrait d'un engagé du plateau par le staff — logique pure, partagée. La
+ * désinscription par le joueur lui-même suit la même fenêtre
+ * (`docs/features/SELF_WITHDRAWAL.md`).
  *
  * Une inscription ne se défaisait pas. Un joueur qui s'était engagé par erreur,
  * une équipe fantôme cochée une fois de trop dans un lot de trente, un engagé

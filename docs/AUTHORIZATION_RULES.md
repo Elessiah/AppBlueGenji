@@ -895,9 +895,15 @@ contexte du lecteur, par les deux portes. Voir
 ### 4.8 Retirer un engagé (avant le coup d'envoi)
 
 `DELETE /api/admin/tournaments/[id]/registrations/[teamId]`, permission
-`tournaments` — et **elle seule** : un engagé ne peut pas se retirer lui-même,
-pas plus qu'un capitaine ne peut retirer son équipe. L'inscription est effacée,
-la place rendue.
+`tournaments` : n'importe quel engagé. L'inscription est effacée, la place
+rendue.
+
+Le joueur se **désinscrit lui-même** par `DELETE /api/tournaments/[id]/register`,
+dans la même fenêtre : son engagé seulement, avec la qualité qu'exige
+l'inscription — `OWNER` ou `MANAGER` de son équipe active (`403
+NOT_TEAM_MANAGER` sinon ; un capitaine ne retire pas son équipe), toujours en
+individuel. Rôles relus sous le verrou de l'équipe. Voir
+`docs/features/SELF_WITHDRAWAL.md`.
 
 La fenêtre s'arrête **au début du tournoi**, bornes comprises
 (`lib/shared/entrant-removal.ts`) : au coup d'envoi le tirage est fait, et retirer

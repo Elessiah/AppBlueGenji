@@ -1,5 +1,5 @@
 {
-  "count": 259,
+  "count": 260,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -24,6 +24,7 @@
     "ENDURANCE_PLAYOFFS_STARTED": "Les play-offs ont commencé : le capital d'endurance est figé. Un forfait se déclare désormais sur le match lui-même.",
     "ENDURANCE_ROUND_ALREADY_PLAYED": "Une manche a été jouée depuis : cette pénalité ne peut plus être retirée.",
     "ENTRANT_REMOVAL_FAILED": "Erreur lors du retrait de l'engagé.",
+    "WITHDRAWAL_FAILED": "Erreur lors de la désinscription.",
     "ENTRANT_REMOVAL_TOURNAMENT_FINISHED": "Le tournoi est terminé : sa liste d'engagés est désormais son palmarès.",
     "ENTRANT_REMOVAL_TOURNAMENT_STARTED": "Le tournoi a commencé : le tirage est fait, un engagé ne s'en retire plus que par abandon.",
     "FIELD_NOT_EDITABLE": "Ce réglage n'est plus modifiable depuis que le tournoi est visible.",

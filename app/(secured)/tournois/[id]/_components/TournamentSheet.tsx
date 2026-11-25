@@ -1017,6 +1017,35 @@ function TournamentSheetView({
     setPendingConfirm({ ...confirm, tone: "primary", run: performRegister });
   };
 
+  // Désinscription par le joueur, avant le coup d'envoi
+  // (`docs/features/SELF_WITHDRAWAL.md`) : confirmée d'abord, comme
+  // l'inscription ; le serveur rejoue fenêtre et droits sous verrou.
+  const performWithdraw = async () => {
+    try {
+      const response = await fetch(`/api/tournaments/${tournamentId}/register`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "WITHDRAWAL_FAILED");
+      showSuccess(a("withdraw.success"));
+      void refresh();
+      return true;
+    } catch (e) {
+      showError(mapParticipantError((e as Error).message, entrantType));
+      return false;
+    }
+  };
+
+  const withdrawEntry = () => {
+    setPendingConfirm({
+      title: a(`withdraw.title.${entrantType}`, { name: detail.card.name }),
+      body: [a(`withdraw.body.${entrantType}`)],
+      confirmLabel: a("withdraw.confirm"),
+      pendingLabel: a("withdraw.pending"),
+      run: performWithdraw,
+    });
+  };
+
   const { isMulti, selectedPhase, contextLabel, filteredMatches, formatForBracket } = selectedPhaseView(
     detail,
     selectedPhaseId,
@@ -1325,6 +1354,7 @@ function TournamentSheetView({
           viewerMatch={viewerMatch}
           frozen={frozen}
           onRegister={registerTeam}
+          onWithdraw={withdrawEntry}
           onReportIssue={() => openIssueReport(null)}
           onGuestRegister={() => setGhostRegistrationOpen(true)}
           onAdvance={() => setAdvanceDialogOpen(true)}

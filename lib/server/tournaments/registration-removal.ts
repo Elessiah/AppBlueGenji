@@ -1,5 +1,7 @@
 /**
- * Retrait d'une inscription par le staff, avant le coup d'envoi.
+ * Retrait d'une inscription avant le coup d'envoi : par le staff
+ * (`removeTournamentEntrant`) ou par le joueur lui-même
+ * (`withdrawOwnRegistration`, `docs/features/SELF_WITHDRAWAL.md`).
  *
  * La règle — **jusqu'au début du tournoi, pas une seconde de plus** — vit dans
  * le module pur `lib/shared/entrant-removal.ts`, partagé avec l'interface. Ce
@@ -27,10 +29,12 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { entrantRemovalBlockReason } from "@/lib/shared/entrant-removal";
-import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
+import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { publishUpdatedEvent } from "./notifications";
-import { lockTournamentRow } from "./registration";
+import type { TournamentRow } from "./_internal";
+import { lockTournamentRow, resolveUserEntrant } from "./registration";
 import { resequenceSeeds } from "./seeding";
 import { syncTournamentState } from "./state";
 
@@ -78,6 +82,82 @@ export async function removeTournamentEntrant(
   tournamentId: number,
   teamId: number,
 ): Promise<RemovedEntrant> {
+  return runEntrantRemoval(tournamentId, {
+    resolveTeamId: async () => teamId,
+  });
+}
+
+/**
+ * Désinscription **à l'initiative du joueur** : son équipe active en tournoi
+ * par équipes, son entrée solo en tournoi individuel — même fenêtre que le
+ * retrait par le staff (jusqu'au coup d'envoi), même effacement.
+ *
+ * Le droit est celui de l'inscription : engager ou désengager une équipe
+ * demande d'en avoir la charge (`OWNER` ou `MANAGER`, `hasTeamManagementRole`) ;
+ * en individuel, le joueur ne retire que lui-même. Les conditions
+ * d'utilisation ne sont **pas** exigées : on ne retient pas une équipe dans un
+ * tournoi faute d'une case cochée (voir `registerCurrentUserTeam`).
+ *
+ * @throws `TOURNAMENT_NOT_FOUND` — identifiant inconnu.
+ * @throws `NO_ACTIVE_TEAM` — rien à désinscrire (aucune équipe, aucune entrée
+ *   solo), ou l'équipe active a changé pendant l'attente du verrou.
+ * @throws `NOT_TEAM_MANAGER` — le joueur n'a pas la charge de son équipe.
+ * @throws `TEAM_NOT_IN_TOURNAMENT` — son engagé n'est pas inscrit.
+ * @throws le code d'`EntrantRemovalBlockReason` — le tournoi a commencé.
+ */
+export async function withdrawOwnRegistration(
+  tournamentId: number,
+  userId: number,
+): Promise<RemovedEntrant> {
+  // L'équipe du joueur, lue sur le pool **avant** d'emprunter la connexion de
+  // la transaction — même raison que l'inscription (`registerCurrentUserTeam`) :
+  // la lire sur une seconde place du pool sous le verrou du tournoi ferait
+  // attendre chaque geste d'une place que les autres ne rendent pas. Elle est
+  // verrouillée puis relue dans la transaction.
+  const candidate = await getUserActiveTeam(userId);
+  const candidateTeamId = candidate?.teamId ?? null;
+  let solo = false;
+
+  return runEntrantRemoval(tournamentId, {
+    // Verrou de l'équipe **avant la première lecture ordinaire** (ordre
+    // tournoi → équipe, celui de l'inscription) : les gestes d'effectif
+    // (rôles, départ, exclusion) tiennent ce verrou, et les rôles relus
+    // ensuite sont donc ceux de l'instant de l'écriture.
+    afterLock: async (connection) => {
+      const [rows] = await connection.execute<(RowDataPacket & { participant_type: string | null })[]>(
+        `SELECT participant_type FROM bg_tournaments WHERE id = ? FOR UPDATE`,
+        [tournamentId],
+      );
+      solo = rows.length > 0 && isSoloTournament(toParticipantType(rows[0].participant_type));
+      if (!solo && candidateTeamId !== null) {
+        await connection.execute(`SELECT id FROM bg_teams WHERE id = ? FOR UPDATE`, [candidateTeamId]);
+      }
+    },
+    resolveTeamId: async (connection, tournament) => {
+      const entrant = await resolveUserEntrant(connection, tournament, userId);
+      if (entrant.teamId === null) throw new Error("NO_ACTIVE_TEAM");
+      // Relue sous le verrou : un joueur qui a changé d'équipe entre la lecture
+      // sur le pool et le verrou ne retire rien — sa nouvelle équipe n'est pas
+      // sous verrou ; un nouvel essai la retire.
+      if (!solo && entrant.teamId !== candidateTeamId) throw new Error("NO_ACTIVE_TEAM");
+      if (!entrant.canActForEntrant) throw new Error("NOT_TEAM_MANAGER");
+      return entrant.teamId;
+    },
+  });
+}
+
+type EntrantRemovalSteps = {
+  /** Verrous supplémentaires, pris juste après celui du tournoi et avant toute lecture ordinaire. */
+  afterLock?: (connection: PoolConnection) => Promise<void>;
+  /** Engagé à retirer, jugé une fois la fenêtre vérifiée (tournoi non commencé). */
+  resolveTeamId: (connection: PoolConnection, tournament: TournamentRow) => Promise<number>;
+};
+
+/** Tronc commun du retrait par le staff et de la désinscription par le joueur. */
+async function runEntrantRemoval(
+  tournamentId: number,
+  steps: EntrantRemovalSteps,
+): Promise<RemovedEntrant> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -90,6 +170,7 @@ export async function removeTournamentEntrant(
     // fenêtre se déciderait sur un état d'avant l'attente du verrou — celui,
     // par exemple, d'un tournoi qu'une inscription concurrente vient de remplir.
     await lockTournamentRow(connection, tournamentId);
+    if (steps.afterLock) await steps.afterLock(connection);
 
     // L'entretien d'abord, la règle ensuite : sans lui, un tournoi dont l'heure
     // de début est passée reste `REGISTRATION` en base tant que personne n'a
@@ -107,6 +188,8 @@ export async function removeTournamentEntrant(
       startAt: tournament.start_at,
     });
     if (blocked) throw new Error(blocked);
+
+    const teamId = await steps.resolveTeamId(connection, tournament);
 
     // Le nom est lu **avant** l'effacement : il vient de `bg_teams`, qui
     // survivrait au retrait, mais la ligne d'inscription est ce qui prouve que

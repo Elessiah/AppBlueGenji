@@ -206,6 +206,7 @@
     "ENTRANT_REMOVAL_TOURNAMENT_STARTED": "The tournament has started: the draw is done, an entrant can only leave by withdrawing.",
     "ENTRANT_REMOVAL_TOURNAMENT_FINISHED": "The tournament is finished: its list of entrants is now its record.",
     "ENTRANT_REMOVAL_FAILED": "Error while removing the entrant.",
+    "WITHDRAWAL_FAILED": "Error while unregistering.",
     "INVALID_TEAM": "Invalid entrant ID.",
     "EMPTY_TEAM_SELECTION": "Select at least one entrant to register.",
     "INVALID_TEAM_IDS": "Unreadable selection: reload the page and start again.",
@@ -264,6 +265,7 @@
     "STAFF_MESSAGE_UNAVAILABLE": "Messages to participants are temporarily unavailable: try again later."
   },
   "soloCodes": {
+    "TEAM_NOT_IN_TOURNAMENT": "This registration no longer exists.",
     "TEAM_NOT_FORFEITED": "This player hasn't withdrawn: there is nothing to cancel.",
     "FORFEIT_ROUND_PASSED": "A round has been played since the withdrawal: putting the player back would spare them the rounds they missed. Roll back first."
   }

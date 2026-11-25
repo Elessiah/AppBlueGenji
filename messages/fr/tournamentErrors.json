@@ -206,6 +206,7 @@
     "ENTRANT_REMOVAL_TOURNAMENT_STARTED": "Le tournoi a commencé : le tirage est fait, un engagé ne s'en retire plus que par abandon.",
     "ENTRANT_REMOVAL_TOURNAMENT_FINISHED": "Le tournoi est terminé : sa liste d'engagés est désormais son palmarès.",
     "ENTRANT_REMOVAL_FAILED": "Erreur lors du retrait de l'engagé.",
+    "WITHDRAWAL_FAILED": "Erreur lors de la désinscription.",
     "INVALID_TEAM": "Identifiant d'engagé invalide.",
     "EMPTY_TEAM_SELECTION": "Sélectionne au moins un engagé à inscrire.",
     "INVALID_TEAM_IDS": "Sélection illisible : recharge la page et recommence.",
@@ -264,6 +265,7 @@
     "STAFF_MESSAGE_UNAVAILABLE": "Messages aux participants momentanément indisponibles : réessaie plus tard."
   },
   "soloCodes": {
+    "TEAM_NOT_IN_TOURNAMENT": "Cette inscription n'existe plus.",
     "TEAM_NOT_FORFEITED": "Ce joueur n'a pas abandonné : il n'y a rien à annuler.",
     "FORFEIT_ROUND_PASSED": "Une manche a été jouée depuis l'abandon : remettre le joueur en lice lui épargnerait les manches qu'il a manquées. Reviens d'abord en arrière."
   }

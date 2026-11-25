@@ -594,6 +594,24 @@ export function formatEntrantRemovedLog(context: {
 }
 
 /**
+ * Désinscription à l'initiative de l'engagé, avant le coup d'envoi
+ * (`docs/features/SELF_WITHDRAWAL.md`).
+ *
+ * Même effacement que le retrait par le staff ({@link formatEntrantRemovedLog}),
+ * et le canal reste le seul endroit où la trace subsiste. Personne n'y est
+ * nommé : une équipe par son nom, un joueur par « un joueur » (`entrantLabel`).
+ */
+export function formatEntrantWithdrawnLog(context: {
+  tournament: BotLogTournament;
+  entrant: LogEntrant;
+  registeredTeams: number;
+  maxTeams: number;
+}): string {
+  const field = `${context.registeredTeams}/${context.maxTeams} ${participantWording(context.entrant.participantType).many}`;
+  return `${lead("➖", "Désinscription", context.tournament)} : ${entrantLabel(context.entrant)} se retire. ${field}.`;
+}
+
+/**
  * Fin d'un match, avec son score.
  *
  * Écrite au moment où le match est **tranché** — les deux engagés d'accord, un

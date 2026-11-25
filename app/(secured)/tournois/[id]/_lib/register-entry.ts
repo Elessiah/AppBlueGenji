@@ -1,4 +1,6 @@
 import type { TournamentDetail } from "@/lib/shared/types";
+import { canRemoveEntrant } from "@/lib/shared/entrant-removal";
+import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
 import type { TournamentActionsText, TournamentErrorsText } from "@/lib/shared/tournament-actions-text";
 import { FR_ERRORS_TEXT, mapError } from "./error-map";
 import { FR_ACTIONS_TEXT } from "./actions-text";
@@ -51,4 +53,23 @@ export function registerBlockedNotice(
   if (detail.registrations.some((row) => row.teamId === detail.myTeamId)) return null;
 
   return text.t("register.notManager");
+}
+
+/**
+ * Le bouton « Se désinscrire » mène-t-il quelque part ?
+ *
+ * Vrai quand le lecteur a un engagé **inscrit** à ce tournoi, qu'il a qualité
+ * pour agir en son nom (`OWNER`/`MANAGER` en tournoi par équipes, toujours en
+ * individuel) et que le coup d'envoi n'est pas passé — la fenêtre même du
+ * retrait par le staff (`lib/shared/entrant-removal.ts`). Le serveur rejoue la
+ * règle sous verrou (`withdrawOwnRegistration`) : ceci ne fait que cacher un
+ * bouton qui ne mènerait nulle part (`docs/features/SELF_WITHDRAWAL.md`).
+ */
+export function canWithdrawOwnEntry(
+  detail: Pick<TournamentDetail, "card" | "canRegisterEntrant" | "myTeamId" | "registrations">,
+  now: number = Date.now(),
+): boolean {
+  if (!detail.canRegisterEntrant) return false;
+  if (!isViewerEntrant(detail.myTeamId, detail.registrations)) return false;
+  return canRemoveEntrant(detail.card, now);
 }

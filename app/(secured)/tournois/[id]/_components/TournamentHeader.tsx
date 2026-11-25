@@ -25,7 +25,7 @@ import { STREAM_NOTICE_PRIVACY_PATH } from "@/lib/shared/stream-notice";
 import { useTournamentPublished } from "../_lib/use-tournament-published";
 import type { LiveFailure } from "../_lib/live-state";
 import { canShowEditButton } from "../_lib/edit-entry";
-import { registerBlockedNotice } from "../_lib/register-entry";
+import { canWithdrawOwnEntry, registerBlockedNotice } from "../_lib/register-entry";
 import { useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
 import {
@@ -92,6 +92,8 @@ interface TournamentHeaderProps {
   /** Suivi arrêté : les actions sont retirées plutôt que laissées à échouer. */
   frozen: boolean;
   onRegister: () => void;
+  /** Désinscrire l'engagé du lecteur, avant le coup d'envoi (`SELF_WITHDRAWAL.md`). */
+  onWithdraw: () => void;
   onReportIssue: () => void;
   onGuestRegister: () => void;
   /** Abréger le calendrier et démarrer sur-le-champ (staff `tournaments`). */
@@ -137,6 +139,7 @@ export function TournamentHeader({
   viewerMatch,
   frozen,
   onRegister,
+  onWithdraw,
   onReportIssue,
   onGuestRegister,
   onAdvance,
@@ -163,6 +166,7 @@ export function TournamentHeader({
   // Le seul refus d'inscription qui ne se lise pas tout seul sur la page :
   // avoir une équipe sans en avoir la charge (`_lib/register-entry.ts`).
   const registerNotice = frozen ? null : registerBlockedNotice(detail, errorsText, actionText);
+  const showWithdraw = !frozen && canWithdrawOwnEntry(detail);
   const nextStage = advanceTarget(card);
   const showEdit = canShowEditButton(card, detail.isAdmin);
   // L'image se règle dans tous les états, contrairement au formulaire : elle
@@ -290,6 +294,19 @@ export function TournamentHeader({
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
               {a(`wording.${entrantType}.registerCta`)}
+            </CyberButton>
+          )}
+          {/* Désinscription : à la place du bouton d'inscription (l'un exclut
+              l'autre), en tête de ligne et en saumon pour qu'on la trouve —
+              elle restait introuvable faute d'exister. */}
+          {showWithdraw && (
+            <CyberButton
+              variant="danger"
+              onClick={onWithdraw}
+              aria-haspopup="dialog"
+              style={{ fontSize: 13, padding: "8px 18px" }}
+            >
+              {a(`withdraw.cta.${entrantType}`)}
             </CyberButton>
           )}
           {/* Partage du lien public (`SHARE_EMBEDS.md`) : seulement un tournoi

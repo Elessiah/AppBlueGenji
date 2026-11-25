@@ -6,12 +6,11 @@ import { FR_ACTIONS_TEXT } from "./actions-text";
 /**
  * Texte de la confirmation d'inscription à un tournoi.
  *
- * « Inscrire mon équipe » engageait l'équipe au premier appui, alors qu'aucun
- * joueur ne peut ensuite se désinscrire — seul le staff retire un engagé
- * (`lib/shared/entrant-removal.ts`). Sur téléphone, un appui accidentel en
- * faisant défiler la fiche suffisait. La confirmation récapitule donc ce qu'on
- * engage (le tournoi, son coup d'envoi) et dit que le geste ne se défait pas
- * seul. Elle informe aussi de la retransmission possible des matchs
+ * « Inscrire mon équipe » engageait l'équipe au premier appui. Sur téléphone,
+ * un appui accidentel en faisant défiler la fiche suffisait. La confirmation
+ * récapitule donc ce qu'on engage (le tournoi, son coup d'envoi) et dit
+ * jusqu'à quand le geste se défait : la désinscription reste ouverte jusqu'au
+ * coup d'envoi (`docs/features/SELF_WITHDRAWAL.md`). Elle informe aussi de la retransmission possible des matchs
  * (`lib/shared/stream-notice.ts`) : c'est le moment où le joueur s'engage.
  *
  * Pur : la date arrive déjà mise en forme, sa présentation dépend du fuseau du

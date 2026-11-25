@@ -11,7 +11,10 @@ describe("confirmation d'inscription", () => {
     const text = registrationConfirmText({ name: "Coupe d'hiver", participantType: "TEAM" }, "12/10/2026 20:00");
     expect(text.title).toContain("« Coupe d'hiver »");
     expect(text.body.join(" ")).toContain("12/10/2026 20:00");
-    expect(text.body.join(" ")).toContain("seul le staff");
+    // La désinscription existe désormais (`SELF_WITHDRAWAL.md`) : la
+    // confirmation dit jusqu'à quand, et par qui.
+    expect(text.body.join(" ")).toContain("pourra la désinscrire jusqu'au coup d'envoi");
+    expect(text.body.join(" ")).not.toContain("seul le staff");
     expect(text.confirmLabel).toBe("Inscrire mon équipe");
   });
 
@@ -20,6 +23,7 @@ describe("confirmation d'inscription", () => {
     expect(text.title).toBe("T'inscrire à « Solo » ?");
     expect(text.confirmLabel).toBe("M'inscrire");
     expect(text.body.join(" ")).not.toContain("équipe");
+    expect(text.body.join(" ")).toContain("Tu pourras te désinscrire jusqu'au coup d'envoi.");
   });
 
   it("informe de la retransmission possible, en équipe comme en individuel", () => {
