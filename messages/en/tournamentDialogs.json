@@ -474,5 +474,34 @@
     "later": "Later",
     "close": "Close",
     "go": "Verify from my profile"
+  },
+  "staffMessage": {
+    "title": "Message participants",
+    "tournament": "Tournament: {name}",
+    "hintSubject": "message participants",
+    "hint": "The message goes by Discord direct message and push notification, in each one's language, signed “the tournament staff”: your name does not appear. You only see numbers, never the recipients' names.",
+    "categoriesLegend": "Recipients",
+    "categories": {
+      "PLAYERS": "Players",
+      "MANAGERS": "Managers",
+      "CAPTAINS": "Captains",
+      "OWNERS": "Owners",
+      "ALL": "Everyone"
+    },
+    "noCategory": "Tick at least one category.",
+    "counting": "Counting recipients…",
+    "counts": "{total, plural, one {# recipient} other {# recipients}}: {reachable} by direct message, {withoutDiscord} without a linked Discord (push only), {optedOut} turned these messages off.",
+    "nobody": "Nobody to notify with these categories.",
+    "label": "Message",
+    "placeholder": "Check-in at 8 pm, voice channel open…",
+    "counter": "{length}/{max}",
+    "tooLong": "{length}/{max} — too long, shorten the message.",
+    "send": "Send",
+    "confirmTitle": "Send the message?",
+    "confirmBody": "It goes right away to {count, plural, one {# participant} other {# participants}} of “{name}”, with no way back. At most {max} sendings per hour for this tournament.",
+    "confirm": "Send the message",
+    "pending": "Sending…",
+    "sent": "Message sent: {sent, plural, one {# direct message delivered} other {# direct messages delivered}}, {pushed, plural, one {# push notification} other {# push notifications}}.",
+    "sentBotUnreachable": "Message sent by push ({pushed}); the Discord bot was unreachable: no direct message went out."
   }
 }

@@ -474,5 +474,34 @@
     "later": "Plus tard",
     "close": "Fermer",
     "go": "Certifier depuis mon profil"
+  },
+  "staffMessage": {
+    "title": "Message aux participants",
+    "tournament": "Tournoi : {name}",
+    "hintSubject": "message aux participants",
+    "hint": "Le message part en message privé Discord et en notification push, dans la langue de chacun, signé « le staff du tournoi » : ton nom n'y paraît pas. Tu ne vois que des nombres, jamais les noms des destinataires.",
+    "categoriesLegend": "Destinataires",
+    "categories": {
+      "PLAYERS": "Joueurs",
+      "MANAGERS": "Managers",
+      "CAPTAINS": "Capitaines",
+      "OWNERS": "Owners",
+      "ALL": "Tous"
+    },
+    "noCategory": "Coche au moins une catégorie.",
+    "counting": "Comptage des destinataires…",
+    "counts": "{total, plural, one {# destinataire} other {# destinataires}} : {reachable} en message privé, {withoutDiscord} sans Discord rattaché (push seulement), {optedOut} {optedOut, plural, one {a coupé} other {ont coupé}} ces messages.",
+    "nobody": "Personne à prévenir avec ces catégories.",
+    "label": "Message",
+    "placeholder": "Check-in à 20 h, salon vocal ouvert…",
+    "counter": "{length}/{max}",
+    "tooLong": "{length}/{max} — trop long, raccourcis le message.",
+    "send": "Envoyer",
+    "confirmTitle": "Envoyer le message ?",
+    "confirmBody": "Il part tout de suite à {count, plural, one {# participant} other {# participants}} de « {name} », sans retour possible. Au plus {max} envois par heure pour ce tournoi.",
+    "confirm": "Envoyer le message",
+    "pending": "Envoi…",
+    "sent": "Message envoyé : {sent, plural, one {# message privé remis} other {# messages privés remis}}, {pushed, plural, one {# notification push} other {# notifications push}}.",
+    "sentBotUnreachable": "Message envoyé en push ({pushed}) ; le bot Discord était injoignable : aucun message privé n'est parti."
   }
 }

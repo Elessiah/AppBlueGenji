@@ -20,6 +20,7 @@ import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
 import { toParticipantType } from "@/lib/shared/participants";
 import { canReturnInSite, isPlainLeftClick, previousSitePathname } from "@/lib/shared/site-back";
 import { advanceTarget } from "@/lib/shared/tournament-launch";
+import { STAFF_MESSAGE_STATES } from "@/lib/shared/tournament-staff-message";
 import { STREAM_NOTICE_PRIVACY_PATH } from "@/lib/shared/stream-notice";
 import { useTournamentPublished } from "../_lib/use-tournament-published";
 import type { LiveFailure } from "../_lib/live-state";
@@ -95,6 +96,8 @@ interface TournamentHeaderProps {
   onGuestRegister: () => void;
   /** Abréger le calendrier et démarrer sur-le-champ (staff `tournaments`). */
   onAdvance: () => void;
+  /** Écrit aux participants (`/message-tournoi` depuis la fiche, staff `tournaments`). */
+  onStaffMessage: () => void;
   onLiveSaved: () => void;
   /** Ouvre le réglage de l'image (illustration ou logo) (staff `tournaments`). */
   onEditImage: () => void;
@@ -137,6 +140,7 @@ export function TournamentHeader({
   onReportIssue,
   onGuestRegister,
   onAdvance,
+  onStaffMessage,
   onLiveSaved,
   onEditImage,
   published: publishedByPage,
@@ -345,6 +349,17 @@ export function TournamentHeader({
                   l'action, pas « triangle pointant vers la droite ». Même
                   traitement que la flèche du bouton « Retour ». */}
               <span aria-hidden="true">▶</span> {a("header.advance")}
+            </CyberButton>
+          )}
+          {/* Message aux participants : les états où le service l'admet
+              (`STAFF_MESSAGE_STATES`), même règle que la commande du bot. */}
+          {detail.isAdmin && !frozen && STAFF_MESSAGE_STATES.includes(card.state) && (
+            <CyberButton
+              variant="ghost"
+              onClick={onStaffMessage}
+              style={{ fontSize: 13, padding: "8px 18px" }}
+            >
+              {a("header.staffMessage")}
             </CyberButton>
           )}
           {/* Signalement : ouvert aux seuls engagés (inscrits, pas seulement dotés

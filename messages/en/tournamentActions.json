@@ -98,7 +98,8 @@
     "edit": "Edit",
     "advanceTitle": "Move to the next step: {stage}.",
     "advance": "Advance the tournament",
-    "reportIssue": "Report a problem"
+    "reportIssue": "Report a problem",
+    "staffMessage": "Message participants"
   },
   "danger": {
     "title": "Destructive actions",
