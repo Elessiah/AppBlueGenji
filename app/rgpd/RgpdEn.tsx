@@ -1104,15 +1104,17 @@ export function RgpdEn({
             categories it picks (players, managers, captains, owners, everyone) and the players of a solo tournament
             — a team that withdrew is no longer targeted. The message reaches you by Discord direct message (linked
             identifier or certified tag) and by push notification, in your account&apos;s language, signed “the
-            tournament staff”; the author only sees numbers, never your names. The text is kept by neither the site
+            tournament staff”; the author only sees numbers (including how many have no Discord or turned these
+            messages off), never your names. The text is kept by neither the site
             nor the bot; only a counter caps each staff member at {STAFF_MESSAGE_SENDS_PER_WINDOW} sendings per
             tournament over {STAFF_MESSAGE_WINDOW_MINUTES} minutes, and is then erased. The sending is noted in the
-            staff log on Discord without naming its author or quoting the text; the server logs keep its author and
+            staff log on Discord, kept for a year, without naming its author or quoting the text; the server logs keep its author and
             the length of the text, according to their rotation. Basis: the association&apos;s{" "}
             <strong>legitimate interest</strong> in the smooth running of tournaments; you object to it by turning
             off the “Tournament staff messages” topic in{" "}
             <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, which also turns off the
             direct message (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>;{" "}
+            <LocaleLink href="/rgpd/registre#t05">T05</LocaleLink>;{" "}
             <LocaleLink href="/rgpd/registre#t08">T08</LocaleLink>).
           </p>
           <p id="test-messages-prives">

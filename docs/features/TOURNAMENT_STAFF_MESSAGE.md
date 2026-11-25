@@ -81,14 +81,16 @@ pas l'envoi qui en a ouvert une nouvelle. Lignes purgées une fois la fenêtre �
 minutes), en cascade avec le tournoi, et à la suppression du compte
 (`anonymizeAccount` : la ligne `bg_users` reste, la cascade ne joue pas).
 Table absente : `503 STAFF_MESSAGE_UNAVAILABLE`. En plus, appels limités en
-mémoire : 60 / 10 min par Discord (bot), 120 / 10 min par compte (fiche).
+mémoire : 60 / 10 min par Discord (bot), 120 / 10 min par compte (fiche) — clé (identifiant Discord ou
+numéro du compte) gardée onze minutes au plus, déclarée au registre (T04).
 
 ## Journal
 
 `publishStaffAction` : sur Discord, « 📣 Message du staff aux participants du
 tournoi « X » (catégories) : N visé(s), … — par le staff » (anonyme, nombres
 seuls) ; dans pm2, l'auteur nommé, le numéro du tournoi et la **longueur** du
-texte. Le texte n'est enregistré nulle part (registre T04, T08).
+texte. Le texte n'est enregistré nulle part (registre T04, T05 — la ligne Discord
+suit la durée du journal, un an —, T08).
 
 ## Depuis Discord — `/message-tournoi`
 

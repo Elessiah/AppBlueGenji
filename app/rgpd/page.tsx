@@ -1307,15 +1307,17 @@ function RgpdFr({
             qu&apos;il choisit (joueurs, managers, capitaines, propriétaires, tous) et les joueurs d&apos;un tournoi
             individuel — une équipe qui a abandonné n&apos;est plus visée. Le message vous arrive en message privé
             Discord (identifiant rattaché ou tag certifié) et en notification push, dans la langue de votre compte,
-            signé « le staff du tournoi » ; l&apos;auteur ne voit que des nombres, jamais vos noms. Le texte
+            signé « le staff du tournoi » ; l&apos;auteur ne voit que des nombres (dont combien n&apos;ont pas de
+            Discord ou ont coupé ces messages), jamais vos noms. Le texte
             n&apos;est gardé ni par le site ni par le bot ; seul un compteur borne chaque membre du staff à{" "}
             {STAFF_MESSAGE_SENDS_PER_WINDOW} envois par tournoi sur {STAFF_MESSAGE_WINDOW_MINUTES} minutes, et
-            s&apos;efface ensuite. L&apos;envoi est noté au journal du staff sur Discord sans nommer son auteur ni
-            citer le texte ; les journaux du serveur gardent son auteur et la longueur du texte, selon leur
+            s&apos;efface ensuite. L&apos;envoi est noté au journal du staff sur Discord, gardé un an, sans nommer
+            son auteur ni citer le texte ; les journaux du serveur gardent son auteur et la longueur du texte, selon leur
             rotation. Base : l&apos;<strong>intérêt légitime</strong> de l&apos;association au bon déroulement des
             tournois ; vous vous y opposez en coupant le sujet « Messages du staff des tournois » dans{" "}
             <Link href="/profil#notifications">Mon profil</Link>, ce qui coupe aussi le message privé
-            (<Link href="/rgpd/registre#t04">registre, T04</Link> ; <Link href="/rgpd/registre#t08">T08</Link>).
+            (<Link href="/rgpd/registre#t04">registre, T04</Link> ; <Link href="/rgpd/registre#t05">T05</Link> ;{" "}
+            <Link href="/rgpd/registre#t08">T08</Link>).
           </p>
           <p id="test-messages-prives">
             <strong>« Tester mes MP ».</strong> Depuis <Link href="/profil#comptes">Mon profil</Link>, ce bouton
