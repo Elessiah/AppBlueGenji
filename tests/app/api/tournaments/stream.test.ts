@@ -120,6 +120,10 @@ beforeEach(() => {
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 1, isAdmin: false, roles: [] }));
   jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(snapshotWith([]));
   jest.mocked(getTournamentViewerContext).mockResolvedValue(viewerWith());
+  // Le temps avancé (fausses horloges) réveille le battement d'entretien de la
+  // salle, qui relit l'instantané : sans ce double, il ouvrirait une vraie
+  // connexion MySQL qui survit à la suite (ERREUR.txt, EF-74).
+  jest.spyOn(snapshotModule, "getTournamentSnapshotFrame").mockRejectedValue(new Error("hors ligne"));
 });
 
 afterEach(() => {
@@ -598,14 +602,6 @@ describe("GET /api/tournaments/[id]/stream — plafonds", () => {
 });
 
 describe("GET /api/tournaments/[id]/stream — contre-pression", () => {
-  beforeEach(() => {
-    // Le temps avancé réveille le battement d'entretien de la salle, qui relit
-    // l'instantané : sans ce double, il ouvrirait une vraie connexion MySQL.
-    jest
-      .spyOn(snapshotModule, "getTournamentSnapshotFrame")
-      .mockRejectedValue(new Error("hors ligne"));
-  });
-
   afterEach(() => {
     jest.useRealTimers();
   });

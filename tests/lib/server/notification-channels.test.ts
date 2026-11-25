@@ -99,7 +99,7 @@ describe("branchements du moteur", () => {
     expect(index).toMatch(
       /publishScoreReportedEvent\(tournamentId, touchedMatchId\);\s*void notifyScoreToConfirm\(touchedMatchId\);/,
     );
-    expect(index).toMatch(/void dispatchMatchStartNotices\(\)/);
+    expect(index).toMatch(/inBackground\(dispatchMatchStartNotices\(\)/);
   });
 
   it("efface les abonnements d'un compte anonymisé", () => {

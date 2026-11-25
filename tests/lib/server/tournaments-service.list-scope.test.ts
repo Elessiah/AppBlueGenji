@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { clearCache } from "@/lib/server/cache";
+import { settleTournamentListMaintenance } from "@/lib/server/tournaments";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 import { tournamentListRow } from "../../helpers/tournament-rows";
 import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
@@ -13,7 +14,10 @@ jest.mock("@/lib/server/database");
 beforeEach(() => {
   clearCache();
 });
-afterEach(() => {
+afterEach(async () => {
+  // Les entretiens lancés par la lecture finissent ici, tant que la base
+  // factice répond encore : sinon ils journalisent après la fin du test.
+  await settleTournamentListMaintenance();
   clearCache();
 });
 

@@ -470,7 +470,7 @@ qu'elle publie invalideraient la liste qu'elle vient de rendre correcte — et s
 échec est avalé : c'est un entretien d'arrière-plan, pas une condition pour
 servir une liste que le cache tient peut-être déjà prête.
 
-Pour la même raison, elle n'est **pas attendue** (`void syncVisibleTournaments()`) :
+Pour la même raison, elle n'est **pas attendue** (`inBackground(syncVisibleTournaments())`) :
 toutes les 15 s, la lecture qui tombait sur la passe — rendu serveur de `/`,
 `GET /api/tournaments` — l'attendait, et toutes celles qui arrivaient pendant
 attendaient la même promesse (`pendingSync`). Rien de l'affichage n'en dépend :
@@ -479,6 +479,12 @@ fin de passe (`publishUpdatedEvent`), ce qui vide la liste. Une lecture partie
 pendant la passe n'y range pas un résultat périmé : le cache compte les
 invalidations (`lib/server/cache.ts`) et jette une valeur lue avant l'une
 d'elles.
+
+Elle et les autres entretiens que la lecture lance (rappels, annonces, salons
+vocaux, purge des connexions) passent par `inBackground` : jamais attendus par
+la lecture, mais suivis, pour qu'un test les laisse finir
+(`settleTournamentListMaintenance()`) au lieu de les voir survivre à sa fin sur
+une base factice déjà remise à zéro.
 
 ### Plafonds de débit — `lib/server/rate-limit.ts` + `lib/server/api-guard.ts`
 

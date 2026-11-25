@@ -675,6 +675,29 @@ export type TournamentListScope = {
 };
 
 /**
+ * Entretiens d'arrière-plan lancés par une lecture de la liste
+ * (`listTournamentBuckets`) : jamais attendus par la lecture, mais suivis, pour
+ * qu'un test puisse les laisser finir ({@link settleTournamentListMaintenance})
+ * au lieu de les voir survivre à sa fin — un balayage tardif lisait alors une
+ * base factice déjà remise à zéro et journalisait après la suite.
+ */
+const listMaintenance = new Set<Promise<unknown>>();
+
+function inBackground(work: Promise<unknown>): void {
+  listMaintenance.add(work);
+  const done = () => listMaintenance.delete(work);
+  void work.then(done, done);
+}
+
+/**
+ * Attend la fin des entretiens d'arrière-plan lancés par les lectures de la
+ * liste, y compris ceux lancés pendant l'attente. Réservé aux tests.
+ */
+export async function settleTournamentListMaintenance(): Promise<void> {
+  while (listMaintenance.size > 0) await Promise.allSettled([...listMaintenance]);
+}
+
+/**
  * Paniers de tournois, par état.
  *
  * La liste publique (sans portée ni recherche) est **mutualisée** : c'est de
@@ -706,7 +729,7 @@ export async function listTournamentBuckets(
   // comptant les invalidations. Son échec n'emporte rien non plus : un verrou
   // ou une panne passagère de MySQL viderait sinon `/tournois` alors qu'il n'y
   // avait rien à en faire.
-  void syncVisibleTournaments().catch(() => undefined);
+  inBackground(syncVisibleTournaments().catch(() => undefined));
 
   // Les rappels de match n'ont pas d'ordonnanceur : c'est le trafic qui les
   // entraîne, comme la bascule d'état juste au-dessus. Étranglé à une minute et
@@ -714,31 +737,31 @@ export async function listTournamentBuckets(
   // liste, et le prochain passage rattrapera ce qui reste dû.
   // Un passage en échec (fenêtre, destinataires) rend ses réservations et se
   // dit dans pm2 : sans trace, des rappels pourraient manquer en silence.
-  void dispatchDueMatchReminders().catch((error: unknown) => {
+  inBackground(dispatchDueMatchReminders().catch((error: unknown) => {
     // Table absente (création avalée au démarrage) : rien à dire à chaque lecture.
     if (!isMissingTableError(error)) console.error("[match-reminders] balayage en échec", failureDiagnostic(error));
-  });
+  }));
   // Même raison pour les départs de match : un lancement ouvert par l'horloge
   // n'a pas toujours d'écriture derrière lui pour déclencher son annonce.
-  void dispatchMatchStartNotices().catch(() => undefined);
+  inBackground(dispatchMatchStartNotices().catch(() => undefined));
   // Et l'annonce unique des cartes de manche, une fois la fenêtre de silence échue.
-  void dispatchDueRoundMapsNotices().catch(() => undefined);
+  inBackground(dispatchDueRoundMapsNotices().catch(() => undefined));
   // Et le check-in du match (`./lobby-brief`), 15 minutes avant l'horaire (ou à
   // l'ouverture du salon d'un match sans horaire), à tous les joueurs.
-  void dispatchLobbyBriefs().catch(() => undefined);
+  inBackground(dispatchLobbyBriefs().catch(() => undefined));
   // Et l'annonce des nouveaux matchs (`./new-match-notices`) : une avancée
   // passée par l'entretien passif n'a pas toujours d'évènement derrière elle.
-  void dispatchNewMatchNotices().catch(() => undefined);
+  inBackground(dispatchNewMatchNotices().catch(() => undefined));
   // Et les salons vocaux d'équipe (`./match-voice`) : création à T−15,
   // libération après le score.
-  void dispatchMatchVoiceChannels();
+  inBackground(dispatchMatchVoiceChannels());
   // Et pour l'annonce des lives : le mode `START_TIME` passe à l'antenne à
   // l'heure dite, sans aucune écriture.
-  void dispatchLiveAnnouncements().catch(() => undefined);
+  inBackground(dispatchLiveAnnouncements().catch(() => undefined));
   // Le journal des connexions se purge aussi sur ce trafic, pas seulement aux
   // connexions : une période sans connexion (sessions de 30 jours) garderait
   // sinon des lignes au-delà de la durée légale annoncée. Étranglée à l'heure.
-  void purgeExpiredConnectionLogs().catch(() => undefined);
+  inBackground(purgeExpiredConnectionLogs().catch(() => undefined));
   // Même raison pour la mesure d'audience : son entretien suit aussi les
   // signalements de visite, qu'un visiteur opposé n'envoie pas. Sans cette
   // seconde entrée, un site où tout le monde s'oppose ne tiendrait plus les
