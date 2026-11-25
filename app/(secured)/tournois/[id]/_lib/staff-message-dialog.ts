@@ -114,8 +114,15 @@ export function staffMessageRenderedTooLong(
  */
 export function staffMessageLinkBase(value: unknown): string | null | undefined {
   if (value === null) return null;
-  if (typeof value === "string" && /^https?:\/\/[^\s]+$/.test(value)) return value.replace(/\/+$/, "");
+  if (typeof value === "string" && /^https?:\/\/\S+$/.test(value)) return withoutTrailingSlashes(value);
   return undefined;
+}
+
+/** L'adresse sans ses barres finales (boucle simple : pas d'expression régulière à retour arrière). */
+function withoutTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === "/") end -= 1;
+  return url.slice(0, end);
 }
 
 /** Refus du serveur qui désignent le champ du texte (`useFieldErrors`). */

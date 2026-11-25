@@ -118,6 +118,14 @@ describe("staffMessageLinkBase", () => {
     expect(staffMessageLinkBase("https://bluegenji.test/")).toBe("https://bluegenji.test");
   });
 
+  it("staffMessageLinkBase_urlWithoutTrailingSlash_returnsItUnchanged", () => {
+    expect(staffMessageLinkBase("https://bluegenji.test")).toBe("https://bluegenji.test");
+  });
+
+  it("staffMessageLinkBase_urlWithSeveralTrailingSlashes_stripsThemAll", () => {
+    expect(staffMessageLinkBase("https://bluegenji.test///")).toBe("https://bluegenji.test");
+  });
+
   it("staffMessageLinkBase_null_returnsNull", () => {
     expect(staffMessageLinkBase(null)).toBeNull();
   });
