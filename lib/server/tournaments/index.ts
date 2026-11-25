@@ -683,13 +683,29 @@ export type TournamentListScope = {
  */
 const listMaintenance = new Set<Promise<unknown>>();
 
+/** Cadence minimale entre deux journaux de rejet imprévu d'un entretien. */
+const STRAY_LOG_INTERVAL_MS = 60_000;
+let lastStrayLogAt = 0;
+
+/**
+ * Lance un entretien sans l'attendre. Hors tests, rien n'est suivi (pas d'ensemble
+ * qui grossirait sur le trafic d'une liste, ni d'entrée gardée par un entretien
+ * pendu) : seul un rejet imprévu se dit dans pm2, au plus une fois par minute.
+ * Sous Jest (`NODE_ENV=test`), l'entretien est aussi suivi.
+ */
 function inBackground(work: Promise<unknown>): void {
-  listMaintenance.add(work);
-  const done = () => listMaintenance.delete(work);
+  const tracked = process.env.NODE_ENV === "test";
+  if (tracked) listMaintenance.add(work);
+  const done = () => {
+    if (tracked) listMaintenance.delete(work);
+  };
   void work.then(done, (error: unknown) => {
     done();
     // Chaque entretien rattrape d'ordinaire ses échecs ; un rejet qui passe
     // quand même se dit dans pm2 plutôt que d'être avalé par le suivi.
+    const now = Date.now();
+    if (now - lastStrayLogAt < STRAY_LOG_INTERVAL_MS) return;
+    lastStrayLogAt = now;
     console.error("[tournaments] entretien de la liste en échec", failureDiagnostic(error));
   });
 }
@@ -699,17 +715,21 @@ const SETTLE_TIMEOUT_MS = 4_000;
 
 /**
  * Attend la fin des entretiens d'arrière-plan lancés par les lectures de la
- * liste, y compris ceux lancés pendant l'attente. **Tests seulement** : jamais
- * appelée par le code servi, elle ferait attendre une requête derrière tous les
- * balayages. Rejette au-delà de {@link SETTLE_TIMEOUT_MS} si un double de test
- * ne se résout jamais, plutôt que de laisser le test atteindre le délai de Jest
- * sans désigner la cause.
+ * liste, y compris ceux lancés pendant l'attente. **Tests seulement** : le suivi
+ * n'existe que sous Jest, ailleurs l'ensemble reste vide et l'appel rend la main
+ * aussitôt. Rejette au-delà de {@link SETTLE_TIMEOUT_MS} si un double de test ne
+ * se résout jamais (en nommant le temps écoulé), et **oublie** alors les
+ * entretiens pendus pour ne pas faire échouer les suites suivantes du même
+ * processus.
  */
 export async function settleTournamentListMaintenanceForTests(timeoutMs: number = SETTLE_TIMEOUT_MS): Promise<void> {
+  const startedAt = Date.now();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expired = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      reject(new Error(`${listMaintenance.size} entretien(s) de la liste jamais terminé(s)`));
+      const stuck = listMaintenance.size;
+      listMaintenance.clear();
+      reject(new Error(`${stuck} entretien(s) de la liste jamais terminé(s) après ${Date.now() - startedAt} ms`));
     }, timeoutMs);
   });
   try {
@@ -788,8 +808,7 @@ export async function listTournamentBuckets(
   // signalements de visite, qu'un visiteur opposé n'envoie pas. Sans cette
   // seconde entrée, un site où tout le monde s'oppose ne tiendrait plus les
   // durées annoncées. Étranglé à l'heure, jamais levé.
-  const retention = maintainSiteVisitRetention();
-  if (retention) inBackground(retention);
+  inBackground(maintainSiteVisitRetention());
 
   // Seule la liste publique est mutualisée : celle des tournois pas encore
   // visibles est réservée au staff, elle est courte et bien plus rarement lue.

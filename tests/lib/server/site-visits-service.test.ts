@@ -597,8 +597,8 @@ describe("rollUpExpiredSiteVisits", () => {
   });
 
   // La promesse rendue sert au suivi des entretiens de la liste (EF-74) :
-  // absente quand la cadence étrangle, jamais rejetée sinon.
-  it("maintainSiteVisitRetention_withinTheHour_returnsUndefined", async () => {
+  // déjà tenue quand la cadence étrangle, jamais rejetée sinon.
+  it("maintainSiteVisitRetention_withinTheHour_returnsResolvedPromise", async () => {
     const connection = rollUpConnection();
     const getConnection = jest.fn(async () => fakeConnection(connection));
     const { getDatabase } = await import("@/lib/server/database");
@@ -608,7 +608,7 @@ describe("rollUpExpiredSiteVisits", () => {
 
     const throttled = maintainSiteVisitRetention(200_000_000 + 30 * 60 * 1000);
 
-    expect(throttled).toBeUndefined();
+    await expect(throttled).resolves.toBeUndefined();
     expect(getConnection).toHaveBeenCalledTimes(1);
   });
 

@@ -655,11 +655,68 @@ describe("settleTournamentListMaintenanceForTests — fin des entretiens d'une l
       await listTournamentBuckets(null);
       clearCache();
 
-      await expect(settleTournamentListMaintenanceForTests(20)).rejects.toThrow("jamais terminé(s)");
+      await expect(settleTournamentListMaintenanceForTests(20)).rejects.toThrow(/jamais terminé\(s\) après \d+ ms/);
 
+      // Les entretiens pendus sont oubliés : l'appel suivant ne rejette pas à son tour.
+      await expect(settleTournamentListMaintenanceForTests(20)).resolves.toBeUndefined();
       releaseSweep();
-      await settleTournamentListMaintenanceForTests();
     });
+  });
+
+  it("listTournamentBuckets_productionEnv_tracksNothing", async () => {
+    let releaseSweep!: () => void;
+    const env = process.env as Record<string, string | undefined>;
+    const previous = env.NODE_ENV;
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("@/lib/server/tournaments/sync-scope", () => ({
+        findSyncCandidates: jest.fn(
+          () =>
+            new Promise<{ id: number; lockFirst: boolean }[]>((resolve) => {
+              releaseSweep = () => resolve([]);
+            }),
+        ),
+      }));
+      jest.doMock("@/lib/server/database", () => emptyDatabase());
+      const { listTournamentBuckets, settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
+      const { clearCache } = await import("@/lib/server/cache");
+      clearCache();
+      env.NODE_ENV = "production";
+      try {
+        await listTournamentBuckets(null);
+        clearCache();
+        // Un entretien pend, mais rien n'est suivi : l'attente rend la main aussitôt.
+        await expect(settleTournamentListMaintenanceForTests(0)).resolves.toBeUndefined();
+      } finally {
+        env.NODE_ENV = previous;
+      }
+      releaseSweep();
+    });
+  });
+
+  it("listTournamentBuckets_repeatedRejections_logsOncePerMinute", async () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("@/lib/server/tournaments/match-voice", () => ({
+        ...jest.requireActual<typeof import("@/lib/server/tournaments/match-voice")>("@/lib/server/tournaments/match-voice"),
+        dispatchMatchVoiceChannels: jest.fn(async () => {
+          throw new Error("BOT DOWN");
+        }),
+      }));
+      jest.doMock("@/lib/server/database", () => emptyDatabase());
+      const { listTournamentBuckets, settleTournamentListMaintenanceForTests } = await import("@/lib/server/tournaments");
+      const { clearCache } = await import("@/lib/server/cache");
+      for (let read = 0; read < 3; read += 1) {
+        clearCache();
+        await listTournamentBuckets(null);
+        await settleTournamentListMaintenanceForTests();
+      }
+
+      const strayLogs = errorSpy.mock.calls.filter(([message]) => message === "[tournaments] entretien de la liste en échec");
+      expect(strayLogs).toHaveLength(1);
+    });
+    errorSpy.mockRestore();
   });
 });
 

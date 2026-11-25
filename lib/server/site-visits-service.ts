@@ -290,11 +290,11 @@ let lastRetentionMaintenanceAt = 0;
  * refusé ou non — c'est de l'entretien, rien n'y concerne le visiteur —, et
  * `listTournamentBuckets` aussi, comme les autres purges : un visiteur opposé
  * dont le navigateur expose le signal n'envoie aucun signalement. Jamais
- * attendu, jamais levé : la promesse rendue (absente quand la cadence l'étrangle)
+ * attendu, jamais levé : la promesse rendue (déjà tenue quand la cadence l'étrangle)
  * ne rejette jamais, elle sert au suivi des entretiens de la liste.
  */
-export function maintainSiteVisitRetention(now: number = Date.now()): Promise<void> | undefined {
-  if (now - lastRetentionMaintenanceAt < RETENTION_MAINTENANCE_INTERVAL_MS) return undefined;
+export function maintainSiteVisitRetention(now: number = Date.now()): Promise<void> {
+  if (now - lastRetentionMaintenanceAt < RETENTION_MAINTENANCE_INTERVAL_MS) return Promise.resolve();
   lastRetentionMaintenanceAt = now;
   return rollUpExpiredSiteVisits().then(
     () => undefined,
