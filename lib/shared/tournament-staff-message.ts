@@ -239,4 +239,11 @@ export type StaffMessageDelivery = {
   pushed: number;
   /** Le bot n'a pas répondu (aucun message privé n'a pu être confirmé). */
   botUnreachable: boolean;
+  /**
+   * Bilan incomplet : l'envoi continue en arrière-plan (réponse rendue avant
+   * sa fin, les nombres sont alors à zéro), ou un lot de messages privés est
+   * resté sans réponse du bot et a pu partir. Ne pas renvoyer : le bilan final
+   * est au journal du staff.
+   */
+  pending: boolean;
 };

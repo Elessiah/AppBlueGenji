@@ -20,6 +20,7 @@ import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { loadNotificationRecipients, notifyUsers, type NotificationRecipient } from "@/lib/server/notify";
+import { startPeriodicClock, trackBackgroundPass } from "@/lib/server/periodic-clock";
 import { usersWithTopicDisabled } from "@/lib/server/push-subscriptions";
 import { parseRoles } from "@/lib/server/serialization";
 import { siteUrl } from "@/lib/server/site-url";
@@ -58,7 +59,16 @@ export const STAFF_MESSAGE_CONTEXT = "tournament-staff-message";
  * Geste explicite du staff, qui attend son bilan : le coupe-circuit des flux
  * de fond ne le refuse pas sans essayer.
  */
-const DELIVERY = { batchSize: 25, timeoutMs: 120_000, honourCircuit: false } as const;
+const DELIVERY = { batchSize: 25, timeoutMs: 120_000, honourCircuit: false, uncertainIsNotLost: true } as const;
+
+/**
+ * Délai au-delà duquel l'envoi répond sans attendre sa fin : nginx coupe la
+ * requête du navigateur à 60 s (`proxy_read_timeout` par défaut). Un plateau
+ * nombreux continue de partir en arrière-plan ; la réponse le dit
+ * (`delivery.pending`) et le bilan final part au journal du staff — le staff
+ * n'a pas de raison de renvoyer, ni un `504` qui l'y pousserait.
+ */
+export const STAFF_MESSAGE_REPLY_DEADLINE_MS = 40_000;
 
 /**
  * Appels de la route par auteur de la commande (identifiant Discord), aperçus
@@ -288,7 +298,6 @@ export async function countTournamentStaffMessageRecipients(
 /** Aperçu : qui recevrait le message, compté. Rien n'est envoyé ni réservé. */
 export async function previewTournamentStaffMessage(request: StaffMessageRequest): Promise<StaffMessagePreview> {
   const { tournament } = await authorize(request);
-  void purgeExpiredStaffMessageQuotas().catch(() => undefined);
   const { counts } = await resolveAudience(tournament.id, request.categories);
   return { tournament, recipients: counts };
 }
@@ -299,33 +308,40 @@ export async function previewTournamentStaffMessage(request: StaffMessageRequest
  * conditionnel compte l'envoi s'il reste de la place, ou ouvre une nouvelle
  * fenêtre si la précédente est échue. `affectedRows` dit si la place est prise
  * — jamais une lecture suivie d'une écriture.
+ *
+ * Deux passes au plus : la purge peut effacer, entre l'insertion et l'`UPDATE`,
+ * une ligne dont la fenêtre vient d'échoir — l'`UPDATE` ne trouve alors rien,
+ * et la seconde passe la recrée. Une fenêtre pleine refuse aux deux passes.
  */
 export async function reserveStaffMessageSend(tournamentId: number, userId: number): Promise<boolean> {
   const db = await getDatabase();
-  await db.execute(
-    `INSERT INTO bg_tournament_staff_message_quota (tournament_id, user_id, window_started_at, sends)
-     VALUES (?, ?, NOW(), 0)
-     ON DUPLICATE KEY UPDATE sends = sends`,
-    [tournamentId, userId],
-  );
-  // `sends` d'abord : son expression lit l'ancienne `window_started_at`, que la
-  // seconde affectation relit aussi telle quelle (elle ne dépend pas de `sends`).
-  const [result] = await db.execute(
-    `UPDATE bg_tournament_staff_message_quota
-        SET sends = IF(window_started_at <= NOW() - INTERVAL ? MINUTE, 1, sends + 1),
-            window_started_at = IF(window_started_at <= NOW() - INTERVAL ? MINUTE, NOW(), window_started_at)
-      WHERE tournament_id = ? AND user_id = ?
-        AND (sends < ? OR window_started_at <= NOW() - INTERVAL ? MINUTE)`,
-    [
-      STAFF_MESSAGE_WINDOW_MINUTES,
-      STAFF_MESSAGE_WINDOW_MINUTES,
-      tournamentId,
-      userId,
-      STAFF_MESSAGE_SENDS_PER_WINDOW,
-      STAFF_MESSAGE_WINDOW_MINUTES,
-    ],
-  );
-  return Number((result as { affectedRows?: number }).affectedRows ?? 0) === 1;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await db.execute(
+      `INSERT INTO bg_tournament_staff_message_quota (tournament_id, user_id, window_started_at, sends)
+       VALUES (?, ?, NOW(), 0)
+       ON DUPLICATE KEY UPDATE sends = sends`,
+      [tournamentId, userId],
+    );
+    // `sends` d'abord : son expression lit l'ancienne `window_started_at`, que la
+    // seconde affectation relit aussi telle quelle (elle ne dépend pas de `sends`).
+    const [result] = await db.execute(
+      `UPDATE bg_tournament_staff_message_quota
+          SET sends = IF(window_started_at <= NOW() - INTERVAL ? MINUTE, 1, sends + 1),
+              window_started_at = IF(window_started_at <= NOW() - INTERVAL ? MINUTE, NOW(), window_started_at)
+        WHERE tournament_id = ? AND user_id = ?
+          AND (sends < ? OR window_started_at <= NOW() - INTERVAL ? MINUTE)`,
+      [
+        STAFF_MESSAGE_WINDOW_MINUTES,
+        STAFF_MESSAGE_WINDOW_MINUTES,
+        tournamentId,
+        userId,
+        STAFF_MESSAGE_SENDS_PER_WINDOW,
+        STAFF_MESSAGE_WINDOW_MINUTES,
+      ],
+    );
+    if (Number((result as { affectedRows?: number }).affectedRows ?? 0) === 1) return true;
+  }
+  return false;
 }
 
 /** Rend l'envoi réservé quand rien n'est parti (bot injoignable et aucun appareil atteint). */
@@ -337,43 +353,41 @@ async function refundStaffMessageSend(tournamentId: number, userId: number): Pro
   );
 }
 
-/** Purge étranglée à l'heure (par processus), comme le journal des connexions. */
-const PURGE_INTERVAL_MS = 60 * 60_000;
-let lastPurgeAt = 0;
-let purgeInFlight: Promise<number> | null = null;
+/** Passage de la purge des compteurs : tous les quarts d'heure, le premier peu après le démarrage. */
+export const STAFF_MESSAGE_PURGE_TICK_MS = 15 * 60_000;
+const STAFF_MESSAGE_PURGE_FIRST_DELAY_MS = 2 * 60_000;
 
 /**
  * Efface les compteurs dont la fenêtre est échue : ils ne servent plus au
- * plafond. Appelée par l'entretien de la liste des tournois et par chaque
- * aperçu ; jamais plus d'une passe par heure.
+ * plafond. Table absente : rien à effacer. Rend le nombre de lignes effacées.
  */
-export function purgeExpiredStaffMessageQuotas(now: number = Date.now()): Promise<number> {
-  if (purgeInFlight) return purgeInFlight;
-  if (now - lastPurgeAt < PURGE_INTERVAL_MS) return Promise.resolve(0);
-  const purge = (async () => {
-    const db = await getDatabase();
+export async function purgeExpiredStaffMessageQuotas(): Promise<number> {
+  const db = await getDatabase();
+  try {
     const [result] = await db.execute(
       `DELETE FROM bg_tournament_staff_message_quota WHERE window_started_at <= NOW() - INTERVAL ? MINUTE`,
       [STAFF_MESSAGE_WINDOW_MINUTES],
     );
-    lastPurgeAt = now;
     return Number((result as { affectedRows?: number }).affectedRows ?? 0);
-  })()
-    .catch((error: unknown) => {
-      if (!isMissingTableError(error)) console.error("[staff-message] purge impossible", failureReason(error));
-      return 0;
-    })
-    .finally(() => {
-      if (purgeInFlight === purge) purgeInFlight = null;
-    });
-  purgeInFlight = purge;
-  return purge;
+  } catch (error) {
+    if (isMissingTableError(error)) return 0;
+    throw error;
+  }
 }
 
-/** Réservé aux tests : oublie l'heure de la dernière purge. */
-export function resetStaffMessagePurgeClock(): void {
-  lastPurgeAt = 0;
-  purgeInFlight = null;
+/**
+ * Lance la purge des compteurs (`instrumentation.ts`, une fois par processus) :
+ * une horloge, pas le trafic — un site sans visite garderait sinon des
+ * compteurs au-delà de la durée annoncée (registre T04).
+ */
+export function startStaffMessageQuotaPurgeClock(): void {
+  startPeriodicClock({
+    key: "staff-message-quota-purge",
+    firstDelayMs: STAFF_MESSAGE_PURGE_FIRST_DELAY_MS,
+    tickMs: STAFF_MESSAGE_PURGE_TICK_MS,
+    run: purgeExpiredStaffMessageQuotas,
+    failureMessage: "[staff-message] Purge des compteurs impossible.",
+  });
 }
 
 /** Libellés français des catégories, pour la ligne du journal (jamais un nom). */
@@ -385,13 +399,91 @@ const CATEGORY_LOG_LABELS: Readonly<Record<StaffMessageCategory, string>> = {
   ALL: "tous",
 };
 
+type DeliveryContext = {
+  staff: { id: number; pseudo: string };
+  tournament: { id: number; name: string };
+  input: StaffMessageDmInput;
+  counts: StaffMessageRecipientCounts;
+  notified: NotificationRecipient[];
+  categories: readonly StaffMessageCategory[];
+  message: string;
+};
+
+/**
+ * L'envoi lui-même, puis son bilan : rendu au plafond si rien n'est parti à
+ * coup sûr (bot injoignable, aucun appareil), noté au journal du staff.
+ */
+async function deliverStaffMessage(context: DeliveryContext): Promise<StaffMessageDelivery> {
+  const { staff, tournament, input, counts, notified } = context;
+  const sentAt = Date.now();
+  const report = await notifyUsers(notified, {
+    topic: TOPIC,
+    push: (locale) =>
+      tournamentStaffMessagePush(
+        { tournamentId: tournament.id, tournamentName: tournament.name, message: context.message, sentAt },
+        locale,
+      ),
+    discord: { message: staffMessageDm(input), context: STAFF_MESSAGE_CONTEXT, delivery: DELIVERY },
+    dmFollowsTopic: true,
+  });
+
+  // Un lot sans réponse du bot à temps (ou coupé en route) a pu partir : ni
+  // « bot injoignable », ni envoi rendu au plafond — le renvoyer doublerait
+  // le message de ceux qui l'ont reçu.
+  const uncertain = report.discordUncertain === true;
+  const botUnreachable = report.discord === null && counts.reachable > 0 && !uncertain;
+  const sent = report.discord?.sent ?? 0;
+  const delivery: StaffMessageDelivery = {
+    sent,
+    failed: Math.max(0, counts.reachable - sent),
+    skipped: counts.optedOut + counts.withoutDiscord,
+    pushed: report.pushed,
+    botUnreachable,
+    pending: uncertain,
+  };
+  if (sent === 0 && report.pushed === 0 && botUnreachable) {
+    await refundStaffMessageSend(tournament.id, staff.id).catch((error: unknown) => {
+      console.error("[staff-message] envoi non rendu au plafond", failureReason(error));
+    });
+  }
+
+  const categories = context.categories.map((category) => CATEGORY_LOG_LABELS[category]).join(", ");
+  const incomplete = uncertain ? " (bilan incomplet : un lot de messages privés sans réponse du bot)" : "";
+  const line =
+    `📣 Message du staff aux participants du tournoi ${discordQuoted(tournament.name, "fr")} (${categories}) : ` +
+    `${counts.total} visé(s), ${sent} message(s) privé(s) remis, ${delivery.failed} non remis, ${delivery.skipped} sans message privé, ${report.pushed} appareil(s) en push${incomplete} — par le staff.`;
+  publishStaffAction(line, staff, {
+    category: "tournament",
+    tournamentId: tournament.id,
+    auditLine: `${line} (tournoi #${tournament.id}, ${[...context.message].length} caractères, texte non gardé)`,
+  });
+  return delivery;
+}
+
+/** Résout `null` après `ms`, sans retenir le processus ; `cancel` arrête le minuteur. */
+function replyDeadline(ms: number): { reached: Promise<null>; cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const reached = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+    timer.unref?.();
+  });
+  return { reached, cancel: () => clearTimeout(timer) };
+}
+
 /**
  * Envoi : tout est relu (compte, permission, état du tournoi, destinataires),
  * puis un envoi est réservé au plafond, puis le message part par
  * `notifyUsers`. Le geste est publié au journal du staff — anonyme sur
  * Discord, nominatif dans pm2 —, sans le texte du message.
+ *
+ * Un envoi qui dépasse {@link STAFF_MESSAGE_REPLY_DEADLINE_MS} continue en
+ * arrière-plan (l'arrêt du serveur l'attend) : la réponse porte alors
+ * `delivery.pending`, sans nombres d'envoi, et le bilan final va au journal.
  */
-export async function sendTournamentStaffMessage(request: StaffMessageRequest): Promise<StaffMessageSendResult> {
+export async function sendTournamentStaffMessage(
+  request: StaffMessageRequest,
+  options: { replyDeadlineMs?: number } = {},
+): Promise<StaffMessageSendResult> {
   const { staff, tournament, input } = await authorize(request);
   const { counts, notified } = await resolveAudience(tournament.id, request.categories);
   if (notified.length === 0) throw new StaffMessageError(STAFF_MESSAGE_ERRORS.noRecipients, 409);
@@ -405,42 +497,39 @@ export async function sendTournamentStaffMessage(request: StaffMessageRequest): 
   }
   if (!reserved) throw new StaffMessageError(STAFF_MESSAGE_ERRORS.quotaExceeded, 429);
 
-  const sentAt = Date.now();
-  const report = await notifyUsers(notified, {
-    topic: TOPIC,
-    push: (locale) =>
-      tournamentStaffMessagePush(
-        { tournamentId: tournament.id, tournamentName: tournament.name, message: request.message, sentAt },
-        locale,
-      ),
-    discord: { message: staffMessageDm(input), context: STAFF_MESSAGE_CONTEXT, delivery: DELIVERY },
-    dmFollowsTopic: true,
+  const work = deliverStaffMessage({
+    staff,
+    tournament,
+    input,
+    counts,
+    notified,
+    categories: request.categories,
+    message: request.message,
   });
-
-  const botUnreachable = report.discord === null && counts.reachable > 0;
-  const sent = report.discord?.sent ?? 0;
-  const delivery: StaffMessageDelivery = {
-    sent,
-    failed: Math.max(0, counts.reachable - sent),
-    skipped: counts.optedOut + counts.withoutDiscord,
-    pushed: report.pushed,
-    botUnreachable,
-  };
-  if (sent === 0 && report.pushed === 0 && botUnreachable) {
-    await refundStaffMessageSend(tournament.id, staff.id).catch((error: unknown) => {
-      console.error("[staff-message] envoi non rendu au plafond", failureReason(error));
-    });
+  trackBackgroundPass(work);
+  let answered = false;
+  // Une panne après la réponse n'a plus d'appelant pour l'entendre : journalisée.
+  work.catch((error: unknown) => {
+    if (answered) console.error("[staff-message] envoi interrompu en arrière-plan", failureReason(error));
+  });
+  const deadline = replyDeadline(options.replyDeadlineMs ?? STAFF_MESSAGE_REPLY_DEADLINE_MS);
+  try {
+    const delivery = await Promise.race([work, deadline.reached]);
+    if (delivery) return { tournament, recipients: counts, delivery };
+  } finally {
+    deadline.cancel();
   }
-
-  const categories = request.categories.map((category) => CATEGORY_LOG_LABELS[category]).join(", ");
-  const line =
-    `📣 Message du staff aux participants du tournoi ${discordQuoted(tournament.name, "fr")} (${categories}) : ` +
-    `${counts.total} visé(s), ${sent} message(s) privé(s) remis, ${delivery.failed} non remis, ${delivery.skipped} sans message privé, ${report.pushed} appareil(s) en push — par le staff.`;
-  publishStaffAction(line, staff, {
-    category: "tournament",
-    tournamentId: tournament.id,
-    auditLine: `${line} (tournoi #${tournament.id}, ${[...request.message].length} caractères, texte non gardé)`,
-  });
-
-  return { tournament, recipients: counts, delivery };
+  answered = true;
+  return {
+    tournament,
+    recipients: counts,
+    delivery: {
+      sent: 0,
+      failed: 0,
+      skipped: counts.optedOut + counts.withoutDiscord,
+      pushed: 0,
+      botUnreachable: false,
+      pending: true,
+    },
+  };
 }

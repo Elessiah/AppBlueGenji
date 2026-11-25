@@ -498,3 +498,64 @@ describe("bot-integration", () => {
     });
   });
 });
+
+// En dernier : chaque cas enregistre un échec, et trois échecs ouvrent le
+// coupe-circuit partagé du module pour les cas qui suivraient.
+describe("pushDiscordDirectMessages — issue incertaine (onUncertain)", () => {
+  const recipients = [{ discordId: "555000111", handle: "kiro", label: "Kiro" }];
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("pushDiscordDirectMessages_timeout_callsOnUncertainAndReturnsNull", async () => {
+    jest.spyOn(global, "fetch").mockRejectedValue(Object.assign(new Error("délai"), { name: "TimeoutError" }));
+    const onUncertain = jest.fn();
+
+    const actual = await pushDiscordDirectMessages("Message", recipients, "ctx", { honourCircuit: false, onUncertain });
+
+    expect(actual).toBeNull();
+    expect(onUncertain).toHaveBeenCalledTimes(1);
+  });
+
+  it("pushDiscordDirectMessages_connectionReset_callsOnUncertain", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockRejectedValue(Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNRESET" } }));
+    const onUncertain = jest.fn();
+
+    await pushDiscordDirectMessages("Message", recipients, "ctx", { honourCircuit: false, onUncertain });
+
+    expect(onUncertain).toHaveBeenCalledTimes(1);
+  });
+
+  it("pushDiscordDirectMessages_okWithUnreadableBody_callsOnUncertain", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response("pas du json", { status: 200 }));
+    const onUncertain = jest.fn();
+
+    const actual = await pushDiscordDirectMessages("Message", recipients, "ctx", { honourCircuit: false, onUncertain });
+
+    expect(actual).toBeNull();
+    expect(onUncertain).toHaveBeenCalledTimes(1);
+  });
+
+  it("pushDiscordDirectMessages_connectionRefused_doesNotCallOnUncertain", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockRejectedValue(Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } }));
+    const onUncertain = jest.fn();
+
+    await pushDiscordDirectMessages("Message", recipients, "ctx", { honourCircuit: false, onUncertain });
+
+    expect(onUncertain).not.toHaveBeenCalled();
+  });
+
+  it("pushDiscordDirectMessages_non2xx_doesNotCallOnUncertain", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 503 }));
+    const onUncertain = jest.fn();
+
+    await pushDiscordDirectMessages("Message", recipients, "ctx", { honourCircuit: false, onUncertain });
+
+    expect(onUncertain).not.toHaveBeenCalled();
+  });
+});

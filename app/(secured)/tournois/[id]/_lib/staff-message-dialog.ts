@@ -1,8 +1,12 @@
+import { MATCH_DM_SETTINGS_PATH } from "@/lib/shared/discord-notifications";
 import {
   normalizeStaffMessage,
   STAFF_MESSAGE_CATEGORIES,
+  STAFF_MESSAGE_ERRORS,
   STAFF_MESSAGE_MAX_LENGTH,
+  staffMessageRefusal,
   type StaffMessageCategory,
+  type StaffMessageDelivery,
   type StaffMessageRecipientCounts,
 } from "@/lib/shared/tournament-staff-message";
 
@@ -65,11 +69,13 @@ export function staffMessageBlocker(input: {
   message: string;
   categories: ReadonlySet<StaffMessageCategory>;
   counts: StaffMessageRecipientCounts | null;
+  /** Le message privé rendu dépasserait le plafond du bot ({@link staffMessageRenderedTooLong}). */
+  renderedTooLong?: boolean;
 }): StaffMessageBlocker | null {
   if (input.categories.size === 0) return "noCategory";
   const length = staffMessageLength(input.message);
   if (length === 0) return "empty";
-  if (length > STAFF_MESSAGE_MAX_LENGTH) return "tooLong";
+  if (length > STAFF_MESSAGE_MAX_LENGTH || input.renderedTooLong === true) return "tooLong";
   if (input.counts === null) return "counting";
   if (staffMessageAudience(input.counts) === 0) return "nobody";
   return null;
@@ -77,3 +83,54 @@ export function staffMessageBlocker(input: {
 
 /** Délai avant de recompter après une case cochée : une rafale de clics ne fait qu'une requête. */
 export const STAFF_MESSAGE_COUNT_DEBOUNCE_MS = 300;
+
+/**
+ * Le message privé rendu (citation, échappement, en-tête, liens) dépasserait-il
+ * le plafond du bot dans l'une des deux langues ? Même règle que le serveur
+ * (`staffMessageRefusal`), les liens bâtis sur l'adresse du site ouvert : un
+ * texte sous 1 200 caractères mais fait de lignes courtes ou de caractères
+ * échappés est retenu avant l'envoi, au lieu d'un refus après confirmation.
+ */
+export function staffMessageRenderedTooLong(
+  message: string,
+  tournament: { id: number; name: string },
+  origin: string,
+): boolean {
+  const text = normalizeStaffMessage(message) ?? "";
+  if (text.length === 0) return false;
+  const refusal = staffMessageRefusal({
+    tournamentName: tournament.name,
+    message: text,
+    tournamentUrl: `${origin}/tournois/${tournament.id}`,
+    settingsUrl: `${origin}${MATCH_DM_SETTINGS_PATH}`,
+  });
+  return refusal === STAFF_MESSAGE_ERRORS.messageTooLong;
+}
+
+/** Refus du serveur qui désignent le champ du texte (`useFieldErrors`). */
+export const STAFF_MESSAGE_FIELD_ERRORS = {
+  [STAFF_MESSAGE_ERRORS.emptyMessage]: "message",
+  [STAFF_MESSAGE_ERRORS.messageTooLong]: "message",
+} as const;
+
+/**
+ * Ce que dit la notification après un envoi :
+ * - `pending` — l'envoi continue (ou un lot reste sans réponse du bot) : ne pas renvoyer ;
+ * - `nothingDelivered` — rien n'a été remis (ni message privé, ni push) : une erreur, pas un succès ;
+ * - `botUnreachable` — bot injoignable, des push sont partis ;
+ * - `sent` — le bilan ordinaire.
+ */
+export type StaffMessageSendOutcome = "pending" | "nothingDelivered" | "botUnreachable" | "sent";
+
+export function staffMessageSendOutcome(delivery: StaffMessageDelivery): StaffMessageSendOutcome {
+  if (delivery.pending) return "pending";
+  if (delivery.sent + delivery.pushed === 0) return "nothingDelivered";
+  if (delivery.botUnreachable) return "botUnreachable";
+  return "sent";
+}
+
+/**
+ * Code du client quand l'envoi n'a pas rendu de réponse lisible (réseau coupé,
+ * `502`/`504` du serveur frontal) : le message a pu partir.
+ */
+export const STAFF_MESSAGE_OUTCOME_UNKNOWN = "STAFF_MESSAGE_OUTCOME_UNKNOWN";

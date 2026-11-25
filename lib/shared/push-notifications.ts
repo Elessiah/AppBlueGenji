@@ -62,7 +62,7 @@ export const PUSH_TOPICS = {
   },
   TOURNAMENT_STAFF_MESSAGE: {
     label: "Messages du staff des tournois",
-    description: "Le staff d'un tournoi où tu es engagé (membre d'une équipe inscrite, ou joueur d'un tournoi individuel) écrit à ses participants depuis Discord. Coupe aussi le message privé Discord.",
+    description: "Le staff d'un tournoi où tu es engagé (membre d'une équipe inscrite, ou joueur d'un tournoi individuel) écrit à ses participants, depuis la page du tournoi ou depuis Discord. Coupe aussi le message privé Discord.",
     audience: null,
   },
   NEW_MATCH: {

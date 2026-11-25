@@ -257,7 +257,7 @@
     "STAFF_MESSAGE_EMPTY": "Write a message before sending it.",
     "STAFF_MESSAGE_TOO_LONG": "Message too long for a Discord direct message: shorten it.",
     "NO_RECIPIENTS": "Nobody to notify with these categories.",
-    "STAFF_MESSAGE_QUOTA_EXCEEDED": "Sending cap reached for this tournament: try again within an hour.",
+    "STAFF_MESSAGE_QUOTA_EXCEEDED": "You reached your sending cap for this tournament: try again within an hour at most.",
     "TOURNAMENT_NOT_OPEN_FOR_MESSAGES": "Messages to participants only go out during registration or while the tournament is running.",
     "INVALID_RECIPIENT_CATEGORIES": "Tick at least one recipient category.",
     "INVALID_STAFF_MESSAGE_REQUEST": "Invalid message request: reload the page and try again.",

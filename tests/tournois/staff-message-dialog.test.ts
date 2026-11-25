@@ -3,7 +3,9 @@ import {
   initialStaffMessageCategories,
   staffMessageBlocker,
   staffMessageLength,
+  staffMessageRenderedTooLong,
   staffMessageRequestCategories,
+  staffMessageSendOutcome,
   toggleStaffMessageCategory,
 } from "@/app/(secured)/tournois/[id]/_lib/staff-message-dialog";
 import { STAFF_MESSAGE_MAX_LENGTH, type StaffMessageCategory } from "@/lib/shared/tournament-staff-message";
@@ -82,5 +84,43 @@ describe("staffMessageBlocker", () => {
 describe("staffMessageLength", () => {
   it("staffMessageLength_emojiAndSpaces_countsTrimmedCodePoints", () => {
     expect(staffMessageLength("  🎮 GG  ")).toBe(4);
+  });
+});
+
+describe("staffMessageRenderedTooLong", () => {
+  const tournament = { id: 12, name: "Coupe d'hiver" };
+
+  it("staffMessageRenderedTooLong_shortText_returnsFalse", () => {
+    expect(staffMessageRenderedTooLong("Check-in à 20 h", tournament, "https://bluegenji.test")).toBe(false);
+  });
+
+  it("staffMessageRenderedTooLong_underMaxButEscapedOverDmCap_returnsTrue", () => {
+    expect(staffMessageRenderedTooLong("*".repeat(1000), tournament, "https://bluegenji.test")).toBe(true);
+  });
+});
+
+describe("staffMessageBlocker — message privé rendu", () => {
+  it("staffMessageBlocker_renderedTooLong_returnsTooLong", () => {
+    expect(staffMessageBlocker({ message: "Salut", categories: set("ALL"), counts, renderedTooLong: true })).toBe("tooLong");
+  });
+});
+
+describe("staffMessageSendOutcome", () => {
+  const delivery = { sent: 2, failed: 0, skipped: 0, pushed: 1, botUnreachable: false, pending: false };
+
+  it("staffMessageSendOutcome_pending_returnsPending", () => {
+    expect(staffMessageSendOutcome({ ...delivery, sent: 0, pushed: 0, pending: true })).toBe("pending");
+  });
+
+  it("staffMessageSendOutcome_nothingDelivered_returnsNothingDelivered", () => {
+    expect(staffMessageSendOutcome({ ...delivery, sent: 0, pushed: 0, botUnreachable: true })).toBe("nothingDelivered");
+  });
+
+  it("staffMessageSendOutcome_botUnreachableWithPush_returnsBotUnreachable", () => {
+    expect(staffMessageSendOutcome({ ...delivery, sent: 0, botUnreachable: true })).toBe("botUnreachable");
+  });
+
+  it("staffMessageSendOutcome_delivered_returnsSent", () => {
+    expect(staffMessageSendOutcome(delivery)).toBe("sent");
   });
 });

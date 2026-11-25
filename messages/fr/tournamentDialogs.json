@@ -485,7 +485,7 @@
       "PLAYERS": "Joueurs",
       "MANAGERS": "Managers",
       "CAPTAINS": "Capitaines",
-      "OWNERS": "Owners",
+      "OWNERS": "Propriétaires",
       "ALL": "Tous"
     },
     "noCategory": "Coche au moins une catégorie.",
@@ -498,10 +498,16 @@
     "tooLong": "{length}/{max} — trop long, raccourcis le message.",
     "send": "Envoyer",
     "confirmTitle": "Envoyer le message ?",
-    "confirmBody": "Il part tout de suite à {count, plural, one {# participant} other {# participants}} de « {name} », sans retour possible. Au plus {max} envois par heure pour ce tournoi.",
+    "confirmBody": "Il part tout de suite à {count, plural, one {# participant} other {# participants}} de « {name} », sans retour possible. Au plus {max} envois par heure de ta part pour ce tournoi.",
     "confirm": "Envoyer le message",
     "pending": "Envoi…",
     "sent": "Message envoyé : {sent, plural, one {# message privé remis} other {# messages privés remis}}, {pushed, plural, one {# notification push} other {# notifications push}}.",
-    "sentBotUnreachable": "Message envoyé en push ({pushed}) ; le bot Discord était injoignable : aucun message privé n'est parti."
+    "sentBotUnreachable": "Message envoyé en push ({pushed}) ; le bot Discord était injoignable : aucun message privé n'est parti.",
+    "countFailed": "Le décompte des destinataires a échoué.",
+    "countRetry": "Recompter",
+    "tooLongFormatted": "{length}/{max} — trop long une fois mis en forme pour Discord (lignes, caractères spéciaux) : raccourcis le message.",
+    "sentPending": "Envoi en cours : le message continue de partir vers les participants. Ne le renvoie pas — le bilan sera noté au journal du staff.",
+    "nothingDelivered": "Aucun message n'a été remis : ni message privé, ni notification push. Réessaie plus tard.",
+    "outcomeUnknown": "Le site n'a pas confirmé l'envoi : le message est peut-être parti. Ne le renvoie pas avant d'avoir vérifié le journal du staff."
   }
 }

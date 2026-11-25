@@ -523,14 +523,15 @@ function emptyDelivery(): DiscordDeliveryReport {
 async function postDiscordNotification(
   path: string,
   body: unknown,
-  options: { timeoutMs: number; honourCircuit: boolean },
+  options: { timeoutMs: number; honourCircuit: boolean; onUncertain?: () => void },
 ): Promise<DiscordDeliveryReport | null> {
   if (outboundMuted() || (options.honourCircuit && isCircuitOpen())) return null;
 
   const baseUrl = resolveBotInternalUrl();
 
+  let response: Response | null = null;
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
+    response = await fetch(`${baseUrl}${path}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -549,8 +550,11 @@ async function postDiscordNotification(
     if (options.honourCircuit) recordSuccess();
     else recordBypassSuccess();
     return { ...emptyDelivery(), ...((await response.json()) as Partial<DiscordDeliveryReport>) };
-  } catch {
+  } catch (error) {
     recordFailure();
+    // La requête a atteint le bot (délai écoulé pendant l'envoi, connexion
+    // coupée en route, bilan `200` illisible) : des messages ont pu partir.
+    if (response?.ok || isTimeoutError(error) || !failedBeforeSending(error)) options.onUncertain?.();
     return null;
   }
 }
@@ -567,19 +571,25 @@ async function postDiscordNotification(
  *   attend la réponse (« Tester mes MP ») — elle mérite sa tentative, sans
  *   refermer le coupe-circuit si elle réussit. `timeoutMs` : délai de l'appel
  *   (défaut 15 s), plus long pour un envoi qui enchaîne beaucoup de destinataires.
+ *   `onUncertain` : appelé quand l'appel échoue **après** avoir atteint le bot
+ *   (délai écoulé, connexion coupée, bilan illisible) — des messages ont pu partir.
  * @returns Le bilan du bot, ou `null` s'il est injoignable.
  */
 export async function pushDiscordDirectMessages(
   message: string,
   recipients: DiscordRecipient[],
   context: string,
-  options: { honourCircuit?: boolean; timeoutMs?: number } = {},
+  options: { honourCircuit?: boolean; timeoutMs?: number; onUncertain?: () => void } = {},
 ): Promise<DiscordDeliveryReport | null> {
   if (recipients.length === 0) return emptyDelivery();
   return postDiscordNotification(
     "/internal/notify/dm",
     { message, recipients, context },
-    { timeoutMs: options.timeoutMs ?? BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: options.honourCircuit ?? true },
+    {
+      timeoutMs: options.timeoutMs ?? BOT_NOTIFY_FETCH_TIMEOUT_MS,
+      honourCircuit: options.honourCircuit ?? true,
+      ...(options.onUncertain ? { onUncertain: options.onUncertain } : {}),
+    },
   );
 }
 

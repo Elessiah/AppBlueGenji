@@ -1,10 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useId, useRef, useState } from "react";
+import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { BusyButton } from "@/components/ui/busy-button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
+import { CodedError, errorCode } from "@/lib/shared/field-errors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
   STAFF_MESSAGE_CATEGORIES,
   STAFF_MESSAGE_MAX_LENGTH,
@@ -21,9 +24,14 @@ import {
   staffMessageAudience,
   staffMessageBlocker,
   staffMessageLength,
+  staffMessageRenderedTooLong,
   staffMessageRequestCategories,
+  staffMessageSendOutcome,
   STAFF_MESSAGE_COUNT_DEBOUNCE_MS,
+  STAFF_MESSAGE_FIELD_ERRORS,
+  STAFF_MESSAGE_OUTCOME_UNKNOWN,
   toggleStaffMessageCategory,
+  type StaffMessageBlocker,
 } from "../_lib/staff-message-dialog";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import s from "./StaffMessageDialog.module.css";
@@ -40,15 +48,40 @@ type StaffMessageResponse = {
   delivery?: StaffMessageDelivery;
 };
 
+/**
+ * Un appel à la route. Sans réponse lisible (réseau coupé, page d'erreur
+ * `502`/`504` du serveur frontal), le code {@link STAFF_MESSAGE_OUTCOME_UNKNOWN} :
+ * pour un envoi, le message a pu partir.
+ */
 async function postStaffMessage(tournamentId: number, body: Record<string, unknown>): Promise<StaffMessageResponse> {
-  const response = await fetch(`/api/tournaments/${tournamentId}/staff-message`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const payload = (await response.json()) as StaffMessageResponse;
-  if (!response.ok) throw new Error(payload.error || "STAFF_MESSAGE_FAILED");
+  let payload: StaffMessageResponse | null = null;
+  let ok = false;
+  try {
+    const response = await fetch(`/api/tournaments/${tournamentId}/staff-message`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    ok = response.ok;
+    payload = (await response.json()) as StaffMessageResponse | null;
+  } catch {
+    payload = null;
+  }
+  if (!payload) throw new CodedError(STAFF_MESSAGE_OUTCOME_UNKNOWN, STAFF_MESSAGE_OUTCOME_UNKNOWN);
+  if (!ok) {
+    const code = payload.error || "STAFF_MESSAGE_FAILED";
+    throw new CodedError(code, code);
+  }
   return payload;
+}
+
+/** Texte du compteur : la longueur, et pourquoi elle retient l'envoi. */
+function counterKey(
+  blocker: StaffMessageBlocker | null,
+  length: number,
+): "staffMessage.counter" | "staffMessage.tooLong" | "staffMessage.tooLongFormatted" {
+  if (blocker !== "tooLong") return "staffMessage.counter";
+  return length > STAFF_MESSAGE_MAX_LENGTH ? "staffMessage.tooLong" : "staffMessage.tooLongFormatted";
 }
 
 /**
@@ -58,19 +91,25 @@ async function postStaffMessage(tournamentId: number, body: Record<string, unkno
  * en nombres seulement —, écrit son texte, puis confirme l'envoi
  * (`ConfirmActionDialog`) : le message part sans retour possible. Même route
  * de service que le bot : destinataires, plafond et journal sont les siens.
- * Refus et bilan en notification (`useToast`), jamais en ligne.
+ * Refus et bilan en notification (`useToast`), jamais en ligne ; un refus qui
+ * désigne le texte y est aussi rattaché (`useFieldErrors`).
  */
 export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Readonly<StaffMessageDialogProps>) {
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const { t } = useDialogsText();
   const ids = useId();
+  const messageId = `${ids}-message`;
+  const fieldErrors = useFieldErrors(STAFF_MESSAGE_FIELD_ERRORS, { message: messageId });
   const [message, setMessage] = useState("");
   const [categories, setCategories] = useState<Set<StaffMessageCategory>>(initialStaffMessageCategories);
   // Dernier décompte reçu, avec les cases qu'il compte : il ne vaut que pour
   // les cases **actuelles** — une case changée le périme, et l'envoi attend
   // le bon chiffre.
   const [counted, setCounted] = useState<{ key: string; counts: StaffMessageRecipientCounts } | null>(null);
+  // Cases dont le décompte a échoué : dit, avec de quoi le relancer.
+  const [countFailed, setCountFailed] = useState<string | null>(null);
+  const [countRetry, setCountRetry] = useState(0);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const countSeq = useRef(0);
@@ -82,20 +121,27 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
   useEffect(() => {
     if (requestKey === "") return;
     const seq = ++countSeq.current;
+    setCountFailed(null);
     const timer = setTimeout(() => {
       postStaffMessage(tournamentId, { mode: "count", categories: requestKey.split(",") })
         .then((payload) => {
           if (seq === countSeq.current && payload.recipients) setCounted({ key: requestKey, counts: payload.recipients });
         })
         .catch((error: unknown) => {
-          if (seq === countSeq.current) showError(mapError((error as Error).message));
+          if (seq !== countSeq.current) return;
+          setCountFailed(requestKey);
+          showError(mapError(errorCode(error) ?? "STAFF_MESSAGE_FAILED"));
         });
     }, STAFF_MESSAGE_COUNT_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [tournamentId, requestKey, showError, mapError]);
+  }, [tournamentId, requestKey, countRetry, showError, mapError]);
 
-  const blocker = staffMessageBlocker({ message, categories, counts });
+  // Les liens du message privé, bâtis comme le serveur les bâtit (même site).
+  const origin = useMemo(() => (typeof window === "undefined" ? "" : window.location.origin), []);
+  const renderedTooLong = staffMessageRenderedTooLong(message, { id: tournamentId, name: tournamentName }, origin);
+  const blocker = staffMessageBlocker({ message, categories, counts, renderedTooLong });
   const length = staffMessageLength(message);
+  const countUnavailable = counts === null && countFailed !== null && countFailed === requestKey;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -111,12 +157,30 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
         message: normalizeStaffMessage(message) ?? "",
       });
       const delivery = payload.delivery;
-      if (delivery?.botUnreachable) showSuccess(t("staffMessage.sentBotUnreachable", { pushed: delivery.pushed }));
+      const outcome = delivery ? staffMessageSendOutcome(delivery) : "pending";
+      if (outcome === "nothingDelivered") {
+        // Rien n'est parti (le serveur rend l'envoi au plafond quand le bot était injoignable).
+        showError(t("staffMessage.nothingDelivered"));
+        setConfirming(false);
+        return false;
+      }
+      if (outcome === "pending") showSuccess(t("staffMessage.sentPending"));
+      else if (outcome === "botUnreachable") showSuccess(t("staffMessage.sentBotUnreachable", { pushed: delivery?.pushed ?? 0 }));
       else showSuccess(t("staffMessage.sent", { sent: delivery?.sent ?? 0, pushed: delivery?.pushed ?? 0 }));
       onClose();
       return true;
     } catch (error) {
-      showError(mapError((error as Error).message));
+      const code = errorCode(error) ?? "STAFF_MESSAGE_FAILED";
+      if (code === STAFF_MESSAGE_OUTCOME_UNKNOWN) {
+        // Peut-être parti : la fenêtre se ferme, pour qu'on ne renvoie pas d'un clic.
+        showError(t("staffMessage.outcomeUnknown"));
+        onClose();
+        return true;
+      }
+      const text = mapError(code);
+      showError(text);
+      // Un refus qui désigne le texte : retour au champ, qui le dit aussi.
+      if (fieldErrors.report(code, text)) setConfirming(false);
       return false;
     } finally {
       setBusy(false);
@@ -124,12 +188,12 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
   };
 
   const titleId = `${ids}-title`;
-  const messageId = `${ids}-message`;
   const counterId = `${ids}-counter`;
   const countsId = `${ids}-counts`;
 
   let countsText: string;
   if (categories.size === 0) countsText = t("staffMessage.noCategory");
+  else if (countUnavailable) countsText = t("staffMessage.countFailed");
   else if (counts === null) countsText = t("staffMessage.counting");
   else if (staffMessageAudience(counts) === 0) countsText = t("staffMessage.nobody");
   else countsText = t("staffMessage.counts", { ...counts });
@@ -167,29 +231,37 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
               </label>
             ))}
           </fieldset>
-          <p id={countsId} className={s.counts} aria-live="polite">
-            {countsText}
-          </p>
+          <div className={s.countsRow}>
+            <p id={countsId} className={s.counts} aria-live="polite">
+              {countsText}
+            </p>
+            {countUnavailable && (
+              <button type="button" className="btn ghost" onClick={() => setCountRetry((n) => n + 1)}>
+                {t("staffMessage.countRetry")}
+              </button>
+            )}
+          </div>
 
           <div className="field">
             <label htmlFor={messageId}>{t("staffMessage.label")}</label>
             <textarea
               id={messageId}
               value={message}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(event) => {
+                setMessage(event.target.value);
+                fieldErrors.clear("message");
+              }}
               rows={6}
               readOnly={busy}
               maxLength={STAFF_MESSAGE_MAX_LENGTH * 2}
-              aria-invalid={blocker === "tooLong"}
-              aria-describedby={`${counterId} ${countsId}`}
+              {...fieldErrors.aria("message", counterId, countsId)}
+              aria-invalid={blocker === "tooLong" || fieldErrors.invalidField === "message" || undefined}
               placeholder={t("staffMessage.placeholder")}
               className={s.message}
             />
+            <FieldErrorText fieldId={messageId} message={fieldErrors.message("message")} />
             <p id={counterId} className={blocker === "tooLong" ? `${s.counter} ${s.counterOver}` : s.counter}>
-              {t(blocker === "tooLong" ? "staffMessage.tooLong" : "staffMessage.counter", {
-                length,
-                max: STAFF_MESSAGE_MAX_LENGTH,
-              })}
+              {t(counterKey(blocker, length), { length, max: STAFF_MESSAGE_MAX_LENGTH })}
             </p>
           </div>
 

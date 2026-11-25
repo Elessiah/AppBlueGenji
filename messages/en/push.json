@@ -18,7 +18,7 @@
     },
     "TOURNAMENT_STAFF_MESSAGE": {
       "label": "Tournament staff messages",
-      "description": "The staff of a tournament you take part in (member of a registered team, or player of a solo tournament) writes to its participants from Discord. Also turns off the Discord direct message."
+      "description": "The staff of a tournament you take part in (member of a registered team, or player of a solo tournament) writes to its participants, from the tournament page or from Discord. Also turns off the Discord direct message."
     },
     "NEW_MATCH": {
       "label": "New match",

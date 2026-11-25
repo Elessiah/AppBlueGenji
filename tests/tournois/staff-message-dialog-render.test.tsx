@@ -47,7 +47,7 @@ describe("StaffMessageDialog", () => {
     const html = render("fr");
 
     expect(html.match(/type="checkbox" checked=""/g)).toHaveLength(5);
-    for (const label of ["Joueurs", "Managers", "Capitaines", "Owners", "Tous"]) expect(html).toContain(label);
+    for (const label of ["Joueurs", "Managers", "Capitaines", "Propriétaires", "Tous"]) expect(html).toContain(label);
   });
 
   it("StaffMessageDialog_french_showsCountingAndTournament", () => {

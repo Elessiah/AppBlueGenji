@@ -258,7 +258,7 @@ ${MATCH_PLACE_COLUMNS}        pairing VARCHAR(48) NOT NULL,
     // `docs/features/TOURNAMENT_STAFF_MESSAGE.md`) : une ligne par membre du
     // staff et par tournoi, le début de la fenêtre et le nombre d'envois — jamais
     // le texte. Réservée en une instruction (`reserveStaffMessageSend`), effacée
-    // avec le tournoi ou le compte, et par la purge horaire une fois la fenêtre échue.
+    // avec le tournoi ou le compte, et par la purge du quart d'heure une fois la fenêtre échue.
     await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_tournament_staff_message_quota (
         tournament_id BIGINT NOT NULL,

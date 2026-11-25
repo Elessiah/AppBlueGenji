@@ -37,7 +37,18 @@ portes appellent **le même service** : `lib/server/tournament-staff-message.ts`
   refusé (`STAFF_MESSAGE_EMPTY`).
 - **Envoi par lots** : `notifyUsers` découpe les destinataires par 100
   (`BOT_DM_RECIPIENTS_PER_CALL`, plafond de `/internal/notify/dm`) et par 25 ici,
-  délai 120 s par appel, sans le coupe-circuit (`DirectMessageDelivery`).
+  délai 120 s par appel, sans le coupe-circuit (`DirectMessageDelivery`). Un lot
+  qui atteint le bot sans rendre de bilan (délai écoulé, connexion coupée en
+  route, `200` illisible : `onUncertain`) n'arrête pas les suivants
+  (`uncertainIsNotLost`) et rend le bilan **incomplet** (`discordUncertain`) :
+  ni « bot injoignable », ni envoi rendu au plafond — le renvoyer doublerait le
+  message de ceux qui l'ont reçu.
+- **Réponse sous 40 s** (`STAFF_MESSAGE_REPLY_DEADLINE_MS`) : nginx coupe une
+  requête du navigateur à 60 s. Passé ce délai, la route répond
+  `delivery.pending: true` (nombres d'envoi à zéro) et l'envoi continue en
+  arrière-plan (`trackBackgroundPass`, attendu par l'arrêt du serveur) ; son
+  bilan final part au journal du staff. `pending` vaut aussi pour un bilan
+  incomplet. Les deux portes disent alors « ne le renvoie pas ».
 
 ## Plafond
 
@@ -46,9 +57,13 @@ sur 60 minutes (`STAFF_MESSAGE_WINDOW_MINUTES`), table
 `bg_tournament_staff_message_quota` (PK tournoi + compte, fenêtre, compte). La
 place se **réserve en une instruction** : `INSERT … ON DUPLICATE KEY UPDATE`
 idempotent, puis `UPDATE … SET sends = IF(fenêtre échue, 1, sends + 1) … WHERE
-sends < ? OR fenêtre échue` et `affectedRows`. Un envoi dont rien n'est parti
-(bot injoignable, aucun push) est rendu au plafond. Lignes purgées toutes les
-heures une fois la fenêtre échue, et en cascade avec le tournoi ou le compte.
+sends < ? OR fenêtre échue` et `affectedRows` — deux passes au plus, la purge
+pouvant effacer entre les deux une ligne dont la fenêtre vient d'échoir. Un
+envoi dont rien n'est parti à coup sûr (bot injoignable, aucun push) est rendu
+au plafond. Lignes purgées une fois la fenêtre échue par une horloge de fond
+(`startStaffMessageQuotaPurgeClock`, `instrumentation.ts`, toutes les 15
+minutes), en cascade avec le tournoi, et à la suppression du compte
+(`anonymizeAccount` : la ligne `bg_users` reste, la cascade ne joue pas).
 Table absente : `503 STAFF_MESSAGE_UNAVAILABLE`. En plus, appels limités en
 mémoire : 60 / 10 min par Discord (bot), 120 / 10 min par compte (fiche).
 
@@ -71,13 +86,16 @@ Corps `{ mode: "preview" | "send", discordId, tournamentId, categories, message 
 le site retrouve le compte rattaché à ce Discord (`DISCORD_ACCOUNT_NOT_LINKED`
 sinon) et vérifie `tournaments` (`FORBIDDEN`). Réponse : des **nombres**
 (`total`, `reachable`, `withoutDiscord`, `optedOut` ; au bilan `sent`, `failed`,
-`skipped`, `pushed`, `botUnreachable`), jamais un nom ni un identifiant.
+`skipped`, `pushed`, `botUnreachable`, `pending`), jamais un nom ni un identifiant.
 
 Côté bot (dépôt `blueGenjiBot`, `src/commandsHandlers/messageTournoi.ts`) :
-réponse éphémère, menu à choix multiples (Joueurs, Managers, Capitaines, Owners,
-Tous ; 1 à 5, Tous par défaut), boutons Envoyer / Annuler réservés à l'auteur,
-panneau expiré après 5 minutes, site injoignable → message éphémère sans
-plantage. Variables du bot : `SITE_INTERNAL_URL` (boucle locale seulement) et
+réponse éphémère, menu à choix multiples (Joueurs, Managers, Capitaines,
+Propriétaires, Tous ; EN Owners ; 1 à 5, Tous par défaut), boutons Envoyer /
+Annuler réservés à l'auteur, panneau expiré après 5 minutes, site injoignable →
+message éphémère sans plantage. Un aperçu en échec passager (site lent ou muet,
+trop de demandes) garde le panneau sur la sélection précédente ; un envoi sans
+réponse lisible (délai, connexion coupée, bilan illisible) dit « peut-être
+parti, ne le relance pas ». Variables du bot : `SITE_INTERNAL_URL` (boucle locale seulement) et
 `SITE_INTERNAL_TOKEN`.
 
 ## Depuis le site — « Message aux participants »
@@ -93,10 +111,17 @@ la demande avec ses textes (`tournamentDialogs.json` § `staffMessage`).
 - Décompte en direct : `{ mode: "count", categories }` à chaque changement de
   cases (300 ms de calme), en nombres seuls ; un décompte ne vaut que pour les
   cases qui l'ont demandé.
+- Décompte en échec : dit, avec un bouton « Recompter ».
 - Compteur du texte (1 200), envoi retenu tant que le texte est vide ou trop
-  long, le décompte absent ou personne à prévenir.
+  long — y compris une fois rendu en message privé (`staffMessageRenderedTooLong`,
+  même règle que le serveur, liens bâtis sur l'adresse du site) —, le décompte
+  absent ou personne à prévenir.
 - Envoi confirmé par `ConfirmActionDialog` (sans retour possible) ; bilan et
-  refus en notification (`useToast`).
+  refus en notification (`useToast`) ; un refus du texte (`STAFF_MESSAGE_EMPTY`,
+  `STAFF_MESSAGE_TOO_LONG`) est aussi rattaché au champ (`useFieldErrors`). Rien
+  de remis (ni message privé, ni push) : une erreur, pas un succès ; bilan
+  `pending` : « envoi en cours, ne le renvoie pas » ; réponse illisible (`502`,
+  `504`, réseau) : « peut-être parti », la fenêtre se ferme.
 
 Route : `POST /api/tournaments/[id]/staff-message` — session, provenance
 vérifiée par le middleware, `can(user, "tournaments")`, corps

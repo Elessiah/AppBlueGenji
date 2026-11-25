@@ -240,6 +240,10 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   // (`created_by` ne se lit nulle part). Table tolérée : une base qui en
   // manque n'a rien à effacer.
   await ignoreMissingTable(connection.execute(`DELETE FROM bg_account_suspensions WHERE user_id = ?`, [userId]));
+  // Le compteur des messages du staff aux participants d'un tournoi
+  // (`TOURNAMENT_STAFF_MESSAGE.md`) : la ligne `bg_users` reste, la cascade ne
+  // joue pas — il part avec le compte, comme `/rgpd` le promet. Table tolérée.
+  await ignoreMissingTable(connection.execute(`DELETE FROM bg_tournament_staff_message_quota WHERE user_id = ?`, [userId]));
   // Le planning des casts et arbitres (`CAST_PLANNING.md`) : disponibilités,
   // préférences, attributions, leur historique et le réglage « caster
   // autonome » ne désignent plus personne. Tables tolérées.

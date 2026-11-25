@@ -5,19 +5,21 @@ jest.mock("@/lib/server/notify", () => ({ loadNotificationRecipients: jest.fn(),
 jest.mock("@/lib/server/push-subscriptions", () => ({ usersWithTopicDisabled: jest.fn() }));
 jest.mock("@/lib/server/staff-audit", () => ({ publishStaffAction: jest.fn() }));
 jest.mock("@/lib/server/site-url", () => ({ siteUrl: jest.fn((path: string) => `https://bluegenji.test${path}`) }));
+jest.mock("@/lib/server/periodic-clock", () => ({ startPeriodicClock: jest.fn(), trackBackgroundPass: jest.fn() }));
 
 import { getDatabase } from "@/lib/server/database";
 import { loadNotificationRecipients, notifyUsers, type NotificationRecipient } from "@/lib/server/notify";
 import { usersWithTopicDisabled } from "@/lib/server/push-subscriptions";
 import { publishStaffAction } from "@/lib/server/staff-audit";
+import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import {
   countTournamentStaffMessageRecipients,
   previewTournamentStaffMessage,
   purgeExpiredStaffMessageQuotas,
   reserveStaffMessageSend,
-  resetStaffMessagePurgeClock,
   selectRecipientIds,
   sendTournamentStaffMessage,
+  startStaffMessageQuotaPurgeClock,
   type StaffMessageRequest,
 } from "@/lib/server/tournament-staff-message";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
@@ -30,8 +32,10 @@ type Rows = Record<string, unknown>[];
 let staffRows: Rows;
 let tournamentRows: Rows;
 let entrantRows: Rows;
-let quotaAffectedRows: number;
+/** `affectedRows` de chaque `UPDATE` de réservation, dans l'ordre ; le dernier vaut ensuite. */
+let quotaAffectedRows: number[];
 let quotaMissing: boolean;
+let purgedRows: number;
 const execute = jest.fn<SqlQuery>();
 
 function missingTable(): Error {
@@ -45,7 +49,11 @@ async function route(sql: string): Promise<unknown> {
   if (sql.includes("bg_tournament_registrations")) return [entrantRows];
   if (sql.includes("bg_tournament_staff_message_quota")) {
     if (quotaMissing) throw missingTable();
-    if (sql.startsWith("UPDATE bg_tournament_staff_message_quota\n")) return [{ affectedRows: quotaAffectedRows }];
+    if (sql.startsWith("UPDATE bg_tournament_staff_message_quota\n")) {
+      const affectedRows = quotaAffectedRows.length > 1 ? quotaAffectedRows.shift() : quotaAffectedRows[0];
+      return [{ affectedRows }];
+    }
+    if (sql.startsWith("DELETE FROM bg_tournament_staff_message_quota")) return [{ affectedRows: purgedRows }];
     return [{ affectedRows: 1 }];
   }
   throw new Error(`requête inattendue : ${sql}`);
@@ -76,15 +84,15 @@ const withoutDiscord = (userId: number): NotificationRecipient => ({ userId, dis
 
 beforeEach(() => {
   jest.clearAllMocks();
-  resetStaffMessagePurgeClock();
   staffRows = [staff()];
   tournamentRows = [{ id: 12, name: "Coupe d'hiver", state: "RUNNING" }];
   entrantRows = [
     { user_id: 1, roles_json: JSON.stringify(["OWNER", "TANK"]), solo: 0 },
     { user_id: 2, roles_json: JSON.stringify(["COACH"]), solo: 0 },
   ];
-  quotaAffectedRows = 1;
+  quotaAffectedRows = [1];
   quotaMissing = false;
+  purgedRows = 0;
   execute.mockImplementation(route);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   jest.mocked(loadNotificationRecipients).mockImplementation(async (ids) =>
@@ -266,7 +274,7 @@ describe("sendTournamentStaffMessage", () => {
   });
 
   it("sendTournamentStaffMessage_quotaReached_throws429WithoutSending", async () => {
-    quotaAffectedRows = 0;
+    quotaAffectedRows = [0];
 
     await expect(sendTournamentStaffMessage(request())).rejects.toMatchObject({ message: "STAFF_MESSAGE_QUOTA_EXCEEDED", status: 429 });
     expect(notifyUsers).not.toHaveBeenCalled();
@@ -288,7 +296,7 @@ describe("sendTournamentStaffMessage", () => {
         dmFollowsTopic: true,
         discord: expect.objectContaining({
           context: "tournament-staff-message",
-          delivery: { batchSize: 25, timeoutMs: 120_000, honourCircuit: false },
+          delivery: { batchSize: 25, timeoutMs: 120_000, honourCircuit: false, uncertainIsNotLost: true },
         }),
       }),
     );
@@ -304,7 +312,7 @@ describe("sendTournamentStaffMessage", () => {
   it("sendTournamentStaffMessage_ok_returnsCountedDelivery", async () => {
     const actual = await sendTournamentStaffMessage(request());
 
-    expect(actual.delivery).toEqual({ sent: 1, failed: 0, skipped: 1, pushed: 3, botUnreachable: false });
+    expect(actual.delivery).toEqual({ sent: 1, failed: 0, skipped: 1, pushed: 3, botUnreachable: false, pending: false });
   });
 
   it("sendTournamentStaffMessage_dmUndelivered_countsItFailed", async () => {
@@ -352,7 +360,7 @@ describe("reserveStaffMessageSend", () => {
   });
 
   it("reserveStaffMessageSend_windowFull_returnsFalse", async () => {
-    quotaAffectedRows = 0;
+    quotaAffectedRows = [0];
 
     await expect(reserveStaffMessageSend(12, 9)).resolves.toBe(false);
   });
@@ -366,18 +374,119 @@ describe("reserveStaffMessageSend", () => {
   });
 });
 
-describe("purgeExpiredStaffMessageQuotas", () => {
-  it("purgeExpiredStaffMessageQuotas_twiceWithinAnHour_deletesOnce", async () => {
-    await purgeExpiredStaffMessageQuotas(1_000_000_000);
-    await purgeExpiredStaffMessageQuotas(1_000_000_000 + 30 * 60_000);
+describe("sendTournamentStaffMessage — délai de réponse", () => {
+  /** Un envoi qui ne finit qu'à la demande du test. */
+  function slowDelivery() {
+    let finish: (value: Awaited<ReturnType<typeof notifyUsers>>) => void = () => undefined;
+    let fail: (error: Error) => void = () => undefined;
+    jest.mocked(notifyUsers).mockReturnValue(
+      new Promise((resolve, reject) => {
+        finish = resolve;
+        fail = reject;
+      }),
+    );
+    return { finish: (value: Awaited<ReturnType<typeof notifyUsers>>) => finish(value), fail: (error: Error) => fail(error) };
+  }
 
-    const deletes = execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_tournament_staff_message_quota"));
-    expect(deletes).toHaveLength(1);
+  it("sendTournamentStaffMessage_deliveryOutlastsDeadline_returnsPendingWithZeroCounts", async () => {
+    slowDelivery();
+
+    const actual = await sendTournamentStaffMessage(request(), { replyDeadlineMs: 5 });
+
+    expect(actual.delivery).toEqual({ sent: 0, failed: 0, skipped: 1, pushed: 0, botUnreachable: false, pending: true });
+  });
+
+  it("sendTournamentStaffMessage_deliveryOutlastsDeadline_publishesStaffLogWhenItFinishes", async () => {
+    const delivery = slowDelivery();
+    await sendTournamentStaffMessage(request(), { replyDeadlineMs: 5 });
+    expect(publishStaffAction).not.toHaveBeenCalled();
+
+    delivery.finish({ discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("sendTournamentStaffMessage_deliveryFailsAfterDeadline_logsWithoutThrowing", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const delivery = slowDelivery();
+    await sendTournamentStaffMessage(request(), { replyDeadlineMs: 5 });
+
+    delivery.fail(new Error("bot figé"));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(consoleError).toHaveBeenCalledWith("[staff-message] envoi interrompu en arrière-plan", expect.anything());
+    consoleError.mockRestore();
+  });
+
+  it("sendTournamentStaffMessage_deliveryFailsBeforeDeadline_rejects", async () => {
+    jest.mocked(notifyUsers).mockRejectedValue(new Error("rédacteur en panne"));
+
+    await expect(sendTournamentStaffMessage(request())).rejects.toThrow("rédacteur en panne");
+  });
+
+  it("sendTournamentStaffMessage_discordUncertain_returnsPendingWithoutRefund", async () => {
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [1], pushed: 0, discordUncertain: true });
+
+    const actual = await sendTournamentStaffMessage(request());
+
+    expect(actual.delivery).toMatchObject({ botUnreachable: false, pending: true });
+    expect(execute.mock.calls.some(([sql]) => sql.includes("GREATEST(sends - 1, 0)"))).toBe(false);
+  });
+});
+
+describe("reserveStaffMessageSend — seconde passe", () => {
+  it("reserveStaffMessageSend_rowPurgedBetweenInsertAndUpdate_succeedsOnSecondPass", async () => {
+    quotaAffectedRows = [0, 1];
+
+    const actual = await reserveStaffMessageSend(12, 9);
+
+    expect(actual).toBe(true);
+    const inserts = execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT INTO bg_tournament_staff_message_quota"));
+    expect(inserts).toHaveLength(2);
+  });
+
+  it("reserveStaffMessageSend_windowFull_refusesAfterTwoPasses", async () => {
+    quotaAffectedRows = [0];
+
+    const actual = await reserveStaffMessageSend(12, 9);
+
+    expect(actual).toBe(false);
+    const updates = execute.mock.calls.filter(([sql]) => sql.startsWith("UPDATE bg_tournament_staff_message_quota\n"));
+    expect(updates).toHaveLength(2);
+  });
+});
+
+describe("purgeExpiredStaffMessageQuotas", () => {
+  it("purgeExpiredStaffMessageQuotas_expiredRows_returnsDeletedCount", async () => {
+    purgedRows = 4;
+
+    const actual = await purgeExpiredStaffMessageQuotas();
+
+    expect(actual).toBe(4);
+    const purge = execute.mock.calls.find(([sql]) => sql.startsWith("DELETE FROM bg_tournament_staff_message_quota"));
+    expect(purge?.[1]).toEqual([60]);
   });
 
   it("purgeExpiredStaffMessageQuotas_tableMissing_resolvesZero", async () => {
     quotaMissing = true;
 
     await expect(purgeExpiredStaffMessageQuotas()).resolves.toBe(0);
+  });
+
+  it("purgeExpiredStaffMessageQuotas_otherError_rejects", async () => {
+    execute.mockRejectedValueOnce(new Error("base indisponible"));
+
+    await expect(purgeExpiredStaffMessageQuotas()).rejects.toThrow("base indisponible");
+  });
+});
+
+describe("startStaffMessageQuotaPurgeClock", () => {
+  it("startStaffMessageQuotaPurgeClock_called_registersQuarterHourClock", () => {
+    startStaffMessageQuotaPurgeClock();
+
+    expect(startPeriodicClock).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "staff-message-quota-purge", tickMs: 15 * 60_000, run: purgeExpiredStaffMessageQuotas }),
+    );
   });
 });
