@@ -1,4 +1,5 @@
-﻿import { getCurrentUser } from "@/lib/server/auth";
+﻿import { reserveRateLimit, TOURNAMENT_REGISTRATION_TOGGLE_RULE } from "@/lib/server/api-guard";
+import { getCurrentUser } from "@/lib/server/auth";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
@@ -9,7 +10,22 @@ import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { formatEntrantWithdrawnLog } from "@/lib/shared/bot-logs";
 import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
 import { isRegistrationFilterError } from "@/lib/shared/registration-filters";
+import { can } from "@/lib/shared/permissions";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
+
+type SessionUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+
+/**
+ * Place réservée dans le plafond des inscriptions et désinscriptions
+ * (`TOURNAMENT_REGISTRATION_TOGGLE_RULE`), en une instruction ; le staff
+ * `tournaments` n'y est pas soumis. `refund` la rend quand le geste est refusé
+ * avant d'avoir eu lieu : seul un geste réussi est décompté.
+ */
+function reserveRegistrationToggle(user: SessionUser): ReturnType<typeof reserveRateLimit> {
+  return can(user, "tournaments")
+    ? { refused: null, refund: () => undefined }
+    : reserveRateLimit(TOURNAMENT_REGISTRATION_TOGGLE_RULE, user.id);
+}
 
 /**
  * Désinscription par le joueur lui-même, tant que le tournoi n'a pas commencé
@@ -29,6 +45,9 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   // Tournoi non publié : même 404 qu'un identifiant inexistant (`write-visibility.ts`).
   if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
 
+  const reservation = reserveRegistrationToggle(user);
+  if (reservation.refused) return reservation.refused;
+
   try {
     const removed = await withdrawOwnRegistration(tournamentId, user.id);
 
@@ -47,6 +66,8 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
 
     return ok({ success: true });
   } catch (error) {
+    // Le service ne lève qu'avant son commit : rien n'a eu lieu.
+    reservation.refund();
     const message = (error as Error).message;
     if (message === "NOT_TEAM_MANAGER") return fail(message, 403);
     if (message === "NO_ACTIVE_TEAM") return fail(message, 400);
@@ -78,10 +99,15 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
   // autre refus (`write-visibility.ts`).
   if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
 
+  const reservation = reserveRegistrationToggle(user);
+  if (reservation.refused) return reservation.refused;
+
   try {
     await registerCurrentUserTeam(tournamentId, user.id);
     return ok({ success: true });
   } catch (error) {
+    // Le service ne lève qu'avant son commit : rien n'a eu lieu.
+    reservation.refund();
     const message = (error as Error).message;
     // Le refus de qualité est un refus de **droits**, pas de forme : le joueur
     // a bien une équipe, il n'a simplement pas la charge de l'engager

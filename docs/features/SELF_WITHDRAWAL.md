@@ -57,6 +57,19 @@ Codes : `NO_ACTIVE_TEAM` (400), `NOT_TEAM_MANAGER` (403), `TOURNAMENT_NOT_FOUND`
 `CONCURRENT_UPDATE_RETRY` (409),
 `WITHDRAWAL_FAILED` (500, sans le texte de l'erreur).
 
+## Plafond
+
+S'inscrire se défait désormais : une boucle « inscrire → désinscrire » prendrait
+le verrou du tournoi, viderait le classement, l'accueil et l'instantané du
+tournoi, relancerait le flux de chaque spectateur et remplirait le journal du
+staff à volonté. `POST` et `DELETE /api/tournaments/[id]/register` partagent donc
+un seau par compte, `TOURNAMENT_REGISTRATION_TOGGLE_RULE` (`lib/server/api-guard.ts`) :
+**10 gestes en 10 minutes**, réservés en une instruction (`reserveRateLimit`)
+après la vérification de visibilité du tournoi, et rendus quand le service
+refuse (inscriptions closes, droit manquant, tournoi lancé…) — seul un geste
+réussi compte. Au-delà : `429 TOO_MANY_REQUESTS`. Le staff `tournaments` n'est
+pas plafonné.
+
 ## Journal Discord
 
 Après le commit, au meilleur effort, une ligne dans la catégorie
@@ -90,6 +103,7 @@ jusqu'au coup d'envoi (FR et EN).
 
 `tests/lib/server/self-withdrawal-service.test.ts`,
 `tests/app/api/tournaments/register.test.ts` (DELETE),
+`tests/app/api/tournaments/register-rate-limit.test.ts`,
 `tests/lib/shared/bot-logs.test.ts`, `tests/tournois/register-entry.test.ts`,
 `tests/components/cyber-button-danger.test.tsx`,
 `tests/app/tournament-actions-i18n.test.tsx` (bouton en anglais, page figée).

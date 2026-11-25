@@ -637,6 +637,8 @@ const ACTIVITIES = registerActivities({
         "Results and achievements: no defined retention period, kept as long as the site exists; anonymized when the account is deleted (borrowed username)"),
       frEn("Inscriptions à un tournoi individuel pas encore commencé, sans match : retirées du tournoi dès la demande de suppression du compte (T01)",
         "Registrations for a solo tournament that has not started yet, with no match: withdrawn from the tournament as soon as deletion of the account is requested (T01)"),
+      frEn("Inscription à un tournoi pas encore commencé : effacée dès que l'engagé s'en désinscrit (son propriétaire ou un manager, ou le joueur lui-même en tournoi individuel) ou que le staff la retire",
+        "Registration for a tournament that has not started yet: erased as soon as the entrant unregisters (its owner or a manager, or the player themselves in a solo tournament) or the staff removes it"),
       frEn("Codes de replay : gardés avec le résultat qu'ils documentent (un détail qui ne l'explique plus est effacé) ; le lien vers le compte qui les a saisis est effacé à la suppression du compte, les codes restent (la partie est conservée par l'éditeur du jeu)",
         "Replay codes: kept with the result they document (a detail that no longer explains it is erased); the link to the account that entered them is erased when the account is deleted, the codes remain (the game is kept by the game's publisher)"),
       frEn("Droit d'opposition ouvert sur demande", "Right to object available on request"),

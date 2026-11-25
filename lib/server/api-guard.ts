@@ -445,6 +445,25 @@ export const TEAM_LIFECYCLE_RULE: RateLimitRule = {
 };
 
 /**
+ * Inscriptions et désinscriptions d'un joueur à un tournoi (un seul seau pour
+ * les deux, `POST`/`DELETE /api/tournaments/[id]/register`), par compte.
+ *
+ * Depuis la désinscription (`docs/features/SELF_WITHDRAWAL.md`), s'inscrire se
+ * défait : une boucle « inscrire → désinscrire » prenait le verrou du tournoi,
+ * vidait le classement, l'accueil et l'instantané du tournoi, relançait le flux
+ * de chaque spectateur et remplissait le journal du staff sur Discord à
+ * volonté. Dix gestes en dix minutes couvrent une inscription faite par erreur
+ * puis refaite, sur plusieurs tournois ; le staff `tournaments` n'est pas
+ * plafonné. Seul un geste **réussi** est décompté ({@link reserveRateLimit}) :
+ * un refus (inscriptions closes, droit manquant, tournoi lancé) ne coûte rien.
+ */
+export const TOURNAMENT_REGISTRATION_TOGGLE_RULE: RateLimitRule = {
+  name: "tournament-registration-toggle",
+  limit: 10,
+  windowMs: 10 * 60_000,
+};
+
+/**
  * Écritures d'identité d'une équipe — nom, sigle, description, logo posé ou
  * retiré (`PATCH /api/teams/[id]`, `POST`/`DELETE /api/teams/[id]/logo`), par
  * compte. Un renommage ou un logo changé d'une équipe inscrite vide le
