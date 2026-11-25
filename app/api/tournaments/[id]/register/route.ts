@@ -1,4 +1,9 @@
-﻿import { reserveRateLimit, TOURNAMENT_REGISTRATION_TOGGLE_RULE } from "@/lib/server/api-guard";
+﻿import {
+  enforceRateLimit,
+  reserveRateLimit,
+  TOURNAMENT_REGISTRATION_ATTEMPT_RULE,
+  TOURNAMENT_REGISTRATION_TOGGLE_RULE,
+} from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { unexpectedFailureCode } from "@/lib/server/failure-reason";
@@ -16,15 +21,19 @@ import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 type SessionUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
 
 /**
- * Place réservée dans le plafond des inscriptions et désinscriptions
- * (`TOURNAMENT_REGISTRATION_TOGGLE_RULE`), en une instruction ; le staff
- * `tournaments` n'y est pas soumis. `refund` la rend quand le geste est refusé
- * avant d'avoir eu lieu : seul un geste réussi est décompté.
+ * Les deux plafonds des inscriptions et désinscriptions, dont le staff
+ * `tournaments` est exempt : chaque appel compte dans
+ * `TOURNAMENT_REGISTRATION_ATTEMPT_RULE` (refus compris — une boucle de refus
+ * tiendrait sinon le verrou du tournoi à volonté), puis une place est réservée,
+ * en une instruction, dans `TOURNAMENT_REGISTRATION_TOGGLE_RULE` ; `refund` la
+ * rend quand le geste est refusé avant d'avoir eu lieu : seul un geste réussi y
+ * est décompté.
  */
 function reserveRegistrationToggle(user: SessionUser): ReturnType<typeof reserveRateLimit> {
-  return can(user, "tournaments")
-    ? { refused: null, refund: () => undefined }
-    : reserveRateLimit(TOURNAMENT_REGISTRATION_TOGGLE_RULE, user.id);
+  if (can(user, "tournaments")) return { refused: null, refund: () => undefined };
+  const throttled = enforceRateLimit(TOURNAMENT_REGISTRATION_ATTEMPT_RULE, user.id);
+  if (throttled) return { refused: throttled, refund: () => undefined };
+  return reserveRateLimit(TOURNAMENT_REGISTRATION_TOGGLE_RULE, user.id);
 }
 
 /**

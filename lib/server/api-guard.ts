@@ -464,6 +464,22 @@ export const TOURNAMENT_REGISTRATION_TOGGLE_RULE: RateLimitRule = {
 };
 
 /**
+ * Tous les appels d'inscription et de désinscription d'un compte, **refus
+ * compris** ({@link enforceRateLimit}, rien n'est rendu). Le plafond des gestes
+ * réussis ({@link TOURNAMENT_REGISTRATION_TOGGLE_RULE}) rend la place d'un
+ * refus : sans cette seconde borne, une boucle de gestes refusés — chacun sous
+ * le verrou du tournoi, synchronisation d'état comprise — ferait attendre sans
+ * fin les inscriptions des autres et les gestes du staff. Soixante appels en dix
+ * minutes laissent largement de quoi corriger un refus et réessayer ; le staff
+ * `tournaments` n'est pas plafonné.
+ */
+export const TOURNAMENT_REGISTRATION_ATTEMPT_RULE: RateLimitRule = {
+  name: "tournament-registration-attempt",
+  limit: 60,
+  windowMs: 10 * 60_000,
+};
+
+/**
  * Écritures d'identité d'une équipe — nom, sigle, description, logo posé ou
  * retiré (`PATCH /api/teams/[id]`, `POST`/`DELETE /api/teams/[id]/logo`), par
  * compte. Un renommage ou un logo changé d'une équipe inscrite vide le

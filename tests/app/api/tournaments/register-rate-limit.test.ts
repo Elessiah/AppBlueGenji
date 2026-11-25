@@ -7,7 +7,7 @@ jest.mock("@/lib/server/tournaments/registration-removal");
 jest.mock("@/lib/server/tournaments/write-visibility");
 
 import { DELETE, POST } from "@/app/api/tournaments/[id]/register/route";
-import { TOURNAMENT_REGISTRATION_TOGGLE_RULE } from "@/lib/server/api-guard";
+import { TOURNAMENT_REGISTRATION_ATTEMPT_RULE, TOURNAMENT_REGISTRATION_TOGGLE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { registerCurrentUserTeam } from "@/lib/server/tournaments-service";
@@ -88,6 +88,19 @@ describe("POST/DELETE /api/tournaments/[id]/register — plafond", () => {
     jest.mocked(registerCurrentUserTeam).mockResolvedValue(undefined);
 
     expect((await register()).status).toBe(200);
+  });
+
+  it("toggle_refusalLoopOverAttemptCap_returns429WithoutTakingTheLock", async () => {
+    jest.mocked(withdrawOwnRegistration).mockRejectedValue(new Error("TEAM_NOT_IN_TOURNAMENT"));
+    for (let i = 0; i < TOURNAMENT_REGISTRATION_ATTEMPT_RULE.limit; i += 1) {
+      expect((await unregister()).status).toBe(404);
+    }
+
+    const res = await unregister();
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "TOO_MANY_REQUESTS" });
+    expect(withdrawOwnRegistration).toHaveBeenCalledTimes(TOURNAMENT_REGISTRATION_ATTEMPT_RULE.limit);
   });
 
   it("toggle_unpublishedTournament_isNotCharged", async () => {

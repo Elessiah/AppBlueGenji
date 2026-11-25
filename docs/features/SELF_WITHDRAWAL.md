@@ -67,8 +67,10 @@ un seau par compte, `TOURNAMENT_REGISTRATION_TOGGLE_RULE` (`lib/server/api-guard
 **10 gestes en 10 minutes**, réservés en une instruction (`reserveRateLimit`)
 après la vérification de visibilité du tournoi, et rendus quand le service
 refuse (inscriptions closes, droit manquant, tournoi lancé…) — seul un geste
-réussi compte. Au-delà : `429 TOO_MANY_REQUESTS`. Le staff `tournaments` n'est
-pas plafonné.
+réussi compte. Un second seau, `TOURNAMENT_REGISTRATION_ATTEMPT_RULE`
+(**60 appels en 10 minutes**, refus compris, rien n'est rendu), borne les boucles
+de gestes refusés, qui prennent chacun le verrou du tournoi. Au-delà de l'un ou
+de l'autre : `429 TOO_MANY_REQUESTS`. Le staff `tournaments` n'est pas plafonné.
 
 ## Journal Discord
 

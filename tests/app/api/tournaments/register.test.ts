@@ -12,6 +12,7 @@ import { withdrawOwnRegistration } from "@/lib/server/tournaments/registration-r
 import { authUser } from "../../../helpers/auth-user";
 import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { getCurrentUser } from "@/lib/server/auth";
+import { resetRateLimit } from "@/lib/server/rate-limit";
 import * as service from "@/lib/server/tournaments-service";
 import { REGISTRATION_FILTER_ERRORS } from "@/lib/shared/registration-filters";
 
@@ -49,6 +50,7 @@ function rejectsWith(code: string) {
 describe("POST /api/tournaments/[id]/register", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetRateLimit();
     jest.mocked(canActOnTournament).mockResolvedValue(true);
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(service.registerCurrentUserTeam).mockResolvedValue(undefined);
@@ -114,6 +116,7 @@ describe("POST /api/tournaments/[id]/register", () => {
 describe("tournoi non publié", () => {
   it("répond le même 404 qu'un identifiant inexistant, sans atteindre le service", async () => {
     jest.clearAllMocks();
+    resetRateLimit();
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(canActOnTournament).mockResolvedValue(false);
     const res = await POST(req(), params);
@@ -152,6 +155,7 @@ describe("DELETE /api/tournaments/[id]/register", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    resetRateLimit();
     jest.mocked(canActOnTournament).mockResolvedValue(true);
     jest.mocked(getCurrentUser).mockResolvedValue(withdrawer);
     jest.mocked(withdrawOwnRegistration).mockResolvedValue(withdrawn);
