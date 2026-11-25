@@ -429,6 +429,18 @@ describe("sendTournamentStaffMessage — délai de réponse", () => {
     await expect(sendTournamentStaffMessage(request())).rejects.toThrow("rédacteur en panne");
   });
 
+  it("sendTournamentStaffMessage_deliveryThrows_writesAnUnknownOutcomeLineToTheStaffLog", async () => {
+    jest.mocked(notifyUsers).mockRejectedValue(new Error("push en panne"));
+
+    await expect(sendTournamentStaffMessage(request())).rejects.toThrow("push en panne");
+
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
+    const [line, , options] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(line).toContain("panne pendant l'envoi");
+    expect(line).toContain("bilan inconnu");
+    expect(options?.tournamentId).toBeDefined();
+  });
+
   it("sendTournamentStaffMessage_discordUncertain_returnsUnconfirmedWithoutRefund", async () => {
     jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [1], pushed: 0, discordUncertainUserIds: [1] });
 

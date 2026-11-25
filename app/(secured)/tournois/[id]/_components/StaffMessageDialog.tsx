@@ -151,13 +151,14 @@ export function StaffMessageDialog({ tournamentId, tournamentName, onClose }: Re
   // Les liens du message privé, bâtis sur la racine du serveur (en attendant
   // le premier décompte, l'adresse du site ouvert).
   const origin = useMemo(() => (typeof window === "undefined" ? "" : window.location.origin), []);
-  const renderedTooLong = staffMessageRenderedTooLong(
-    message,
-    { id: tournamentId, name: tournamentName },
-    linkBase === undefined ? origin : linkBase,
+  // Mesurés à la saisie seulement (texte, racine des liens) : un décompte reçu ou
+  // un envoi en cours ne refont pas les deux rendus du message privé.
+  const renderedTooLong = useMemo(
+    () => staffMessageRenderedTooLong(message, { id: tournamentId, name: tournamentName }, linkBase === undefined ? origin : linkBase),
+    [message, tournamentId, tournamentName, linkBase, origin],
   );
+  const length = useMemo(() => staffMessageLength(message), [message]);
   const blocker = staffMessageBlocker({ message, categories, counts, renderedTooLong });
-  const length = staffMessageLength(message);
   const countUnavailable = counts === null && countFailed !== null && countFailed === requestKey;
 
   const submit = (event: FormEvent) => {

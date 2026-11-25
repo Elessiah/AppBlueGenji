@@ -432,16 +432,27 @@ function publishStaffMessageLine(context: DeliveryContext, line: string): void {
 async function deliverStaffMessage(context: DeliveryContext): Promise<StaffMessageDelivery> {
   const { staff, tournament, input, counts, notified } = context;
   const sentAt = Date.now();
-  const report = await notifyUsers(notified, {
-    topic: TOPIC,
-    push: (locale) =>
-      tournamentStaffMessagePush(
-        { tournamentId: tournament.id, tournamentName: tournament.name, message: context.message, sentAt },
-        locale,
-      ),
-    discord: { message: staffMessageDm(input), context: STAFF_MESSAGE_CONTEXT, delivery: DELIVERY },
-    dmFollowsTopic: true,
-  });
+  let report: Awaited<ReturnType<typeof notifyUsers>>;
+  try {
+    report = await notifyUsers(notified, {
+      topic: TOPIC,
+      push: (locale) =>
+        tournamentStaffMessagePush(
+          { tournamentId: tournament.id, tournamentName: tournament.name, message: context.message, sentAt },
+          locale,
+        ),
+      discord: { message: staffMessageDm(input), context: STAFF_MESSAGE_CONTEXT, delivery: DELIVERY },
+      dmFollowsTopic: true,
+    });
+  } catch (error) {
+    // Panne en plein envoi : des messages ont pu partir, l'envoi n'est pas rendu
+    // au plafond. Le journal du staff le dit (sinon aucune trace), puis la panne remonte.
+    publishStaffMessageLine(
+      context,
+      `${staffLogLead(context)} : panne pendant l'envoi (${counts.total} visé(s)) — bilan inconnu, des participants ont pu recevoir le message — par le staff.`,
+    );
+    throw error;
+  }
 
   // Un lot sans réponse du bot à temps (ou coupé en route) a pu partir : ni
   // « bot injoignable », ni « non remis », ni envoi rendu au plafond — le

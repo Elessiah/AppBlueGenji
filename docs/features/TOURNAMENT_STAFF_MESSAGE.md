@@ -57,6 +57,9 @@ portes appellent **le même service** : `lib/server/tournament-staff-message.ts`
   survient pendant l'envoi, `onBackgroundHalt` pose sur-le-champ au journal une
   ligne « le site s'arrête pendant l'envoi », avant son vidage. Les deux portes
   disent « ne le renvoie pas » pour `pending` comme pour `unconfirmed`.
+- **Panne en plein envoi** (`notifyUsers` lève) : une ligne « panne pendant
+  l'envoi — bilan inconnu » va au journal du staff avant que la panne remonte
+  (500, fenêtre fermée sur « peut-être parti ») ; l'envoi n'est pas rendu au plafond.
 
 ## Plafond
 
