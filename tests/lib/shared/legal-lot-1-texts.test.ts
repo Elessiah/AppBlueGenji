@@ -31,7 +31,7 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
     // les statistiques de fréquentation détaillées (STATS-PAGE, 2026-11-18), l'empreinte
     // perceptuelle des avatars bloqués (EF-72, 2026-11-19), « Tester mes MP » et
     // les rôles de plateforme (DEVDOC-PAGE, 2026-11-20).
-    expect(PRIVACY_CHANGES.at(-24)?.id).toBe(ID);
+    expect(PRIVACY_CHANGES.at(-25)?.id).toBe(ID);
   });
 
   it("rectificatifHebergement_hosting_saysNoProviderNoContractHetznerProcessorFrAndEn", () => {
@@ -109,8 +109,8 @@ describe("politique du bot (LEGAL-LOT-1)", () => {
     expect(en).not.toContain("sub-processor");
   });
 
-  it("botPrivacyPolicy_lastUpdated_datedWithSiteRectification", () => {
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["18 novembre 2026", "18 November 2026"]);
+  it("botPrivacyPolicy_lastUpdated_datedWithLatestChange", () => {
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["26 novembre 2026", "26 November 2026"]);
   });
 });
 

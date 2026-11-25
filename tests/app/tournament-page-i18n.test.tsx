@@ -403,6 +403,7 @@ describe("rendu anglais — aucun français hors des blocs lang=\"fr\"", () => {
         onReportIssue={noop}
         onGuestRegister={noop}
         onAdvance={noop}
+        onStaffMessage={noop}
         onLiveSaved={noop}
         onEditImage={noop}
       />,

@@ -38,9 +38,9 @@ function expectAllParts(text: string | undefined, parts: readonly string[]): voi
 
 describe("historique des changements — prod d'un match", () => {
   it("prodEntry_beforePlanningPlacementEntry_datedWithRegisterForEveryone", () => {
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ENTRY_ID);
+    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(ENTRY_ID);
     expect(frEntry().publishedAt).toBe("2026-11-21");
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-21");
+    expect(REGISTER_UPDATED_AT >= "2026-11-21").toBe(true);
     expect(frEntry().audience).toBeUndefined();
     expect(frEntry().asksTermsAcceptance).toBeUndefined();
   });

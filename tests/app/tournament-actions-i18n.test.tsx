@@ -94,6 +94,7 @@ import { EndurancePenaltyDialog } from "@/app/(secured)/tournois/[id]/_component
 import { EntrantContactsPanel } from "@/app/(secured)/tournois/[id]/_components/EntrantContactsPanel";
 import { GhostRegistrationDialog } from "@/app/(secured)/tournois/[id]/_components/GhostRegistrationDialog";
 import { IssueReportDialog } from "@/app/(secured)/tournois/[id]/_components/IssueReportDialog";
+import { StaffMessageDialog } from "@/app/(secured)/tournois/[id]/_components/StaffMessageDialog";
 import { MatchLiveDialog } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MapResultList";
 import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/MatchPlanningPanel";
@@ -463,7 +464,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     });
     const html = renderPage(
       "en",
-      <TournamentHeader detail={detail} isLive tier="PRIORITY" fatal={null} frozen={false} onRegister={noop} onReportIssue={noop} onGuestRegister={noop} onAdvance={noop} onLiveSaved={noop} onEditImage={noop} />,
+      <TournamentHeader detail={detail} isLive tier="PRIORITY" fatal={null} frozen={false} onRegister={noop} onReportIssue={noop} onGuestRegister={noop} onAdvance={noop} onStaffMessage={noop} onLiveSaved={noop} onEditImage={noop} />,
     );
     // L'édition reste française (lot 8b-2) : son lien l'annonce.
     expectNoFrench(html.replace(/<a[^>]*hrefLang="fr"[^>]*>[^<]*<\/a>/, ""));
@@ -471,6 +472,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(html).toContain("Learn more");
     expect(html).toContain("+ Ghost team");
     expect(html).toContain("Advance the tournament");
+    expect(html).toContain("Message participants");
     expect(html).toContain("Report a problem");
   });
 
@@ -912,6 +914,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     ["suppression", () => <DeleteTournamentDialog tournamentId={1} tournamentName="Spring Cup" onClose={noop} onDeleted={noop} />],
     ["retour en arrière", () => <RollbackRoundDialog tournamentId={1} stageLabel="round 2" stageKey="0:1" matches={[versus]} tournamentFinished onClose={noop} onRolledBack={noop} />],
     ["signalement", () => <IssueReportDialog tournamentId={1} match={versus} onClose={noop} />],
+    ["message aux participants", () => <StaffMessageDialog tournamentId={1} tournamentName="Spring Cup" onClose={noop} />],
     ["pénalité", () => <EndurancePenaltyDialog tournamentId={1} teamId={10} teamName="Alpha" currentPoints={5} round={2} onClose={noop} onApplied={noop} />],
     ["diffusion", () => <MatchLiveDialog match={versus} onClose={noop} onSaved={noop} canSpeakForOrganisation />],
     ["rediff", () => <MatchReplayDialog match={{ ...versus, status: "COMPLETED", team1Score: 2, team2Score: 0, winnerTeamId: 10 }} onClose={noop} onSaved={noop} />],

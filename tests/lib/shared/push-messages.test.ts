@@ -15,6 +15,7 @@ import {
   staffReportPush,
   stripMarkdown,
   teamJoinRequestPush,
+  tournamentStaffMessagePush,
   tournamentStartPush,
 } from "@/lib/shared/push-messages";
 
@@ -366,5 +367,32 @@ describe("nom de tournoi du message privé aux arbitres (discordInline)", () => 
     const content = issueReportPush({ tournamentId: 7, tournamentName: HOSTILE, match }, "en", discordInline);
 
     expect(content.body).toContain("@\u200beveryone");
+  });
+});
+
+describe("tournamentStaffMessagePush", () => {
+  const input = { tournamentId: 12, tournamentName: "Coupe d'hiver", message: "Check-in à 20 h", sentAt: 1764000000000 };
+
+  it("tournamentStaffMessagePush_french_namesTournamentAndTextWithoutTheStaff", () => {
+    expect(tournamentStaffMessagePush(input, "fr")).toEqual({
+      title: "Message du staff du tournoi",
+      body: "Coupe d'hiver : Check-in à 20 h",
+      url: "/tournois/12",
+      tag: "tournament-12-staff-1764000000000",
+    });
+  });
+
+  it("tournamentStaffMessagePush_english_localizesTitleAndLink", () => {
+    const actual = tournamentStaffMessagePush(input, "en");
+
+    expect(actual.title).toBe("Message from the tournament staff");
+    expect(actual.body).toBe("Coupe d'hiver: Check-in à 20 h");
+    expect(actual.url).toBe("/en/tournois/12");
+  });
+
+  it("tournamentStaffMessagePush_longText_clippedToPushBodyLimit", () => {
+    const actual = tournamentStaffMessagePush({ ...input, message: "a".repeat(1200) }, "fr");
+
+    expect([...actual.body].length).toBeLessThanOrEqual(240);
   });
 });

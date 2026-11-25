@@ -655,3 +655,46 @@ describe("notifyUsers — dmFollowsTopic (sujets du planning)", () => {
     expect(usersWithTopicDisabled).not.toHaveBeenCalled();
   });
 });
+
+describe("notifyUsers — envoi par lots", () => {
+  const recipient = (userId: number) => ({
+    userId,
+    locale: "fr" as const,
+    discord: { discordId: String(userId), handle: null, label: `p${userId}` },
+  });
+  const many = (count: number) => Array.from({ length: count }, (_unused, index) => recipient(index + 1));
+
+  it("notifyUsers_moreRecipientsThanTheBotAcceptsPerCall_splitsIntoCallsOfOneHundred", async () => {
+    await notifyUsers(many(101), { topic: "TEAM_JOIN_REQUEST", push: PUSH, discord: { message: DM, context: "ctx" } });
+
+    const sizes = jest.mocked(pushDiscordDirectMessages).mock.calls.map(([, recipients]) => recipients.length);
+    expect(sizes).toEqual([100, 1]);
+  });
+
+  it("notifyUsers_deliveryOptions_batchesAndPassesTimeoutAndCircuit", async () => {
+    await notifyUsers(many(3), {
+      topic: "TEAM_JOIN_REQUEST",
+      push: PUSH,
+      discord: { message: DM, context: "ctx", delivery: { batchSize: 2, timeoutMs: 120_000, honourCircuit: false } },
+    });
+
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls.map(([, recipients, , options]) => [recipients.length, options])).toEqual([
+      [2, { honourCircuit: false, timeoutMs: 120_000 }],
+      [1, { honourCircuit: false, timeoutMs: 120_000 }],
+    ]);
+  });
+
+  it("notifyUsers_lostBatch_stopsLaterBatchesAndNamesTheirAccounts", async () => {
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValueOnce({ sent: 2, unresolved: [], failed: [] }).mockResolvedValueOnce(null);
+
+    const actual = await notifyUsers(many(5), {
+      topic: "TEAM_JOIN_REQUEST",
+      push: PUSH,
+      discord: { message: DM, context: "ctx", delivery: { batchSize: 2 } },
+    });
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(2);
+    expect(actual.discord).toEqual({ sent: 2, unresolved: [], failed: [] });
+    expect(actual.discordUnreachedUserIds).toEqual([3, 4, 5]);
+  });
+});
