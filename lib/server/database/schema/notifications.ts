@@ -253,4 +253,27 @@ ${MATCH_PLACE_COLUMNS}        pairing VARCHAR(48) NOT NULL,
   } catch {
     // Table déjà présente, ou création refusée : les lives ne sont pas annoncés.
   }
+  try {
+    // Plafond des messages du staff d'un tournoi à ses engagés (`/message-tournoi`,
+    // `docs/features/TOURNAMENT_STAFF_MESSAGE.md`) : une ligne par membre du
+    // staff et par tournoi, le début de la fenêtre et le nombre d'envois — jamais
+    // le texte. Réservée en une instruction (`reserveStaffMessageSend`), effacée
+    // avec le tournoi ou le compte, et par la purge du quart d'heure une fois la fenêtre échue.
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_tournament_staff_message_quota (
+        tournament_id BIGINT NOT NULL,
+        user_id BIGINT NOT NULL,
+        window_started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        sends INT NOT NULL DEFAULT 0,
+        PRIMARY KEY (tournament_id, user_id),
+        KEY idx_bg_staff_message_quota_window (window_started_at),
+        CONSTRAINT fk_bg_staff_message_quota_tournament FOREIGN KEY (tournament_id)
+          REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bg_staff_message_quota_user FOREIGN KEY (user_id)
+          REFERENCES bg_users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée : l'envoi répond STAFF_MESSAGE_UNAVAILABLE.
+  }
 }

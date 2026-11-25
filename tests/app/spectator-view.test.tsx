@@ -439,6 +439,7 @@ describe("fiche commune sous SpectatorViewProvider", () => {
           onReportIssue={noop}
           onGuestRegister={noop}
           onAdvance={noop}
+          onStaffMessage={noop}
           onLiveSaved={noop}
           onEditImage={noop}
         />,

@@ -6,6 +6,7 @@ export type PlanningClockMocks = {
   notices: jest.Mock<() => void>;
   deadlines: jest.Mock<() => void>;
   autoConfirm: jest.Mock<() => void>;
+  staffMessageQuota: jest.Mock<() => void>;
 };
 
 /**
@@ -24,10 +25,12 @@ export function mockPlanningClocks(): PlanningClockMocks {
     notices: jest.fn<() => void>(),
     deadlines: jest.fn<() => void>(),
     autoConfirm: jest.fn<() => void>(),
+    staffMessageQuota: jest.fn<() => void>(),
   };
   jest.doMock("@/lib/server/planning/retention", () => ({ startPlanningRetentionClock: mocks.retention }));
   jest.doMock("@/lib/server/planning/new-entries", () => ({ startPlanningNoticesClock: mocks.notices }));
   jest.doMock("@/lib/server/tournaments/schedule-deadline", () => ({ startScheduleDeadlineClock: mocks.deadlines }));
   jest.doMock("@/lib/server/planning/auto-confirm", () => ({ startPlanningAutoConfirmClock: mocks.autoConfirm }));
+  jest.doMock("@/lib/server/tournament-staff-message", () => ({ startStaffMessageQuotaPurgeClock: mocks.staffMessageQuota }));
   return mocks;
 }

@@ -253,7 +253,15 @@
     "SCHEDULE_DEADLINE_TOO_SOON": "La date butoir doit être au moins 24 heures devant.",
     "SCHEDULE_DEADLINE_TOO_FAR": "La date butoir ne peut pas dépasser soixante jours.",
     "SCHEDULE_DEADLINE_NOT_ALLOWED": "Date butoir impossible : le match a déjà un horaire, est lancé ou joué, ou le tournoi ne planifie pas ses matchs par l'arbitrage.",
-    "SCHEDULE_DEADLINE_UPDATE_FAILED": "La date butoir n'a pas pu être enregistrée. Réessaie dans un instant."
+    "SCHEDULE_DEADLINE_UPDATE_FAILED": "La date butoir n'a pas pu être enregistrée. Réessaie dans un instant.",
+    "STAFF_MESSAGE_EMPTY": "Écris un message avant de l'envoyer.",
+    "STAFF_MESSAGE_TOO_LONG": "Message trop long pour un message privé Discord : raccourcis-le.",
+    "NO_RECIPIENTS": "Personne à prévenir avec ces catégories.",
+    "STAFF_MESSAGE_QUOTA_EXCEEDED": "Tu as atteint ton plafond d'envois pour ce tournoi : réessaie dans une heure au plus.",
+    "TOURNAMENT_NOT_OPEN_FOR_MESSAGES": "Les messages aux participants ne partent que pendant les inscriptions ou le tournoi en cours.",
+    "INVALID_RECIPIENT_CATEGORIES": "Coche au moins une catégorie de destinataires.",
+    "INVALID_STAFF_MESSAGE_REQUEST": "Demande de message invalide : recharge la page et réessaie.",
+    "STAFF_MESSAGE_UNAVAILABLE": "Messages aux participants momentanément indisponibles : réessaie plus tard."
   },
   "soloCodes": {
     "TEAM_NOT_FORFEITED": "Ce joueur n'a pas abandonné : il n'y a rien à annuler.",

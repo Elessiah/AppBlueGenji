@@ -55,6 +55,12 @@ export async function register(): Promise<void> {
       } catch (error) {
         await logStartupFailure("[planning] Confirmation d'office non lancée.", error);
       }
+      try {
+        const { startStaffMessageQuotaPurgeClock } = await import("@/lib/server/tournament-staff-message");
+        startStaffMessageQuotaPurgeClock();
+      } catch (error) {
+        await logStartupFailure("[staff-message] Purge des compteurs non lancée.", error);
+      }
     }
   }
 }

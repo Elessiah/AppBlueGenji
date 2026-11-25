@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import {
   backgroundPassesHalted,
+  onBackgroundHalt,
   resumeSuspendedPeriodicClocks,
   startPeriodicClock,
   stopAllPeriodicClocks,
@@ -249,6 +250,39 @@ describe("passages de fond hors horloge", () => {
 
     resumeSuspendedPeriodicClocks();
     expect(backgroundPassesHalted()).toBe(false);
+  });
+
+  it("onBackgroundHalt_stopAll_callsListenerSynchronously", () => {
+    const listener = jest.fn();
+    const stop = onBackgroundHalt(listener);
+
+    void stopAllPeriodicClocks();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("onBackgroundHalt_unsubscribed_listenerNotCalled", async () => {
+    const listener = jest.fn();
+    onBackgroundHalt(listener)();
+
+    await stopAllPeriodicClocks();
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("onBackgroundHalt_listenerThrows_otherListenersStillRunAndStopResolves", async () => {
+    const second = jest.fn();
+    const stopFirst = onBackgroundHalt(() => {
+      throw new Error("écouteur en panne");
+    });
+    const stopSecond = onBackgroundHalt(second);
+
+    await expect(stopAllPeriodicClocks()).resolves.toBeUndefined();
+
+    expect(second).toHaveBeenCalledTimes(1);
+    stopFirst();
+    stopSecond();
   });
 
   it("backgroundPassesHalted_noShutdown_false", () => {

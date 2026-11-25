@@ -1256,6 +1256,15 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Who sees it and who is notified: like any cast signup or prod, the readers of the tournament and of the match, including without an account. The prod receives the notice of a placed prod, unless the action is their own; a caster placed on a stream with no link yet is asked to add their channel's; the person the staff removes is notified. These actions are noted in the staff log on Discord without naming anyone, the author of a staff action and the accounts concerned in the server logs. Basis: the association's legitimate interest, as for the schedule, with a right to object.",
     ],
   },
+  "2026-11-message-du-staff-tournoi": {
+    linkLabels: ["Read record T04 of the register", "Read record T08 of the register"],
+    title: "Tournaments: staff messages to participants",
+    summary: "A tournament's staff can write to its participants, from the tournament page or from Discord: the message arrives by Discord direct message and push notification, signed “the tournament staff”. A new topic, “Tournament staff messages”, turns it off in “My profile”.",
+    details: [
+      "Who receives what: during registration or while the tournament is running, the current members of the registered teams, according to the categories the staff picks (players, managers, captains, owners, everyone), and the players of a solo tournament; a team that withdrew is no longer targeted. The message goes by Discord direct message (linked identifier or certified tag) and by push notification, in your language. The staff member only sees numbers (including how many have no Discord or turned the topic off), never your names. Basis: the association's legitimate interest in the smooth running of tournaments; you object to it by turning off the topic, which also turns off the direct message.",
+      "What is kept: none of the text, neither by the site nor by the bot (it stays in the messages received); only a counter of each staff member's sendings per tournament, erased at the latest a quarter of an hour after its one-hour window ends, caps their number. The sending is noted in the staff log on Discord, kept for a year, without naming its author or quoting the text; the server logs keep its author and the length of the text, according to their rotation. From Discord, the bot sends the site the Discord identifier of whoever runs the command and their message, without keeping them; the site keeps that identifier (or, from its page, the account number) in memory only, eleven minutes at most, to cap the calls.",
+    ],
+  },
 };
 
 /**

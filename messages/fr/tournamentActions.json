@@ -98,7 +98,8 @@
     "edit": "Modifier",
     "advanceTitle": "Passer à l'étape suivante : {stage}.",
     "advance": "Avancer le tournoi",
-    "reportIssue": "Signaler un problème"
+    "reportIssue": "Signaler un problème",
+    "staffMessage": "Message aux participants"
   },
   "danger": {
     "title": "Zone de danger",

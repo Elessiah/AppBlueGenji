@@ -241,8 +241,8 @@ describe("entrée PRIVACY_CHANGES de la version 11", () => {
   it("privacyChange_termsV11_isLastDatedWithTermsForAllAccounts", () => {
     // Suivie, le même jour, du rectificatif de la reprise d'équipe (#595), des avis d'équipe (TEAMS-LOT) et de leur réglage (TEAM-DM-OPTOUT).
     // Puis l'avis d'exclusion du bot (même jour), le rectificatif de la marque de session (EF-63, plus tard) puis les trois entrées d'EF-65 (2026-11-18), puis la mesure détaillée (STATS-PAGE) et l'empreinte perceptuelle (EF-72).
-    expect(PRIVACY_CHANGES.at(-23)?.id).toBe(V11_ID);
-    expect(PRIVACY_CHANGES.at(-19)?.publishedAt).toBe(TERMS_UPDATED_AT);
+    expect(PRIVACY_CHANGES.at(-24)?.id).toBe(V11_ID);
+    expect(PRIVACY_CHANGES.at(-20)?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.audience).toBeUndefined();
   });
@@ -268,9 +268,9 @@ describe("entrée PRIVACY_CHANGES de la version 11", () => {
 });
 
 describe("documents du bot — D47 et reprise d'équipe", () => {
-  it("botDocs_bothDocuments_termsDated13PrivacyDated18November2026FrAndEn", () => {
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["13 novembre 2026", "13 November 2026"]);
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["18 novembre 2026", "18 November 2026"]);
+  it("botDocs_bothDocuments_bothDated26November2026FrAndEn", () => {
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["26 novembre 2026", "26 November 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["26 novembre 2026", "26 November 2026"]);
   });
 
   // D4 (#595) : la reprise ne cite plus « un admin » — la politique du bot ne le dit plus.

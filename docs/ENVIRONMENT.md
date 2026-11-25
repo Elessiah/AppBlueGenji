@@ -20,6 +20,7 @@ BLIZZARD_REDIRECT_URI=  # optional — défaut: <APP_URL>/api/auth/blizzard/call
 BLIZZARD_REGION=  # optional — « cn » seulement, sinon origine mondiale
 BOT_INTERNAL_URL=http://127.0.0.1:4400  # optional
 BOT_INTERNAL_TOKEN=  # must match bot's INTERNAL_API_TOKEN
+SITE_INTERNAL_TOKEN=  # jeton du bot vers le site (`/message-tournoi`), même valeur que SITE_INTERNAL_TOKEN du bot ; absent, de moins de 32 caractères ou égal à BOT_INTERNAL_TOKEN = route refusée (503) ; à générer par `openssl rand -hex 32` ; un appel passé par nginx est refusé (403) — `docs/features/TOURNAMENT_STAFF_MESSAGE.md`
 DEV_AUTH_USER_ID=  # optional — bypass auth in dev (see `docs/features/DEV_AUTH_BYPASS.md`)
 BOT_DOCS_PATH=  # optional — chemin du projet blueGenjiBot (défaut: ../blueGenjiBot)
 VISIT_HASH_SALT=  # recommandé — sel des empreintes de visiteur (défaut: BOT_INTERNAL_TOKEN) ; dérive aussi le secret des empreintes d'arbitre (`refereeKeySecret` ; sans l'un ni l'autre, secret aléatoire à chaque démarrage, signalé par un avertissement en production)

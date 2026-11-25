@@ -98,6 +98,7 @@ const MatchScheduleDialog = dynamic(() => orReload(withDialogsText(import("./Mat
 const ScheduleDeadlineDialog = dynamic(() => orReload(import("./ScheduleDeadlineDialog").then((m) => m.ScheduleDeadlineDialog)), { ssr: false });
 const MatchReplayDialog = dynamic(() => orReload(withDialogsText(import("./MatchReplayDialog").then((m) => m.MatchReplayDialog))), { ssr: false });
 const IssueReportDialog = dynamic(() => orReload(withDialogsText(import("./IssueReportDialog").then((m) => m.IssueReportDialog))), { ssr: false });
+const StaffMessageDialog = dynamic(() => orReload(withDialogsText(import("./StaffMessageDialog").then((m) => m.StaffMessageDialog))), { ssr: false });
 const DeleteTournamentDialog = dynamic(() => orReload(withDialogsText(import("./DeleteTournamentDialog").then((m) => m.DeleteTournamentDialog))), { ssr: false });
 const RollbackRoundDialog = dynamic(() => orReload(withDialogsText(import("./RollbackRoundDialog").then((m) => m.RollbackRoundDialog))), { ssr: false });
 const EndurancePenaltyDialog = dynamic(() => orReload(withDialogsText(import("./EndurancePenaltyDialog").then((m) => m.EndurancePenaltyDialog))), { ssr: false });
@@ -561,6 +562,7 @@ function TournamentSheetView({
   // rapporter à 2-1 — et l'enregistrer écrasait la saisie de l'autre arbitre.
   const [selectedMatchForAdminId, setSelectedMatchForAdminId] = useState<number | null>(null);
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
+  const [staffMessageOpen, setStaffMessageOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rollbackDialogOpen, setRollbackDialogOpen] = useState(false);
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
@@ -1326,6 +1328,7 @@ function TournamentSheetView({
           onReportIssue={() => openIssueReport(null)}
           onGuestRegister={() => setGhostRegistrationOpen(true)}
           onAdvance={() => setAdvanceDialogOpen(true)}
+          onStaffMessage={() => setStaffMessageOpen(true)}
           onLiveSaved={() => void refresh()}
           onEditImage={() => setImageDialogOpen(true)}
           published={published}
@@ -1609,6 +1612,14 @@ function TournamentSheetView({
           tournamentId={tournamentId}
           match={issueTarget}
           onClose={() => setIssueTarget(undefined)}
+        />
+      )}
+
+      {staffMessageOpen && detail.isAdmin && !frozen && (
+        <StaffMessageDialog
+          tournamentId={tournamentId}
+          tournamentName={detail.card.name}
+          onClose={() => setStaffMessageOpen(false)}
         />
       )}
 

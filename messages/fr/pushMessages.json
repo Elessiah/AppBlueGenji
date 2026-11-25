@@ -67,6 +67,10 @@
     "title": "Le tournoi commence",
     "body": "{tournament} est lancé. Retrouve ton premier match sur la page du tournoi."
   },
+  "tournamentStaffMessage": {
+    "title": "Message du staff du tournoi",
+    "body": "{tournament} : {message}"
+  },
   "teamJoinRequest": {
     "title": "Demande d'adhésion",
     "body": "Un joueur demande à rejoindre {team}. Réponds depuis la fiche de l'équipe."

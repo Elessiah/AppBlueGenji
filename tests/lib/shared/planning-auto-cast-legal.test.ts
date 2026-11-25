@@ -27,9 +27,10 @@ function sheet(list: typeof PROCESSING_ACTIVITIES, ref: string) {
 const page = (path: string) => readSource(path).replace(/\s+/g, " ");
 
 describe("historique des changements — placement par le planning", () => {
-  it("planningPlacementEntry_lastEntry_datedWithRegisterForEveryAccount", () => {
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(ENTRY_ID);
-    expect(frEntry().publishedAt).toBe(REGISTER_UPDATED_AT);
+  it("planningPlacementEntry_beforeStaffMessageEntry_datedForEveryAccount", () => {
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(ENTRY_ID);
+    expect(frEntry().publishedAt).toBe("2026-11-21");
+    expect(REGISTER_UPDATED_AT >= "2026-11-21").toBe(true);
     // Une prod sans permission `live` est placée aussi : l'entrée vise tout le monde.
     expect(frEntry().audience).toBeUndefined();
     expect(frEntry().asksTermsAcceptance).toBeUndefined();

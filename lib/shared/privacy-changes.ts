@@ -2372,6 +2372,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Qui le voit et qui est prévenu : comme toute inscription de cast ou prod, les lecteurs du tournoi et du match, y compris sans compte. La prod reçoit l'avis d'une prod placée, sauf quand le geste est le sien ; un caster placé sur une diffusion encore sans lien est invité à donner celui de sa chaîne ; la personne que le staff retire en est prévenue. Ces gestes sont notés au journal du staff sur Discord sans nommer personne, l'auteur d'un geste du staff et les comptes visés dans les journaux du serveur. Base : l'intérêt légitime de l'association, comme pour le planning, avec droit d'opposition.",
     ],
   },
+  {
+    // TOURNAMENT-DM — message du staff d'un tournoi à ses participants, depuis la
+    // page du tournoi ou la commande Discord /message-tournoi
+    // (`docs/features/TOURNAMENT_STAFF_MESSAGE.md`) : registre T04 et T08, /rgpd
+    // (FR et EN), pages légales du bot. Datée comme `REGISTER_UPDATED_AT` — tout
+    // avancer ensemble si la mise en ligne glisse.
+    id: "2026-11-message-du-staff-tournoi",
+    publishedAt: "2026-11-26",
+    title: "Tournois : messages du staff aux participants",
+    links: [
+      { href: "/rgpd/registre#t04", label: "Lire la fiche T04 du registre" },
+      { href: "/rgpd/registre#t08", label: "Lire la fiche T08 du registre" },
+    ],
+    summary: "Le staff d'un tournoi peut écrire à ses participants, depuis la page du tournoi ou depuis Discord : le message arrive en message privé Discord et en notification push, signé « le staff du tournoi ». Un nouveau sujet, « Messages du staff des tournois », le coupe dans « Mon profil ».",
+    details: [
+      "Qui reçoit quoi : pendant les inscriptions ou le tournoi en cours, les membres actuels des équipes inscrites, selon les catégories choisies par le staff (joueurs, managers, capitaines, propriétaires, tous), et les joueurs d'un tournoi individuel ; une équipe qui a abandonné n'est plus visée. Le message part en message privé Discord (identifiant rattaché ou tag certifié) et en notification push, dans votre langue. Le membre du staff ne voit que des nombres (dont combien n'ont pas de Discord ou ont coupé le sujet), jamais vos noms. Base : l'intérêt légitime de l'association au bon déroulement des tournois ; vous vous y opposez en coupant le sujet, ce qui coupe aussi le message privé.",
+      "Ce qui est gardé : rien du texte, ni par le site ni par le bot (il reste dans les messages reçus) ; seul un compteur des envois de chaque membre du staff par tournoi, effacé au plus tard un quart d'heure après la fin de sa fenêtre d'une heure, borne leur nombre. L'envoi est noté au journal du staff sur Discord, gardé un an, sans nommer son auteur ni citer le texte ; les journaux du serveur gardent son auteur et la longueur du texte, selon leur rotation. Depuis Discord, le bot transmet au site l'identifiant Discord de qui lance la commande et son message, sans les garder ; le site garde cet identifiant (ou, depuis sa page, le numéro du compte) en mémoire seulement, onze minutes au plus, pour plafonner les appels.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

@@ -60,6 +60,11 @@ export const PUSH_TOPICS = {
     description: "Un tournoi où ton équipe est inscrite vient de commencer.",
     audience: null,
   },
+  TOURNAMENT_STAFF_MESSAGE: {
+    label: "Messages du staff des tournois",
+    description: "Le staff d'un tournoi où tu es engagé (membre d'une équipe inscrite, ou joueur d'un tournoi individuel) écrit à ses participants, depuis la page du tournoi ou depuis Discord. Coupe aussi le message privé Discord.",
+    audience: null,
+  },
   NEW_MATCH: {
     label: "Nouveau match",
     description: "L'adversaire de ton prochain match (équipe dont tu es membre, ou ton tournoi individuel) est connu : qui tu affrontes (sans le nommer en tournoi individuel), l'horaire s'il est posé (alors pas redit par « Horaires et rappels de match » avant les rappels) et le lien du match.",

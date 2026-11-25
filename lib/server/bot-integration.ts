@@ -523,14 +523,15 @@ function emptyDelivery(): DiscordDeliveryReport {
 async function postDiscordNotification(
   path: string,
   body: unknown,
-  options: { timeoutMs: number; honourCircuit: boolean },
+  options: { timeoutMs: number; honourCircuit: boolean; onUncertain?: () => void },
 ): Promise<DiscordDeliveryReport | null> {
   if (outboundMuted() || (options.honourCircuit && isCircuitOpen())) return null;
 
   const baseUrl = resolveBotInternalUrl();
 
+  let response: Response | null = null;
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
+    response = await fetch(`${baseUrl}${path}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -542,17 +543,34 @@ async function postDiscordNotification(
     });
 
     if (!response.ok) {
-      recordFailure();
+      // Une panne du bot en pleine distribution (`500`) a pu survenir après des
+      // envois ; `503` (serveur BlueGenji introuvable) dit que rien n'est parti.
+      recordUndeliveredCall(options, response.status >= 500 && response.status !== 503);
+      await discardBody(response);
       return null;
     }
 
     if (options.honourCircuit) recordSuccess();
     else recordBypassSuccess();
     return { ...emptyDelivery(), ...((await response.json()) as Partial<DiscordDeliveryReport>) };
-  } catch {
-    recordFailure();
+  } catch (error) {
+    // La requête a atteint le bot (délai écoulé pendant l'envoi, connexion
+    // coupée en route, bilan `200` illisible) : des messages ont pu partir.
+    recordUndeliveredCall(options, Boolean(response?.ok) || isTimeoutError(error) || !failedBeforeSending(error));
     return null;
   }
+}
+
+/**
+ * Un appel sans bilan. Il compte au coupe-circuit, sauf l'issue **incertaine**
+ * d'un geste explicite qui l'écoute (`onUncertain` sans `honourCircuit`, le
+ * message du staff) : un lot de vingt-cinq messages privés qui dépasse ses
+ * deux minutes dit un bot lent, pas tombé — le compter suspendrait tout le
+ * trafic de fond (rappels de match) pendant le refroidissement.
+ */
+function recordUndeliveredCall(options: { honourCircuit: boolean; onUncertain?: () => void }, uncertain: boolean): void {
+  if (!(uncertain && options.onUncertain && !options.honourCircuit)) recordFailure();
+  if (uncertain) options.onUncertain?.();
 }
 
 /**
@@ -565,22 +583,37 @@ async function postDiscordNotification(
  * @param options `honourCircuit` : respecter le coupe-circuit (défaut `true`,
  *   flux d'arrière-plan) ; `false` pour une action explicite d'un joueur qui
  *   attend la réponse (« Tester mes MP ») — elle mérite sa tentative, sans
- *   refermer le coupe-circuit si elle réussit.
+ *   refermer le coupe-circuit si elle réussit. `timeoutMs` : délai de l'appel
+ *   (défaut 15 s), plus long pour un envoi qui enchaîne beaucoup de destinataires.
+ *   `onUncertain` : appelé quand l'appel échoue **après** avoir atteint le bot
+ *   (délai écoulé, connexion coupée, bilan illisible, panne `5xx` hors `503`) —
+ *   des messages ont pu partir.
  * @returns Le bilan du bot, ou `null` s'il est injoignable.
  */
 export async function pushDiscordDirectMessages(
   message: string,
   recipients: DiscordRecipient[],
   context: string,
-  options: { honourCircuit?: boolean } = {},
+  options: { honourCircuit?: boolean; timeoutMs?: number; onUncertain?: () => void } = {},
 ): Promise<DiscordDeliveryReport | null> {
   if (recipients.length === 0) return emptyDelivery();
   return postDiscordNotification(
     "/internal/notify/dm",
     { message, recipients, context },
-    { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: options.honourCircuit ?? true },
+    {
+      timeoutMs: options.timeoutMs ?? BOT_NOTIFY_FETCH_TIMEOUT_MS,
+      honourCircuit: options.honourCircuit ?? true,
+      ...(options.onUncertain ? { onUncertain: options.onUncertain } : {}),
+    },
   );
 }
+
+/**
+ * Destinataires que le bot accepte par appel à `/internal/notify/dm`
+ * (`MAX_RECIPIENTS` de blueGenjiBot) : il **ignore** ceux qui suivent. Un envoi
+ * plus large part donc en plusieurs appels (`notifyUsers`).
+ */
+export const BOT_DM_RECIPIENTS_PER_CALL = 100;
 
 /**
  * Alerte les arbitres : canal de logs du bot **et** message privé à chaque

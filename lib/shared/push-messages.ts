@@ -707,6 +707,28 @@ export function tournamentStartPush(
   };
 }
 
+/**
+ * Le staff d'un tournoi écrit à ses engagés (`/message-tournoi`,
+ * `TOURNAMENT_STAFF_MESSAGE.md`) : le nom du tournoi et le début du texte du
+ * staff, sans nommer qui l'écrit ; le corps est borné par `buildPushPayload`.
+ * L'étiquette porte l'heure d'envoi : deux messages ne se remplacent pas.
+ */
+export function tournamentStaffMessagePush(
+  input: { tournamentId: number; tournamentName: string; message: string; sentAt: number },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("tournamentStaffMessage.title"),
+    body: clipPushText(
+      text.t("tournamentStaffMessage.body", { tournament: shown(input.tournamentName), message: shown(input.message) }),
+      PUSH_BODY_MAX,
+    ),
+    url: localeHref(`/tournois/${input.tournamentId}`, locale),
+    tag: `tournament-${input.tournamentId}-staff-${input.sentAt}`,
+  };
+}
+
 /** Un joueur demande à rejoindre une équipe que le destinataire gère. */
 export function teamJoinRequestPush(input: { teamId: number; teamName: string }, locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];
