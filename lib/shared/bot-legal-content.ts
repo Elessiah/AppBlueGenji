@@ -96,8 +96,10 @@ export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // renvoient donc.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
-const LAST_UPDATED_FR = "13 novembre 2026";
-const LAST_UPDATED_EN = "13 November 2026";
+// Message du staff d'un tournoi à ses participants et commande /message-tournoi
+// (TOURNAMENT-DM), les deux — datée comme l'entrée `2026-11-message-du-staff-tournoi`.
+const LAST_UPDATED_FR = "26 novembre 2026";
+const LAST_UPDATED_EN = "26 November 2026";
 // La politique a sa propre date : une modification qui ne touche qu'elle (le
 // passage des sauvegardes chez Hetzner) laisse aux conditions la leur. Les
 // horaires de match remis en message privé touchent les deux ; l'annonce des
@@ -139,9 +141,11 @@ const LAST_UPDATED_EN = "13 November 2026";
 // d'équipe coupés par l'interrupteur de « Mon profil » (TEAM-DM-OPTOUT, D68), la
 // politique seule — même date, celle de l'entrée `2026-11-messages-d-equipe-reglage-du-profil` ;
 // avis d'exclusion remis en message privé à l'exclu et ce que le bot en garde (BOT-LOT,
-// rectificatif), la politique seule — même date, celle de l'entrée `2026-11-bot-avis-d-exclusion`.
-const PRIVACY_LAST_UPDATED_FR = "18 novembre 2026";
-const PRIVACY_LAST_UPDATED_EN = "18 November 2026";
+// rectificatif), la politique seule — même date, celle de l'entrée `2026-11-bot-avis-d-exclusion` ;
+// message du staff d'un tournoi à ses participants et commande /message-tournoi (TOURNAMENT-DM,
+// registre T04 et T08), les deux — celle de l'entrée `2026-11-message-du-staff-tournoi`.
+const PRIVACY_LAST_UPDATED_FR = "26 novembre 2026";
+const PRIVACY_LAST_UPDATED_EN = "26 November 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
@@ -213,8 +217,8 @@ export const TERMS_OF_SERVICE: BilingualDoc = inBothLanguages<LegalDoc>({
         },
         {
           kind: "p",
-          text: frEn("Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, horaires de match (posés, changés ou retirés), rappels de match, check-in d'un match, avis de retrait d'un match (« Match retiré ») et avis envoyé à un caster dont l'inscription est retirée par un autre que lui — ces messages de match aux seuls comptes dont le tag Discord est certifié sur le site —, alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe, jamais personne) et informations sur les données. Il est gratuit.",
-            "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match times (set, changed or removed), match reminders, the check-in of a match, notices of removal from a match (“Match retiré”) and the notice sent to a caster whose registration for a match is removed by someone else — these match messages only to accounts with a Discord tag certified on the website —, referee alerts, moderation notices, team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team, never anyone) and data-protection notices. It is free of charge."),
+          text: frEn("Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, horaires de match (posés, changés ou retirés), rappels de match, check-in d'un match, avis de retrait d'un match (« Match retiré ») et avis envoyé à un caster dont l'inscription est retirée par un autre que lui — ces messages de match aux seuls comptes dont le tag Discord est certifié sur le site —, alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe, jamais personne), messages du staff d'un tournoi à ses participants (signés « le staff du tournoi ») et informations sur les données. Le staff des tournois du site peut écrire ces derniers depuis Discord, par la commande **/message-tournoi** : le Bot transmet la demande au site, qui vérifie le droit de son auteur, choisit les destinataires et n'en rend que le nombre. Il est gratuit.",
+            "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match times (set, changed or removed), match reminders, the check-in of a match, notices of removal from a match (“Match retiré”) and the notice sent to a caster whose registration for a match is removed by someone else — these match messages only to accounts with a Discord tag certified on the website —, referee alerts, moderation notices, team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team, never anyone), messages from a tournament's staff to its participants (signed “the tournament staff”) and data-protection notices. The website's tournament staff can write the latter from Discord, with the **/message-tournoi** command: the Bot passes the request on to the website, which checks its author's permission, picks the recipients and only returns their number. It is free of charge."),
         },
       ],
     },
@@ -442,6 +446,15 @@ export const PRIVACY_POLICY: BilingualDoc = inBothLanguages<LegalDoc>({
         },
         {
           kind: "subhead",
+          text: frEn("Messages du staff d'un tournoi (/message-tournoi)", "Tournament staff messages (/message-tournoi)"),
+        },
+        {
+          kind: "p",
+          text: frEn(`Quand un membre du staff des tournois utilise **/message-tournoi**, le Bot transmet au site son identifiant Discord (pour que le site retrouve son compte et vérifie qu'il a la permission de gérer les tournois), le tournoi visé (le numéro tiré du lien donné), les catégories de destinataires choisies et le texte du message, sans rien en enregistrer. Le site ne lui rend que des nombres (destinataires, messages remis), que le Bot montre au seul auteur, dans un aperçu fermé au plus tard cinq minutes après la commande. Le message lui-même part comme les autres messages du site : en message privé, signé « le staff du tournoi », sans nommer son auteur, et chaque participant le coupe dans « Mon profil » sur le site (sujet « Messages du staff des tournois »). Base : l'intérêt légitime de l'association au bon déroulement des tournois. Ce traitement relève de la [politique de confidentialité du site](${SITE_PRIVACY_HREF}).`,
+            `When a member of the tournament staff uses **/message-tournoi**, the Bot sends the website their Discord ID (so that the website finds their account and checks that they hold the permission to manage tournaments), the targeted tournament (the number taken from the link given), the chosen recipient categories and the message text, without recording any of it. The website only returns numbers (recipients, messages delivered), which the Bot shows to the author alone, in a preview closed at the latest five minutes after the command. The message itself goes out like the website's other messages: by direct message, signed “the tournament staff”, without naming its author, and each participant turns it off in “My profile” on the website (“Tournament staff messages” topic). Basis: the association's legitimate interest in the smooth running of tournaments. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}).`),
+        },
+        {
+          kind: "subhead",
           text: frEn("Journaux", "Logs"),
         },
         {
@@ -501,6 +514,8 @@ export const PRIVACY_POLICY: BilingualDoc = inBothLanguages<LegalDoc>({
               `**Staff private log channel** (and the Bot's direct messages to its owner): one year (${BOT_STAFF_LOG_RETENTION_DAYS} days); older messages from the Bot are deleted by the nightly clean-up, in batches (several nights for a large backlog), except the reason posted in the channel for an exclusion still in force — and, for an exclusion issued from this rule on, its notice and the copy of its reason by direct message —, deleted when it is lifted.`),
             frEn(`**Salons vocaux d'équipe** : le salon est supprimé dès qu'il est vide une fois rendu, au plus tard ${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu même occupé, si Discord ne l'en empêche pas ; jamais rendu, il est supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création, sa reprise ou sa recréation ; sa fiche part avec lui (une recréation la reporte sur le salon neuf), ou est oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création, sa reprise ou sa recréation si le Bot ne peut plus lire le salon, et reste sans limite tant qu'un salon jamais rendu reste occupé ou que Discord empêche sa suppression (réessayée à chaque balayage ; un salon que le Bot ne voit plus est laissé à la modération). Ces durées s'entendent à un balayage près (toutes les ${VOICE_BOT_SWEEP_MINUTES} minutes). Un salon déplacé hors de la catégorie des matchs n'est plus suivi : sa fiche est oubliée et le Bot ne le supprime plus. L'état vocal et les fiches de membre ne sont tenus qu'en mémoire, à jour de Discord, et perdus à l'arrêt du Bot. Le journal d'audit de Discord garde la création et la suppression de chaque salon, avec son nom, et les déconnexions d'un vidage (leur nombre et leur motif, tels que Discord les y inscrit), pour la durée que Discord fixe.`,
               `**Team voice channels**: the channel is deleted as soon as it is empty once handed back, within ${VOICE_BOT_RELEASED_MAX_HOURS} hours and ${VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest even if occupied, unless Discord prevents it; never handed back, it is deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation, its reuse or its recreation; its record goes with it (a recreation moves it to the new channel), or is forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation, its reuse or its recreation if the Bot can no longer read the channel, and stays with no limit while a channel never handed back stays occupied or while Discord prevents its deletion (retried at each sweep; a channel the Bot no longer sees is left to moderation). These periods are accurate to within one sweep (every ${VOICE_BOT_SWEEP_MINUTES} minutes). A channel moved out of the match category is no longer tracked: its record is forgotten and the Bot no longer deletes it. Voice state and member profiles are only held in memory, kept up to date by Discord, and lost when the Bot stops. Discord's audit log keeps the creation and deletion of each channel, with its name, and the disconnections of a clearing (their number and reason, as Discord records them), for the period Discord sets.`),
+            frEn("**/message-tournoi** : rien n'est enregistré par le Bot ; l'aperçu, visible du seul auteur, se ferme au plus tard cinq minutes après la commande. Le texte n'est pas non plus gardé par le site.",
+              "**/message-tournoi**: nothing is recorded by the Bot; the preview, visible to the author alone, closes at the latest five minutes after the command. The text is not kept by the website either."),
             frEn("**Journaux du serveur** : selon leur rotation automatique.",
               "**Server logs**: according to their automatic rotation."),
             frEn("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur ; supprimées sur demande de l'équipe, du joueur ou du caster concerné (formulaire « Signaler un problème » du site, catégorie RGPD). Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération ; à la suppression du compte du joueur (dès la demande, le site en avertit le staff sans nommer le joueur), les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.",
@@ -533,6 +548,8 @@ export const PRIVACY_POLICY: BilingualDoc = inBothLanguages<LegalDoc>({
               "The members of the channel where **/scrim** or **/recrute** is used: the command replies publicly there, and Discord shows who used it."),
             frEn("Les membres des serveurs partenaires, qui lisent les annonces relayées.",
               "Members of partner servers, who read the relayed advertisements."),
+            frEn("Le site BlueGenji, à qui le Bot transmet l'identifiant Discord de l'auteur de **/message-tournoi** et son message ; les participants du tournoi visés, qui reçoivent le message signé « le staff du tournoi », jamais le nom de son auteur.",
+              "The BlueGenji website, to which the Bot sends the Discord ID of the author of **/message-tournoi** and their message; the targeted participants of the tournament, who receive the message signed “the tournament staff”, never its author's name."),
             frEn("Les membres du rôle d'arbitrage de chaque serveur qui en a défini un, pour les alertes d'arbitrage du site.",
               "Members of the referee role of every server that has set one, for the website's referee alerts."),
             frEn("Les membres du serveur Discord de l'association, qui lisent dans le salon #live l'annonce des matchs diffusés.",

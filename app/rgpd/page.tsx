@@ -74,6 +74,7 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { RgpdEn } from "./RgpdEn";
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
+import { STAFF_MESSAGE_SENDS_PER_WINDOW, STAFF_MESSAGE_WINDOW_MINUTES } from "@/lib/shared/tournament-staff-message";
 import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
@@ -1171,7 +1172,7 @@ function RgpdFr({
         <div className={styles.prose}>
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
-            score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de la date butoir de planification d&apos;un match que vous menez (capitaine, manager ou propriétaire, ou joueur d&apos;un tournoi individuel) — son annonce, ses rappels 24 h et 3 h avant et le double forfait qui peut la suivre si elle passe sans horaire —, de l&apos;horaire de vos matchs (posé,
+            score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un message du staff d&apos;un tournoi auquel vous participez, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de la date butoir de planification d&apos;un match que vous menez (capitaine, manager ou propriétaire, ou joueur d&apos;un tournoi individuel) — son annonce, ses rappels 24 h et 3 h avant et le double forfait qui peut la suivre si elle passe sans horaire —, de l&apos;horaire de vos matchs (posé,
             changé ou retiré) et de ses rappels (24 h avant ; aussi 10 h avant si le tournoi a un check-in), du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, dans un tournoi qui a un check-in, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
             alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage ; une prod, de sa place de prod d&apos;un match donnée ou retirée par un autre qu&apos;elle, par le staff ou d&apos;office, avec le motif, tant qu&apos;elle détient la permission de prod ; un arbitre, caster ou prod, du planning (nouveaux créneaux où il peut tenir un rôle, ses affectations, les désistements d&apos;attributions confirmées sur ses créneaux confirmés, et, caster, son statut de caster autonome changé par le staff) et, staff des tournois, des places à pourvoir et des diffusions perdues. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
@@ -1298,6 +1299,23 @@ function RgpdFr({
             vous y opposer à tout moment en décochant « Messages privés Discord de mes matchs et de mes équipes »
             dans <Link href="/profil#notifications">Mon profil</Link> — la notification push garde ses propres
             réglages (<Link href="/rgpd/registre#t03">registre, T03</Link>).
+          </p>
+          <p id="message-du-staff">
+            <strong>Messages du staff d&apos;un tournoi.</strong> Pendant les inscriptions ou le tournoi en cours, le
+            staff qui gère les tournois peut écrire aux participants d&apos;un tournoi, depuis sa page ou depuis
+            Discord (commande /message-tournoi) : les membres actuels des équipes inscrites selon les catégories
+            qu&apos;il choisit (joueurs, managers, capitaines, propriétaires, tous) et les joueurs d&apos;un tournoi
+            individuel — une équipe qui a abandonné n&apos;est plus visée. Le message vous arrive en message privé
+            Discord (identifiant rattaché ou tag certifié) et en notification push, dans la langue de votre compte,
+            signé « le staff du tournoi » ; l&apos;auteur ne voit que des nombres, jamais vos noms. Le texte
+            n&apos;est gardé ni par le site ni par le bot ; seul un compteur borne chaque membre du staff à{" "}
+            {STAFF_MESSAGE_SENDS_PER_WINDOW} envois par tournoi sur {STAFF_MESSAGE_WINDOW_MINUTES} minutes, et
+            s&apos;efface ensuite. L&apos;envoi est noté au journal du staff sur Discord sans nommer son auteur ni
+            citer le texte ; les journaux du serveur gardent son auteur et la longueur du texte, selon leur
+            rotation. Base : l&apos;<strong>intérêt légitime</strong> de l&apos;association au bon déroulement des
+            tournois ; vous vous y opposez en coupant le sujet « Messages du staff des tournois » dans{" "}
+            <Link href="/profil#notifications">Mon profil</Link>, ce qui coupe aussi le message privé
+            (<Link href="/rgpd/registre#t04">registre, T04</Link> ; <Link href="/rgpd/registre#t08">T08</Link>).
           </p>
           <p id="test-messages-prives">
             <strong>« Tester mes MP ».</strong> Depuis <Link href="/profil#comptes">Mon profil</Link>, ce bouton
