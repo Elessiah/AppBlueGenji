@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import type { TournamentDetail } from "@/lib/shared/types";
-import { registerBlockedNotice } from "@/app/(secured)/tournois/[id]/_lib/register-entry";
+import { canWithdrawOwnEntry, registerBlockedNotice, withdrawalBodyKey } from "@/app/(secured)/tournois/[id]/_lib/register-entry";
+import { tournamentCard } from "../helpers/tournament-card";
+import { tournamentDetail } from "../helpers/tournament-detail";
 import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 
 function detail(overrides: Partial<TournamentDetail> = {}): TournamentDetail {
@@ -92,5 +94,75 @@ describe("registerBlockedNotice", () => {
         }),
       ),
     ).not.toBeNull();
+  });
+});
+
+/**
+ * `canWithdrawOwnEntry` — le bouton « Se désinscrire » de l'en-tête
+ * (`docs/features/SELF_WITHDRAWAL.md`) : engagé inscrit, qualité pour agir en
+ * son nom, coup d'envoi pas encore passé.
+ */
+describe("canWithdrawOwnEntry", () => {
+  const KICKOFF = Date.parse("2026-05-12T10:00:00.000Z");
+  const BEFORE_KICKOFF = Date.parse("2026-05-11T10:00:00.000Z");
+  const registration = {
+    teamId: 10,
+    teamName: "Team Nova",
+    logoUrl: null,
+    seed: 1,
+    registeredAt: "2026-05-03T10:00:00.000Z",
+    finalRank: null,
+  };
+
+  function withdrawable(overrides: Partial<TournamentDetail> = {}): TournamentDetail {
+    return tournamentDetail({
+      card: tournamentCard({ id: 7, state: "REGISTRATION" }),
+      registrations: [registration],
+      canRegisterEntrant: true,
+      myTeamId: 10,
+      ...overrides,
+    });
+  }
+
+  it("canWithdrawOwnEntry_managerRegisteredBeforeKickoff_returnsTrue", () => {
+    expect(canWithdrawOwnEntry(withdrawable(), BEFORE_KICKOFF)).toBe(true);
+  });
+
+  it("canWithdrawOwnEntry_cannotActForEntrant_returnsFalse", () => {
+    expect(canWithdrawOwnEntry(withdrawable({ canRegisterEntrant: false }), BEFORE_KICKOFF)).toBe(false);
+  });
+
+  it("canWithdrawOwnEntry_entrantNotRegistered_returnsFalse", () => {
+    expect(
+      canWithdrawOwnEntry(withdrawable({ registrations: [{ ...registration, teamId: 11 }] }), BEFORE_KICKOFF),
+    ).toBe(false);
+  });
+
+  it("canWithdrawOwnEntry_noEntrant_returnsFalse", () => {
+    expect(canWithdrawOwnEntry(withdrawable({ myTeamId: null }), BEFORE_KICKOFF)).toBe(false);
+  });
+
+  it("canWithdrawOwnEntry_kickoffPassed_returnsFalse", () => {
+    expect(canWithdrawOwnEntry(withdrawable(), KICKOFF)).toBe(false);
+  });
+
+  it("canWithdrawOwnEntry_oneMillisecondBeforeKickoff_returnsTrue", () => {
+    expect(canWithdrawOwnEntry(withdrawable(), KICKOFF - 1)).toBe(true);
+  });
+
+  it("canWithdrawOwnEntry_tournamentFinished_returnsFalse", () => {
+    expect(
+      canWithdrawOwnEntry(withdrawable({ card: tournamentCard({ id: 7, state: "FINISHED" }) }), BEFORE_KICKOFF),
+    ).toBe(false);
+  });
+});
+
+describe("withdrawalBodyKey", () => {
+  it("withdrawalBodyKey_registrationOpen_promisesReRegistration", () => {
+    expect(withdrawalBodyKey("REGISTRATION")).toBe("withdraw.body");
+  });
+
+  it("withdrawalBodyKey_registrationClosedBeforeKickoff_saysWithdrawalIsFinal", () => {
+    expect(withdrawalBodyKey("UPCOMING")).toBe("withdraw.bodyClosed");
   });
 });

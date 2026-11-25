@@ -400,6 +400,7 @@ describe("rendu anglais — aucun français hors des blocs lang=\"fr\"", () => {
         fatal={null}
         frozen={false}
         onRegister={noop}
+        onWithdraw={noop}
         onReportIssue={noop}
         onGuestRegister={noop}
         onAdvance={noop}

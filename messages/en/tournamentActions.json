@@ -80,16 +80,37 @@
       "pending": "Registering…",
       "TEAM": {
         "title": "Register your team for “{name}”?",
-        "final": "The whole team will be entered. It won't be able to unregister itself: only the tournament staff can remove an entrant."
+        "final": "The whole team will be entered. Its owner or a manager can unregister it until kickoff."
       },
       "SOLO": {
         "title": "Register for “{name}”?",
-        "final": "You won't be able to cancel this registration yourself: only the tournament staff can remove an entrant."
+        "final": "You can unregister until kickoff."
       }
     },
     "success": "Registration confirmed.",
     "streamNoticeShort": "Matches may be streamed live and recorded: playing in them means appearing under your username.",
     "streamNoticeSubject": "Match streaming"
+  },
+  "withdraw": {
+    "cta": {
+      "TEAM": "Unregister my team",
+      "SOLO": "Unregister"
+    },
+    "title": {
+      "TEAM": "Unregister your team from “{name}”?",
+      "SOLO": "Unregister from “{name}”?"
+    },
+    "body": {
+      "TEAM": "The team leaves the list of entrants and frees its spot. It can register again while registration stays open and a spot remains.",
+      "SOLO": "You leave the list of entrants and free your spot. You can register again while registration stays open and a spot remains."
+    },
+    "bodyClosed": {
+      "TEAM": "Registration is closed: the team leaves the list of entrants and won't be able to register for this tournament again.",
+      "SOLO": "Registration is closed: you leave the list of entrants and won't be able to register for this tournament again."
+    },
+    "confirm": "Unregister",
+    "pending": "Unregistering…",
+    "success": "Registration withdrawn."
   },
   "header": {
     "imageAria": "Tournament image",

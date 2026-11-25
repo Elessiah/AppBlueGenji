@@ -53,6 +53,26 @@
   }
 }
 
+/* Geste qui retire (se désinscrire) : saumon des erreurs, texte clair à plus
+   de 10:1 sur le fond teinté. */
+.danger {
+  background: rgba(var(--danger-rgb), 0.14);
+  border-color: rgba(var(--danger-rgb), 0.55);
+  color: #ffd9df;
+}
+
+.danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  border-color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.22);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .danger:hover:not(:disabled):not([aria-disabled="true"]) {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 3px rgba(var(--danger-rgb), 0.2);
+  }
+}
+
 /*
  * État désactivé.
  *
@@ -94,6 +114,10 @@
   border-color: var(--blue-500);
 }
 
+.danger[aria-disabled="true"][aria-busy="true"] {
+  border-color: var(--danger);
+}
+
 .primary[aria-disabled="true"][aria-busy="true"] {
   border-color: var(--blue-100);
 }
@@ -101,14 +125,16 @@
 /* Mouvement réduit (préférence système ou menu d'accessibilité) : le bouton
    s'éclaire au survol sans se déplacer. */
 :global(:root[data-a11y~="motion"]) .primary:hover:not(:disabled):not([aria-disabled="true"]),
-:global(:root[data-a11y~="motion"]) .ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+:global(:root[data-a11y~="motion"]) .ghost:hover:not(:disabled):not([aria-disabled="true"]),
+:global(:root[data-a11y~="motion"]) .danger:hover:not(:disabled):not([aria-disabled="true"]) {
   transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .root,
   .primary:hover:not(:disabled):not([aria-disabled="true"]),
-  .ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+  .ghost:hover:not(:disabled):not([aria-disabled="true"]),
+  .danger:hover:not(:disabled):not([aria-disabled="true"]) {
     transition: none;
     transform: none;
   }

@@ -439,7 +439,7 @@ describe("français inchangé — les messages égalent les textes d'origine", (
       title: "Inscrire ton équipe à « Cup » ?",
       body: [
         "Coup d'envoi : 12/05/2026 20:00.",
-        "Toute l'équipe sera engagée. Elle ne pourra pas se désinscrire elle-même : seul le staff du tournoi peut retirer un engagé.",
+        "Toute l'équipe sera engagée. Son propriétaire ou un manager pourra la désinscrire jusqu'au coup d'envoi.",
         registrationStreamNotice(false),
       ],
       confirmLabel: "Inscrire mon équipe",
@@ -464,7 +464,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     });
     const html = renderPage(
       "en",
-      <TournamentHeader detail={detail} isLive tier="PRIORITY" fatal={null} frozen={false} onRegister={noop} onReportIssue={noop} onGuestRegister={noop} onAdvance={noop} onStaffMessage={noop} onLiveSaved={noop} onEditImage={noop} />,
+      <TournamentHeader detail={detail} isLive tier="PRIORITY" fatal={null} frozen={false} onRegister={noop} onWithdraw={noop} onReportIssue={noop} onGuestRegister={noop} onAdvance={noop} onStaffMessage={noop} onLiveSaved={noop} onEditImage={noop} />,
     );
     // L'édition reste française (lot 8b-2) : son lien l'annonce.
     expectNoFrench(html.replace(/<a[^>]*hrefLang="fr"[^>]*>[^<]*<\/a>/, ""));
@@ -474,6 +474,49 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(html).toContain("Advance the tournament");
     expect(html).toContain("Message participants");
     expect(html).toContain("Report a problem");
+  });
+
+  it("TournamentHeader_registeredManagerBeforeKickoff_showsUnregisterButton", () => {
+    const detail = tournamentDetail({
+      card: tournamentCard({
+        name: "Autumn Cup",
+        state: "REGISTRATION",
+        registrationOpenAt: "2026-01-01T10:00:00.000Z",
+        registrationCloseAt: "2099-05-10T10:00:00.000Z",
+        startAt: "2099-05-12T10:00:00.000Z",
+      }),
+      canRegisterEntrant: true,
+      myTeamId: 10,
+      registrations: [{ teamId: 10, teamName: "Alpha", registeredAt: "2026-05-03T18:30:00.000Z", finalRank: null, seed: 1, logoUrl: null }],
+    });
+
+    const html = renderPage(
+      "en",
+      <TournamentHeader detail={detail} isLive tier="PRIORITY" fatal={null} frozen={false} onRegister={noop} onWithdraw={noop} onReportIssue={noop} onGuestRegister={noop} onAdvance={noop} onStaffMessage={noop} onLiveSaved={noop} onEditImage={noop} />,
+    );
+
+    expect(html).toMatch(/<button[^>]*class="[^"]*danger[^"]*"[^>]*aria-haspopup="dialog"[^>]*>Unregister my team<\/button>/);
+  });
+
+  it("TournamentHeader_frozen_hidesUnregisterButton", () => {
+    const detail = tournamentDetail({
+      card: tournamentCard({
+        state: "REGISTRATION",
+        registrationOpenAt: "2026-01-01T10:00:00.000Z",
+        registrationCloseAt: "2099-05-10T10:00:00.000Z",
+        startAt: "2099-05-12T10:00:00.000Z",
+      }),
+      canRegisterEntrant: true,
+      myTeamId: 10,
+      registrations: [{ teamId: 10, teamName: "Alpha", registeredAt: "2026-05-03T18:30:00.000Z", finalRank: null, seed: 1, logoUrl: null }],
+    });
+
+    const html = renderPage(
+      "en",
+      <TournamentHeader detail={detail} isLive tier="PRIORITY" fatal={null} frozen onRegister={noop} onWithdraw={noop} onReportIssue={noop} onGuestRegister={noop} onAdvance={noop} onStaffMessage={noop} onLiveSaved={noop} onEditImage={noop} />,
+    );
+
+    expect(html).not.toContain("Unregister");
   });
 
   it("refus d'inscription expliqué dans la langue de la page", () => {

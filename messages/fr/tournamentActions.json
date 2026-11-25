@@ -80,16 +80,37 @@
       "pending": "Inscription…",
       "TEAM": {
         "title": "Inscrire ton équipe à « {name} » ?",
-        "final": "Toute l'équipe sera engagée. Elle ne pourra pas se désinscrire elle-même : seul le staff du tournoi peut retirer un engagé."
+        "final": "Toute l'équipe sera engagée. Son propriétaire ou un manager pourra la désinscrire jusqu'au coup d'envoi."
       },
       "SOLO": {
         "title": "T'inscrire à « {name} » ?",
-        "final": "Tu ne pourras pas annuler toi-même cette inscription : seul le staff du tournoi peut retirer un engagé."
+        "final": "Tu pourras te désinscrire jusqu'au coup d'envoi."
       }
     },
     "success": "Inscription validée.",
     "streamNoticeShort": "Les matchs peuvent être diffusés en direct et enregistrés : y jouer, c'est y paraître sous ton pseudo.",
     "streamNoticeSubject": "Retransmission des matchs"
+  },
+  "withdraw": {
+    "cta": {
+      "TEAM": "Désinscrire mon équipe",
+      "SOLO": "Me désinscrire"
+    },
+    "title": {
+      "TEAM": "Désinscrire ton équipe de « {name} » ?",
+      "SOLO": "Te désinscrire de « {name} » ?"
+    },
+    "body": {
+      "TEAM": "L'équipe quitte la liste des engagés et libère sa place. Elle pourra se réinscrire tant que les inscriptions restent ouvertes et qu'il reste une place.",
+      "SOLO": "Tu quittes la liste des engagés et tu libères ta place. Tu pourras te réinscrire tant que les inscriptions restent ouvertes et qu'il reste une place."
+    },
+    "bodyClosed": {
+      "TEAM": "Les inscriptions sont closes : l'équipe quitte la liste des engagés et ne pourra plus se réinscrire à ce tournoi.",
+      "SOLO": "Les inscriptions sont closes : tu quittes la liste des engagés et ne pourras plus te réinscrire à ce tournoi."
+    },
+    "confirm": "Se désinscrire",
+    "pending": "Désinscription…",
+    "success": "Désinscription effectuée."
   },
   "header": {
     "imageAria": "Image du tournoi",

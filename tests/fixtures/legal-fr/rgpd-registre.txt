@@ -137,6 +137,8 @@ Aucune
 Conservation
 Résultats et palmarès : aucune durée de conservation définie, conservés tant que le site existe ; anonymisés à la suppression du compte (pseudo d'emprunt)
 Inscriptions à un tournoi individuel pas encore commencé, sans match : retirées du tournoi dès la demande de suppression du compte (T01)
+Inscription à un tournoi pas encore commencé : effacée dès que l'engagé s'en désinscrit (son propriétaire ou un manager, ou le joueur lui-même en tournoi individuel) ou que le staff la retire
+Inscriptions et désinscriptions : en mémoire seulement, le numéro du compte et l'heure de chaque geste, pour leurs plafonds — dix minutes au plus, remis à zéro quand le site redémarre
 Codes de replay : gardés avec le résultat qu'ils documentent (un détail qui ne l'explique plus est effacé) ; le lien vers le compte qui les a saisis est effacé à la suppression du compte, les codes restent (la partie est conservée par l'éditeur du jeu)
 Droit d'opposition ouvert sur demande
 Adresse IP de ces lecteurs, pour ces plafonds et la mesure de charge : en mémoire seulement, deux minutes au plus après sa dernière requête
@@ -245,7 +247,7 @@ T05 Journal d'activité du staff sur Discord
 Finalité principale
 Tenir le staff informé des faits marquants de la plateforme
 Sous-finalités
-Arrivées de joueurs, inscriptions et abandons en tournoi, fins de match, clôtures
+Arrivées de joueurs, inscriptions, désinscriptions et abandons en tournoi, fins de match, clôtures
 Suppressions de compte demandées et leurs réactivations, et les retraits d'inscription ou forfaits qu'elles entraînent, sans nommer le joueur (« un joueur » ; nom de l'équipe ou du tournoi seulement) ; pour un compte annoncé dans #live en tournoi individuel, les lignes de sa demande de suppression citent le tournoi, le jour et une heure de chaque soirée #live où il a pu paraître, pour que les modérateurs suppriment à la main celles de leurs alertes AutoMod qu'ils parviennent à identifier (T16)
 Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match et dates butoirs de planification posés, changés ou retirés, et, quand leur auteur joue le match, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue — ces quatre gestes — tout abandon imposé par l'arbitrage qui clôt une manche compris, une trace par manche close face à un adversaire connu, quelle que soit l'équipe retirée — laissant aussi, que leur auteur joue ou non, une trace courte dans les seuls journaux du serveur), pour la modération
 Programme d'arbitrage : environ 10 h à l'avance, les matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel)

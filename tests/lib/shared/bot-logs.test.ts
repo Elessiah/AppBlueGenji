@@ -4,6 +4,7 @@ import {
   formatEndurancePenaltyLiftedLog,
   formatEndurancePenaltyLog,
   formatEntrantRemovedLog,
+  formatEntrantWithdrawnLog,
   formatForfeitCancelledLog,
   formatForfeitLog,
   formatMatchResultLog,
@@ -742,5 +743,32 @@ describe("staffActor", () => {
     const user = { id: 9, pseudo: "Chef", isAdmin: true, email: "chef@example.test" };
 
     expect(staffActor(user)).toEqual({ id: 9, pseudo: "Chef" });
+  });
+});
+
+describe("formatEntrantWithdrawnLog", () => {
+  it("formatEntrantWithdrawnLog_teamEntrant_namesTeamAndRemainingCount", () => {
+    const line = formatEntrantWithdrawnLog({
+      tournament: TOURNAMENT,
+      entrant: { name: "Les Renards", participantType: "TEAM" },
+      registeredTeams: 15,
+      maxTeams: 16,
+    });
+
+    expect(line).toMatch(/^➖ Désinscription — /);
+    expect(line).toContain("Les Renards se retire");
+    expect(line).toContain("15/16 équipes");
+  });
+
+  it("formatEntrantWithdrawnLog_soloEntrant_saysUnJoueurNotPseudo", () => {
+    const line = formatEntrantWithdrawnLog({
+      tournament: TOURNAMENT,
+      entrant: { name: "Kiro", participantType: "SOLO" },
+      registeredTeams: 3,
+      maxTeams: 8,
+    });
+
+    expect(line).toContain(`${ANONYMOUS_PLAYER_LABEL} se retire`);
+    expect(line).not.toContain("Kiro");
   });
 });

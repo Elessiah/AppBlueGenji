@@ -445,6 +445,41 @@ export const TEAM_LIFECYCLE_RULE: RateLimitRule = {
 };
 
 /**
+ * Inscriptions et désinscriptions d'un joueur à un tournoi (un seul seau pour
+ * les deux, `POST`/`DELETE /api/tournaments/[id]/register`), par compte.
+ *
+ * Depuis la désinscription (`docs/features/SELF_WITHDRAWAL.md`), s'inscrire se
+ * défait : une boucle « inscrire → désinscrire » prenait le verrou du tournoi,
+ * vidait le classement, l'accueil et l'instantané du tournoi, relançait le flux
+ * de chaque spectateur et remplissait le journal du staff sur Discord à
+ * volonté. Dix gestes en dix minutes couvrent une inscription faite par erreur
+ * puis refaite, sur plusieurs tournois ; le staff `tournaments` n'est pas
+ * plafonné. Seul un geste **réussi** est décompté ({@link reserveRateLimit}) :
+ * un refus (inscriptions closes, droit manquant, tournoi lancé) ne coûte rien.
+ */
+export const TOURNAMENT_REGISTRATION_TOGGLE_RULE: RateLimitRule = {
+  name: "tournament-registration-toggle",
+  limit: 10,
+  windowMs: 10 * 60_000,
+};
+
+/**
+ * Tous les appels d'inscription et de désinscription d'un compte, **refus
+ * compris** ({@link enforceRateLimit}, rien n'est rendu). Le plafond des gestes
+ * réussis ({@link TOURNAMENT_REGISTRATION_TOGGLE_RULE}) rend la place d'un
+ * refus : sans cette seconde borne, une boucle de gestes refusés — chacun sous
+ * le verrou du tournoi, synchronisation d'état comprise — ferait attendre sans
+ * fin les inscriptions des autres et les gestes du staff. Soixante appels en dix
+ * minutes laissent largement de quoi corriger un refus et réessayer ; le staff
+ * `tournaments` n'est pas plafonné.
+ */
+export const TOURNAMENT_REGISTRATION_ATTEMPT_RULE: RateLimitRule = {
+  name: "tournament-registration-attempt",
+  limit: 60,
+  windowMs: 10 * 60_000,
+};
+
+/**
  * Écritures d'identité d'une équipe — nom, sigle, description, logo posé ou
  * retiré (`PATCH /api/teams/[id]`, `POST`/`DELETE /api/teams/[id]/logo`), par
  * compte. Un renommage ou un logo changé d'une équipe inscrite vide le

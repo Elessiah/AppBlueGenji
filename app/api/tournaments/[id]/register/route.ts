@@ -1,9 +1,98 @@
-﻿import { getCurrentUser } from "@/lib/server/auth";
+﻿import {
+  enforceRateLimit,
+  reserveRateLimit,
+  TOURNAMENT_REGISTRATION_ATTEMPT_RULE,
+  TOURNAMENT_REGISTRATION_TOGGLE_RULE,
+} from "@/lib/server/api-guard";
+import { getCurrentUser } from "@/lib/server/auth";
+import { sendBotLog } from "@/lib/server/bot-integration";
+import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
+import { withdrawOwnRegistration } from "@/lib/server/tournaments/registration-removal";
 import { registerCurrentUserTeam } from "@/lib/server/tournaments-service";
+import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
+import { formatEntrantWithdrawnLog } from "@/lib/shared/bot-logs";
+import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
 import { isRegistrationFilterError } from "@/lib/shared/registration-filters";
+import { can } from "@/lib/shared/permissions";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
+
+type SessionUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+
+/**
+ * Les deux plafonds des inscriptions et désinscriptions, dont le staff
+ * `tournaments` est exempt : chaque appel compte dans
+ * `TOURNAMENT_REGISTRATION_ATTEMPT_RULE` (refus compris — une boucle de refus
+ * tiendrait sinon le verrou du tournoi à volonté), puis une place est réservée,
+ * en une instruction, dans `TOURNAMENT_REGISTRATION_TOGGLE_RULE` ; `refund` la
+ * rend quand le geste est refusé avant d'avoir eu lieu : seul un geste réussi y
+ * est décompté.
+ */
+function reserveRegistrationToggle(user: SessionUser): ReturnType<typeof reserveRateLimit> {
+  if (can(user, "tournaments")) return { refused: null, refund: () => undefined };
+  const throttled = enforceRateLimit(TOURNAMENT_REGISTRATION_ATTEMPT_RULE, user.id);
+  if (throttled) return { refused: throttled, refund: () => undefined };
+  return reserveRateLimit(TOURNAMENT_REGISTRATION_TOGGLE_RULE, user.id);
+}
+
+/**
+ * Désinscription par le joueur lui-même, tant que le tournoi n'a pas commencé
+ * (`docs/features/SELF_WITHDRAWAL.md`) : son équipe active s'il en a la charge
+ * (`OWNER`/`MANAGER`), son entrée solo en tournoi individuel.
+ */
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return fail("UNAUTHORIZED", 401);
+
+  const { id } = await context.params;
+  const tournamentId = Number(id);
+  if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
+    return fail("INVALID_TOURNAMENT_ID", 400);
+  }
+
+  // Tournoi non publié : même 404 qu'un identifiant inexistant (`write-visibility.ts`).
+  if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
+
+  const reservation = reserveRegistrationToggle(user);
+  if (reservation.refused) return reservation.refused;
+
+  try {
+    const removed = await withdrawOwnRegistration(tournamentId, user.id);
+
+    // Après le commit, au meilleur effort : la ligne d'inscription est déjà
+    // effacée, et le canal est le seul endroit où la trace subsiste. Aucun
+    // pseudo n'y part (« un joueur » en individuel).
+    sendBotLog(
+      formatEntrantWithdrawnLog({
+        tournament: { id: removed.tournamentId, name: removed.tournamentName },
+        entrant: { name: removed.entrantName, participantType: removed.participantType },
+        registeredTeams: removed.registeredTeams,
+        maxTeams: removed.maxTeams,
+      }),
+      { category: "registrations", tournamentId: removed.tournamentId },
+    );
+
+    return ok({ success: true });
+  } catch (error) {
+    // Le service ne lève qu'avant son commit : rien n'a eu lieu.
+    reservation.refund();
+    const message = (error as Error).message;
+    if (message === "NOT_TEAM_MANAGER") return fail(message, 403);
+    if (message === "NO_ACTIVE_TEAM") return fail(message, 400);
+    // L'équipe active a changé pendant l'attente du verrou : réessayer tranche.
+    if (message === CONCURRENT_UPDATE_RETRY) return fail(message, 409);
+    if (message === "TOURNAMENT_NOT_FOUND" || message === "TEAM_NOT_IN_TOURNAMENT") {
+      return fail(message, 404);
+    }
+    // `Object.hasOwn` et non `in` : voir la route de retrait par le staff.
+    if (Object.hasOwn(ENTRANT_REMOVAL_BLOCK_MESSAGES, message)) return fail(message, 409);
+    return fail(
+      unexpectedFailureCode(error, "WITHDRAWAL_FAILED", `[tournaments] désinscription du tournoi ${tournamentId} échouée`),
+      500,
+    );
+  }
+}
 
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -19,10 +108,15 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
   // autre refus (`write-visibility.ts`).
   if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
 
+  const reservation = reserveRegistrationToggle(user);
+  if (reservation.refused) return reservation.refused;
+
   try {
     await registerCurrentUserTeam(tournamentId, user.id);
     return ok({ success: true });
   } catch (error) {
+    // Le service ne lève qu'avant son commit : rien n'a eu lieu.
+    reservation.refund();
     const message = (error as Error).message;
     // Le refus de qualité est un refus de **droits**, pas de forme : le joueur
     // a bien une équipe, il n'a simplement pas la charge de l'engager

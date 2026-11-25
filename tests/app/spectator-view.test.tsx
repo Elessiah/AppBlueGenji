@@ -436,6 +436,7 @@ describe("fiche commune sous SpectatorViewProvider", () => {
           fatal={null}
           frozen={false}
           onRegister={noop}
+          onWithdraw={noop}
           onReportIssue={noop}
           onGuestRegister={noop}
           onAdvance={noop}

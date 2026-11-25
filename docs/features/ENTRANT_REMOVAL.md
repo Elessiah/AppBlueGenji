@@ -21,6 +21,9 @@ Pour un tournoi qui n'a pas commencé, c'est écrire une défaite là où il n'y
 jamais eu de match — et, sur un plateau complet, c'est surtout une place qui ne
 se rend pas.
 
+> Le joueur peut aussi se désinscrire lui-même, dans la même fenêtre :
+> `SELF_WITHDRAWAL.md`.
+
 ## La règle
 
 > Le staff `tournaments` retire un engagé **jusqu'au début du tournoi**, pas une
