@@ -51,8 +51,14 @@ aux partenaires, sponsors et annonceurs. Données : la mesure T19
    suivante) n'y est pas comptée.
 8. Qui nous consulte : appareils, provenance, langue — barres segmentées,
    couleur fixée par catégorie (jamais par rang), légende chiffrée. Les
-   lignes d'un jour sous 5 visiteurs y forment « Petits nombres regroupés »
-   (`small`). Le seuil des textes vient de `AUDIENCE_MIN_VISITORS` (`{min}`).
+   lignes d'un jour sous 5 visiteurs y forment « Non détaillé » (« Not broken
+   down », `small`) — jamais « non comptés » : ces visiteurs sont dans les
+   totaux, seule leur répartition est tue. Le « i » de la carte l'explique
+   (`audience.hint`). Le groupe a sa teinte neutre, `--st-series-rest`
+   (`shareTone`), la même dans les trois répartitions et toujours en dernier :
+   il ne reprend jamais la teinte d'une catégorie (la provenance a 6
+   familles, une 7ᵉ teinte de palette retomberait sur celle d'« Accès
+   direct »). Le seuil des textes vient de `AUDIENCE_MIN_VISITORS` (`{min}`).
 9. La communauté : tournois publiés joués (en cours ou terminés, `PLAYED_STATES`
    comme les fiches d'équipe et les profils), matchs joués de ces tournois (hors exemptions),
    équipes et comptes **avec la définition de l'accueil**

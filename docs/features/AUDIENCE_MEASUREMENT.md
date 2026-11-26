@@ -124,7 +124,7 @@ toucher : T06 compte des arrivées, T19 des pages vues et du temps.
   sont écrites dans `bg_audience_day_pages` / `_hours` / `_dims`, et la
   lecture (`readRange`) ne fait qu'additionner. Une ligne d'un jour sous 5
   visiteurs (ou un type de page inconnu, ou `other`) rejoint « Autres
-  pages » ou `small` (« Petits nombres regroupés » : appareils, provenance,
+  pages » ou `small` (« Non détaillé » : appareils, provenance,
   langue) ; une heure sous 5 visiteurs n'est pas écrite. Le groupe compte ses
   visiteurs **distincts** (dans le détail : en mémoire pour un jour d'une
   seule tranche, `inMemoryDistinctCounter` ; `COUNT(DISTINCT visitor_key)`

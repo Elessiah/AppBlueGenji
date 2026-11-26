@@ -97,6 +97,7 @@
   },
   "audience": {
     "title": "Who reads us",
+    "hint": "On a day when a category has fewer than {min} visitors, they are counted under “Not broken down” (with, if needed, the next smallest category) so that no one can be recognised. They still count in the totals.",
     "devices": "Devices",
     "sources": "Where visitors come from",
     "sourcesHint": "Where visitors come from on their first page: the referring site is only kept as a family.",
@@ -111,7 +112,7 @@
       "other": "Other websites"
     },
     "localeLabels": { "fr": "French", "en": "English" },
-    "small": "Small numbers, grouped"
+    "small": "Not broken down"
   },
   "community": {
     "title": "The community",

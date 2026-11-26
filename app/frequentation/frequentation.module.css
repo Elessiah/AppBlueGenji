@@ -23,6 +23,8 @@
   --st-series-4: #7b52c9;
   --st-series-5: #c2467a;
   --st-series-6: #008300;
+  /* « Non détaillé » : gris bleuté neutre, hors de la palette catégorielle (3,5:1). */
+  --st-series-rest: #7f8aa0;
   --st-heat-0: #f1f2f5;
   --st-heat-1: #cde2fb;
   --st-heat-2: #9ec5f4;

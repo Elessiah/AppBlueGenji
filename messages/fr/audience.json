@@ -97,6 +97,7 @@
   },
   "audience": {
     "title": "Qui nous consulte",
+    "hint": "Un jour où une catégorie compte moins de {min} visiteurs, ils sont comptés dans « Non détaillé » (avec, si besoin, la plus petite catégorie suivante) pour qu'aucun ne soit reconnaissable. Ils restent dans les totaux.",
     "devices": "Appareils",
     "sources": "Provenance des visiteurs",
     "sourcesHint": "D'où arrivent les visiteurs à leur première page : le site d'origine n'est conservé que sous forme de famille.",
@@ -111,7 +112,7 @@
       "other": "Autres sites"
     },
     "localeLabels": { "fr": "Français", "en": "Anglais" },
-    "small": "Petits nombres regroupés"
+    "small": "Non détaillé"
   },
   "community": {
     "title": "La communauté",
