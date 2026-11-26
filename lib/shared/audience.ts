@@ -660,7 +660,7 @@ export const AUDIENCE_MIN_VISITORS = 5;
 
 /**
  * Clé d'une répartition (appareils, provenance, langue) où se fondent les
- * lignes d'un jour sous {@link AUDIENCE_MIN_VISITORS} : « petits nombres ».
+ * lignes d'un jour sous {@link AUDIENCE_MIN_VISITORS} : « Non détaillé » à l'écran.
  */
 export const AUDIENCE_SMALL_KEY = "small";
 

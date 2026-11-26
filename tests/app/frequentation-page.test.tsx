@@ -13,11 +13,11 @@ jest.mock("@/lib/server/audience-service");
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { evolutionLabels, nextHeatCell } from "@/app/frequentation/AudienceDashboard";
+import { evolutionLabels, nextHeatCell, shareTone } from "@/app/frequentation/AudienceDashboard";
 import FrequentationPage, { generateMetadata } from "@/app/frequentation/page";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { getAudienceStats } from "@/lib/server/audience-service";
-import { emptyHeatmap, type AudienceRangeStats, type AudienceStats } from "@/lib/shared/audience";
+import { AUDIENCE_SMALL_KEY, emptyHeatmap, type AudienceRangeStats, type AudienceStats } from "@/lib/shared/audience";
 import { publicSitemapRoutes } from "@/lib/shared/sitemap";
 import enAudience from "@/messages/en/audience.json";
 import frAudience from "@/messages/fr/audience.json";
@@ -41,6 +41,20 @@ const STATS: AudienceStats = {
   ],
   ranges: { "7d": rangeStats(), "30d": rangeStats(), "12m": rangeStats(), all: rangeStats() },
   community: { tournaments: 4, matches: 37, teams: 12, players: 90 },
+};
+
+/** Répartitions dont une part n'est pas détaillée (jours sous le seuil d'anonymat). */
+function rangeStatsWithSmall(): AudienceRangeStats {
+  return {
+    ...rangeStats(),
+    devices: [{ key: "mobile", views: 30, visitors: 9 }, { key: AUDIENCE_SMALL_KEY, views: 10, visitors: 6 }],
+    sources: [{ key: "direct", views: 4, visitors: 5 }, { key: AUDIENCE_SMALL_KEY, views: 12, visitors: 7 }],
+  };
+}
+
+const STATS_WITH_SMALL: AudienceStats = {
+  ...STATS,
+  ranges: { "7d": rangeStatsWithSmall(), "30d": rangeStatsWithSmall(), "12m": rangeStatsWithSmall(), all: rangeStatsWithSmall() },
 };
 
 async function render(locale: "fr" | "en"): Promise<string> {
@@ -164,6 +178,65 @@ describe("FrequentationPage", () => {
   });
 });
 
+describe("« Non détaillé » — part regroupée sous le seuil d'anonymat", () => {
+  it("page_fr_whoReadsUs_showsNonDetailleWithHintBehindInfoHint", async () => {
+    jest.mocked(getAudienceStats).mockResolvedValue(STATS_WITH_SMALL);
+
+    const html = await render("fr");
+
+    expect(html).toMatch(/>Non détaillé<\/span><span[^>]*>25\s?%/);
+    expect(html).not.toContain("Petits nombres regroupés");
+    expect(html).toContain("Plus d&#x27;infos : Qui nous consulte");
+    expect(html).toContain("Un jour où une catégorie compte moins de 5 visiteurs");
+  });
+
+  it("page_noGroupedShare_listsNoNonDetailleRow", async () => {
+    jest.mocked(getAudienceStats).mockResolvedValue(STATS);
+
+    const html = await render("fr");
+
+    expect(html).not.toMatch(/>Non détaillé<\/span>/);
+    expect(html).toMatch(/>Mobile<\/span>/);
+  });
+
+  it("page_en_whoReadsUs_showsNotBrokenDownWithHint", async () => {
+    jest.mocked(getAudienceStats).mockResolvedValue(STATS_WITH_SMALL);
+
+    const html = await render("en");
+
+    expect(html).toMatch(/>Not broken down<\/span><span[^>]*>25\s?%/);
+    expect(html).toContain("On a day when a category has fewer than 5 visitors");
+  });
+
+  it("page_smallShare_swatchUsesRestTone", async () => {
+    jest.mocked(getAudienceStats).mockResolvedValue(STATS_WITH_SMALL);
+
+    const html = await render("fr");
+
+    expect(html).toMatch(/background:var\(--st-series-rest\)"[^>]*><\/span><span[^>]*>Non détaillé</);
+  });
+
+  it("messages_audienceHint_presentInFrAndEnWithMinPlaceholder", () => {
+    expect(frAudience.audience.hint).toContain("{min}");
+    expect(enAudience.audience.hint).toContain("{min}");
+  });
+});
+
+describe("shareTone", () => {
+  it("shareTone_smallKey_returnsRestTone", () => {
+    expect(shareTone(AUDIENCE_SMALL_KEY, 6)).toBe("--st-series-rest");
+  });
+
+  it("shareTone_smallKeyInShorterBreakdown_returnsSameRestTone", () => {
+    expect(shareTone(AUDIENCE_SMALL_KEY, 2)).toBe("--st-series-rest");
+  });
+
+  it("shareTone_category_returnsSeriesToneOfItsIndex", () => {
+    expect(shareTone("direct", 0)).toBe("--st-series-1");
+    expect(shareTone("other", 5)).toBe("--st-series-6");
+  });
+});
+
 describe("diffusion", () => {
   it("n'est pas listée dans le plan du site", () => {
     expect(publicSitemapRoutes().map((route) => route.path)).not.toContain("/frequentation");
@@ -226,7 +299,7 @@ describe("palette", () => {
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
 
-  it.each<[string]>([["--st-series-1"], ["--st-series-2"], ["--st-series-3"], ["--st-series-4"], ["--st-series-5"], ["--st-series-6"]])(
+  it.each<[string]>([["--st-series-1"], ["--st-series-2"], ["--st-series-3"], ["--st-series-4"], ["--st-series-5"], ["--st-series-6"], ["--st-series-rest"]])(
     "palette_%s_atLeastThreeToOneOnWhite",
     (token) => {
       const css = readFileSync(join(process.cwd(), "app/frequentation/frequentation.module.css"), "utf8");

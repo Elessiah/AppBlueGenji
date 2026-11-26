@@ -40,6 +40,8 @@ const MONTHLY_FROM_DAYS = 731;
 const BUCKET_LIMITS: Record<Exclude<AudienceBucket, "day">, number> = { week: 26, month: 24, year: 50 };
 /** Teintes catégorielles, dans l'ordre fixe (jamais recyclées). */
 const SERIES_TONES = ["--st-series-1", "--st-series-2", "--st-series-3", "--st-series-4", "--st-series-5", "--st-series-6"];
+/** Teinte neutre de « Non détaillé » (`AUDIENCE_SMALL_KEY`) : ce n'est pas une catégorie, il ne prend aucune de leurs teintes. */
+const REST_TONE = "--st-series-rest";
 /** Paliers de la carte de chaleur (`--st-heat-0` = aucune page vue). */
 const HEAT_LEVELS = 5;
 
@@ -200,9 +202,23 @@ function Card({ title, hint, children, wide = false }: { title: string; hint?: s
   );
 }
 
+/**
+ * Teinte d'une ligne de répartition : « Non détaillé » a la sienne, neutre et
+ * la même dans chaque répartition ; les catégories suivent leur ordre fixe.
+ */
+export function shareTone(key: string, index: number): string {
+  if (key === AUDIENCE_SMALL_KEY) return REST_TONE;
+  return SERIES_TONES[index % SERIES_TONES.length];
+}
+
 /** Barre segmentée d'une répartition (appareils, provenance, langue), légende chiffrée dessous. */
 function ShareBar({ title, shares, labels, hint, f }: { title: string; shares: AudienceShare[]; labels: Record<string, string>; hint?: string; f: Formatters }) {
-  const known = shares.filter((share) => share.key in labels);
+  // Teinte prise au rang dans l'ordre fixe, avant tout filtre : une catégorie
+  // écartée ne décale pas la couleur des suivantes. « Non détaillé » vide
+  // n'est pas listé : rien n'a été regroupé, la ligne ferait croire à une catégorie.
+  const known = shares
+    .map((share, order) => ({ ...share, tone: shareTone(share.key, order) }))
+    .filter((share) => share.key in labels && !(share.key === AUDIENCE_SMALL_KEY && share.views === 0));
   const percents = percentShares(known.map((share) => share.views));
   return (
     <div className={styles.share}>
@@ -215,7 +231,7 @@ function ShareBar({ title, shares, labels, hint, f }: { title: string; shares: A
             <span
               key={share.key}
               className={styles.shareSegment}
-              style={{ flexGrow: share.views, background: `var(${SERIES_TONES[index % SERIES_TONES.length]})` }}
+              style={{ flexGrow: share.views, background: `var(${share.tone})` }}
               title={`${labels[share.key]} — ${f.percent(percents[index] / 100)}`}
             />
           ) : null,
@@ -224,7 +240,7 @@ function ShareBar({ title, shares, labels, hint, f }: { title: string; shares: A
       <ul className={styles.legend}>
         {known.map((share, index) => (
           <li key={share.key}>
-            <span className={styles.swatch} style={{ background: `var(${SERIES_TONES[index % SERIES_TONES.length]})` }} aria-hidden="true" />
+            <span className={styles.swatch} style={{ background: `var(${share.tone})` }} aria-hidden="true" />
             <span className={styles.legendLabel}>{labels[share.key]}</span>
             <span className={styles.legendValue}>
               {f.percent(percents[index] / 100)} · {f.number(share.views)}
@@ -400,7 +416,7 @@ export function AudienceDashboard({ stats, unavailable = false, messages: m, loc
           <Card title={m.timing.heatmapTitle} hint={fillTemplate(m.timing.heatmapHint, { min: AUDIENCE_MIN_VISITORS })} wide>
             <Heatmap m={m} f={f} heatmap={rangeStats.heatmap} formatNumber={formatNumber} />
           </Card>
-          <Card title={m.audience.title} wide>
+          <Card title={m.audience.title} hint={fillTemplate(m.audience.hint, { min: AUDIENCE_MIN_VISITORS })} wide>
             <div className={styles.shares}>
               <ShareBar
                 title={m.audience.devices}

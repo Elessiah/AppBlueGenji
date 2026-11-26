@@ -97,6 +97,7 @@
   },
   "audience": {
     "title": "Who reads us",
+    "hint": "On a day when a category has fewer than {min} visitors, they move to “Not broken down”, with other categories if needed, so that no one can be recognised; if the group is still too small, that breakdown is not shown for that day. Everyone still counts in the totals.",
     "devices": "Devices",
     "sources": "Where visitors come from",
     "sourcesHint": "Where visitors come from on their first page: the referring site is only kept as a family.",
@@ -111,7 +112,7 @@
       "other": "Other websites"
     },
     "localeLabels": { "fr": "French", "en": "English" },
-    "small": "Small numbers, grouped"
+    "small": "Not broken down"
   },
   "community": {
     "title": "The community",
@@ -140,7 +141,7 @@
       "A visitor is only recognised for one day: visitors of a week, a month or a year are the sum of each day's visitors.",
       "Time counted is the time the page is shown in the foreground, sent in slices, each capped at {minutes} minutes.",
       "Known bots and people who object to the measurement are not counted. Today's figures appear the next day.",
-      "No row of a breakdown (page, device, source, language, hour) describes fewer than {min} visitors from the same day: small numbers are grouped, and a group still too small takes in the next row. Each day's totals are given as they are."
+      "No row of a breakdown (page, device, source, language, hour) describes fewer than {min} visitors from the same day: small numbers move to “Other pages” or “Not broken down” (an hour too small is not shown), with the next row if needed, and a group still too small is not published. Each day's totals are given as they are."
     ],
     "privacy": "Privacy of the measurement",
     "sourceCode": "Source code",
