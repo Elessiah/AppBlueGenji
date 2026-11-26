@@ -97,7 +97,7 @@
   },
   "audience": {
     "title": "Qui nous consulte",
-    "hint": "Un jour où une catégorie compte moins de {min} visiteurs, ses visiteurs passent dans « Non détaillé », avec si besoin d'autres catégories, pour qu'aucun ne soit reconnaissable ; une journée trop calme n'est pas détaillée du tout. Tous restent comptés dans les totaux.",
+    "hint": "Un jour où une catégorie compte moins de {min} visiteurs, ses visiteurs passent dans « Non détaillé », avec si besoin d'autres catégories, pour qu'aucun ne soit reconnaissable ; si le groupe reste trop petit, la répartition n'est pas détaillée ce jour-là. Tous restent comptés dans les totaux.",
     "devices": "Appareils",
     "sources": "Provenance des visiteurs",
     "sourcesHint": "D'où arrivent les visiteurs à leur première page : le site d'origine n'est conservé que sous forme de famille.",
@@ -141,7 +141,7 @@
       "Un visiteur est reconnu le temps d'une journée seulement : les visiteurs d'une semaine, d'un mois ou d'une année sont la somme des visiteurs de chaque jour.",
       "Le temps compté est celui où la page est affichée au premier plan, envoyé par tranches, chacune plafonnée à {minutes} minutes.",
       "Les robots connus et les personnes qui s'opposent à la mesure ne sont pas comptés. Les chiffres du jour en cours s'affichent le lendemain.",
-      "Aucune ligne d'une répartition (page, appareil, provenance, langue, heure) ne décrit moins de {min} visiteurs d'une même journée : les petits nombres passent dans « Autres pages » ou « Non détaillé », avec si besoin la ligne suivante, et un groupe qui reste trop petit n'est pas publié. Les totaux de chaque jour sont donnés tels quels."
+      "Aucune ligne d'une répartition (page, appareil, provenance, langue, heure) ne décrit moins de {min} visiteurs d'une même journée : les petits nombres passent dans « Autres pages » ou « Non détaillé » (une heure trop petite n'est pas affichée), avec si besoin la ligne suivante, et un groupe qui reste trop petit n'est pas publié. Les totaux de chaque jour sont donnés tels quels."
     ],
     "privacy": "Confidentialité de la mesure",
     "sourceCode": "Code source",
