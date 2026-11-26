@@ -213,7 +213,12 @@ export function shareTone(key: string, index: number): string {
 
 /** Barre segmentée d'une répartition (appareils, provenance, langue), légende chiffrée dessous. */
 function ShareBar({ title, shares, labels, hint, f }: { title: string; shares: AudienceShare[]; labels: Record<string, string>; hint?: string; f: Formatters }) {
-  const known = shares.filter((share) => share.key in labels);
+  // Teinte prise au rang dans l'ordre fixe, avant tout filtre : une catégorie
+  // écartée ne décale pas la couleur des suivantes. « Non détaillé » vide
+  // n'est pas listé : rien n'a été regroupé, la ligne ferait croire à une catégorie.
+  const known = shares
+    .map((share, order) => ({ ...share, tone: shareTone(share.key, order) }))
+    .filter((share) => share.key in labels && !(share.key === AUDIENCE_SMALL_KEY && share.views === 0));
   const percents = percentShares(known.map((share) => share.views));
   return (
     <div className={styles.share}>
@@ -226,7 +231,7 @@ function ShareBar({ title, shares, labels, hint, f }: { title: string; shares: A
             <span
               key={share.key}
               className={styles.shareSegment}
-              style={{ flexGrow: share.views, background: `var(${shareTone(share.key, index)})` }}
+              style={{ flexGrow: share.views, background: `var(${share.tone})` }}
               title={`${labels[share.key]} — ${f.percent(percents[index] / 100)}`}
             />
           ) : null,
@@ -235,7 +240,7 @@ function ShareBar({ title, shares, labels, hint, f }: { title: string; shares: A
       <ul className={styles.legend}>
         {known.map((share, index) => (
           <li key={share.key}>
-            <span className={styles.swatch} style={{ background: `var(${shareTone(share.key, index)})` }} aria-hidden="true" />
+            <span className={styles.swatch} style={{ background: `var(${share.tone})` }} aria-hidden="true" />
             <span className={styles.legendLabel}>{labels[share.key]}</span>
             <span className={styles.legendValue}>
               {f.percent(percents[index] / 100)} · {f.number(share.views)}

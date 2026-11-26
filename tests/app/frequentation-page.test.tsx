@@ -184,10 +184,19 @@ describe("« Non détaillé » — part regroupée sous le seuil d'anonymat", ()
 
     const html = await render("fr");
 
-    expect(html).toContain("Non détaillé");
+    expect(html).toMatch(/>Non détaillé<\/span><span[^>]*>25\s?%/);
     expect(html).not.toContain("Petits nombres regroupés");
     expect(html).toContain("Plus d&#x27;infos : Qui nous consulte");
-    expect(html).toMatch(/<div[^>]*hidden[^>]*><p>Un jour où une catégorie compte moins de 5 visiteurs/);
+    expect(html).toContain("Un jour où une catégorie compte moins de 5 visiteurs");
+  });
+
+  it("page_noGroupedShare_listsNoNonDetailleRow", async () => {
+    jest.mocked(getAudienceStats).mockResolvedValue(STATS);
+
+    const html = await render("fr");
+
+    expect(html).not.toMatch(/>Non détaillé<\/span>/);
+    expect(html).toMatch(/>Mobile<\/span>/);
   });
 
   it("page_en_whoReadsUs_showsNotBrokenDownWithHint", async () => {
@@ -195,7 +204,7 @@ describe("« Non détaillé » — part regroupée sous le seuil d'anonymat", ()
 
     const html = await render("en");
 
-    expect(html).toContain("Not broken down");
+    expect(html).toMatch(/>Not broken down<\/span><span[^>]*>25\s?%/);
     expect(html).toContain("On a day when a category has fewer than 5 visitors");
   });
 
