@@ -313,7 +313,8 @@ C'est `reportSchemaFailure` qui l'applique, aux deux migrations. Le cas nominal
 ne journalise rien : il se produit à chaque démarrage, et une ligne par entrée
 noierait la seule qui compte.
 
-**Dix `CREATE TABLE` ne suivent pas cette règle**, et ce n'est pas un oubli :
+**Onze `CREATE TABLE` ne suivent pas cette règle**, et ce n'est pas un oubli :
+`bg_geti_posts` (annonces GETI, `docs/features/GETI_INFO.md` : table absente = routes du bot en `503`),
 `bg_tournament_staff_message_quota` (plafond des messages du staff, `docs/features/TOURNAMENT_STAFF_MESSAGE.md` : table absente = `503`), `bg_match_reminders`, `bg_referee_alerts`, `bg_endurance_penalties`, les trois
 tables des notifications push (`bg_push_subscriptions`, `bg_push_topic_optouts`,
 `bg_match_start_notices` — `docs/features/PUSH_NOTIFICATIONS.md`) et les

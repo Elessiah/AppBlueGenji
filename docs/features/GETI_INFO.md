@@ -8,7 +8,7 @@ cinq lots ; ce document grandit avec eux.
 | Lot | Contenu | État |
 | --- | --- | --- |
 | 1. GETI-PARSER | Analyse d'une annonce et filtre (`lib/shared/geti/`), jeu d'annonces anonymisées | **fait** |
-| 2. GETI-INGEST | Bot → site : création, modification, suppression, rattrapage de 14 jours ; table, purge, mentions légales | à venir |
+| 2. GETI-INGEST | Bot → site : création, modification, suppression, rattrapage ; table, purge, mentions légales (§ Récupération) | **fait** |
 | 3. GETI-PAGE | Page, six catégories, filtres, copie du pseudo, carte d'invitation, « Publier » | à venir |
 | 4. GETI-NAV | Menu et mention sur l'accueil | à venir |
 | 5. GETI-ALERTS | Alertes sur un filtre enregistré | à venir |
@@ -187,3 +187,125 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
 `tests/lib/shared/geti/` — `ranks.test.ts`, `fields.test.ts`,
 `parse-post.test.ts`, `filter.test.ts`, `fixtures.test.ts` (jeu
 `tests/fixtures/geti/posts.json`) ; fabriques dans `tests/helpers/geti.ts`.
+
+## Récupération (lot 2) — le bot pousse, le site garde
+
+### Format réel des annonces
+
+Constaté sur le flux réel (échantillon en lecture seule du bot de production,
+quatorze jours, jamais versé au dépôt — les jeux de test restent de synthèse).
+Deux sortes d'annonces vivent dans les six salons, et **les deux sont gardées** :
+
+| `source` | Qui écrit | Forme | Modification / suppression suivie |
+| --- | --- | --- | --- |
+| `direct` | un membre, dans notre salon | contenu du message ; l'auteur Discord est l'auteur de l'annonce | celles du message du membre |
+| `relay` | GETI Bot (`GETI_BOT_USER_ID`), depuis un serveur abonné au réseau | contenu vide, **un** encart dont la description commence par `<@id>*(pseudo)* sur [Serveur](invitation)`, puis l'annonce citée (`> …`) ; ni titre ni champs | celles du **relais** par GETI Bot |
+
+L'en-tête du relais donne l'identifiant de l'auteur, son pseudo (celui qui se
+copie) et le serveur d'origine — dont le nom peut porter des crochets
+(`[TAG] Nom`). `parseGetiPost` le lit (`GETI_RELAY_HEADER`), le retire du texte
+et ôte les marques de citation ; l'auteur de l'en-tête prime sur toute mention
+du texte. Le message de **tout autre bot** (le nôtre compris), un message système
+ou un message sans texte n'est pas une annonce : ni poussé par le bot, ni gardé
+par le site. Le réglage de l'analyse sur les textes réels est un lot à part
+(GETI-TUNE).
+
+### Durées de garde, par catégorie
+
+`GETI_RETENTION_DAYS` (`lib/shared/geti/ingest.ts`) : **7 jours pour `lfs`**
+(une recherche de scrim est vite périmée), **14 jours pour les cinq autres**,
+comptés depuis la publication sur Discord. La même table borne l'écriture
+(annonce trop ancienne : comptée `expired`, jamais gardée), la purge, la lecture
+(une annonce échue n'est jamais rendue, même avant la purge), la fenêtre de
+réconciliation et, côté bot, la profondeur du rattrapage (`GETI_CHANNELS`,
+recopie à tenir alignée — le bot vit dans un autre dépôt).
+
+### Table `bg_geti_posts`
+
+Une ligne par message Discord (`message_id` unique) : `channel_id`, `category`,
+`source`, `author_id`, `author_tag`, `raw_json` (le message brut poussé, borné à
+60 000 octets), `parsed_json` (l'analyse `parseGetiPost` faite **à l'écriture**),
+`posted_at`, `edited_at`, `received_at`. Index `(category, posted_at)`,
+`(channel_id, posted_at)`, `(posted_at)`. Aucun lien avec un compte du site.
+Créée par `lib/server/database/schema/geti.ts` ; table absente = routes en `503`.
+
+Une modification repasse par la même écriture (`ON DUPLICATE KEY UPDATE`) et
+ré-analyse le message ; la version reçue n'écrase la version gardée que si elle
+est au moins aussi récente (`COALESCE(edited_at, posted_at)`) — un rattrapage
+peut croiser une modification en direct. Le rattrapage du bot repoussant toute
+la fenêtre, **un redémarrage du bot ré-analyse toutes les annonces gardées** :
+c'est ainsi qu'une amélioration de l'analyse atteint les lignes déjà en base.
+
+### Routes internes (bot → site)
+
+Seconde exception au sens app → bot, après `/message-tournoi`. Même porte
+(`rejectWithoutSiteInternalToken`) : boucle locale seulement (403 derrière nginx),
+jeton `SITE_INTERNAL_TOKEN` comparé en temps constant (401), 503 sans jeton.
+Plafond commun `GETI_INGEST_RULE` (1 200 appels par minute, 429 au-delà), corps
+lu borné (413), réponses en **nombres** seulement, refus par **code**
+(`GETI_INGEST_ERRORS`), panne de base = `503 GETI_UNAVAILABLE` (le bot réessaie).
+
+| Route | Corps | Effet | Réponse |
+| --- | --- | --- | --- |
+| `POST /api/internal/geti/posts` | `{ posts: [{ id, channelId, content, author{id,username,discriminator,bot}, embeds[{authorName,title,description,fields,footerText}], postedAt, editedAt }] }` — 20 au plus, 512 Kio | crée ou remplace chaque annonce, analysée ici | `{ stored, emptied, expired, rejected }` |
+| `POST /api/internal/geti/posts/delete` | `{ ids: [...] }` — 100 au plus | retire ces messages | `{ removed }` |
+| `POST /api/internal/geti/reconcile` | `{ channelId, since, until, ids: [...] }` — 10 000 identifiants au plus | retire toute annonce gardée du salon, publiée entre `since` (ramené à la fenêtre de garde) et `until`, absente de `ids` | `{ removed }` |
+
+Tout champ est tenu pour non fiable (`lib/server/geti/wire.ts`) : typé, borné,
+écarté s'il n'a pas la forme attendue (`rejected`). Un message sans texte après
+analyse (`emptied`) est retiré s'il était gardé.
+
+### Purge
+
+`purgeExpiredGetiPosts`, lancée par `startGetiPostsPurgeClock`
+(`instrumentation.ts`, horloge `geti-posts-purge` : 3 minutes après le
+démarrage, puis toutes les heures) : par catégorie selon sa durée, puis toute
+ligne plus vieille que la plus longue. Suppression définitive — une horloge, pas
+le trafic ni le bot : un site sans visite ou un bot arrêté ne garde rien au-delà
+de la durée annoncée.
+
+### Lecture — `listGetiPosts(filter, page, executor?, now?)`
+
+`lib/server/geti/posts.ts`, pour la page du lot 3 et les alertes du lot 5 :
+annonces de la plus récente à la plus ancienne, `GetiPostPage`
+(`posts`, `total`, `page`, `pageSize` — 30 par défaut, 100 au plus). La
+catégorie et l'âge se filtrent en SQL, le reste par `matchesGetiFilter` sur
+l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
+`channelId`, `category`, `source`, `authorTag`, `authorId`, `parsed`,
+`postedAt`, `editedAt` — jamais le message brut.
+
+### Côté bot (dépôt `blueGenjiBot`, `src/geti/`)
+
+- Écoute `messageCreate`, `messageUpdate`, `messageDelete`, `messageDeleteBulk`
+  sur les six salons seulement ; partiel `Message` activé (sans lui, la
+  modification ou la suppression d'un message hors cache n'est jamais annoncée) ;
+  un message partiel est relu avant d'être poussé.
+- Rattrapage au démarrage et à chaque nouvelle session Discord : historique de
+  chaque salon sur sa fenêtre de garde (pages de 100, pause entre deux pages,
+  5 000 messages au plus par salon), puis `reconcile` avec la liste des messages
+  encore présents — ce qui a été supprimé pendant l'arrêt du bot quitte le site.
+- Site injoignable : file bornée en mémoire, reprises espacées puis abandon ;
+  un abandon déclenche un rattrapage complet, retenté toutes les cinq minutes.
+  Le bot ne plante jamais et ne journalise (pm2) que des nombres et des
+  identifiants de salon.
+- Intentions `Guilds`, `GuildMessages`, `MessageContent` ; permissions
+  **Voir le salon** et **Voir les anciens messages** sur les six salons. Sur
+  Discord, le bot n'écrit **rien**.
+- Déploiement : l'ordre ne casse rien (un bot plus récent que le site reçoit des
+  404, réessaie puis rattrape ; un site sans bot à jour reste vide). Le site
+  porte `SITE_INTERNAL_TOKEN`, le bot `SITE_INTERNAL_URL` et le même jeton —
+  déjà posés pour `/message-tournoi`.
+
+### Données personnelles
+
+Registre T21 (et T08 pour la lecture par le bot), `/rgpd#annonces-geti` (FR et
+EN), entrée `2026-11-annonces-de-recrutement-overwatch` de `PRIVACY_CHANGES`,
+politique de confidentialité du bot. Le seed pose quatorze annonces de synthèse
+(`lib/server/seed/geti.ts`, messages `1000000000000009NN`) dans les deux formes.
+
+### Tests (lot 2)
+
+`tests/lib/server/geti/` (`wire`, `posts`, `schema-and-clock`),
+`tests/app/api/internal/geti/geti-routes.test.ts`,
+`tests/lib/shared/geti/geti-bot-relay.test.ts` (en-tête du relais) ; fabriques
+dans `tests/helpers/geti-ingest.ts`.
