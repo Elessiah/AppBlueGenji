@@ -263,11 +263,19 @@ export function RgpdEn({
             What is kept: the post&apos;s text, its author&apos;s Discord username and identifier, the server of origin of a
             relayed post, the dates and the criteria read automatically in the text (rank, role, region, platform,
             language, availability, stated minimum age, team name), as well as the message as the bot passed it (to redo that reading when it improves), with no link to an account of the site — whether the author has one or not. A
-            scrim search is kept {GETI_RETENTION_DAYS.lfs} days after its publication on Discord, the other posts{" "}
-            {GETI_RETENTION_DAYS.lfp} days; deleting the post on Discord removes it from the site at once (a message erased by its author&apos;s ban from the Discord server, which Discord does not report to the bot, only leaves at the next reading of the channels, at the latest at the end of its retention period), editing it
-            replaces the previous version. Basis: the association&apos;s legitimate interest (helping players and teams
-            find each other), for posts that are already public; their author can object and ask for removal (see
-            “Exercising your rights”): their posts are then removed and no longer copied, the association keeping for that only the author&apos;s Discord identifier (or that of the targeted post), as long as the objection stands ({GETI_RETENTION_MAX_DAYS} days for a single post). Register of processing activities: record T21.
+            scrim search is kept {GETI_RETENTION_DAYS.lfs} days after its publication in the association&apos;s channel
+            (for a relayed post, that of its relay), the other posts {GETI_RETENTION_DAYS.lfp} days. Deleting the post
+            from the channel removes it from the site at once, editing it replaces the previous version — for a relayed
+            post, when GETI Bot deletes or edits its relay, which the association does not control. A deletion made
+            while the bot is stopped is only seen at its next reading of the channels, within the last 5,000 messages of
+            each channel, and so is a message erased by its author&apos;s ban from the Discord server, which Discord does
+            not report to the bot; failing that, the post leaves at the end of its retention period (an encrypted backup
+            copy may keep the removed post or its previous version for {BACKUP_RETENTION_DAYS} days at most). A
+            post&apos;s text may mention other people (a teammate, a contact): they have the same rights as its author.
+            Basis: the association&apos;s legitimate interest (helping players and teams find each other), for posts that
+            are already public; their author — including the author of a post relayed from another server, who cannot
+            delete it here — can object and ask for removal (see{" "}
+            <a href="#exercer-vos-droits">“Exercising your rights”</a>): their posts are then removed and no longer copied, the association keeping for that only the author&apos;s Discord identifier (or that of the targeted post), as long as the objection stands ({GETI_RETENTION_MAX_DAYS} days for a single post). Register of processing activities: record T21.
           </p>
           <p id="age-minimum">
             <strong>Minimum age.</strong> You must be at least {SITE_MINIMUM_AGE} years old to create an account

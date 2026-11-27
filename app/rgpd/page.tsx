@@ -323,11 +323,19 @@ function RgpdFr({
             Discord de son auteur, le serveur d&apos;origine d&apos;une annonce relayée, les dates et les critères lus
             automatiquement dans le texte (rang, rôle, région, plateforme, langue, disponibilités, âge minimal annoncé, nom d&apos;équipe), ainsi que le message tel que le bot l&apos;a transmis (pour refaire cette lecture quand elle s&apos;améliore), sans lien avec un
             compte du site — que l&apos;auteur en ait un ou non. Une recherche de scrim est gardée{" "}
-            {GETI_RETENTION_DAYS.lfs} jours après sa publication sur Discord, les autres annonces{" "}
-            {GETI_RETENTION_DAYS.lfp} jours ; supprimer l&apos;annonce sur Discord la retire du site aussitôt (un message effacé par le bannissement de son auteur du serveur Discord, dont Discord ne prévient pas le bot, ne part qu&apos;à la relecture suivante des salons, au plus tard au terme de sa garde), la modifier
-            remplace l&apos;ancienne version. Base : l&apos;intérêt légitime de l&apos;association (aider joueurs et équipes à se
-            trouver), pour des annonces déjà publiques ; leur auteur peut s&apos;y opposer et en demander le retrait (voir
-            « Exercer vos droits ») : ses annonces sont alors retirées et ne sont plus recopiées, l&apos;association ne gardant pour cela que l&apos;identifiant Discord de l&apos;auteur (ou celui de l&apos;annonce visée), tant que l&apos;opposition tient ({GETI_RETENTION_MAX_DAYS} jours pour une seule annonce). Registre des traitements : fiche T21.
+            {GETI_RETENTION_DAYS.lfs} jours après sa publication dans le salon de l&apos;association (pour une annonce
+            relayée, celle de son relais), les autres annonces {GETI_RETENTION_DAYS.lfp} jours. Supprimer l&apos;annonce du
+            salon la retire du site aussitôt, la modifier remplace l&apos;ancienne version — pour une annonce relayée, quand
+            GETI Bot supprime ou modifie son relais, ce que l&apos;association ne maîtrise pas. Une suppression faite
+            pendant un arrêt du bot n&apos;est vue qu&apos;à sa relecture suivante des salons, dans la limite des 5 000 derniers
+            messages de chaque salon, de même qu&apos;un message effacé par le bannissement de son auteur du serveur
+            Discord, dont Discord ne prévient pas le bot ; à défaut, l&apos;annonce part au terme de sa garde (une copie de
+            sauvegarde chiffrée peut garder l&apos;annonce retirée ou son ancienne version {BACKUP_RETENTION_DAYS} jours au
+            plus). Le texte d&apos;une annonce peut citer d&apos;autres personnes (coéquipier, contact) : elles ont les mêmes
+            droits que son auteur. Base : l&apos;intérêt légitime de l&apos;association (aider joueurs et équipes à se
+            trouver), pour des annonces déjà publiques ; leur auteur — y compris celui d&apos;une annonce relayée depuis un
+            autre serveur, qui ne peut pas la supprimer ici — peut s&apos;y opposer et en demander le retrait (voir{" "}
+            <a href="#exercer-vos-droits">« Exercer vos droits »</a>) : ses annonces sont alors retirées et ne sont plus recopiées, l&apos;association ne gardant pour cela que l&apos;identifiant Discord de l&apos;auteur (ou celui de l&apos;annonce visée), tant que l&apos;opposition tient ({GETI_RETENTION_MAX_DAYS} jours pour une seule annonce). Registre des traitements : fiche T21.
           </p>
           <p id="age-minimum">
             <strong>Âge minimum.</strong> Il faut avoir au moins {SITE_MINIMUM_AGE} ans pour
