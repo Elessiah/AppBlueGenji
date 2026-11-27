@@ -766,6 +766,40 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
     ).toEqual([]);
   });
 
+  it("privacyPolicy_getiPosts_siteIsARecipientFrAndEn", () => {
+    expect(
+      missingInBoth(
+        ["ainsi que les annonces des salons de recrutement Overwatch du serveur de l'association"],
+        ["as well as the posts of the Overwatch recruitment channels of the association's server"],
+      ),
+    ).toEqual([]);
+  });
+
+  it("privacyPolicy_getiPosts_legitimateInterestAndMemoryOnlyFrAndEn", () => {
+    expect(
+      missingInBoth(
+        [
+          "La lecture des annonces de recrutement transmises au site repose elle aussi sur son intérêt légitime",
+          "dans le cache de messages de Discord, qui garde les 200 derniers messages reçus de chaque salon",
+          "à chaque nouvelle session Discord",
+          "après un envoi au site en échec ou une lecture d'un salon en échec passager",
+          "ne déclenche pas à lui seul ces nouvelles lectures",
+          "le temps d'un rattrapage (la lecture de l'historique des salons, qui garde aussi l'identifiant des messages modifiés ou supprimés pendant ce temps)",
+          "la file et le cache étant effacés à son redémarrage",
+        ],
+        [
+          "Reading the recruitment posts passed to the website also rests on its legitimate interest",
+          "in Discord's message cache, which keeps the latest 200 messages received in each channel",
+          "at each new Discord session",
+          "after a failed sending to the website or a temporarily failed read of a channel",
+          "does not by itself trigger those retries",
+          "for the duration of a catch-up (the reading of the channels' history, which also keeps the identifier of the messages edited or deleted meanwhile)",
+          "the queue and the cache being erased when it restarts",
+        ],
+      ),
+    ).toEqual([]);
+  });
+
   it("privacyPolicy_voiceChannels_legitimateInterestFrAndEn", () => {
     expect(
       missingInBoth(

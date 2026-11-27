@@ -5,10 +5,11 @@ import { parseReconcileBody } from "@/lib/server/geti/wire";
 
 /**
  * `POST /api/internal/geti/reconcile` — appelé par le bot seul, à la fin du
- * rattrapage d'un salon : `{ channelId, since, until, ids }`, tous les
- * messages que Discord porte encore entre `since` et `until`. Une annonce
- * gardée sur cette fenêtre et absente de `ids` a été supprimée pendant que le
- * bot n'écoutait pas : elle est retirée. Rend `{ removed }`.
+ * rattrapage d'un salon : `{ channelId, since, until, ids }`, les annonces
+ * que Discord porte encore entre `since` et `until` (un message qui n'en est
+ * plus une n'y figure pas). Une annonce gardée sur cette fenêtre et absente de
+ * `ids` a été supprimée, ou a cessé d'être une annonce, pendant que le bot
+ * n'écoutait pas : elle est retirée. Rend `{ removed }`.
  */
 export function POST(req: Request) {
   return handleGetiIngest(req, GETI_INGEST_BODY_MAX_BYTES, async (body) => {

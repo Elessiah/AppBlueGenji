@@ -82,15 +82,18 @@ const AMBIGUOUS_ADVERBS = new Set(["bien", "plus", "tout", "assez"]);
  * sujet : « il a eu », « on a eu », mais « de NA à EU ».
  */
 const A_SUBJECTS = new Set(["il", "elle", "on", "qui", "ca", "cela", "y", "n"]);
-const WORDS_BEFORE = /(?:(\p{L}+)[^\p{L}\p{N}\n]+)?(\p{L}+)[^\p{L}\p{N}\n]*$/u;
+const WORDS_BEFORE = /(?:(?:(\p{L}+)[^\p{L}\p{N}\n]+)?(\p{L}+)[^\p{L}\p{N}\n]+)?(\p{L}+)[^\p{L}\p{N}\n]*$/u;
 
 function isParticiple(before: string): boolean {
   const words = WORDS_BEFORE.exec(before);
   if (words === null) return false;
-  const [, subject, previous] = words;
+  const [, third, subject, previous] = words;
   if (previous === "a") return subject !== undefined && A_SUBJECTS.has(subject);
-  // « à tout EU » : derrière « a », l'adverbe reste ambigu et la région l'emporte.
-  if (AMBIGUOUS_ADVERBS.has(previous)) return subject !== undefined && subject !== "a" && AVOIR.has(subject);
+  if (AMBIGUOUS_ADVERBS.has(previous)) {
+    // « on a bien eu » : « a » derrière son sujet ; « de NA à tout EU » : la région.
+    if (subject === "a") return third !== undefined && A_SUBJECTS.has(third);
+    return subject !== undefined && AVOIR.has(subject);
+  }
   return PARTICIPLE_BEFORE.has(previous);
 }
 
@@ -127,6 +130,28 @@ const BOTH_PLATFORMS = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:hybrid|hybride|hybrides|cross[\s-]?play|cross[\s-]?plate?form|cross[\s-]?plateforme)${NOT_BEFORE_WORD}`,
   "u",
 );
+const BOTH_PLATFORMS_ALL = new RegExp(BOTH_PLATFORMS.source, "gu");
+/**
+ * « Hybrid » est aussi un mode de carte : cité près d'un autre mode ou du mot
+ * « map » (« maps: control, hybrid, push »), il ne dit pas la plateforme.
+ */
+const MAP_MODE_WORDS = "maps? cartes? modes? control controle push escort escorte flashpoint clash assault assaut koth";
+const MAP_MODE_NEAR = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:${MAP_MODE_WORDS.split(" ").join("|")})${NOT_BEFORE_WORD}`,
+  "u",
+);
+const MAP_MODE_REACH = 30;
+
+/** Une mention « hybrid » ou « crossplay » qui dit la plateforme, pas le mode de carte. */
+function saysBothPlatforms(lower: string): boolean {
+  for (const match of lower.matchAll(BOTH_PLATFORMS_ALL)) {
+    const end = match.index + match[0].length;
+    const around = lower.slice(Math.max(0, match.index - MAP_MODE_REACH), end + MAP_MODE_REACH);
+    if (!match[0].includes("hybrid") || !MAP_MODE_NEAR.test(around)) return true;
+  }
+  return false;
+}
+
 /** « mixed », dans une recherche de scrim, dit la même chose ; ailleurs, c'est une équipe mixte. */
 const MIXED = new RegExp(String.raw`${NOT_AFTER_WORD}mixed${NOT_BEFORE_WORD}`, "u");
 
@@ -139,7 +164,7 @@ const MIXED = new RegExp(String.raw`${NOT_AFTER_WORD}mixed${NOT_BEFORE_WORD}`, "
  * @returns Les plateformes, dans l'ordre de `GETI_PLATFORMS`.
  */
 export function parseGetiPlatforms(lower: string, scrim = false): GetiPlatform[] {
-  if (BOTH_PLATFORMS.test(lower) || (scrim && MIXED.test(lower))) return [...GETI_PLATFORMS];
+  if (saysBothPlatforms(lower) || (scrim && MIXED.test(lower))) return [...GETI_PLATFORMS];
   return findPlatforms(lower);
 }
 
@@ -343,6 +368,11 @@ const UNITLESS_SINGLE = new RegExp(
   String.raw`(?<![\p{L}\p{N}:#+.,/–-])(\d{1,2})(?:[.:](\d{2}))?(?= ?\(?(?:cest|cet)${NOT_BEFORE_WORD})`,
   "gu",
 );
+/** Une tranche d'âge devant la fourchette : « âge : 16-20 », « âgés de 18-25 », « tranche 16-22 ». */
+const AGE_BEFORE_RANGE = new RegExp(
+  String.raw`(?<!\p{L})(?:ages?|agees?|tranche(?: d'?\s?age)?|age range)\s?(?:[:=]|de|entre|between)?\s?$`,
+  "u",
+);
 /** Ce qu'une fourchette sans unité compte quand ce n'est pas un horaire : « 18-25 ans », « 20-22 novembre ». */
 const NOT_A_TIME_AFTER = new RegExp(
   String.raw`^ ?(?:%|€|(?:ans|yo|years?|joueu(?:r|se)s?|players?|personnes?|min|minutes?|k|sr|elo|jours?|days?|soirs?|fois|janv(?:ier)?|fev(?:r(?:ier)?)?|mars|avr(?:il)?|mai|juin|juil(?:let)?|aout|sept(?:embre)?|oct(?:obre|ober)?|nov(?:embre|ember)?|dec(?:embre|ember)?|january|february|march|april|may|june|july|august|september|jan|feb|mar|apr|jun|jul|aug|sep)${NOT_BEFORE_WORD})`,
@@ -454,6 +484,7 @@ function parseUnitlessTimes(lower: string): { times: GetiTimeRange[]; rest: stri
   };
   for (const match of lower.matchAll(UNITLESS_RANGE)) {
     const end = match.index + match[0].length;
+    if (AGE_BEFORE_RANGE.test(lower.slice(Math.max(0, match.index - 20), match.index))) continue;
     const range = unitlessRange(match, lower.slice(end, end + 12));
     if (range === null) continue;
     times.push(range);
@@ -550,9 +581,9 @@ function civilDay(year: number, month: number, day: number): number | null {
   return date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? time : null;
 }
 
-/** « 26/11 », « 22/11/26 », « 02/12/2026 » — pas « 4/5 jours », « 3/4 soirs ». */
+/** « 26/11 », « 22/11/26 », « 02/12/2026 » — pas « 4/5 jours », « 3/4 soirs », « 2/3 joueurs », « 1/12 places ». */
 const NUMERIC_DATE = new RegExp(
-  String.raw`(?<![\p{L}\p{N}/.,:–-])(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?(?![\p{N}/]|\s?(?:jours?|j|soirs?|fois|days?|nights?|semaines?|h)${NOT_BEFORE_WORD})`,
+  String.raw`(?<![\p{L}\p{N}/.,:–-])(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?(?![\p{N}/]|\s?(?:jours?|j|soirs?|fois|days?|nights?|semaines?|h|joueu(?:r|se)s?|players?|places?|slots?|spots?|personnes?|membres?|members?|postes?)${NOT_BEFORE_WORD})`,
   "gu",
 );
 /** Début d'un nom de mois, collé au quantième : « Friday 27NOV ». */
@@ -578,13 +609,16 @@ function writtenYear(year: string): number {
   return Number(year.length === 2 ? `20${year}` : year);
 }
 
-/** Dates « jour/mois » : dans l'année de la publication, sinon la suivante, ou dans l'année écrite. */
+/**
+ * Dates « jour/mois » : dans l'année de la publication, la suivante ou la
+ * précédente (« 31/12 » lu un 1er janvier), ou dans l'année écrite.
+ */
 function numericDates(lower: string, today: number): number[] {
   const year = new Date(today).getUTCFullYear();
   const found: number[] = [];
   for (const match of lower.matchAll(NUMERIC_DATE)) {
     const [day, month] = [Number(match[1]), Number(match[2])];
-    const years = match[3] === undefined ? [year, year + 1] : [writtenYear(match[3])];
+    const years = match[3] === undefined ? [year, year + 1, year - 1] : [writtenYear(match[3])];
     const date = years.map((candidate) => nearDay(civilDay(candidate, month, day), today)).find((near) => near !== null);
     if (date !== undefined && date !== null) found.push(date);
   }
@@ -691,7 +725,7 @@ const LEVEL_NEEDS_CONTEXT = new Set(["int", "exp"]);
 const LEVEL_JOIN = /^\s?(?:[/,&>→–-]|-+>|to|a)\s?(?:(?:high|low|mid|haut|bas)[\s-]?)?$/u;
 /** « open » au sens courant : « DMs open », « position open for trials », « open to all ». */
 const OPEN_COMMON_BEFORE = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:dms?|mps?|pms?|positions?|postes?|spots?|slots?|tryouts?|trials?|is|are|est|sont|still|now)\s$`,
+  String.raw`${NOT_AFTER_WORD}(?:dms?|mps?|pms?|positions?|postes?|spots?|slots?|tryouts?|trials?|recrutements?|recruitments?|recruiting|inscriptions?|candidatures?|applications?|apps|is|are|est|sont|still|now|toujours|always)\s$`,
   "u",
 );
 const OPEN_COMMON_AFTER = new RegExp(String.raw`^\s(?:for|to|a|aux|pour|until|jusqu)${NOT_BEFORE_WORD}`, "u");
@@ -776,7 +810,7 @@ const AGE = String.raw`(1[3-9]|2[0-5])`;
  * « +18 FR »). « +20 joueurs », « +15 min » ou « 20+ inscrits » sont des nombres.
  */
 const AGE_FOLLOW = new RegExp(
-  String.raw`^[^\S\n]*(?:$|[^\p{L}\p{N}\s]|\n|(?:ans?|yo|y/o|years?|old|only|seulement|uniquement|obligatoire|requis|required|minimum|mini|svp|pls|please|et|and|tank|tanks|dps|supp?|supports?|heal|heals|healers?|flex|fr|eu|na|eng?|euw|francais|francaise|francophones?|english|anglophones?|pc|console|ps5|xbox|team|equipe|lfp|lft|lfs|lfsub|lfstaff|lfcast)${NOT_BEFORE_WORD})`,
+  String.raw`^[^\S\n]*(?:$|[^\p{L}\p{N}\s]|\n|(?:ans?|yo|y/o|years?|old|only|seulement|uniquement|obligatoire|requis|required|minimum|mini|svp|pls|please|et|and|ou|or|de preference|preferable|preferably|preferred|prefere|idealement|ideally|conseille|recommande|recommended|souhaite|mature|matures|tank|tanks|dps|supp?|supports?|heal|heals|healers?|flex|fr|eu|na|eng?|euw|francais|francaise|francophones?|english|anglophones?|pc|console|ps5|xbox|team|equipe|lfp|lft|lfs|lfsub|lfstaff|lfcast)${NOT_BEFORE_WORD})`,
   "u",
 );
 /** … et pas derrière un mot qui en fait un niveau ou un délai : « lvl 20+ », « dans +15 min ». */
@@ -966,9 +1000,10 @@ function cleanTeamName(candidate: string, following = "", skipLeading = false): 
  * Texte non fiable : rendu par `visibleText`, borné, jamais interprété.
  *
  * @param clean Texte à la casse et aux accents gardés (`prepareGetiText`).
+ * @param playerSearch `true` pour un joueur qui cherche une équipe (`lft`) : le mot devant le verbe n'est pas lu.
  * @returns Le nom, ou `null` quand rien de net n'est lu.
  */
-export function parseGetiTeamName(clean: string): string | null {
+export function parseGetiTeamName(clean: string, playerSearch = false): string | null {
   const label = TEAM_LABEL.exec(clean);
   if (label !== null) {
     const name = cleanTeamName(label[1].split(LABEL_END)[0]);
@@ -980,16 +1015,21 @@ export function parseGetiTeamName(clean: string): string | null {
     const name = cleanTeamName(match[1], clean.slice(end, end + 16));
     if (name !== null) return name;
   }
-  return structureName(clean);
+  return structureName(clean, playerSearch);
 }
 
-/** À défaut de « team … » : le nom devant un suffixe de structure, sinon devant le verbe de l'annonce. */
-function structureName(clean: string): string | null {
+/**
+ * À défaut de « team … » : le nom devant un suffixe de structure, sinon devant
+ * le verbe de l'annonce — sauf pour un joueur qui cherche une équipe
+ * (« Lucas recherche une team » : son pseudo, pas une équipe).
+ */
+function structureName(clean: string, playerSearch: boolean): string | null {
   for (const match of clean.matchAll(TEAM_SUFFIXED)) {
     const name = cleanTeamName(`${match[1]} ${match[2]}`, "", true);
     // Le suffixe seul ne nomme rien : il faut au moins un mot devant lui.
     if (name?.includes(" ") === true) return name;
   }
+  if (playerSearch) return null;
   for (const match of clean.matchAll(TEAM_BEFORE_VERB)) {
     const name = cleanTeamName(match[1], "", true);
     // Le nom doit toucher le verbe : « Blue Sonate FR recherche » ne nomme personne.

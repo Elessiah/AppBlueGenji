@@ -64,12 +64,18 @@ aucun message réel n'a été lu. Le format du relais GETI a été connu depuis
   encart, `authorTag`.
 
 **Usurpation d'auteur.** Pseudo et identifiant viennent toujours de la même
-source. Notre relais s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête
-GETI : quand l'en-tête et la ligne « Sent from » nomment deux comptes différents,
-personne n'est désigné. Un bot ou un webhook peut écrire n'importe quel en-tête :
-`parseGetiPost(raw, { relayBotIds })` ne lit l'auteur que des bots listés — les
-autres gardent leur texte, sans auteur ni serveur d'origine. **Le lot 2 passe la
-liste** (bot GETI et notre bot) ; sans elle, tout bot est cru.
+source. Un bot ou un webhook peut écrire n'importe quel en-tête, et notre relais
+s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête GETI :
+`parseGetiPost(raw, { getiBotIds, siteBotIds })` ne croit chaque bot que pour
+son propre format. Un bot de `getiBotIds` nomme l'auteur par son en-tête (ou un
+libellé hors citation, `>` et `>>>` compris — un `>>>` ne cite que la fin de son propre morceau : message, titre, description ou champ) ; un bot de `siteBotIds`, par sa
+seule ligne « Sent from » — un en-tête ou un libellé dans son encart est le
+texte du joueur, et une ligne sans « by <@id> » ne nomme personne (le pseudo de
+la ligne d'auteur, écrite par le bot, reste). Un bot listé des deux côtés lit
+les deux ; s'ils nomment deux comptes différents, personne n'est désigné. Un bot
+absent des listes, ou toute annonce de bot **sans liste**, garde son texte, sans
+auteur ni serveur d'origine. **Le lot 2 passe les deux listes** (bot GETI, notre
+bot).
 
 Le jeu `tests/fixtures/geti/posts.json` est **de synthèse** (tournures courantes
 du recrutement Overwatch, en français et en anglais ; pseudos, identifiants,
@@ -130,8 +136,17 @@ texte**, jamais comme du balisage ; un identifiant qui n'est pas un identifiant
 Discord (15 à 22 chiffres) est rendu `null`.
 
 - `teamName` et `originServer` ne gardent aucun caractère de balisage ni de
-  mention (astérisque, tiret bas, tilde, accent grave, barre verticale, chevrons, « @ » et barre oblique inverse retirés, `withoutMarkup`) :
-  « @everyone **Nitro** » devient « everyone Nitro ».
+  mention (`withoutMarkup`) : une mention `<@id>` / `<#id>` est retirée en
+  entier (l'identifiant d'un tiers ne sort pas), un émoji `<:nom:id>` garde son
+  nom, puis astérisque, tiret bas, tilde, accent grave, barre verticale,
+  chevrons, « @ » et barre oblique inverse sont retirés : « @everyone **Nitro** »
+  devient « everyone Nitro ».
+- `authorTag` : mentions, « @ » et chevrons retirés, émoji de serveur réduit à
+  son nom ; le balisage n'est retiré qu'au bord d'un mot, tiret bas gardé (ils
+  font partie de bien des pseudos : « Star*Lord#1234 » reste tel quel) : un
+  en-tête `(**faux_nitro** @everyone)` donne « faux_nitro everyone ».
+- Un en-tête GETI ou une ligne « Sent from » écrits par un autre bot que le
+  leur restent dans `text` : c'est le texte du joueur, affiché tel quel.
 - `text` garde le balisage de l'annonce mais aucune mention active
   (`getiSafeText`) : `<@id>` et `<@&id>` deviennent « @… » (l'identifiant d'un
   tiers ne sort pas), `<#id>` « #… », `@everyone` / `@here` perdent leur « @ ».
@@ -231,18 +246,21 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   remerciement relié par « pour / for / de / du » (« merci pour tout votre
   soutien », « thanks a lot for the support », « thank you very much for your
   support ») n'est pas un rôle — « je serai ton support », « thx we need a
-  support », « merci de jouer le support » en sont.
+  support », « merci de jouer le support » en sont. « hs » seul derrière « être »
+  ou un appareil (« mon micro est hs », « casque hs ») veut dire « hors service ».
 - **Région** : mêmes mots que le relais du bot, plus l'Océanie et le drapeau
   européen. « eu » derrière un auxiliaire ou un adverbe (« j'ai eu », « il a eu »,
   « jamais eu ») est le participe d'« avoir », pas l'Europe ; « a » ne compte que
   derrière son sujet (« de NA à EU », « ouvert à tout EU » restent l'Europe), et
   « bien / plus / tout / assez » que derrière une forme d'« avoir » (« j'ai bien
-  eu » est le participe, « plus EU que NA » l'Europe).
+  eu » est le participe, « plus EU que NA » l'Europe) ; « on a bien eu » est le
+  participe, « de NA à tout EU » l'Europe.
 - **Langues** : mots (« francophone », « english »), drapeaux, sigles **en liste**
   (« FR/EN ») ou derrière « langue : » — seuls, « EN », « ES » ou « DE » sont des
   mots courants.
 - **Plateformes** : « hybrid(e) », « crossplay » — et « mixed » dans une recherche
-  de scrim — valent PC **et** console.
+  de scrim — valent PC **et** console ; « hybrid » près d'un mode de carte ou du
+  mot « map » (« maps: control, hybrid, push ») est le mode, pas la plateforme.
 - **Jours** : noms complets, fautes courantes comprises (« mecredi »,
   « wenesday ») ; les abréviations (« mar », « jeu », « mon » sont des mots) ne
   se lisent que devant une date ou une heure (« Tue 20-22 », « sam 28/11 ») ou
@@ -311,10 +329,16 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
 - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
 - **Âge** : publiée depuis `maxAgeHours` au plus ; une annonce sans date, ou
   datée de plus de 5 minutes dans le futur, est écartée.
-- **Filtre enregistré** (JSON relu pour les alertes) : un rôle inconnu
-  (« constructor ») ou une borne de rang qui n'est pas un rang (palier inconnu,
-  division hors de 1–5) est ignoré, jamais une erreur.
-- **Annonces closes** : écartées avec `hideClosed: true`.
+- **Filtre enregistré** (JSON relu pour les alertes) : rien n'y est une
+  erreur. Un filtre `null` ne filtre rien ; une liste qui n'en est pas une
+  (`"regions":"EU"`) est ignorée ; un rôle inconnu (« constructor ») aussi ; une
+  borne de rang qui n'est pas un rang (palier inconnu, division hors de 1–5) est
+  ouverte, et deux bornes invalides valent un critère absent ; une division
+  écrite en texte (`"3"`) est lue comme un nombre ; un `maxAgeHours` écrit en
+  texte (`"24"`) aussi, mais un texte illisible (`"24h"`, `""`) n'est jamais lu
+  comme « sans limite » : rien ne passe ; `includeUnknown: "true"` vaut `true` ;
+  une catégorie inconnue (`"LFP"`) est ignorée.
+- **Annonces closes** : écartées avec `hideClosed: true` (ou `"true"`).
 - **Champ non lu** (rang, rôle, région, plateforme, langue, niveau) : l'annonce est
   écartée, sauf `includeUnknown: true` — le lot 3 décide du réglage par défaut de
   la page.
@@ -325,8 +349,8 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
   de joueurs sont lus ; le lot 2 ajoute des annonces réelles anonymisées et mesure
   le taux de reconnaissance.
 - Accès du bot de production aux six salons (`Voir le salon`, `Lire l'historique`)
-  à vérifier avant le rattrapage de 14 jours.
-- « Top 500 » et la correspondance SR → rang sont des approximations assumées.
+  à vérifier avant le rattrapage (14 jours, 7 pour les scrims).
+- « Top 500 » et l'ancien SR sont des approximations assumées.
 
 ## Réglage sur les annonces réelles (lot 2b)
 
@@ -340,9 +364,23 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
   autres channels. », lien d'invitation du bot) n'est pas une annonce ;
   `upsertGetiPosts` l'écarte comme un message vide (compté `emptied`, retiré
   s'il était gardé). Un relais à en-tête GETI n'en est jamais une.
-- **Analyses déjà gardées** : `listGetiPosts` donne `dates`, `levels` et
-  `closed` vides à une ligne analysée avant ce lot ; le rattrapage du bot la
-  réanalyse.
+- **Analyses déjà gardées** : une ligne analysée avant ce lot (sans clé
+  `"closed"` dans `parsed_json`) est réanalysée à la lecture depuis son
+  `raw_json` par `listGetiPosts` (seules ces lignes remontent leur message brut) ;
+  message brut illisible : `dates`, `levels` et `closed` vides. Hors requête,
+  l’horloge de purge horaire (`refreshStaleGetiPosts`, 5 000 lignes au plus par
+  passage) réécrit ces lignes une fois (une ligne dont le message brut est
+  illisible garde son analyse, champs ajoutés vides ; une ligne sans texte ou
+  avis du bot est retirée) : la lecture ne les réanalyse plus (~0,3 ms chacune,
+  jusqu’à 3 000 par page sinon). L’écriture ne touche qu’une ligne encore
+  ancienne. `closed` naît dans ce lot : aucune ligne gardée ne porte d’analyse
+  plus ancienne avec la clé.
+- **Faux positifs écartés** (revue) : une tranche d'âge (« âge : 16-20 ») n'est
+  pas un horaire ; « 2/3 joueurs », « 1/12 places » ne sont pas des dates, et
+  « 31/12 » lu un 1er janvier l'est (année précédente) ; « recrutement /
+  inscriptions / candidatures open » n'est pas le niveau Open ; « +18 de
+  préférence », « 18+ ou mature » sont un âge ; dans une recherche d'équipe
+  (`lft`), le mot devant « recherche » est le pseudo du joueur, pas une équipe.
 
 Limites connues : le rôle d'une recherche de remplaçant donné par la seule
 mention d'un rôle Discord (`<@&id>`) n'est pas lu ; le pool de héros, l'âge du
@@ -383,7 +421,12 @@ copie) et le serveur d'origine — dont le nom peut porter des crochets
 le lit (`GETI_HEADER`) et le retire du texte, qui garde ses marques de citation
 (`> …`) ; l'auteur de l'en-tête prime sur toute mention du texte. Le message de **tout autre bot** (le nôtre compris), un message système
 ou un message sans texte n'est pas une annonce : ni poussé par le bot, ni gardé
-par le site. Le réglage de l'analyse sur les textes réels est un lot à part
+par le site. Un message de GETI Bot dont le premier encart ne s'ouvre pas sur l'en-tête d'un
+relais — mention de l'auteur, `(pseudo)`, puis `sur`/`on`/`from` (l'avis « Ton
+annonce a été publié dans … », même s'il mentionne l'auteur) — n'en est pas une non plus
+(`isGetiRelay`, `isGetiRelayMessage` côté bot ; dans le premier encart, cette garde est plus large que l'en-tête que lit l'analyse — tout en-tête lu dans ce premier encart la passe, ce que vérifie un test ; un en-tête placé dans un encart suivant, ou un auteur seulement mentionné dans le texte, ne la passe pas — : 671 des 672 relais de l'échantillon réel ont cette forme). L'analyse ne croit l'en-tête
+que des bots listés (`getiTrustedBots` : GETI Bot seul — notre bot n'y est pas,
+ses messages étant refusés avant l'analyse). Le réglage de l'analyse sur les textes réels est un lot à part
 (GETI-TUNE).
 
 ### Durées de garde, par catégorie
@@ -458,8 +501,11 @@ l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
   un message partiel est relu avant d'être poussé.
 - Rattrapage au démarrage et à chaque nouvelle session Discord : historique de
   chaque salon sur sa fenêtre de garde (pages de 100, pause entre deux pages,
-  5 000 messages au plus par salon), puis `reconcile` avec la liste des messages
-  encore présents — ce qui a été supprimé pendant l'arrêt du bot quitte le site.
+  5 000 messages au plus par salon), puis `reconcile` avec la liste des annonces
+  encore présentes, plus celles poussées en direct pendant le rattrapage — ce qui a
+  été supprimé, ou a cessé d'être une annonce, pendant l'arrêt du bot quitte le site.
+  Un salon que Discord refuse (salon disparu, accès ou permission retirés) ne
+  relance pas à lui seul de rattrapage ; un échec passager en relance un toutes les cinq minutes.
 - Site injoignable : file bornée en mémoire, reprises espacées puis abandon ;
   un abandon déclenche un rattrapage complet, retenté toutes les cinq minutes.
   Le bot ne plante jamais et ne journalise (pm2) que des nombres et des
