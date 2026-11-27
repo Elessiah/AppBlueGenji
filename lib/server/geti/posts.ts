@@ -14,6 +14,7 @@
  */
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { toIso } from "@/lib/server/serialization";
 import { purgeStaleGetiObjections, withholdObjectedGetiPosts } from "@/lib/server/geti/objections";
@@ -107,6 +108,26 @@ export function getiTrustedBots(): GetiParseOptions {
   return { getiBotIds: [GETI_BOT_USER_ID], siteBotIds: [] };
 }
 
+/** Valeurs d'une ligne écrite, dans l'ordre des colonnes de `upsertSql`. */
+type GetiRowValues = (string | Date | null)[];
+
+/** Version d'une ligne : sa modification, sinon sa publication (colonnes 9 et 8). */
+function rowVersion(row: Readonly<GetiRowValues>): number {
+  const at = row[9] ?? row[8];
+  return at instanceof Date ? at.getTime() : 0;
+}
+
+/** Une ligne par message : la version la plus récente, la plus tardive du lot à égalité. */
+function newestPerMessage(rows: readonly GetiRowValues[]): Map<string, GetiRowValues> {
+  const newest = new Map<string, GetiRowValues>();
+  for (const row of rows) {
+    const id = String(row[0]);
+    const kept = newest.get(id);
+    if (kept === undefined || rowVersion(row) >= rowVersion(kept)) newest.set(id, row);
+  }
+  return newest;
+}
+
 /**
  * Enregistre un lot d'annonces poussées, chacune analysée ici. Une annonce déjà
  * gardée est remplacée (modification), sauf si la version reçue est plus
@@ -119,7 +140,7 @@ export async function upsertGetiPosts(
 ): Promise<GetiUpsertOutcome> {
   const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0, withheld: 0 };
   const emptied: string[] = [];
-  const rows: (string | Date | null)[][] = [];
+  const rows: GetiRowValues[] = [];
   const trusted = getiTrustedBots();
   for (const post of posts) {
     if (post.postedAt.getTime() < getiRetentionCutoff(post.category, now).getTime()) {
@@ -146,11 +167,15 @@ export async function upsertGetiPosts(
     ]);
     outcome.stored += 1;
   }
-  if (rows.length > 0) {
-    await executor.execute(upsertSql(rows.length), rows.flat());
+  // Un même message deux fois dans un lot (création puis modification) ne compte qu'une annonce : sa
+  // version la plus récente est écrite (la plus tardive à égalité), et `stored` compte des messages, comme `withheld`.
+  const unique = [...newestPerMessage(rows).values()];
+  outcome.stored = unique.length;
+  if (unique.length > 0) {
+    await executor.execute(upsertSql(unique.length), unique.flat());
     // Une annonce dont l'auteur (ou le message) fait l'objet d'une opposition ne reste pas : le bot
     // la repousserait sinon à chaque rattrapage, tant que le message est sur Discord.
-    outcome.withheld = await withholdObjectedGetiPosts(executor, rows.map((row) => String(row[0])));
+    outcome.withheld = await withholdObjectedGetiPosts(executor, unique.map((row) => String(row[0])));
     outcome.stored -= outcome.withheld;
   }
   if (emptied.length > 0) await deleteGetiPosts(executor, emptied);
@@ -211,7 +236,12 @@ export async function purgeExpiredGetiPosts(executor: GetiExecutor, now: number 
   }
   removed += await deleteInBatches(executor, "posted_at < ?", [new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS)]);
   if (removed > 0) forgetGetiListScans();
-  await purgeStaleGetiObjections(executor, now);
+  // Garde à part : un échec sur les oppositions (table absente) ne fait pas passer pour manquée la purge des annonces.
+  try {
+    await purgeStaleGetiObjections(executor, now);
+  } catch (error) {
+    console.error("[geti] purge des oppositions échouée", failureReason(error));
+  }
   return removed;
 }
 

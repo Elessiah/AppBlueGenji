@@ -98,9 +98,10 @@ const GETI_HEADER = new RegExp(
 /**
  * Première ligne qui s'ouvre comme un en-tête GETI (mention en tête) sans s'y
  * lire en entier : écrite par le bot GETI avec le pseudo et le nom de serveur
- * que d'autres choisissent, elle n'est jamais lue pour l'auteur ni pour le texte.
+ * que d'autres choisissent, elle n'est jamais lue pour le texte, ni pour le
+ * pseudo ou le serveur ; seule sa mention de tête, qu'écrit le bot, nomme l'auteur.
  */
-const GETI_HEADER_LIKE_LINE = /^\s*<@!?\d{15,22}>[^\n]*(?:\n|$)/u;
+const GETI_HEADER_LIKE_LINE = /^\s*<@!?(\d{15,22})>[^\n]*(?:\n|$)/u;
 /**
  * Pseudo Discord lisible sur une ligne d'auteur d'encart : nouveau format
  * (« faux.pseudo ») ou ancien (« Faux Pseudo#4821 »). Un nom d'affichage libre
@@ -322,9 +323,12 @@ function readEmbed(embed: GetiRawEmbed, trust: RelayTrust): EmbedReading {
   // nom de serveur qu'il porte sont choisis par d'autres, qui y écriraient « Contact : <@quelqu'un> ».
   const headerLike = trust.geti && header === null ? GETI_HEADER_LIKE_LINE.exec(description) : null;
   const start = header !== null && headerMatch !== null ? headerMatch[0].length : (headerLike?.[0].length ?? 0);
+  // Sa mention de tête, elle, est écrite par le bot GETI avant tout texte choisi par d'autres : l'auteur
+  // reste connu (une opposition sur cet auteur le couvre), sans pseudo ni serveur.
+  const named = header ?? (headerLike === null ? null : { id: headerLike[1], tag: null, originServer: null });
   const end = trusted === null ? undefined : Math.max(start, trusted.index);
   const parts = [text(embed.title), description.slice(start, end), ...embedFieldLines(embed)];
-  return { parts, header, trailer, embedTag, lineServer };
+  return { parts, header: named, trailer, embedTag, lineServer };
 }
 
 /**

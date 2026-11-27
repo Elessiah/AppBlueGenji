@@ -45,6 +45,7 @@
  */
 
 import { PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
+import { GETI_RETENTION_MAX_DAYS } from "@/lib/shared/geti/ingest";
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
@@ -2406,7 +2407,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary: "Le site recopie les annonces de recrutement Overwatch publiées dans les salons d'annonces du serveur Discord de l'association — écrites sur place, ou relayées par GETI Bot depuis les serveurs abonnés à son réseau —, pour les réunir sur une page de recherche. Une recherche de scrim y est gardée 7 jours, les autres annonces 14 jours.",
     details: [
       "Ce qui est recopié : le texte de l'annonce, le pseudo et l'identifiant Discord de son auteur, le serveur d'origine d'une annonce relayée, les dates, et les critères lus automatiquement dans le texte (rang, rôle, région, plateforme, langue, disponibilités, âge minimal annoncé, nom d'équipe) pour filtrer les annonces, ainsi que le message tel que le bot l'a transmis, pour refaire cette lecture quand elle s'améliore. Rien n'est rattaché à un compte du site, et le bot de l'association, qui lit ces salons pour le site, n'en enregistre rien (il ne les tient qu'en mémoire : la lecture de l'historique des salons, sa file d'envoi, et le cache de messages de Discord, effacés à son redémarrage). Base : l'intérêt légitime de l'association à aider joueurs et équipes à se trouver, pour des annonces déjà publiques.",
-      "Combien de temps, et comment retirer une annonce : 7 jours après sa publication sur Discord pour une recherche de scrim, 14 jours pour les autres, puis un effacement automatique. Supprimer l'annonce sur Discord la retire du site aussitôt ; la modifier remplace l'ancienne version, dont rien n'est gardé. Son auteur peut aussi s'y opposer et en demander le retrait à l'association (formulaire de signalement, catégorie RGPD) : ses annonces sont alors retirées et ne sont plus recopiées, l'association ne gardant pour cela que son identifiant Discord (ou celui de l'annonce visée), tant que l'opposition tient (14 jours pour une seule annonce).",
+      `Combien de temps, et comment retirer une annonce : 7 jours après sa publication sur Discord pour une recherche de scrim, 14 jours pour les autres, puis un effacement automatique. Supprimer l'annonce sur Discord la retire du site aussitôt ; la modifier remplace l'ancienne version, dont rien n'est gardé. Son auteur peut aussi s'y opposer et en demander le retrait à l'association (formulaire de signalement, catégorie RGPD) : ses annonces sont alors retirées et ne sont plus recopiées, l'association ne gardant pour cela que son identifiant Discord (ou celui de l'annonce visée), tant que l'opposition tient (${GETI_RETENTION_MAX_DAYS} jours pour une seule annonce).`,
     ],
   },
 ];

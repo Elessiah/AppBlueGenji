@@ -43,8 +43,23 @@ describe("parseGetiPost — relay authorship cannot be spoofed", () => {
       GETI_TRUSTED_BOTS,
     );
 
-    expect(post.authorId).toBeNull();
+    expect(post.authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(post.authorTag).toBeNull();
+    expect(post.originServer).toBeNull();
     expect(post.text).not.toContain("Contact");
+  });
+
+  it("parseGetiPost_headerLikeLineWithOverlongServerName_keepsTheLeadingMentionAsAuthor", () => {
+    const post = parseGetiPost(
+      getiRelayPost(`<@${GETI_FAKE_OTHER_ID}>*(bob)* sur [${"s".repeat(210)}](https://discord.gg/fauxcode)
+
+> LFT tank`),
+      GETI_TRUSTED_BOTS,
+    );
+
+    expect(post.authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(post.authorTag).toBeNull();
+    expect(post.text).toContain("LFT tank");
   });
 
   it("parseGetiPost_untrustedBotHeaderLikeLine_keepsItsTextAsIs", () => {

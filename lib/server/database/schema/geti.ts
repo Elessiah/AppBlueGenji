@@ -32,7 +32,8 @@ export async function createGetiTables(db: Pool): Promise<void> {
         UNIQUE KEY uniq_bg_geti_posts_message (message_id),
         KEY idx_bg_geti_posts_category (category, posted_at),
         KEY idx_bg_geti_posts_channel (channel_id, posted_at),
-        KEY idx_bg_geti_posts_posted (posted_at)
+        KEY idx_bg_geti_posts_posted (posted_at),
+        KEY idx_bg_geti_posts_author (author_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
   } catch {

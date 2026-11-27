@@ -209,6 +209,35 @@ describe("upsertGetiPosts", () => {
     expect([values[0], values[10], values[20]]).toEqual(["100000000000000911", "100000000000000912", "100000000000000913"]);
   });
 
+  it("upsertGetiPosts_sameMessageTwiceInBatch_writesOneRowAndCountsOneStored", async () => {
+    const execute = executeMock();
+    const posts = [
+      getiPushedPost({ id: "100000000000000914", content: "LFT tank" }),
+      getiPushedPost({ id: "100000000000000914", content: "LFT tank Master", editedAt: new Date(NOW - 60_000).toISOString() }),
+    ];
+
+    const outcome = await upsertGetiPosts(executor(execute), posts, NOW);
+
+    expect(outcome.stored).toBe(1);
+    const values: unknown[] = Array.isArray(execute.mock.calls[0][1]) ? execute.mock.calls[0][1] : [];
+    expect(values).toHaveLength(10);
+    expect(String(values[7])).toContain("LFT tank Master");
+  });
+
+  it("upsertGetiPosts_sameMessageTwiceOlderLast_keepsTheNewerVersion", async () => {
+    const execute = executeMock();
+    const posts = [
+      getiPushedPost({ id: "100000000000000915", content: "LFT tank Master", editedAt: new Date(NOW - 60_000).toISOString() }),
+      getiPushedPost({ id: "100000000000000915", content: "LFT tank", editedAt: new Date(NOW - 120_000).toISOString() }),
+    ];
+
+    await upsertGetiPosts(executor(execute), posts, NOW);
+
+    const values: unknown[] = Array.isArray(execute.mock.calls[0][1]) ? execute.mock.calls[0][1] : [];
+    expect(values).toHaveLength(10);
+    expect(String(values[7])).toContain("LFT tank Master");
+  });
+
   it("upsertGetiPosts_expiredAndEmptiedMixedWithKept_writesOnlyTheKeptOnes", async () => {
     const execute = executeMock([], 1);
     const posts = [
@@ -248,6 +277,34 @@ describe("upsertGetiPosts — oppositions", () => {
     expect(sql).toContain("DELETE FROM bg_geti_posts");
     expect(sql).toContain("bg_geti_objections");
     expect(params).toEqual(["100000000000000931", "100000000000000932"]);
+  });
+
+  it("upsertGetiPosts_objectedDuplicate_countsZeroStored", async () => {
+    const execute = jest.fn<SqlQuery>(async () => [{ affectedRows: 1 }]);
+    const posts = [
+      getiPushedPost({ id: "100000000000000933" }),
+      getiPushedPost({ id: "100000000000000933", editedAt: new Date(NOW - 60_000).toISOString() }),
+    ];
+
+    const outcome = await upsertGetiPosts(executor(execute), posts, NOW);
+
+    expect(outcome).toEqual({ stored: 0, emptied: 0, expired: 0, withheld: 1 });
+  });
+
+  it("upsertGetiPosts_unreadableGetiHeader_storesTheLeadingMentionAsAuthorId", async () => {
+    const execute = executeMock([], 1);
+    const post = getiPushedPost(
+      getiWireRelay("LFT tank", {
+        embeds: [{ description: `<@${GETI_FAKE_RELAYED_AUTHOR_ID}>*(bob)* sur [${"s".repeat(210)}](https://discord.gg/fauxcode)
+
+> LFT tank` }],
+      }),
+    );
+
+    await upsertGetiPosts(executor(execute), [post], NOW);
+
+    const values: unknown[] = Array.isArray(execute.mock.calls[0][1]) ? execute.mock.calls[0][1] : [];
+    expect(values[4]).toBe(GETI_FAKE_RELAYED_AUTHOR_ID);
   });
 
   it("upsertGetiPosts_noRowsToWrite_skipsTheObjectionCheck", async () => {
@@ -406,6 +463,20 @@ describe("purgeExpiredGetiPosts", () => {
     await purgeExpiredGetiPosts(executor(execute), NOW);
 
     expect(execute).toHaveBeenCalledTimes(100 * 7 + 1);
+  });
+
+  it("purgeExpiredGetiPosts_objectionPurgeFails_stillReturnsRemovedAndLogs", async () => {
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.includes("bg_geti_objections")) throw new Error("Table 'bg_geti_objections' doesn't exist");
+      return [{ affectedRows: 2 }];
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const removed = await purgeExpiredGetiPosts(executor(execute), NOW);
+
+    expect(removed).toBe(14);
+    expect(error).toHaveBeenCalledWith("[geti] purge des oppositions échouée", expect.any(String));
+    error.mockRestore();
   });
 
   it("purgeExpiredGetiPosts_always_purgesStaleMessageObjections", async () => {

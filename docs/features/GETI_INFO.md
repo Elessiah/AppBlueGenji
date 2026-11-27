@@ -429,10 +429,17 @@ l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
   autrement que par « message inconnu » (panne passagère de Discord) fait relire
   son salon au passage des cinq minutes.
 - Annonces directes d'un utilisateur exclu du relais (table `Ban`, `checkBan`) :
-  ni poussées, ni comptées présentes (la réconciliation les retire du site).
-- Bannissement d'un membre du serveur (`guildBanAdd`, intention
-  `GuildModeration`) : Discord ne signale pas un à un les messages qu'un
-  bannissement efface ; un rattrapage complet est lancé.
+  ni poussées, ni comptées présentes (la réconciliation les retire du site) ;
+  `/ban` et `/unban` lancent un rattrapage complet (`requestGetiResync`), qui
+  retire du site ses annonces déjà copiées ou les y remet.
+- Bannissement Discord d'un membre : **non écouté** (`guildBanAdd` n'arrive qu'à
+  un bot qui a « Bannir des membres » ou « Voir les logs du serveur », que le
+  relais n'a pas à recevoir). Les messages qu'il efface, que Discord ne signale
+  pas un à un, restent sur le site jusqu'au prochain rattrapage ou à la fin de
+  leur durée de garde.
+- Opposition sur un auteur : un en-tête GETI illisible (pseudo ou serveur hors
+  forme) garde l'auteur par sa mention de tête, écrite par GETI Bot — sans
+  pseudo ni serveur —, pour que l'opposition le couvre.
 - Rattrapage au démarrage et à chaque nouvelle session Discord : historique de
   chaque salon sur sa fenêtre de garde (pages de 100, pause entre deux pages,
   5 000 messages au plus par salon), puis `reconcile` avec la liste des annonces

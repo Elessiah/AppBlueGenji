@@ -88,7 +88,7 @@ import {
   type AudienceOptOutReason,
 } from "@/lib/shared/site-visits";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
-import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
+import { GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS } from "@/lib/shared/geti/ingest";
 import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
 
@@ -267,7 +267,7 @@ export function RgpdEn({
             {GETI_RETENTION_DAYS.lfp} days; deleting the post on Discord removes it from the site at once, editing it
             replaces the previous version. Basis: the association&apos;s legitimate interest (helping players and teams
             find each other), for posts that are already public; their author can object and ask for removal (see
-            “Exercising your rights”): their posts are then removed and no longer copied, the association keeping for that only the author&apos;s Discord identifier (or that of the targeted post), as long as the objection stands ({GETI_RETENTION_DAYS.lfp} days for a single post). Register of processing activities: record T21.
+            “Exercising your rights”): their posts are then removed and no longer copied, the association keeping for that only the author&apos;s Discord identifier (or that of the targeted post), as long as the objection stands ({GETI_RETENTION_MAX_DAYS} days for a single post). Register of processing activities: record T21.
           </p>
           <p id="age-minimum">
             <strong>Minimum age.</strong> You must be at least {SITE_MINIMUM_AGE} years old to create an account

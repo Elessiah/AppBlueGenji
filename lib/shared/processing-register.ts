@@ -90,7 +90,7 @@ import { ACCOUNT_REACTIVATION_DAYS, REACTIVATION_TICKET_MINUTES } from "@/lib/sh
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { STAFF_MESSAGE_SENDS_PER_WINDOW, STAFF_MESSAGE_WINDOW_MINUTES } from "@/lib/shared/tournament-staff-message";
 import { PLANNING_HISTORY_WEEKS, PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
-import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
+import { GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS } from "@/lib/shared/geti/ingest";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
 export const REGISTER_UPDATED_AT = "2026-11-28";
@@ -1929,8 +1929,8 @@ const ACTIVITIES = registerActivities({
         `Scrim searches: ${GETI_RETENTION_DAYS.lfs} days after their publication on Discord; the other posts: ${GETI_RETENTION_DAYS.lfp} days; then erased by an hourly purge, apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`),
       frEn("Avant ce terme : retirée dès que le message est supprimé sur Discord (par son auteur ou la modération du salon ; pour une annonce relayée, quand son relais y est supprimé) ; une modification remplace la version précédente, dont rien n'est gardé",
         "Before that term: removed as soon as the message is deleted on Discord (by its author or the channel's moderation; for a relayed post, when its relay there is deleted); an edit replaces the previous version, of which nothing is kept"),
-      frEn(`Oppositions : celle d'un auteur, jusqu'à ce qu'il la retire ; celle d'une seule annonce, ${GETI_RETENTION_DAYS.lfp} jours (au-delà, l'annonce est trop ancienne pour revenir), puis effacée par la purge horaire`,
-        `Objections: an author's, until they withdraw it; one for a single post, ${GETI_RETENTION_DAYS.lfp} days (beyond that, the post is too old to come back), then erased by the hourly purge`),
+      frEn(`Oppositions : celle d'un auteur, jusqu'à ce qu'il la retire ; celle d'une seule annonce, ${GETI_RETENTION_MAX_DAYS} jours (au-delà, l'annonce est trop ancienne pour revenir), puis effacée par la purge horaire`,
+        `Objections: an author's, until they withdraw it; one for a single post, ${GETI_RETENTION_MAX_DAYS} days (beyond that, the post is too old to come back), then erased by the hourly purge`),
     ],
     recipients: [
       frEn("Visiteurs du site, y compris sans compte : la page des annonces, quand elle est en ligne, montre le texte de l'annonce, le pseudo Discord de son auteur, le serveur d'origine et la date — ce que les serveurs abonnés montrent déjà",
