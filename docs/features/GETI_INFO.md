@@ -544,11 +544,12 @@ posée par `app/geti-info/page.tsx` et `app/geti-info/[category]/page.tsx`.
   `lfcast` — le sigle du salon, le même dans les deux langues (`getiCategoryPath`).
   Toute autre écriture (casse comprise) répond 404.
 - `/geti-info` rend la première catégorie **sans renvoi** ; son adresse canonique
-  est `/geti-info/lfp`. Le sitemap liste les six catégories (FR + EN), jamais
-  `/geti-info` tout court. L'adresse canonique ne porte jamais les filtres.
-- Le texte des annonces porte `data-nosnippet` (sur une enveloppe `<div>` : les
-  moteurs ne le lisent que sur `div`, `span` et `section`) : la page est indexable,
-  mais un moteur ne reprend pas en extrait une annonce qui disparaîtra sous 7 ou 14 jours.
+  est `/geti-info/lfp`. L'adresse canonique ne porte jamais les filtres.
+- **Non indexée** (`GETI_ROBOTS` : `noindex, follow`, `lib/shared/geti/page.ts`) et
+  absente du sitemap : les annonces portent le pseudo Discord de tiers (relais GETI
+  compris), et `data-nosnippet` ne cache que l'extrait — une recherche sur un pseudo
+  mènerait sinon à la page (revue sécurité 1). Le texte garde `data-nosnippet` (sur
+  une enveloppe `<div>`), au cas où un moteur passerait outre.
 
 ### Filtres — l'adresse est la seule mémoire
 
@@ -618,9 +619,12 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
 - **Étiquettes** des données lues (`getiPostChips`), teintées par nature ; celles
   qui répondent à un critère actif (`getiChipMatches`) sont mises en avant — plus
   vives, cochées, et préfixées pour un lecteur d'écran (jamais la couleur seule).
-- **Texte** : toujours un nœud de texte (`getiPostBodyText`) — marques de
-  citation et balisage Discord retirés, mention → mot neutre (jamais un
-  identifiant), émoji de serveur → son nom, lien laissé en texte. Replié au-delà
+- **Texte** : toujours un nœud de texte (`getiPostBodyText`) — **une** marque de
+  citation suivie d'une espace (celle du relais ; « >4000 » reste), balisage par
+  paires au bord d'un mot (« xX__Sniper__Xx » reste), passage masqué `||…||` →
+  « [masqué] » / « [hidden] » (jamais son contenu), mention → mot neutre (jamais un
+  identifiant), émoji de serveur → son nom, horodatage `<t:…>` → date ou heure à
+  l'heure de Paris (`getiTimestampLabel`, `R` écrit comme `f`), lien laissé en texte. Replié au-delà
   de 420 caractères ou 7 lignes (« Lire la suite ») ; une fois la page chargée, le
   bouton ne reste que si le texte replié dépasse réellement.
 
@@ -639,7 +643,7 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
 ### Fraîcheur
 
 Aucun flux : `GetiRefresher` relit la page (`router.refresh()`) au retour sur
-l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lecture SQL des annonces est mutualisée 10 s par catégorie et âge — `listGetiPostsShared`, `cached` à vol unique —, le filtre et la page restent par demande ; un geste de filtre attend 300 ms de calme avant de naviguer, « Réinitialiser » part tout de suite ; la fenêtre « Publier » rend sa carte elle-même à l'ouverture)
+l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lecture SQL des annonces est mutualisée 10 s par catégorie et âge — `listGetiPostsShared`, `cached` à vol unique, oubliée après toute écriture : enregistrement, suppression, réconciliation, purge, réanalyse ; une annonce supprimée sur Discord disparaît donc aussitôt, comme le dit `/rgpd` —, le filtre et la page restent par demande ; un geste de filtre attend 300 ms de calme avant de naviguer, « Réinitialiser » part tout de suite ; la fenêtre « Publier » rend sa carte elle-même à l'ouverture)
 (`getiRefreshIntervalMs`, `CLIENT_POWER_MODES.md`) ; un onglet caché ne demande rien.
 
 ### Textes, tests, seed
@@ -660,8 +664,8 @@ l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lec
 
 ## Retouches UX (cycle ui 1)
 
-- `GetiLayout` (client) enveloppe filtres et résultats : pendant un changement de filtre, la grille porte `aria-busy` + `data-pending` (liste grisée) et le panneau annonce « Mise à jour… » (`<output>`).
+- `GetiLayout` (client) enveloppe filtres et résultats : pendant un changement de filtre, la grille porte `aria-busy` + `data-pending` (liseré pointillé, jamais d'opacité : contraste 4,5:1) et le panneau annonce « Mise à jour… » (`<output>`).
 - « Réinitialiser » rend le focus au bouton Filtres (mobile) ou au titre du panneau avant de disparaître ; sur mobile, un bouton « Voir les N annonces » referme le panneau.
-- Liste indisponible : filtres masqués, bouton « Réessayer » (`GetiRetry`, `router.refresh()`).
+- Liste indisponible : filtres masqués, « Aucune annonce à afficher » en ligne, la panne en notification (`showError`) et bouton « Réessayer » (`GetiRetry`, `router.refresh()`) ; pm2 reçoit `[geti] post list unavailable: <code>` (code seul).
 - La date exacte de publication / modification est un texte du pied de carte (plus d'infobulle) ; le repli de copie rend le focus au bouton.
 - Onglets anglais au pluriel (Players, Teams, Subs, Staff, Scrims, Casters).

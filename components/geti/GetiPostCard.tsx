@@ -80,7 +80,8 @@ export function GetiPostCard({
     member: text.mentionMember,
     role: text.mentionRole,
     channel: text.mentionChannel,
-  });
+    spoiler: text.spoiler,
+  }, locale);
   const chips = getiPostChips(parsed);
   const postedAbsolute = absoluteDate(post.postedAt, locale);
   const editedAbsolute = post.editedAt ? absoluteDate(post.editedAt, locale) : "";

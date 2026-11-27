@@ -14,7 +14,7 @@
  */
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { cached } from "@/lib/server/cache";
+import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { toIso } from "@/lib/server/serialization";
 import type { GetiPushedPost, GetiReconcileRequest } from "@/lib/server/geti/wire";
@@ -148,6 +148,7 @@ export async function upsertGetiPosts(
     outcome.stored += 1;
   }
   if (emptied.length > 0) await deleteGetiPosts(executor, emptied);
+  if (outcome.stored > 0) forgetGetiScans();
   return outcome;
 }
 
@@ -162,6 +163,7 @@ export async function deleteGetiPosts(executor: GetiExecutor, messageIds: readon
     );
     removed += affected(result);
   }
+  if (removed > 0) forgetGetiScans();
   return removed;
 }
 
@@ -208,7 +210,9 @@ export async function purgeExpiredGetiPosts(executor: GetiExecutor, now: number 
   const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE posted_at < ?`, [
     new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS),
   ]);
-  return removed + affected(result);
+  removed += affected(result);
+  if (removed > 0) forgetGetiScans();
+  return removed;
 }
 
 const PURGE_CLOCK_KEY = "geti-posts-purge";
@@ -342,6 +346,7 @@ export async function refreshStaleGetiPosts(executor: GetiExecutor): Promise<num
       );
       written += affected(result);
     }
+    if (written > 0) forgetGetiScans();
     const removed = gone.length > 0 ? await deleteGetiPosts(executor, gone) : 0;
     done += written + removed;
     // Rien n'a bougé (ligne qui résiste) : relire le même lot ne ferait que boucler.
@@ -450,6 +455,20 @@ function pageOfStored(stored: readonly GetiStoredPost[], filter: GetiFilter, pag
   return { posts: matching.slice(start, start + pageSize), total: matching.length, page: requested, pageSize };
 }
 
+/** Préfixe des lectures partagées de la page publique (une clé par catégorie et âge). */
+const GETI_SCAN_CACHE_PREFIX = "geti:scan:";
+
+/**
+ * Oublie les lectures partagées : appelée après toute écriture (enregistrement,
+ * modification, suppression, réconciliation, purge, réanalyse). Chaque requête
+ * est validée seule (pas de transaction), donc la page ne sert jamais, après la
+ * réponse au bot, une annonce supprimée sur Discord — `/rgpd` promet son retrait
+ * « aussitôt ».
+ */
+function forgetGetiScans(): void {
+  invalidateCachedPrefix(GETI_SCAN_CACHE_PREFIX);
+}
+
 /** Durée de vie de la lecture partagée de la page publique : une annonce modifiée sur Discord s'y voit en quelques secondes. */
 export const GETI_SCAN_CACHE_TTL_MS = 10_000;
 
@@ -465,7 +484,7 @@ export async function listGetiPostsShared(
   now: number = Date.now(),
 ): Promise<GetiPostPage> {
   const age = typeof filter.maxAgeHours === "number" && Number.isFinite(filter.maxAgeHours) ? filter.maxAgeHours : 0;
-  const key = `geti:scan:${isCategory(filter.category) ? filter.category : "all"}:${age}`;
+  const key = `${GETI_SCAN_CACHE_PREFIX}${isCategory(filter.category) ? filter.category : "all"}:${age}`;
   const stored = await cached(key, GETI_SCAN_CACHE_TTL_MS, async () =>
     scanGetiPosts(filter, await getDatabase(), now),
   );

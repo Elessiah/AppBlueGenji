@@ -127,6 +127,7 @@
     "beyondLink": "Aller à la page {page}",
     "emptyReset": "Réinitialiser les filtres",
     "unavailable": "Les annonces sont momentanément indisponibles.",
+    "none": "Aucune annonce à afficher.",
     "retry": "Réessayer",
     "pagination": "Pages d'annonces",
     "previous": "Annonces plus récentes",
@@ -154,7 +155,8 @@
     "matchPrefix": "Correspond à ta recherche :",
     "mentionMember": "@membre",
     "mentionRole": "@rôle",
-    "mentionChannel": "#salon"
+    "mentionChannel": "#salon",
+    "spoiler": "[masqué]"
   },
   "chips": {
     "rankRange": "{min} – {max}",

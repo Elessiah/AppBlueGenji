@@ -7,7 +7,8 @@
  */
 import { getiStoredRankRange, getiStoredTimeSlot, getiTimeSlotMatches } from "@/lib/shared/geti/filter";
 import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
-import type { Locale } from "@/lib/shared/locales";
+import type { Metadata } from "next";
+import { INTL_LOCALE, SITE_TIME_ZONE, type Locale } from "@/lib/shared/locales";
 
 export { GETI_OFFICIAL_INVITE_CODE, GETI_OFFICIAL_INVITE_URL } from "@/lib/shared/discord";
 import { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";
@@ -440,8 +441,31 @@ function listOf<T>(values: readonly T[] | null | undefined): readonly T[] {
   return Array.isArray(values) ? values : [];
 }
 
+/**
+ * Valeurs d'une liste gardée qui appartiennent au domaine : une valeur inconnue
+ * (`"__proto__"`, ancienne énumération) n'a pas de libellé et ferait échouer le
+ * rendu de toute la page — elle est ignorée.
+ */
+function knownOf<T extends string>(values: readonly T[] | null | undefined, domain: readonly T[]): T[] {
+  return listOf<unknown>(values).filter((value): value is T => domain.some((known) => known === value));
+}
+
 /** Analyse gardée, champs peut-être absents (ligne écrite à la main, analyse ancienne). */
 type StoredAnalysis = Partial<GetiParsedPost>;
+
+/** Étiquettes des listes fermées (rôles, niveaux, région…), valeurs hors domaine écartées. */
+function listedChips(stored: StoredAnalysis): GetiChip[] {
+  return [
+    ...knownOf(stored.roles, GETI_ROLES).map((value): GetiChip => ({ kind: "role", value })),
+    ...knownOf(stored.subRoles, GETI_SUB_ROLES).map((value): GetiChip => ({ kind: "subRole", value })),
+    ...knownOf(stored.staffRoles, GETI_STAFF_ROLES).map((value): GetiChip => ({ kind: "staffRole", value })),
+    ...knownOf(stored.levels, GETI_LEVELS).map((value): GetiChip => ({ kind: "level", value })),
+    ...knownOf(stored.regions, GETI_REGIONS).map((value): GetiChip => ({ kind: "region", value })),
+    ...knownOf(stored.platforms, GETI_PLATFORMS).map((value): GetiChip => ({ kind: "platform", value })),
+    ...knownOf(stored.languages, GETI_LANGUAGES).map((value): GetiChip => ({ kind: "language", value })),
+    ...knownOf(stored.availability?.days, GETI_DAYS).map((value): GetiChip => ({ kind: "day", value })),
+  ];
+}
 
 /**
  * Les données lues dans une annonce, dans l'ordre d'affichage. Une analyse
@@ -450,7 +474,7 @@ type StoredAnalysis = Partial<GetiParsedPost>;
 export function getiPostChips(post: GetiParsedPost): GetiChip[] {
   const stored: StoredAnalysis = post;
   const chips: GetiChip[] = [];
-  if (stored.teamName) chips.push({ kind: "team", name: stored.teamName });
+  if (typeof stored.teamName === "string" && stored.teamName) chips.push({ kind: "team", name: stored.teamName });
   const byRole = stored.ranks?.byRole ?? {};
   const overall = getiStoredRankRange(stored.ranks);
   const perRole = RANKED_ROLES.flatMap((role): GetiChip[] => {
@@ -459,24 +483,19 @@ export function getiPostChips(post: GetiParsedPost): GetiChip[] {
   });
   if (perRole.length > 0) chips.push(...perRole);
   else if (overall !== null) chips.push({ kind: "rank", role: null, min: overall.min, max: overall.max });
-  for (const value of listOf(stored.roles)) chips.push({ kind: "role", value });
-  for (const value of listOf(stored.subRoles)) chips.push({ kind: "subRole", value });
-  for (const value of listOf(stored.staffRoles)) chips.push({ kind: "staffRole", value });
-  for (const value of listOf(stored.levels)) chips.push({ kind: "level", value });
-  for (const value of listOf(stored.regions)) chips.push({ kind: "region", value });
-  for (const value of listOf(stored.platforms)) chips.push({ kind: "platform", value });
-  for (const value of listOf(stored.languages)) chips.push({ kind: "language", value });
+  chips.push(...listedChips(stored));
   const availability = stored.availability;
-  for (const value of listOf(availability?.days)) chips.push({ kind: "day", value });
+  const timezone = typeof availability?.timezone === "string" ? availability.timezone : null;
   const slots = listOf<unknown>(availability?.times).flatMap((slot) => {
     const valid = getiStoredTimeSlot(slot);
     return valid === null ? [] : [valid];
   });
   for (const slot of slots.slice(0, MAX_TIME_CHIPS)) {
-    chips.push({ kind: "time", from: slot.from, to: slot.to, timezone: availability?.timezone ?? null });
+    chips.push({ kind: "time", from: slot.from, to: slot.to, timezone });
   }
-  for (const iso of listOf(stored.dates).slice(0, MAX_DATE_CHIPS)) chips.push({ kind: "date", iso });
-  if (typeof stored.minAge === "number") chips.push({ kind: "minAge", age: stored.minAge });
+  const dates = listOf<unknown>(stored.dates).filter((iso): iso is string => typeof iso === "string");
+  for (const iso of dates.slice(0, MAX_DATE_CHIPS)) chips.push({ kind: "date", iso });
+  if (typeof stored.minAge === "number" && Number.isFinite(stored.minAge)) chips.push({ kind: "minAge", age: stored.minAge });
   return chips;
 }
 
@@ -575,17 +594,21 @@ export function getiClockLabel(minutes: number, locale: Locale = "fr"): string {
   return rest === "00" ? `${hours}h` : `${hours}h${rest}`;
 }
 
-/** Mots neutres qui remplacent les mentions Discord d'une annonce. */
-export type GetiMentionLabels = { member: string; role: string; channel: string };
+/** Mots neutres qui remplacent les mentions Discord d'une annonce, et le texte masqué (`||…||`). */
+export type GetiMentionLabels = { member: string; role: string; channel: string; spoiler: string };
 
 /** Au-delà, la carte replie le texte derrière « Lire la suite ». */
 export const GETI_TEXT_COLLAPSE_CHARS = 420;
 export const GETI_TEXT_COLLAPSE_LINES = 7;
 
+/**
+ * Une seule marque de citation en tête de ligne, suivie d'une espace — comme
+ * Discord, qui n'imbrique pas les citations et laisse « >4000 » en texte.
+ */
+const QUOTE_PREFIX = /^[ \t]*(?:>>>|>) /u;
+
 function stripLineMarks(line: string): string {
-  let rest = line.trimStart();
-  // Marques de citation du relais (« > », « >> »).
-  while (rest.startsWith(">")) rest = rest.slice(1).trimStart();
+  const rest = line.replace(QUOTE_PREFIX, "").trimStart();
   if (rest.startsWith("-# ")) return rest.slice(3);
   // Titres Discord (« # », « ## », « ### »).
   const heading = /^#{1,3} /.exec(rest);
@@ -593,23 +616,68 @@ function stripLineMarks(line: string): string {
 }
 
 /**
- * Le texte d'une annonce tel que la page le montre : du **texte simple**. Les
- * marques de citation du relais (`> `) et le balisage Discord (gras, souligné,
- * barré, titres) sont retirés, une mention devient un mot neutre (jamais un
- * identifiant), un émoji de serveur son nom. Rien n'est interprété : le rendu
- * reste un nœud de texte, un lien reste du texte.
+ * Passage masqué (`||…||`) : l'auteur l'a caché derrière un clic sur Discord,
+ * la page ne le montre jamais. Borné pour rester linéaire sur un texte hostile.
  */
-export function getiPostBodyText(text: string, labels: GetiMentionLabels): string {
-  return text
+const SPOILER = /\|\|(?:[^|]|\|(?!\|)){1,1000}\|\|/gu;
+/**
+ * Balisage par paires (gras, souligné, barré) **au bord d'un mot** : « xX__Sniper__Xx »
+ * reste tel quel, un pseudo écrit dans le texte se recopie juste. Contenu borné.
+ */
+const PAIRED_MARKUP = [String.raw`\*\*`, "__", "~~"].map(
+  (mark) => new RegExp(String.raw`(?<![\p{L}\p{N}])${mark}(?=\S)([\s\S]{0,300}?\S)${mark}(?![\p{L}\p{N}])`, "gu"),
+);
+/** Code en ligne ou en bloc, par paires : la marque part, le texte reste. */
+const CODE = /(`{1,3})([^`]{1,1000}?)\1/gu;
+/** Horodatage Discord `<t:secondes:style>`, rendu en date lisible à l'heure du site. */
+const TIMESTAMP = /<t:(\d{1,12})(?::([a-zA-Z]))?>/gu;
+
+const TIME_PARTS: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
+const TIMESTAMP_STYLES: Record<string, Intl.DateTimeFormatOptions> = {
+  t: { ...TIME_PARTS, timeZoneName: "short" },
+  T: { ...TIME_PARTS, second: "2-digit", timeZoneName: "short" },
+  d: { day: "2-digit", month: "2-digit", year: "numeric" },
+  D: { day: "numeric", month: "long", year: "numeric" },
+  f: { day: "numeric", month: "long", year: "numeric", ...TIME_PARTS, timeZoneName: "short" },
+  F: { weekday: "long", day: "numeric", month: "long", year: "numeric", ...TIME_PARTS, timeZoneName: "short" },
+};
+
+/**
+ * Un horodatage Discord en texte, dans la langue de la page et à l'heure du
+ * site (fuseau écrit pour une heure). Le style relatif (`R`) vieillirait sur
+ * une page relue : il s'écrit comme la date complète (`f`), tout comme un style inconnu.
+ */
+export function getiTimestampLabel(seconds: number, style: string | undefined, locale: Locale = "fr"): string {
+  const date = new Date(seconds * 1000);
+  if (!Number.isFinite(seconds) || Number.isNaN(date.getTime())) return "";
+  const options = (style !== undefined && Object.hasOwn(TIMESTAMP_STYLES, style) ? TIMESTAMP_STYLES[style] : null) ?? TIMESTAMP_STYLES.f;
+  return new Intl.DateTimeFormat(INTL_LOCALE[locale], { ...options, timeZone: SITE_TIME_ZONE }).format(date);
+}
+
+/**
+ * Le texte d'une annonce tel que la page le montre : du **texte simple**. Une
+ * marque de citation (celle du relais, `> `) et le balisage Discord par paires
+ * (gras, souligné, barré, code, titres) sont retirés, un passage masqué devient
+ * un mot neutre (jamais son contenu), une mention aussi (jamais un identifiant),
+ * un émoji de serveur son nom, un horodatage une date. Rien n'est interprété :
+ * le rendu reste un nœud de texte, un lien reste du texte.
+ */
+export function getiPostBodyText(text: string, labels: GetiMentionLabels, locale: Locale = "fr"): string {
+  let body = text
     .split("\n")
     .map(stripLineMarks)
     .join("\n")
+    .replace(SPOILER, labels.spoiler)
     .replace(/<@&\d{1,25}>/g, labels.role)
     .replace(/<@!?\d{1,25}>/g, labels.member)
     .replace(/<#\d{1,25}>/g, labels.channel)
     .replace(/<a?:(\w{1,40}):\d{1,25}>/g, ":$1:")
-    .replace(/<t:\d{1,12}(?::[a-zA-Z])?>/g, "")
-    .replace(/\*\*|__|~~|\|\||`{1,3}/g, "")
+    .replace(TIMESTAMP, (_match, seconds: string, style: string | undefined) =>
+      getiTimestampLabel(Number(seconds), style, locale),
+    );
+  for (const pattern of PAIRED_MARKUP) body = body.replace(pattern, "$1");
+  return body
+    .replace(CODE, "$2")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -644,3 +712,21 @@ export const GETI_REFRESH_INTERVAL_MS = 300_000;
 export function getiRefreshIntervalMs(mode: string): number | null {
   return mode === "FULL" ? GETI_REFRESH_INTERVAL_MS : null;
 }
+
+/** Code court d'une erreur de lecture (`ER_PARSE_ERROR`, `ECONNREFUSED`…), sinon « unknown ». */
+export function getiErrorCode(error: unknown): string {
+  const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+  return typeof code === "string" && /^[A-Z0-9_]{1,40}$/u.test(code) ? code : "unknown";
+}
+
+/**
+ * Consigne aux moteurs : ne pas indexer, suivre les liens. Les annonces portent
+ * le pseudo Discord de tiers (relais GETI compris) ; `data-nosnippet` ne cache
+ * que l'extrait, pas l'indexation — une recherche sur un pseudo mènerait sinon
+ * à la page. Les catégories restent hors du plan du site.
+ */
+export const GETI_ROBOTS: NonNullable<Metadata["robots"]> = {
+  index: false,
+  follow: true,
+  googleBot: { index: false, follow: true },
+};

@@ -17,6 +17,7 @@ import {
   getiAgeOptions,
   getiCategoryPath,
   getiChannelUrl,
+  getiErrorCode,
   getiPageFilter,
   getiPageHref,
   parseGetiPageQuery,
@@ -54,7 +55,11 @@ export async function GetiInfoView({
   const now = Date.now();
   // Base injoignable : la page reste lisible (carte, onglets, bouton « Publier »).
   const listed: GetiPostPage | null = await listGetiPostsShared(filter, { page: query.page }, now).catch(
-    () => null,
+    (error: unknown) => {
+      // Un code seul (jamais le message, qui peut citer la requête) : la panne se voit dans pm2.
+      console.warn("[geti] post list unavailable:", getiErrorCode(error));
+      return null;
+    },
   );
   const activeFilters = getiActiveFilterCount(query);
   const data = getiFilterDataText(m);
@@ -183,9 +188,9 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, d
     return (
       <section className={styles.results} aria-labelledby="geti-category-title">
         <p /* NOSONAR S6819 — compteur de résultats annoncé à chaque filtre, pas une sortie de formulaire */ className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
-          {m.results.unavailable}
+          {m.results.none}
         </p>
-        <GetiRetry label={m.results.retry} />
+        <GetiRetry label={m.results.retry} error={m.results.unavailable} />
       </section>
     );
   }
