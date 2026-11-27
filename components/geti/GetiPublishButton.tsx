@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { getiText, type GetiMessages } from "@/lib/shared/geti/page-text";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { GetiOfficialCard, type OfficialText } from "./GetiOfficialCard";
 import styles from "./geti.module.css";
 
 type PublishText = GetiMessages["publish"];
@@ -19,8 +20,8 @@ type PublishProps = Readonly<{
   channelUrl: string;
   /** Invitation de notre serveur, pour qui n'en est pas encore membre. */
   ourInviteUrl: string;
-  /** Carte du serveur officiel de GETI, rendue par le serveur. */
-  card: ReactNode;
+  /** Texte de la carte du serveur officiel de GETI, rendue ici à l'ouverture (pas dans chaque page). */
+  official: OfficialText;
 }>;
 
 function PublishDialog({
@@ -28,7 +29,7 @@ function PublishDialog({
   categoryTitle,
   channelUrl,
   ourInviteUrl,
-  card,
+  official,
   onClose,
 }: PublishProps & Readonly<{ onClose: () => void }>) {
   const locale = useAppLocale();
@@ -75,7 +76,7 @@ function PublishDialog({
             </li>
             <li>
               <p className={styles.modalText}>{text.stepGeti}</p>
-              {card}
+              <GetiOfficialCard text={official} locale={locale} headingLevel={3} />
             </li>
           </ol>
           <p className={styles.modalNote}>{text.rules}</p>

@@ -1,13 +1,11 @@
 import type { ReactNode } from "react";
-import { Users } from "lucide-react";
-import { getGetiCommunity } from "@/lib/server/geti/community";
 import { GETI_OFFICIAL_INVITE_URL, GETI_OFFICIAL_SERVER_NAME } from "@/lib/shared/geti/page";
 import { getiText, type GetiMessages } from "@/lib/shared/geti/page-text";
-import { formatLocalNumber } from "@/lib/shared/dates";
 import type { Locale } from "@/lib/shared/locales";
 import styles from "./geti.module.css";
 
-type OfficialText = GetiMessages["official"];
+/** Texte de la carte : importable côté client (la fenêtre « Publier » la rend elle-même). */
+export type OfficialText = GetiMessages["official"];
 
 /**
  * Carte du serveur Discord officiel de GETI, en tête de chaque catégorie et
@@ -51,22 +49,5 @@ export function GetiOfficialCard({
         {text.join}
       </a>
     </section>
-  );
-}
-
-/** Fréquentation du serveur GETI ; rien si Discord ne la donne pas. */
-export async function GetiOfficialCount({ text, locale }: Readonly<{ text: OfficialText; locale: Locale }>) {
-  const stats = await getGetiCommunity();
-  if (!stats) return null;
-  return (
-    <p className={styles.officialCount}>
-      <Users size={13} aria-hidden="true" />
-      <span>{getiText(locale, text.members, { count: stats.memberCount })}</span>
-      {stats.onlineCount > 0 ? (
-        <span className={styles.officialOnline}>
-          {getiText(locale, text.online, { count: formatLocalNumber(stats.onlineCount, locale) })}
-        </span>
-      ) : null}
-    </p>
   );
 }

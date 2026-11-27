@@ -18,6 +18,18 @@ export type GetiDataText = Pick<
   "chips" | "tiers" | "roles" | "subRoles" | "staffRoles" | "levels" | "regions" | "platforms" | "languages" | "days"
 >;
 
+/**
+ * Ce que lit le panneau de filtres (composant client) : les libellés de données
+ * et le seul gabarit de rang des étiquettes — pas le reste des étiquettes.
+ */
+export type GetiFilterDataText = Omit<GetiDataText, "chips"> & { chips: Pick<GetiDataText["chips"], "rank"> };
+
+/** Extrait les libellés que lit le panneau de filtres (ce qui voyage vers un composant client). */
+export function getiFilterDataText(messages: GetiMessages): GetiFilterDataText {
+  const { chips, tiers, roles, subRoles, staffRoles, levels, regions, platforms, languages, days } = messages;
+  return { chips: { rank: chips.rank }, tiers, roles, subRoles, staffRoles, levels, regions, platforms, languages, days };
+}
+
 /** Extrait les libellés de données des messages (ce qui voyage vers un composant client). */
 export function getiDataText(messages: GetiMessages): GetiDataText {
   const { chips, tiers, roles, subRoles, staffRoles, levels, regions, platforms, languages, days } = messages;
@@ -30,7 +42,7 @@ export function getiText(locale: Locale, source: string, values?: MessageValues)
 }
 
 /** « Master 3 ». */
-export function getiRankLabel(rank: GetiRank, text: GetiDataText, locale: Locale): string {
+export function getiRankLabel(rank: GetiRank, text: GetiFilterDataText, locale: Locale): string {
   return getiText(locale, text.chips.rank, { tier: text.tiers[rank.tier], division: rank.division });
 }
 

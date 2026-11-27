@@ -3,7 +3,7 @@ import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
-import { listGetiPosts } from "@/lib/server/geti/posts";
+import { listGetiPostsShared } from "@/lib/server/geti/posts";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -23,13 +23,14 @@ import {
   type GetiPageQuery,
   type GetiSearchParams,
 } from "@/lib/shared/geti/page";
-import { getiDataText, getiText, type GetiMessages } from "@/lib/shared/geti/page-text";
+import { getiDataText, getiFilterDataText, getiText, type GetiDataText, type GetiMessages } from "@/lib/shared/geti/page-text";
 import { localeHref, type Locale } from "@/lib/shared/locales";
 import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
 import { GetiFilters } from "./GetiFilters";
 import { GetiLayout } from "./GetiLayout";
 import { GetiRetry } from "./GetiRetry";
-import { GetiOfficialCard, GetiOfficialCount } from "./GetiOfficialCard";
+import { GetiOfficialCard } from "./GetiOfficialCard";
+import { GetiOfficialCount } from "./GetiOfficialCount";
 import { GetiPostCard } from "./GetiPostCard";
 import { GetiPublishButton } from "./GetiPublishButton";
 import { GetiRefresher } from "./GetiRefresher";
@@ -52,11 +53,12 @@ export async function GetiInfoView({
   const filter = getiPageFilter(category, query);
   const now = Date.now();
   // Base injoignable : la page reste lisible (carte, onglets, bouton « Publier »).
-  const listed: GetiPostPage | null = await listGetiPosts(filter, { page: query.page }, undefined, now).catch(
+  const listed: GetiPostPage | null = await listGetiPostsShared(filter, { page: query.page }, now).catch(
     () => null,
   );
   const activeFilters = getiActiveFilterCount(query);
-  const data = getiDataText(m);
+  const data = getiFilterDataText(m);
+  const cardData = getiDataText(m);
   const retentionDays = GETI_RETENTION_DAYS[category];
 
   return (
@@ -126,7 +128,7 @@ export async function GetiInfoView({
             categoryTitle={m.categories[category].title}
             channelUrl={getiChannelUrl(category)}
             ourInviteUrl={DISCORD_INVITE_URL}
-            card={<GetiOfficialCard text={m.official} locale={locale} headingLevel={3} />}
+            official={m.official}
           />
         </header>
 
@@ -151,6 +153,7 @@ export async function GetiInfoView({
             filter={filter}
             filtered={activeFilters > 0}
             messages={m}
+            data={cardData}
             locale={locale}
             now={now}
           />
@@ -169,12 +172,13 @@ type ResultsProps = Readonly<{
   /** Au moins un filtre est actif. */
   filtered: boolean;
   messages: GetiMessages;
+  data: GetiDataText;
   locale: Locale;
   now: number;
 }>;
 
 /** Compteur annoncé (`aria-live`), liste des annonces, pagination. */
-function GetiResults({ listed, category, query, filter, filtered, messages: m, locale, now }: ResultsProps) {
+function GetiResults({ listed, category, query, filter, filtered, messages: m, data, locale, now }: ResultsProps) {
   if (listed === null) {
     return (
       <section className={styles.results} aria-labelledby="geti-category-title">
@@ -185,7 +189,6 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, l
       </section>
     );
   }
-  const data = getiDataText(m);
   const pages = Math.max(1, Math.ceil(listed.total / listed.pageSize));
   // Page au-delà de la dernière (lien partagé, annonces retirées depuis) : la liste n'est pas vide.
   const beyond = listed.posts.length === 0 && listed.total > 0;

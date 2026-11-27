@@ -33,7 +33,7 @@ import {
   type GetiFilterField,
   type GetiPageQuery,
 } from "@/lib/shared/geti/page";
-import { getiRankLabel, getiText, type GetiDataText, type GetiMessages } from "@/lib/shared/geti/page-text";
+import { getiRankLabel, getiText, type GetiFilterDataText, type GetiMessages } from "@/lib/shared/geti/page-text";
 import { useGetiPending } from "./GetiLayout";
 import styles from "./geti.module.css";
 
@@ -92,6 +92,9 @@ function ResetButton({ active, text, onReset }: Readonly<{ active: number; text:
   );
 }
 
+/** Calme à attendre après le dernier geste avant de demander la liste au serveur. */
+const GETI_FILTER_DEBOUNCE_MS = 300;
+
 /**
  * Filtres d'une catégorie d'annonces (`docs/features/GETI_INFO.md` § Page).
  *
@@ -118,7 +121,7 @@ export function GetiFilters({
   /** Annonces de la liste affichée (bouton « Voir les annonces » sur mobile). */
   total: number;
   text: FiltersText;
-  data: GetiDataText;
+  data: GetiFilterDataText;
 }>) {
   const locale = useAppLocale();
   const router = useLocaleRouter();
@@ -137,6 +140,13 @@ export function GetiFilters({
   // Navigations de filtre en cours : une fois toutes rendues, plus rien n'est attendu
   // (un geste défait vers l'adresse déjà affichée ne produit parfois aucun rendu).
   const [navigating, startNavigation] = useTransition();
+  // Navigation de filtre en attente de sa fenêtre de calme (`GETI_FILTER_DEBOUNCE_MS`).
+  const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function cancelNavigation() {
+    if (navTimer.current === null) return;
+    clearTimeout(navTimer.current);
+    navTimer.current = null;
+  }
   useEffect(() => {
     // Chaque rendu du serveur (nouvel objet `query`) passe ici, même à adresse égale :
     // un geste défait avant son rendu lève aussi l'attente.
@@ -148,11 +158,13 @@ export function GetiFilters({
     if (!navigating) pendingSearch.current = null;
     setPending(navigating);
   }, [navigating, setPending]);
+  useEffect(() => cancelNavigation, []);
   useEffect(() => {
     // Retour arrière ou avant, ou lien suivi (pagination, « Réinitialiser » de la liste) :
     // l'adresse affichée reprend la main sur les contrôles.
     const release = () => {
       pendingSearch.current = null;
+      cancelNavigation();
     };
     const releaseOnLink = (event: MouseEvent) => {
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -176,19 +188,26 @@ export function GetiFilters({
     };
   }, []);
 
-  const apply = (next: GetiPageQuery) => {
+  const apply = (next: GetiPageQuery, immediate = false) => {
     // Tout changement de filtre revient à la première page.
     const first = { ...next, page: 1 };
     setDraft(first);
     pendingSearch.current = getiNormalizedSearch(category, first);
-    startNavigation(() => router.replace(getiPageHref(category, first), { scroll: false }));
+    // Une rafale de cases cochées ne coûte qu'un rendu serveur : seule la dernière adresse part.
+    cancelNavigation();
+    const go = () => {
+      navTimer.current = null;
+      startNavigation(() => router.replace(getiPageHref(category, first), { scroll: false }));
+    };
+    if (immediate) go();
+    else navTimer.current = setTimeout(go, GETI_FILTER_DEBOUNCE_MS);
   };
 
   // Les boutons « Réinitialiser » disparaissent avec le dernier filtre : le focus passe à
   // une cible qui reste (le bouton Filtres sur mobile, le titre du panneau sinon).
   const resetAll = () => {
     focusStableTarget(toggleRef.current, titleRef.current);
-    apply({ ...emptyGetiPageQuery() });
+    apply({ ...emptyGetiPageQuery() }, true);
   };
 
   const active = getiActiveFilterCount(draft);

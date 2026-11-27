@@ -14,9 +14,11 @@ describe("fréquentation du serveur officiel de GETI", () => {
 
   beforeEach(() => {
     clearCache();
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     globalThis.fetch = originalFetch;
     clearCache();
   });
@@ -55,12 +57,44 @@ describe("fréquentation du serveur officiel de GETI", () => {
     await expect(getGetiCommunity()).resolves.toBeNull();
   });
 
-  it("l'échec est mis en cache : un seul appel sortant pour deux rendus", async () => {
+  it("un échec n'est gardé qu'une courte fenêtre : un seul appel pendant la fenêtre", async () => {
     const spy = mockFetch(() => jsonResponse({}, false));
 
     await getGetiCommunity();
     await getGetiCommunity();
 
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("après la fenêtre d'abstention, la page retente et le chiffre revient", async () => {
+    jest.useFakeTimers({ now: Date.UTC(2026, 10, 27, 12) });
+    try {
+      const spy = mockFetch(() => jsonResponse({}, false));
+      await expect(getGetiCommunity()).resolves.toBeNull();
+
+      jest.setSystemTime(Date.UTC(2026, 10, 27, 12, 1, 5));
+      spy.mockImplementation(async () => jsonResponse({ approximate_member_count: 10, approximate_presence_count: 2 }));
+
+      await expect(getGetiCommunity()).resolves.toEqual({ memberCount: 10, onlineCount: 2 });
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("un succès est gardé trente minutes, puis relu", async () => {
+    jest.useFakeTimers({ now: Date.UTC(2026, 10, 27, 12) });
+    try {
+      const spy = mockFetch(() => jsonResponse({ approximate_member_count: 10, approximate_presence_count: 2 }));
+      await getGetiCommunity();
+      jest.setSystemTime(Date.UTC(2026, 10, 27, 12, 29));
+      await getGetiCommunity();
+      expect(spy).toHaveBeenCalledTimes(1);
+      jest.setSystemTime(Date.UTC(2026, 10, 27, 12, 31));
+      await getGetiCommunity();
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

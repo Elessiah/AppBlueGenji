@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database", () => ({ getDatabase: jest.fn() }));
 jest.mock("@/lib/server/periodic-clock", () => ({ startPeriodicClock: jest.fn() }));
 
+import { clearCache } from "@/lib/server/cache";
 import { getDatabase } from "@/lib/server/database";
 import {
   deleteGetiPosts,
   getiTrustedBots,
   listGetiPosts,
+  listGetiPostsShared,
   purgeExpiredGetiPosts,
   reconcileGetiChannel,
   refreshStaleGetiPosts,
@@ -663,5 +665,83 @@ describe("refreshStaleGetiPosts", () => {
 
     expect(done).toBe(0);
     expect(execute.mock.calls.filter(([sql]) => String(sql).startsWith("SELECT"))).toHaveLength(1);
+  });
+});
+
+describe("listGetiPostsShared", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+
+  function shared(rows: unknown[]) {
+    const execute = executeMock(rows);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    return execute;
+  }
+
+  it("listGetiPostsShared_sameCategoryTwice_readsTheBaseOnce", async () => {
+    const execute = shared([row()]);
+
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW + 1000);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPostsShared_concurrentReaders_shareOneRead", async () => {
+    const execute = shared([row()]);
+
+    await Promise.all(Array.from({ length: 20 }, () => listGetiPostsShared({ category: "lft" }, {}, NOW)));
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPostsShared_otherCategory_readsAgain", async () => {
+    const execute = shared([row()]);
+
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    await listGetiPostsShared({ category: "lfp" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_otherMaxAge_readsAgain", async () => {
+    const execute = shared([row()]);
+
+    await listGetiPostsShared({ category: "lft", maxAgeHours: 24 }, {}, NOW);
+    await listGetiPostsShared({ category: "lft", maxAgeHours: 72 }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_differentFilterSameScan_filtersPerRequest", async () => {
+    const execute = shared([row()]);
+
+    const all = await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    const none = await listGetiPostsShared({ category: "lft", regions: ["NA"], includeUnknown: false }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(all.total).toBe(1);
+    expect(none.total).toBe(0);
+  });
+
+  it("listGetiPostsShared_pageBeyondLast_returnsNoPostsButTheTotal", async () => {
+    shared([row()]);
+
+    const page = await listGetiPostsShared({ category: "lft" }, { page: 5 }, NOW);
+
+    expect(page.posts).toEqual([]);
+    expect(page.total).toBe(1);
+    expect(page.page).toBe(5);
+  });
+
+  it("listGetiPostsShared_readFails_isNotCached", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(new Error("down")).mockResolvedValue([[row()]]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+
+    await expect(listGetiPostsShared({ category: "lft" }, {}, NOW)).rejects.toThrow();
+    const page = await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(page.total).toBe(1);
   });
 });
