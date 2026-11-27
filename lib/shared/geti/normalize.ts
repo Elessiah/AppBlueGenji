@@ -5,7 +5,9 @@
  * `plain` (sans accents, casse gardée, pour les sigles en capitales) et `lower`
  * (sans accents, en minuscules, où se lisent rangs, rôles et horaires). Le
  * bruit Discord — liens, mentions, balisage, pictogrammes — y devient une
- * espace : il ne doit ni se lire comme un mot ni coller deux mots.
+ * espace : il ne doit ni se lire comme un mot ni coller deux mots. Le nom d'un
+ * émoji de serveur (`:Grandmaster:`, `:tank:`) se lit dans `plain` et `lower`,
+ * pas dans `clean` : « :LogoStructure: ELDRAVEN » ne nomme pas une équipe.
  *
  * Module pur : importable côté serveur comme côté client.
  */
@@ -24,7 +26,12 @@ const URL_LIKE = /(?:https?:\/\/|discord\.gg\/|www\.)\S+/giu;
 const CUSTOM_EMOJI = /<a?:(\w{1,32}):\d{1,22}>/gu;
 const MENTION = /<(?:@[!&]?|#)\d{1,22}>/gu;
 const TIMESTAMP = /<t:\d{1,16}(?::[a-zA-Z])?>/gu;
-const MARKDOWN = /[*_~`|]+|^[ \t]*(?:>{1,3}|#{1,3}|-#)[ \t]+/gmu;
+/**
+ * Balisage : gras, italique, barré, code, masqué (`||…||`), citation, titre.
+ * Une barre verticale seule est un séparateur de l'auteur (« Tank | Flex
+ * DPS ») : elle reste, pour que « tank » et « flex » ne se lisent pas ensemble.
+ */
+const MARKDOWN = /[*_~`]+|\|{2,}|^[ \t]*(?:>{1,3}|#{1,3}|-#)[ \t]+/gmu;
 const REGIONAL_INDICATORS = /[\u{1F1E6}-\u{1F1FF}]/gu;
 const PICTOGRAPHS = /\p{Extended_Pictographic}|\uFE0F|\u200D|\u20E3|\p{Emoji_Modifier}/gu;
 const DIACRITICS = /\p{M}/gu;
@@ -81,19 +88,20 @@ export type GetiPreparedText = {
  * @returns Ses formes d'analyse.
  */
 export function prepareGetiText(text: string): GetiPreparedText {
-  const clean = text
-    .normalize("NFKC")
-    .replace(URL_LIKE, " ")
-    .replace(CUSTOM_EMOJI, " $1 ")
-    .replace(TIMESTAMP, " ")
-    .replace(MENTION, " ")
-    .replace(REGIONAL_INDICATORS, " ")
-    .replace(PICTOGRAPHS, " ")
-    .replace(MARKDOWN, " ")
-    .replace(/[\u2018\u2019\u00B4]/gu, "'")
-    .replace(/[^\S\n]+/gu, " ");
-  const plain = clean.normalize("NFD").replace(DIACRITICS, "");
-  return { clean, plain, lower: plain.toLowerCase() };
+  const prepare = (emoji: string) =>
+    text
+      .normalize("NFKC")
+      .replace(URL_LIKE, " ")
+      .replace(CUSTOM_EMOJI, emoji)
+      .replace(TIMESTAMP, " ")
+      .replace(MENTION, " ")
+      .replace(REGIONAL_INDICATORS, " ")
+      .replace(PICTOGRAPHS, " ")
+      .replace(MARKDOWN, " ")
+      .replace(/[\u2018\u2019\u00B4]/gu, "'")
+      .replace(/[^\S\n]+/gu, " ");
+  const plain = prepare(" $1 ").normalize("NFD").replace(DIACRITICS, "");
+  return { clean: prepare(" "), plain, lower: plain.toLowerCase() };
 }
 
 /** Échappe un texte pour l'insérer tel quel dans une expression régulière. */
@@ -104,7 +112,8 @@ export function escapeRegExp(text: string): string {
 /**
  * Alternative d'expression régulière pour une liste d'alias : les plus longs
  * d'abord (« grand master » avant « master »), une espace d'alias tolérant
- * espace, tiret ou rien (« grand-master », « grandmaster »).
+ * espace, tiret ou rien (« grand-master », « grandmaster ») — jamais un saut de
+ * ligne : « DPS » puis « Flex support » à la ligne sont deux postes.
  *
  * @param aliases Alias en minuscules, sans accents.
  * @returns Le motif, sans groupe capturant.
@@ -112,7 +121,7 @@ export function escapeRegExp(text: string): string {
 export function aliasPattern(aliases: readonly string[]): string {
   return [...aliases]
     .sort((a, b) => b.length - a.length)
-    .map((alias) => alias.split(" ").map(escapeRegExp).join(String.raw`[\s-]?`))
+    .map((alias) => alias.split(" ").map(escapeRegExp).join(String.raw`(?:[^\S\n]|-)?`))
     .join("|");
 }
 

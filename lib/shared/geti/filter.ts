@@ -71,7 +71,8 @@ function matchesAge(post: GetiParsedPost, maxAgeHours: number | null | undefined
  * - **Rangs** : la fourchette de l'annonce recoupe celle du filtre ; avec des
  *   rôles voulus et un rang par rôle dans l'annonce, seuls ces rôles comptent.
  * - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
- * - **Région, plateforme, langue** : une valeur voulue est dans l'annonce.
+ * - **Région, plateforme, langue, niveau** : une valeur voulue est dans l'annonce.
+ * - **Annonces closes** : écartées avec `hideClosed`.
  * - **Âge** : publiée depuis `maxAgeHours` au plus ; sans date, écartée.
  *
  * Une annonce où le critère n'a pas été lu est écartée, sauf `includeUnknown`.
@@ -84,12 +85,14 @@ function matchesAge(post: GetiParsedPost, maxAgeHours: number | null | undefined
 export function matchesGetiFilter(post: GetiParsedPost, filter: GetiFilter, now: number = Date.now()): boolean {
   const includeUnknown = filter.includeUnknown === true;
   if (filter.category !== null && filter.category !== undefined && post.category !== filter.category) return false;
+  if (filter.hideClosed === true && post.closed) return false;
   return (
     matchesAge(post, filter.maxAgeHours, now) &&
     matchesRoles(post, filter, includeUnknown) &&
     matchesRanks(post, filter, includeUnknown) &&
     matchesAny(post.regions, wanted(filter.regions), includeUnknown) &&
     matchesAny(post.platforms, wanted(filter.platforms), includeUnknown) &&
-    matchesAny(post.languages, wanted(filter.languages), includeUnknown)
+    matchesAny(post.languages, wanted(filter.languages), includeUnknown) &&
+    matchesAny(post.levels, wanted(filter.levels), includeUnknown)
   );
 }

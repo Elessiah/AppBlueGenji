@@ -4,8 +4,8 @@
  * Porté de `extractRanks` du bot (Marvel Rivals, paliers seuls) et étendu à
  * Overwatch : paliers Bronze → Champion, divisions 5 → 1, formes abrégées
  * (« d3 », « gm1 »), fourchettes (« d3-m2 », « diam 3-1 »), bornes ouvertes
- * (« master+ », « max d1 »), « top 500 », ancien SR (« 3500 sr », « 4k2 »), et
- * rang par rôle (« tank m2 / dps d1 »).
+ * (« master+ », « max d1 »), « top 500 », SR de scrim (« 3500 sr », « 4k2 »,
+ * « 3k4-5 », « 3.4-3.5k », « SR 3.6-3.7 ») et rang par rôle (« tank m2 / dps d1 »).
  *
  * Un rang vaut un entier de 0 (Bronze 5) à 39 (Champion 1) ; un palier sans
  * division couvre ses cinq divisions.
@@ -97,6 +97,9 @@ function wordAfter(words: string): RegExp {
 }
 
 const GREETED = "tout tous toutes a\\stous all everyone every1 les la\\steam the\\steam guys y'?all friends? frerots? la\\scommu chat";
+const TITLE_BEFORE =
+  "open inter intermediate intermediaire adv advanced avance expert division div faceit lan tournoi tournament cup";
+const TITLE_AFTER = "de du d' des of";
 const COMMON_WORD_SENSES: Readonly<Record<string, CommonSense>> = {
   gm: {
     before: /(?:^|\n)[^\S\n]*$/u,
@@ -115,6 +118,9 @@ const COMMON_WORD_SENSES: Readonly<Record<string, CommonSense>> = {
     before: wordBefore("le un du au ce mon ton son en\\splein"),
     after: wordAfter("de du d' des libre lexical"),
   },
+  // Un titre, pas un rang : « S10 Intermediate Champion », « champion de France ».
+  champion: { before: wordBefore(TITLE_BEFORE), after: wordAfter(TITLE_AFTER) },
+  champions: { before: wordBefore(TITLE_BEFORE), after: wordAfter(TITLE_AFTER) },
 };
 
 /** Le mot est pris dans son sens courant (sans division, ni « + »). */
@@ -163,11 +169,33 @@ const NOT_LETTER_RANK_BEFORE = new RegExp(
 const NOT_LETTER_RANK_AFTER = /^[\s-]?(?:e-?sports?|gaming)(?![\p{L}\p{N}])/u;
 const TOP_500 = new RegExp(String.raw`${NOT_AFTER_WORD}(?:top\s?500|t500)${NOT_BEFORE_WORD}`, "gu");
 /**
- * Ancien SR en milliers : « 4k », « 4.2k », « 3k5 », « 3k+ » — un rang (« 4k »
- * ≈ Grand maître), sauf dans un contexte net qui en fait autre chose.
+ * SR en milliers : « 4k », « 4.2k », « 3k5 », « 3k+ » — un rang (« 4k »
+ * ≈ Grand maître), sauf dans un contexte net qui en fait autre chose. Une
+ * fourchette de centaines suit parfois le chiffre : « 3k4-5 », « 2k5/7 ».
  */
 const SR_THOUSANDS = new RegExp(
-  String.raw`(?<![\p{L}\p{N}.,#])([1-4])(?:[.,](\d))?k(\d)?(?:\s?(sr|elo))?${NOT_BEFORE_WORD}`,
+  String.raw`(?<![\p{L}\p{N}.,#])([1-5])(?:[.,](\d))?k(?:(\d)(?:[-/](\d)(?![\p{L}\p{N}.,:]))?)?(?:\s?(sr|elo))?${NOT_BEFORE_WORD}`,
+  "gu",
+);
+/**
+ * Fourchette dont seule la seconde borne porte le « k » : « 3.4-3.5k »,
+ * « 3.5-6k » (3 500 à 3 600), « 3.2-3k » (3 200 à 3 000), « 3.5/4k ».
+ */
+const SR_DECIMAL_RANGE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}.,#])([1-4])[.,](\d)\s?[-–/]\s?(?:([1-5])[.,](\d)|(\d))\s?k${NOT_BEFORE_WORD}`,
+  "gu",
+);
+/**
+ * SR décimal nu, lu dans une recherche de scrim ou de remplaçant seulement :
+ * « LFS EU PC 3.6-3.7 », « LFS 4.5 20-22 », « adv 4.5+ ».
+ */
+const SR_BARE_DECIMAL = new RegExp(
+  String.raw`(?<![\p{L}\p{N}.,#/:–-])([1-4])[.,](\d)(?:\s?[-–/]\s?([1-5])[.,](\d))?(?![\p{L}\p{N}]|[.,:/–-]\p{N}|\s?%)`,
+  "gu",
+);
+/** SR décimal derrière son libellé, sans « k » : « SR 3.6-3.7 », « elo : 3.2 ». */
+const SR_LABELLED_DECIMAL = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:sr|elo)\s?:?\s?([1-4])[.,](\d)(?:\s?[-–/]\s?([1-5])[.,](\d))?(?![\p{L}\p{N}.,])`,
   "gu",
 );
 /**
@@ -180,15 +208,18 @@ const COUNTED_AFTER = new RegExp(
 );
 /** … ou ce qui le précède : « écran 4k », « cashprize 1k », « $4k », « résolution 4k ». */
 const NOT_RANK_BEFORE = new RegExp(
-  String.raw`(?:${NOT_AFTER_WORD}(?:ecrans?|screens?|monitors?|moniteurs?|resolution|tv|televiseur|video|videos|stream|qualite|quality|cash\s?prize|prize\s?pool|prize|dotation|budget|prix|price|salaire|salary|recompense|reward|code|id|pin|tag|ref|numero|num|tel|telephone|phone)\s?:?\s?(?:de\s|en\s|of\s|in\s)?|[€$£]\s?)$`,
+  String.raw`(?:${NOT_AFTER_WORD}(?:ecrans?|screens?|monitors?|moniteurs?|resolution|tv|televiseur|video|videos|stream|qualite|quality|cash\s?prize|prize\s?pool|prize|dotation|budget|prix|price|salaire|salary|recompense|reward|code|id|pin|tag|ref|numero|num|tel|telephone|phone|loi|law)\s?:?\s?(?:de\s|en\s|of\s|in\s)?|[€$£]\s?)$`,
   "u",
 );
-/** Suite de chiffres groupés (un numéro de téléphone) : un numéro, pas un SR. */
-const DIGITS_BEFORE = /\d{2}[\s.-]?$/u;
-const DIGITS_AFTER = /^[\s.-]?\d{2}/u;
-/** Ancien SR en chiffres : « 3500 sr », « 4400+ », « 3500-4000 ». */
+/**
+ * Suite de chiffres groupés (un numéro de téléphone) : un numéro, pas un SR.
+ * Un horaire voisin n'en est pas un : « 3500 21-23 », « 20-22 3500 ».
+ */
+const DIGITS_BEFORE = /(?:^|[^\p{N}\-–/:h])\d{2}[\s.]$/u;
+const DIGITS_AFTER = /^(?:[\s.]\d{2}(?:[\s.]\d{2})+|[\s.-]?\d{4})(?!\p{N})/u;
+/** SR en chiffres : « 3500 sr », « 4400+ », « 3500-4000 ». */
 const SR_NUMBER = new RegExp(
-  String.raw`(?<![\p{L}\p{N}.,#])([1-4]\d{3})(?:\s?[-–/]\s?([1-4]\d{3}))?(?:\s?(sr|elo)|(\+))?${NOT_BEFORE_WORD}`,
+  String.raw`(?<![\p{L}\p{N}.,#])([1-4]\d{3}|5000)(?:\s?[-–/]\s?([1-4]\d{3}|5000))?(?:\s?(sr|elo)|(\+))?${NOT_BEFORE_WORD}`,
   "gu",
 );
 
@@ -253,10 +284,19 @@ function tierSpan(tier: GetiTier, first: string | undefined, second: string | un
   return { min: Math.min(a, b), max: Math.max(a, b) };
 }
 
-/** Rang d'un ancien SR : 500 points par palier, 100 par division, plafonné à Grand Maître 1. */
+/**
+ * Rang d'un SR : 500 points par palier, 100 par division — 3 000 = Diamant 5,
+ * 4 000 = Grand Maître 5, 4 500 = Champion 5 (l'échelle des annonces de scrim,
+ * où « 4.5k+ » se lit couramment), plafonné à Champion 1.
+ */
 function srValue(sr: number): number {
   const steps = Math.floor((sr - 1000) / 100);
-  return Math.min(GETI_TIERS.indexOf("GRANDMASTER") * DIVISIONS + DIVISIONS - 1, Math.max(0, steps));
+  return Math.min(GETI_RANK_TOP, Math.max(0, steps));
+}
+
+function srSpan(first: number, second: number): ValueRange {
+  const values = [srValue(first), srValue(second)];
+  return { min: Math.min(...values), max: Math.max(...values) };
 }
 
 function isYear(value: number): boolean {
@@ -296,43 +336,68 @@ function srNumberSpan(match: RegExpExecArray): ValueRange | null {
   const labelled = match[3] !== undefined || match[4] !== undefined;
   // « 4000 » seul est un SR ; « 2025 » seul ou « 2025-2026 » sont des années.
   if (!labelled && isYear(first) && isYear(second)) return null;
-  const values = [srValue(first), srValue(second)];
-  return { min: Math.min(...values), max: Math.max(...values) };
+  return srSpan(first, second);
 }
 
-/** Le nombre vise autre chose qu'un rang : unité derrière, montant ou écran devant. */
-function isNotRank(lower: string, match: RegExpExecArray): boolean {
+/**
+ * Le nombre vise autre chose qu'un rang : unité derrière, montant ou écran
+ * devant, ou — pour un nombre sans « k » (`phone`) — chiffres d'un numéro.
+ */
+function isNotRank(lower: string, match: RegExpExecArray, phone: boolean): boolean {
   const end = match.index + match[0].length;
   const before = lower.slice(Math.max(0, match.index - 20), match.index);
   const after = lower.slice(end, end + 14);
-  return (
-    COUNTED_AFTER.test(after) ||
-    NOT_RANK_BEFORE.test(before) ||
-    DIGITS_BEFORE.test(before) ||
-    DIGITS_AFTER.test(after)
-  );
+  if (COUNTED_AFTER.test(after) || NOT_RANK_BEFORE.test(before)) return true;
+  return phone && (DIGITS_BEFORE.test(before) || DIGITS_AFTER.test(after));
 }
 
-/** Ancien SR, en milliers ou en chiffres. */
-function srTokens(lower: string): RankToken[] {
+/** Seconde borne de « 3.5-6k » : des centaines (3 600), sauf un millier plausible (« 3.5-4k », « 3.2-3k »). */
+function decimalRangeEnd(thousands: number, digit: number): number {
+  return digit >= thousands && digit <= 5 ? digit * 1000 : thousands * 1000 + digit * 100;
+}
+
+/** SR, en milliers ou en chiffres ; `scrim` lit aussi le décimal nu (« 3.6 »). */
+function srTokens(lower: string, scrim: boolean): RankToken[] {
   const tokens: RankToken[] = [];
+  for (const match of scrim ? lower.matchAll(SR_BARE_DECIMAL) : []) {
+    const first = Number(match[1]) * 1000 + Number(match[2]) * 100;
+    const second = match[3] === undefined ? first : Number(match[3]) * 1000 + Number(match[4]) * 100;
+    tokens.push(tokenOf(match, srSpan(first, second)));
+  }
+  for (const match of lower.matchAll(SR_DECIMAL_RANGE)) {
+    if (isNotRank(lower, match, false)) continue;
+    const thousands = Number(match[1]);
+    const first = thousands * 1000 + Number(match[2]) * 100;
+    const second =
+      match[5] === undefined
+        ? Number(match[3]) * 1000 + Number(match[4]) * 100
+        : decimalRangeEnd(thousands, Number(match[5]));
+    tokens.push(tokenOf(match, srSpan(first, second)));
+  }
+  for (const match of lower.matchAll(SR_LABELLED_DECIMAL)) {
+    const first = Number(match[1]) * 1000 + Number(match[2]) * 100;
+    const second = match[3] === undefined ? first : Number(match[3]) * 1000 + Number(match[4]) * 100;
+    tokens.push(tokenOf(match, srSpan(first, second)));
+  }
   for (const match of lower.matchAll(SR_THOUSANDS)) {
     if (match[2] !== undefined && match[3] !== undefined) continue;
     // « 4k sr » est un SR quoi qu'il y ait autour.
-    if (match[4] === undefined && isNotRank(lower, match)) continue;
-    const value = srValue(Number(match[1]) * 1000 + Number(match[2] ?? match[3] ?? 0) * 100);
-    tokens.push(tokenOf(match, { min: value, max: value }));
+    if (match[5] === undefined && isNotRank(lower, match, false)) continue;
+    const thousands = Number(match[1]) * 1000;
+    const first = thousands + Number(match[2] ?? match[3] ?? 0) * 100;
+    const second = match[4] === undefined ? first : thousands + Number(match[4]) * 100;
+    tokens.push(tokenOf(match, srSpan(first, second)));
   }
   for (const match of lower.matchAll(SR_NUMBER)) {
     const span = srNumberSpan(match);
-    const rank = match[3] !== undefined || !isNotRank(lower, match);
+    const rank = match[3] !== undefined || !isNotRank(lower, match, true);
     if (span !== null && rank) tokens.push(tokenOf(match, span, match[4] !== undefined));
   }
   return tokens;
 }
 
-function rawTokens(lower: string): RankToken[] {
-  return [...tierTokens(lower), ...srTokens(lower)];
+function rawTokens(lower: string, scrim: boolean): RankToken[] {
+  return [...tierTokens(lower), ...srTokens(lower, scrim)];
 }
 
 /** Marqueurs de borne ouverte autour d'un rang, absorbés dans son étendue. */
@@ -361,8 +426,8 @@ function withOpenMarkers(lower: string, token: RankToken): RankToken {
   return next;
 }
 
-function rankTokens(lower: string): RankToken[] {
-  const sorted = rawTokens(lower).sort((a, b) => a.start - b.start || b.end - a.end);
+function rankTokens(lower: string, scrim: boolean): RankToken[] {
+  const sorted = rawTokens(lower, scrim).sort((a, b) => a.start - b.start || b.end - a.end);
   const kept: RankToken[] = [];
   for (const token of sorted) {
     const previous = kept.at(-1);
@@ -487,11 +552,13 @@ function toRankRange(range: ValueRange): GetiRankRange {
  *
  * @param lower Texte sans accents, en minuscules (`prepareGetiText`).
  * @param roleTokens Rôles déjà repérés dans ce même texte.
+ * @param scrim `true` pour une recherche de scrim ou de remplaçant : un
+ *   décimal nu (« 3.6 », « 4.5+ ») y est un SR.
  * @returns Les rangs ; `min` et `max` valent `null` quand aucun rang n'est lu.
  */
-export function parseGetiRanks(lower: string, roleTokens: readonly GetiRoleToken[]): GetiRanks {
+export function parseGetiRanks(lower: string, roleTokens: readonly GetiRoleToken[], scrim = false): GetiRanks {
   const runs = roleRuns(lower, roleTokens);
-  const groups = rankGroups(lower, rankTokens(lower));
+  const groups = rankGroups(lower, rankTokens(lower, scrim));
   if (groups.length === 0) return { min: null, max: null, byRole: {} };
   const byRoleValues = ranksByRole(lower, groups, runs);
   const byRole: GetiRanks["byRole"] = {};

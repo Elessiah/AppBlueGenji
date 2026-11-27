@@ -14,12 +14,33 @@ type RoleKind = GetiRole | GetiSubRole;
 const ROLE_ALIASES: Readonly<Record<RoleKind, readonly string[]>> = {
   MAIN_TANK: ["main tank", "mt"],
   OFF_TANK: ["off tank", "ot"],
-  TANK: ["tank", "tanks", "tanker", "tankeur"],
-  HITSCAN: ["hitscan dps", "dps hitscan", "hitscan", "hit scan"],
-  FLEX_DPS: ["flex dps", "fdps", "projectile dps", "dps projectile", "proj dps"],
+  TANK: ["tank", "tanks", "tanker", "tankeur", "flex tank"],
+  HITSCAN: ["hitscan dps", "dps hitscan", "hitscan", "hit scan", "hs dps", "dps hs", "hs"],
+  FLEX_DPS: ["flex dps", "dps flex", "fdps", "projectile dps", "dps projectile", "proj dps"],
   DPS: ["dps", "damage", "degats", "dmg"],
-  MAIN_SUPPORT: ["main support", "main supp", "main sup", "main heal", "main healer", "ms"],
-  FLEX_SUPPORT: ["flex support", "flex supp", "flex sup", "flex heal", "flex healer", "fs"],
+  MAIN_SUPPORT: [
+    "main support",
+    "main supp",
+    "main sup",
+    "main heal",
+    "main healer",
+    "support main",
+    "supp main",
+    "sup main",
+    "ms",
+  ],
+  FLEX_SUPPORT: [
+    "flex support",
+    "flex supp",
+    "flex sup",
+    "flex heal",
+    "flex healer",
+    "support flex",
+    "supp flex",
+    "sup flex",
+    "heal flex",
+    "fs",
+  ],
   SUPPORT: [
     "support",
     "supports",
@@ -48,7 +69,12 @@ const SUB_ROLE_PARENT: Readonly<Record<GetiSubRole, GetiRole>> = {
 };
 
 /** Abréviations de deux lettres, ambiguës derrière un nombre (« 20 ms » de ping). */
-const SHORT_ABBREVIATIONS = new Set(["mt", "ot", "ms", "fs"]);
+const SHORT_ABBREVIATIONS = new Set(["mt", "ot", "ms", "fs", "hs"]);
+/**
+ * « flex » est aussi un verbe : « can flex to Juno », « peut flex sur Ana »,
+ * « flex on other heroes » ne disent pas un joueur polyvalent.
+ */
+const FLEX_VERB_AFTER = /^\s(?:to|on|onto|sur|vers|into)(?![\p{L}\p{N}])/u;
 /** « support » et « soutien » sont aussi des mots de politesse (« merci pour votre soutien »). */
 const POLITE_WORDS = new Set(["support", "supports", "soutien"]);
 /**
@@ -91,6 +117,10 @@ export function findGetiRoleTokens(lower: string): GetiRoleToken[] {
     const start = match.index;
     if (SHORT_ABBREVIATIONS.has(key) && /\d\s?$/u.test(lower.slice(Math.max(0, start - 2), start))) continue;
     if (POLITE_WORDS.has(key) && POLITE_BEFORE.test(lower.slice(Math.max(0, start - 40), start))) continue;
+    if (key === "flex" && FLEX_VERB_AFTER.test(lower.slice(start + match[0].length, start + match[0].length + 8))) continue;
+    // « tank flex » : un tank qui joue tous les tanks, pas un joueur polyvalent en plus.
+    const previous = tokens.at(-1);
+    if (key === "flex" && previous?.role === "TANK" && lower.slice(previous.end, start) === " ") continue;
     tokens.push(
       isSubRole(kind)
         ? { start, end: start + match[0].length, role: SUB_ROLE_PARENT[kind], subRole: kind }

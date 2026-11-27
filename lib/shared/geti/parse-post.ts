@@ -12,7 +12,9 @@
 import {
   detectGetiCategory,
   parseGetiAvailability,
+  parseGetiDates,
   parseGetiLanguages,
+  parseGetiLevels,
   parseGetiMinAge,
   parseGetiPlatforms,
   parseGetiRegions,
@@ -76,6 +78,24 @@ const GETI_HEADER = new RegExp(
   String.raw`^\s*<@!?(\d{15,22})>[^\S\n]*[*_]*\(((?:\\.|[^)\n\\]){1,64})\)[*_]*[^\S\n]*(?:sur|on|from)[^\S\n]*${GETI_SERVER_LINK}[^\S\n]*(?:\n|$)`,
   "iu",
 );
+/** Passage barré : ce qui n'est plus d'actualité (un jour pris, une annonce close). */
+const STRUCK = /~~([^~]+(?:~(?!~)[^~]*)*)~~/gu;
+/** Ce qui n'est pas du texte : citation, mentions, émojis de serveur, balisage, ponctuation. */
+const NOT_TEXT = /<[^<>\s]{1,60}>|[^\p{L}\p{N}]/gu;
+
+/**
+ * Texte à analyser : sans ses passages barrés (« ~~Mardi 24/11~~ Mercredi
+ * 25/11 » ne cherche plus que mercredi). Quand **tout** est barré, l'annonce
+ * est close : son contenu reste lu, pour qu'elle garde ses données.
+ */
+function withoutStruck(displayed: string): { analysed: string; closed: boolean } {
+  if (!displayed.includes("~~")) return { analysed: displayed, closed: false };
+  const kept = displayed.replace(STRUCK, " ");
+  if (kept === displayed) return { analysed: displayed, closed: false };
+  const closed = kept.replace(NOT_TEXT, "") === "";
+  return { analysed: closed ? displayed.replace(STRUCK, " $1 ") : kept, closed };
+}
+
 /** Pseudo entre parenthèses derrière un nom d'affichage : « Nom (@pseudo) ». */
 const HANDLE_IN_PARENTHESES = /\(@?([\w.]{2,32}(?:#\d{4})?)\)\s*$/u;
 
@@ -212,6 +232,8 @@ function contentOf(raw: GetiRawPost): RelayContent & { relayed: boolean } {
  * celle du seul mot-clé (« lfp », « lft »…) du texte. Les rôles d'une annonce
  * « je cherche un joueur » sont les rôles **recherchés** ; ceux d'une annonce
  * « je cherche une équipe » sont ceux de l'auteur — même champ, lu pareil.
+ * Un passage barré (`~~…~~`) n'est pas lu, sauf si toute l'annonce l'est :
+ * elle est alors `closed`.
  *
  * @param raw Message Discord brut, non fiable.
  * @returns L'annonce analysée ; un message vide rend des champs vides.
@@ -220,28 +242,38 @@ export function parseGetiPost(raw: GetiRawPost): GetiParsedPost {
   const source: GetiRawPost = typeof raw === "object" && raw !== null ? raw : {};
   const content = contentOf(source);
   const displayed = getiDisplayText(content.body);
-  const prepared = prepareGetiText(displayed);
+  const { analysed, closed } = withoutStruck(displayed);
+  const prepared = prepareGetiText(analysed);
   const roleTokens = findGetiRoleTokens(prepared.lower);
+  const category = isCategory(source.category)
+    ? source.category
+    : (getiCategoryOfChannel(source.channelId) ?? detectGetiCategory(prepared.lower));
+  const postedAt = isoDate(source.postedAt);
+  // Scrim ou remplaçant — d'après le salon, ou le mot-clé d'une annonce postée
+  // ailleurs (« LFSub » dans le salon des joueurs) : une soirée précise, à un SR donné.
+  const oneEvening = [category, detectGetiCategory(prepared.lower)].some((kind) => kind === "lfs" || kind === "lfsub");
+  const dates = parseGetiDates(prepared.lower, postedAt, oneEvening);
   return {
-    category: isCategory(source.category)
-      ? source.category
-      : (getiCategoryOfChannel(source.channelId) ?? detectGetiCategory(prepared.lower)),
+    category,
     authorTag: content.authorTag,
     authorId: content.authorId,
     relayed: content.relayed,
     originServer: content.originServer,
     text: displayed,
-    ranks: parseGetiRanks(prepared.lower, roleTokens),
+    ranks: parseGetiRanks(prepared.lower, roleTokens, oneEvening),
     roles: getiRolesOf(roleTokens),
     subRoles: getiSubRolesOf(roleTokens),
-    regions: parseGetiRegions(prepared.lower, displayed),
-    platforms: parseGetiPlatforms(prepared.lower),
-    languages: parseGetiLanguages(prepared, displayed),
-    availability: parseGetiAvailability(prepared),
+    regions: parseGetiRegions(prepared.lower, analysed),
+    platforms: parseGetiPlatforms(prepared.lower, category === "lfs"),
+    languages: parseGetiLanguages(prepared, analysed),
+    availability: parseGetiAvailability(prepared, dates),
+    dates,
+    levels: parseGetiLevels(prepared.lower),
+    closed,
     teamName: parseGetiTeamName(prepared.clean),
     staffRoles: parseGetiStaffRoles(prepared.lower),
     minAge: parseGetiMinAge(prepared.lower),
-    postedAt: isoDate(source.postedAt),
+    postedAt,
     edited: isoDate(source.editedAt) !== null,
   };
 }

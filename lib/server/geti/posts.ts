@@ -251,7 +251,8 @@ function storedPostOf(row: GetiPostRow, now: number): GetiStoredPost | null {
     authorTag: row.author_tag,
     authorId: row.author_id,
     // La date gardée fait foi pour le filtre d'âge, pas celle recopiée dans l'analyse.
-    parsed: { ...parsed, postedAt },
+    // Une analyse gardée avant l'ajout d'un champ (dates, niveaux, clôture) le reçoit vide.
+    parsed: { dates: [], levels: [], closed: false, ...parsed, postedAt },
     postedAt,
     editedAt: toIso(row.edited_at),
   };

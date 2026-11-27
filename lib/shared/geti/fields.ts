@@ -1,7 +1,7 @@
 /**
  * Champs secondaires d'une annonce GETI : région, plateforme, langues,
- * disponibilités, nom d'équipe, postes de staff, âge minimal, mot-clé de
- * catégorie.
+ * disponibilités, dates, niveau de division, nom d'équipe, postes de staff,
+ * âge minimal, mot-clé de catégorie.
  *
  * Module pur : importable côté serveur comme côté client.
  */
@@ -18,6 +18,7 @@ import {
   GETI_CATEGORIES,
   GETI_DAYS,
   GETI_LANGUAGES,
+  GETI_LEVELS,
   GETI_PLATFORMS,
   GETI_REGIONS,
   GETI_STAFF_ROLES,
@@ -25,6 +26,7 @@ import {
   type GetiCategory,
   type GetiDay,
   type GetiLanguage,
+  type GetiLevel,
   type GetiPlatform,
   type GetiRegion,
   type GetiStaffRole,
@@ -113,14 +115,24 @@ const PLATFORM_ALIASES: Readonly<Record<GetiPlatform, readonly string[]>> = {
 };
 
 const findPlatforms = aliasFinder(GETI_PLATFORMS, PLATFORM_ALIASES);
+/** Équipe qui mêle PC et console : les deux plateformes. */
+const BOTH_PLATFORMS = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:hybrid|hybride|hybrides|cross[\s-]?play|cross[\s-]?plate?form|cross[\s-]?plateforme)${NOT_BEFORE_WORD}`,
+  "u",
+);
+/** « mixed », dans une recherche de scrim, dit la même chose ; ailleurs, c'est une équipe mixte. */
+const MIXED = new RegExp(String.raw`${NOT_AFTER_WORD}mixed${NOT_BEFORE_WORD}`, "u");
 
 /**
- * Plateformes citées.
+ * Plateformes citées ; « hybrid », « crossplay » (et « mixed » pour un scrim)
+ * valent PC **et** console.
  *
  * @param lower Texte sans accents, en minuscules.
+ * @param scrim `true` pour une recherche de scrim (`lfs`).
  * @returns Les plateformes, dans l'ordre de `GETI_PLATFORMS`.
  */
-export function parseGetiPlatforms(lower: string): GetiPlatform[] {
+export function parseGetiPlatforms(lower: string, scrim = false): GetiPlatform[] {
+  if (BOTH_PLATFORMS.test(lower) || (scrim && MIXED.test(lower))) return [...GETI_PLATFORMS];
   return findPlatforms(lower);
 }
 
@@ -194,31 +206,82 @@ export function parseGetiLanguages(prepared: GetiPreparedText, rawText: string):
   return inReferenceOrder(GETI_LANGUAGES, found);
 }
 
-/** Noms complets seulement : « mar », « jeu », « mon » ou « sun » sont des mots courants. */
+/** Noms complets (fautes courantes comprises) ; les abréviations se lisent à part, en contexte. */
 const DAY_ALIASES: Readonly<Record<GetiDay, readonly string[]>> = {
   MON: ["lundi", "lundis", "monday", "mondays"],
   TUE: ["mardi", "mardis", "tuesday", "tuesdays"],
-  WED: ["mercredi", "mercredis", "wednesday", "wednesdays"],
-  THU: ["jeudi", "jeudis", "thursday", "thursdays"],
+  WED: ["mercredi", "mercredis", "mecredi", "mercedi", "wednesday", "wednesdays", "wenesday", "wednesay"],
+  THU: ["jeudi", "jeudis", "thursday", "thursdays", "thurday"],
   FRI: ["vendredi", "vendredis", "friday", "fridays"],
   SAT: ["samedi", "samedis", "saturday", "saturdays"],
   SUN: ["dimanche", "dimanches", "sunday", "sundays"],
 };
+/**
+ * Abréviations : « mar », « jeu », « mon » ou « sun » sont aussi des mots
+ * courants — lues seulement devant une date ou une heure (« Tue 20-22 »,
+ * « sam 28/11 », « ven. 21h ») ou en liste ponctuée (« lun/mer/ven »,
+ * « mon-fri ») ; « mon jeu » reste « mon jeu ».
+ */
+const DAY_ABBREVIATIONS: Readonly<Record<GetiDay, readonly string[]>> = {
+  MON: ["lun", "mon"],
+  TUE: ["mar", "tue", "tues"],
+  WED: ["mer", "wed"],
+  THU: ["jeu", "thu", "thur", "thurs"],
+  FRI: ["ven", "fri"],
+  SAT: ["sam", "sat"],
+  SUN: ["dim", "sun"],
+};
+const DAY_ABBREVIATION_TABLE = aliasTable(DAY_ABBREVIATIONS);
+const ABBREVIATION = `(${DAY_ABBREVIATION_TABLE.pattern})`;
+const DAY_ABBREVIATION_DATED = new RegExp(
+  String.raw`${NOT_AFTER_WORD}${ABBREVIATION}\.?\s?:?\s?(?=\d{1,2}\s?(?:[/h:–-]\s?\d|h${NOT_BEFORE_WORD}))`,
+  "gu",
+);
+const DAY_ABBREVIATION_LIST = new RegExp(
+  String.raw`${NOT_AFTER_WORD}${ABBREVIATION}\.?\s?[/,&–-]\s?${ABBREVIATION}\.?(?:\s?[/,&–-]\s?${ABBREVIATION}\.?)*${NOT_BEFORE_WORD}`,
+  "gu",
+);
+const DAY_ABBREVIATION_WORD = new RegExp(`${NOT_AFTER_WORD}${ABBREVIATION}${NOT_BEFORE_WORD}`, "gu");
 const DAY_TABLE = aliasTable(DAY_ALIASES);
 const DAY_RANGE = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(${DAY_TABLE.pattern})\s?(?:-|–|au|a|to|jusqu'?\s?au)\s?(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}`,
+  // Sur une ligne : « - Mardi » puis « - Dimanche » à la ligne sont deux jours, pas une fourchette.
+  String.raw`${NOT_AFTER_WORD}(${DAY_TABLE.pattern})[^\S\n]?(?:-|–|au|a|to|jusqu'?[^\S\n]?au)[^\S\n]?(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}`,
   "gu",
 );
 const DAY_SINGLE = new RegExp(`${NOT_AFTER_WORD}(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}`, "gu");
 const WEEKDAYS = new RegExp(String.raw`${NOT_AFTER_WORD}(?:en semaine|la semaine|weekdays?)${NOT_BEFORE_WORD}`, "u");
 const WEEKEND = new RegExp(String.raw`${NOT_AFTER_WORD}(?:week[\s-]?ends?)${NOT_BEFORE_WORD}`, "u");
 const EVERY_DAY = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:tous les jours|tous les soirs|chaque jour|chaque soir|every\s?day|every evening|7j/7|7/7)${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}(?:tous les jours|tous les soirs|chaque jour|chaque soir|every\s?day|every evening|7\s?j?\s?/\s?7\s?(?:j|jours?|days?)?)${NOT_BEFORE_WORD}`,
   "u",
 );
 
-function parseDays(lower: string): GetiDay[] {
+/** Jours abrégés lus en contexte : devant une date ou une heure, ou en liste. */
+function abbreviatedDays(lower: string): GetiDay[] {
   const found: GetiDay[] = [];
+  const dayOf = (text: string) => DAY_ABBREVIATION_TABLE.lookup.get(aliasKey(text));
+  for (const dated of lower.matchAll(DAY_ABBREVIATION_DATED)) {
+    const day = dayOf(dated[1]);
+    if (day !== undefined) found.push(day);
+  }
+  for (const list of lower.matchAll(DAY_ABBREVIATION_LIST)) {
+    const days = [...list[0].matchAll(DAY_ABBREVIATION_WORD)].flatMap((word) => dayOf(word[1]) ?? []);
+    // « lun-ven », « mon-fri » : la fourchette entière.
+    if (days.length === 2 && /^\p{L}+\.?\s?[–-]/u.test(list[0])) {
+      for (let index = GETI_DAYS.indexOf(days[0]); ; index = (index + 1) % GETI_DAYS.length) {
+        found.push(GETI_DAYS[index]);
+        if (GETI_DAYS[index] === days[1]) break;
+      }
+    } else if (new Set(days).size > 1) {
+      // Deux abréviations différentes au moins : « sun sun » ou « mer mer » ne sont pas des jours.
+      found.push(...days);
+    }
+  }
+  return found;
+}
+
+function parseDays(lower: string): GetiDay[] {
+  const found: GetiDay[] = abbreviatedDays(lower);
   const dayOf = (text: string) => DAY_TABLE.lookup.get(aliasKey(text));
   for (const range of lower.matchAll(DAY_RANGE)) {
     const from = dayOf(range[1]);
@@ -252,6 +315,35 @@ const TIME_RANGE = new RegExp(
   "gu",
 );
 const TIME_SINGLE = new RegExp(String.raw`(?<![\p{L}\p{N}:#+])${TIME_ATOM}${NOT_BEFORE_WORD}`, "gu");
+/** Fuseau écrit derrière un horaire, en minuscules dans le texte préparé. */
+const ZONE_AFTER_PATTERN = new RegExp(String.raw`^ ?\(?(?:cest|cet|utc|gmt|bst|eet)${NOT_BEFORE_WORD}`, "u");
+/**
+ * Fourchette sans unité, la forme des recherches de scrim : « 20-22 CET »,
+ * « 21 - 23 », « 21/23 CET », « 21.15-23 CET », « h21-23 », « 20-22cest ».
+ * Sans fuseau derrière, elle n'est lue qu'en soirée (à partir de 13 h au
+ * tiret, de 19 h à la barre oblique) : « 3-5 joueurs », « 22/11 » ou
+ * « 15/20 » ne sont pas des horaires.
+ */
+const UNITLESS_RANGE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}:#+.,/–-])h?(\d{1,2})(?:[.:](\d{2}))? ?([-–/]) ?(\d{1,2})(?:[.:](\d{2}))?(?!\p{N}|(?!ces?t${NOT_BEFORE_WORD})\p{L}|[.,:/–-]\p{N})`,
+  "gu",
+);
+/** Sans fuseau, la barre oblique ne se lit qu'en fin de soirée : « 21/23 », pas « 15/20 ». */
+const SLASH_FROM_HOUR = 19;
+const SLASH_SPAN_MAX_HOURS = 4;
+/** Heure seule sans unité, devant son fuseau : « 20 CET ». */
+const UNITLESS_SINGLE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}:#+.,/–-])(\d{1,2})(?:[.:](\d{2}))?(?= ?\(?(?:cest|cet)${NOT_BEFORE_WORD})`,
+  "gu",
+);
+/** Ce qu'une fourchette sans unité compte quand ce n'est pas un horaire : « 18-25 ans », « 20-22 novembre ». */
+const NOT_A_TIME_AFTER = new RegExp(
+  String.raw`^ ?(?:%|€|(?:ans|yo|years?|joueu(?:r|se)s?|players?|personnes?|min|minutes?|k|sr|elo|jours?|days?|soirs?|fois|janv(?:ier)?|fev(?:r(?:ier)?)?|mars|avr(?:il)?|mai|juin|juil(?:let)?|aout|sept(?:embre)?|oct(?:obre|ober)?|nov(?:embre|ember)?|dec(?:embre|ember)?|january|february|march|april|may|june|july|august|september|jan|feb|mar|apr|jun|jul|aug|sep)${NOT_BEFORE_WORD})`,
+  "u",
+);
+const EVENING_FROM_HOUR = 13;
+/** Dernière heure d'une fourchette qui passe minuit : « 22-1 CET ». */
+const NIGHT_END_HOUR = 4;
 /** Une durée n'est pas une heure : « 2h par jour », « 3h de jeu » (pas « parfois », « partout »). */
 const DURATION_AFTER =
   /^\s?(?:par(?!\p{L})|de jeu|de scrim|per(?!\p{L})|a day|\/\s?(?:jour|soir|day|night|semaine|week))/u;
@@ -329,8 +421,52 @@ function parseTimeRanges(lower: string): { times: GetiTimeRange[]; rest: string 
   return { times, rest };
 }
 
+function minutesOf(hour: string, minutes: string | undefined): number | null {
+  const value = Number(hour) * 60 + Number(minutes ?? 0);
+  return Number(minutes ?? 0) >= 60 || value > 24 * 60 ? null : value;
+}
+
+/** Fourchette sans unité : avec un fuseau derrière, ou en soirée et écrite au tiret. */
+function unitlessRange(match: RegExpMatchArray, after: string): GetiTimeRange | null {
+  const from = minutesOf(match[1], match[2]);
+  const to = minutesOf(match[4], match[5]);
+  if (from === null || to === null || from === to || NOT_A_TIME_AFTER.test(after)) return null;
+  if (ZONE_AFTER_PATTERN.test(after)) return to > from || to <= NIGHT_END_HOUR * 60 ? { from, to } : null;
+  if (to <= from) return null;
+  if (match[3] === "/") {
+    return from >= SLASH_FROM_HOUR * 60 && to - from <= SLASH_SPAN_MAX_HOURS * 60 ? { from, to } : null;
+  }
+  return from >= EVENING_FROM_HOUR * 60 ? { from, to } : null;
+}
+
+/** Horaires sans unité (« 20-22 CET », « 20 CET »), effacés du texte une fois lus. */
+function parseUnitlessTimes(lower: string): { times: GetiTimeRange[]; rest: string } {
+  const times: GetiTimeRange[] = [];
+  let rest = lower;
+  const erase = (index: number, length: number) => {
+    rest = rest.slice(0, index) + " ".repeat(length) + rest.slice(index + length);
+  };
+  for (const match of lower.matchAll(UNITLESS_RANGE)) {
+    const end = match.index + match[0].length;
+    const range = unitlessRange(match, lower.slice(end, end + 12));
+    if (range === null) continue;
+    times.push(range);
+    erase(match.index, match[0].length);
+  }
+  for (const match of rest.matchAll(UNITLESS_SINGLE)) {
+    const from = minutesOf(match[1], match[2]);
+    if (from === null) continue;
+    times.push({ from, to: null });
+    erase(match.index, match[0].length);
+  }
+  return { times, rest };
+}
+
 function parseTimes(lower: string): GetiTimeRange[] {
-  const { times, rest } = parseTimeRanges(lower);
+  const explicit = parseTimeRanges(lower);
+  const unitless = parseUnitlessTimes(explicit.rest);
+  const times = [...explicit.times, ...unitless.times];
+  const rest = unitless.rest;
   for (const match of rest.matchAll(TIME_SINGLE)) {
     const parts = timeParts(match, 1);
     if (!parts.explicit) continue;
@@ -354,7 +490,9 @@ function uniqueSortedTimes(times: readonly GetiTimeRange[]): GetiTimeRange[] {
 }
 
 /** Sigles de fuseau lus en capitales seulement (« est » est un mot français). */
-const TIMEZONE_CODE = /(?<![\p{L}\p{N}])(CEST|CET|(?:UTC|GMT)(?:\s?[+-]\s?\d{1,2})?)(?![\p{L}\p{N}])/u;
+const TIMEZONE_CODE = /(?<![\p{L}\p{N}])(CEST|CET|BST|EET|(?:UTC|GMT)(?:\s?[+-]\s?\d{1,2})?)(?![\p{L}\p{N}])/u;
+/** … ou en minuscules derrière une heure : « 20-22 cet », « 21h cest » (« cet été » n'en est pas un). */
+const TIMEZONE_AFTER_TIME = /\d ?h? ?\(?(cest|cet)(?![\p{L}\p{N}])/u;
 const PARIS_TIME = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:heure francaise|heure de paris|heure de france|french time|paris time)${NOT_BEFORE_WORD}`,
   "u",
@@ -363,21 +501,210 @@ const PARIS_TIME = new RegExp(
 function parseTimezone(prepared: GetiPreparedText): string | null {
   if (PARIS_TIME.test(prepared.lower)) return "Europe/Paris";
   const code = TIMEZONE_CODE.exec(prepared.plain);
-  return code === null ? null : code[1].replace(/\s/gu, "");
+  if (code !== null) return code[1].replace(/\s/gu, "");
+  const afterTime = TIMEZONE_AFTER_TIME.exec(prepared.lower);
+  return afterTime === null ? null : afterTime[1].toUpperCase();
+}
+
+const DAY_MS = 86_400_000;
+/** Une date lue reste proche de la publication : au-delà, c'est autre chose (« 9/10 », une note). */
+const DATE_WINDOW_DAYS = 60;
+const DATE_MAX = 14;
+const PARIS_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Paris",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** Jour civil à Paris d'un instant, en millisecondes UTC à minuit de ce jour. */
+function parisDay(instant: number): number {
+  const parts = PARIS_DATE.formatToParts(new Date(instant));
+  const part = (type: string) => Number(parts.find((entry) => entry.type === type)?.value ?? 0);
+  return Date.UTC(part("year"), part("month") - 1, part("day"));
+}
+
+function isoDay(day: number): string {
+  return new Date(day).toISOString().slice(0, 10);
+}
+
+/** Jour de la semaine d'une date « AAAA-MM-JJ ». */
+function weekdayOf(date: string): GetiDay {
+  return GETI_DAYS[(new Date(`${date}T00:00:00.000Z`).getUTCDay() + 6) % 7];
+}
+
+/** Jour civil valide (le 31/02 n'existe pas), en millisecondes UTC, ou `null`. */
+function civilDay(year: number, month: number, day: number): number | null {
+  const time = Date.UTC(year, month - 1, day);
+  const date = new Date(time);
+  return date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? time : null;
+}
+
+/** « 26/11 », « 22/11/26 », « 02/12/2026 » — pas « 4/5 jours », « 3/4 soirs ». */
+const NUMERIC_DATE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}/.,:–-])(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?(?![\p{N}/]|\s?(?:jours?|j|soirs?|fois|days?|nights?|semaines?|h)${NOT_BEFORE_WORD})`,
+  "gu",
+);
+/** Début d'un nom de mois, collé au quantième : « Friday 27NOV ». */
+const MONTH_START = "(?:jan|fev|feb|mar|avr|apr|mai|may|jui|jun|jul|aou|aug|sep|oct|nov|dec)";
+/** Jour nommé suivi de son quantième : « Thursday 26 », « dimanche 29 ». */
+const NAMED_DAY_NUMBER = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(${DAY_TABLE.pattern})\s(\d{1,2})(?!\p{N}|(?!${MONTH_START})\p{L}|\s?[/h:.k]|\s?[–-]\s?\d)`,
+  "gu",
+);
+const TODAY = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:ce soir|tonight|today|aujourd'?\s?hui)${NOT_BEFORE_WORD}`,
+  "u",
+);
+const TOMORROW = new RegExp(String.raw`${NOT_AFTER_WORD}(?:demain|tomorrow|tmrw|tmr)${NOT_BEFORE_WORD}`, "u");
+
+/** Au-delà, les jours cités sont une disponibilité habituelle, pas des soirées précises. */
+const EVENING_DAYS_MAX = 6;
+/** « now », « asap » : pour tout de suite. */
+const RIGHT_NOW = new RegExp(String.raw`${NOT_AFTER_WORD}(?:now|asap|maintenant|mtn)${NOT_BEFORE_WORD}`, "u");
+
+/**
+ * Soirées d'une recherche de scrim ou de remplaçant qui ne donne pas de date :
+ * un jour nommé (« Mardi 21h-23h ») vise sa prochaine occurrence, et un
+ * horaire sans jour (« LFS 3k5 20-22 CET ») ou un « now » le jour même de la
+ * publication.
+ */
+function eveningDays(lower: string, today: number, found: readonly number[]): number[] {
+  const dated = new Set(found.map((day) => weekdayOf(isoDay(day))));
+  const named = parseDays(lower).filter((day) => !dated.has(day));
+  if (named.length > EVENING_DAYS_MAX) return [];
+  if (named.length === 0) {
+    return found.length === 0 && (parseTimes(lower).length > 0 || RIGHT_NOW.test(lower)) ? [today] : [];
+  }
+  const todayIndex = GETI_DAYS.indexOf(weekdayOf(isoDay(today)));
+  return named.map((day) => today + ((GETI_DAYS.indexOf(day) - todayIndex + 7) % 7) * DAY_MS);
+}
+
+/**
+ * Dates visées par l'annonce (« 26/11 », « Thursday 26 », « ce soir »,
+ * « tomorrow »), résolues depuis la date de publication, à l'heure de Paris.
+ * Sans date de publication, rien n'est lu : une date sans année ne se situe pas.
+ *
+ * @param lower Texte sans accents, en minuscules.
+ * @param postedAt Date ISO de publication, ou `null`.
+ * @param sameDay `true` pour une recherche de scrim ou de remplaçant : un jour
+ *   nommé vise sa prochaine occurrence, un horaire sans jour le soir même.
+ * @returns Les dates « AAAA-MM-JJ », triées, sans doublon.
+ */
+export function parseGetiDates(lower: string, postedAt: string | null, sameDay = false): string[] {
+  const posted = postedAt === null ? Number.NaN : Date.parse(postedAt);
+  if (Number.isNaN(posted)) return [];
+  const today = parisDay(posted);
+  const year = new Date(today).getUTCFullYear();
+  const near = (day: number | null) =>
+    day !== null && day >= today - DAY_MS && day <= today + DATE_WINDOW_DAYS * DAY_MS ? day : null;
+  const found: number[] = [];
+  for (const match of lower.matchAll(NUMERIC_DATE)) {
+    const [day, month] = [Number(match[1]), Number(match[2])];
+    const written = match[3] === undefined ? null : Number(match[3].length === 2 ? `20${match[3]}` : match[3]);
+    const date =
+      written === null
+        ? (near(civilDay(year, month, day)) ?? near(civilDay(year + 1, month, day)))
+        : near(civilDay(written, month, day));
+    if (date !== null) found.push(date);
+  }
+  for (const match of lower.matchAll(NAMED_DAY_NUMBER)) {
+    const named = DAY_TABLE.lookup.get(aliasKey(match[1]));
+    const month = new Date(today).getUTCMonth() + 1;
+    const next = month === 12 ? civilDay(year + 1, 1, Number(match[2])) : civilDay(year, month + 1, Number(match[2]));
+    // Ce mois-ci, sinon le suivant ; le quantième doit tomber sur le jour nommé.
+    const date = [civilDay(year, month, Number(match[2])), next]
+      .map(near)
+      .find((day) => day !== null && weekdayOf(isoDay(day)) === named);
+    if (date !== undefined && date !== null) found.push(date);
+  }
+  if (TODAY.test(lower)) found.push(today);
+  if (TOMORROW.test(lower)) found.push(today + DAY_MS);
+  if (sameDay) found.push(...eveningDays(lower, today, found));
+  return [...new Set(found)]
+    .sort((a, b) => a - b)
+    .slice(0, DATE_MAX)
+    .map(isoDay);
 }
 
 /**
  * Disponibilités : jours cités, horaires (minutes depuis minuit) et fuseau.
  *
  * @param prepared Formes d'analyse du texte.
+ * @param dates Dates déjà lues (`parseGetiDates`) : leur jour de semaine s'ajoute aux jours cités.
  * @returns Les disponibilités, listes vides quand rien n'est lu.
  */
-export function parseGetiAvailability(prepared: GetiPreparedText): GetiAvailability {
+export function parseGetiAvailability(prepared: GetiPreparedText, dates: readonly string[] = []): GetiAvailability {
   return {
-    days: parseDays(prepared.lower),
+    days: inReferenceOrder(GETI_DAYS, [...parseDays(prepared.lower), ...dates.map(weekdayOf)]),
     times: parseTimes(prepared.lower),
     timezone: parseTimezone(prepared),
   };
+}
+
+const LEVEL_ALIASES: Readonly<Record<GetiLevel, readonly string[]>> = {
+  OPEN: ["open"],
+  INTERMEDIATE: ["intermediate", "intermediaire", "intermediaires", "inter", "int"],
+  ADVANCED: ["advanced", "adv"],
+  EXPERT: ["expert", "exp"],
+};
+const LEVEL_TABLE = aliasTable(LEVEL_ALIASES);
+/** Un niveau, avec sa nuance collée ou non devant : « high open », « HighOpen », « low-mid advanced ». */
+const LEVEL_WORD = new RegExp(
+  String.raw`${NOT_AFTER_WORD}((?:high|low|mid|haut|bas)[\s-]?)?(${LEVEL_TABLE.pattern})${NOT_BEFORE_WORD}`,
+  "gu",
+);
+/**
+ * Abréviations qui sont d'abord autre chose (« exp : 200 h de scrim », un
+ * entier) : lues seulement nuancées (« low int ») ou collées à un autre niveau
+ * (« adv/exp », « open-adv-inter »).
+ */
+const LEVEL_NEEDS_CONTEXT = new Set(["int", "exp"]);
+const LEVEL_JOIN = /^\s?(?:[/,&>→–-]|-+>|to|a)\s?(?:(?:high|low|mid|haut|bas)[\s-]?)?$/u;
+/** « open » au sens courant : « DMs open », « position open for trials », « open to all ». */
+const OPEN_COMMON_BEFORE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:dms?|mps?|pms?|positions?|postes?|spots?|slots?|tryouts?|trials?|is|are|est|sont|still|now)\s$`,
+  "u",
+);
+const OPEN_COMMON_AFTER = new RegExp(String.raw`^\s(?:for|to|a|aux|pour|until|jusqu)${NOT_BEFORE_WORD}`, "u");
+
+type LevelMatch = { start: number; end: number; key: string; level: GetiLevel; nuanced: boolean };
+
+/**
+ * Niveaux de division cités (ligue FACEIT : Open, Intermediate, Advanced,
+ * Expert) — le niveau d'une équipe qui cherche un scrim ou un joueur, ou celui
+ * qu'un joueur vise.
+ *
+ * @param lower Texte sans accents, en minuscules.
+ * @returns Les niveaux, dans l'ordre de `GETI_LEVELS`.
+ */
+export function parseGetiLevels(lower: string): GetiLevel[] {
+  const matches: LevelMatch[] = [];
+  for (const match of lower.matchAll(LEVEL_WORD)) {
+    const key = aliasKey(match[2]);
+    const level = LEVEL_TABLE.lookup.get(key);
+    if (level === undefined) continue;
+    const end = match.index + match[0].length;
+    matches.push({ start: match.index, end, key, level, nuanced: match[1] !== undefined });
+  }
+  const joined = (index: number) =>
+    [index - 1, index].some((left) => {
+      const [first, second] = [matches[left], matches[left + 1]];
+      return first !== undefined && second !== undefined && LEVEL_JOIN.test(lower.slice(first.end, second.start));
+    });
+  const found = matches.filter((match, index) => {
+    if (match.nuanced || joined(index)) return true;
+    if (LEVEL_NEEDS_CONTEXT.has(match.key)) return false;
+    if (match.key !== "open") return true;
+    return (
+      !OPEN_COMMON_BEFORE.test(lower.slice(Math.max(0, match.start - 12), match.start)) &&
+      !OPEN_COMMON_AFTER.test(lower.slice(match.end, match.end + 8))
+    );
+  });
+  return inReferenceOrder(
+    GETI_LEVELS,
+    found.map((match) => match.level),
+  );
 }
 
 const STAFF_ALIASES: Readonly<Record<GetiStaffRole, readonly string[]>> = {
@@ -472,6 +799,16 @@ const TEAM_INLINE = new RegExp(
   String.raw`(?<![\p{L}\p{N}])${TEAM_WORD} +(${NAME_TOKEN}(?: +${NAME_TOKEN}){0,2})`,
   "gu",
 );
+/** Nom suivi de ce qui en fait une structure : « Chroma Esport », « ELEVEN Academy », « Clay Family ». */
+const TEAM_SUFFIXED = new RegExp(
+  String.raw`(?<![\p{L}\p{N}])(${NAME_TOKEN}(?: +${NAME_TOKEN}){0,2}) +(E-?[Ss]ports?|E-?SPORTS?|Gaming|GAMING|Academy|ACADEMY|Family|FAMILY)(?![\p{L}\p{N}])`,
+  "gu",
+);
+/** Nom en capitale juste devant le verbe de l'annonce : « MTP RECRUTE », « Verdict Astral recherche ». */
+const TEAM_BEFORE_VERB = new RegExp(
+  String.raw`(?<![\p{L}\p{N}])(${NAME_TOKEN}(?: +${NAME_TOKEN}){0,2}) +(?:[Rr]ecrute|RECRUTE|[Rr]echerche|RECHERCHE|[Cc]herche|CHERCHE|is looking|are looking|is recruiting|IS LOOKING|ARE LOOKING|IS RECRUITING)(?![\p{L}\p{N}])`,
+  "gu",
+);
 /** Fin d'un nom derrière un libellé : première ponctuation de séparation. */
 const LABEL_END = /\s[-–—]\s|[,;•·(\[]|\s{2,}/u;
 
@@ -488,10 +825,18 @@ const NOT_A_NAME = new Set(
     "competitive competitif compet chill serieuse serieux tryhard semi francaise francophone",
     "name nom discord role roles rang rank region plateforme platform contact",
     "je j nous on il elle ils elles vous tu notre nos votre vos mon ma mes",
+    "equipe lequipe team structure lastructure roster association lassociation asso lasso staff",
+    "recrutement recrute recrutements bonjour hello salut chez join rejoins rejoindre avec with by",
+    "coach manager analyste analyst joueur joueuse joueurs joueuses player players hitscan hs fdps main sub",
+    "open inter intermediate advanced adv expert low mid high only mixed hybrid elo sr faceit cet cest utc gmt",
   ]
     .join(" ")
     .split(" "),
 );
+/** Mots qui, seuls, ne nomment personne : « la structure E-sport », « notre pôle Overwatch ». */
+const NOT_A_NAME_ALONE = new Set(["esport", "esports", "gaming", "academy", "family", "league", "ligue"]);
+/** Un SR n'est pas un nom : « Roster 3K », « ROSTER 4K3 ». */
+const SR_WORD = /^(?:[1-5]k\d?)+$/u;
 /**
  * Pronoms anglais : un nom en capitales peut en finir un (« Team Game I »,
  * « Team Ride Or Die » n'en a pas, « Team Not You »), pas en ouvrir un
@@ -523,15 +868,21 @@ function opensSentence(candidate: string): boolean {
 
 function isNameWord(word: string, index: number): boolean {
   const key = nameKey(word);
-  if (key === "" || NOT_A_NAME.has(key) || /^[bsgpdmc][1-5]$/u.test(key)) return false;
+  if (key === "" || NOT_A_NAME.has(key) || /^[bsgpdmc][1-5]$/u.test(key) || SR_WORD.test(key)) return false;
   return !ENGLISH_PRONOUNS.has(key) || (index > 0 && CAPITALISED.test(word));
 }
 
-function cleanTeamName(candidate: string): string | null {
-  const words = candidate.split(/\s+/u).filter((word) => word !== "");
+function cleanTeamName(candidate: string, skipLeading = false): string | null {
+  const all = candidate.split(/\s+/u).filter((word) => word !== "");
+  // Devant un verbe ou un suffixe, les premiers mots sont souvent du vocabulaire, un article ou un
+  // horaire : « L'association Blue Sonate recrute », « La LND ASTRA cherche », « 20-23 CET Chroma Esport ».
+  const leads = (word: string) => !isNameWord(word, 0) || !/\p{L}/u.test(word) || LEADING_ARTICLES.has(nameKey(word));
+  const first = skipLeading ? all.findIndex((word) => !leads(word)) : 0;
+  const words = first === -1 ? [] : all.slice(first);
   // Le nom s'arrête au premier mot du vocabulaire d'annonce : « Blue Phoenix EU ».
   const stop = words.findIndex((word, index) => !isNameWord(word, index));
   const kept = stop === -1 ? words : words.slice(0, stop);
+  if (kept.length === 1 && NOT_A_NAME_ALONE.has(nameKey(kept[0]))) return null;
   const name = visibleText(kept.join(" ")).replace(/[.'-]+$/u, "");
   // Mots en capitale seulement : « 5 joueurs dont 2 tanks » n'est pas un nom.
   if (!/\p{Lu}/u.test(name)) return null;
@@ -556,6 +907,15 @@ export function parseGetiTeamName(clean: string): string | null {
     if (opensSentence(match[1])) continue;
     const name = cleanTeamName(match[1]);
     if (name !== null) return name;
+  }
+  for (const match of clean.matchAll(TEAM_SUFFIXED)) {
+    const name = cleanTeamName(`${match[1]} ${match[2]}`, true);
+    // Le suffixe seul ne nomme rien : il faut au moins un mot devant lui.
+    if (name !== null && name.includes(" ")) return name;
+  }
+  for (const match of clean.matchAll(TEAM_BEFORE_VERB)) {
+    const name = cleanTeamName(match[1], true);
+    if (name !== null && name === match[1].trim().split(/\s+/u).slice(-name.split(" ").length).join(" ")) return name;
   }
   return null;
 }
