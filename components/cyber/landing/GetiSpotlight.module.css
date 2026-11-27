@@ -43,6 +43,13 @@
   color: var(--blue-500);
 }
 
+/* La phrase d'appel et son « i » (en ligne : `InfoHintRow inline` remet la
+   marge du paragraphe à zéro, l'écart vient de cette enveloppe). */
+.ledeRow {
+  margin: 18px 0 0;
+  max-width: 560px;
+}
+
 .lede {
   margin: 18px 0 0;
   max-width: 560px;

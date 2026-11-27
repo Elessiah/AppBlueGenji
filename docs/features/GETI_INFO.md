@@ -676,9 +676,15 @@ chaque page vitrine et dès l'accueil.
   partie compétitive (Tournois, Équipes, Classement, Joueurs) en sont sorties. La
   barre des connectés (`SiteNav`) ne change pas.
 - **Accueil** (`components/cyber/landing/GetiSpotlight.tsx`, juste après le bandeau
-  défilant) : une carte avec une phrase d'appel, le bouton « Voir les annonces GETI »
-  (`/geti-info`) et un raccourci par catégorie (« Je cherche : un joueur, une équipe,
-  un remplaçant, un staff, un scrim, un cast » → `/geti-info/<catégorie>`). Composant
+  défilant) : une carte avec une phrase d'appel (la marche à suivre — filtrer, puis
+  contacter l'auteur sur Discord — derrière un `<InfoHint>`), le bouton « Voir les
+  annonces GETI » et un raccourci par catégorie (« Parcourir : Équipes qui recrutent,
+  Joueurs sans équipe, Remplaçants recherchés, Staff, Scrims, Casts » →
+  `/geti-info/<catégorie>`). Le bouton vise l'adresse canonique `/geti-info/lfp`
+  (celle que déclare `/geti-info`) : une seule adresse par liste. Les raccourcis
+  nomment **ce que la liste contient**, pas l'intention de l'auteur comme les
+  onglets de la page (« Je cherche un joueur » = annonces d'équipes qui recrutent) :
+  un capitaine qui cherche un joueur n'y est pas envoyé vers d'autres équipes. Composant
   serveur **sans lecture de données** : il ne dépend ni de la base ni de Discord.
   Textes dans l'espace `geti` de `messages/<langue>/landing.json` (serveur seulement,
   hors `LANDING_CLIENT_NAMESPACES`). Liens par `LocaleLink` ; la liste des raccourcis

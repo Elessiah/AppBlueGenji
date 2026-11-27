@@ -16,7 +16,9 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
   fonction principale du site : son entrée (« Annonces GETI » / « GETI posts »,
   `featured`) ouvre la liste, encadrée et teintée glacier (`.linkFeatured` — bordure
   et graisse, pas la seule couleur), et reste page courante sur chaque catégorie
-  (`/geti-info/lfs`).
+  (`/geti-info/lfs`) — alors `.linkFeatured.linkActive` : bordure pleine, fond
+  plus soutenu et trait intérieur à gauche, pour que la page courante se voie
+  aussi sur l'entrée déjà mise en avant.
 - **Rien dans le menu burger ne mène à la partie compétitive.** « Tournois »,
   « Équipes », « Classement » et « Joueurs » en sont sortis (GETI-NAV) : on entre
   dans la compétition par l'accueil (tableau des tournois, classement, calendrier),

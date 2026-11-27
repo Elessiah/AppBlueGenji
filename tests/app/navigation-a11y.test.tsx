@@ -284,6 +284,20 @@ describe("PublicNavPanel — page courante", () => {
     expect(currentLinks(panel("/geti-info/lfs"))).toEqual(["Annonces GETI"]);
   });
 
+  it("publicNavPanel_onGetiCategory_featuredLinkActive : l'entrée GETI cumule mise en avant et page courante", () => {
+    const html = panel("/geti-info/lfs");
+    expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*class="[^"]*linkFeatured[^"]*linkActive[^"]*"[^>]*>Annonces GETI<\/a>/);
+  });
+
+  it("publicNavCss_featuredActive_hasNonColorMarker : la page courante mise en avant se voit autrement que par la couleur", () => {
+    const css = readSource("components/cyber/landing/PublicNavMenu.module.css");
+    const rule = /\.linkFeatured\.linkActive\s*\{([^}]*)\}/.exec(css);
+    expect(rule).not.toBeNull();
+    expect(rule?.[1]).toMatch(/box-shadow:\s*inset 3px 0 0 var\(--blue-500/);
+    expect(rule?.[1]).toMatch(/border-color: var\(--blue-500/);
+    expect(css.indexOf(".linkFeatured.linkActive {")).toBeGreaterThan(css.indexOf(".linkFeatured:hover {"));
+  });
+
   it("ne signale aucune entrée sur une page de la partie compétitive", () => {
     expect(currentLinks(panel("/tournois/42"))).toEqual([]);
     expect(currentLinks(panel("/equipes"))).toEqual([]);

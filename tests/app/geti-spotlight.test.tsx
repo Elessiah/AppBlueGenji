@@ -30,34 +30,58 @@ const links = (html: string) =>
   [...html.matchAll(/<a [^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map((m) => ({ href: m[1], label: m[2] }));
 
 describe("GetiSpotlight — encart de l'accueil", () => {
-  it("mène à la page des annonces puis à ses six catégories, en français", () => {
-    expect(links(french())).toEqual([
-      { href: "/geti-info", label: "Voir les annonces GETI" },
-      { href: "/geti-info/lfp", label: "Un joueur" },
-      { href: "/geti-info/lft", label: "Une équipe" },
-      { href: "/geti-info/lfsub", label: "Un remplaçant" },
-      { href: "/geti-info/lfstaff", label: "Un staff" },
-      { href: "/geti-info/lfs", label: "Un scrim" },
-      { href: "/geti-info/lfcast", label: "Un cast" },
+  it("getiSpotlight_french_ctaTargetsCanonicalCategory : le bouton vise l'adresse canonique de la première catégorie", () => {
+    expect(links(french())[0]).toEqual({ href: "/geti-info/lfp", label: "Voir les annonces GETI" });
+  });
+
+  it("getiSpotlight_french_chipsNameListContent : les raccourcis disent ce que chaque liste contient", () => {
+    expect(links(french()).slice(1)).toEqual([
+      { href: "/geti-info/lfp", label: "Équipes qui recrutent" },
+      { href: "/geti-info/lft", label: "Joueurs sans équipe" },
+      { href: "/geti-info/lfsub", label: "Remplaçants recherchés" },
+      { href: "/geti-info/lfstaff", label: "Staff" },
+      { href: "/geti-info/lfs", label: "Scrims" },
+      { href: "/geti-info/lfcast", label: "Casts" },
+    ]);
+    expect(french()).toMatch(/<p id="geti-spotlight-categories"[^>]*>Parcourir<\/p>/);
+  });
+
+  it("getiSpotlight_english_chipsAndCtaUnderEn : adresses /en et libellés anglais", () => {
+    expect(links(english())).toEqual([
+      { href: "/en/geti-info/lfp", label: "Browse GETI posts" },
+      { href: "/en/geti-info/lfp", label: "Teams recruiting" },
+      { href: "/en/geti-info/lft", label: "Free agents" },
+      { href: "/en/geti-info/lfsub", label: "Subs wanted" },
+      { href: "/en/geti-info/lfstaff", label: "Staff" },
+      { href: "/en/geti-info/lfs", label: "Scrims" },
+      { href: "/en/geti-info/lfcast", label: "Casts" },
     ]);
   });
 
-  it("mène aux adresses /en avec des libellés anglais", () => {
-    expect(links(english())).toEqual([
-      { href: "/en/geti-info", label: "Browse GETI posts" },
-      { href: "/en/geti-info/lfp", label: "A player" },
-      { href: "/en/geti-info/lft", label: "A team" },
-      { href: "/en/geti-info/lfsub", label: "A sub" },
-      { href: "/en/geti-info/lfstaff", label: "Staff" },
-      { href: "/en/geti-info/lfs", label: "A scrim" },
-      { href: "/en/geti-info/lfcast", label: "A cast" },
-    ]);
+  it("getiSpotlight_ctaAndFirstChip_shareOneAddress : aucune liste sous deux adresses", () => {
+    const html = french();
+    expect(html).not.toContain('href="/geti-info"');
+    const [cta, firstChip] = links(html);
+    expect(cta.href).toBe(firstChip.href);
+  });
+
+  it("getiSpotlight_lede_hasInfoHintWithHowTo : la marche à suivre est derrière le « i »", () => {
+    const html = french();
+    expect(html).toContain("Toutes les annonces de recrutement Overwatch du réseau GETI, réunies sur une seule page.");
+    expect(html).toMatch(/<button [^>]*aria-controls="geti-spotlight-hint"[^>]*aria-label="Plus d&#x27;infos : Annonces GETI"|<button [^>]*aria-label="Plus d&#x27;infos : Annonces GETI"[^>]*aria-controls="geti-spotlight-hint"/);
+    expect(html).toMatch(/id="geti-spotlight-hint"[^>]*hidden[^>]*>[^<]*Filtre par rôle, rang et disponibilités, puis contacte l&#x27;auteur de l&#x27;annonce sur Discord\./);
+  });
+
+  it("getiSpotlight_english_infoHint : le « i » parle anglais sous /en", () => {
+    const html = english();
+    expect(html).toContain("GETI posts");
+    expect(html).toContain("Filter by role, rank and availability, then contact the post&#x27;s author on Discord.");
   });
 
   it("ne laisse aucun texte français dans le rendu anglais", () => {
     const html = english();
     expect(html).toContain("GETI posts are here.");
-    expect(html).not.toMatch(/Annonces|Je cherche|joueur|équipe|remplaçant/i);
+    expect(html).not.toMatch(/Annonces|Parcourir|joueur|équipe|remplaçant|Plus d/i);
   });
 
   it("titre la section et nomme la liste des catégories", () => {
@@ -66,8 +90,7 @@ describe("GetiSpotlight — encart de l'accueil", () => {
     expect(html).toMatch(
       /<h2 id="geti-spotlight-title"[^>]*>Un joueur, une équipe, un scrim \? <span[^>]*>Les annonces GETI sont ici\.<\/span><\/h2>/,
     );
-    expect(html).toMatch(/<p id="geti-spotlight-categories"[^>]*>Je cherche<\/p>/);
-    expect(html).toMatch(/<ul [^>]*aria-labelledby="geti-spotlight-categories"/);
+        expect(html).toMatch(/<ul [^>]*aria-labelledby="geti-spotlight-categories"/);
   });
 
   it("donne à chaque lien un texte visible distinct", () => {

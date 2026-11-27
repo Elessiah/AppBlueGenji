@@ -141,6 +141,18 @@
   border-color: var(--blue-500, rgba(90, 200, 255, 0.9));
 }
 
+/* Entrée mise en avant ET page courante (`/geti-info…`) : bordure pleine,
+   fond plus soutenu et trait intérieur à gauche — la page courante se voit
+   autrement que par la couleur, comme sur les autres entrées. */
+.linkFeatured.linkActive {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.2);
+  border-color: var(--blue-500, rgba(90, 200, 255, 0.9));
+  box-shadow:
+    inset 3px 0 0 var(--blue-500, #5ac8ff),
+    0 0 14px rgba(90, 200, 255, calc(0.2 * var(--glow, 1)));
+}
+
 .link:focus-visible {
   outline: 2px solid var(--blue-500);
   outline-offset: 2px;
