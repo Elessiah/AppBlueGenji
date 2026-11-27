@@ -828,7 +828,11 @@ const TEAM_WORD = String.raw`(?:[Tt]eam|TEAM|[Éé]quipe|[Ee]quipe|[ÉE]QUIPE|[S
 const TEAM_NOUN = "[ée]quipe|team|structure";
 /** Libellés d'un nom d'équipe : « Nom de l'équipe », « Team name », « Équipe », « Roster ». */
 const TEAM_LABEL_WORDS = String.raw`nom\s+(?:de\s+(?:la\s+|l'\s?)?|d'\s?)?(?:${TEAM_NOUN})|team\s*name|${TEAM_NOUN}|roster`;
-const TEAM_LABEL = new RegExp(String.raw`^[ \t]*(?:${TEAM_LABEL_WORDS})\s?[:=]\s?(.{1,80})$`, "imu");
+/**
+ * Seuls les 80 premiers caractères derrière le libellé sont lus (coût borné) :
+ * la ligne peut être plus longue — « Équipe : Blue Phoenix — nous cherchons… ».
+ */
+const TEAM_LABEL = new RegExp(String.raw`^[ \t]*(?:${TEAM_LABEL_WORDS})\s?[:=]\s?(.{1,80})`, "imu");
 const NAME_TOKEN = String.raw`[\p{Lu}\p{N}][\p{L}\p{N}'.-]*`;
 const TEAM_INLINE = new RegExp(
   String.raw`(?<![\p{L}\p{N}])${TEAM_WORD} +(${NAME_TOKEN}(?: +${NAME_TOKEN}){0,2})`,
@@ -889,12 +893,12 @@ const FRENCH_VERB_AFTER = new RegExp(
   "u",
 );
 
+const NAME_MARKS = /\p{M}/gu;
+const NAME_SYMBOLS = /[^\p{L}\p{N}]/gu;
+const TIER_LIKE = /^[bsgpedmc][1-5]$/u;
+
 function nameKey(word: string): string {
-  return word
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]/gu, "");
+  return word.normalize("NFD").replace(NAME_MARKS, "").toLowerCase().replace(NAME_SYMBOLS, "");
 }
 
 /**
@@ -922,7 +926,7 @@ type NameWordPlace = { index: number; last: boolean; following: string };
 
 function isNameWord(word: string, place: NameWordPlace): boolean {
   const key = nameKey(word);
-  if (key === "" || NOT_A_NAME.has(key) || /^[bsgpedmc][1-5]$/u.test(key) || SR_WORD.test(key)) return false;
+  if (key === "" || NOT_A_NAME.has(key) || TIER_LIKE.test(key) || SR_WORD.test(key)) return false;
   const verbAfter = verbAfterPronoun(key);
   if (verbAfter === null) return true;
   return place.index > 0 && place.last && CAPITALISED.test(word) && !verbAfter.test(place.following);

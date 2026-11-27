@@ -470,6 +470,28 @@ describe("noms d'équipe — tournures réelles", () => {
   });
 });
 
+describe("nom d'équipe derrière un libellé — ligne longue", () => {
+  it("le nom est lu même si la ligne dépasse 80 caractères", () => {
+    const line = `Équipe : Blue Falcons — ${"nous cherchons des joueurs motivés et sérieux ".repeat(3)}`;
+
+    expect(parseGetiText(line).teamName).toBe("Blue Falcons");
+  });
+
+  it("un nom qui court au-delà des 80 caractères lus n'est pas rendu tronqué", () => {
+    const line = `Équipe : ${"Abcdefghij ".repeat(12)}`;
+
+    expect(parseGetiText(line).teamName).toBeNull();
+  });
+
+  it("une ligne de 100 000 caractères derrière le libellé est lue en temps borné", () => {
+    const start = performance.now();
+
+    parseGetiText(`Équipe : ${"A".repeat(100_000)}`);
+
+    expect(performance.now() - start).toBeLessThan(3000);
+  });
+});
+
 describe("réponses de service d'un bot", () => {
   const notice = (description: string) => ({
     content: "",

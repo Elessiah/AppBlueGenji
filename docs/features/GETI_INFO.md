@@ -320,6 +320,13 @@ sont pas des champs ; « 20 22 / 21 23 » (sans séparateur) n'est pas un horair
 lot 2b), `fixtures.test.ts` (jeu
 `tests/fixtures/geti/posts.json`) ; fabriques dans `tests/helpers/geti.ts`.
 
+## Coût d'analyse (borné)
+
+- Chaque texte brut (contenu, titre, description, champ) est coupé à `2 × GETI_TEXT_MAX` avant tout motif ; au plus 10 encarts et 25 champs par encart sont lus ; la ligne « Sent from » se cherche dans les 600 derniers caractères de la description ; la forme NFKC est recoupée (un « ﷺ » vaut 18 lettres).
+- Les motifs n'ont aucune paire de `\s*` adjacents (« by <@id> », « by : <@id> »), donc pas de retour arrière quadratique.
+- Rangs : une jonction « gold a plat » ne regarde que le rang qui finit juste avant ; les rôles voisins d'un groupe se trouvent par dichotomie.
+- Une liste se filtre par `filterGetiPosts(posts, filter, now?)` : l'horloge est lue une seule fois.
+
 ## Récupération (lot 2) — le bot pousse, le site garde
 
 ### Format réel des annonces

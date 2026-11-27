@@ -21,7 +21,7 @@ import {
   parseGetiStaffRoles,
   parseGetiTeamName,
 } from "@/lib/shared/geti/fields";
-import { NOT_AFTER_WORD, getiDisplayText, prepareGetiText } from "@/lib/shared/geti/normalize";
+import { GETI_TEXT_MAX, NOT_AFTER_WORD, getiDisplayText, prepareGetiText } from "@/lib/shared/geti/normalize";
 import { parseGetiRanks } from "@/lib/shared/geti/ranks";
 import { findGetiRoleTokens, getiRolesOf, getiSubRolesOf } from "@/lib/shared/geti/roles";
 import {
@@ -37,6 +37,13 @@ import { visibleText } from "@/lib/shared/visible-text";
 /** Pseudo Discord : 32 caractères, plus l'ancien suffixe « #1234 ». */
 const USERNAME_MAX = 32;
 const ORIGIN_SERVER_MAX = 100;
+/** Longueur lue d'un texte brut (contenu, titre, description, champ) : deux fois la borne affichée. */
+const RAW_TEXT_MAX = GETI_TEXT_MAX * 2;
+/** Discord n'envoie jamais plus de 10 encarts, de 25 champs chacun. */
+const EMBEDS_MAX = 10;
+const EMBED_FIELDS_MAX = 25;
+/** La ligne « Sent from » est la dernière : elle tient dans la fin de la description. */
+const TRAILER_WINDOW = 600;
 const SNOWFLAKE = /^\d{15,22}$/u;
 const DISCRIMINATOR = /^\d{4}$/u;
 /**
@@ -48,9 +55,9 @@ const DISCRIMINATOR = /^\d{4}$/u;
  */
 const AUTHOR_MENTION = new RegExp(
   [
-    String.raw`^[^\p{L}\p{N}<>\n]*(?:by|par|from|author|auteur|contact)\s*:?\s*<@!?(\d{15,22})>`,
+    String.raw`^[^\p{L}\p{N}<>\n]*(?:by|par|from|author|auteur|contact)\s*(?::\s*)?<@!?(\d{15,22})>`,
     String.raw`${NOT_AFTER_WORD}(?:author|auteur|contact)\s*:\s*<@!?(\d{15,22})>`,
-    String.raw`${NOT_AFTER_WORD}(?:posted|sent|written|post[ée]e?|publi[ée]e?|envoy[ée]e?|[ée]crite?)\s+(?:by|par)\s*:?\s*<@!?(\d{15,22})>`,
+    String.raw`${NOT_AFTER_WORD}(?:posted|sent|written|post[ée]e?|publi[ée]e?|envoy[ée]e?|[ée]crite?)\s+(?:by|par)\s*(?::\s*)?<@!?(\d{15,22})>`,
   ].join("|"),
   "gimu",
 );
@@ -129,8 +136,9 @@ function withoutStruck(displayed: string): { analysed: string; closed: boolean }
 /** Pseudo entre parenthèses derrière un nom d'affichage : « Nom (@pseudo) ». */
 const HANDLE_IN_PARENTHESES = /\(@?([\w.]{2,32}(?:#\d{4})?)\)\s*$/u;
 
+/** Un texte brut, borné : aucun motif ne lit plus que ce qu'une annonce peut porter. */
 function text(value: unknown): string {
-  return typeof value === "string" ? value : "";
+  return typeof value === "string" ? value.slice(0, RAW_TEXT_MAX) : "";
 }
 
 function snowflake(value: unknown): string | null {
@@ -182,13 +190,15 @@ type RelayContent = {
 
 function embedsOf(raw: GetiRawPost): GetiRawEmbed[] {
   return Array.isArray(raw.embeds)
-    ? raw.embeds.filter((embed): embed is GetiRawEmbed => typeof embed === "object" && embed !== null)
+    ? raw.embeds
+        .slice(0, EMBEDS_MAX)
+        .filter((embed): embed is GetiRawEmbed => typeof embed === "object" && embed !== null)
     : [];
 }
 
 /** Champs d'un encart, une ligne chacun : « Nom : valeur ». */
 function embedFieldLines(embed: GetiRawEmbed): string[] {
-  const fields = Array.isArray(embed.fields) ? embed.fields : [];
+  const fields = Array.isArray(embed.fields) ? embed.fields.slice(0, EMBED_FIELDS_MAX) : [];
   return fields.flatMap((field) => {
     if (typeof field !== "object" || field === null) return [];
     const parts = [text(field.name).trim(), text(field.value).trim()].filter((part) => part !== "");
@@ -202,8 +212,9 @@ function embedFieldLines(embed: GetiRawEmbed): string[] {
  * <@id> ») : la deviner enverrait les lecteurs vers quelqu'un qui n'a rien écrit.
  */
 function mentionedAuthorId(body: string): string | null {
-  const labelled = [...body.matchAll(AUTHOR_MENTION)].at(-1);
-  return labelled?.slice(1).find((id) => id !== undefined) ?? null;
+  let last: RegExpMatchArray | null = null;
+  for (const match of body.matchAll(AUTHOR_MENTION)) last = match;
+  return last?.slice(1).find((id) => id !== undefined) ?? null;
 }
 
 /** Retire les échappements Markdown (« \_ », « \] »). */
@@ -231,8 +242,10 @@ function relayContent(raw: GetiRawPost): RelayContent {
       originServer ??= serverName(header[3]);
     }
     tag ??= embedAuthorTag(embed.authorName);
-    const trailer = SENT_FROM.exec(description);
+    const windowStart = Math.max(0, description.length - TRAILER_WINDOW);
+    const trailer = SENT_FROM.exec(description.slice(windowStart));
     if (trailer !== null) {
+      trailer.index += windowStart;
       originServer ??= serverName(trailer[1]);
       authorId ??= trailer[2] ?? null;
     }

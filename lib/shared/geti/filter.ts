@@ -96,3 +96,21 @@ export function matchesGetiFilter(post: GetiParsedPost, filter: GetiFilter, now:
     matchesAny(post.levels, wanted(filter.levels), includeUnknown)
   );
 }
+
+/**
+ * Garde les annonces qui passent un filtre, en lisant l'horloge **une seule
+ * fois** : une annonce au bord de la limite d'âge passerait ou non
+ * selon sa place dans la liste.
+ *
+ * @param posts Annonces analysées.
+ * @param filter Critères (voir {@link matchesGetiFilter}).
+ * @param now Instant de référence en millisecondes (par défaut : maintenant).
+ * @returns Les annonces retenues, dans leur ordre.
+ */
+export function filterGetiPosts<T extends GetiParsedPost>(
+  posts: readonly T[],
+  filter: GetiFilter,
+  now: number = Date.now(),
+): T[] {
+  return posts.filter((post) => matchesGetiFilter(post, filter, now));
+}
