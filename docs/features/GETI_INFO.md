@@ -131,13 +131,15 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
   seule n'est jamais un rang. « argent » n'est lu que suivi d'une division ; « or »
   n'est pas lu (mot trop courant) — « gold » l'est. Derrière « saison », « depuis
   la », « jouer à », collée à « ex- » (« depuis la s2 », « je joue à D2 »,
-  « ex-G2 ») ou devant « esport », ce n'est pas un rang ; « ex d1 », « ancien
-  m1 », « depuis d2 » en sont.
+  « ex-G2 ») ou devant « esport », ce n'est pas un rang, ni « depuis s1 » (une
+  saison) ; « ex d1 », « ancien m1 », « depuis d2 » en sont.
 - **Abréviations** : « gm », « gm3 », « gm5+ », « diam », « dia », « plat »,
   « plat1 », « plat+ », « champ », « top500 », « t500 »… Celles qui sont aussi des
   mots courants ne sont écartées, sans division, que dans leur sens courant :
-  « gm » de salut en tête de ligne (« gm tout le monde », « gm les gars »),
-  « un plat de pâtes », « à plat » (mais « jusqu'à plat »), « champ de bataille ».
+  « gm » de salut en tête de ligne (« gm tout le monde », « gm les gars » — mais
+  « GM tous rôles », « GM, Master » sont des rangs), « un plat de pâtes », « à
+  plat » (mais « jusqu'à plat », « gold à plat », « du silver au plat »), « champ
+  de bataille ».
 - **Fourchettes** : « diam 3-1 », « d3-m2 », « plat à diam », « d3 to m2 ».
   Plusieurs rangs dispersés : du plus bas au plus haut.
 - **Bornes ouvertes** : « master+ », « min d2 », « au moins diamant » → jusqu'à
@@ -149,10 +151,14 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
   « 3k-4k », « 3500 », « 4200 », « 2800-3200 », « 3500+ », « 3500 sr » — 500
   points par palier, 100 par division, plafonné à Grand Maître 1. Un nombre est
   un SR sauf contexte net : unité derrière (« 1500+ heures », « 4k 144hz »,
-  « 1k abonnés », « 1200 followers », « 2000 balles », « 1k€ »), montant ou
+  « 1k abonnés », « 1200 followers », « 1200 personnes », « 3000 inscrits »,
+  « 2000 balles », « 1k€ »), montant ou
   écran devant (« cashprize », « budget », « $ », « écran / résolution 4k »),
-  identifiant (« code 3456 », « id 3500 »), suite de chiffres d'un numéro
-  (« 06 1234 5678 »), année (« en 2025 », « 2025-2026 »). « sr » / « elo »
+  identifiant (« code 3456 », « id 3500 »), numéro de téléphone (deux autres
+  groupes de chiffres autour, un groupe collé par « - » ou « . », un indicatif :
+  « 06 1234 5678 », « 555-1234 », « +33 4200 » — mais « 4200 20 ans » garde son
+  SR), année (« 2025 », « 2025-2026 », et dès 1950 derrière un mot de date : « né
+  en 2005 », « nés avant 2008 »). « sr » / « elo »
   collé l'emporte sur tout contexte.
 - **Par rôle** : le rôle écrit contre le rang, sur la même ligne, devant
   (« tank m2 / dps d1 ») ou derrière (« M2 tank, D1 dps ») ; une liste de rôles
@@ -165,13 +171,16 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
 - **Rôles** : français, anglais, abrégés (« heal », « supp », « mt », « fdps »…).
   « flex dps » / « flex support » sont des sous-rôles, pas le rôle Flex. « ms »
   derrière un nombre est un ping ; « support » / « soutien » juste après un
-  remerciement (« merci pour votre soutien », « merci à tous pour le soutien »,
-  « thanks for the support ») n'est pas un rôle — « je serai ton support »,
-  « merci de jouer le support » en sont.
+  remerciement relié par « pour / for / de / du » (« merci pour tout votre
+  soutien », « thanks a lot for the support », « thank you very much for your
+  support ») n'est pas un rôle — « je serai ton support », « thx we need a
+  support », « merci de jouer le support » en sont.
 - **Région** : mêmes mots que le relais du bot, plus l'Océanie et le drapeau
   européen. « eu » derrière un auxiliaire ou un adverbe (« j'ai eu », « il a eu »,
   « jamais eu ») est le participe d'« avoir », pas l'Europe ; « a » ne compte que
-  derrière son sujet (« de NA à EU », « ouvert à tout EU » restent l'Europe).
+  derrière son sujet (« de NA à EU », « ouvert à tout EU » restent l'Europe), et
+  « bien / plus / tout / assez » que derrière une forme d'« avoir » (« j'ai bien
+  eu » est le participe, « plus EU que NA » l'Europe).
 - **Langues** : mots (« francophone », « english »), drapeaux, sigles **en liste**
   (« FR/EN ») ou derrière « langue : » — seuls, « EN », « ES » ou « DE » sont des
   mots courants.
@@ -180,7 +189,7 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
   soirs ».
 - **Horaires** : « 21h-23h », « 20h30 », « 20-23h », « 8-11pm », « 20:30 » ; une
   durée (« 2h par jour », « 2-3h par soir », « 1h-2h par jour ») n'en est pas un ;
-  deux vraies heures (« 20h-23h par soir », « 21h-23h per day ») restent une
+  au-delà de 6 h (« 20h-23h par soir », « 20-23h par soir », « 21h-23h per day »), c'est une
   plage, et « parfois » n'est pas « par ». Fuseau : « CET », « CEST », « UTC+1 »,
   « heure française » (= `Europe/Paris`).
 - **Nom d'équipe** : derrière un libellé (« Équipe : … », « Team: … ») ou dans la
@@ -189,11 +198,16 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
   capitale (« Roster : 5 joueurs »), ou derrière « team » un pronom ou un article
   (« Team Je cherche », « team La plus chill »), pas de nom — sauf un article en
   capitale devant un mot en capitale (« équipe The Owls », « team La Horde »). Un
-  pronom anglais en capitale peut finir un nom (« Team Game I »), pas l'ouvrir ;
-  « on » reste français (« Team Game On » donne « Game »).
-- **Âge minimal** : « 18+ », « +18 », « 17 ans minimum », « majeur », y compris
-  suivis d'un mot (« 18+ dps », « +18 FR ») ; devant ce qu'ils comptent
-  (« +20 joueurs », « 15+ heures », « 20+ teams ») ce sont des nombres.
+  pronom en capitale peut finir un nom (« Team Game I », « Team Game On »), pas
+  l'ouvrir, et pas quand un verbe de sa langue le suit (« Team Nova I need »,
+  « team Phoenix On cherche » donnent « Nova », « Phoenix ») ; limite assumée :
+  « Team Game On recrute » donne « Game ».
+- **Âge minimal** : « 18+ », « +18 », « 17 ans minimum », « majeur ». « 18+ » ou
+  « +18 » nu n'est un âge que suivi de la fin, d'une ponctuation, d'un mot d'âge
+  ou d'un mot d'annonce (rôle, région, langue, plateforme : « 18+ dps », « +18
+  FR ») ; suivi d'autre chose (« +20 joueurs », « +20 inscrits », « +15 min »)
+  ou derrière un niveau ou un délai (« lvl 20+ », « top 20+ », « dans +15 »),
+  c'est un nombre.
 
 ## Filtre — `matchesGetiFilter(post, filter, now?)`
 

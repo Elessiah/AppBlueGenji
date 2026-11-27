@@ -4,6 +4,7 @@ import { getiRange, getiRank, parseGetiText } from "@/tests/helpers/geti";
 
 const BRONZE_5 = getiRank("BRONZE", 5);
 const CHAMPION_1 = getiRank("CHAMPION", 1);
+const NO_RANK = { min: null, max: null };
 
 /** Fourchette globale lue dans un texte. */
 function rangeOf(text: string) {
@@ -259,7 +260,6 @@ describe("rangs d'une annonce — rang par rôle", () => {
 });
 
 describe("rangs d'une annonce — faux rangs écartés", () => {
-  const NO_RANK = { min: null, max: null };
 
   it("un montant en milliers n'est pas un SR (« cashprize 1k€ »)", () => {
     expect(rangeOf("LFT tank, cashprize 1k€ gagné")).toEqual(NO_RANK);
@@ -349,7 +349,6 @@ describe("rangs d'une annonce — initiales écartées seulement dans leur conte
 });
 
 describe("rangs d'une annonce — ancien SR", () => {
-  const NO_RANK = { min: null, max: null };
 
   it.each([
     { text: "lft 4k", expected: getiRange(getiRank("GRANDMASTER", 5)) },
@@ -409,5 +408,129 @@ describe("rangs d'une annonce — abréviations", () => {
     "lft champ de bataille",
   ])("« %s » n'est pas un rang (sens courant)", (text) => {
     expect(rangeOf(text)).toEqual({ min: null, max: null });
+  });
+});
+
+describe("rangs d'une annonce — revue 3 : années, nombres comptés, téléphones", () => {
+  it.each([
+    { text: "lft dps, né en 2005" },
+    { text: "joueurs nés avant 2008" },
+  ])(
+    "« $text » : une année derrière un mot de date n'est pas un SR",
+    ({ text }) => {
+      expect(rangeOf(text)).toEqual(NO_RANK);
+    },
+  );
+
+  it.each([
+    { text: "serveur de 1200 personnes, lft" },
+    { text: "3000 inscrits, lfp" },
+    { text: "1500 points de cashprize" },
+  ])(
+    "« $text » : un nombre qui compte quelque chose n'est pas un SR",
+    ({ text }) => {
+      expect(rangeOf(text)).toEqual(NO_RANK);
+    },
+  );
+
+  it.each([
+    { text: "lft 3500", expected: getiRange(getiRank("MASTER", 5)) },
+    { text: "dps 4000", expected: getiRange(getiRank("GRANDMASTER", 5)) },
+  ])(
+    "« $text » : un SR nu sans mot de date reste un rang",
+    ({ text, expected }) => {
+      expect(rangeOf(text)).toEqual(expected);
+    },
+  );
+
+  it("un âge à deux chiffres à côté du SR ne l'efface pas (« 4200 20 ans »)", () => {
+    expect(rangeOf("lft dps 4200 20 ans")).toEqual(
+      getiRange(getiRank("GRANDMASTER", 3)),
+    );
+  });
+
+  it.each([
+    { text: "06 12 34 56 78 4200" },
+    { text: "appelle le 555-1234" },
+    { text: "+33 4200" },
+  ])("« $text » : un numéro de téléphone n'est pas un SR", ({ text }) => {
+    expect(rangeOf(text)).toEqual(NO_RANK);
+  });
+
+  it("« 3k-4k » reste une fourchette de SR", () => {
+    expect(rangeOf("lft 3k-4k")).toEqual(
+      getiRange(getiRank("DIAMOND", 5), getiRank("GRANDMASTER", 5)),
+    );
+  });
+});
+
+describe("rangs d'une annonce — revue 3 : abréviations courantes", () => {
+  it.each([
+    {
+      text: "recherche joueurs gold à plat",
+      expected: getiRange(getiRank("GOLD", 5), getiRank("PLATINUM", 1)),
+    },
+    {
+      text: "lfp du silver au plat",
+      expected: getiRange(getiRank("SILVER", 5), getiRank("PLATINUM", 1)),
+    },
+    {
+      text: "du gm au champ, lft",
+      expected: getiRange(getiRank("GRANDMASTER", 5), CHAMPION_1),
+    },
+  ])(
+    "« $text » : la borne haute reliée par « à / au » est gardée",
+    ({ text, expected }) => {
+      expect(rangeOf(text)).toEqual(expected);
+    },
+  );
+
+  it.each([
+    { text: "mon plat d'entrée" },
+    { text: "mon pneu est à plat" },
+    { text: "un plat de pâtes" },
+  ])("« $text » : « plat » au sens courant n'est pas un rang", ({ text }) => {
+    expect(rangeOf(text)).toEqual(NO_RANK);
+  });
+
+  it.each([
+    {
+      text: "GM tous rôles",
+      expected: getiRange(
+        getiRank("GRANDMASTER", 5),
+        getiRank("GRANDMASTER", 1),
+      ),
+    },
+    {
+      text: "GM all roles\nlft",
+      expected: getiRange(
+        getiRank("GRANDMASTER", 5),
+        getiRank("GRANDMASTER", 1),
+      ),
+    },
+    {
+      text: "GM, Master\nlfp",
+      expected: getiRange(getiRank("MASTER", 5), getiRank("GRANDMASTER", 1)),
+    },
+  ])(
+    "« $text » : « GM » devant une liste de rangs ou de rôles est un rang",
+    ({ text, expected }) => {
+      expect(rangeOf(text)).toEqual(expected);
+    },
+  );
+
+  it.each([{ text: "gm tout le monde" }, { text: "GM !" }])(
+    "« $text » reste un salut",
+    ({ text }) => {
+      expect(rangeOf(text)).toEqual(NO_RANK);
+    },
+  );
+
+  it("« depuis s1 » est une saison, pas Silver 1", () => {
+    expect(rangeOf("je joue depuis s1, lft dps")).toEqual(NO_RANK);
+  });
+
+  it("« depuis d2 » reste Diamant 2", () => {
+    expect(rangeOf("depuis d2")).toEqual(getiRange(getiRank("DIAMOND", 2)));
   });
 });
