@@ -248,7 +248,7 @@ describe("upsertGetiPosts", () => {
     const outcome = await upsertGetiPosts(executor(execute), posts, NOW);
 
     expect(outcome).toEqual({ stored: 1, emptied: 0, expired: 0, withheld: 0 });
-    expect(execute).not.toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE message_id IN (?)", ["100000000000000916"]);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("COALESCE(edited_at, posted_at) <= ?"))).toBe(false);
     const values: unknown[] = Array.isArray(execute.mock.calls[0][1]) ? execute.mock.calls[0][1] : [];
     expect(String(values[7])).toContain("LFT tank Master");
   });
@@ -264,7 +264,7 @@ describe("upsertGetiPosts", () => {
 
     expect(outcome).toEqual({ stored: 0, emptied: 1, expired: 0, withheld: 0 });
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE message_id IN (?)", ["100000000000000917"]);
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE (message_id = ? AND COALESCE(edited_at, posted_at) <= ?)", ["100000000000000917", posts[1].editedAt]);
   });
 
   it("upsertGetiPosts_expiredAndEmptiedMixedWithKept_writesOnlyTheKeptOnes", async () => {
@@ -290,7 +290,51 @@ describe("upsertGetiPosts", () => {
 
     expect(outcome).toEqual({ stored: 0, emptied: 1, expired: 0, withheld: 0 });
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE message_id IN (?)", [GETI_FAKE_MESSAGE_ID]);
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE (message_id = ? AND COALESCE(edited_at, posted_at) <= ?)", [GETI_FAKE_MESSAGE_ID, post.postedAt]);
+  });
+
+  it("upsertGetiPosts_staleEmptyVersionRetriedAfterEdit_deleteGuardedByItsVersion", async () => {
+    const execute = executeMock([], 0);
+    const stale = getiPushedPost({ content: "  ", postedAt: new Date(NOW - 3_600_000).toISOString() });
+
+    const outcome = await upsertGetiPosts(executor(execute), [stale], NOW);
+
+    expect(outcome).toEqual({ stored: 0, emptied: 1, expired: 0, withheld: 0 });
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE (message_id = ? AND COALESCE(edited_at, posted_at) <= ?)", [GETI_FAKE_MESSAGE_ID, new Date(NOW - 3_600_000)]);
+  });
+
+  it("upsertGetiPosts_emptiedEditedPost_guardUsesEditedAt", async () => {
+    const execute = executeMock([], 1);
+    const edited = getiPushedPost({ content: "  ", editedAt: new Date(NOW - 60_000).toISOString() });
+
+    await upsertGetiPosts(executor(execute), [edited], NOW);
+
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE (message_id = ? AND COALESCE(edited_at, posted_at) <= ?)", [GETI_FAKE_MESSAGE_ID, new Date(NOW - 60_000)]);
+  });
+
+  it("upsertGetiPosts_twoEmptiedPosts_oneGuardedDeletePerPost", async () => {
+    const execute = executeMock([], 2);
+    const posts = [getiPushedPost({ id: "100000000000000941", content: "" }), getiPushedPost({ id: "100000000000000942", content: "" })];
+
+    await upsertGetiPosts(executor(execute), posts, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0][0]).toBe(
+      "DELETE FROM bg_geti_posts WHERE (message_id = ? AND COALESCE(edited_at, posted_at) <= ?) OR (message_id = ? AND COALESCE(edited_at, posted_at) <= ?)",
+    );
+    expect(execute.mock.calls[0][1]).toEqual(["100000000000000941", posts[0].postedAt, "100000000000000942", posts[1].postedAt]);
+  });
+
+  it("upsertGetiPosts_twoHundredAndOneEmptied_runsTwoGuardedDeletes", async () => {
+    const execute = executeMock([], 1);
+    const posts = Array.from({ length: 201 }, (_, index) =>
+      getiPushedPost({ id: `10000000000000${1000 + index}`, content: "" }),
+    );
+
+    await upsertGetiPosts(executor(execute), posts, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[1]).toEqual(["DELETE FROM bg_geti_posts WHERE (message_id = ? AND COALESCE(edited_at, posted_at) <= ?)", ["100000000000001200", posts[200].postedAt]]);
   });
 });
 

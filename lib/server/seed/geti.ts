@@ -186,10 +186,15 @@ export async function createGetiPosts(db: Pool): Promise<void> {
     pushed(wirePost({ category: "lft", ageHours: expiredAfter("lft"), author: "test_geti_perime", text: "LFT trop ancien" }, 90, now)),
     pushed(wirePost({ category: "lfs", ageHours: expiredAfter("lfs"), author: "test_geti_perime", text: "LFS trop ancien" }, 91, now)),
   ];
-  const deleted = pushed(wirePost({ category: "lfs", ageHours: 1, author: "test_geti_supprime", text: "LFS annulé" }, 92, now));
+  const deletedBody = wirePost({ category: "lfs", ageHours: 1, author: "test_geti_supprime", text: "LFS annulé" }, 92, now);
+  const deleted = pushed({ ...deletedBody, editedAt: new Date(now - HOUR_MS / 2).toISOString() });
   const outcome = await upsertGetiPosts(db, [...posts, ...expired, deleted], now);
   // Rejouée : la modification d'une annonce déjà gardée passe par `ON DUPLICATE KEY UPDATE`.
   await upsertGetiPosts(db, posts.slice(0, 1), now);
+  // Version vide plus ancienne que la version gardée (envoi retenté après la modification) : l'annonce reste.
+  const stale = await upsertGetiPosts(db, [pushed({ ...deletedBody, content: "", embeds: [] })], now);
+  const [staleRows] = await db.execute(`SELECT COUNT(*) AS total FROM bg_geti_posts WHERE message_id = ?`, [deleted.messageId]);
+  const staleKept = Number((staleRows as { total: number }[])[0]?.total ?? 0) === 1 && stale.emptied === 1;
   const removed = await deleteGetiPosts(db, [deleted.messageId]);
 
   // Réconciliation d'un salon dont rien n'a disparu, puis purge : aucune ligne ne doit partir.
@@ -230,12 +235,13 @@ export async function createGetiPosts(db: Pool): Promise<void> {
     outcome.stored !== posts.length + 1 ||
     outcome.expired !== expired.length ||
     removed !== 1 ||
+    !staleKept ||
     reconciled !== 0 ||
     beforePurge !== posts.length ||
     afterPurge !== posts.length
   ) {
     throw new Error(
-      `annonces GETI : bilan inattendu (${outcome.stored} gardées, ${outcome.expired} périmée(s), ${removed} supprimée(s), ${reconciled} réconciliée(s), ${beforePurge} puis ${afterPurge} après purge)`,
+      `annonces GETI : bilan inattendu (${outcome.stored} gardées, ${outcome.expired} périmée(s), ${removed} supprimée(s), version vide ancienne ${staleKept ? "ignorée" : "appliquée"}, ${reconciled} réconciliée(s), ${beforePurge} puis ${afterPurge} après purge)`,
     );
   }
 

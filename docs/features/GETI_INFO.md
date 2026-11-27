@@ -440,7 +440,15 @@ l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
 - Opposition sur un auteur : un en-tête GETI illisible (pseudo ou serveur hors
   forme) garde l'auteur par sa mention de tête, écrite par GETI Bot — sans
   pseudo ni serveur —, pour que l'opposition le couvre. Dans le premier encart
-  seulement : la ligne de tête d'un encart suivant ne nomme personne.
+  du message seulement (position 0, même si un encart illisible la tient) : la
+  mention de tête d'un en-tête illisible dans un encart suivant ne nomme
+  personne. Un en-tête complet et les libellés hors citation (« Contact :
+  <@id> ») se lisent, eux, dans tout encart — le texte du joueur y est cité.
+- Une annonce vidée (pièce jointe seule, texte effacé) n'est retirée que si sa
+  version est au moins aussi récente que la version gardée : un ancien envoi
+  vide, retenté après la modification, ne retire pas l'annonce à jour.
+- `stored` compte les annonces acceptées : une version plus ancienne que la
+  version gardée y figure, sans rien écrire.
 - Un lot qui porte deux versions d'un même message n'en garde que la plus
   récente (modification, sinon publication), avant l'analyse : une ancienne
   version vide ne retire pas la version récente du même lot.

@@ -88,7 +88,10 @@ const upsertSql = (rows: number): string => `
 
 /** Bilan d'un lot poussé : des nombres seulement. */
 export type GetiUpsertOutcome = {
-  /** Annonces enregistrées ou mises à jour. */
+  /**
+   * Annonces acceptées : écrites, ou laissées telles quelles parce que la version
+   * gardée est plus récente (`INCOMING_IS_CURRENT`).
+   */
   stored: number;
   /** Annonces sans texte (pièce jointe seule, texte vidé par une modification) : retirées si elles étaient gardées. */
   emptied: number;
@@ -141,7 +144,7 @@ export async function upsertGetiPosts(
   now: number = Date.now(),
 ): Promise<GetiUpsertOutcome> {
   const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0, withheld: 0 };
-  const emptied: string[] = [];
+  const emptied: { messageId: string; version: Date }[] = [];
   const rows: GetiRowValues[] = [];
   const trusted = getiTrustedBots();
   // Un même message deux fois dans un lot (création puis modification) ne compte qu'une annonce : sa
@@ -154,7 +157,7 @@ export async function upsertGetiPosts(
     const parsed = parseGetiPost(post.raw, trusted);
     if (parsed.text.trim() === "") {
       outcome.emptied += 1;
-      emptied.push(post.messageId);
+      emptied.push({ messageId: post.messageId, version: post.editedAt ?? post.postedAt });
       continue;
     }
     rows.push([
@@ -178,9 +181,28 @@ export async function upsertGetiPosts(
     outcome.withheld = await withholdObjectedGetiPosts(executor, rows.map((row) => String(row[0])));
     outcome.stored -= outcome.withheld;
   }
-  if (emptied.length > 0) await deleteGetiPosts(executor, emptied);
+  if (emptied.length > 0) await deleteEmptiedGetiPosts(executor, emptied);
   forgetGetiListScans();
   return outcome;
+}
+
+/**
+ * Retire les annonces vidées, chacune seulement si sa version vide est au moins
+ * aussi récente que la version gardée (même règle que `INCOMING_IS_CURRENT`) :
+ * un ancien envoi vide, retenté par la file après la modification, ne retire
+ * pas l'annonce à jour.
+ */
+async function deleteEmptiedGetiPosts(
+  executor: GetiExecutor,
+  emptied: readonly { messageId: string; version: Date }[],
+): Promise<void> {
+  for (let start = 0; start < emptied.length; start += DELETE_CHUNK) {
+    const chunk = emptied.slice(start, start + DELETE_CHUNK);
+    await executor.execute(
+      `DELETE FROM bg_geti_posts WHERE ${chunk.map(() => "(message_id = ? AND COALESCE(edited_at, posted_at) <= ?)").join(" OR ")}`,
+      chunk.flatMap((post) => [post.messageId, post.version]),
+    );
+  }
 }
 
 /** Retire des annonces par identifiant de message Discord ; rend le nombre de lignes retirées. */
