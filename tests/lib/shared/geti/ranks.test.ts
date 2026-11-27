@@ -265,7 +265,7 @@ describe("rangs d'une annonce — faux rangs écartés", () => {
     expect(rangeOf("LFT tank, cashprize 1k€ gagné")).toEqual(NO_RANK);
   });
 
-  it("« 4k » sans libellé ni rôle n'est pas un SR (« écran 4k »)", () => {
+  it("« écran 4k » n'est pas un SR", () => {
     expect(rangeOf("lft, joue sur écran 4k")).toEqual(NO_RANK);
   });
 
@@ -326,5 +326,88 @@ describe("rangs d'une annonce — borne ouverte au bout d'une liste", () => {
 
   it("« jusqu'à plat ou diam » descend jusqu'à Bronze 5", () => {
     expect(rangeOf("lfp jusqu'a plat ou diam")).toEqual(getiRange(BRONZE_5, getiRank("DIAMOND", 1)));
+  });
+});
+
+
+describe("rangs d'une annonce — initiales écartées seulement dans leur contexte", () => {
+  it("« ancien m1 » reste un rang", () => {
+    expect(rangeOf("lft dps ancien m1, actuellement d2")).toEqual(getiRange(getiRank("DIAMOND", 2), getiRank("MASTER", 1)));
+  });
+
+  it("« ex d1 » reste un rang", () => {
+    expect(rangeOf("lft dps ex d1")).toEqual(getiRange(getiRank("DIAMOND", 1)));
+  });
+
+  it("« depuis d2 » reste un rang", () => {
+    expect(rangeOf("lft depuis d2")).toEqual(getiRange(getiRank("DIAMOND", 2)));
+  });
+
+  it("« je joue à D2 » est un jeu, pas Diamant 2", () => {
+    expect(rangeOf("je joue à D2 aussi, lft")).toEqual({ min: null, max: null });
+  });
+});
+
+describe("rangs d'une annonce — ancien SR", () => {
+  const NO_RANK = { min: null, max: null };
+
+  it.each([
+    { text: "lft 4k", expected: getiRange(getiRank("GRANDMASTER", 5)) },
+    { text: "lft dps 3.5k", expected: getiRange(getiRank("MASTER", 5)) },
+    { text: "lft 4k5", expected: getiRange(getiRank("GRANDMASTER", 1)) },
+    { text: "lft 4000", expected: getiRange(getiRank("GRANDMASTER", 5)) },
+    { text: "lft 3500", expected: getiRange(getiRank("MASTER", 5)) },
+    { text: "lft dps 4200", expected: getiRange(getiRank("GRANDMASTER", 3)) },
+    { text: "lfp 2800-3200", expected: getiRange(getiRank("PLATINUM", 2), getiRank("DIAMOND", 3)) },
+    { text: "lft 3500+", expected: getiRange(getiRank("MASTER", 5), CHAMPION_1) },
+    { text: "lft 3k+", expected: getiRange(getiRank("DIAMOND", 5), CHAMPION_1) },
+    { text: "lft 3k-4k", expected: getiRange(getiRank("DIAMOND", 5), getiRank("GRANDMASTER", 5)) },
+  ])("« $text » est un SR", ({ text, expected }) => {
+    expect(rangeOf(text)).toEqual(expected);
+  });
+
+  it.each([
+    "lft, résolution 4k",
+    "lft 4k 144hz",
+    "lft 4k heures",
+    "1k abonnés sur twitch, lft",
+    "1200 followers, lft",
+    "budget 1k, lft",
+    "lft $2000",
+    "cashprize 1500€",
+    "lft 2000 balles",
+    "code 3456",
+    "id 3500",
+    "appelle 06 1234 5678",
+    "lft en 2025",
+    "2025-2026 saison",
+  ])("« %s » n'est pas un SR", (text) => {
+    expect(rangeOf(text)).toEqual(NO_RANK);
+  });
+});
+
+describe("rangs d'une annonce — abréviations", () => {
+  it.each([
+    { text: "lft GM", expected: getiRange(getiRank("GRANDMASTER", 5), getiRank("GRANDMASTER", 1)) },
+    { text: "lft gm5+", expected: getiRange(getiRank("GRANDMASTER", 5), CHAMPION_1) },
+    { text: "lft dia", expected: getiRange(getiRank("DIAMOND", 5), getiRank("DIAMOND", 1)) },
+    { text: "lft plat1", expected: getiRange(getiRank("PLATINUM", 1)) },
+    { text: "lft plat+", expected: getiRange(getiRank("PLATINUM", 5), CHAMPION_1) },
+    { text: "lft champ", expected: getiRange(getiRank("CHAMPION", 5), CHAMPION_1) },
+    { text: "lft dps, diam ou plat", expected: getiRange(getiRank("PLATINUM", 5), getiRank("DIAMOND", 1)) },
+    { text: "lft gm, dps", expected: getiRange(getiRank("GRANDMASTER", 5), getiRank("GRANDMASTER", 1)) },
+    { text: "gm, lft dps m2", expected: getiRange(getiRank("MASTER", 2)) },
+  ])("« $text » est lu", ({ text, expected }) => {
+    expect(rangeOf(text)).toEqual(expected);
+  });
+
+  it.each([
+    "gm tout le monde, lft dps",
+    "gm les gars",
+    "je mange un plat de pâtes, lft dps",
+    "mon écran est à plat, lft",
+    "lft champ de bataille",
+  ])("« %s » n'est pas un rang (sens courant)", (text) => {
+    expect(rangeOf(text)).toEqual({ min: null, max: null });
   });
 });

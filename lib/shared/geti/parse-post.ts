@@ -46,7 +46,7 @@ const DISCRIMINATOR = /^\d{4}$/u;
  */
 const AUTHOR_MENTION = new RegExp(
   [
-    String.raw`^[^\p{L}\p{N}<\n]*(?:by|par|from|author|auteur|contact)\s*:?\s*<@!?(\d{15,22})>`,
+    String.raw`^[^\p{L}\p{N}<>\n]*(?:by|par|from|author|auteur|contact)\s*:?\s*<@!?(\d{15,22})>`,
     String.raw`${NOT_AFTER_WORD}(?:author|auteur|contact)\s*:\s*<@!?(\d{15,22})>`,
     String.raw`${NOT_AFTER_WORD}(?:posted|sent|written|post[ée]e?|publi[ée]e?|envoy[ée]e?|[ée]crite?)\s+(?:by|par)\s*:?\s*<@!?(\d{15,22})>`,
   ].join("|"),
@@ -60,6 +60,14 @@ const SENT_FROM_LINK = String.raw`\[((?:\\.|[^\]\\])*)\]\([^)\s]*\)`;
 const SENT_FROM_AUTHOR = String.raw`(?:\s*by\s*<@!?(\d{15,22})>)?`;
 const SENT_FROM = new RegExp(
   String.raw`\n*[*_]*Sent from\s?:\s?${SENT_FROM_LINK}[*_]*${SENT_FROM_AUTHOR}\s*$`,
+  "iu",
+);
+/**
+ * Première ligne d'un relais du bot GETI :
+ * « <@id>*(pseudo)* sur [Serveur](invitation) », puis le texte cité (« > … »).
+ */
+const GETI_HEADER = new RegExp(
+  String.raw`^\s*<@!?(\d{15,22})>[^\S\n]*[*_]*\(((?:\\.|[^)\n\\]){1,64})\)[*_]*[^\S\n]*(?:sur|on|from)[^\S\n]*${SENT_FROM_LINK}[^\S\n]*(?:\n|$)`,
   "iu",
 );
 /** Pseudo entre parenthèses derrière un nom d'affichage : « Nom (@pseudo) ». */
@@ -142,6 +150,15 @@ function mentionedAuthorId(body: string): string | null {
   return labelled?.slice(1).find((id) => id !== undefined) ?? null;
 }
 
+/** Retire les échappements Markdown (« \_ », « \] »). */
+function unescapeMarkdown(value: string): string {
+  return value.replace(/\\(.)/gu, "$1");
+}
+
+function serverName(value: string): string | null {
+  return visibleText(unescapeMarkdown(value)).slice(0, ORIGIN_SERVER_MAX) || null;
+}
+
 /** Texte, auteur et origine d'un relais : tout se lit dans les encarts du bot. */
 function relayContent(raw: GetiRawPost): RelayContent {
   const parts: string[] = [text(raw.content)];
@@ -149,14 +166,23 @@ function relayContent(raw: GetiRawPost): RelayContent {
   let authorId: string | null = null;
   let tag: string | null = null;
   for (const embed of embedsOf(raw)) {
-    tag ??= embedAuthorTag(embed.authorName);
     const description = text(embed.description);
+    // L'en-tête GETI nomme l'auteur : il passe avant toute mention du texte cité.
+    const header = GETI_HEADER.exec(description);
+    if (header !== null) {
+      authorId ??= header[1];
+      tag ??= embedAuthorTag(unescapeMarkdown(header[2]));
+      originServer ??= serverName(header[3]);
+    }
+    tag ??= embedAuthorTag(embed.authorName);
     const trailer = SENT_FROM.exec(description);
     if (trailer !== null) {
-      originServer ??= visibleText(trailer[1].replace(/\\(.)/gu, "$1")).slice(0, ORIGIN_SERVER_MAX) || null;
+      originServer ??= serverName(trailer[1]);
       authorId ??= trailer[2] ?? null;
     }
-    parts.push(text(embed.title), description.slice(0, trailer?.index), ...embedFieldLines(embed));
+    const start = header === null ? 0 : header[0].length;
+    const end = trailer === null ? undefined : Math.max(start, trailer.index);
+    parts.push(text(embed.title), description.slice(start, end), ...embedFieldLines(embed));
   }
   const body = parts.filter((part) => part.trim() !== "").join("\n");
   return { body, authorTag: tag, authorId: authorId ?? mentionedAuthorId(body), originServer };

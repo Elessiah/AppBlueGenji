@@ -371,5 +371,31 @@
       "staffRoles": [],
       "minAge": null
     }
+  },
+  {
+    "name": "lft-relais-geti-en-tete",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "",
+      "author": { "id": "100000000000000090", "username": "FauxBotGeti", "discriminator": "0", "bot": true },
+      "embeds": [
+        {
+          "description": "<@100000000000000003>*(fauxjoueur_03)* sur [Faux Serveur OW EU](https://discord.gg/fauxcode)\n\n> LFT tank Master 1, dispo 20h-23h\n> contact <@100000000000000004>"
+        }
+      ],
+      "postedAt": "2026-11-24T19:00:00.000Z"
+    },
+    "expected": {
+      "category": "lft",
+      "authorTag": "fauxjoueur_03",
+      "authorId": "100000000000000003",
+      "relayed": true,
+      "originServer": "Faux Serveur OW EU",
+      "roles": ["TANK"],
+      "regions": [],
+      "ranks": { "min": { "tier": "MASTER", "division": 1 }, "max": { "tier": "MASTER", "division": 1 }, "byRole": { "TANK": { "min": { "tier": "MASTER", "division": 1 }, "max": { "tier": "MASTER", "division": 1 } } } },
+      "availability": { "days": [], "times": [{ "from": 1200, "to": 1380 }], "timezone": null },
+      "teamName": null
+    }
   }
 ]

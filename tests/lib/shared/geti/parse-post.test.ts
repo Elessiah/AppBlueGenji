@@ -300,3 +300,54 @@ describe("parseGetiPost — entrées douteuses", () => {
     expect(parseGetiPost(raw)).toMatchObject({ text: "lft tank\ngm1", roles: ["TANK"] });
   });
 });
+
+
+describe("parseGetiPost — en-tête d'un relais GETI", () => {
+  const HEADER = `<@${GETI_FAKE_OTHER_ID}>*(fauxpseudo)* sur [Faux Serveur](https://discord.gg/fauxcode)`;
+
+  it("l'en-tête donne l'auteur, son pseudo et le serveur d'origine", () => {
+    const parsed = parseGetiPost(getiRelayPost(`${HEADER}\n\n> lft dps d3 eu`, null));
+
+    expect(parsed).toMatchObject({
+      relayed: true,
+      authorId: GETI_FAKE_OTHER_ID,
+      authorTag: "fauxpseudo",
+      originServer: "Faux Serveur",
+      roles: ["DPS"],
+      regions: ["EU"],
+    });
+  });
+
+  it("l'en-tête est retiré du texte : seul le texte cité reste", () => {
+    expect(parseGetiPost(getiRelayPost(`${HEADER}\n\n> lft dps`, null)).text).toBe("> lft dps");
+  });
+
+  it("le nom du serveur n'apporte ni rôle, ni rang, ni région, ni équipe", () => {
+    const header = `<@${GETI_FAKE_OTHER_ID}>*(heal_m1)* sur [Overwatch France EU - Team Phoenix Tank Diamond](https://discord.gg/a)`;
+    const parsed = parseGetiPost(getiRelayPost(`${header}\n\n> lft dps`, null));
+
+    expect(parsed).toMatchObject({ roles: ["DPS"], ranks: { min: null, max: null }, regions: [], teamName: null });
+  });
+
+  it("un pseudo aux caractères échappés est rendu sans ses échappements", () => {
+    const header = `<@${GETI_FAKE_OTHER_ID}>*(faux\\_pseudo)* sur [S](https://discord.gg/a)`;
+
+    expect(parseGetiPost(getiRelayPost(`${header}\n\n> lft`, null)).authorTag).toBe("faux_pseudo");
+  });
+
+  it("l'auteur de l'en-tête passe avant une mention « contact » du texte cité", () => {
+    const description = `${HEADER}\n\n> LFT tank m2\n> contact <@999999999999999999>`;
+
+    expect(parseGetiPost(getiRelayPost(description, null)).authorId).toBe(GETI_FAKE_OTHER_ID);
+  });
+
+  it("sans en-tête, une mention « contact » dans une citation ne désigne pas l'auteur", () => {
+    expect(parseGetiPost(getiRelayPost("lft\n> contact <@999999999999999999>", null)).authorId).toBeNull();
+  });
+
+  it("une mention qui n'ouvre pas la description n'est pas un en-tête", () => {
+    const description = `lft dps ${HEADER}`;
+
+    expect(parseGetiPost(getiRelayPost(description, null))).toMatchObject({ authorId: null, originServer: null });
+  });
+});

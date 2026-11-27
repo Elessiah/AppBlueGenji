@@ -80,6 +80,56 @@ const TIER_ALIASES: Readonly<Record<GetiTier, readonly string[]>> = {
 /** Alias lus seulement suivis d'une division. */
 const NEEDS_DIVISION = new Set(["argent"]);
 
+/**
+ * Abréviations qui sont aussi des mots courants, écartées sans division dans
+ * leur sens courant : « gm tout le monde » (salut), « un plat de pâtes »,
+ * « à plat », « champ de bataille ». « lft gm », « diam ou plat » restent des rangs.
+ */
+type CommonSense = { before?: RegExp; after?: RegExp };
+
+/** Un des mots, juste avant (`wordBefore`) ou juste après (`wordAfter`) l'abréviation. */
+function wordBefore(words: string): RegExp {
+  return new RegExp(String.raw`${NOT_AFTER_WORD}(?:${words.split(" ").join("|")})\s$`, "u");
+}
+
+function wordAfter(words: string): RegExp {
+  return new RegExp(String.raw`^\s(?:${words.split(" ").join("|")})${NOT_BEFORE_WORD}`, "u");
+}
+
+const GREETED = "tout tous toutes a\\stous all everyone every1 les la\\steam the\\steam guys y'?all friends? frerots? la\\scommu chat";
+const COMMON_WORD_SENSES: Readonly<Record<string, CommonSense>> = {
+  gm: {
+    before: /(?:^|\n)[^\S\n]*$/u,
+    after: new RegExp(String.raw`^[^\S\n]*(?:[!,]|(?:${GREETED.split(" ").join("|")})${NOT_BEFORE_WORD})`, "u"),
+  },
+  plat: {
+    // « à plat », mais « jusqu'à plat » est une borne de rang.
+    before: wordBefore("un le ce mon ton son notre votre leur du (?<!jusqu['\\s]?)a au bon gros petit"),
+    after: wordAfter("de du d' des principal prefere chaud froid"),
+  },
+  plats: {
+    before: wordBefore("les des mes tes ses nos vos leurs bons petits"),
+    after: wordAfter("de du d' des cuisines?"),
+  },
+  champ: {
+    before: wordBefore("le un du au ce mon ton son en\\splein"),
+    after: wordAfter("de du d' des libre lexical"),
+  },
+};
+
+/** Le mot est pris dans son sens courant (sans division, ni « + »). */
+function isCommonWordSense(lower: string, key: string, match: RegExpExecArray): boolean {
+  const sense = COMMON_WORD_SENSES[key];
+  if (sense === undefined || match[2] !== undefined) return false;
+  const end = match.index + match[0].length;
+  const before = lower.slice(Math.max(0, match.index - 12), match.index);
+  const after = lower.slice(end, end + 16);
+  if (/^\s?\+/u.test(after)) return false;
+  // « gm » salue en tête de ligne seulement : les deux conditions ensemble.
+  if (key === "gm") return (sense.before?.test(before) ?? false) && (sense.after?.test(after) ?? false);
+  return (sense.before?.test(before) ?? false) || (sense.after?.test(after) ?? false);
+}
+
 /** Initiale d'un palier, lue seulement collée à une division (« d3 », « m1 »). */
 const TIER_LETTERS: Readonly<Record<string, GetiTier>> = {
   b: "BRONZE",
@@ -100,28 +150,42 @@ const LETTER_RANK = new RegExp(
   String.raw`${NOT_AFTER_WORD}([bsgpdmc])([1-5])(?:[-–/]([1-5]))?${NOT_BEFORE_WORD}`,
   "gu",
 );
-/** Une initiale + chiffre n'est pas un rang derrière « saison » (« depuis la s2 ») ou « ex- » (« ex-G2 »). */
+/**
+ * Une initiale + chiffre n'est pas un rang derrière « saison » (« depuis la s2 »)
+ * ou « jouer à » (« je joue à D2 », un jeu), ni collée à « ex- » (« ex-G2 ») ;
+ * « ex d1 », « ancien m1 », « je joue d2 » restent des rangs.
+ */
 const NOT_LETTER_RANK_BEFORE = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:saison|season|depuis(?: la)?|since|ex|anciens?|ancienne|former)[\s-]?$`,
+  String.raw`(?:${NOT_AFTER_WORD}(?:saison|season|depuis la|since|jou(?:e|es|ent|er|ons|ez|ais|ait)\s(?:aussi\s)?a)\s?|${NOT_AFTER_WORD}ex-)$`,
   "u",
 );
 /** … ni devant « esport » (« G2 Esports »). */
 const NOT_LETTER_RANK_AFTER = /^[\s-]?(?:e-?sports?|gaming)(?![\p{L}\p{N}])/u;
 const TOP_500 = new RegExp(String.raw`${NOT_AFTER_WORD}(?:top\s?500|t500)${NOT_BEFORE_WORD}`, "gu");
 /**
- * Ancien SR en milliers : « 4k », « 4.2k », « 3k5 ». « 4k » seul, sans « sr » ni
- * « elo » autour ni rôle contre lui, est un montant (« cashprize 1k », « écran 4k »).
+ * Ancien SR en milliers : « 4k », « 4.2k », « 3k5 », « 3k+ » — un rang (« 4k »
+ * ≈ Grand maître), sauf dans un contexte net qui en fait autre chose.
  */
 const SR_THOUSANDS = new RegExp(
   String.raw`(?<![\p{L}\p{N}.,#])([1-4])(?:[.,](\d))?k(\d)?(?:\s?(sr|elo))?${NOT_BEFORE_WORD}`,
   "gu",
 );
-const SR_LABEL_BEFORE = new RegExp(String.raw`${NOT_AFTER_WORD}(?:sr|elo)\s?:?\s?$`, "u");
-/** Ce qu'un nombre compte quand ce n'est pas un SR : « 1500+ heures », « 2000 abonnés ». */
+/**
+ * Ce qu'un nombre compte quand ce n'est pas un SR : « 1500+ heures »,
+ * « 1k abonnés », « 1k€ », « 4k 60 fps », « 4k écran ».
+ */
 const COUNTED_AFTER = new RegExp(
-  String.raw`^\s?(?:h|hrs?|heures?|hours?|€|\$|euros?|abonnes?|followers?|joueurs?|players?|membres?|members?|games?|parties|matchs?|viewers?|vues|views)(?![\p{L}\p{N}])`,
+  String.raw`^\s?\+?\s?(?:h|hrs?|heures?|hours?|€|\$|euros?|dollars?|abonnes?|followers?|subs?|joueurs?|players?|membres?|members?|games?|parties|matchs?|viewers?|vues|views|balles|ans|minutes|ecrans?|screens?|monitors?|moniteurs?|tv|uhd|hdr|\d{2,3}\s?(?:fps|hz))(?![\p{L}\p{N}])`,
   "u",
 );
+/** … ou ce qui le précède : « écran 4k », « cashprize 1k », « $4k », « résolution 4k ». */
+const NOT_RANK_BEFORE = new RegExp(
+  String.raw`(?:${NOT_AFTER_WORD}(?:ecrans?|screens?|monitors?|moniteurs?|resolution|tv|televiseur|video|videos|stream|qualite|quality|cash\s?prize|prize\s?pool|prize|dotation|budget|prix|price|salaire|salary|recompense|reward|code|id|pin|tag|ref|numero|num|tel|telephone|phone)\s?:?\s?(?:de\s|en\s|of\s|in\s)?|[€$£]\s?)$`,
+  "u",
+);
+/** Suite de chiffres groupés (un numéro de téléphone) : un numéro, pas un SR. */
+const DIGITS_BEFORE = /\d{2}[\s.-]?$/u;
+const DIGITS_AFTER = /^[\s.-]?\d{2}/u;
 /** Ancien SR en chiffres : « 3500 sr », « 4400+ », « 3500-4000 ». */
 const SR_NUMBER = new RegExp(
   String.raw`(?<![\p{L}\p{N}.,#])([1-4]\d{3})(?:\s?[-–/]\s?([1-4]\d{3}))?(?:\s?(sr|elo)|(\+))?${NOT_BEFORE_WORD}`,
@@ -176,8 +240,6 @@ type RankToken = {
   max: number;
   openUp: boolean;
   openDown: boolean;
-  /** Ancien SR en milliers sans libellé : rang seulement contre un rôle. */
-  needsRole: boolean;
 };
 
 type ValueRange = { min: number; max: number };
@@ -201,8 +263,8 @@ function isYear(value: number): boolean {
   return value >= YEAR_MIN && value <= YEAR_MAX;
 }
 
-function tokenOf(match: RegExpExecArray, span: ValueRange, openUp = false, needsRole = false): RankToken {
-  return { start: match.index, end: match.index + match[0].length, ...span, openUp, openDown: false, needsRole };
+function tokenOf(match: RegExpExecArray, span: ValueRange, openUp = false): RankToken {
+  return { start: match.index, end: match.index + match[0].length, ...span, openUp, openDown: false };
 }
 
 /** Paliers nommés, initiales collées à une division et « top 500 ». */
@@ -212,6 +274,7 @@ function tierTokens(lower: string): RankToken[] {
     const key = aliasKey(match[1]);
     const tier = TIER_TABLE.lookup.get(key);
     if (tier === undefined || (NEEDS_DIVISION.has(key) && match[2] === undefined)) continue;
+    if (isCommonWordSense(lower, key, match)) continue;
     tokens.push(tokenOf(match, tierSpan(tier, match[2], match[3])));
   }
   for (const match of lower.matchAll(LETTER_RANK)) {
@@ -231,35 +294,39 @@ function srNumberSpan(match: RegExpExecArray): ValueRange | null {
   const first = Number(match[1]);
   const second = match[2] === undefined ? first : Number(match[2]);
   const labelled = match[3] !== undefined || match[4] !== undefined;
-  const alone = match[2] === undefined;
-  if (!labelled && (alone || (isYear(first) && isYear(second)))) return null;
+  // « 4000 » seul est un SR ; « 2025 » seul ou « 2025-2026 » sont des années.
+  if (!labelled && isYear(first) && isYear(second)) return null;
   const values = [srValue(first), srValue(second)];
   return { min: Math.min(...values), max: Math.max(...values) };
 }
 
-function isCounted(lower: string, match: RegExpExecArray): boolean {
+/** Le nombre vise autre chose qu'un rang : unité derrière, montant ou écran devant. */
+function isNotRank(lower: string, match: RegExpExecArray): boolean {
   const end = match.index + match[0].length;
-  return COUNTED_AFTER.test(lower.slice(end, end + 12));
+  const before = lower.slice(Math.max(0, match.index - 20), match.index);
+  const after = lower.slice(end, end + 14);
+  return (
+    COUNTED_AFTER.test(after) ||
+    NOT_RANK_BEFORE.test(before) ||
+    DIGITS_BEFORE.test(before) ||
+    DIGITS_AFTER.test(after)
+  );
 }
 
 /** Ancien SR, en milliers ou en chiffres. */
 function srTokens(lower: string): RankToken[] {
   const tokens: RankToken[] = [];
   for (const match of lower.matchAll(SR_THOUSANDS)) {
-    if ((match[2] !== undefined && match[3] !== undefined) || isCounted(lower, match)) continue;
+    if (match[2] !== undefined && match[3] !== undefined) continue;
+    // « 4k sr » est un SR quoi qu'il y ait autour.
+    if (match[4] === undefined && isNotRank(lower, match)) continue;
     const value = srValue(Number(match[1]) * 1000 + Number(match[2] ?? match[3] ?? 0) * 100);
-    // « 4k2 », « 3.9k » ne s'écrivent que pour un SR ; « 4k » seul est souvent un montant.
-    const labelled =
-      match[2] !== undefined ||
-      match[3] !== undefined ||
-      match[4] !== undefined ||
-      SR_LABEL_BEFORE.test(lower.slice(Math.max(0, match.index - 6), match.index));
-    tokens.push(tokenOf(match, { min: value, max: value }, false, !labelled));
+    tokens.push(tokenOf(match, { min: value, max: value }));
   }
   for (const match of lower.matchAll(SR_NUMBER)) {
     const span = srNumberSpan(match);
-    const notCounted = match[3] !== undefined || !isCounted(lower, match);
-    if (span !== null && notCounted) tokens.push(tokenOf(match, span, match[4] !== undefined));
+    const rank = match[3] !== undefined || !isNotRank(lower, match);
+    if (span !== null && rank) tokens.push(tokenOf(match, span, match[4] !== undefined));
   }
   return tokens;
 }
@@ -359,15 +426,6 @@ function isSameRoleGap(gap: string): boolean {
   return gap.length <= ROLE_RANK_GAP_MAX && SAME_ROLE_GAP.test(gap);
 }
 
-/** Un SR en milliers sans libellé n'est un rang que contre un rôle (« tank 4k »). */
-function isBesideRole(lower: string, token: RankToken, runs: readonly RoleRun[]): boolean {
-  const before = runs.findLast((run) => run.end <= token.start);
-  const after = runs.find((run) => run.start >= token.end);
-  return (
-    (before !== undefined && isRoleRankGap(lower.slice(before.end, token.start))) ||
-    (after !== undefined && isRoleRankGap(lower.slice(token.end, after.start)))
-  );
-}
 
 /**
  * Rattache chaque groupe de rangs au rôle écrit juste avant (« tank m2 ») ou,
@@ -433,8 +491,7 @@ function toRankRange(range: ValueRange): GetiRankRange {
  */
 export function parseGetiRanks(lower: string, roleTokens: readonly GetiRoleToken[]): GetiRanks {
   const runs = roleRuns(lower, roleTokens);
-  const tokens = rankTokens(lower).filter((token) => !token.needsRole || isBesideRole(lower, token, runs));
-  const groups = rankGroups(lower, tokens);
+  const groups = rankGroups(lower, rankTokens(lower));
   if (groups.length === 0) return { min: null, max: null, byRole: {} };
   const byRoleValues = ranksByRole(lower, groups, runs);
   const byRole: GetiRanks["byRole"] = {};
