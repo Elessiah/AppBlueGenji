@@ -1,11 +1,11 @@
 "use client";
 
 import { Bell } from "lucide-react";
-import { useId, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useEffect, useId, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useAppLocale } from "@/components/i18n/locale-context";
-import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { LocaleLink, useLocaleHref } from "@/components/i18n/locale-navigation";
 import { BusyButton } from "@/components/ui/busy-button";
 import { BusyLabel } from "@/components/ui/busy-label";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -55,6 +55,16 @@ async function refusalOf(response: Response): Promise<string | null> {
   }
 }
 
+/** L'alerte d'une réponse réussie, ou `null` si son corps n'est pas celui attendu (relais, page d'erreur en 200). */
+async function alertOf(response: Response): Promise<GetiAlert | null> {
+  try {
+    const body = (await response.json()) as { alert?: GetiAlert };
+    return body.alert ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function send(url: string, method: "POST" | "PATCH" | "DELETE", body?: object): Promise<Response | null> {
   try {
     return await fetch(url, {
@@ -73,7 +83,7 @@ function useRefusalText(text: AlertsText): (code: string | null) => string {
   const locale = useAppLocale();
   return (code) => {
     const errors: Readonly<Record<string, string>> = text.errors;
-    const source = code !== null && code in errors ? errors[code] : text.errors.generic;
+    const source = code !== null && Object.hasOwn(errors, code) ? errors[code] : text.errors.generic;
     return getiText(locale, source, { max: GETI_ALERT_MAX_PER_USER, nameMax: GETI_ALERT_NAME_MAX });
   };
 }
@@ -86,10 +96,12 @@ type RowProps = Readonly<{
   text: AlertsText;
   onChanged: (alert: GetiAlert) => void;
   onDeleted: (id: number) => void;
+  /** Le serveur ne reconnaît plus la session : la fenêtre repasse à l'invite de connexion. */
+  onSessionLost: () => void;
 }>;
 
 /** Une alerte de la liste : son nom, ses filtres, pause, renommage, suppression. */
-function AlertRow({ alert, label, categoryTitle, text, onChanged, onDeleted }: RowProps) {
+function AlertRow({ alert, label, categoryTitle, text, onChanged, onDeleted, onSessionLost }: RowProps) {
   const locale = useAppLocale();
   const { showSuccess, showError } = useToast();
   const refusalText = useRefusalText(text);
@@ -98,29 +110,48 @@ function AlertRow({ alert, label, categoryTitle, text, onChanged, onDeleted }: R
   const [draft, setDraft] = useState(alert.name ?? "");
   const [confirming, setConfirming] = useState(false);
   const renameId = useId();
+  const renameInput = useRef<HTMLInputElement>(null);
+  const renameButton = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+  // Le focus suit le geste : le champ à l'ouverture du renommage, le bouton
+  // « Renommer » à sa fermeture (le bouton ou le champ qui l'avait y est démonté).
+  useEffect(() => {
+    if (renaming) renameInput.current?.focus();
+    else if (returnFocus.current) {
+      returnFocus.current = false;
+      renameButton.current?.focus();
+    }
+  }, [renaming]);
   const fieldErrors = useFieldErrors<"name">(NAME_ERRORS, { name: renameId });
   const filters = getiActiveFilterCount(getiAlertQuery(alert.category, alert.search));
 
   const patch = async (body: { name?: string | null; paused?: boolean }, done: string): Promise<boolean> => {
     const response = await send(`/api/geti/alerts/${alert.id}`, "PATCH", body);
-    const refusal = response ? await refusalOf(response) : "";
+    let refusal = response ? await refusalOf(response) : "";
     if (response && refusal === null) {
-      const updated = ((await response.json()) as { alert: GetiAlert }).alert;
-      onChanged(updated);
-      showSuccess(done);
-      return true;
+      const updated = await alertOf(response);
+      if (updated) {
+        onChanged(updated);
+        showSuccess(done);
+        return true;
+      }
+      refusal = "";
     }
     const message = refusalText(refusal);
     fieldErrors.report(refusal, message);
     showError(message);
     if (refusal === GETI_ALERT_ERRORS.notFound) onDeleted(alert.id);
+    if (refusal === GETI_ALERT_ERRORS.unauthorized) onSessionLost();
     return false;
   };
 
   const rename = async (event: FormEvent) => {
     event.preventDefault();
     await run(async () => {
-      if (await patch({ name: draft }, text.renamed)) setRenaming(false);
+      if (await patch({ name: draft }, text.renamed)) {
+        returnFocus.current = true;
+        setRenaming(false);
+      }
     });
   };
 
@@ -133,6 +164,7 @@ function AlertRow({ alert, label, categoryTitle, text, onChanged, onDeleted }: R
       return true;
     }
     showError(refusalText(refusal));
+    if (refusal === GETI_ALERT_ERRORS.unauthorized) onSessionLost();
     return false;
   };
 
@@ -165,6 +197,7 @@ function AlertRow({ alert, label, categoryTitle, text, onChanged, onDeleted }: R
             value={draft}
             maxLength={GETI_ALERT_NAME_MAX}
             autoComplete="off"
+            ref={renameInput}
             onChange={(event) => {
               setDraft(event.target.value);
               fieldErrors.clear("name");
@@ -180,6 +213,7 @@ function AlertRow({ alert, label, categoryTitle, text, onChanged, onDeleted }: R
               type="button"
               className={styles.alertButton}
               onClick={() => {
+                returnFocus.current = true;
                 setRenaming(false);
                 setDraft(alert.name ?? "");
               }}
@@ -200,7 +234,7 @@ function AlertRow({ alert, label, categoryTitle, text, onChanged, onDeleted }: R
             {alert.paused ? text.resume : text.pause}
             <span className="sr-only"> — {label}</span>
           </BusyButton>
-          <BusyButton className={styles.alertButton} busy={busy} onClick={() => setRenaming(true)}>
+          <BusyButton ref={renameButton} className={styles.alertButton} busy={busy} onClick={() => setRenaming(true)}>
             {text.rename}
             <span className="sr-only"> — {label}</span>
           </BusyButton>
@@ -240,6 +274,7 @@ type DialogProps = GetiAlertsProps &
 
 export function GetiAlertsDialog({ text, category, search, categoryTitles, signedIn, alerts, setAlerts, onClose }: DialogProps) {
   const locale = useAppLocale();
+  const localized = useLocaleHref();
   const { showSuccess, showError } = useToast();
   const refusalText = useRefusalText(text);
   const dialogRef = useDialogBehavior({ open: true, onClose });
@@ -247,6 +282,10 @@ export function GetiAlertsDialog({ text, category, search, categoryTitles, signe
   const titleId = useId();
   const nameId = useId();
   const [name, setName] = useState("");
+  const [sessionLost, setSessionLost] = useState(false);
+  const noteId = useId();
+  const returnTo = localized(getiCategoryPath(category) + search);
+  const loginHref = `/connexion?redirect=${encodeURIComponent(returnTo)}`;
   const { busy, run } = useBusyGuard();
   const fieldErrors = useFieldErrors<"name">(NAME_ERRORS, { name: nameId });
   const filters = getiActiveFilterCount(getiAlertQuery(category, search));
@@ -261,17 +300,21 @@ export function GetiAlertsDialog({ text, category, search, categoryTitles, signe
 
   const create = async () => {
     const response = await send("/api/geti/alerts", "POST", { category, search, name });
-    const refusal = response ? await refusalOf(response) : "";
+    let refusal = response ? await refusalOf(response) : "";
     if (response && refusal === null) {
-      const created = ((await response.json()) as { alert: GetiAlert }).alert;
-      setAlerts((current) => [...current, created]);
-      setName("");
-      showSuccess(text.created);
-      return;
+      const created = await alertOf(response);
+      if (created) {
+        setAlerts((current) => [...current, created]);
+        setName("");
+        showSuccess(text.created);
+        return;
+      }
+      refusal = "";
     }
     const message = refusalText(refusal);
     fieldErrors.report(refusal, message);
     showError(message);
+    if (refusal === GETI_ALERT_ERRORS.unauthorized) setSessionLost(true);
   };
 
   return createPortal(
@@ -293,12 +336,18 @@ export function GetiAlertsDialog({ text, category, search, categoryTitles, signe
           </button>
         </header>
         <ScrollArea orientation="y" className={styles.modalScroll} ariaLabel={text.title}>
-          {signedIn ? (
+          {signedIn && !sessionLost ? (
             <div className={styles.alertBody}>
               <form className={styles.alertForm} onSubmit={submit}>
                 <h3 className={styles.alertSection}>{text.createTitle}</h3>
                 <p className={styles.modalText} data-testid="geti-alert-summary">
                   {getiText(locale, text.summary, { category: categoryTitles[category], count: filters })}
+                </p>
+                <p className={styles.modalNote}>
+                  {text.channels}{" "}
+                  <LocaleLink href="/profil#notifications" className={styles.modalLink}>
+                    {text.channelsLink}
+                  </LocaleLink>
                 </p>
                 <label htmlFor={nameId} className={styles.alertLabel}>
                   {text.nameLabel}
@@ -318,13 +367,13 @@ export function GetiAlertsDialog({ text, category, search, categoryTitles, signe
                 />
                 <FieldErrorText fieldId={nameId} message={fieldErrors.message("name")} />
                 {full ? (
-                  <p className={styles.modalNote}>
+                  <p id={noteId} className={styles.modalNote}>
                     {getiText(locale, text.errors.GETI_ALERT_LIMIT, { max: GETI_ALERT_MAX_PER_USER })}
                   </p>
                 ) : null}
                 <div>
                   <CyberButton variant="primary" asChild>
-                    <BusyButton type="submit" busy={busy} blocked={full}>
+                    <BusyButton type="submit" busy={busy} blocked={full} aria-describedby={full ? noteId : undefined}>
                       <BusyLabel busy={busy} idle={text.create} pending={text.creating} />
                     </BusyButton>
                   </CyberButton>
@@ -347,24 +396,22 @@ export function GetiAlertsDialog({ text, category, search, categoryTitles, signe
                       onChanged={(updated) =>
                         setAlerts((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)))
                       }
+                      // Le focus d'une ligne supprimée passe à sa voisine (`useDialogBehavior`).
                       onDeleted={(id) => setAlerts((current) => current.filter((entry) => entry.id !== id))}
+                      onSessionLost={() => setSessionLost(true)}
                     />
                   ))}
                 </ul>
               )}
-              <p className={styles.modalNote}>
-                {text.channels}{" "}
-                <LocaleLink href="/profil#notifications" className={styles.modalLink}>
-                  {text.channelsLink}
-                </LocaleLink>
-              </p>
             </div>
           ) : (
             <>
               <p className={styles.modalText}>{text.loginText}</p>
               <div>
                 <CyberButton variant="primary" asChild>
-                  <LocaleLink href="/connexion">{text.loginLink}</LocaleLink>
+                  <LocaleLink href={loginHref} onClick={onClose}>
+                    {text.loginLink}
+                  </LocaleLink>
                 </CyberButton>
               </div>
             </>

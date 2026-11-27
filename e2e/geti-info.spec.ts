@@ -69,7 +69,7 @@ test.describe("GETI Info — page publique", () => {
     const login = dialog.getByRole("link", { name: "Se connecter" });
     // Sous le bypass DEV_AUTH, un compte est connecté : la fenêtre montre le formulaire.
     test.skip((await login.count()) === 0, "Session active (bypass DEV_AUTH) : le parcours sans session ne joue pas."); // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
-    await expect(login).toHaveAttribute("href", "/connexion");
+    await expect(login).toHaveAttribute("href", "/connexion?redirect=%2Fgeti-info%2Flfp%3Frole%3Dtank");
 
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);

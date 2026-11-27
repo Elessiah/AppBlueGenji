@@ -92,8 +92,22 @@ describe("GetiAlertsDialog", () => {
     const html = renderDialog({ signedIn: false });
 
     expect(html).toContain("Connecte-toi pour créer une alerte");
-    expect(html).toContain('href="/connexion"');
+    expect(html).toContain('href="/connexion?redirect=%2Fgeti-info%2Flfp%3Frole%3Dtank%26reg%3Deu"');
     expect(html).not.toContain("<form");
+  });
+
+  it("GetiAlertsDialog_signedOutEnglish_loginReturnsToTheEnglishPage", () => {
+    const html = renderDialog({ signedIn: false, text: enGeti.alerts }, "en");
+
+    expect(html).toContain('href="/en/connexion?redirect=%2Fen%2Fgeti-info%2Flfp%3Frole%3Dtank%26reg%3Deu"');
+  });
+
+  it("GetiAlertsDialog_signedIn_explainsTheChannelsBeforeTheNameField", () => {
+    const html = renderDialog();
+
+    expect(html.indexOf("notification push")).toBeGreaterThan(-1);
+    expect(html.indexOf("notification push")).toBeLessThan(html.indexOf("Nom de l"));
+    expect(html.match(/notification push/g)).toHaveLength(1);
   });
 
   it("GetiAlertsDialog_signedIn_saysWhatTheAlertWillKeepAndLabelsTheNameField", () => {
@@ -135,6 +149,9 @@ describe("GetiAlertsDialog", () => {
 
     expect(html).toMatch(/<button[^>]*type="submit"[^>]*aria-disabled="true"/);
     expect(html).toContain("Tu as déjà 10 alertes");
+    const noteId = /<p id="([^"]+)"[^>]*>Tu as déjà 10 alertes/.exec(html)?.[1];
+    expect(noteId).toBeDefined();
+    expect(html).toContain(`aria-describedby="${noteId}"`);
   });
 
   it("GetiAlertsDialog_belowTheLimit_keepsCreationArmed", () => {
@@ -172,6 +189,27 @@ describe("textes des alertes", () => {
 
     expect(code.match(/setAlerts\(\(current\) =>/g)).toHaveLength(3);
     expect(code).not.toMatch(/setAlerts\((\[|alerts\.)/);
+  });
+
+  it("GetiAlerts_unexpectedBodiesAndSession_areHandledWithoutSilentFailure", () => {
+    const code = readSource("components/geti/GetiAlerts.tsx");
+
+    // Un 200 au corps illisible = erreur générique, jamais un geste muet.
+    expect(code).not.toContain("await response.json()) as { alert: GetiAlert }");
+    expect(code.match(/await alertOf\(response\)/g)).toHaveLength(2);
+    expect(code).toContain("Object.hasOwn(errors, code)");
+    // Session perdue : la fenêtre repasse à l'invite de connexion.
+    expect(code.match(/GETI_ALERT_ERRORS\.unauthorized/g)).toHaveLength(3);
+    expect(code).toContain("signedIn && !sessionLost");
+  });
+
+  it("GetiAlerts_keyboardFocus_followsRenamingAndDeletion", () => {
+    const code = readSource("components/geti/GetiAlerts.tsx");
+
+    expect(code).toContain("renameInput.current?.focus()");
+    expect(code).toContain("renameButton.current?.focus()");
+    // La suppression laisse `useDialogBehavior` rendre le focus à la ligne voisine : aucun focus posé à la main.
+    expect(code).not.toContain("setTimeout");
   });
 
   it("getiAlertsHint_frenchAndEnglish_takeTheCooldownFromTheConstant", () => {
