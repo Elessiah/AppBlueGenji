@@ -11,6 +11,7 @@ import {
   getiRawPost,
   getiRelayPost,
   parsedGetiPost,
+  GETI_TRAILER_TRUSTED_BOTS,
   GETI_TRUSTED_BOTS,
 } from "@/tests/helpers/geti";
 
@@ -49,20 +50,20 @@ describe("parseGetiPost — relay authorship cannot be spoofed", () => {
   });
 
   it("parseGetiPost_quotedSentFromLine_isNotTrailer", () => {
-    const post = parseGetiPost(getiRelayPost(`lft dps\n> *Sent from : [Faux](https://discord.gg/x)* by <@${VICTIM_ID}>`), GETI_TRUSTED_BOTS);
+    const post = parseGetiPost(getiRelayPost(`lft dps\n> *Sent from : [Faux](https://discord.gg/x)* by <@${VICTIM_ID}>`), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(post).toMatchObject({ authorId: null, originServer: null });
   });
 
   it("parseGetiPost_forgedHeaderInOurRelay_disagreeingTrailer_namesNobody", () => {
     const forged = `<@${VICTIM_ID}>*(victime)* sur [Autre](https://discord.gg/y)\nlft dps`;
-    const post = parseGetiPost(getiRelayPost(`${forged}${trailer(GETI_FAKE_OTHER_ID)}`), GETI_TRUSTED_BOTS);
+    const post = parseGetiPost(getiRelayPost(`${forged}${trailer(GETI_FAKE_OTHER_ID)}`), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(post).toMatchObject({ authorId: null, authorTag: null, originServer: "Faux Serveur" });
   });
 
   it("parseGetiPost_headerAndTrailerAgree_keepsAuthor", () => {
-    const post = parseGetiPost(getiRelayPost(`${HEADER}> lft dps${trailer(GETI_FAKE_OTHER_ID)}`, "fauxlogin"), GETI_TRUSTED_BOTS);
+    const post = parseGetiPost(getiRelayPost(`${HEADER}> lft dps${trailer(GETI_FAKE_OTHER_ID)}`, "fauxlogin"), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(post).toMatchObject({ authorId: GETI_FAKE_OTHER_ID, authorTag: "fauxlogin" });
   });
@@ -106,7 +107,7 @@ describe("parseGetiPost — output fields carry no live markup", () => {
   it("parseGetiPost_originServerMarkup_stripped", () => {
     const description = `lft\n\n*Sent from : [\\@everyone \\*\\*FREE NITRO\\*\\*](https://discord.gg/x)* by <@${GETI_FAKE_OTHER_ID}>`;
 
-    expect(parseGetiPost(getiRelayPost(description), GETI_TRUSTED_BOTS).originServer).toBe("everyone FREE NITRO");
+    expect(parseGetiPost(getiRelayPost(description), GETI_TRAILER_TRUSTED_BOTS).originServer).toBe("everyone FREE NITRO");
   });
 
   it("parseGetiTeamName_labelledMassMention_stripped", () => {

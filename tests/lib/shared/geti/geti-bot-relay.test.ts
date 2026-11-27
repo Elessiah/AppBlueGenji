@@ -120,4 +120,21 @@ describe("isGetiRelay — relais ou avis de GETI Bot", () => {
   it("isGetiRelay_englishHeaderWithOn_returnsTrue", () => {
     expect(isGetiRelay([{ description: `<@${AUTHOR_ID}> (fauxpseudo) on [Faux Serveur](https://discord.gg/fauxcode)\n\n> LFT dps` }])).toBe(true);
   });
+
+  // Toute forme d'en-tête que l'analyse lit (l'auteur nommé) est un relais : la
+  // garde n'écarte jamais un relais que le site saurait attribuer.
+  it.each([
+    [`<@${AUTHOR_ID}>*(fauxpseudo)* sur [[FAUX] Serveur Test](https://discord.gg/fauxcode)`],
+    [`<@!${AUTHOR_ID}>**(faux.pseudo)** from [Faux Serveur](https://discord.gg/fauxcode)`],
+    [`  <@${AUTHOR_ID}> _(Faux Pseudo#4821)_ ON [Faux (FR) Serveur](https://discord.gg/fauxcode)`],
+  ])("isGetiRelay_headerTheParserReads_returnsTrue (%s)", (header: string) => {
+    const description = `${header}\n\n> LFP tank`;
+
+    expect(parseGetiPost(relay(description), GETI_TRUSTED_BOTS).authorId).toBe(AUTHOR_ID);
+    expect(isGetiRelay([{ description }])).toBe(true);
+  });
+
+  it("isGetiRelay_boldPseudoWithoutParentheses_returnsFalse", () => {
+    expect(isGetiRelay([{ description: `<@${AUTHOR_ID}> **fauxpseudo** sur [Faux Serveur](https://discord.gg/fauxcode)` }])).toBe(false);
+  });
 });

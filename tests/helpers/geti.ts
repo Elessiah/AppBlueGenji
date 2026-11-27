@@ -17,10 +17,17 @@ export const GETI_FAKE_BOT_ID = "100000000000000090";
 export const GETI_FAKE_SITE_BOT_ID = "100000000000000092";
 
 /**
- * Bot relais factice cru des deux côtés (en-tête GETI et ligne « Sent from ») :
- * les tests de lecture d'un relais. Les tests d'usurpation séparent les deux.
+ * Bot relais factice cru comme GETI Bot seul — le réglage de la production
+ * (`getiTrustedBots` : aucun bot du site cru) : les tests de lecture d'un relais.
  */
-export const GETI_TRUSTED_BOTS: GetiParseOptions = { getiBotIds: [GETI_FAKE_BOT_ID], siteBotIds: [GETI_FAKE_BOT_ID] };
+export const GETI_TRUSTED_BOTS: GetiParseOptions = { getiBotIds: [GETI_FAKE_BOT_ID], siteBotIds: [] };
+
+/**
+ * Bot relais factice cru aussi pour sa ligne « Sent from » : les seuls tests de
+ * cette lecture, que la production n'emprunte pas (`getiTrustedBots`). Les
+ * tests d'usurpation séparent les deux.
+ */
+export const GETI_TRAILER_TRUSTED_BOTS: GetiParseOptions = { getiBotIds: [GETI_FAKE_BOT_ID], siteBotIds: [GETI_FAKE_BOT_ID] };
 
 /** Message d'un joueur, avec son texte pour seul contenu utile. */
 export function getiRawPost(content: string, overrides: Partial<GetiRawPost> = {}): GetiRawPost {
