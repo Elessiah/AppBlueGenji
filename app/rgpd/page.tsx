@@ -104,6 +104,11 @@ import {
   TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
   TEAM_NOTICE_DMS_HOURLY_CAP,
 } from "@/lib/shared/team-invite-notice";
+import {
+  GETI_ALERT_COOLDOWN_MINUTES,
+  GETI_ALERT_HIT_RETENTION_DAYS,
+  GETI_ALERT_MAX_PER_USER,
+} from "@/lib/shared/geti/alerts";
 import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
 import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
@@ -328,6 +333,19 @@ function RgpdFr({
             remplace l&apos;ancienne version. Base : l&apos;intérêt légitime de l&apos;association (aider joueurs et équipes à se
             trouver), pour des annonces déjà publiques ; leur auteur peut s&apos;y opposer et en demander le retrait (voir
             « Exercer vos droits »). Registre des traitements : fiche T21.
+          </p>
+          <p id="alertes-geti">
+            <strong>Alertes d&apos;annonces.</strong> Sur la page des annonces, un compte connecté peut créer des alertes
+            ({GETI_ALERT_MAX_PER_USER} au plus) : le site garde la catégorie et les filtres choisis, un nom facultatif,
+            l&apos;état de l&apos;alerte (active ou en pause), sa date de création et celle de la dernière notification, et une
+            trace technique des annonces déjà signalées. Quand une nouvelle annonce correspond, le compte est prévenu
+            par notification push sur ses appareils abonnés et, si son compte Discord est certifié, par message privé
+            Discord — au plus une fois toutes les {GETI_ALERT_COOLDOWN_MINUTES} minutes par alerte, sans pseudo ni texte
+            de l&apos;annonce (le nom de l&apos;alerte et un lien). Le sujet « Alertes d&apos;annonces GETI » de « Mon profil »
+            coupe les deux. Une alerte est gardée jusqu&apos;à sa suppression par le compte ; l&apos;effacement du compte emporte
+            toutes ses alertes, et la trace des annonces déjà signalées est effacée au bout de{" "}
+            {GETI_ALERT_HIT_RETENTION_DAYS} jours. Base : l&apos;exécution du service demandé par le compte. Registre des
+            traitements : fiche T22.
           </p>
           <p id="age-minimum">
             <strong>Âge minimum.</strong> Il faut avoir au moins {SITE_MINIMUM_AGE} ans pour

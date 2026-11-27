@@ -59,6 +59,12 @@ import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import {
+  GETI_ALERT_COOLDOWN_MINUTES,
+  GETI_ALERT_HIT_RETENTION_DAYS,
+  GETI_ALERT_MAX_PER_USER,
+  GETI_ALERT_NAME_MAX,
+} from "@/lib/shared/geti/alerts";
+import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
   TEAM_INVITE_NOTICES_DAILY_CAP,
   TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
@@ -1344,6 +1350,8 @@ const ACTIVITIES = registerActivities({
         "Removal of their refereeing of a match (by the staff, match assigned to another referee or switched to self-management, or automatically), with the reason, for the assigned referee who still holds the refereeing permission"),
       frEn("Planning des casts et arbitres (T20), pour les arbitres, casters et prods : nouveaux créneaux, affectations, désistements, caster autonome réglé par le staff ; pour le staff des tournois : places à pourvoir — couper l'un de ces sujets coupe aussi son message privé Discord",
         "Cast and referee schedule (T20), for referees, casters and prods: new slots, assignments, withdrawals, solo caster set by the staff; for the tournament staff: open slots \u2014 turning off one of these topics also turns off its Discord direct message"),
+      frEn("Alertes d'annonces de recrutement (T22) : une nouvelle annonce correspond à une alerte que le compte a créée — couper ce sujet coupe aussi son message privé Discord",
+        "Recruitment post alerts (T22): a new post matches an alert the account created — turning off this topic also turns off its Discord direct message"),
     ],
     legalBasis: frEn("Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet ; un sujet ajouté depuis l'abonnement, comme « Nouveau match », est actif d'office sur un appareil déjà abonné, ce que la politique de données annonce, et se coupe de même)",
       "Consent (activation on each device, withdrawable at any time, topic by topic; a topic added since the subscription, such as “New match”, is on by default on a device already subscribed, which the data policy announces, and is turned off the same way)"),
@@ -1937,6 +1945,61 @@ const ACTIVITIES = registerActivities({
         "Transmission from the bot to the site on the server itself, without going through the Internet, protected by its own secret"),
       frEn("Texte d'une annonce toujours affiché comme du texte, jamais interprété",
         "A post's text always displayed as text, never interpreted"),
+    ],
+  },
+  T22: {
+    name: frEn("Alertes d'annonces de recrutement (GETI Info)", "Recruitment post alerts (GETI Info)"),
+    purpose: frEn("Prévenir un compte, à sa demande, qu'une nouvelle annonce de recrutement Overwatch correspond à une recherche qu'il a gardée",
+      "Notifying an account, at its request, that a new Overwatch recruitment post matches a search it has saved"),
+    subPurposes: [
+      frEn(`Garder, pour chaque alerte créée par le compte sur la page des annonces, la catégorie et les filtres qu'il a choisis (rang, rôle, niveau, région, plateforme, langue, disponibilités), un nom facultatif et sa mise en pause ; ${GETI_ALERT_MAX_PER_USER} alertes au plus par compte`,
+        `Keeping, for each alert the account creates on the posts page, the category and the filters it chose (rank, role, level, region, platform, language, availability), an optional name and whether it is paused; ${GETI_ALERT_MAX_PER_USER} alerts at most per account`),
+      frEn(`Comparer automatiquement chaque nouvelle annonce (T21) aux alertes actives de sa catégorie et prévenir le compte dont une alerte correspond : notification push sur ses appareils abonnés (T12) et, si son compte Discord est certifié, message privé Discord remis par le bot (T08) ; le message ne porte que le nom de l'alerte et un lien vers la page, ni pseudo ni texte de l'annonce ; au plus une notification par alerte toutes les ${GETI_ALERT_COOLDOWN_MINUTES} minutes ; aucune décision n'en découle`,
+        `Automatically comparing each new post (T21) with the active alerts of its category and notifying the account one of whose alerts matches: push notification on its subscribed devices (T12) and, if its Discord account is certified, a Discord direct message delivered by the bot (T08); the message carries only the alert's name and a link to the page, neither a username nor the post's text; at most one notification per alert every ${GETI_ALERT_COOLDOWN_MINUTES} minutes; no decision follows from it`),
+      frEn("Ne jamais prévenir deux fois pour la même annonce : une trace technique associe l'alerte à l'identifiant Discord du message déjà signalé",
+        "Never notifying twice for the same post: a technical record ties the alert to the Discord identifier of the message already reported"),
+    ],
+    legalBasis: frEn("Exécution du service demandé par le compte (RGPD, art. 6.1.b, conditions d'utilisation) : une alerte n'existe que parce que le compte la crée, et il la met en pause ou la supprime à tout moment ; la notification push repose en outre sur le consentement donné sur chaque appareil (T12), et le sujet « Alertes d'annonces GETI » coupé dans « Mon profil » coupe aussi le message privé Discord",
+      "Performance of the service the account asked for (GDPR, art. 6.1.b, terms of use): an alert exists only because the account creates it, and the account pauses or deletes it at any time; the push notification also relies on the consent given on each device (T12), and turning off the “GETI post alerts” topic in “My profile” also turns off the Discord direct message"),
+    dataSubjects: [
+      frEn("Titulaires d'un compte qui créent une alerte", "Account holders who create an alert"),
+    ],
+    dataCategories: [
+      frEn("Catégorie d'annonces et filtres de l'alerte", "Post category and filters of the alert"),
+      frEn(`Nom donné à l'alerte (facultatif, texte libre de ${GETI_ALERT_NAME_MAX} caractères au plus)`,
+        `Name given to the alert (optional, free text of ${GETI_ALERT_NAME_MAX} characters at most)`),
+      frEn("État (active, en pause), date de création, date de la dernière notification",
+        "State (active, paused), creation date, date of the last notification"),
+      frEn("Trace des annonces déjà signalées : identifiant de l'alerte et identifiant Discord du message",
+        "Record of the posts already reported: identifier of the alert and Discord identifier of the message"),
+    ],
+    sensitiveData: frEn("Aucune", "None"),
+    retention: [
+      frEn(`Alerte : jusqu'à sa suppression par le compte, ou jusqu'à l'effacement du compte, qui emporte toutes ses alertes ; hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
+        `Alert: until the account deletes it, or until the account is erased, which removes all its alerts; apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`),
+      frEn(`Trace des annonces déjà signalées : ${GETI_ALERT_HIT_RETENTION_DAYS} jours, puis effacée par une purge horaire ; effacée avec l'alerte`,
+        `Record of the posts already reported: ${GETI_ALERT_HIT_RETENTION_DAYS} days, then erased by an hourly purge; erased with the alert`),
+    ],
+    recipients: [
+      frEn("Le titulaire du compte lui-même (liste de ses alertes, export de ses données)",
+        "The account holder themselves (list of their alerts, export of their data)"),
+      frEn("Le bot Discord de l'association (T08) et Discord, pour remettre le message privé au compte Discord certifié",
+        "The association's Discord bot (T08) and Discord, to deliver the direct message to the certified Discord account"),
+      frEn("Le service de push de son navigateur (Google, Mozilla, Apple ou Microsoft), qui achemine un message chiffré qu'il ne peut pas lire (T12)",
+        "Their browser's push service (Google, Mozilla, Apple or Microsoft), which delivers an encrypted message it cannot read (T12)"),
+      frEn("Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)",
+        "The association's technical manager, who is also the site's host (database)"),
+    ],
+    transfers: [
+      frEn(`États-Unis : Discord (message privé) et le service de push du navigateur choisi par le compte, qui ne reçoit que des messages chiffrés de bout en bout — ${transferBasis(["DISCORD", "GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
+        `United States: Discord (direct message) and the push service of the browser chosen by the account, which only receives end-to-end encrypted messages — ${transferBasisEn(["DISCORD", "GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`),
+    ],
+    security: [
+      ...COMMON_SECURITY,
+      frEn("Une alerte n'est lue, changée ou supprimée que par son compte ; ses filtres sont relus et bornés par le site avant d'être gardés",
+        "An alert is read, changed or deleted only by its account; its filters are re-read and bounded by the site before being kept"),
+      frEn("Aucun pseudo ni texte d'annonce dans une notification ou un message privé d'alerte",
+        "No username or post text in an alert notification or direct message"),
     ],
   },
 });

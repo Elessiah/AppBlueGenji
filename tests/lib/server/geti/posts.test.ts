@@ -357,7 +357,9 @@ describe("startGetiPostsPurgeClock", () => {
 
     await run();
 
-    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [expect.any(Date)]);
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [expect.any(Date)]);
+    // Même passe : les traces des alertes déjà prévenues.
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_alert_hits WHERE created_at < ?", [expect.any(Date)]);
   });
 });
 

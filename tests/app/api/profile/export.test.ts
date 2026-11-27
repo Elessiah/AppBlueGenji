@@ -53,6 +53,7 @@ function sampleExport(): PersonalDataExport {
     tournaments: [],
     privacyAcknowledgments: [],
     pushNotifications: { devices: [], disabledTopics: [] },
+    getiAlerts: [],
     connectionLogs: [{ event: "LOGIN_GOOGLE", ip: "203.0.113.7", createdAt: "2026-07-01T10:00:00.000Z" }],
     mapEntries: [],
     liveAnnouncements: [],

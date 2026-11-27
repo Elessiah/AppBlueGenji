@@ -6,6 +6,7 @@ jest.mock("@/lib/server/geti/posts", () => ({
   deleteGetiPosts: jest.fn(),
   reconcileGetiChannel: jest.fn(),
 }));
+jest.mock("@/lib/server/geti/alerts", () => ({ notifyGetiAlerts: jest.fn(async () => ({ matched: 0, notified: 0 })) }));
 
 import { POST as deletePosts } from "@/app/api/internal/geti/posts/delete/route";
 import { POST as upsertPosts } from "@/app/api/internal/geti/posts/route";
@@ -130,7 +131,12 @@ describe("POST /api/internal/geti/posts", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ stored: 1, emptied: 0, expired: 0, rejected: 1 });
-    expect(upsertGetiPosts).toHaveBeenCalledWith(pool, [expect.objectContaining({ messageId: GETI_FAKE_MESSAGE_ID })]);
+    expect(upsertGetiPosts).toHaveBeenCalledWith(
+      pool,
+      [expect.objectContaining({ messageId: GETI_FAKE_MESSAGE_ID })],
+      expect.any(Number),
+      expect.any(Function),
+    );
   });
 
   it("POST_tooManyPosts_returns400", async () => {

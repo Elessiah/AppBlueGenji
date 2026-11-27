@@ -665,6 +665,150 @@
   justify-content: flex-end;
 }
 
+/* Fenêtre « Alertes ». */
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.alertOpen {
+  gap: 8px;
+}
+
+.alertBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.alertForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.alertSection {
+  margin: 0;
+  color: var(--blue-100);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.alertLabel {
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.alertInput {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong-cy);
+  border-radius: var(--r-cy-md);
+  background: var(--cyber-bg-0);
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.alertInput[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.alertList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alertRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-cy);
+  border-radius: var(--r-cy-md);
+  background: rgba(var(--blue-500-rgb), 0.05);
+}
+
+.alertHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.alertName {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.alertMeta {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.alertRename {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alertActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.alertButton {
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid rgba(var(--blue-500-rgb), 0.45);
+  border-radius: 999px;
+  background: rgba(var(--blue-500-rgb), 0.1);
+  color: var(--blue-100);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.alertButton:hover:not([aria-disabled="true"]) {
+  background: rgba(var(--blue-500-rgb), 0.2);
+}
+
+.alertButton[aria-disabled="true"] {
+  border-color: var(--line-cy);
+  background: transparent;
+  color: var(--ink-mute);
+  cursor: default;
+}
+
+.alertButton:focus-visible,
+.alertInput:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 2px;
+}
+
+.alertDanger {
+  border-color: rgba(var(--danger-rgb), 0.5);
+  background: rgba(var(--danger-rgb), 0.08);
+  color: var(--danger);
+}
+
+.alertDanger:hover:not([aria-disabled="true"]) {
+  background: rgba(var(--danger-rgb), 0.18);
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);

@@ -1,3 +1,4 @@
+import { deleteGetiAlertsOfUser } from "@/lib/server/geti/alerts";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { retireAccountQuarantinesOn } from "@/lib/server/blocked-images";
 import { ignoreMissingTable, isDuplicateEntryError, isUnknownColumnError } from "@/lib/server/mysql-errors";
@@ -229,6 +230,9 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   // n'a rien à effacer.
   await ignoreMissingTable(connection.execute(`DELETE FROM bg_push_subscriptions WHERE user_id = ?`, [userId]));
   await ignoreMissingTable(connection.execute(`DELETE FROM bg_push_topic_optouts WHERE user_id = ?`, [userId]));
+  // Ses alertes d'annonces GETI (recherches gardées) et leurs traces : un
+  // compte anonymisé n'est plus prévenu de rien.
+  await deleteGetiAlertsOfUser(connection, userId);
   // Même raison pour les acceptations des conditions d'utilisation. Les
   // signalements qu'il a envoyés restent à traiter — l'association en a
   // besoin —, mais ne pointent plus vers lui.

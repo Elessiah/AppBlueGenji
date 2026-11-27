@@ -55,6 +55,11 @@ jest.mock("@/lib/server/account-suspensions", () => ({
     },
   ]),
 }));
+jest.mock("@/lib/server/geti/alerts", () => ({
+  exportGetiAlerts: jest.fn(async () => [
+    { category: "lfp", name: "Tank EU", search: "?role=tank&reg=eu", paused: false, createdAt: "2026-11-27T10:00:00.000Z" },
+  ]),
+}));
 jest.mock("@/lib/server/push-subscriptions", () => ({
   exportPushData: jest.fn(async () => ({
     devices: [{ endpoint: "https://fcm.googleapis.com/fcm/send/abc", p256dh: "k", auth: "a", createdAt: "2026-09-01T00:00:00.000Z", lastSuccessAt: null }],
@@ -137,6 +142,10 @@ describe("exportOwnData", () => {
     // site détient : ils sont rendus, clés comprises, avec les sujets coupés.
     expect(data.pushNotifications.devices).toHaveLength(1);
     expect(data.pushNotifications.disabledTopics).toEqual(["MATCH_REMINDER"]);
+    // Les alertes d'annonces GETI du compte : catégorie, filtres gardés, nom, pause.
+    expect(data.getiAlerts).toEqual([
+      { category: "lfp", name: "Tank EU", search: "?role=tank&reg=eu", paused: false, createdAt: "2026-11-27T10:00:00.000Z" },
+    ]);
 
     // Les suspensions conservées font partie du droit d'accès — sans leur
     // identifiant interne ni qui les a prononcées.

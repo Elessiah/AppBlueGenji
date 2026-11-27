@@ -86,7 +86,11 @@ export function GetiPostCard({
   const editedAbsolute = post.editedAt ? absoluteDate(post.editedAt, locale) : "";
 
   return (
-    <article className={parsed.closed ? `${styles.card} ${styles.cardClosed}` : styles.card} data-testid="geti-post">
+    <article
+      id={`post-${post.messageId}`}
+      className={parsed.closed ? `${styles.card} ${styles.cardClosed}` : styles.card}
+      data-testid="geti-post"
+    >
       <header className={styles.cardHead}>
         <div className={styles.author}>
           {tag ? (

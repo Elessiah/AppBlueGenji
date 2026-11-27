@@ -1285,6 +1285,8 @@ export type PersonalDataExport = {
    * abonnés — **tout** ce que la ligne garde, clés comprises — et les sujets
    * coupés par le compte.
    */
+  /** Alertes d'annonces GETI : catégorie, filtres gardés (forme de l'adresse), nom, pause. */
+  getiAlerts: { category: string; name: string | null; search: string; paused: boolean; createdAt: string }[];
   pushNotifications: {
     devices: {
       endpoint: string;

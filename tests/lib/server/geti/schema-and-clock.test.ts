@@ -24,7 +24,7 @@ describe("createGetiTables", () => {
     expect(ddl).toContain("UNIQUE KEY uniq_bg_geti_posts_message (message_id)");
     expect(ddl).toContain("KEY idx_bg_geti_posts_category (category, posted_at)");
     expect(ddl).toContain("KEY idx_bg_geti_posts_posted (posted_at)");
-    expect(DECLARED_TABLES).toHaveLength(1);
+    expect(DECLARED_TABLES).toHaveLength(3);
   });
 
   it("createGetiTables_creationRefused_doesNotThrow", async () => {

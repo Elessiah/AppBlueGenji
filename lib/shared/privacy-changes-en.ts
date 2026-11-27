@@ -1274,6 +1274,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "How long, and how to remove a post: 7 days after its publication on Discord for a scrim search, 14 days for the others, then an automatic erasure. Deleting the post on Discord removes it from the site at once; editing it replaces the previous version, of which nothing is kept. Its author can also object and ask the association to remove it (report form, GDPR category).",
     ],
   },
+  "2026-11-alertes-d-annonces-geti": {
+    linkLabels: ["Read record T22 of the register", "Read the “Post alerts” paragraph"],
+    title: "Alerts on a search of recruitment posts",
+    summary: "On the Overwatch recruitment posts page, a signed-in account can create alerts: the site keeps the chosen category and filters, and notifies the account when a new post matches them.",
+    details: [
+      "What is kept: for each alert, the chosen category and filters, an optional name, its state (active or paused), its creation date and the date of the last notification, plus a technical record of the posts already reported, so that you are never notified twice. Ten alerts at most per account. Nothing is created without your action: the alert is a service you ask for.",
+      "How you are notified: by push notification on the devices where you turned it on, and by Discord direct message if your Discord account is certified — at most once every 10 minutes per alert. The message carries only the name of your alert and a link to the page, neither a username nor the post's text. The “GETI post alerts” topic in “My profile” turns both off.",
+      "How long: until you delete the alert (or pause it, which keeps it without notifying you); erasing your account removes all your alerts. The record of the posts already reported is erased after 15 days. Your alerts are included in the export of your data.",
+    ],
+  },
 };
 
 /**

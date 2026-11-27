@@ -2409,6 +2409,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Combien de temps, et comment retirer une annonce : 7 jours après sa publication sur Discord pour une recherche de scrim, 14 jours pour les autres, puis un effacement automatique. Supprimer l'annonce sur Discord la retire du site aussitôt ; la modifier remplace l'ancienne version, dont rien n'est gardé. Son auteur peut aussi s'y opposer et en demander le retrait à l'association (formulaire de signalement, catégorie RGPD).",
     ],
   },
+  {
+    // GETI-ALERTS — alertes sur une recherche d'annonces
+    // (`docs/features/GETI_INFO.md` § Alertes) : registre T22 (et T12),
+    // /rgpd (FR et EN). Datée comme `REGISTER_UPDATED_AT` — tout avancer
+    // ensemble si la mise en ligne glisse.
+    id: "2026-11-alertes-d-annonces-geti",
+    publishedAt: "2026-11-28",
+    title: "Alertes sur une recherche d'annonces de recrutement",
+    links: [
+      { href: "/rgpd/registre#t22", label: "Lire la fiche T22 du registre" },
+      { href: "/rgpd#alertes-geti", label: "Lire le paragraphe « Alertes d'annonces »" },
+    ],
+    summary: "Sur la page des annonces de recrutement Overwatch, un compte connecté peut créer des alertes : le site garde la catégorie et les filtres choisis, et le prévient quand une nouvelle annonce y correspond.",
+    details: [
+      "Ce qui est gardé : pour chaque alerte, la catégorie et les filtres choisis, un nom facultatif, son état (active ou en pause), sa date de création et celle de la dernière notification, ainsi qu'une trace technique des annonces déjà signalées, pour ne jamais prévenir deux fois. Dix alertes au plus par compte. Rien n'est créé sans ton geste : l'alerte est un service que tu demandes.",
+      "Comment tu es prévenu : par notification push sur les appareils où tu l'as activée, et par message privé Discord si ton compte Discord est certifié — au plus une fois toutes les 10 minutes par alerte. Le message ne porte que le nom de ton alerte et un lien vers la page, ni pseudo ni texte de l'annonce. Le sujet « Alertes d'annonces GETI » de « Mon profil » coupe les deux.",
+      "Combien de temps : jusqu'à ce que tu supprimes l'alerte (ou la mettes en pause, ce qui la garde sans te prévenir) ; l'effacement de ton compte emporte toutes tes alertes. La trace des annonces déjà signalées est effacée au bout de 15 jours. Tes alertes figurent dans l'export de tes données.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

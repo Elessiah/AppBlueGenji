@@ -88,6 +88,11 @@ import {
   type AudienceOptOutReason,
 } from "@/lib/shared/site-visits";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
+import {
+  GETI_ALERT_COOLDOWN_MINUTES,
+  GETI_ALERT_HIT_RETENTION_DAYS,
+  GETI_ALERT_MAX_PER_USER,
+} from "@/lib/shared/geti/alerts";
 import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
 import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
@@ -268,6 +273,18 @@ export function RgpdEn({
             replaces the previous version. Basis: the association&apos;s legitimate interest (helping players and teams
             find each other), for posts that are already public; their author can object and ask for removal (see
             “Exercising your rights”). Register of processing activities: record T21.
+          </p>
+          <p id="alertes-geti">
+            <strong>Post alerts.</strong> On the posts page, a signed-in account can create alerts (
+            {GETI_ALERT_MAX_PER_USER} at most): the site keeps the chosen category and filters, an optional name, the
+            alert&apos;s state (active or paused), its creation date and the date of the last notification, and a technical
+            record of the posts already reported. When a new post matches, the account is notified by push
+            notification on its subscribed devices and, if its Discord account is certified, by Discord direct
+            message — at most once every {GETI_ALERT_COOLDOWN_MINUTES} minutes per alert, with neither a username nor
+            the post&apos;s text (the alert&apos;s name and a link). The “GETI post alerts” topic in “My profile” turns both
+            off. An alert is kept until the account deletes it; erasing the account removes all its alerts, and the
+            record of the posts already reported is erased after {GETI_ALERT_HIT_RETENTION_DAYS} days. Basis:
+            performance of the service the account asked for. Register of processing activities: record T22.
           </p>
           <p id="age-minimum">
             <strong>Minimum age.</strong> You must be at least {SITE_MINIMUM_AGE} years old to create an account

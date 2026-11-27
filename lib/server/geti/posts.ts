@@ -14,6 +14,7 @@
  */
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { purgeGetiAlertHits } from "@/lib/server/geti/alerts";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { toIso } from "@/lib/server/serialization";
 import type { GetiPushedPost, GetiReconcileRequest } from "@/lib/server/geti/wire";
@@ -90,12 +91,14 @@ export type GetiUpsertOutcome = {
 /**
  * Enregistre un lot d'annonces poussées, chacune analysée ici. Une annonce déjà
  * gardée est remplacée (modification), sauf si la version reçue est plus
- * ancienne que la version gardée.
+ * ancienne que la version gardée. `onStored` reçoit chaque annonce
+ * enregistrée avec son analyse (les alertes, `lib/server/geti/alerts.ts`).
  */
 export async function upsertGetiPosts(
   executor: GetiExecutor,
   posts: readonly GetiPushedPost[],
   now: number = Date.now(),
+  onStored?: (post: GetiPushedPost, parsed: GetiParsedPost) => void,
 ): Promise<GetiUpsertOutcome> {
   const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0 };
   const emptied: string[] = [];
@@ -124,6 +127,7 @@ export async function upsertGetiPosts(
       post.editedAt,
     ]);
     outcome.stored += 1;
+    onStored?.(post, parsed);
   }
   if (emptied.length > 0) await deleteGetiPosts(executor, emptied);
   return outcome;
@@ -204,7 +208,12 @@ export function startGetiPostsPurgeClock(): void {
     key: PURGE_CLOCK_KEY,
     firstDelayMs: FIRST_PURGE_DELAY_MS,
     tickMs: PURGE_TICK_MS,
-    run: async () => purgeExpiredGetiPosts(await getDatabase()),
+    run: async () => {
+      const db = await getDatabase();
+      await purgeExpiredGetiPosts(db);
+      // Traces « alerte déjà prévenue pour cette annonce » : même horloge, même garde.
+      await purgeGetiAlertHits(db);
+    },
     failureMessage: "[geti] Purge des annonces impossible.",
   });
 }

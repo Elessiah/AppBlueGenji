@@ -3,12 +3,15 @@ import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { getCurrentUser } from "@/lib/server/auth";
+import { listGetiAlerts } from "@/lib/server/geti/alerts";
 import { listGetiPosts } from "@/lib/server/geti/posts";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { GETI_CATEGORIES, type GetiCategory, type GetiFilter } from "@/lib/shared/geti";
+import { getiAlertSearch, type GetiAlert } from "@/lib/shared/geti/alerts";
 import { GETI_RETENTION_DAYS, type GetiPostPage } from "@/lib/shared/geti/ingest";
 import {
   GETI_CATEGORY_FILTERS,
@@ -19,6 +22,7 @@ import {
   getiChannelUrl,
   getiPageFilter,
   getiPageHref,
+  getiPageSearch,
   parseGetiPageQuery,
   type GetiPageQuery,
   type GetiSearchParams,
@@ -26,6 +30,7 @@ import {
 import { getiDataText, getiText, type GetiMessages } from "@/lib/shared/geti/page-text";
 import { localeHref, type Locale } from "@/lib/shared/locales";
 import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
+import { GetiAlerts } from "./GetiAlerts";
 import { GetiFilters } from "./GetiFilters";
 import { GetiOfficialCard, GetiOfficialCount } from "./GetiOfficialCard";
 import { GetiPostCard } from "./GetiPostCard";
@@ -54,6 +59,13 @@ export async function GetiInfoView({
     () => null,
   );
   const activeFilters = getiActiveFilterCount(query);
+  // Les alertes du compte connecté, s'il y en a un : la page reste publique, et
+  // se rend sans elles si la session ou la table ne se lisent pas.
+  const viewer = await getCurrentUser().catch(() => null);
+  const alerts: GetiAlert[] = viewer ? await listGetiAlerts(viewer.id).catch(() => []) : [];
+  const categoryTitles = Object.fromEntries(
+    GETI_CATEGORIES.map((entry) => [entry, m.categories[entry].title]),
+  ) as Record<GetiCategory, string>;
   const data = getiDataText(m);
   const retentionDays = GETI_RETENTION_DAYS[category];
 
@@ -119,13 +131,28 @@ export async function GetiInfoView({
               </InfoHint>
             </InfoHintRow>
           </div>
-          <GetiPublishButton
-            text={m.publish}
-            categoryTitle={m.categories[category].title}
-            channelUrl={getiChannelUrl(category)}
-            ourInviteUrl={DISCORD_INVITE_URL}
-            card={<GetiOfficialCard text={m.official} locale={locale} headingLevel={3} />}
-          />
+          <div className={styles.headActions}>
+            <InfoHintRow inline>
+              <GetiAlerts
+                text={m.alerts}
+                category={category}
+                search={getiAlertSearch(category, getiPageSearch(query)) ?? ""}
+                categoryTitles={categoryTitles}
+                signedIn={viewer !== null}
+                initialAlerts={alerts}
+              />
+              <InfoHint id="geti-alerts-hint" subject={m.alerts.hintSubject}>
+                {m.alerts.hint}
+              </InfoHint>
+            </InfoHintRow>
+            <GetiPublishButton
+              text={m.publish}
+              categoryTitle={m.categories[category].title}
+              channelUrl={getiChannelUrl(category)}
+              ourInviteUrl={DISCORD_INVITE_URL}
+              card={<GetiOfficialCard text={m.official} locale={locale} headingLevel={3} />}
+            />
+          </div>
         </header>
 
         <div className={styles.layout}>
