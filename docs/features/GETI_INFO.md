@@ -784,23 +784,36 @@ attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
    30 minutes) : le rattrapage du bot, qui repousse deux semaines d'annonces à
    chaque démarrage, ne prévient personne. Une annonce ancienne **modifiée**
    à l'instant compte comme récente : si elle correspond désormais à une
-   alerte qui ne l'avait jamais vue, elle prévient une fois.
+   alerte qui ne l'avait jamais vue, elle prévient une fois. Ce tri se refait
+   sur la **version gardée**, relue dans `bg_geti_posts` : une version plus
+   ancienne arrivée après une modification (l'enregistrement la laisse de
+   côté) est jugée sur la version gardée — fermée, elle ne prévient pas — et
+   une annonce retirée entre-temps ne prévient pas.
 2. Une lecture des alertes actives des catégories du lot (`paused = 0`, au plus
-   `GETI_ALERT_SCAN_MAX`).
+   `GETI_ALERT_SCAN_MAX` ; borne atteinte = avertissement chiffré dans pm2),
+   avec l'identifiant Discord du compte : **sa propre annonce ne prévient pas
+   son auteur**.
 3. Correspondance en mémoire par `matchingGetiAlerts` → `matchesGetiFilter`,
    le filtre de chaque alerte construit une seule fois par lot.
-4. **Jamais deux fois pour la même annonce** : `INSERT IGNORE INTO
-   bg_geti_alert_hits` ; seule l'insertion qui crée la ligne compte
-   (modification, second rattrapage, envoi en double : rien).
+4. **Jamais deux fois pour la même annonce** : par annonce, une lecture des
+   traces déjà là puis un seul `INSERT IGNORE INTO bg_geti_alert_hits` à
+   plusieurs lignes pour les autres (par paquets de 500) ; une insertion qui
+   ne pose rien (passe simultanée) ne prévient pas (modification, second
+   rattrapage, envoi en double : rien).
 5. **Délai par alerte**, réservé en une instruction : `UPDATE bg_geti_alerts
    SET last_notified_at = ? WHERE id = ? AND paused = 0 AND (last_notified_at
    IS NULL OR last_notified_at <= ?)` + `affectedRows`. Une annonce arrivée
    pendant le délai garde sa trace et ne sera pas signalée plus tard : elle se
-   lit sur la page. Une seule notification par compte et par lot.
+   lit sur la page. Une seule notification **réussie** par compte et par lot.
 6. Envoi (`notifyUsers`) au compte, s'il existe encore et n'est pas suspendu.
+   Un envoi qui ne joint personne (compte suspendu ou effacé) ou qui échoue
+   **rend** le délai (date précédente remise, si personne ne l'a reprise) et
+   retire la trace de l'annonce : une autre alerte du compte peut prévenir, et
+   une modification récente de l'annonce aussi.
 
-**Borne du coût** : par lot (20 annonces au plus), une lecture d'au plus 2 000
-alertes, puis au plus `annonces récentes × alertes de la catégorie`
+**Borne du coût** : par lot (20 annonces au plus), une relecture des annonces
+récentes, une lecture d'au plus 2 000 alertes, deux instructions par annonce
+touchée pour les traces, puis au plus `annonces récentes × alertes de la catégorie`
 comparaisons en mémoire (40 000 dans le pire cas, chacune sur une annonce déjà
 analysée) ; les écritures ne portent que sur les couples qui correspondent.
 Hors rattrapage, un lot porte une annonce. Au-delà de 2 000 alertes actives
@@ -816,8 +829,11 @@ sur les catégories d'un lot, les plus récentes ne sont pas lues — à revoir
   l'horloge `geti-posts-purge` (`purgeGetiAlertHits`), et partent avec l'alerte.
 - **Effacement du compte** : l'anonymisation garde la ligne `bg_users`, la
   cascade ne joue donc pas — `anonymizeAccount` appelle
-  `deleteGetiAlertsOfUser` (traces puis alertes).
-- **Export des données** : `getiAlerts` dans `PersonalDataExport`.
+  `deleteGetiAlertsOfUser` (traces puis alertes, chaque instruction avec sa
+  garde de table absente).
+- **Export des données** : `getiAlerts` dans `PersonalDataExport` — tout ce
+  que la ligne garde (dont `lastNotifiedAt`) et les annonces déjà signalées
+  (`reportedPosts` : identifiant du message, date de la trace).
 - Mentions : registre T22 (et sous-finalité de T12), entrée
   `2026-11-alertes-d-annonces-geti` de `PRIVACY_CHANGES` (FR et EN),
   `/rgpd#alertes-geti` (FR et EN).

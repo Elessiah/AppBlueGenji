@@ -10,6 +10,7 @@ import {
   createGetiAlert,
   deleteGetiAlert,
   deleteGetiAlertsOfUser,
+  exportGetiAlerts,
   listGetiAlerts,
   notifyGetiAlerts,
   purgeGetiAlertHits,
@@ -23,8 +24,11 @@ import {
   GETI_ALERT_HIT_RETENTION_DAYS,
   GETI_ALERT_MAX_PER_USER,
   GETI_ALERT_NAME_MAX,
+  GETI_ALERT_SCAN_MAX,
 } from "@/lib/shared/geti/alerts";
+import type { GetiParsedPost } from "@/lib/shared/geti";
 import { parsedGetiPost } from "../../../helpers/geti";
+import { GETI_FAKE_AUTHOR_ID } from "../../../helpers/geti";
 import { GETI_FAKE_MESSAGE_ID } from "../../../helpers/geti-ingest";
 import { connectionMock, fakeConnection, fakePool, type SqlMock, type SqlQuery } from "../../../helpers/sql-double";
 
@@ -272,12 +276,71 @@ describe("deleteGetiAlertsOfUser", () => {
     await expect(deleteGetiAlertsOfUser(fakePool({ execute }), USER_ID)).resolves.toBeUndefined();
   });
 
+  it("deleteGetiAlertsOfUser_hitsTableMissing_stillDeletesTheAlerts", async () => {
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.startsWith("DELETE FROM bg_geti_alert_hits")) throw missingTable();
+      return [{ affectedRows: 1 }];
+    });
+
+    await deleteGetiAlertsOfUser(fakePool({ execute }), USER_ID);
+
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_alerts WHERE user_id = ?", [USER_ID]);
+  });
+
   it("deleteGetiAlertsOfUser_otherFailure_throws", async () => {
     const execute = jest.fn<SqlQuery>(async () => {
       throw new Error("base injoignable");
     });
 
     await expect(deleteGetiAlertsOfUser(fakePool({ execute }), USER_ID)).rejects.toThrow("base injoignable");
+  });
+});
+
+describe("exportGetiAlerts", () => {
+  it("exportGetiAlerts_alertsWithHits_returnsLastNotificationAndReportedPosts", async () => {
+    const execute = jest.fn<SqlQuery>(async (sql: string) =>
+      sql.includes("FROM bg_geti_alert_hits")
+        ? [[{ alert_id: 7, message_id: GETI_FAKE_MESSAGE_ID, created_at: new Date("2026-11-27T11:00:00.000Z") }]]
+        : [[alertRow({ last_notified_at: new Date("2026-11-27T11:00:00.000Z") }), alertRow({ id: 8, last_notified_at: null })]],
+    );
+
+    const exported = await exportGetiAlerts(USER_ID, fakePool({ execute }));
+
+    expect(exported).toEqual([
+      expect.objectContaining({
+        lastNotifiedAt: "2026-11-27T11:00:00.000Z",
+        reportedPosts: [{ messageId: GETI_FAKE_MESSAGE_ID, createdAt: "2026-11-27T11:00:00.000Z" }],
+      }),
+      expect.objectContaining({ lastNotifiedAt: null, reportedPosts: [] }),
+    ]);
+    expect(exported[0]).toMatchObject({ category: "lfp", name: "Tank EU", search: "?role=tank", paused: false });
+  });
+
+  it("exportGetiAlerts_noAlert_returnsEmptyWithoutReadingHits", async () => {
+    const execute = executeMock([]);
+
+    await expect(exportGetiAlerts(USER_ID, fakePool({ execute }))).resolves.toEqual([]);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("exportGetiAlerts_hitsTableMissing_returnsAlertsWithoutReportedPosts", async () => {
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.includes("FROM bg_geti_alert_hits")) throw missingTable();
+      return [[alertRow({ last_notified_at: null })]];
+    });
+
+    const exported = await exportGetiAlerts(USER_ID, fakePool({ execute }));
+
+    expect(exported).toHaveLength(1);
+    expect(exported[0].reportedPosts).toEqual([]);
+  });
+
+  it("exportGetiAlerts_alertsTableMissing_returnsEmpty", async () => {
+    const execute = jest.fn<SqlQuery>(async () => {
+      throw missingTable();
+    });
+
+    await expect(exportGetiAlerts(USER_ID, fakePool({ execute }))).resolves.toEqual([]);
   });
 });
 
@@ -305,13 +368,45 @@ describe("purgeGetiAlertHits", () => {
 describe("notifyGetiAlerts", () => {
   const send = jest.fn<GetiAlertSender>();
 
-  /** Base simulée : alertes actives lues, trace posée ou déjà là, délai réservé ou non. */
-  function alertsDatabase(options: { alerts?: unknown[]; newHit?: boolean; reserved?: boolean } = {}): SqlMock {
-    const { alerts = [alertRow()], newHit = true, reserved = true } = options;
-    return jest.fn<SqlQuery>(async (sql: string) => {
+  /** Ligne gardée d'une annonce : par défaut, la même version que `freshPost`. */
+  function storedRow(messageId: string, parsed: GetiParsedPost = parsedGetiPost({ category: "lfp", roles: ["TANK"] })) {
+    return {
+      message_id: messageId,
+      category: parsed.category,
+      parsed_json: JSON.stringify(parsed),
+      posted_at: new Date(NOW - MINUTE_MS),
+      edited_at: null,
+    };
+  }
+
+  function activeAlertRow(overrides: Record<string, unknown> = {}) {
+    return alertRow({ last_notified_at: null, discord_id: null, ...overrides });
+  }
+
+  /**
+   * Base simulée : version gardée de chaque annonce relue, alertes actives
+   * lues, traces déjà là, trace posée ou non, délai réservé ou non.
+   */
+  function alertsDatabase(
+    options: {
+      alerts?: unknown[];
+      stored?: (messageId: string) => unknown;
+      seen?: number[];
+      newHit?: boolean;
+      reserved?: boolean;
+    } = {},
+  ): SqlMock {
+    const { alerts = [activeAlertRow()], stored = (id: string) => storedRow(id), seen = [], newHit = true, reserved = true } = options;
+    return jest.fn<SqlQuery>(async (sql: string, params?: unknown) => {
+      const values = (params ?? []) as unknown[];
+      if (sql.includes("FROM bg_geti_posts")) {
+        return [values.map((id) => stored(String(id))).filter((row) => row !== null)];
+      }
+      if (sql.includes("SELECT alert_id FROM bg_geti_alert_hits")) return [seen.map((id) => ({ alert_id: id }))];
       if (sql.includes("SELECT")) return [alerts];
-      if (sql.includes("INSERT IGNORE")) return [{ affectedRows: newHit ? 1 : 0 }];
-      return [{ affectedRows: reserved ? 1 : 0 }];
+      if (sql.includes("INSERT IGNORE")) return [{ affectedRows: newHit ? values.length / 3 : 0 }];
+      if (sql.startsWith("UPDATE") && sql.includes("paused = 0")) return [{ affectedRows: reserved ? 1 : 0 }];
+      return [{ affectedRows: 1 }];
     });
   }
 
@@ -359,13 +454,13 @@ describe("notifyGetiAlerts", () => {
   });
 
   it("notifyGetiAlerts_postNotMatchingTheAlert_recordsNoHit", async () => {
-    const execute = alertsDatabase();
     const support = freshPost({ parsed: parsedGetiPost({ category: "lfp", roles: ["SUPPORT"] }) });
+    const execute = alertsDatabase({ stored: (id) => storedRow(id, support.parsed) });
 
     const outcome = await notifyGetiAlerts([support], NOW, fakePool({ execute }), send);
 
     expect(outcome).toEqual({ matched: 0, notified: 0 });
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(sqlOf(execute).some((sql) => sql.includes("bg_geti_alert_hits"))).toBe(false);
     expect(send).not.toHaveBeenCalled();
   });
 
@@ -379,21 +474,134 @@ describe("notifyGetiAlerts", () => {
   });
 
   it("notifyGetiAlerts_readsOnlyActiveAlertsOfThePostCategories", async () => {
-    const execute = alertsDatabase({ alerts: [] });
+    const lfs = freshPost({ messageId: "100000000000000902", category: "lfs", parsed: parsedGetiPost({ category: "lfs" }) });
+    const execute = alertsDatabase({
+      alerts: [],
+      stored: (id) => (id === lfs.messageId ? storedRow(id, lfs.parsed) : storedRow(id)),
+    });
 
-    await notifyGetiAlerts([freshPost(), freshPost({ category: "lfs" })], NOW, fakePool({ execute }), send);
+    await notifyGetiAlerts([freshPost(), lfs], NOW, fakePool({ execute }), send);
 
-    expect(execute.mock.calls[0][0]).toContain("WHERE paused = 0 AND category IN (?, ?)");
-    expect(execute.mock.calls[0][1]).toEqual(["lfp", "lfs"]);
+    expect(execute.mock.calls[1][0]).toContain("WHERE a.paused = 0 AND a.category IN (?, ?)");
+    expect(execute.mock.calls[1][1]).toEqual(["lfp", "lfs"]);
   });
 
   it("notifyGetiAlerts_postAlreadySeenByTheAlert_doesNotNotifyAgain", async () => {
+    const execute = alertsDatabase({ seen: [7] });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome).toEqual({ matched: 0, notified: 0 });
+    expect(sqlOf(execute).some((sql) => sql.startsWith("INSERT IGNORE"))).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("notifyGetiAlerts_concurrentPassAlreadyInsertedTheHits_doesNotNotify", async () => {
     const execute = alertsDatabase({ newHit: false });
 
     const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
 
     expect(outcome).toEqual({ matched: 0, notified: 0 });
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("notifyGetiAlerts_olderVersionArrivesAfterClosingEdit_judgesTheStoredClosedVersion", async () => {
+    const closed = parsedGetiPost({ category: "lfp", roles: ["TANK"], closed: true });
+    const execute = alertsDatabase({ stored: (id) => storedRow(id, closed) });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome).toEqual({ matched: 0, notified: 0 });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("notifyGetiAlerts_postDeletedBeforeThePass_sendsNothing", async () => {
+    const execute = alertsDatabase({ stored: () => null });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome).toEqual({ matched: 0, notified: 0 });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyGetiAlerts_storedRowUnreadable_isSkipped", async () => {
+    const execute = alertsDatabase({ stored: (id) => ({ ...storedRow(id), parsed_json: "{pas du json" }) });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome).toEqual({ matched: 0, notified: 0 });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("notifyGetiAlerts_postWrittenByTheAlertOwner_doesNotNotifyThem", async () => {
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ discord_id: GETI_FAKE_AUTHOR_ID })] });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome).toEqual({ matched: 0, notified: 0 });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("notifyGetiAlerts_ownerWithoutDiscordAndPostWithoutAuthor_stillNotifies", async () => {
+    const anonymous = parsedGetiPost({ category: "lfp", roles: ["TANK"], authorId: null });
+    const execute = alertsDatabase({ stored: (id) => storedRow(id, anonymous) });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome).toEqual({ matched: 1, notified: 1 });
+  });
+
+  it("notifyGetiAlerts_severalAlertsMatchOnePost_writesTheirHitsInOneInstruction", async () => {
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ id: 7, user_id: 1 }), activeAlertRow({ id: 8, user_id: 2 })] });
+
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    const inserts = sqlOf(execute).filter((sql) => sql.startsWith("INSERT IGNORE"));
+    expect(inserts).toEqual([
+      "INSERT IGNORE INTO bg_geti_alert_hits (alert_id, message_id, created_at) VALUES (?, ?, ?), (?, ?, ?)",
+    ]);
+  });
+
+  it("notifyGetiAlerts_accountNotReachable_releasesTheCooldownAndTheHit", async () => {
+    const previous = new Date(NOW - 60 * MINUTE_MS);
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ last_notified_at: previous })] });
+    send.mockResolvedValue(false);
+
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(execute).toHaveBeenCalledWith("UPDATE bg_geti_alerts SET last_notified_at = ? WHERE id = ? AND last_notified_at = ?", [
+      previous,
+      7,
+      new Date(NOW),
+    ]);
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_alert_hits WHERE alert_id = ? AND message_id = ?", [
+      7,
+      GETI_FAKE_MESSAGE_ID,
+    ]);
+  });
+
+  it("notifyGetiAlerts_sendThrowsForAnAlert_letsAnotherAlertOfTheSameAccountTry", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ id: 7 }), activeAlertRow({ id: 8, search: "" })] });
+    send.mockRejectedValueOnce(new Error("bot injoignable"));
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome).toEqual({ matched: 2, notified: 1 });
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ id: 8 }), expect.anything());
+    logged.mockRestore();
+  });
+
+  it("notifyGetiAlerts_scanCapReached_warnsWithACountOnly", async () => {
+    const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const capped = Array.from({ length: GETI_ALERT_SCAN_MAX }, (_, index) => activeAlertRow({ id: index + 1, search: "?role=support" }));
+    const execute = alertsDatabase({ alerts: capped });
+
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(warned).toHaveBeenCalledWith("[geti] borne des alertes lues atteinte:", GETI_ALERT_SCAN_MAX);
+    warned.mockRestore();
   });
 
   it("notifyGetiAlerts_cooldownNotElapsed_keepsTheHitButDoesNotSend", async () => {
@@ -406,7 +614,7 @@ describe("notifyGetiAlerts", () => {
   });
 
   it("notifyGetiAlerts_twoAlertsOfTheSameAccount_sendsOneNotification", async () => {
-    const execute = alertsDatabase({ alerts: [alertRow({ id: 7 }), alertRow({ id: 8, search: "" })] });
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ id: 7 }), activeAlertRow({ id: 8, search: "" })] });
 
     const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
 
@@ -425,7 +633,7 @@ describe("notifyGetiAlerts", () => {
   });
 
   it("notifyGetiAlerts_sendFailsForOneAccount_stillNotifiesTheNextOne", async () => {
-    const execute = alertsDatabase({ alerts: [alertRow({ id: 7, user_id: 1 }), alertRow({ id: 8, user_id: 2 })] });
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ id: 7, user_id: 1 }), activeAlertRow({ id: 8, user_id: 2 })] });
     const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
     send.mockRejectedValueOnce(new Error("bot injoignable"));
 

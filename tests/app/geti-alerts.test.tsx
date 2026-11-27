@@ -164,4 +164,19 @@ describe("textes des alertes", () => {
     expect(code).toContain("<ConfirmActionDialog");
     expect(code).not.toContain("window.confirm");
   });
+
+  it("GetiAlerts_twoActionsInFlight_applyEachAnswerToTheCurrentList", () => {
+    // Pause d'une alerte puis suppression d'une autre, réponses dans le désordre :
+    // chaque réponse part de la liste du moment, jamais de celle capturée au clic.
+    const code = readSource("components/geti/GetiAlerts.tsx");
+
+    expect(code.match(/setAlerts\(\(current\) =>/g)).toHaveLength(3);
+    expect(code).not.toMatch(/setAlerts\((\[|alerts\.)/);
+  });
+
+  it("getiAlertsHint_frenchAndEnglish_takeTheCooldownFromTheConstant", () => {
+    expect(frGeti.alerts.hint).toContain("{minutes} minutes");
+    expect(enGeti.alerts.hint).toContain("{minutes} minutes");
+    expect(readSource("components/geti/GetiInfoView.tsx")).toContain("minutes: GETI_ALERT_COOLDOWN_MINUTES");
+  });
 });

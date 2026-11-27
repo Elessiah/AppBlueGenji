@@ -1,7 +1,7 @@
 "use client";
 
 import { Bell } from "lucide-react";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useAppLocale } from "@/components/i18n/locale-context";
@@ -233,7 +233,8 @@ function AlertRow({ alert, label, categoryTitle, text, onChanged, onDeleted }: R
 type DialogProps = GetiAlertsProps &
   Readonly<{
     alerts: readonly GetiAlert[];
-    setAlerts: (next: readonly GetiAlert[]) => void;
+    /** Setter d'état : chaque réponse s'applique à la liste du moment (deux gestes en vol ne s'écrasent pas). */
+    setAlerts: Dispatch<SetStateAction<readonly GetiAlert[]>>;
     onClose: () => void;
   }>;
 
@@ -263,7 +264,7 @@ export function GetiAlertsDialog({ text, category, search, categoryTitles, signe
     const refusal = response ? await refusalOf(response) : "";
     if (response && refusal === null) {
       const created = ((await response.json()) as { alert: GetiAlert }).alert;
-      setAlerts([...alerts, created]);
+      setAlerts((current) => [...current, created]);
       setName("");
       showSuccess(text.created);
       return;
@@ -343,8 +344,10 @@ export function GetiAlertsDialog({ text, category, search, categoryTitles, signe
                       label={labelOf(alert)}
                       categoryTitle={categoryTitles[alert.category]}
                       text={text}
-                      onChanged={(updated) => setAlerts(alerts.map((entry) => (entry.id === updated.id ? updated : entry)))}
-                      onDeleted={(id) => setAlerts(alerts.filter((entry) => entry.id !== id))}
+                      onChanged={(updated) =>
+                        setAlerts((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)))
+                      }
+                      onDeleted={(id) => setAlerts((current) => current.filter((entry) => entry.id !== id))}
                     />
                   ))}
                 </ul>

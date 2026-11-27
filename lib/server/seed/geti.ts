@@ -229,6 +229,8 @@ export async function createGetiAlerts(db: Pool, userId: number): Promise<void> 
   // Une annonce récente qui correspond à l'alerte nommée : vue une fois, pas deux ; l'alerte en pause ne voit rien.
   const fresh = pushed(wirePost({ category: "lfp", ageHours: 0, author: "test_geti_alerte", text: "LFP — équipe Test Alerte cherche un main tank Diamant, EU." }, 93, now));
   const lft = pushed(wirePost({ category: "lft", ageHours: 0, author: "test_geti_alerte", text: "LFT — support Master cherche une équipe, EU." }, 94, now));
+  // Enregistrées d'abord, comme par la route : la passe juge la version gardée en base.
+  await upsertGetiPosts(db, [fresh, lft], now);
   const posts = [fresh, lft].map((post) => ({
     messageId: post.messageId,
     category: post.category,
@@ -245,6 +247,8 @@ export async function createGetiAlerts(db: Pool, userId: number): Promise<void> 
   const again = await notifyGetiAlerts(posts, now, db, send);
   const purged = await purgeGetiAlertHits(db, now);
   const kept = await listGetiAlerts(userId, db);
+  // Annonces de la passe retirées : la matrice d'annonces reste celle de `createGetiPosts`.
+  await deleteGetiPosts(db, [fresh.messageId, lft.messageId]);
   if (first.matched !== 1 || first.notified !== 1 || again.matched !== 0 || sent.join() !== String(named.id) || purged !== 0 || kept.length !== 2) {
     throw new Error(
       `alertes GETI : bilan inattendu (${first.matched} touchée(s), ${first.notified} prévenu(s), puis ${again.matched} ; ${purged} trace(s) purgée(s), ${kept.length} alerte(s))`,

@@ -2,6 +2,9 @@ import { describe, expect, it } from "@jest/globals";
 
 import { getiAlertDm, getiAlertPath, getiAlertPush, type GetiAlertNotice } from "@/lib/shared/push-messages";
 import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
+import { GETI_ALERT_COOLDOWN_MINUTES, GETI_ALERT_HIT_RETENTION_DAYS } from "@/lib/shared/geti/alerts";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import enPush from "@/messages/en/push.json";
 import frPush from "@/messages/fr/push.json";
 
@@ -72,5 +75,20 @@ describe("sujet GETI_ALERT", () => {
     expect(PUSH_TOPICS.GETI_ALERT.audience).toBeNull();
     expect(frPush.topics.GETI_ALERT.label).toBe(PUSH_TOPICS.GETI_ALERT.label);
     expect(enPush.topics.GETI_ALERT.label).toBe("GETI post alerts");
+  });
+});
+
+describe("privacy change « alertes d'annonces GETI »", () => {
+  // L'entrée est un historique écrit en clair : changer le délai ou la garde des
+  // traces fait échouer ce test, et appelle une nouvelle entrée.
+  it("getiAlertPrivacyChange_frenchAndEnglish_stateTheCurrentCooldownAndHitRetention", () => {
+    const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-11-alertes-d-annonces-geti");
+    const english = PRIVACY_CHANGES_EN["2026-11-alertes-d-annonces-geti"];
+    expect(english).toBeDefined();
+
+    expect(entry?.details.join(" ")).toContain(`toutes les ${GETI_ALERT_COOLDOWN_MINUTES} minutes`);
+    expect(entry?.details.join(" ")).toContain(`au bout de ${GETI_ALERT_HIT_RETENTION_DAYS} jours`);
+    expect(english.details.join(" ")).toContain(`every ${GETI_ALERT_COOLDOWN_MINUTES} minutes`);
+    expect(english.details.join(" ")).toContain(`after ${GETI_ALERT_HIT_RETENTION_DAYS} days`);
   });
 });

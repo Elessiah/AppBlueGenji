@@ -11,7 +11,7 @@ import { requestLocale } from "@/lib/server/request-locale";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { GETI_CATEGORIES, type GetiCategory, type GetiFilter } from "@/lib/shared/geti";
-import { getiAlertSearch, type GetiAlert } from "@/lib/shared/geti/alerts";
+import { GETI_ALERT_COOLDOWN_MINUTES, getiAlertSearch, type GetiAlert } from "@/lib/shared/geti/alerts";
 import { GETI_RETENTION_DAYS, type GetiPostPage } from "@/lib/shared/geti/ingest";
 import {
   GETI_CATEGORY_FILTERS,
@@ -151,7 +151,7 @@ export async function GetiInfoView({
                 initialAlerts={alerts}
               />
               <InfoHint id="geti-alerts-hint" subject={m.alerts.hintSubject}>
-                {m.alerts.hint}
+                {getiText(locale, m.alerts.hint, { minutes: GETI_ALERT_COOLDOWN_MINUTES })}
               </InfoHint>
             </InfoHintRow>
             <GetiPublishButton
