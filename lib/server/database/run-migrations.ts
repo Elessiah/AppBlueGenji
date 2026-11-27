@@ -16,6 +16,7 @@ import { applyRecentSchemaChanges } from "./recent-schema-changes";
 import { warnIfSchemaIsBehind } from "./schema-check";
 import { createAccountTables } from "./schema/accounts";
 import { createComplianceTables } from "./schema/compliance";
+import { createGetiTables } from "./schema/geti";
 import { createSentNotificationTables } from "./schema/notifications";
 import { createPhaseTables } from "./schema/phases";
 import { createPlanningTables } from "./schema/planning";
@@ -83,6 +84,7 @@ export async function runMigrations(db: Pool): Promise<void> {
   await createSentNotificationTables(db);
   await createShowcaseTables(db);
   await createComplianceTables(db);
+  await createGetiTables(db);
   await applyRecentSchemaChanges(db);
   await backfillLaunchedAt(db);
   await switchOpenToRecruitmentDefault(db);
