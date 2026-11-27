@@ -2,27 +2,38 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
+import { GETI_DEFAULT_LIST_PATH, GETI_PAGE_PATH } from "@/lib/shared/geti/path";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { useShellText } from "@/components/i18n/shell-text";
 import type { ShellKey } from "@/lib/shared/shell-text";
 import styles from "./PublicNavMenu.module.css";
 
-type NavLink = { href: string; labelKey: ShellKey };
+/**
+ * `section` : la rubrique que l'entrée désigne comme page courante, quand elle
+ * diffère de `href` (l'entrée des annonces mène à la liste canonique
+ * `/geti-info/lfp` mais reste courante sur toute page `/geti-info…`).
+ */
+type NavLink = { href: string; labelKey: ShellKey; featured?: boolean; section?: string };
 
 /**
- * Une entrée par page, jamais deux vers la même adresse ; les règles des
- * tournois n'y figurent pas — elles se lisent depuis la page du tournoi
- * (`RulesHelpFab`), qui mène au mode réellement joué
+ * Une entrée par page, jamais deux vers la même adresse. Les annonces GETI
+ * ouvrent la liste, mises en avant (`featured`) : c'est une fonction principale
+ * du site. Rien n'y mène à la partie compétitive (tournois, équipes, joueurs,
+ * classement, règles) : on y entre par l'accueil, par le bouton de l'en-tête
+ * une fois connecté et par le pied de page
  * (docs/features/PUBLIC_NAVIGATION.md).
+ *
+ * L'entrée des annonces mène à l'adresse canonique de la liste par défaut
+ * (`/geti-info/lfp`, comme l'encart de l'accueil : une seule adresse par liste)
+ * et reste la page courante sur toute la rubrique `/geti-info`. Ces adresses
+ * viennent de `lib/shared/geti/path.ts`, module sans dépendance : importer `lib/shared/geti/page.ts` chargerait les filtres des
+ * annonces dans l'en-tête de chaque page.
  */
 export const PUBLIC_NAV_LINKS: readonly NavLink[] = [
-  { href: "/tournois", labelKey: "nav.links.tournaments" },
-  { href: "/equipes", labelKey: "nav.links.teams" },
-  { href: "/classement", labelKey: "nav.links.ranking" },
-  { href: "/joueurs", labelKey: "nav.links.players" },
-  { href: "/recrutement", labelKey: "nav.links.recruitment" },
+  { href: GETI_DEFAULT_LIST_PATH, section: GETI_PAGE_PATH, labelKey: "nav.links.geti", featured: true },
   { href: "/bot", labelKey: "nav.links.bot" },
   { href: "/association", labelKey: "nav.links.association" },
+  { href: "/recrutement", labelKey: "nav.links.recruitment" },
   { href: "/benevoles", labelKey: "nav.links.volunteers" },
 ];
 
@@ -78,13 +89,15 @@ export function PublicNavPanel({
   return (
     <nav id={id} className={styles.panel} aria-label={t("nav.mainLabel")}>
       {PUBLIC_NAV_LINKS.map((link) => {
-        const isActive = isNavLinkActive(pathname, link.href);
+        const isActive = isNavLinkActive(pathname, link.section ?? link.href);
         return (
           <LocaleLink
             key={link.href}
             href={link.href}
             aria-current={isActive ? "page" : undefined}
-            className={`${styles.link} ${isActive ? styles.linkActive : ""}`}
+            className={[styles.link, link.featured ? styles.linkFeatured : "", isActive ? styles.linkActive : ""]
+              .filter(Boolean)
+              .join(" ")}
             onClick={onNavigate}
           >
             {t(link.labelKey)}

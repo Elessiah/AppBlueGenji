@@ -10,7 +10,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  height: 42px;
+  min-height: 44px;
   padding: 0 14px;
   background: rgba(90, 200, 255, 0.1);
   border: 1px solid rgba(90, 200, 255, 0.42);
@@ -108,7 +108,10 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-mute);
-  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 4px 14px;
   border-radius: var(--r-cy-sm, 8px);
   transition: color 0.16s ease, background 0.16s ease;
 }
@@ -118,9 +121,54 @@
   background: rgba(90, 200, 255, 0.08);
 }
 
+/* Page courante : teinte, et un trait intérieur à gauche pour qu'elle se voie
+   autrement que par la couleur (WCAG 1.4.1) — `aria-current` la dit aux
+   lecteurs d'écran. */
 .linkActive {
   color: var(--blue-300);
   background: rgba(90, 200, 255, 0.06);
+  box-shadow: inset 3px 0 0 var(--blue-500, #5ac8ff);
+}
+
+/* Entrée mise en avant (annonces GETI) : encadrée et teintée glacier, en tête
+   de liste — elle se distingue par sa bordure et sa graisse, pas par la seule
+   couleur. */
+.linkFeatured {
+  margin-bottom: 8px;
+  color: var(--blue-300);
+  font-weight: 600;
+  background: rgba(90, 200, 255, 0.1);
+  border: 1px solid rgba(90, 200, 255, 0.42);
+  box-shadow: 0 0 14px rgba(90, 200, 255, calc(0.14 * var(--glow, 1)));
+}
+
+.linkFeatured:hover {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.18);
+  border-color: var(--blue-500, rgba(90, 200, 255, 0.9));
+}
+
+/* Entrée mise en avant ET page courante (`/geti-info…`) : bordure pleine,
+   fond plus soutenu et trait intérieur à gauche — la page courante se voit
+   autrement que par la couleur, avec le même trait que les autres entrées. */
+.linkFeatured.linkActive {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.2);
+  border-color: var(--blue-500, rgba(90, 200, 255, 0.9));
+  box-shadow:
+    inset 3px 0 0 var(--blue-500, #5ac8ff),
+    0 0 14px rgba(90, 200, 255, calc(0.2 * var(--glow, 1)));
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+/* Entrée en tête, bordée et lumineuse : l'anneau de focus s'écarte plus pour
+   ne pas se fondre dans la bordure, la lueur et le trait de la page courante. */
+.linkFeatured:focus-visible {
+  outline-offset: 4px;
 }
 
 /* Respecte la préférence système « animations réduites ». */

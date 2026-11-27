@@ -747,3 +747,32 @@ l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lec
 - Liste indisponible : filtres masqués, « Annonces non chargées » / « Posts not loaded » en ligne (jamais un « aucune annonce », qui se lirait comme une recherche vide), la panne en notification (`showError`, redite si « Réessayer » revient encore sans liste) et bouton « Réessayer » (`GetiRetry`, `router.refresh()`) ; pm2 reçoit `[geti] post list unavailable: <code>` (code, à défaut nom de la classe d'erreur ; une ligne par minute au plus, avec le nombre d'échecs tus — `logGetiListFailure`). Une écriture qui échoue en cours de route oublie aussi la lecture partagée.
 - La date exacte de publication / modification est un texte du pied de carte (plus d'infobulle) ; le repli de copie rend le focus au bouton.
 - Onglets anglais au pluriel (Players, Teams, Subs, Staff, Scrims, Casters).
+
+## Navigation (lot 4)
+
+La page est une **fonction principale** du site : on y arrive de deux endroits, sur
+chaque page vitrine et dès l'accueil.
+
+- **Menu burger** (`PublicNavMenu`, `PUBLIC_NAVIGATION.md`) : « Annonces GETI » /
+  « GETI posts » ouvre la liste, mise en avant, vers l'adresse canonique `/geti-info/lfp`
+  (`GETI_DEFAULT_LIST_PATH`), page courante sur toute la rubrique ; les entrées de la
+  partie compétitive (Tournois, Équipes, Classement, Joueurs) en sont sorties. La
+  barre des connectés (`SiteNav`) ne change pas.
+- **Accueil** (`components/cyber/landing/GetiSpotlight.tsx`, juste après le bandeau
+  défilant) : une carte avec une accroche courte (les types d'annonces ; ce que la page
+  réunit et la marche à suivre — filtrer, puis contacter l'auteur sur Discord —
+  derrière un `<InfoHint>`), le bouton « Voir les
+  annonces GETI » et un raccourci par catégorie (« Parcourir : Équipes qui recrutent,
+  Joueurs sans équipe, Remplaçants recherchés, Staff, Scrims, Casts » →
+  `/geti-info/<catégorie>`). Le bouton vise l'adresse canonique `/geti-info/lfp`
+  (celle que déclare `/geti-info`), comme l'entrée du menu : une seule adresse par liste. Les raccourcis
+  nomment **ce que la liste contient**, pas l'intention de l'auteur comme les
+  onglets de la page (« Je cherche un joueur » = annonces d'équipes qui recrutent) :
+  un capitaine qui cherche un joueur n'y est pas envoyé vers d'autres équipes. Composant
+  serveur **sans lecture de données** : il ne dépend ni de la base ni de Discord.
+  Textes dans l'espace `geti` de `messages/<langue>/landing.json` (serveur seulement,
+  hors `LANDING_CLIENT_NAMESPACES`). Liens par `LocaleLink` ; la liste des raccourcis
+  est nommée par son libellé (`aria-labelledby`). Sous 900 px la carte passe en
+  colonne ; à 375 px les raccourcis passent à la ligne, sans défilement horizontal.
+- Tests : `tests/app/navigation-a11y.test.tsx`, `tests/app/geti-spotlight.test.tsx`,
+  `e2e/landing.spec.ts`.

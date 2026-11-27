@@ -5,6 +5,7 @@
   "nav": {
     "mainLabel": "Main navigation",
     "links": {
+      "geti": "GETI posts",
       "players": "Players",
       "teams": "Teams",
       "tournaments": "Tournaments",

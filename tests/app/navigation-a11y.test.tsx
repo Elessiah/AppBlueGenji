@@ -17,6 +17,11 @@ import {
   PublicNavPanel,
   handleMenuEscape,
 } from "@/components/cyber/landing/PublicNavMenu";
+import { AppLocaleProvider } from "@/components/i18n/locale-context";
+import { ShellTextProvider } from "@/components/i18n/shell-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { GETI_DEFAULT_CATEGORY, GETI_PAGE_PATH, getiCategoryPath } from "@/lib/shared/geti/page";
+import { GETI_DEFAULT_LIST_PATH } from "@/lib/shared/geti/path";
 import { readSource } from "../helpers/read-source";
 
 const siteNav = (activeTeam: { teamId: number; teamName: string } | null = null) =>
@@ -244,16 +249,98 @@ describe("PublicNavPanel — page courante", () => {
     expect(currentLinks(panel("/"))).toEqual([]);
   });
 
-  it("mène aux listes des tournois et des équipes, pas à des sections de l'accueil", () => {
+  it("ouvre sur les annonces GETI, puis les pages hors compétition", () => {
+    expect(PUBLIC_NAV_LINKS.map((l) => l.href)).toEqual([
+      "/geti-info/lfp",
+      "/bot",
+      "/association",
+      "/recrutement",
+      "/benevoles",
+    ]);
+  });
+
+  it("publicNavLinks_getiEntry_pointsToCanonicalList : l'entrée GETI mène à l'adresse canonique, courante sur toute la rubrique", () => {
+    expect(PUBLIC_NAV_LINKS[0].href).toBe(GETI_DEFAULT_LIST_PATH);
+    expect(PUBLIC_NAV_LINKS[0].section).toBe(GETI_PAGE_PATH);
+  });
+
+  it("getiDefaultListPath_comparedToPage_equalsCanonicalCategoryPath : l'adresse écrite en clair suit la page", () => {
+    expect(GETI_DEFAULT_LIST_PATH).toBe(getiCategoryPath(GETI_DEFAULT_CATEGORY));
+  });
+
+  it("publicNavPanel_onNonSectionedPage_usesHref : une entrée sans rubrique est courante sur sa propre adresse", () => {
+    expect(currentLinks(panel("/bot"))).toEqual(["Bot"]);
+  });
+
+  it("publicNavCss_linkActive_hasNonColourMarker : toute page courante se voit autrement que par la couleur", () => {
+    const css = readSource("components/cyber/landing/PublicNavMenu.module.css");
+    const rule = /^\.linkActive\s*\{([^}]*)\}/m.exec(css);
+    expect(rule?.[1]).toMatch(/box-shadow:\s*inset 3px 0 0 var\(--blue-500/);
+  });
+
+  it("tire l'adresse d'un module sans dépendance, pas de la page (poids de l'en-tête)", () => {
+    const menu = readSource("components/cyber/landing/PublicNavMenu.tsx");
+    const path = readSource("lib/shared/geti/path.ts");
+    expect(menu).toContain('from "@/lib/shared/geti/path"');
+    expect(menu).not.toContain('lib/shared/geti/page"');
+    expect(path).not.toMatch(/^\s*import\s/m);
+  });
+
+  it("ne mène plus à la partie compétitive ni à une section de l'accueil", () => {
     const html = panel("/");
-    expect(html).toContain('href="/tournois"');
-    expect(html).toContain('href="/equipes"');
+    for (const href of ["/tournois", "/equipes", "/joueurs", "/classement", "/regles", "/signalements"]) {
+      expect(html).not.toContain(`href="${href}`);
+    }
     expect(html).not.toMatch(/href="\/#/);
   });
 
-  it("signale les listes des tournois et des équipes comme page courante", () => {
-    expect(currentLinks(panel("/tournois/42"))).toEqual(["Tournois"]);
-    expect(currentLinks(panel("/equipes"))).toEqual(["Équipes"]);
+  it("met en avant la seule entrée des annonces GETI, en tête", () => {
+    const links = [...panel("/").matchAll(/<a [^>]*class="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map((m) => ({
+      featured: m[1].includes("linkFeatured"),
+      label: m[2],
+    }));
+    expect(links[0]).toEqual({ featured: true, label: "Annonces GETI" });
+    expect(links.slice(1).map((l) => l.featured)).toEqual([false, false, false, false]);
+  });
+
+  it("signale les annonces GETI comme page courante, catégories comprises", () => {
+    expect(currentLinks(panel("/geti-info"))).toEqual(["Annonces GETI"]);
+    expect(currentLinks(panel("/geti-info/lfs"))).toEqual(["Annonces GETI"]);
+  });
+
+  it("publicNavPanel_onGetiCategory_featuredLinkActive : l'entrée GETI cumule mise en avant et page courante", () => {
+    const html = panel("/geti-info/lfs");
+    expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*class="[^"]*linkFeatured[^"]*linkActive[^"]*"[^>]*>Annonces GETI<\/a>/);
+  });
+
+  it("publicNavCss_featuredActive_hasNonColorMarker : la page courante mise en avant se voit autrement que par la couleur", () => {
+    const css = readSource("components/cyber/landing/PublicNavMenu.module.css");
+    const rule = /\.linkFeatured\.linkActive\s*\{([^}]*)\}/.exec(css);
+    expect(rule).not.toBeNull();
+    expect(rule?.[1]).toMatch(/box-shadow:\s*inset 3px 0 0 var\(--blue-500/);
+    expect(rule?.[1]).toMatch(/border-color: var\(--blue-500/);
+    expect(css.indexOf(".linkFeatured.linkActive {")).toBeGreaterThan(css.indexOf(".linkFeatured:hover {"));
+  });
+
+  it("ne signale aucune entrée sur une page de la partie compétitive", () => {
+    expect(currentLinks(panel("/tournois/42"))).toEqual([]);
+    expect(currentLinks(panel("/equipes"))).toEqual([]);
+  });
+
+  it("libelle l'entrée « GETI posts » en anglais, vers /en/geti-info/lfp", () => {
+    const html = renderToStaticMarkup(
+      <AppLocaleProvider locale="en">
+        <ShellTextProvider locale="en" messages={messagesFor("en").shell}>
+          <PublicNavPanel id="menu" pathname="/geti-info" onNavigate={() => undefined} />
+        </ShellTextProvider>
+      </AppLocaleProvider>,
+    );
+    expect(html).toMatch(/<a [^>]*href="\/en\/geti-info\/lfp"[^>]*>GETI posts<\/a>/);
+    expect(html).not.toContain("Annonces GETI");
+  });
+
+  it("laisse la barre des connectés telle quelle : joueurs, équipes, tournois, classement", () => {
+    expect(SITE_NAV_LINKS.map((l) => l.href)).toEqual(["/joueurs", "/equipes", "/tournois", "/classement"]);
   });
 
   it("porte l'identifiant que le bouton désigne", () => {
@@ -314,5 +401,23 @@ describe("PublicHeader — menu du compte", () => {
     const source = readSource("components/cyber/landing/PublicHeader.tsx");
     expect(source).toContain("<AccountMenu pseudo={user.pseudo}");
     expect(source).not.toContain('aria-label="Mon profil"');
+  });
+});
+
+describe("menu burger — cibles tactiles et focus", () => {
+  const css = readSource("components/cyber/landing/PublicNavMenu.module.css");
+  const rule = (selector: string) => css.slice(css.indexOf(`${selector} {`)).split("}")[0];
+
+  it("garde au bouton burger une hauteur d'au moins 44 px", () => {
+    expect(rule(".burger")).toContain("min-height: 44px;");
+  });
+
+  it("garde à chaque lien du panneau une hauteur d'au moins 44 px", () => {
+    expect(rule(".link")).toContain("min-height: 44px;");
+    expect(rule(".link")).toContain("display: flex;");
+  });
+
+  it("écarte l'anneau de focus de l'entrée mise en avant de sa bordure", () => {
+    expect(css).toMatch(/\.linkFeatured:focus-visible \{\s*outline-offset: 4px;/);
   });
 });

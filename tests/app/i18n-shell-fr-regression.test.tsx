@@ -54,7 +54,7 @@ const CLIENT_FIXTURES: ReadonlyArray<[string, () => ReactElement]> = [
       <AccountMenuPanel id="c" activeTeam={{ teamId: 7, teamName: "Les Ours" }} leaving={false} onNavigate={noop} onLogout={noop} />
     ),
   ],
-  ["PublicNavPanel", () => <PublicNavPanel id="n" pathname="/equipes" onNavigate={noop} />],
+  ["PublicNavPanel", () => <PublicNavPanel id="n" pathname="/geti-info/lfs" onNavigate={noop} />],
   [
     "SiteNav",
     () => (

@@ -5,6 +5,7 @@
   "nav": {
     "mainLabel": "Navigation principale",
     "links": {
+      "geti": "Annonces GETI",
       "players": "Joueurs",
       "teams": "Équipes",
       "tournaments": "Tournois",

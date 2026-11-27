@@ -7,6 +7,7 @@
  */
 import { getiStoredRankRange, getiStoredTimeSlot, getiTimeSlotMatches } from "@/lib/shared/geti/filter";
 import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
+import { GETI_PAGE_PATH } from "@/lib/shared/geti/path";
 import type { Metadata } from "next";
 import { INTL_LOCALE, SITE_TIME_ZONE, type Locale } from "@/lib/shared/locales";
 
@@ -41,8 +42,8 @@ import {
   type GetiSubRole,
 } from "@/lib/shared/geti/types";
 
-/** Adresse de la page, sans préfixe de langue. */
-export const GETI_PAGE_PATH = "/geti-info";
+/** Adresse de la page, sans préfixe de langue (définie dans `path.ts`, sans dépendance). */
+export { GETI_PAGE_PATH };
 
 /** Catégorie rendue par `/geti-info` tout court. */
 export const GETI_DEFAULT_CATEGORY: GetiCategory = "lfp";
