@@ -226,9 +226,15 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* Changement de filtre en attente de son rendu : l'ancienne liste ne passe pas pour la réponse. */
+/*
+ * Changement de filtre en attente de son rendu : l'ancienne liste ne passe pas
+ * pour la réponse. Un liseré à la couleur d'accent, jamais une opacité (le
+ * texte garderait moins de 4,5:1) ; la note « Mise à jour… » le dit en mots.
+ */
 .layout[data-pending="true"] .results {
-  opacity: 0.6;
+  outline: 1px dashed var(--blue-300);
+  outline-offset: 6px;
+  border-radius: 4px;
 }
 
 .pendingNote {

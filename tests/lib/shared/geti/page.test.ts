@@ -28,7 +28,7 @@ import { getiRange, getiRank, parsedGetiPost } from "@/tests/helpers/geti";
 
 const D3 = getiRank("DIAMOND", 3);
 const M2 = getiRank("MASTER", 2);
-const LABELS = { member: "@membre", role: "@rôle", channel: "#salon" };
+const LABELS = { member: "@membre", role: "@rôle", channel: "#salon", spoiler: "[masqué]" };
 
 describe("adresses des catégories", () => {
   it("chaque catégorie a son adresse sous /geti-info", () => {
@@ -469,15 +469,15 @@ describe("getiPostBodyText", () => {
   });
 
   it("le balisage Discord est retiré, le texte reste", () => {
-    expect(getiPostBodyText("**LFS** __ce soir__ ~~annulé~~ ||secret|| `code`", LABELS)).toBe("LFS ce soir annulé secret code");
+    expect(getiPostBodyText("**LFS** __ce soir__ ~~annulé~~ ||secret|| `code`", LABELS)).toBe("LFS ce soir annulé [masqué] code");
   });
 
   it("un titre et un sous-texte Discord perdent leur marque", () => {
     expect(getiPostBodyText("# Recrutement\n-# petit texte", LABELS)).toBe("Recrutement\npetit texte");
   });
 
-  it("un horodatage Discord est retiré", () => {
-    expect(getiPostBodyText("scrim <t:1764270000:R> ok", LABELS)).toBe("scrim  ok");
+  it("un horodatage Discord devient une date lisible", () => {
+    expect(getiPostBodyText("scrim <t:1764270000:d> ok", LABELS)).toBe("scrim 27/11/2025 ok");
   });
 
   it("les lignes vides en rafale sont réduites à une", () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { matchesGetiFilter } from "@/lib/shared/geti";
+import { GETI_ROBOTS } from "@/lib/shared/geti/page";
 import { MIGRATED_ROUTES } from "@/lib/shared/i18n-routes";
 import { isMigratedRoute } from "@/lib/shared/locales";
 import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
@@ -93,22 +94,18 @@ describe("matchesGetiFilter — créneau horaire", () => {
 });
 
 describe("page des annonces — référencement", () => {
-  it("le sitemap liste une adresse par catégorie", () => {
-    const paths = publicSitemapRoutes().map((route) => route.path);
-
-    expect(paths.filter((path) => path.startsWith("/geti-info"))).toEqual([
-      "/geti-info/lfp", "/geti-info/lft", "/geti-info/lfsub", "/geti-info/lfstaff", "/geti-info/lfs", "/geti-info/lfcast",
-    ]);
+  it("publicSitemapRoutes_any_listsNoGetiPage", () => {
+    expect(publicSitemapRoutes().map((route) => route.path).filter((path) => path.startsWith("/geti-info"))).toEqual([]);
   });
 
-  it("le sitemap ne liste pas /geti-info tout court, qui désigne la première catégorie comme canonique", () => {
-    expect(publicSitemapRoutes().map((route) => route.path)).not.toContain("/geti-info");
-  });
-
-  it("chaque catégorie a son entrée anglaise", () => {
+  it("localizedSitemapEntries_any_listsNoEnglishGetiPage", () => {
     const paths = localizedSitemapEntries(publicSitemapRoutes()).map((entry) => entry.path);
 
-    expect(paths).toContain("/en/geti-info/lfs");
+    expect(paths.filter((path) => path.includes("/geti-info"))).toEqual([]);
+  });
+
+  it("GETI_ROBOTS_always_noindexButFollow", () => {
+    expect(GETI_ROBOTS).toEqual({ index: false, follow: true, googleBot: { index: false, follow: true } });
   });
 
   it("la page et ses catégories sont des routes traduites", () => {

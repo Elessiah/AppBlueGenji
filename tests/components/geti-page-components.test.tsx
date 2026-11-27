@@ -189,7 +189,34 @@ describe("GetiLayout, GetiRetry et finitions UI (cycle ui 1)", () => {
   });
 
   it("le bouton Réessayer porte son libellé", () => {
-    expect(renderToStaticMarkup(<GetiRetry label="Réessayer" />)).toContain("Réessayer");
+    expect(renderToStaticMarkup(<GetiRetry label="Réessayer" error="Indisponible" />)).toContain("Réessayer");
+  });
+
+  it("GetiRetry_mount_announcesTheFailureAsAToastNotInline", () => {
+    const source = readSource("components/geti/GetiRetry.tsx");
+    const markup = renderToStaticMarkup(<GetiRetry label="Réessayer" error="Indisponible" />);
+
+    expect(source).toMatch(/useEffect\(\(\) => \{\s*showError\(error\);/);
+    expect(markup).not.toContain("Indisponible");
+  });
+
+  it("GetiInfoView_listUnavailable_logsACodeOnlyAndShowsANeutralLine", () => {
+    const source = readSource("components/geti/GetiInfoView.tsx");
+
+    expect(source).toContain('console.warn("[geti] post list unavailable:", getiErrorCode(error))');
+    expect(source).toContain("{m.results.none}");
+    expect(source).toContain("error={m.results.unavailable}");
+  });
+
+  it("les messages du repli neutre et du texte masqué existent en français et en anglais", () => {
+    expect([frMessages.results.none, enMessages.results.none]).toEqual(["Aucune annonce à afficher.", "No posts to show."]);
+    expect([frMessages.post.spoiler, enMessages.post.spoiler]).toEqual(["[masqué]", "[hidden]"]);
+  });
+
+  it("l'attente d'un filtre ne passe pas par une opacité (contraste 4,5:1)", () => {
+    const css = readSource("components/geti/geti.module.css");
+
+    expect(css).not.toMatch(/data-pending="true"\] \.results \{[^}]*opacity/);
   });
 
   it("le panneau rend le bouton « Voir les annonces » avec le total, et une zone de statut", () => {

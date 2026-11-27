@@ -735,6 +735,68 @@ describe("listGetiPostsShared", () => {
     expect(page.page).toBe(5);
   });
 
+  /** Écriture sur un double à part : la lecture partagée garde son propre compteur. */
+  function writer(affectedRows: number) {
+    return executor(executeMock([], affectedRows));
+  }
+
+  it("listGetiPostsShared_afterDelete_readsAgain", async () => {
+    const execute = shared([row()]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    await deleteGetiPosts(writer(1), [GETI_FAKE_MESSAGE_ID]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_deleteRemovesNothing_keepsTheSharedRead", async () => {
+    const execute = shared([row()]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    await deleteGetiPosts(writer(0), [GETI_FAKE_MESSAGE_ID]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPostsShared_afterUpsert_readsAgain", async () => {
+    const execute = shared([row()]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    await upsertGetiPosts(writer(1), [getiPushedPost({ postedAt: "2026-11-27T10:00:00.000Z" })], NOW);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_afterPurge_readsAgain", async () => {
+    const execute = shared([row()]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    await purgeExpiredGetiPosts(writer(1), NOW);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_afterReanalysis_readsAgain", async () => {
+    const execute = shared([row()]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support adv" }).raw);
+    let selects = 0;
+    const refresh = jest.fn<SqlQuery>(async (sql: string) => {
+      if (!sql.trimStart().startsWith("SELECT")) return [{ affectedRows: 1 }];
+      selects += 1;
+      return [selects === 1 ? [{ message_id: GETI_FAKE_MESSAGE_ID, raw_json: raw, parsed_json: "{}" }] : []];
+    });
+
+    await refreshStaleGetiPosts(executor(refresh));
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
   it("listGetiPostsShared_readFails_isNotCached", async () => {
     const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(new Error("down")).mockResolvedValue([[row()]]);
     jest.mocked(getDatabase).mockResolvedValue(executor(execute));

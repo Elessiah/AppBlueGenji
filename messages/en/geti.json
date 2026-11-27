@@ -127,6 +127,7 @@
     "beyondLink": "Go to page {page}",
     "emptyReset": "Reset the filters",
     "unavailable": "Posts are temporarily unavailable.",
+    "none": "No posts to show.",
     "retry": "Try again",
     "pagination": "Post pages",
     "previous": "Newer posts",
@@ -154,7 +155,8 @@
     "matchPrefix": "Matches your search:",
     "mentionMember": "@member",
     "mentionRole": "@role",
-    "mentionChannel": "#channel"
+    "mentionChannel": "#channel",
+    "spoiler": "[hidden]"
   },
   "chips": {
     "rankRange": "{min} – {max}",
