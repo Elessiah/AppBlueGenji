@@ -17,6 +17,10 @@ import {
   PublicNavPanel,
   handleMenuEscape,
 } from "@/components/cyber/landing/PublicNavMenu";
+import { AppLocaleProvider } from "@/components/i18n/locale-context";
+import { ShellTextProvider } from "@/components/i18n/shell-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { GETI_PAGE_PATH } from "@/lib/shared/geti/page";
 import { readSource } from "../helpers/read-source";
 
 const siteNav = (activeTeam: { teamId: number; teamName: string } | null = null) =>
@@ -244,16 +248,61 @@ describe("PublicNavPanel — page courante", () => {
     expect(currentLinks(panel("/"))).toEqual([]);
   });
 
-  it("mène aux listes des tournois et des équipes, pas à des sections de l'accueil", () => {
+  it("ouvre sur les annonces GETI, puis les pages hors compétition", () => {
+    expect(PUBLIC_NAV_LINKS.map((l) => l.href)).toEqual([
+      "/geti-info",
+      "/recrutement",
+      "/bot",
+      "/association",
+      "/benevoles",
+    ]);
+  });
+
+  it("écrit l'adresse des annonces GETI comme la page la déclare", () => {
+    expect(PUBLIC_NAV_LINKS[0].href).toBe(GETI_PAGE_PATH);
+  });
+
+  it("ne mène plus à la partie compétitive ni à une section de l'accueil", () => {
     const html = panel("/");
-    expect(html).toContain('href="/tournois"');
-    expect(html).toContain('href="/equipes"');
+    for (const href of ["/tournois", "/equipes", "/joueurs", "/classement", "/regles", "/signalements"]) {
+      expect(html).not.toContain(`href="${href}`);
+    }
     expect(html).not.toMatch(/href="\/#/);
   });
 
-  it("signale les listes des tournois et des équipes comme page courante", () => {
-    expect(currentLinks(panel("/tournois/42"))).toEqual(["Tournois"]);
-    expect(currentLinks(panel("/equipes"))).toEqual(["Équipes"]);
+  it("met en avant la seule entrée des annonces GETI, en tête", () => {
+    const links = [...panel("/").matchAll(/<a [^>]*class="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map((m) => ({
+      featured: m[1].includes("linkFeatured"),
+      label: m[2],
+    }));
+    expect(links[0]).toEqual({ featured: true, label: "Annonces GETI" });
+    expect(links.slice(1).map((l) => l.featured)).toEqual([false, false, false, false]);
+  });
+
+  it("signale les annonces GETI comme page courante, catégories comprises", () => {
+    expect(currentLinks(panel("/geti-info"))).toEqual(["Annonces GETI"]);
+    expect(currentLinks(panel("/geti-info/lfs"))).toEqual(["Annonces GETI"]);
+  });
+
+  it("ne signale aucune entrée sur une page de la partie compétitive", () => {
+    expect(currentLinks(panel("/tournois/42"))).toEqual([]);
+    expect(currentLinks(panel("/equipes"))).toEqual([]);
+  });
+
+  it("libelle l'entrée « GETI posts » en anglais, vers /en/geti-info", () => {
+    const html = renderToStaticMarkup(
+      <AppLocaleProvider locale="en">
+        <ShellTextProvider locale="en" messages={messagesFor("en").shell}>
+          <PublicNavPanel id="menu" pathname="/geti-info" onNavigate={() => undefined} />
+        </ShellTextProvider>
+      </AppLocaleProvider>,
+    );
+    expect(html).toMatch(/<a [^>]*href="\/en\/geti-info"[^>]*>GETI posts<\/a>/);
+    expect(html).not.toContain("Annonces GETI");
+  });
+
+  it("laisse la barre des connectés telle quelle : joueurs, équipes, tournois, classement", () => {
+    expect(SITE_NAV_LINKS.map((l) => l.href)).toEqual(["/joueurs", "/equipes", "/tournois", "/classement"]);
   });
 
   it("porte l'identifiant que le bouton désigne", () => {

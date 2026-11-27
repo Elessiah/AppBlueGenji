@@ -114,6 +114,22 @@
     "defaultRegistration": "REGISTRATION OPEN · More brackets coming soon",
     "defaultCommunity": "COMMUNITY · Join the BlueGenji Discord"
   },
+  "geti": {
+    "eyebrow": "OVERWATCH · GETI POSTS",
+    "titleLead": "A player, a team, a scrim?",
+    "titleAccent": "GETI posts are here.",
+    "lede": "Every Overwatch recruitment post from the GETI network, gathered and filterable by role, rank and availability. Spot the one that fits and contact its author on Discord.",
+    "cta": "Browse GETI posts",
+    "categoriesLabel": "I'm looking for",
+    "categories": {
+      "lfp": "A player",
+      "lft": "A team",
+      "lfsub": "A sub",
+      "lfstaff": "Staff",
+      "lfs": "A scrim",
+      "lfcast": "A cast"
+    }
+  },
   "board": {
     "title": "Current and upcoming tournaments",
     "openCount": "{count, plural, one {# OPEN TOURNAMENT} other {# OPEN TOURNAMENTS}}",

@@ -12,6 +12,17 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
   l'ancienne colonne COMMUNAUTÉ et « Serveur Discord » de CONTACT vers la même invitation) allongeaient
   les listes sans rien ouvrir de plus : il n'en reste qu'un. Le menu burger le
   vérifie par test ; le pied de page aussi.
+- **Les annonces GETI en tête du menu burger, mises en avant.** `/geti-info` est une
+  fonction principale du site : son entrée (« Annonces GETI » / « GETI posts »,
+  `featured`) ouvre la liste, encadrée et teintée glacier (`.linkFeatured` — bordure
+  et graisse, pas la seule couleur), et reste page courante sur chaque catégorie
+  (`/geti-info/lfs`).
+- **Rien dans le menu burger ne mène à la partie compétitive.** « Tournois »,
+  « Équipes », « Classement » et « Joueurs » en sont sortis (GETI-NAV) : on entre
+  dans la compétition par l'accueil (tableau des tournois, classement, calendrier),
+  par le bouton « Accéder à la partie compétitive » de l'en-tête une fois connecté —
+  qui ouvre la barre des connectés, inchangée — et par la colonne COMPÉTITIONS du
+  pied de page. Un test interdit leur retour.
 - **Pas de « Règles des tournois » dans les menus.** L'association ne joue pas tous
   les modes que le moteur sait faire tourner : l'index `/regles` exposait des modes
   qu'aucun de ses tournois n'utilise. Les pages restent en ligne et indexées (sitemap),
@@ -23,7 +34,12 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
 
 | Menu burger | Pied de page |
 |---|---|
-| Tournois · Équipes · Classement · Joueurs · Recrutement · Bot · L'asso · Bénévoles | COMPÉTITIONS : Tournois, Classement (`/classement`), Bot · ASSOCIATION : Manifeste, Bénévoles, Partenaires · CONTACT (courriel, tag et serveur Discord, `FooterContact`) · LÉGAL (voir `LEGAL_PAGE.md`) |
+| **Annonces GETI** (`/geti-info`, mise en avant) · Recrutement · Bot · L'asso · Bénévoles | COMPÉTITIONS : Tournois, Classement (`/classement`), Bot · ASSOCIATION : Manifeste, Bénévoles, Partenaires · CONTACT (courriel, tag et serveur Discord, `FooterContact`) · LÉGAL (voir `LEGAL_PAGE.md`) |
+
+L'adresse `/geti-info` est écrite en clair dans `PUBLIC_NAV_LINKS` (un test la tient
+égale à `GETI_PAGE_PATH`) : importer `lib/shared/geti/page.ts` dans ce composant client
+chargerait les filtres des annonces dans l'en-tête de chaque page. L'accueil annonce
+aussi la page (`GetiSpotlight`, voir `GETI_INFO.md` § Navigation).
 
 ## Barre des connectés
 
@@ -49,7 +65,9 @@ Accessibilité du menu (Échap, sortie au clavier, `aria-current`) →
 
 ## Tests
 
-- `tests/app/navigation-a11y.test.tsx` — adresses uniques du menu, absence de `/regles` ;
+- `tests/app/navigation-a11y.test.tsx` — contenu exact du menu (annonces GETI en
+  tête et seules mises en avant, aucune adresse de la partie compétitive, libellé
+  anglais), adresses uniques, absence de `/regles` ;
   barre des connectés : lien « Classement » et son `aria-current`, teintes
   froides toutes distinctes.
 - `tests/app/legal-forms-consistency.test.ts` — pied de page : adresses uniques,

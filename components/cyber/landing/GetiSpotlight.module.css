@@ -1,0 +1,130 @@
+/* Encart « Annonces GETI » de l'accueil (docs/features/GETI_INFO.md § Navigation). */
+.root {
+  position: relative;
+  z-index: 1;
+  width: min(1240px, calc(100vw - max(40px, var(--a11y-tab-gutter))));
+  margin: 0 auto;
+  padding: 34px 0 12px;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(90, 200, 255, 0.32);
+  padding: 40px 48px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(90, 200, 255, 0.1), transparent 60%),
+    var(--cyber-bg-1, #0c0f14);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 40px;
+}
+
+.copy {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 640px;
+}
+
+.title {
+  margin: 16px 0 0;
+  font-size: clamp(28px, 3.4vw, 40px);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.accent {
+  color: var(--blue-500);
+}
+
+.lede {
+  margin: 18px 0 0;
+  max-width: 560px;
+  color: var(--ink-mute);
+  line-height: 1.75;
+}
+
+.side {
+  flex: 0 1 380px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.categoriesLabel {
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+}
+
+.categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.category {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.08);
+  border: 1px solid rgba(90, 200, 255, 0.32);
+  border-radius: 999px;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.category:hover {
+  background: rgba(90, 200, 255, 0.18);
+  border-color: var(--blue-500);
+}
+
+.category:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 26px;
+  }
+
+  .side {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .root {
+    width: min(1240px, calc(100vw - 24px));
+  }
+
+  .card {
+    padding: 24px 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .category {
+    transition: none;
+  }
+}

@@ -307,8 +307,8 @@ complète sans JavaScript.
 ## Liens
 
 - Leaderboard de l'accueil : « Voir le classement complet » → `/classement`.
-- Menu burger de la vitrine (`PUBLIC_NAV_LINKS`) : « Classement », après
-  « Équipes ».
+- Menu burger de la vitrine : plus d'entrée « Classement » depuis GETI-NAV (rien
+  n'y mène à la partie compétitive, `PUBLIC_NAVIGATION.md`).
 - Barre de navigation des connectés (`SITE_NAV_LINKS`,
   `components/site-nav.tsx`) : « Classement », après « Tournois », teinte
   rose (`--pink-400-rgb`) — voir `PUBLIC_NAVIGATION.md`.

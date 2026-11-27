@@ -123,6 +123,29 @@
   background: rgba(90, 200, 255, 0.06);
 }
 
+/* Entrée mise en avant (annonces GETI) : encadrée et teintée glacier, en tête
+   de liste — elle se distingue par sa bordure et sa graisse, pas par la seule
+   couleur. */
+.linkFeatured {
+  margin-bottom: 6px;
+  color: var(--blue-300);
+  font-weight: 600;
+  background: rgba(90, 200, 255, 0.1);
+  border: 1px solid rgba(90, 200, 255, 0.42);
+  box-shadow: 0 0 14px rgba(90, 200, 255, calc(0.14 * var(--glow, 1)));
+}
+
+.linkFeatured:hover {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.18);
+  border-color: var(--blue-500, rgba(90, 200, 255, 0.9));
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
 /* Respecte la préférence système « animations réduites ». */
 @media (prefers-reduced-motion: reduce) {
   .bar,

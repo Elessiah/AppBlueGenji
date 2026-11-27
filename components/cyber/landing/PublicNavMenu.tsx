@@ -7,19 +7,22 @@ import { useShellText } from "@/components/i18n/shell-text";
 import type { ShellKey } from "@/lib/shared/shell-text";
 import styles from "./PublicNavMenu.module.css";
 
-type NavLink = { href: string; labelKey: ShellKey };
+type NavLink = { href: string; labelKey: ShellKey; featured?: boolean };
 
 /**
- * Une entrée par page, jamais deux vers la même adresse ; les règles des
- * tournois n'y figurent pas — elles se lisent depuis la page du tournoi
- * (`RulesHelpFab`), qui mène au mode réellement joué
+ * Une entrée par page, jamais deux vers la même adresse. Les annonces GETI
+ * ouvrent la liste, mises en avant (`featured`) : c'est une fonction principale
+ * du site. Rien n'y mène à la partie compétitive (tournois, équipes, joueurs,
+ * classement, règles) : on y entre par l'accueil, par le bouton de l'en-tête
+ * une fois connecté et par le pied de page
  * (docs/features/PUBLIC_NAVIGATION.md).
+ *
+ * L'adresse des annonces est écrite ici en clair (égale à `GETI_PAGE_PATH`,
+ * vérifié par test) : importer `lib/shared/geti/page.ts` chargerait les filtres
+ * des annonces dans l'en-tête de chaque page.
  */
 export const PUBLIC_NAV_LINKS: readonly NavLink[] = [
-  { href: "/tournois", labelKey: "nav.links.tournaments" },
-  { href: "/equipes", labelKey: "nav.links.teams" },
-  { href: "/classement", labelKey: "nav.links.ranking" },
-  { href: "/joueurs", labelKey: "nav.links.players" },
+  { href: "/geti-info", labelKey: "nav.links.geti", featured: true },
   { href: "/recrutement", labelKey: "nav.links.recruitment" },
   { href: "/bot", labelKey: "nav.links.bot" },
   { href: "/association", labelKey: "nav.links.association" },
@@ -84,7 +87,9 @@ export function PublicNavPanel({
             key={link.href}
             href={link.href}
             aria-current={isActive ? "page" : undefined}
-            className={`${styles.link} ${isActive ? styles.linkActive : ""}`}
+            className={[styles.link, link.featured ? styles.linkFeatured : "", isActive ? styles.linkActive : ""]
+              .filter(Boolean)
+              .join(" ")}
             onClick={onNavigate}
           >
             {t(link.labelKey)}

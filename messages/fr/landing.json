@@ -114,6 +114,22 @@
     "defaultRegistration": "INSCRIPTIONS · Prochains brackets à venir",
     "defaultCommunity": "COMMUNAUTÉ · Rejoindre le Discord BlueGenji"
   },
+  "geti": {
+    "eyebrow": "OVERWATCH · ANNONCES GETI",
+    "titleLead": "Un joueur, une équipe, un scrim ?",
+    "titleAccent": "Les annonces GETI sont ici.",
+    "lede": "Toutes les annonces de recrutement Overwatch du réseau GETI, réunies et filtrables par rôle, rang et disponibilités. Repère celle qui te correspond et contacte son auteur sur Discord.",
+    "cta": "Voir les annonces GETI",
+    "categoriesLabel": "Je cherche",
+    "categories": {
+      "lfp": "Un joueur",
+      "lft": "Une équipe",
+      "lfsub": "Un remplaçant",
+      "lfstaff": "Un staff",
+      "lfs": "Un scrim",
+      "lfcast": "Un cast"
+    }
+  },
   "board": {
     "title": "Tournois en cours et à venir",
     "openCount": "{count, plural, one {# TOURNOI OUVERT} other {# TOURNOIS OUVERTS}}",

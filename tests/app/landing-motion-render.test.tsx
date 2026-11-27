@@ -78,6 +78,6 @@ describe("animations de l'accueil — contenu visible sans JavaScript", () => {
   it("l'accueil enveloppe ses sections sous le hero, pas le hero (LCP)", () => {
     const page = readSource("app/page.tsx");
     expect(page).not.toMatch(/<Reveal>\s*<Hero/);
-    expect(page.match(/<Reveal>/g) ?? []).toHaveLength(5);
+    expect(page.match(/<Reveal>/g) ?? []).toHaveLength(6);
   });
 });

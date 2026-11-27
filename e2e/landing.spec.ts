@@ -52,4 +52,37 @@ test.describe("Header landing", () => {
     await burger.click();
     await expect(header.getByRole("navigation", { name: "Navigation principale" })).toBeVisible();
   });
+
+  test("le menu burger ouvre sur les annonces GETI, sans la partie compétitive", async ({ page }) => {
+    await page.goto("/");
+    const header = page.locator("header").first();
+    const burger = header.getByRole("button", { name: /Ouvrir le menu/ });
+    const nav = header.getByRole("navigation", { name: "Navigation principale" });
+    // Un clic avant l'hydratation est perdu : on réessaie jusqu'à l'ouverture.
+    await expect(async () => {
+      if (!(await nav.isVisible())) await burger.click();
+      await expect(nav).toBeVisible({ timeout: 1_000 });
+    }).toPass();
+
+    await expect(nav.getByRole("link").first()).toHaveText("Annonces GETI");
+    await expect(nav.getByRole("link", { name: "Annonces GETI" })).toHaveAttribute("href", "/geti-info");
+    for (const name of ["Tournois", "Équipes", "Classement", "Joueurs"]) {
+      await expect(nav.getByRole("link", { name, exact: true })).toHaveCount(0);
+    }
+  });
+
+  test("l'accueil annonce les annonces GETI et ses six catégories", async ({ page }) => {
+    await page.goto("/");
+    const spotlight = page.locator("section", { has: page.locator("#geti-spotlight-title") });
+    await expect(spotlight.getByRole("link", { name: "Voir les annonces GETI" })).toHaveAttribute("href", "/geti-info");
+    await expect(spotlight.getByRole("list", { name: "Je cherche" }).getByRole("link")).toHaveCount(6);
+    await expect(spotlight.getByRole("link", { name: "Un scrim" })).toHaveAttribute("href", "/geti-info/lfs");
+  });
+
+  test("l'accueil anglais annonce les annonces GETI en anglais", async ({ page }) => {
+    await page.goto("/en");
+    const spotlight = page.locator("section", { has: page.locator("#geti-spotlight-title") });
+    await expect(spotlight.getByRole("link", { name: "Browse GETI posts" })).toHaveAttribute("href", "/en/geti-info");
+    await expect(spotlight.getByRole("link", { name: "A scrim" })).toHaveAttribute("href", "/en/geti-info/lfs");
+  });
 });

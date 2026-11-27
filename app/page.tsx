@@ -5,6 +5,7 @@ import { landingClientMessages } from "@/lib/shared/landing-text";
 import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { SiteCopyEditorProvider } from "@/components/cyber/landing/EditableCopy";
 import { Hero } from "@/components/cyber/landing/Hero";
+import { GetiSpotlight } from "@/components/cyber/landing/GetiSpotlight";
 import { JoinCTA } from "@/components/cyber/landing/JoinCTA";
 import { LandingTicker } from "@/components/cyber/landing/LandingTicker";
 import { LeaderCal } from "@/components/cyber/landing/LeaderCal";
@@ -123,6 +124,10 @@ export default async function HomePage() {
         <SiteCopyEditorProvider entries={isAdmin ? copyBundle.editor : null}>
           <Hero stats={stats} live={live} nextUpcoming={featured} copy={copy} canEditCopy={isAdmin} spectator={!user} />
           <LandingTicker items={ticker.items} />
+          {/* Annonces GETI : fonction principale du site, annoncée dès le haut de l'accueil. */}
+          <Reveal>
+            <GetiSpotlight locale={locale} />
+          </Reveal>
           {/* Apparition au défilement, une fois : sans JavaScript, tout est visible. */}
           <Reveal>
             <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} locale={locale} spectator={!user} />

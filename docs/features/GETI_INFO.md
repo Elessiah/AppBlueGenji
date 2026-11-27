@@ -585,3 +585,24 @@ l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement
   `/rgpd#annonces-geti` et `PRIVACY_CHANGES` (texte, pseudo, serveur d'origine,
   dates, critères lus). L'appel à Discord pour la fréquentation part du serveur,
   sans rien du visiteur.
+
+## Navigation (lot 4)
+
+La page est une **fonction principale** du site : on y arrive de deux endroits, sur
+chaque page vitrine et dès l'accueil.
+
+- **Menu burger** (`PublicNavMenu`, `PUBLIC_NAVIGATION.md`) : « Annonces GETI » /
+  « GETI posts » ouvre la liste, mise en avant, vers `/geti-info` ; les entrées de la
+  partie compétitive (Tournois, Équipes, Classement, Joueurs) en sont sorties. La
+  barre des connectés (`SiteNav`) ne change pas.
+- **Accueil** (`components/cyber/landing/GetiSpotlight.tsx`, juste après le bandeau
+  défilant) : une carte avec une phrase d'appel, le bouton « Voir les annonces GETI »
+  (`/geti-info`) et un raccourci par catégorie (« Je cherche : un joueur, une équipe,
+  un remplaçant, un staff, un scrim, un cast » → `/geti-info/<catégorie>`). Composant
+  serveur **sans lecture de données** : il ne dépend ni de la base ni de Discord.
+  Textes dans l'espace `geti` de `messages/<langue>/landing.json` (serveur seulement,
+  hors `LANDING_CLIENT_NAMESPACES`). Liens par `LocaleLink` ; la liste des raccourcis
+  est nommée par son libellé (`aria-labelledby`). Sous 900 px la carte passe en
+  colonne ; à 375 px les raccourcis passent à la ligne, sans défilement horizontal.
+- Tests : `tests/app/navigation-a11y.test.tsx`, `tests/app/geti-spotlight.test.tsx`,
+  `e2e/landing.spec.ts`.
