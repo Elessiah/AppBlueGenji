@@ -5,6 +5,7 @@ import {
   matchesGetiFilter,
   parseGetiPost,
   type GetiCategory,
+  type GetiFilter,
   type GetiParsedPost,
 } from "@/lib/shared/geti";
 import {
@@ -587,6 +588,18 @@ describe("matchesGetiFilter — niveaux et annonces closes", () => {
 
   it("hideClosed écarte une annonce close", () => {
     expect(matchesGetiFilter(parsedGetiPost({ closed: true }), { hideClosed: true }, NOW)).toBe(false);
+  });
+
+  it("hideClosed enregistré en « \"true\" » écarte une annonce close", () => {
+    const stored = { hideClosed: "true" } as unknown as GetiFilter;
+
+    expect(matchesGetiFilter(parsedGetiPost({ closed: true }), stored, NOW)).toBe(false);
+  });
+
+  it("hideClosed enregistré en 1 ne filtre rien", () => {
+    const stored = { hideClosed: 1 } as unknown as GetiFilter;
+
+    expect(matchesGetiFilter(parsedGetiPost({ closed: true }), stored, NOW)).toBe(true);
   });
 
   it("hideClosed laisse passer une annonce ouverte", () => {

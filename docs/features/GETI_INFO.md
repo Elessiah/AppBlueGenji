@@ -367,7 +367,14 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
 - **Analyses déjà gardées** : une ligne analysée avant ce lot (sans clé
   `"closed"` dans `parsed_json`) est réanalysée à la lecture depuis son
   `raw_json` par `listGetiPosts` (seules ces lignes remontent leur message brut) ;
-  message brut illisible : `dates`, `levels` et `closed` vides.
+  message brut illisible : `dates`, `levels` et `closed` vides. Hors requête,
+  l’horloge de purge horaire (`refreshStaleGetiPosts`, 5 000 lignes au plus par
+  passage) réécrit ces lignes une fois (une ligne dont le message brut est
+  illisible garde son analyse, champs ajoutés vides ; une ligne sans texte ou
+  avis du bot est retirée) : la lecture ne les réanalyse plus (~0,3 ms chacune,
+  jusqu’à 3 000 par page sinon). L’écriture ne touche qu’une ligne encore
+  ancienne. `closed` naît dans ce lot : aucune ligne gardée ne porte d’analyse
+  plus ancienne avec la clé.
 - **Faux positifs écartés** (revue) : une tranche d'âge (« âge : 16-20 ») n'est
   pas un horaire ; « 2/3 joueurs », « 1/12 places » ne sont pas des dates, et
   « 31/12 » lu un 1er janvier l'est (année précédente) ; « recrutement /

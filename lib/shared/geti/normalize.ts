@@ -141,8 +141,11 @@ export function prepareGetiText(text: string): GetiPreparedText {
       .replace(MARKDOWN, " ")
       .replace(/[\u2018\u2019\u00B4]/gu, "'")
       .replace(/[^\S\n]+/gu, " ");
-  const plain = prepare(" $1 ").normalize("NFD").replace(DIACRITICS, "");
-  return { clean: prepare(" "), plain, lower: plain.toLowerCase() };
+  // Sans émoji de serveur (le cas courant) les deux formes sont les mêmes : un seul passage.
+  const hasEmoji = bounded.includes("<:") || bounded.includes("<a:");
+  const clean = prepare(" ");
+  const plain = (hasEmoji ? prepare(" $1 ") : clean).normalize("NFD").replace(DIACRITICS, "");
+  return { clean, plain, lower: plain.toLowerCase() };
 }
 
 /** Échappe un texte pour l'insérer tel quel dans une expression régulière. */

@@ -100,6 +100,15 @@ export function getiTrustedBots(): GetiParseOptions {
 }
 
 /**
+ * Sans texte, ou réponse de service du bot (« Ton annonce a été publié… ») : pas une annonce.
+ * Le relais (`parsePushedPost`) écarte déjà tout message de bot qui n'est pas un relais ; cette garde,
+ * côté enregistrement, couvre les autres appelants (graine, relecture des anciennes lignes).
+ */
+function isNotAnnouncement(parsed: GetiParsedPost, raw: GetiPushedPost["raw"]): boolean {
+  return parsed.text.trim() === "" || isGetiBotNotice(raw);
+}
+
+/**
  * Enregistre un lot d'annonces poussées, chacune analysée ici. Une annonce déjà
  * gardée est remplacée (modification), sauf si la version reçue est plus
  * ancienne que la version gardée.
@@ -118,8 +127,7 @@ export async function upsertGetiPosts(
       continue;
     }
     const parsed = parseGetiPost(post.raw, trusted);
-    // Sans texte, ou réponse de service du bot (« Ton annonce a été publié… ») : pas une annonce.
-    if (parsed.text.trim() === "" || isGetiBotNotice(post.raw)) {
+    if (isNotAnnouncement(parsed, post.raw)) {
       outcome.emptied += 1;
       emptied.push(post.messageId);
       continue;
@@ -217,7 +225,11 @@ export function startGetiPostsPurgeClock(): void {
     key: PURGE_CLOCK_KEY,
     firstDelayMs: FIRST_PURGE_DELAY_MS,
     tickMs: PURGE_TICK_MS,
-    run: async () => purgeExpiredGetiPosts(await getDatabase()),
+    run: async () => {
+      const db = await getDatabase();
+      await purgeExpiredGetiPosts(db);
+      return refreshStaleGetiPosts(db);
+    },
     failureMessage: "[geti] Purge des annonces impossible.",
   });
 }
@@ -269,6 +281,72 @@ function analysisOf(row: GetiPostRow): unknown {
     }
   }
   return JSON.parse(row.parsed_json);
+}
+
+/** Lignes réanalysées par lot, et lots par passage (borne : 5 000 lignes, la table en garde quelques centaines). */
+const REFRESH_CHUNK = 200;
+const REFRESH_CHUNKS_MAX = 25;
+
+/**
+ * Nouvelle analyse (JSON) d'une ligne ancienne : celle du message brut ; à défaut, la gardée,
+ * champs ajoutés vides. `null` : pas une annonce, ou ni message brut ni analyse lisibles.
+ */
+function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): string | null {
+  try {
+    const raw: GetiPushedPost["raw"] = JSON.parse(String(row.raw_json));
+    const parsed = parseGetiPost(raw, trusted);
+    return isNotAnnouncement(parsed, raw) ? null : JSON.stringify(parsed);
+  } catch {
+    try {
+      return JSON.stringify({ ...ADDED_FIELDS, ...JSON.parse(String(row.parsed_json)) });
+    } catch {
+      return null;
+    }
+  }
+}
+
+/**
+ * Réécrit l'analyse des lignes gardées avant le dernier champ ajouté (`closed`) :
+ * relues de leur message brut par la version courante de l'analyse, une seule fois,
+ * hors du chemin d'une requête (la lecture les réanalyse sinon à chaque page, ~0,3 ms
+ * chacune). Un message brut illisible garde son analyse, champs ajoutés vides : la
+ * ligne cesse d'être « ancienne » et n'est plus relue. Une ligne qui n'est pas une
+ * annonce (sans texte, avis du bot) est retirée, comme à l'enregistrement. L'écriture
+ * ne touche qu'une ligne encore ancienne : une modification arrivée entre-temps gagne.
+ *
+ * @param executor Pool ou connexion.
+ * @returns Le nombre de lignes réécrites ou retirées.
+ */
+export async function refreshStaleGetiPosts(executor: GetiExecutor): Promise<number> {
+  const trusted = getiTrustedBots();
+  let done = 0;
+  for (let chunk = 0; chunk < REFRESH_CHUNKS_MAX; chunk += 1) {
+    const [rows] = await executor.execute<RowDataPacket[]>(
+      `SELECT message_id, raw_json, parsed_json FROM bg_geti_posts
+        WHERE parsed_json NOT LIKE '%"closed":%' ORDER BY id LIMIT ${REFRESH_CHUNK}`,
+    );
+    if (rows.length === 0) return done;
+    const gone: string[] = [];
+    let written = 0;
+    for (const row of rows) {
+      const messageId = String(row.message_id);
+      const next = reanalysed(row, trusted);
+      if (next === null) {
+        gone.push(messageId);
+        continue;
+      }
+      const [result] = await executor.execute(
+        `UPDATE bg_geti_posts SET parsed_json = ? WHERE message_id = ? AND parsed_json NOT LIKE '%"closed":%'`,
+        [next, messageId],
+      );
+      written += affected(result);
+    }
+    const removed = gone.length > 0 ? await deleteGetiPosts(executor, gone) : 0;
+    done += written + removed;
+    // Rien n'a bougé (ligne qui résiste) : relire le même lot ne ferait que boucler.
+    if (written + removed === 0 || rows.length < REFRESH_CHUNK) return done;
+  }
+  return done;
 }
 
 /** Une ligne en annonce rendue ; `null` si elle est illisible, ou sortie de la fenêtre de garde de sa catégorie. */

@@ -10,6 +10,7 @@ import {
   listGetiPosts,
   purgeExpiredGetiPosts,
   reconcileGetiChannel,
+  refreshStaleGetiPosts,
   startGetiPostsPurgeClock,
   upsertGetiPosts,
 } from "@/lib/server/geti/posts";
@@ -373,7 +374,18 @@ describe("startGetiPostsPurgeClock", () => {
 
     await run();
 
-    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [expect.any(Date)]);
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [expect.any(Date)]);
+  });
+
+  it("startGetiPostsPurgeClock_clockPass_thenRewritesRowsParsedBeforeTheLastField", async () => {
+    const execute = executeMock([], 1);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    startGetiPostsPurgeClock();
+    const [{ run }] = jest.mocked(startPeriodicClock).mock.calls[0];
+
+    await run();
+
+    expect(String(execute.mock.calls.at(-1)?.[0])).toContain(`parsed_json NOT LIKE '%"closed":%'`);
   });
 });
 
@@ -567,5 +579,89 @@ describe("listGetiPosts", () => {
     const page = await listGetiPosts({}, {}, executor(execute), NOW);
 
     expect(page.total).toBe(0);
+  });
+});
+
+describe("refreshStaleGetiPosts", () => {
+  const STALE_SELECT = `parsed_json NOT LIKE '%"closed":%'`;
+
+  function updateOf(execute: SqlMock): { sql: string; params: unknown[] } {
+    const call = execute.mock.calls.find(([sql]) => String(sql).startsWith("UPDATE"));
+    return { sql: String(call?.[0]), params: Array.isArray(call?.[1]) ? call[1] : [] };
+  }
+
+  function stale(raw: string, text = "LFT support adv") {
+    const { dates, levels, closed, ...older } = parsedGetiPost({ text });
+    return { message_id: GETI_FAKE_MESSAGE_ID, raw_json: raw, parsed_json: JSON.stringify(older), unused: [dates, levels, closed] };
+  }
+
+  /** Select rendu une fois avec `rows`, puis vide : le passage s'arrête quand plus rien n'est ancien. */
+  function once(rows: unknown[], affectedRows = 1): SqlMock {
+    let selects = 0;
+    return jest.fn<SqlQuery>(async (sql: string) => {
+      if (!sql.trimStart().startsWith("SELECT")) return [{ affectedRows }];
+      selects += 1;
+      return [selects === 1 ? rows : []];
+    });
+  }
+
+  it("refreshStaleGetiPosts_noOldRow_writesNothing", async () => {
+    const execute = executeMock([]);
+
+    const done = await refreshStaleGetiPosts(executor(execute));
+
+    expect(done).toBe(0);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshStaleGetiPosts_oldRow_isRewrittenFromItsRawMessageWithTheNewFields", async () => {
+    const raw = getiPushedPost({ content: "LFT support adv" }).raw;
+    const execute = once([stale(JSON.stringify(raw))]);
+
+    const done = await refreshStaleGetiPosts(executor(execute));
+
+    const update = updateOf(execute);
+    expect(done).toBe(1);
+    expect(update.sql).toContain(STALE_SELECT);
+    expect(JSON.parse(String(update.params[0]))).toMatchObject({ levels: ["ADVANCED"], dates: [], closed: false });
+    expect(update.params[1]).toBe(GETI_FAKE_MESSAGE_ID);
+  });
+
+  it("refreshStaleGetiPosts_unreadableRawMessage_keepsTheAnalysisWithEmptyFieldsSoItIsNotRetried", async () => {
+    const execute = once([stale("{pas du json", "LFT support")]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(JSON.parse(String(updateOf(execute).params[0]))).toMatchObject({ text: "LFT support", dates: [], levels: [], closed: false });
+  });
+
+  it("refreshStaleGetiPosts_rawAndAnalysisBothUnreadable_removesTheRow", async () => {
+    const execute = once([{ message_id: GETI_FAKE_MESSAGE_ID, raw_json: "{x", parsed_json: "{y" }]);
+
+    const done = await refreshStaleGetiPosts(executor(execute));
+
+    expect(done).toBe(1);
+    expect(execute.mock.calls.some(([sql]) => String(sql).startsWith("DELETE"))).toBe(true);
+    expect(execute.mock.calls.some(([sql]) => String(sql).startsWith("UPDATE"))).toBe(false);
+  });
+
+  it("refreshStaleGetiPosts_rowWithoutText_isRemovedLikeAtWriteTime", async () => {
+    const execute = once([stale(JSON.stringify(getiPushedPost({ content: "" }).raw))]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining("DELETE FROM bg_geti_posts"), [GETI_FAKE_MESSAGE_ID]);
+  });
+
+  it("refreshStaleGetiPosts_rowRewrittenMeanwhile_stopsInsteadOfLooping", async () => {
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support" }).raw);
+    const execute = jest.fn<SqlQuery>(async (sql: string) =>
+      sql.trimStart().startsWith("SELECT") ? [Array.from({ length: 200 }, () => stale(raw))] : [{ affectedRows: 0 }],
+    );
+
+    const done = await refreshStaleGetiPosts(executor(execute));
+
+    expect(done).toBe(0);
+    expect(execute.mock.calls.filter(([sql]) => String(sql).startsWith("SELECT"))).toHaveLength(1);
   });
 });
