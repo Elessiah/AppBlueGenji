@@ -123,6 +123,15 @@ describe("GetiFilters — heures", () => {
     expect(source).toContain("getiFilterSync(pendingSearch.current, serverSearch)");
     expect(source).toContain('window.addEventListener("popstate", release)');
   });
+
+  it("l'attente porte l'adresse normalisée, se lève à chaque rendu et sur un lien suivi", () => {
+    const source = readSource("components/geti/GetiFilters.tsx");
+
+    expect(source).toContain("pendingSearch.current = getiNormalizedSearch(category, first)");
+    expect(source).not.toContain("lastServerSearch");
+    expect(source).toContain('document.addEventListener("click", releaseOnLink, true)');
+    expect(source).toContain('closest("a[href]")');
+  });
 });
 
 describe("GetiInfoView", () => {
@@ -138,5 +147,11 @@ describe("GetiInfoView", () => {
     expect(enMessages.results.beyond).not.toBe("");
     expect(frMessages.results.beyondLink).toContain("{page}");
     expect(enMessages.results.beyondLink).toContain("{page}");
+  });
+
+  it("au-delà de la dernière page, la pagination n'est pas rendue", () => {
+    const source = readSource("components/geti/GetiInfoView.tsx");
+
+    expect(source).toMatch(/\{beyond \? null : \(\s*<GetiPagination/);
   });
 });

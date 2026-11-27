@@ -117,6 +117,8 @@ test.describe("GETI Info — page publique", () => {
     await page.goto("/geti-info/lfp?p=50");
     const beyond = page.getByTestId("geti-beyond");
     await expect(beyond).toContainText("Cette page n'existe plus");
+    await expect(page.getByRole("navigation", { name: /pagination|pages/i })).toHaveCount(0);
+    await expect(page.getByText(/Page 50 \//)).toHaveCount(0);
     await beyond.getByRole("link", { name: "Aller à la page 1" }).click();
     await expect(page).toHaveURL(/\/geti-info\/lfp$/);
     await expect(page.getByTestId("geti-post").first()).toBeVisible();

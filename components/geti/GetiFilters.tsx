@@ -24,6 +24,7 @@ import {
   getiAllRanks,
   getiClockLabel,
   getiFilterSync,
+  getiNormalizedSearch,
   getiPageHref,
   getiPageSearch,
   getiRankSlug,
@@ -105,31 +106,40 @@ export function GetiFilters({
   const [draft, setDraft] = useState(query);
   // L'adresse fait foi : un retour arrière ou un lien partagé remet les contrôles d'accord.
   const serverSearch = getiPageSearch(query);
-  const lastServerSearch = useRef(serverSearch);
-  // Dernière adresse demandée par un changement de filtre, tant que son rendu n'est pas arrivé :
-  // le rendu d'un changement plus ancien ne doit pas défaire le dernier geste.
+  // Dernière adresse demandée par un changement de filtre (normalisée comme le serveur la
+  // rendra), tant que son rendu n'est pas arrivé : le rendu d'un changement plus ancien ne
+  // doit pas défaire le dernier geste.
   const pendingSearch = useRef<string | null>(null);
   useEffect(() => {
-    if (lastServerSearch.current === serverSearch) return;
-    lastServerSearch.current = serverSearch;
+    // Chaque rendu du serveur (nouvel objet `query`) passe ici, même à adresse égale :
+    // un geste défait avant son rendu lève aussi l'attente.
     const sync = getiFilterSync(pendingSearch.current, serverSearch);
     pendingSearch.current = sync.pending;
     if (sync.adopt) setDraft(query);
   }, [serverSearch, query]);
   useEffect(() => {
-    // Retour arrière ou avant : l'adresse affichée reprend la main sur les contrôles.
+    // Retour arrière ou avant, ou lien suivi (pagination, « Réinitialiser » de la liste) :
+    // l'adresse affichée reprend la main sur les contrôles.
     const release = () => {
       pendingSearch.current = null;
     };
+    const releaseOnLink = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (event.target instanceof Element && event.target.closest("a[href]")) release();
+    };
     window.addEventListener("popstate", release);
-    return () => window.removeEventListener("popstate", release);
+    document.addEventListener("click", releaseOnLink, true);
+    return () => {
+      window.removeEventListener("popstate", release);
+      document.removeEventListener("click", releaseOnLink, true);
+    };
   }, []);
 
   const apply = (next: GetiPageQuery) => {
     // Tout changement de filtre revient à la première page.
     const first = { ...next, page: 1 };
     setDraft(first);
-    pendingSearch.current = getiPageSearch(first);
+    pendingSearch.current = getiNormalizedSearch(category, first);
     router.replace(getiPageHref(category, first), { scroll: false });
   };
 

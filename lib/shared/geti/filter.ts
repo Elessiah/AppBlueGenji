@@ -74,11 +74,23 @@ function rankRangesOf(post: GetiParsedPost, filter: GetiFilter): GetiRankRange[]
   const ranks = post.ranks ?? { min: null, max: null, byRole: {} };
   const byRole = ranks.byRole ?? {};
   const perRole = wanted(filter.roles).flatMap((role) => {
-    const range = isRankedRole(role) && Object.hasOwn(byRole, role) ? byRole[role] : undefined;
-    return range === undefined ? [] : [range];
+    const range = isRankedRole(role) && Object.hasOwn(byRole, role) ? getiStoredRankRange(byRole[role]) : null;
+    return range === null ? [] : [range];
   });
   if (perRole.length > 0) return perRole;
-  return !ranks.min || !ranks.max ? [] : [{ min: ranks.min, max: ranks.max }];
+  const overall = getiStoredRankRange(ranks);
+  return overall === null ? [] : [overall];
+}
+
+/**
+ * Fourchette de rang d'une analyse gardée, lue seulement si ses deux bornes
+ * sont de vrais rangs (une ligne écrite à la main peut porter `null` ou un
+ * objet abîmé) ; sinon `null` (rang non lu).
+ */
+export function getiStoredRankRange(range: unknown): GetiRankRange | null {
+  if (typeof range !== "object" || range === null) return null;
+  const { min, max } = range as { min?: GetiRank | null; max?: GetiRank | null };
+  return min && max && rankValue(min) !== null && rankValue(max) !== null ? { min, max } : null;
 }
 
 function matchesRanks(post: GetiParsedPost, filter: GetiFilter, includeUnknown: boolean): boolean {
@@ -102,6 +114,25 @@ const DAY_MINUTES = 1440;
 function minuteBound(value: unknown): number | null {
   const minutes = storedNumber(value);
   return Number.isFinite(minutes) && minutes >= 0 && minutes <= DAY_MINUTES ? minutes : null;
+}
+
+/** Une fin à « 0h » après un début dans la journée (« 22h-0h ») est la fin de journée, pas minuit du matin. */
+function untilMidnight(start: number, end: number): number {
+  return end === 0 && start > 0 ? DAY_MINUTES : end;
+}
+
+/**
+ * Horaire d'une analyse gardée, lu seulement s'il est un objet aux bornes
+ * valides (minutes, 0–1440 ; fin absente = heure seule) ; sinon `null`.
+ */
+export function getiStoredTimeSlot(slot: unknown): { from: number; to: number | null } | null {
+  if (typeof slot !== "object" || slot === null) return null;
+  const { from: rawFrom, to: rawTo } = slot as { from?: unknown; to?: unknown };
+  const from = minuteBound(rawFrom);
+  if (from === null) return null;
+  if (rawTo === null || rawTo === undefined) return { from, to: null };
+  const to = minuteBound(rawTo);
+  return to === null ? null : { from, to };
 }
 
 /** Plage `[début, fin]` en minutes ; une plage qui passe minuit (« 22h-2h ») se coupe en deux. */
@@ -130,11 +161,12 @@ export function getiTimeSlotMatches(
   from: number | null,
   to: number | null,
 ): boolean {
-  const start = minuteBound(slot.from);
-  if (start === null) return false;
-  const end = slot.to === null ? start : minuteBound(slot.to);
-  if (end === null) return false;
-  const windows = segmentsOf(from ?? 0, to ?? DAY_MINUTES);
+  const stored = getiStoredTimeSlot(slot);
+  if (stored === null) return false;
+  const start = stored.from;
+  const end = stored.to === null ? start : untilMidnight(start, stored.to);
+  const windowFrom = from ?? 0;
+  const windows = segmentsOf(windowFrom, untilMidnight(windowFrom, to ?? DAY_MINUTES));
   return segmentsOf(start, end).some(([low, high]) =>
     windows.some(([windowLow, windowHigh]) => high >= windowLow && low <= windowHigh),
   );
@@ -146,7 +178,11 @@ function matchesTime(post: GetiParsedPost, filter: GetiFilter, includeUnknown: b
   const from = minuteBound(bounds?.from);
   const to = minuteBound(bounds?.to);
   if (from === null && to === null) return true;
-  const times = wanted(post.availability?.times);
+  // Un horaire abîmé (ligne écrite à la main) vaut un horaire non lu.
+  const times = wanted<unknown>(post.availability?.times).flatMap((slot) => {
+    const stored = getiStoredTimeSlot(slot);
+    return stored === null ? [] : [stored];
+  });
   if (times.length === 0) return includeUnknown;
   return times.some((slot) => getiTimeSlotMatches(slot, from, to));
 }

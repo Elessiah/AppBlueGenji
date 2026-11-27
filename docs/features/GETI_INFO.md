@@ -578,9 +578,11 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
 - Le filtre du moteur a reçu quatre critères pour la page : `subRoles`,
   `staffRoles`, `days`, `time` (créneau en minutes ; un horaire de l'annonce doit
   le recouper, une heure seule y tomber ; horaire ou créneau qui passe minuit
-  coupé en deux, `getiTimeSlotMatches`) — `matchesGetiFilter`. Une analyse gardée
-  à laquelle manque un champ est lue comme « critère non lu », jamais une erreur
-  (de même pour `getiPostChips`).
+  coupé en deux, `getiTimeSlotMatches` ; une fin à « 0h » après un début dans la
+  journée, « 22h-0h », est la fin de journée) — `matchesGetiFilter`. Une analyse
+  gardée à laquelle manque un champ, ou dont un horaire ou un rang est abîmé
+  (`null`, borne hors domaine : `getiStoredTimeSlot`, `getiStoredRankRange`), est
+  lue comme « critère non lu », jamais une erreur (de même pour `getiPostChips`).
 - Heures écrites selon la langue (`getiClockLabel`) : « 21h », « 20h30 » ; en
   anglais « 21:00 ». La fin de journée s'écrit « 24h » / « 24:00 ».
 - `GetiFilters` (client) : groupes nommés (`<fieldset>` + légende), cases et listes
@@ -590,7 +592,15 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
   résultats est une région `aria-live`. Sous 900 px le panneau se replie derrière
   un bouton (`aria-expanded`). Tant qu'un changement attend son rendu, le rendu
   d'un changement plus ancien ne remet pas les contrôles en arrière
-  (`getiFilterSync`) ; un retour arrière lève l'attente.
+  (`getiFilterSync`) ; l'attente porte l'adresse **normalisée** comme le serveur
+  la rendra (`getiNormalizedSearch` : rangs inversés remis dans l'ordre), se lève
+  à chaque rendu qui l'atteint — même s'il redonne l'adresse précédente — et
+  sur un retour arrière ou un lien suivi (pagination, réinitialisation).
+- Étiquette de rang mise en avant comme le filtre la juge : avec des rôles voulus,
+  seul le rang de ces rôles, sauf si la carte n'en donne aucun (le filtre compare
+  alors la fourchette globale et les rangs par rôle de la carte sont jugés).
+- Au-delà de la dernière page, seuls le message et le lien vers la dernière page
+  restent (pas de pagination « Page 5 / 3 »).
 
 ### Carte d'une annonce (`GetiPostCard`)
 

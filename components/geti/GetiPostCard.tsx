@@ -121,7 +121,7 @@ export function GetiPostCard({
       {chips.length > 0 ? (
         <ul className={styles.chips} aria-label={text.chipsLabel}>
           {chips.map((chip, index) => {
-            const matched = getiChipMatches(chip, filter);
+            const matched = getiChipMatches(chip, filter, chips);
             const label = getiChipLabel(chip, data, locale);
             return (
               <li

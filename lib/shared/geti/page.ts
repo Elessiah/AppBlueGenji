@@ -5,7 +5,7 @@
  *
  * Module pur : importable côté serveur comme côté client.
  */
-import { getiTimeSlotMatches } from "@/lib/shared/geti/filter";
+import { getiStoredRankRange, getiStoredTimeSlot, getiTimeSlotMatches } from "@/lib/shared/geti/filter";
 import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
 import type { Locale } from "@/lib/shared/locales";
 
@@ -291,6 +291,17 @@ export function getiPageSearch(query: GetiPageQuery): string {
   return text === "" ? "" : `?${text}`;
 }
 
+/**
+ * Paramètres d'adresse d'un état de filtres **tel que le serveur le rendra** :
+ * relus comme une adresse (rangs inversés remis dans l'ordre, valeurs hors
+ * catégorie retirées). Un changement de filtre attend ce rendu-là, pas l'état
+ * brut du panneau, sinon l'attente ne se lèverait jamais.
+ */
+export function getiNormalizedSearch(category: GetiCategory, query: GetiPageQuery): string {
+  const params = Object.fromEntries(new URLSearchParams(getiPageSearch(query)));
+  return getiPageSearch(parseGetiPageQuery(category, params));
+}
+
 /** Adresse (sans préfixe de langue) d'une catégorie avec ses filtres. */
 export function getiPageHref(category: GetiCategory, query?: GetiPageQuery): string {
   return `${getiCategoryPath(category)}${query ? getiPageSearch(query) : ""}`;
@@ -352,7 +363,10 @@ export function getiPageFilter(category: GetiCategory, query: GetiPageQuery): Ge
  * est ignoré : il déferait le dernier geste. Sans attente (retour arrière, lien
  * partagé), l'adresse rendue fait foi.
  *
- * @param pending Adresse (paramètres) du dernier changement en attente, ou `null`.
+ * Appelée à **chaque** rendu du serveur, même s'il redonne l'adresse
+ * précédente (un geste défait avant son rendu) : l'attente atteinte se lève.
+ *
+ * @param pending Adresse normalisée (`getiNormalizedSearch`) du dernier changement en attente, ou `null`.
  * @param serverSearch Paramètres de l'état que le serveur vient de rendre.
  * @returns `adopt` : reprendre l'état du serveur ; `pending` : l'attente qui reste.
  */
@@ -404,13 +418,12 @@ export function getiPostChips(post: GetiParsedPost): GetiChip[] {
   if (stored.teamName) chips.push({ kind: "team", name: stored.teamName });
   const byRole = stored.ranks?.byRole ?? {};
   const perRole = RANKED_ROLES.flatMap((role): GetiChip[] => {
-    const range = Object.hasOwn(byRole, role) ? byRole[role] : undefined;
-    return range?.min && range.max ? [{ kind: "rank", role, min: range.min, max: range.max }] : [];
+    const range = Object.hasOwn(byRole, role) ? getiStoredRankRange(byRole[role]) : null;
+    return range === null ? [] : [{ kind: "rank", role, min: range.min, max: range.max }];
   });
+  const overall = getiStoredRankRange(stored.ranks);
   if (perRole.length > 0) chips.push(...perRole);
-  else if (stored.ranks?.min && stored.ranks.max) {
-    chips.push({ kind: "rank", role: null, min: stored.ranks.min, max: stored.ranks.max });
-  }
+  else if (overall !== null) chips.push({ kind: "rank", role: null, min: overall.min, max: overall.max });
   for (const value of listOf(stored.roles)) chips.push({ kind: "role", value });
   for (const value of listOf(stored.subRoles)) chips.push({ kind: "subRole", value });
   for (const value of listOf(stored.staffRoles)) chips.push({ kind: "staffRole", value });
@@ -420,7 +433,11 @@ export function getiPostChips(post: GetiParsedPost): GetiChip[] {
   for (const value of listOf(stored.languages)) chips.push({ kind: "language", value });
   const availability = stored.availability;
   for (const value of listOf(availability?.days)) chips.push({ kind: "day", value });
-  for (const slot of listOf(availability?.times).slice(0, MAX_TIME_CHIPS)) {
+  const slots = listOf<unknown>(availability?.times).flatMap((slot) => {
+    const valid = getiStoredTimeSlot(slot);
+    return valid === null ? [] : [valid];
+  });
+  for (const slot of slots.slice(0, MAX_TIME_CHIPS)) {
     chips.push({ kind: "time", from: slot.from, to: slot.to, timezone: availability?.timezone ?? null });
   }
   for (const iso of listOf(stored.dates).slice(0, MAX_DATE_CHIPS)) chips.push({ kind: "date", iso });
@@ -441,13 +458,17 @@ function isRankedRole(role: unknown): role is GetiRankedRole {
 function rankChipMatches(
   chip: { role: GetiRankedRole | null; min: GetiRank; max: GetiRank },
   filter: GetiFilter,
+  cardRoles: readonly GetiRankedRole[] | null,
 ): boolean {
   const min = filter.ranks?.min ?? null;
   const max = filter.ranks?.max ?? null;
   if (min === null && max === null) return false;
-  // Comme le filtre : avec des rôles voulus, seul le rang de ces rôles compte.
+  // Comme le filtre : avec des rôles voulus, seul le rang de ces rôles compte —
+  // sauf si la carte n'en porte aucun ; le filtre compare alors la fourchette
+  // globale, que les rangs par rôle de la carte composent.
   const wantedRoles = (filter.roles ?? []).filter(isRankedRole);
-  if (chip.role !== null && wantedRoles.length > 0 && !wantedRoles.includes(chip.role)) return false;
+  const cardHasWanted = cardRoles === null || wantedRoles.some((role) => cardRoles.includes(role));
+  if (chip.role !== null && cardHasWanted && wantedRoles.length > 0 && !wantedRoles.includes(chip.role)) return false;
   const low = min === null ? 0 : getiRankValue(min);
   const high = max === null ? GETI_RANK_TOP : getiRankValue(max);
   return getiRankValue(chip.max) >= low && getiRankValue(chip.min) <= high;
@@ -463,11 +484,21 @@ function timeChipMatches(chip: { from: number; to: number | null }, filter: Geti
 /**
  * L'étiquette répond-elle à un critère **actif** de la recherche ? Sert à la
  * mettre en avant ; un critère absent ne met rien en avant.
+ *
+ * @param chips Toutes les étiquettes de la carte : un rang par rôle se juge
+ *   comme le filtre, qui retombe sur la fourchette globale quand l'annonce ne
+ *   donne le rang d'aucun rôle voulu. Sans elles, seul le rôle de l'étiquette compte.
  */
-export function getiChipMatches(chip: GetiChip, filter: GetiFilter): boolean {
+export function getiChipMatches(chip: GetiChip, filter: GetiFilter, chips?: readonly GetiChip[]): boolean {
   switch (chip.kind) {
     case "rank":
-      return rankChipMatches(chip, filter);
+      return rankChipMatches(
+        chip,
+        filter,
+        chips
+          ? chips.flatMap((entry) => (entry.kind === "rank" && entry.role !== null ? [entry.role] : []))
+          : null,
+      );
     case "role":
       // « Flex » répond à tout rôle voulu, comme dans le filtre.
       return included(filter.roles, chip.value) || (chip.value === "FLEX" && (filter.roles ?? []).length > 0);
