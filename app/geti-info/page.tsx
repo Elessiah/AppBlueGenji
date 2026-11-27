@@ -6,7 +6,7 @@ import { getiCategoryMetadata } from "./metadata";
 /**
  * `/geti-info` (et `/en/geti-info`) : la première catégorie, sans renvoi.
  * Son adresse canonique est celle de la catégorie (`/geti-info/lfp`) — une
- * seule page à indexer pour un même contenu.
+ * seule adresse pour un même contenu (la page n'est pas indexée).
  */
 export function generateMetadata(): Promise<Metadata> {
   return getiCategoryMetadata(GETI_DEFAULT_CATEGORY);

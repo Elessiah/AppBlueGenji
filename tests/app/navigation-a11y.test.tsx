@@ -251,15 +251,23 @@ describe("PublicNavPanel — page courante", () => {
   it("ouvre sur les annonces GETI, puis les pages hors compétition", () => {
     expect(PUBLIC_NAV_LINKS.map((l) => l.href)).toEqual([
       "/geti-info",
-      "/recrutement",
       "/bot",
       "/association",
+      "/recrutement",
       "/benevoles",
     ]);
   });
 
   it("écrit l'adresse des annonces GETI comme la page la déclare", () => {
     expect(PUBLIC_NAV_LINKS[0].href).toBe(GETI_PAGE_PATH);
+  });
+
+  it("tire l'adresse d'un module sans dépendance, pas de la page (poids de l'en-tête)", () => {
+    const menu = readSource("components/cyber/landing/PublicNavMenu.tsx");
+    const path = readSource("lib/shared/geti/path.ts");
+    expect(menu).toContain('from "@/lib/shared/geti/path"');
+    expect(menu).not.toContain('lib/shared/geti/page"');
+    expect(path).not.toMatch(/^\s*import\s/m);
   });
 
   it("ne mène plus à la partie compétitive ni à une section de l'accueil", () => {
@@ -282,6 +290,20 @@ describe("PublicNavPanel — page courante", () => {
   it("signale les annonces GETI comme page courante, catégories comprises", () => {
     expect(currentLinks(panel("/geti-info"))).toEqual(["Annonces GETI"]);
     expect(currentLinks(panel("/geti-info/lfs"))).toEqual(["Annonces GETI"]);
+  });
+
+  it("publicNavPanel_onGetiCategory_featuredLinkActive : l'entrée GETI cumule mise en avant et page courante", () => {
+    const html = panel("/geti-info/lfs");
+    expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*class="[^"]*linkFeatured[^"]*linkActive[^"]*"[^>]*>Annonces GETI<\/a>/);
+  });
+
+  it("publicNavCss_featuredActive_hasNonColorMarker : la page courante mise en avant se voit autrement que par la couleur", () => {
+    const css = readSource("components/cyber/landing/PublicNavMenu.module.css");
+    const rule = /\.linkFeatured\.linkActive\s*\{([^}]*)\}/.exec(css);
+    expect(rule).not.toBeNull();
+    expect(rule?.[1]).toMatch(/box-shadow:\s*inset 3px 0 0 var\(--blue-500/);
+    expect(rule?.[1]).toMatch(/border-color: var\(--blue-500/);
+    expect(css.indexOf(".linkFeatured.linkActive {")).toBeGreaterThan(css.indexOf(".linkFeatured:hover {"));
   });
 
   it("ne signale aucune entrée sur une page de la partie compétitive", () => {
@@ -363,5 +385,23 @@ describe("PublicHeader — menu du compte", () => {
     const source = readSource("components/cyber/landing/PublicHeader.tsx");
     expect(source).toContain("<AccountMenu pseudo={user.pseudo}");
     expect(source).not.toContain('aria-label="Mon profil"');
+  });
+});
+
+describe("menu burger — cibles tactiles et focus", () => {
+  const css = readSource("components/cyber/landing/PublicNavMenu.module.css");
+  const rule = (selector: string) => css.slice(css.indexOf(`${selector} {`)).split("}")[0];
+
+  it("garde au bouton burger une hauteur d'au moins 44 px", () => {
+    expect(rule(".burger")).toContain("min-height: 44px;");
+  });
+
+  it("garde à chaque lien du panneau une hauteur d'au moins 44 px", () => {
+    expect(rule(".link")).toContain("min-height: 44px;");
+    expect(rule(".link")).toContain("display: flex;");
+  });
+
+  it("écarte l'anneau de focus de l'entrée mise en avant de sa bordure", () => {
+    expect(css).toMatch(/\.linkFeatured:focus-visible \{\s*outline-offset: 4px;/);
   });
 });

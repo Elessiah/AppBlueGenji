@@ -15,6 +15,26 @@ import { GETI_CATEGORIES, type GetiCategory, type GetiParsedPost } from "@/lib/s
 export const GETI_BOT_USER_ID = "357980843001511937";
 
 /**
+ * Début d'un relais de GETI Bot : la mention de l'auteur, son `(pseudo)`, puis
+ * `sur`/`on`/`from` (« <@id>*(pseudo)* sur … »), sur la première ligne.
+ */
+const GETI_RELAY_HEADER_START = /^\s*<@!?\d{15,22}>[^\S\n]*[*_]*\([^\n]{1,200}?\)[*_]*[^\S\n]*(?:sur|on|from)(?![\p{L}\p{N}])/iu;
+
+/**
+ * Le message de GETI Bot est-il un relais d'annonce ? Un relais ouvre son
+ * premier encart sur son en-tête : mention de l'auteur, `(pseudo)`, puis
+ * `sur`/`on`/`from` ; ses autres messages (« Ton annonce a été publié dans … »,
+ * l'avis qui suit une annonce directe), même s'ils mentionnent l'auteur, n'en
+ * sont pas — même règle côté bot (`isGetiRelayMessage`).
+ *
+ * @param embeds Encarts du message, non fiables.
+ */
+export function isGetiRelay(embeds: readonly { description?: string | null }[] | null | undefined): boolean {
+  const description = Array.isArray(embeds) ? embeds[0]?.description : null;
+  return typeof description === "string" && GETI_RELAY_HEADER_START.test(description);
+}
+
+/**
  * D'où vient une annonce : écrite **directement** dans notre salon par un
  * membre (`direct` — l'auteur Discord est l'auteur de l'annonce, sa
  * modification et sa suppression sont les siennes), ou **relayée** par GETI

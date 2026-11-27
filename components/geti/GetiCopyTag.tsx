@@ -6,15 +6,26 @@ import { useToast } from "@/components/ui/toast";
 import { getiText } from "@/lib/shared/geti/page-text";
 import styles from "./geti.module.css";
 
-type CopyText = { copy: string; copyLabel: string; copied: string; copyFailed: string; tagLabel: string };
+type CopyText = {
+  copy: string;
+  copyLabel: string;
+  copied: string;
+  copyFailed: string;
+  tagLabel: string;
+  /** Préfixe lu par un lecteur d'écran avant le pseudo (ponctuation de la langue). */
+  tagPrefix: string;
+};
 
 /** Copie par l'ancienne voie (`execCommand`), pour un navigateur sans presse-papiers asynchrone. */
 function legacyCopy(value: string): boolean {
+  // Le textarea prend le focus le temps de la copie : on le rend au bouton ensuite.
+  const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const area = document.createElement("textarea");
   area.value = value;
   area.setAttribute("readonly", "");
   area.style.position = "fixed";
   area.style.opacity = "0";
+  area.style.fontSize = "16px"; // iOS zoome sur un champ de moins de 16 px
   document.body.appendChild(area);
   area.select();
   let done = false;
@@ -24,6 +35,7 @@ function legacyCopy(value: string): boolean {
     done = false;
   }
   area.remove();
+  previous?.focus({ preventScroll: true });
   return done;
 }
 
@@ -56,7 +68,7 @@ export function GetiCopyTag({ tag, text }: Readonly<{ tag: string; text: CopyTex
   return (
     <>
       <span className={styles.tag} title={text.tagLabel} data-testid="geti-tag">
-        <span className="sr-only">{text.tagLabel} : </span>
+        <span className="sr-only">{text.tagPrefix} </span>
         {tag}
       </span>
       <button

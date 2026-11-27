@@ -80,7 +80,8 @@ export function GetiPostCard({
     member: text.mentionMember,
     role: text.mentionRole,
     channel: text.mentionChannel,
-  });
+    spoiler: text.spoiler,
+  }, locale);
   const chips = getiPostChips(parsed);
   const postedAbsolute = absoluteDate(post.postedAt, locale);
   const editedAbsolute = post.editedAt ? absoluteDate(post.editedAt, locale) : "";
@@ -96,7 +97,14 @@ export function GetiPostCard({
           {tag ? (
             <GetiCopyTag
               tag={tag}
-              text={{ copy: text.copy, copyLabel: text.copyLabel, copied: text.copied, copyFailed: text.copyFailed, tagLabel: text.tagLabel }}
+              text={{
+                copy: text.copy,
+                copyLabel: text.copyLabel,
+                copied: text.copied,
+                copyFailed: text.copyFailed,
+                tagLabel: text.tagLabel,
+                tagPrefix: text.tagPrefix,
+              }}
             />
           ) : (
             <span className={styles.noTag}>{text.noTag}</span>
@@ -104,21 +112,15 @@ export function GetiPostCard({
         </div>
         <div className={styles.meta}>
           {parsed.closed ? <span className="pill pill-neutral">{text.closed}</span> : null}
-          <time dateTime={post.postedAt} title={getiText(locale, text.postedAt, { date: postedAbsolute })}>
-            {relativeDate(post.postedAt, locale, now)}
-          </time>
-          {post.editedAt ? (
-            <span className={styles.edited} title={getiText(locale, text.editedAt, { date: editedAbsolute })}>
-              {text.edited}
-            </span>
-          ) : null}
+          <time dateTime={post.postedAt}>{relativeDate(post.postedAt, locale, now)}</time>
+          {post.editedAt ? <span className={styles.edited}>{text.edited}</span> : null}
         </div>
       </header>
 
       {chips.length > 0 ? (
         <ul className={styles.chips} aria-label={text.chipsLabel}>
           {chips.map((chip, index) => {
-            const matched = getiChipMatches(chip, filter);
+            const matched = getiChipMatches(chip, filter, chips);
             const label = getiChipLabel(chip, data, locale);
             return (
               <li
@@ -143,6 +145,9 @@ export function GetiPostCard({
       <GetiPostText body={body} long={getiTextIsLong(body)} text={{ more: text.more, less: text.less }} />
 
       <footer className={styles.cardFoot}>
+        {/* La date exacte est lisible sans survol : au toucher et au clavier, une infobulle ne s'ouvre pas. */}
+        <span>{getiText(locale, text.postedAt, { date: postedAbsolute })}</span>
+        {post.editedAt ? <span>{getiText(locale, text.editedAt, { date: editedAbsolute })}</span> : null}
         <span>{post.source === "relay" ? text.sourceRelay : text.sourceDirect}</span>
         {origin ? <span>{getiText(locale, text.origin, { server: origin })}</span> : null}
       </footer>

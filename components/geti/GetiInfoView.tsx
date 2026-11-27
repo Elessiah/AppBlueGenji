@@ -5,7 +5,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { getCurrentUser } from "@/lib/server/auth";
 import { listGetiAlerts } from "@/lib/server/geti/alerts";
-import { listGetiPosts } from "@/lib/server/geti/posts";
+import { listGetiPostsShared } from "@/lib/server/geti/posts";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -20,6 +20,7 @@ import {
   getiAgeOptions,
   getiCategoryPath,
   getiChannelUrl,
+  getiErrorCode,
   getiPageFilter,
   getiPageHref,
   getiPageSearch,
@@ -27,12 +28,15 @@ import {
   type GetiPageQuery,
   type GetiSearchParams,
 } from "@/lib/shared/geti/page";
-import { getiDataText, getiText, type GetiMessages } from "@/lib/shared/geti/page-text";
+import { getiDataText, getiFilterDataText, getiText, type GetiDataText, type GetiMessages } from "@/lib/shared/geti/page-text";
 import { localeHref, type Locale } from "@/lib/shared/locales";
 import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
 import { GetiAlerts } from "./GetiAlerts";
 import { GetiFilters } from "./GetiFilters";
-import { GetiOfficialCard, GetiOfficialCount } from "./GetiOfficialCard";
+import { GetiLayout } from "./GetiLayout";
+import { GetiRetry } from "./GetiRetry";
+import { GetiOfficialCard } from "./GetiOfficialCard";
+import { GetiOfficialCount } from "./GetiOfficialCount";
 import { GetiPostCard } from "./GetiPostCard";
 import { GetiPublishButton } from "./GetiPublishButton";
 import { GetiRefresher } from "./GetiRefresher";
@@ -55,8 +59,12 @@ export async function GetiInfoView({
   const filter = getiPageFilter(category, query);
   const now = Date.now();
   // Base injoignable : la page reste lisible (carte, onglets, bouton « Publier »).
-  const listed: GetiPostPage | null = await listGetiPosts(filter, { page: query.page }, undefined, now).catch(
-    () => null,
+  const listed: GetiPostPage | null = await listGetiPostsShared(filter, { page: query.page }, now).catch(
+    (error: unknown) => {
+      // Un code seul (jamais le message, qui peut citer la requête) : la panne se voit dans pm2.
+      console.warn("[geti] post list unavailable:", getiErrorCode(error));
+      return null;
+    },
   );
   const activeFilters = getiActiveFilterCount(query);
   // Les alertes du compte connecté, s'il y en a un : la page reste publique, et
@@ -66,7 +74,8 @@ export async function GetiInfoView({
   const categoryTitles = Object.fromEntries(
     GETI_CATEGORIES.map((entry) => [entry, m.categories[entry].title]),
   ) as Record<GetiCategory, string>;
-  const data = getiDataText(m);
+  const data = getiFilterDataText(m);
+  const cardData = getiDataText(m);
   const retentionDays = GETI_RETENTION_DAYS[category];
 
   return (
@@ -150,21 +159,24 @@ export async function GetiInfoView({
               categoryTitle={m.categories[category].title}
               channelUrl={getiChannelUrl(category)}
               ourInviteUrl={DISCORD_INVITE_URL}
-              card={<GetiOfficialCard text={m.official} locale={locale} headingLevel={3} />}
+              official={m.official}
             />
           </div>
         </header>
 
-        <div className={styles.layout}>
-          <GetiFilters
-            category={category}
-            query={query}
-            fields={GETI_CATEGORY_FILTERS[category]}
-            ageOptions={getiAgeOptions(category)}
-            retentionDays={retentionDays}
-            text={m.filters}
-            data={data}
-          />
+        <GetiLayout single={listed === null}>
+          {listed === null ? null : (
+            <GetiFilters
+              category={category}
+              query={query}
+              fields={GETI_CATEGORY_FILTERS[category]}
+              ageOptions={getiAgeOptions(category)}
+              retentionDays={retentionDays}
+              total={listed.total}
+              text={m.filters}
+              data={data}
+            />
+          )}
 
           <GetiResults
             listed={listed}
@@ -173,10 +185,11 @@ export async function GetiInfoView({
             filter={filter}
             filtered={activeFilters > 0}
             messages={m}
+            data={cardData}
             locale={locale}
             now={now}
           />
-        </div>
+        </GetiLayout>
       </div>
       <GetiRefresher />
     </PublicPageShell>
@@ -191,28 +204,40 @@ type ResultsProps = Readonly<{
   /** Au moins un filtre est actif. */
   filtered: boolean;
   messages: GetiMessages;
+  data: GetiDataText;
   locale: Locale;
   now: number;
 }>;
 
 /** Compteur annoncé (`aria-live`), liste des annonces, pagination. */
-function GetiResults({ listed, category, query, filter, filtered, messages: m, locale, now }: ResultsProps) {
+function GetiResults({ listed, category, query, filter, filtered, messages: m, data, locale, now }: ResultsProps) {
   if (listed === null) {
     return (
       <section className={styles.results} aria-labelledby="geti-category-title">
         <p /* NOSONAR S6819 — compteur de résultats annoncé à chaque filtre, pas une sortie de formulaire */ className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
-          {m.results.unavailable}
+          {m.results.none}
         </p>
+        <GetiRetry label={m.results.retry} error={m.results.unavailable} />
       </section>
     );
   }
-  const data = getiDataText(m);
+  const pages = Math.max(1, Math.ceil(listed.total / listed.pageSize));
+  // Page au-delà de la dernière (lien partagé, annonces retirées depuis) : la liste n'est pas vide.
+  const beyond = listed.posts.length === 0 && listed.total > 0;
   return (
     <section className={styles.results} aria-labelledby="geti-category-title">
       <p /* NOSONAR S6819 — compteur de résultats annoncé à chaque filtre, pas une sortie de formulaire */ className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
         {getiText(locale, filtered ? m.results.countFiltered : m.results.count, { count: listed.total })}
       </p>
-      {listed.posts.length === 0 ? (
+      {beyond ? (
+        <div className={styles.empty} data-testid="geti-beyond">
+          <p>{m.results.beyond}</p>
+          <LocaleLink href={getiPageHref(category, { ...query, page: pages })} className={styles.resetLink}>
+            {getiText(locale, m.results.beyondLink, { page: pages })}
+          </LocaleLink>
+        </div>
+      ) : null}
+      {!beyond && listed.posts.length === 0 ? (
         <div className={styles.empty}>
           <p>{filtered ? m.results.emptyFiltered : m.results.empty}</p>
           {filtered ? (
@@ -221,23 +246,24 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, l
             </LocaleLink>
           ) : null}
         </div>
-      ) : (
-        // Le texte des annonces n'est pas repris en extrait par les moteurs (`data-nosnippet`).
-        <ul className={styles.list} aria-label={m.results.listLabel} data-nosnippet="">
-          {listed.posts.map((post) => (
-            <li key={post.messageId}>
-              <GetiPostCard post={post} filter={filter} text={m.post} data={data} locale={locale} now={now} />
-            </li>
-          ))}
-        </ul>
+      ) : null}
+      {listed.posts.length > 0 ? (
+        // Le texte des annonces n'est pas repris en extrait par les moteurs : `data-nosnippet`
+        // n'est lu que sur `div`, `span` et `section`, d'où l'enveloppe.
+        <div data-nosnippet="" data-testid="geti-nosnippet">
+          <ul className={styles.list} aria-label={m.results.listLabel}>
+            {listed.posts.map((post) => (
+              <li key={post.messageId}>
+                <GetiPostCard post={post} filter={filter} text={m.post} data={data} locale={locale} now={now} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {/* Au-delà de la dernière page (liste vide comprise), pas de « Page 5 sur 1 » : seul le lien de retour reste. */}
+      {query.page > pages ? null : (
+        <GetiPagination category={category} query={query} pages={pages} text={m.results} locale={locale} />
       )}
-      <GetiPagination
-        category={category}
-        query={query}
-        pages={Math.max(1, Math.ceil(listed.total / listed.pageSize))}
-        text={m.results}
-        locale={locale}
-      />
     </section>
   );
 }

@@ -158,6 +158,12 @@ describe("parsePushedPost", () => {
     expect(post).toMatchObject({ source: "relay", raw: { author: { id: GETI_BOT_USER_ID, bot: true } } });
   });
 
+  it("parsePushedPost_publishedNoticeOfGetiBot_returnsNull", () => {
+    const embeds = [{ description: "Ton annonce a été publié dans **32 autres channels**." }];
+
+    expect(parsePushedPost(getiWireRelay("", { embeds }))).toBeNull();
+  });
+
   it("parsePushedPost_messageOfAnotherBot_returnsNull", () => {
     const author = { id: "100000000000000090", username: "AutreBot", discriminator: "0", bot: true };
 

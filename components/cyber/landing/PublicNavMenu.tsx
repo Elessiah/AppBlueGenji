@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
+import { GETI_PAGE_PATH } from "@/lib/shared/geti/path";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { useShellText } from "@/components/i18n/shell-text";
 import type { ShellKey } from "@/lib/shared/shell-text";
@@ -17,15 +18,15 @@ type NavLink = { href: string; labelKey: ShellKey; featured?: boolean };
  * une fois connecté et par le pied de page
  * (docs/features/PUBLIC_NAVIGATION.md).
  *
- * L'adresse des annonces est écrite ici en clair (égale à `GETI_PAGE_PATH`,
- * vérifié par test) : importer `lib/shared/geti/page.ts` chargerait les filtres
- * des annonces dans l'en-tête de chaque page.
+ * L'adresse des annonces vient de `lib/shared/geti/path.ts`, module sans
+ * dépendance : importer `lib/shared/geti/page.ts` chargerait les filtres des
+ * annonces dans l'en-tête de chaque page.
  */
 export const PUBLIC_NAV_LINKS: readonly NavLink[] = [
-  { href: "/geti-info", labelKey: "nav.links.geti", featured: true },
-  { href: "/recrutement", labelKey: "nav.links.recruitment" },
+  { href: GETI_PAGE_PATH, labelKey: "nav.links.geti", featured: true },
   { href: "/bot", labelKey: "nav.links.bot" },
   { href: "/association", labelKey: "nav.links.association" },
+  { href: "/recrutement", labelKey: "nav.links.recruitment" },
   { href: "/benevoles", labelKey: "nav.links.volunteers" },
 ];
 

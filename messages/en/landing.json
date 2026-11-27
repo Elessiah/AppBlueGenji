@@ -118,16 +118,18 @@
     "eyebrow": "OVERWATCH · GETI POSTS",
     "titleLead": "A player, a team, a scrim?",
     "titleAccent": "GETI posts are here.",
-    "lede": "Every Overwatch recruitment post from the GETI network, gathered and filterable by role, rank and availability. Spot the one that fits and contact its author on Discord.",
+    "lede": "Every Overwatch post from the GETI network (teams, players, scrims, staff, casts), gathered on a single page.",
+    "hint": "Filter by role, rank and availability, then contact the post's author on Discord.",
+    "hintSubject": "GETI posts",
     "cta": "Browse GETI posts",
-    "categoriesLabel": "I'm looking for",
+    "categoriesLabel": "Browse",
     "categories": {
-      "lfp": "A player",
-      "lft": "A team",
-      "lfsub": "A sub",
+      "lfp": "Teams recruiting",
+      "lft": "Free agents",
+      "lfsub": "Subs wanted",
       "lfstaff": "Staff",
-      "lfs": "A scrim",
-      "lfcast": "A cast"
+      "lfs": "Scrims",
+      "lfcast": "Casts"
     }
   },
   "board": {

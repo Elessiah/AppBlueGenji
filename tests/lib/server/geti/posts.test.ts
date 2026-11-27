@@ -3,20 +3,24 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database", () => ({ getDatabase: jest.fn() }));
 jest.mock("@/lib/server/periodic-clock", () => ({ startPeriodicClock: jest.fn() }));
 
+import { clearCache } from "@/lib/server/cache";
 import { getDatabase } from "@/lib/server/database";
 import {
   deleteGetiPosts,
+  getiTrustedBots,
   listGetiPosts,
+  listGetiPostsShared,
   purgeExpiredGetiPosts,
   reconcileGetiChannel,
+  refreshStaleGetiPosts,
   startGetiPostsPurgeClock,
   upsertGetiPosts,
 } from "@/lib/server/geti/posts";
 import { parsePushedPost } from "@/lib/server/geti/wire";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { GETI_CHANNEL_IDS, parseGetiPost, type GetiParsedPost } from "@/lib/shared/geti";
-import { GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS, getiRetentionCutoff, getiRetentionMs } from "@/lib/shared/geti/ingest";
-import { parsedGetiPost } from "../../../helpers/geti";
+import { GETI_BOT_USER_ID, GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS, getiRetentionCutoff, getiRetentionMs } from "@/lib/shared/geti/ingest";
+import { GETI_TRUSTED_BOTS, parsedGetiPost } from "../../../helpers/geti";
 import {
   GETI_FAKE_MESSAGE_ID,
   GETI_FAKE_RELAYED_AUTHOR_ID,
@@ -54,6 +58,7 @@ function row(overrides: Record<string, unknown> = {}, parsed: Partial<GetiParsed
     author_id: "100000000000000001",
     author_tag: "fauxjoueur",
     parsed_json: JSON.stringify(parsedGetiPost({ text: "LFT support", ...parsed })),
+    stale_raw_json: null,
     posted_at: storedDate(2 * 60 * 60 * 1000),
     edited_at: null,
     ...overrides,
@@ -84,6 +89,16 @@ describe("durées de garde", () => {
 
   it("getiRetentionMs_scrim_isSevenDays", () => {
     expect(getiRetentionMs("lfs")).toBe(7 * DAY_MS);
+  });
+});
+
+describe("getiTrustedBots", () => {
+  it("getiTrustedBots_always_trustsGetiBotOnly", () => {
+    expect(getiTrustedBots()).toEqual({ getiBotIds: [GETI_BOT_USER_ID], siteBotIds: [] });
+  });
+
+  it("getiTrustedBots_testHelper_trustsNoSiteBotLikeProduction", () => {
+    expect(GETI_TRUSTED_BOTS.siteBotIds).toEqual(getiTrustedBots().siteBotIds);
   });
 });
 
@@ -137,16 +152,20 @@ describe("upsertGetiPosts", () => {
 
   it("upsertGetiPosts_botPublicationNotice_isCountedEmptiedAndRemovedNotStored", async () => {
     const execute = executeMock();
-    const notice = getiPushedPost(
-      getiWireRelay("", {
+    // Le fil refuse déjà cet avis (`isGetiRelay`) : l'écriture l'écarte aussi, par défense.
+    const relay = getiPushedPost(getiWireRelay("LFT tank"));
+    const notice = {
+      ...relay,
+      raw: {
+        ...relay.raw,
         embeds: [
           {
             description:
               "Ton annonce a été publié dans **32 autres channels**.\n[=> Invite FauxBot](https://discord.com/oauth2/authorize?client_id=100000000000000090)",
           },
         ],
-      }),
-    );
+      },
+    };
 
     const outcome = await upsertGetiPosts(executor(execute), [notice], NOW);
 
@@ -359,7 +378,18 @@ describe("startGetiPostsPurgeClock", () => {
 
     expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [expect.any(Date)]);
     // Même passe : les traces des alertes déjà prévenues.
-    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_alert_hits WHERE created_at < ?", [expect.any(Date)]);
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_alert_hits WHERE created_at < ?", [expect.any(Date)]);
+  });
+
+  it("startGetiPostsPurgeClock_clockPass_thenRewritesRowsParsedBeforeTheLastField", async () => {
+    const execute = executeMock([], 1);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    startGetiPostsPurgeClock();
+    const [{ run }] = jest.mocked(startPeriodicClock).mock.calls[0];
+
+    await run();
+
+    expect(String(execute.mock.calls.at(-1)?.[0])).toContain(`parsed_json NOT LIKE '%"closed":%'`);
   });
 });
 
@@ -407,6 +437,36 @@ describe("listGetiPosts", () => {
 
     expect([dates, levels, closed]).toEqual([[], [], false]);
     expect(page.posts[0].parsed).toMatchObject({ dates: [], levels: [], closed: false });
+  });
+
+  it("listGetiPosts_rowParsedBeforeDatesLevelsClosedExisted_isReparsedFromItsRawMessage", async () => {
+    const { dates, levels, closed, ...older } = parsedGetiPost({ text: "LFT support adv" });
+    const raw = getiPushedPost({ content: "LFT support adv, ~~ancien texte~~" }).raw;
+    const execute = executeMock([row({ parsed_json: JSON.stringify(older), stale_raw_json: JSON.stringify(raw) })]);
+
+    const page = await listGetiPosts({ levels: ["ADVANCED"] }, {}, executor(execute), NOW);
+
+    expect([dates, levels, closed]).toEqual([[], [], false]);
+    expect(page.posts).toHaveLength(1);
+    expect(page.posts[0].parsed.levels).toEqual(["ADVANCED"]);
+  });
+
+  it("listGetiPosts_staleRowWithUnreadableRawMessage_keepsStoredAnalysisWithEmptyFields", async () => {
+    const { dates, levels, closed, ...older } = parsedGetiPost({ text: "LFT support" });
+    const execute = executeMock([row({ parsed_json: JSON.stringify(older), stale_raw_json: "{pas du json" })]);
+
+    const page = await listGetiPosts({}, {}, executor(execute), NOW);
+
+    expect([dates, levels, closed]).toEqual([[], [], false]);
+    expect(page.posts[0].parsed).toMatchObject({ text: "LFT support", dates: [], levels: [], closed: false });
+  });
+
+  it("listGetiPosts_query_readsRawMessageOnlyForAnalysesWithoutClosedKey", async () => {
+    const execute = executeMock([]);
+
+    await listGetiPosts({}, {}, executor(execute), NOW);
+
+    expect(String(execute.mock.calls[0][0])).toContain(`IF(parsed_json LIKE '%"closed":%', NULL, raw_json) AS stale_raw_json`);
   });
 
   it("listGetiPosts_noExecutorGiven_readsFromThePool", async () => {
@@ -523,5 +583,229 @@ describe("listGetiPosts", () => {
     const page = await listGetiPosts({}, {}, executor(execute), NOW);
 
     expect(page.total).toBe(0);
+  });
+});
+
+describe("refreshStaleGetiPosts", () => {
+  const STALE_SELECT = `parsed_json NOT LIKE '%"closed":%'`;
+
+  function updateOf(execute: SqlMock): { sql: string; params: unknown[] } {
+    const call = execute.mock.calls.find(([sql]) => String(sql).startsWith("UPDATE"));
+    return { sql: String(call?.[0]), params: Array.isArray(call?.[1]) ? call[1] : [] };
+  }
+
+  function stale(raw: string, text = "LFT support adv") {
+    const { dates, levels, closed, ...older } = parsedGetiPost({ text });
+    return { message_id: GETI_FAKE_MESSAGE_ID, raw_json: raw, parsed_json: JSON.stringify(older), unused: [dates, levels, closed] };
+  }
+
+  /** Select rendu une fois avec `rows`, puis vide : le passage s'arrête quand plus rien n'est ancien. */
+  function once(rows: unknown[], affectedRows = 1): SqlMock {
+    let selects = 0;
+    return jest.fn<SqlQuery>(async (sql: string) => {
+      if (!sql.trimStart().startsWith("SELECT")) return [{ affectedRows }];
+      selects += 1;
+      return [selects === 1 ? rows : []];
+    });
+  }
+
+  it("refreshStaleGetiPosts_noOldRow_writesNothing", async () => {
+    const execute = executeMock([]);
+
+    const done = await refreshStaleGetiPosts(executor(execute));
+
+    expect(done).toBe(0);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshStaleGetiPosts_oldRow_isRewrittenFromItsRawMessageWithTheNewFields", async () => {
+    const raw = getiPushedPost({ content: "LFT support adv" }).raw;
+    const execute = once([stale(JSON.stringify(raw))]);
+
+    const done = await refreshStaleGetiPosts(executor(execute));
+
+    const update = updateOf(execute);
+    expect(done).toBe(1);
+    expect(update.sql).toContain(STALE_SELECT);
+    expect(JSON.parse(String(update.params[0]))).toMatchObject({ levels: ["ADVANCED"], dates: [], closed: false });
+    expect(update.params[1]).toBe(GETI_FAKE_MESSAGE_ID);
+  });
+
+  it("refreshStaleGetiPosts_unreadableRawMessage_keepsTheAnalysisWithEmptyFieldsSoItIsNotRetried", async () => {
+    const execute = once([stale("{pas du json", "LFT support")]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(JSON.parse(String(updateOf(execute).params[0]))).toMatchObject({ text: "LFT support", dates: [], levels: [], closed: false });
+  });
+
+  it("refreshStaleGetiPosts_rawAndAnalysisBothUnreadable_removesTheRow", async () => {
+    const execute = once([{ message_id: GETI_FAKE_MESSAGE_ID, raw_json: "{x", parsed_json: "{y" }]);
+
+    const done = await refreshStaleGetiPosts(executor(execute));
+
+    expect(done).toBe(1);
+    expect(execute.mock.calls.some(([sql]) => String(sql).startsWith("DELETE"))).toBe(true);
+    expect(execute.mock.calls.some(([sql]) => String(sql).startsWith("UPDATE"))).toBe(false);
+  });
+
+  it("refreshStaleGetiPosts_rowWithoutText_isRemovedLikeAtWriteTime", async () => {
+    const execute = once([stale(JSON.stringify(getiPushedPost({ content: "" }).raw))]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining("DELETE FROM bg_geti_posts"), [GETI_FAKE_MESSAGE_ID]);
+  });
+
+  it("refreshStaleGetiPosts_rowRewrittenMeanwhile_stopsInsteadOfLooping", async () => {
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support" }).raw);
+    const execute = jest.fn<SqlQuery>(async (sql: string) =>
+      sql.trimStart().startsWith("SELECT") ? [Array.from({ length: 200 }, () => stale(raw))] : [{ affectedRows: 0 }],
+    );
+
+    const done = await refreshStaleGetiPosts(executor(execute));
+
+    expect(done).toBe(0);
+    expect(execute.mock.calls.filter(([sql]) => String(sql).startsWith("SELECT"))).toHaveLength(1);
+  });
+});
+
+describe("listGetiPostsShared", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+
+  function shared(rows: unknown[]) {
+    const execute = executeMock(rows);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    return execute;
+  }
+
+  it("listGetiPostsShared_sameCategoryTwice_readsTheBaseOnce", async () => {
+    const execute = shared([row()]);
+
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW + 1000);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPostsShared_concurrentReaders_shareOneRead", async () => {
+    const execute = shared([row()]);
+
+    await Promise.all(Array.from({ length: 20 }, () => listGetiPostsShared({ category: "lft" }, {}, NOW)));
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPostsShared_otherCategory_readsAgain", async () => {
+    const execute = shared([row()]);
+
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    await listGetiPostsShared({ category: "lfp" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_otherMaxAge_readsAgain", async () => {
+    const execute = shared([row()]);
+
+    await listGetiPostsShared({ category: "lft", maxAgeHours: 24 }, {}, NOW);
+    await listGetiPostsShared({ category: "lft", maxAgeHours: 72 }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_differentFilterSameScan_filtersPerRequest", async () => {
+    const execute = shared([row()]);
+
+    const all = await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    const none = await listGetiPostsShared({ category: "lft", regions: ["NA"], includeUnknown: false }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(all.total).toBe(1);
+    expect(none.total).toBe(0);
+  });
+
+  it("listGetiPostsShared_pageBeyondLast_returnsNoPostsButTheTotal", async () => {
+    shared([row()]);
+
+    const page = await listGetiPostsShared({ category: "lft" }, { page: 5 }, NOW);
+
+    expect(page.posts).toEqual([]);
+    expect(page.total).toBe(1);
+    expect(page.page).toBe(5);
+  });
+
+  /** Écriture sur un double à part : la lecture partagée garde son propre compteur. */
+  function writer(affectedRows: number) {
+    return executor(executeMock([], affectedRows));
+  }
+
+  it("listGetiPostsShared_afterDelete_readsAgain", async () => {
+    const execute = shared([row()]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    await deleteGetiPosts(writer(1), [GETI_FAKE_MESSAGE_ID]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_deleteRemovesNothing_keepsTheSharedRead", async () => {
+    const execute = shared([row()]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    await deleteGetiPosts(writer(0), [GETI_FAKE_MESSAGE_ID]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPostsShared_afterUpsert_readsAgain", async () => {
+    const execute = shared([row()]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    await upsertGetiPosts(writer(1), [getiPushedPost({ postedAt: "2026-11-27T10:00:00.000Z" })], NOW);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_afterPurge_readsAgain", async () => {
+    const execute = shared([row()]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    await purgeExpiredGetiPosts(writer(1), NOW);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_afterReanalysis_readsAgain", async () => {
+    const execute = shared([row()]);
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support adv" }).raw);
+    let selects = 0;
+    const refresh = jest.fn<SqlQuery>(async (sql: string) => {
+      if (!sql.trimStart().startsWith("SELECT")) return [{ affectedRows: 1 }];
+      selects += 1;
+      return [selects === 1 ? [{ message_id: GETI_FAKE_MESSAGE_ID, raw_json: raw, parsed_json: "{}" }] : []];
+    });
+
+    await refreshStaleGetiPosts(executor(refresh));
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPostsShared_readFails_isNotCached", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(new Error("down")).mockResolvedValue([[row()]]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+
+    await expect(listGetiPostsShared({ category: "lft" }, {}, NOW)).rejects.toThrow();
+    const page = await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(page.total).toBe(1);
   });
 });

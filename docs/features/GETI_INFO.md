@@ -64,12 +64,18 @@ aucun message réel n'a été lu. Le format du relais GETI a été connu depuis
   encart, `authorTag`.
 
 **Usurpation d'auteur.** Pseudo et identifiant viennent toujours de la même
-source. Notre relais s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête
-GETI : quand l'en-tête et la ligne « Sent from » nomment deux comptes différents,
-personne n'est désigné. Un bot ou un webhook peut écrire n'importe quel en-tête :
-`parseGetiPost(raw, { relayBotIds })` ne lit l'auteur que des bots listés — les
-autres gardent leur texte, sans auteur ni serveur d'origine. **Le lot 2 passe la
-liste** (bot GETI et notre bot) ; sans elle, tout bot est cru.
+source. Un bot ou un webhook peut écrire n'importe quel en-tête, et notre relais
+s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête GETI :
+`parseGetiPost(raw, { getiBotIds, siteBotIds })` ne croit chaque bot que pour
+son propre format. Un bot de `getiBotIds` nomme l'auteur par son en-tête (ou un
+libellé hors citation, `>` et `>>>` compris — un `>>>` ne cite que la fin de son propre morceau : message, titre, description ou champ) ; un bot de `siteBotIds`, par sa
+seule ligne « Sent from » — un en-tête ou un libellé dans son encart est le
+texte du joueur, et une ligne sans « by <@id> » ne nomme personne (le pseudo de
+la ligne d'auteur, écrite par le bot, reste). Un bot listé des deux côtés lit
+les deux ; s'ils nomment deux comptes différents, personne n'est désigné. Un bot
+absent des listes, ou toute annonce de bot **sans liste**, garde son texte, sans
+auteur ni serveur d'origine. **Le lot 2 passe les deux listes** (bot GETI, notre
+bot).
 
 Le jeu `tests/fixtures/geti/posts.json` est **de synthèse** (tournures courantes
 du recrutement Overwatch, en français et en anglais ; pseudos, identifiants,
@@ -130,8 +136,17 @@ texte**, jamais comme du balisage ; un identifiant qui n'est pas un identifiant
 Discord (15 à 22 chiffres) est rendu `null`.
 
 - `teamName` et `originServer` ne gardent aucun caractère de balisage ni de
-  mention (astérisque, tiret bas, tilde, accent grave, barre verticale, chevrons, « @ » et barre oblique inverse retirés, `withoutMarkup`) :
-  « @everyone **Nitro** » devient « everyone Nitro ».
+  mention (`withoutMarkup`) : une mention `<@id>` / `<#id>` est retirée en
+  entier (l'identifiant d'un tiers ne sort pas), un émoji `<:nom:id>` garde son
+  nom, puis astérisque, tiret bas, tilde, accent grave, barre verticale,
+  chevrons, « @ » et barre oblique inverse sont retirés : « @everyone **Nitro** »
+  devient « everyone Nitro ».
+- `authorTag` : mentions, « @ » et chevrons retirés, émoji de serveur réduit à
+  son nom ; le balisage n'est retiré qu'au bord d'un mot, tiret bas gardé (ils
+  font partie de bien des pseudos : « Star*Lord#1234 » reste tel quel) : un
+  en-tête `(**faux_nitro** @everyone)` donne « faux_nitro everyone ».
+- Un en-tête GETI ou une ligne « Sent from » écrits par un autre bot que le
+  leur restent dans `text` : c'est le texte du joueur, affiché tel quel.
 - `text` garde le balisage de l'annonce mais aucune mention active
   (`getiSafeText`) : `<@id>` et `<@&id>` deviennent « @… » (l'identifiant d'un
   tiers ne sort pas), `<#id>` « #… », `@everyone` / `@here` perdent leur « @ ».
@@ -231,18 +246,21 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   remerciement relié par « pour / for / de / du » (« merci pour tout votre
   soutien », « thanks a lot for the support », « thank you very much for your
   support ») n'est pas un rôle — « je serai ton support », « thx we need a
-  support », « merci de jouer le support » en sont.
+  support », « merci de jouer le support » en sont. « hs » seul derrière « être »
+  ou un appareil (« mon micro est hs », « casque hs ») veut dire « hors service ».
 - **Région** : mêmes mots que le relais du bot, plus l'Océanie et le drapeau
   européen. « eu » derrière un auxiliaire ou un adverbe (« j'ai eu », « il a eu »,
   « jamais eu ») est le participe d'« avoir », pas l'Europe ; « a » ne compte que
   derrière son sujet (« de NA à EU », « ouvert à tout EU » restent l'Europe), et
   « bien / plus / tout / assez » que derrière une forme d'« avoir » (« j'ai bien
-  eu » est le participe, « plus EU que NA » l'Europe).
+  eu » est le participe, « plus EU que NA » l'Europe) ; « on a bien eu » est le
+  participe, « de NA à tout EU » l'Europe.
 - **Langues** : mots (« francophone », « english »), drapeaux, sigles **en liste**
   (« FR/EN ») ou derrière « langue : » — seuls, « EN », « ES » ou « DE » sont des
   mots courants.
 - **Plateformes** : « hybrid(e) », « crossplay » — et « mixed » dans une recherche
-  de scrim — valent PC **et** console.
+  de scrim — valent PC **et** console ; « hybrid » près d'un mode de carte ou du
+  mot « map » (« maps: control, hybrid, push ») est le mode, pas la plateforme.
 - **Jours** : noms complets, fautes courantes comprises (« mecredi »,
   « wenesday ») ; les abréviations (« mar », « jeu », « mon » sont des mots) ne
   se lisent que devant une date ou une heure (« Tue 20-22 », « sam 28/11 ») ou
@@ -311,10 +329,16 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
 - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
 - **Âge** : publiée depuis `maxAgeHours` au plus ; une annonce sans date, ou
   datée de plus de 5 minutes dans le futur, est écartée.
-- **Filtre enregistré** (JSON relu pour les alertes) : un rôle inconnu
-  (« constructor ») ou une borne de rang qui n'est pas un rang (palier inconnu,
-  division hors de 1–5) est ignoré, jamais une erreur.
-- **Annonces closes** : écartées avec `hideClosed: true`.
+- **Filtre enregistré** (JSON relu pour les alertes) : rien n'y est une
+  erreur. Un filtre `null` ne filtre rien ; une liste qui n'en est pas une
+  (`"regions":"EU"`) est ignorée ; un rôle inconnu (« constructor ») aussi ; une
+  borne de rang qui n'est pas un rang (palier inconnu, division hors de 1–5) est
+  ouverte, et deux bornes invalides valent un critère absent ; une division
+  écrite en texte (`"3"`) est lue comme un nombre ; un `maxAgeHours` écrit en
+  texte (`"24"`) aussi, mais un texte illisible (`"24h"`, `""`) n'est jamais lu
+  comme « sans limite » : rien ne passe ; `includeUnknown: "true"` vaut `true` ;
+  une catégorie inconnue (`"LFP"`) est ignorée.
+- **Annonces closes** : écartées avec `hideClosed: true` (ou `"true"`).
 - **Champ non lu** (rang, rôle, région, plateforme, langue, niveau) : l'annonce est
   écartée, sauf `includeUnknown: true` — le lot 3 décide du réglage par défaut de
   la page.
@@ -325,8 +349,8 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
   de joueurs sont lus ; le lot 2 ajoute des annonces réelles anonymisées et mesure
   le taux de reconnaissance.
 - Accès du bot de production aux six salons (`Voir le salon`, `Lire l'historique`)
-  à vérifier avant le rattrapage de 14 jours.
-- « Top 500 » et la correspondance SR → rang sont des approximations assumées.
+  à vérifier avant le rattrapage (14 jours, 7 pour les scrims).
+- « Top 500 » et l'ancien SR sont des approximations assumées.
 
 ## Réglage sur les annonces réelles (lot 2b)
 
@@ -340,9 +364,23 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
   autres channels. », lien d'invitation du bot) n'est pas une annonce ;
   `upsertGetiPosts` l'écarte comme un message vide (compté `emptied`, retiré
   s'il était gardé). Un relais à en-tête GETI n'en est jamais une.
-- **Analyses déjà gardées** : `listGetiPosts` donne `dates`, `levels` et
-  `closed` vides à une ligne analysée avant ce lot ; le rattrapage du bot la
-  réanalyse.
+- **Analyses déjà gardées** : une ligne analysée avant ce lot (sans clé
+  `"closed"` dans `parsed_json`) est réanalysée à la lecture depuis son
+  `raw_json` par `listGetiPosts` (seules ces lignes remontent leur message brut) ;
+  message brut illisible : `dates`, `levels` et `closed` vides. Hors requête,
+  l’horloge de purge horaire (`refreshStaleGetiPosts`, 5 000 lignes au plus par
+  passage) réécrit ces lignes une fois (une ligne dont le message brut est
+  illisible garde son analyse, champs ajoutés vides ; une ligne sans texte ou
+  avis du bot est retirée) : la lecture ne les réanalyse plus (~0,3 ms chacune,
+  jusqu’à 3 000 par page sinon). L’écriture ne touche qu’une ligne encore
+  ancienne. `closed` naît dans ce lot : aucune ligne gardée ne porte d’analyse
+  plus ancienne avec la clé.
+- **Faux positifs écartés** (revue) : une tranche d'âge (« âge : 16-20 ») n'est
+  pas un horaire ; « 2/3 joueurs », « 1/12 places » ne sont pas des dates, et
+  « 31/12 » lu un 1er janvier l'est (année précédente) ; « recrutement /
+  inscriptions / candidatures open » n'est pas le niveau Open ; « +18 de
+  préférence », « 18+ ou mature » sont un âge ; dans une recherche d'équipe
+  (`lft`), le mot devant « recherche » est le pseudo du joueur, pas une équipe.
 
 Limites connues : le rôle d'une recherche de remplaçant donné par la seule
 mention d'un rôle Discord (`<@&id>`) n'est pas lu ; le pool de héros, l'âge du
@@ -383,7 +421,12 @@ copie) et le serveur d'origine — dont le nom peut porter des crochets
 le lit (`GETI_HEADER`) et le retire du texte, qui garde ses marques de citation
 (`> …`) ; l'auteur de l'en-tête prime sur toute mention du texte. Le message de **tout autre bot** (le nôtre compris), un message système
 ou un message sans texte n'est pas une annonce : ni poussé par le bot, ni gardé
-par le site. Le réglage de l'analyse sur les textes réels est un lot à part
+par le site. Un message de GETI Bot dont le premier encart ne s'ouvre pas sur l'en-tête d'un
+relais — mention de l'auteur, `(pseudo)`, puis `sur`/`on`/`from` (l'avis « Ton
+annonce a été publié dans … », même s'il mentionne l'auteur) — n'en est pas une non plus
+(`isGetiRelay`, `isGetiRelayMessage` côté bot ; dans le premier encart, cette garde est plus large que l'en-tête que lit l'analyse — tout en-tête lu dans ce premier encart la passe, ce que vérifie un test ; un en-tête placé dans un encart suivant, ou un auteur seulement mentionné dans le texte, ne la passe pas — : 671 des 672 relais de l'échantillon réel ont cette forme). L'analyse ne croit l'en-tête
+que des bots listés (`getiTrustedBots` : GETI Bot seul — notre bot n'y est pas,
+ses messages étant refusés avant l'analyse). Le réglage de l'analyse sur les textes réels est un lot à part
 (GETI-TUNE).
 
 ### Durées de garde, par catégorie
@@ -458,8 +501,11 @@ l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
   un message partiel est relu avant d'être poussé.
 - Rattrapage au démarrage et à chaque nouvelle session Discord : historique de
   chaque salon sur sa fenêtre de garde (pages de 100, pause entre deux pages,
-  5 000 messages au plus par salon), puis `reconcile` avec la liste des messages
-  encore présents — ce qui a été supprimé pendant l'arrêt du bot quitte le site.
+  5 000 messages au plus par salon), puis `reconcile` avec la liste des annonces
+  encore présentes, plus celles poussées en direct pendant le rattrapage — ce qui a
+  été supprimé, ou a cessé d'être une annonce, pendant l'arrêt du bot quitte le site.
+  Un salon que Discord refuse (salon disparu, accès ou permission retirés) ne
+  relance pas à lui seul de rattrapage ; un échec passager en relance un toutes les cinq minutes.
 - Site injoignable : file bornée en mémoire, reprises espacées puis abandon ;
   un abandon déclenche un rattrapage complet, retenté toutes les cinq minutes.
   Le bot ne plante jamais et ne journalise (pm2) que des nombres et des
@@ -498,28 +544,31 @@ posée par `app/geti-info/page.tsx` et `app/geti-info/[category]/page.tsx`.
   `lfcast` — le sigle du salon, le même dans les deux langues (`getiCategoryPath`).
   Toute autre écriture (casse comprise) répond 404.
 - `/geti-info` rend la première catégorie **sans renvoi** ; son adresse canonique
-  est `/geti-info/lfp`. Le sitemap liste les six catégories (FR + EN), jamais
-  `/geti-info` tout court. L'adresse canonique ne porte jamais les filtres.
-- Le texte des annonces porte `data-nosnippet` : la page est indexable, mais un
-  moteur ne reprend pas en extrait une annonce qui disparaîtra sous 7 ou 14 jours.
+  est `/geti-info/lfp`. L'adresse canonique ne porte jamais les filtres.
+- **Non indexée** (`GETI_ROBOTS` : `noindex, follow`, `lib/shared/geti/page.ts`) et
+  absente du sitemap : les annonces portent le pseudo Discord de tiers (relais GETI
+  compris), et `data-nosnippet` ne cache que l'extrait — une recherche sur un pseudo
+  mènerait sinon à la page (revue sécurité 1). Le texte garde `data-nosnippet` (sur
+  une enveloppe `<div>`), au cas où un moteur passerait outre.
 
 ### Filtres — l'adresse est la seule mémoire
 
 `lib/shared/geti/page.ts` (pur) : `parseGetiPageQuery` lit l'adresse,
 `getiPageSearch` l'écrit, `getiPageFilter` en fait le `GetiFilter` du moteur. Une
 valeur inconnue, hors borne ou non proposée par la catégorie est **ignorée** ;
-des bornes inversées sont remises dans l'ordre.
+des rangs inversés sont remis dans l'ordre. Des heures « inversées » ne le sont
+pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
 
 | Paramètre | Sens | Exemple |
 | --- | --- | --- |
 | `rmin`, `rmax` | fourchette de rangs (`palier-division`) | `rmin=diamond-3` |
 | `role`, `sub`, `staff` | rôles, sous-rôles, rôles de staff | `role=tank,dps` |
 | `lvl`, `reg`, `plat`, `lang`, `day` | niveau d'équipe, région, plateforme, langue, jour | `lvl=advanced` |
-| `hfrom`, `hto` | créneau horaire, heures entières 0–24 | `hfrom=20&hto=23` |
+| `hfrom`, `hto` | créneau horaire, heures entières (début 0–23, fin 1–24 ; début après la fin = passe minuit) | `hfrom=22&hto=2` |
 | `age` | âge maximal en jours, sous la durée de garde (1, 3, et 7 hors scrims) | `age=3` |
 | `closed=1` | montrer aussi les annonces closes (masquées par défaut) | |
 | `strict=1` | écarter les annonces qui ne précisent pas un critère choisi | |
-| `p` | page (30 annonces par page) | `p=2` |
+| `p` | page (30 annonces par page ; au-delà de la dernière, un message et un lien vers la dernière) | `p=2` |
 
 - **Filtres par catégorie** (`GETI_CATEGORY_FILTERS`) : seulement ce que l'analyse
   lit dans ses annonces — pas de rôle pour un scrim, des rôles de staff pour
@@ -529,13 +578,36 @@ des bornes inversées sont remises dans l'ordre.
   annonces qui ne précisent pas un critère » les écarte (`strict=1`).
 - Le filtre du moteur a reçu quatre critères pour la page : `subRoles`,
   `staffRoles`, `days`, `time` (créneau en minutes ; un horaire de l'annonce doit
-  le recouper, une heure seule y tomber) — `matchesGetiFilter`.
+  le recouper, une heure seule y tomber ; horaire ou créneau qui passe minuit
+  coupé en deux, `getiTimeSlotMatches` ; une fin à « 0h » après un début dans la
+  journée, « 22h-0h », est la fin de journée) — `matchesGetiFilter`. Une analyse
+  gardée à laquelle manque un champ, ou dont un horaire ou un rang est abîmé
+  (`null`, borne hors domaine : `getiStoredTimeSlot`, `getiStoredRankRange`), est
+  lue comme « critère non lu », jamais une erreur (de même pour `getiPostChips`).
+- Heures écrites selon la langue (`getiClockLabel`) : « 21h », « 20h30 » ; en
+  anglais « 21:00 ». La fin de journée s'écrit « 24h » / « 24:00 ».
 - `GetiFilters` (client) : groupes nommés (`<fieldset>` + légende), cases et listes
   natives, « i » (`InfoHint`) pour le rang, le rôle, le niveau, l'horaire et les
   deux réglages d'affichage. Chaque changement réécrit l'adresse
   (`router.replace`, sans défilement, retour à la page 1) ; le compteur de
   résultats est une région `aria-live`. Sous 900 px le panneau se replie derrière
-  un bouton (`aria-expanded`).
+  un bouton (`aria-expanded`). Tant qu'un changement attend son rendu, le rendu
+  d'un changement plus ancien ne remet pas les contrôles en arrière
+  (`getiFilterSync`) ; l'attente porte l'adresse **normalisée** comme le serveur
+  la rendra (`getiNormalizedSearch` : rangs inversés remis dans l'ordre), se lève
+  à chaque rendu qui l'atteint — même s'il redonne l'adresse précédente — et
+  sur un retour arrière, quand toutes les navigations de filtre sont rendues
+  (`useTransition`), ou sur un lien qui remplace cette page (pagination,
+  réinitialisation ; `getiLinkNavigatesTab` écarte nouvel onglet, téléchargement,
+  autre site et ancre de la même page).
+- Étiquette de rang mise en avant comme le filtre la juge : avec des rôles voulus,
+  seul le rang de ces rôles, sauf si la carte n'en donne aucun ou qu'aucun rôle
+  n'est voulu : le filtre compare alors la fourchette globale de l'annonce, que
+  chaque étiquette de rang par rôle porte (`overall`) et sur laquelle elle est jugée.
+  Une fourchette gardée est relue en vrais rangs, bornes remises dans l'ordre
+  (`getiStoredRankRange`).
+- Au-delà de la dernière page (liste vide comprise), pas de pagination
+  (« Page 5 sur 1 ») : seuls le message et son lien restent.
 
 ### Carte d'une annonce (`GetiPostCard`)
 
@@ -547,17 +619,21 @@ des bornes inversées sont remises dans l'ordre.
 - **Étiquettes** des données lues (`getiPostChips`), teintées par nature ; celles
   qui répondent à un critère actif (`getiChipMatches`) sont mises en avant — plus
   vives, cochées, et préfixées pour un lecteur d'écran (jamais la couleur seule).
-- **Texte** : toujours un nœud de texte (`getiPostBodyText`) — marques de
-  citation et balisage Discord retirés, mention → mot neutre (jamais un
-  identifiant), émoji de serveur → son nom, lien laissé en texte. Replié au-delà
-  de 420 caractères ou 7 lignes (« Lire la suite »).
+- **Texte** : toujours un nœud de texte (`getiPostBodyText`) — **une** marque de
+  citation suivie d'une espace (celle du relais ; « >4000 » reste), balisage par
+  paires au bord d'un mot (« xX__Sniper__Xx » reste), passage masqué `||…||` →
+  « [masqué] » / « [hidden] » (jamais son contenu), mention → mot neutre (jamais un
+  identifiant), émoji de serveur → son nom, horodatage `<t:…>` → date ou heure à
+  l'heure de Paris (`getiTimestampLabel`, `R` écrit comme `f`), lien laissé en texte. Replié au-delà
+  de 420 caractères ou 7 lignes (« Lire la suite ») ; une fois la page chargée, le
+  bouton ne reste que si le texte replié dépasse réellement.
 
 ### Carte du serveur officiel de GETI, fenêtre « Publier »
 
 - `GetiOfficialCard` en tête de chaque catégorie : **notre** carte (la CSP interdit
   tout cadre, aucune image n'est chargée de chez Discord), bouton « Rejoindre »
   vers l'invitation. La fréquentation (`lib/server/geti/community.ts`, invitation
-  publique de Discord, 1,2 s au plus, cache de 30 min, échec compris) est rendue
+  publique de Discord, 0,8 s au plus, succès gardé 30 min, échec une minute seulement et journalisé par code) est rendue
   sous `Suspense` : elle ne retient jamais la page et disparaît si Discord se tait.
 - « Publier une annonce » (`GetiPublishButton`, modale portée dans `body`) : on ne
   publie pas sur le site mais dans le salon Discord de la catégorie
@@ -567,7 +643,7 @@ des bornes inversées sont remises dans l'ordre.
 ### Fraîcheur
 
 Aucun flux : `GetiRefresher` relit la page (`router.refresh()`) au retour sur
-l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement
+l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lecture SQL des annonces est mutualisée 10 s par catégorie et âge — `listGetiPostsShared`, `cached` à vol unique, oubliée après toute écriture : enregistrement, suppression, réconciliation, purge, réanalyse ; une annonce supprimée sur Discord disparaît donc aussitôt, comme le dit `/rgpd` —, le filtre et la page restent par demande ; un geste de filtre attend 300 ms de calme avant de naviguer, « Réinitialiser » part tout de suite ; la fenêtre « Publier » rend sa carte elle-même à l'ouverture)
 (`getiRefreshIntervalMs`, `CLIENT_POWER_MODES.md`) ; un onglet caché ne demande rien.
 
 ### Textes, tests, seed
@@ -578,13 +654,21 @@ l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement
 - Tests : `tests/lib/shared/geti/page.test.ts`, `page-text.test.ts`,
   `page-filter.test.ts`, `tests/lib/server/geti/community.test.ts`,
   `e2e/geti-info.spec.ts`.
-- Seed : 17 annonces `Test_` — chaque catégorie, relais et messages directs, une
+- Seed : 18 annonces `Test_` — chaque catégorie, relais et messages directs, une
   annonce modifiée, une close, un niveau de division, un rang Émeraude, une autre
-  région, un texte long ; un scrim de plus de 7 jours n'est jamais gardé.
+  région, un texte long, un horaire qui passe minuit ; un scrim de plus de 7 jours n'est jamais gardé.
 - Données personnelles : rien de plus que ce que décrivent déjà le registre (T21),
   `/rgpd#annonces-geti` et `PRIVACY_CHANGES` (texte, pseudo, serveur d'origine,
   dates, critères lus). L'appel à Discord pour la fréquentation part du serveur,
   sans rien du visiteur.
+
+## Retouches UX (cycle ui 1)
+
+- `GetiLayout` (client) enveloppe filtres et résultats : pendant un changement de filtre, la grille porte `aria-busy` + `data-pending` (liseré pointillé, jamais d'opacité : contraste 4,5:1) et le panneau annonce « Mise à jour… » (`<output>`).
+- « Réinitialiser » rend le focus au bouton Filtres (mobile) ou au titre du panneau avant de disparaître ; sur mobile, un bouton « Voir les N annonces » referme le panneau.
+- Liste indisponible : filtres masqués, « Aucune annonce à afficher » en ligne, la panne en notification (`showError`) et bouton « Réessayer » (`GetiRetry`, `router.refresh()`) ; pm2 reçoit `[geti] post list unavailable: <code>` (code seul).
+- La date exacte de publication / modification est un texte du pied de carte (plus d'infobulle) ; le repli de copie rend le focus au bouton.
+- Onglets anglais au pluriel (Players, Teams, Subs, Staff, Scrims, Casters).
 
 ## Navigation (lot 4)
 
@@ -596,9 +680,15 @@ chaque page vitrine et dès l'accueil.
   partie compétitive (Tournois, Équipes, Classement, Joueurs) en sont sorties. La
   barre des connectés (`SiteNav`) ne change pas.
 - **Accueil** (`components/cyber/landing/GetiSpotlight.tsx`, juste après le bandeau
-  défilant) : une carte avec une phrase d'appel, le bouton « Voir les annonces GETI »
-  (`/geti-info`) et un raccourci par catégorie (« Je cherche : un joueur, une équipe,
-  un remplaçant, un staff, un scrim, un cast » → `/geti-info/<catégorie>`). Composant
+  défilant) : une carte avec une phrase d'appel (la marche à suivre — filtrer, puis
+  contacter l'auteur sur Discord — derrière un `<InfoHint>`), le bouton « Voir les
+  annonces GETI » et un raccourci par catégorie (« Parcourir : Équipes qui recrutent,
+  Joueurs sans équipe, Remplaçants recherchés, Staff, Scrims, Casts » →
+  `/geti-info/<catégorie>`). Le bouton vise l'adresse canonique `/geti-info/lfp`
+  (celle que déclare `/geti-info`) : une seule adresse par liste. Les raccourcis
+  nomment **ce que la liste contient**, pas l'intention de l'auteur comme les
+  onglets de la page (« Je cherche un joueur » = annonces d'équipes qui recrutent) :
+  un capitaine qui cherche un joueur n'y est pas envoyé vers d'autres équipes. Composant
   serveur **sans lecture de données** : il ne dépend ni de la base ni de Discord.
   Textes dans l'espace `geti` de `messages/<langue>/landing.json` (serveur seulement,
   hors `LANDING_CLIENT_NAMESPACES`). Liens par `LocaleLink` ; la liste des raccourcis

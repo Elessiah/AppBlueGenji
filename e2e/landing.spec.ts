@@ -74,15 +74,15 @@ test.describe("Header landing", () => {
   test("l'accueil annonce les annonces GETI et ses six catégories", async ({ page }) => {
     await page.goto("/");
     const spotlight = page.locator("section", { has: page.locator("#geti-spotlight-title") });
-    await expect(spotlight.getByRole("link", { name: "Voir les annonces GETI" })).toHaveAttribute("href", "/geti-info");
-    await expect(spotlight.getByRole("list", { name: "Je cherche" }).getByRole("link")).toHaveCount(6);
-    await expect(spotlight.getByRole("link", { name: "Un scrim" })).toHaveAttribute("href", "/geti-info/lfs");
+    await expect(spotlight.getByRole("link", { name: "Voir les annonces GETI" })).toHaveAttribute("href", "/geti-info/lfp");
+    await expect(spotlight.getByRole("list", { name: "Parcourir" }).getByRole("link")).toHaveCount(6);
+    await expect(spotlight.getByRole("link", { name: "Scrims" })).toHaveAttribute("href", "/geti-info/lfs");
   });
 
   test("l'accueil anglais annonce les annonces GETI en anglais", async ({ page }) => {
     await page.goto("/en");
     const spotlight = page.locator("section", { has: page.locator("#geti-spotlight-title") });
-    await expect(spotlight.getByRole("link", { name: "Browse GETI posts" })).toHaveAttribute("href", "/en/geti-info");
-    await expect(spotlight.getByRole("link", { name: "A scrim" })).toHaveAttribute("href", "/en/geti-info/lfs");
+    await expect(spotlight.getByRole("link", { name: "Browse GETI posts" })).toHaveAttribute("href", "/en/geti-info/lfp");
+    await expect(spotlight.getByRole("link", { name: "Scrims" })).toHaveAttribute("href", "/en/geti-info/lfs");
   });
 });

@@ -16,7 +16,9 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
   fonction principale du site : son entrée (« Annonces GETI » / « GETI posts »,
   `featured`) ouvre la liste, encadrée et teintée glacier (`.linkFeatured` — bordure
   et graisse, pas la seule couleur), et reste page courante sur chaque catégorie
-  (`/geti-info/lfs`).
+  (`/geti-info/lfs`) — alors `.linkFeatured.linkActive` : bordure pleine, fond
+  plus soutenu et trait intérieur à gauche, pour que la page courante se voie
+  aussi sur l'entrée déjà mise en avant.
 - **Rien dans le menu burger ne mène à la partie compétitive.** « Tournois »,
   « Équipes », « Classement » et « Joueurs » en sont sortis (GETI-NAV) : on entre
   dans la compétition par l'accueil (tableau des tournois, classement, calendrier),
@@ -34,12 +36,19 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
 
 | Menu burger | Pied de page |
 |---|---|
-| **Annonces GETI** (`/geti-info`, mise en avant) · Recrutement · Bot · L'asso · Bénévoles | COMPÉTITIONS : Tournois, Classement (`/classement`), Bot · ASSOCIATION : Manifeste, Bénévoles, Partenaires · CONTACT (courriel, tag et serveur Discord, `FooterContact`) · LÉGAL (voir `LEGAL_PAGE.md`) |
+| **Annonces GETI** (`/geti-info`, mise en avant) · Bot · L'asso · Recrutement · Bénévoles | COMPÉTITIONS : Tournois, Classement (`/classement`), Bot · ASSOCIATION : Manifeste, Bénévoles, Partenaires · CONTACT (courriel, tag et serveur Discord, `FooterContact`) · LÉGAL (voir `LEGAL_PAGE.md`) |
 
-L'adresse `/geti-info` est écrite en clair dans `PUBLIC_NAV_LINKS` (un test la tient
-égale à `GETI_PAGE_PATH`) : importer `lib/shared/geti/page.ts` dans ce composant client
-chargerait les filtres des annonces dans l'en-tête de chaque page. L'accueil annonce
-aussi la page (`GetiSpotlight`, voir `GETI_INFO.md` § Navigation).
+L'adresse vient de `lib/shared/geti/path.ts` (`GETI_PAGE_PATH`, module sans aucune
+dépendance, que `page.ts` réexporte) : `PublicNavMenu`, composant client de l'en-tête de
+chaque page, ne doit jamais importer `page.ts`, qui chargerait les filtres des annonces
+(un test le tient). Le menu, l'encart et la page n'ont ainsi qu'une source. L'accueil
+annonce aussi la page (`GetiSpotlight`, voir `GETI_INFO.md` § Navigation).
+
+Coût de l'encart à l'accueil : aucune lecture de données ni requête (texte du bundle
+`landing`, rendu serveur), `InfoHint` déjà dans le paquet de l'accueil (`AboutStats`),
+aucun message envoyé au client ; compact sous 720 px pour ne pas repousser le tableau
+des tournois. Le bouton burger (44 px) ne fige aucune hauteur d'en-tête : les décalages
+collants se mesurent (`StickyHeaderOffset`).
 
 ## Barre des connectés
 

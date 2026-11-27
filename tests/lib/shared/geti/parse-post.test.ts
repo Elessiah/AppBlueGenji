@@ -8,6 +8,8 @@ import {
   getiRawPost,
   getiRelayPost,
   parsedGetiPost,
+  GETI_TRAILER_TRUSTED_BOTS,
+  GETI_TRUSTED_BOTS,
 } from "@/tests/helpers/geti";
 
 // Écrits par leur point de code : un caractère invisible ne se relit pas dans un source.
@@ -43,6 +45,29 @@ describe("getiDisplayText", () => {
   it("garde un texte à la longueur maximale et coupe au-delà", () => {
     expect(getiDisplayText("a".repeat(GETI_TEXT_MAX))).toHaveLength(GETI_TEXT_MAX);
     expect(getiDisplayText("a".repeat(GETI_TEXT_MAX + 1))).toHaveLength(GETI_TEXT_MAX);
+  });
+});
+
+describe("prepareGetiText — server emoji", () => {
+  it("a server emoji name is read in plain and lower but not in clean", () => {
+    const prepared = prepareGetiText("<:Grandmaster:123456789012345678> ELDRAVEN");
+
+    expect(prepared.plain).toContain("Grandmaster");
+    expect(prepared.lower).toContain("grandmaster");
+    expect(prepared.clean).not.toContain("Grandmaster");
+  });
+
+  it("a text without server emoji gives the same clean and plain when it has no accent", () => {
+    const prepared = prepareGetiText("LFT **tank** diamond");
+
+    expect(prepared.plain).toBe(prepared.clean);
+  });
+
+  it("an accented text without server emoji keeps clean accented and plain without", () => {
+    const prepared = prepareGetiText("Équipe");
+
+    expect(prepared.clean).toBe("Équipe");
+    expect(prepared.plain).toBe("Equipe");
   });
 });
 
@@ -166,13 +191,13 @@ describe("parseGetiPost — relais d'un bot", () => {
   const OUR_TRAILER = `\n\n*Sent from : [Faux Serveur](https://discord.gg/fauxcode)* by <@${GETI_FAKE_OTHER_ID}>`;
 
   it("l'auteur est lu dans l'encart, pas le bot", () => {
-    const parsed = parseGetiPost(getiRelayPost(`lft dps d3${OUR_TRAILER}`));
+    const parsed = parseGetiPost(getiRelayPost(`lft dps d3${OUR_TRAILER}`), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(parsed).toMatchObject({ relayed: true, authorTag: "fauxpseudo", authorId: GETI_FAKE_OTHER_ID });
   });
 
   it("la ligne de relais est retirée du texte et donne le serveur d'origine", () => {
-    const parsed = parseGetiPost(getiRelayPost(`lft dps d3${OUR_TRAILER}`));
+    const parsed = parseGetiPost(getiRelayPost(`lft dps d3${OUR_TRAILER}`), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(parsed.text).toBe("lft dps d3");
     expect(parsed.originServer).toBe("Faux Serveur");
@@ -181,69 +206,69 @@ describe("parseGetiPost — relais d'un bot", () => {
   it("le nom du serveur d'origine perd ses échappements de crochets", () => {
     const description = "lft\n\n*Sent from : [Faux \\[FR\\] Serveur](https://discord.gg/fauxcode)* by <@100000000000000002>";
 
-    expect(parseGetiPost(getiRelayPost(description)).originServer).toBe("Faux [FR] Serveur");
+    expect(parseGetiPost(getiRelayPost(description), GETI_TRAILER_TRUSTED_BOTS).originServer).toBe("Faux [FR] Serveur");
   });
 
   it("la ligne d'auteur « Nom (@pseudo) » est un nom d'affichage libre : aucun pseudo", () => {
-    expect(parseGetiPost(getiRelayPost("lft", "Faux Nom (@faux.pseudo)")).authorTag).toBeNull();
+    expect(parseGetiPost(getiRelayPost("lft", "Faux Nom (@faux.pseudo)"), GETI_TRUSTED_BOTS).authorTag).toBeNull();
   });
 
   it("la ligne d'auteur à l'ancien format garde son suffixe", () => {
-    expect(parseGetiPost(getiRelayPost("lft", "fauxpseudo#4821")).authorTag).toBe("fauxpseudo#4821");
+    expect(parseGetiPost(getiRelayPost("lft", "fauxpseudo#4821"), GETI_TRUSTED_BOTS).authorTag).toBe("fauxpseudo#4821");
   });
 
   it("sans ligne d'auteur, le pseudo est nul : celui du bot n'est jamais rendu", () => {
-    expect(parseGetiPost(getiRelayPost("lft", null)).authorTag).toBeNull();
+    expect(parseGetiPost(getiRelayPost("lft", null), GETI_TRUSTED_BOTS).authorTag).toBeNull();
   });
 
   it("sans ligne de relais, l'auteur est la mention derrière un libellé", () => {
     const description = `lft dps, duo avec <@100000000000000003>\nContact : <@${GETI_FAKE_OTHER_ID}>`;
 
-    expect(parseGetiPost(getiRelayPost(description)).authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(parseGetiPost(getiRelayPost(description), GETI_TRUSTED_BOTS).authorId).toBe(GETI_FAKE_OTHER_ID);
   });
 
   it("sans libellé, une mention seule ne désigne personne : elle peut viser un tiers", () => {
-    expect(parseGetiPost(getiRelayPost(`lft dps <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBeNull();
-    expect(parseGetiPost(getiRelayPost(`lft dps, duo avec <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBeNull();
+    expect(parseGetiPost(getiRelayPost(`lft dps <@${GETI_FAKE_OTHER_ID}>`), GETI_TRUSTED_BOTS).authorId).toBeNull();
+    expect(parseGetiPost(getiRelayPost(`lft dps, duo avec <@${GETI_FAKE_OTHER_ID}>`), GETI_TRUSTED_BOTS).authorId).toBeNull();
   });
 
   it("« by <@id> » en tête de ligne désigne l'auteur", () => {
     expect(parseGetiPost(getiRelayPost(`lft dps
-by <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBe(GETI_FAKE_OTHER_ID);
+by <@${GETI_FAKE_OTHER_ID}>`), GETI_TRUSTED_BOTS).authorId).toBe(GETI_FAKE_OTHER_ID);
   });
 
   it("« Auteur : <@id> » dans la ligne désigne l'auteur", () => {
-    expect(parseGetiPost(getiRelayPost(`lft dps — Auteur : <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(parseGetiPost(getiRelayPost(`lft dps — Auteur : <@${GETI_FAKE_OTHER_ID}>`), GETI_TRUSTED_BOTS).authorId).toBe(GETI_FAKE_OTHER_ID);
   });
 
   it("« posté par <@id> » désigne l'auteur", () => {
-    expect(parseGetiPost(getiRelayPost(`lft dps, posté par <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(parseGetiPost(getiRelayPost(`lft dps, posté par <@${GETI_FAKE_OTHER_ID}>`), GETI_TRUSTED_BOTS).authorId).toBe(GETI_FAKE_OTHER_ID);
   });
 
   it("« remplaçant de <@id> » ne désigne pas l'auteur", () => {
     const description = `Remplaçant de <@${GETI_FAKE_OTHER_ID}> recherché, dps`;
 
-    expect(parseGetiPost(getiRelayPost(description)).authorId).toBeNull();
+    expect(parseGetiPost(getiRelayPost(description), GETI_TRUSTED_BOTS).authorId).toBeNull();
   });
 
   it("« remplacé par <@id> » dans une phrase ne désigne pas l'auteur", () => {
     const description = `lft dps, notre tank remplacé par <@${GETI_FAKE_OTHER_ID}>`;
 
-    expect(parseGetiPost(getiRelayPost(description)).authorId).toBeNull();
+    expect(parseGetiPost(getiRelayPost(description), GETI_TRUSTED_BOTS).authorId).toBeNull();
   });
 
   it("un libellé collé à un mot ne compte pas (« lobby <@id> »)", () => {
-    expect(parseGetiPost(getiRelayPost(`Je viens du lobby <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBeNull();
+    expect(parseGetiPost(getiRelayPost(`Je viens du lobby <@${GETI_FAKE_OTHER_ID}>`), GETI_TRUSTED_BOTS).authorId).toBeNull();
   });
 
   it("plusieurs mentions sans libellé ne désignent personne", () => {
     const description = `lft <@${GETI_FAKE_OTHER_ID}> et <@100000000000000003> en duo`;
 
-    expect(parseGetiPost(getiRelayPost(description)).authorId).toBeNull();
+    expect(parseGetiPost(getiRelayPost(description), GETI_TRUSTED_BOTS).authorId).toBeNull();
   });
 
   it("sans mention, l'identifiant est nul : celui du bot n'est jamais rendu", () => {
-    const parsed = parseGetiPost(getiRelayPost("lft dps"));
+    const parsed = parseGetiPost(getiRelayPost("lft dps"), GETI_TRUSTED_BOTS);
 
     expect(parsed.authorId).toBeNull();
     expect(parsed.authorId).not.toBe(GETI_FAKE_BOT_ID);
@@ -306,7 +331,7 @@ describe("parseGetiPost — en-tête d'un relais GETI", () => {
   const HEADER = `<@${GETI_FAKE_OTHER_ID}>*(fauxpseudo)* sur [Faux Serveur](https://discord.gg/fauxcode)`;
 
   it("l'en-tête donne l'auteur, son pseudo et le serveur d'origine", () => {
-    const parsed = parseGetiPost(getiRelayPost(`${HEADER}\n\n> lft dps d3 eu`, null));
+    const parsed = parseGetiPost(getiRelayPost(`${HEADER}\n\n> lft dps d3 eu`, null), GETI_TRUSTED_BOTS);
 
     expect(parsed).toMatchObject({
       relayed: true,
@@ -319,12 +344,12 @@ describe("parseGetiPost — en-tête d'un relais GETI", () => {
   });
 
   it("l'en-tête est retiré du texte : seul le texte cité reste", () => {
-    expect(parseGetiPost(getiRelayPost(`${HEADER}\n\n> lft dps`, null)).text).toBe("> lft dps");
+    expect(parseGetiPost(getiRelayPost(`${HEADER}\n\n> lft dps`, null), GETI_TRUSTED_BOTS).text).toBe("> lft dps");
   });
 
   it("le nom du serveur n'apporte ni rôle, ni rang, ni région, ni équipe", () => {
     const header = `<@${GETI_FAKE_OTHER_ID}>*(heal_m1)* sur [Overwatch France EU - Team Phoenix Tank Diamond](https://discord.gg/a)`;
-    const parsed = parseGetiPost(getiRelayPost(`${header}\n\n> lft dps`, null));
+    const parsed = parseGetiPost(getiRelayPost(`${header}\n\n> lft dps`, null), GETI_TRUSTED_BOTS);
 
     expect(parsed).toMatchObject({ roles: ["DPS"], ranks: { min: null, max: null }, regions: [], teamName: null });
   });
@@ -332,22 +357,22 @@ describe("parseGetiPost — en-tête d'un relais GETI", () => {
   it("un pseudo aux caractères échappés est rendu sans ses échappements", () => {
     const header = `<@${GETI_FAKE_OTHER_ID}>*(faux\\_pseudo)* sur [S](https://discord.gg/a)`;
 
-    expect(parseGetiPost(getiRelayPost(`${header}\n\n> lft`, null)).authorTag).toBe("faux_pseudo");
+    expect(parseGetiPost(getiRelayPost(`${header}\n\n> lft`, null), GETI_TRUSTED_BOTS).authorTag).toBe("faux_pseudo");
   });
 
   it("l'auteur de l'en-tête passe avant une mention « contact » du texte cité", () => {
     const description = `${HEADER}\n\n> LFT tank m2\n> contact <@999999999999999999>`;
 
-    expect(parseGetiPost(getiRelayPost(description, null)).authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(parseGetiPost(getiRelayPost(description, null), GETI_TRUSTED_BOTS).authorId).toBe(GETI_FAKE_OTHER_ID);
   });
 
   it("sans en-tête, une mention « contact » dans une citation ne désigne pas l'auteur", () => {
-    expect(parseGetiPost(getiRelayPost("lft\n> contact <@999999999999999999>", null)).authorId).toBeNull();
+    expect(parseGetiPost(getiRelayPost("lft\n> contact <@999999999999999999>", null), GETI_TRUSTED_BOTS).authorId).toBeNull();
   });
 
   it("une mention qui n'ouvre pas la description n'est pas un en-tête", () => {
     const description = `lft dps ${HEADER}`;
 
-    expect(parseGetiPost(getiRelayPost(description, null))).toMatchObject({ authorId: null, originServer: null });
+    expect(parseGetiPost(getiRelayPost(description, null), GETI_TRUSTED_BOTS)).toMatchObject({ authorId: null, originServer: null });
   });
 });

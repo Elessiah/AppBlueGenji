@@ -23,8 +23,8 @@ export const NOT_BEFORE_WORD = String.raw`(?![\p{L}\p{N}])`;
 
 const URL_LIKE = /(?:https?:\/\/|discord\.gg\/|www\.)\S+/giu;
 /** Émoji de serveur `<:nom:id>` : son nom porte souvent le rang ou le rôle. */
-const CUSTOM_EMOJI = /<a?:(\w{1,32}):\d{1,22}>/gu;
-const MENTION = /<(?:@[!&]?|#)\d{1,22}>/gu;
+export const CUSTOM_EMOJI = /<a?:(\w{1,32}):\d{1,22}>/gu;
+export const MENTION = /<(?:@[!&]?|#)\d{1,22}>/gu;
 const TIMESTAMP = /<t:\d{1,16}(?::[a-zA-Z])?>/gu;
 /**
  * Balisage : gras, italique, barré, code, masqué (`||…||`), citation, titre.
@@ -82,14 +82,21 @@ export function getiSafeText(text: string): string {
 }
 
 /**
- * Nom en texte seul : balisage Markdown, chevrons, « @ » et barres obliques
- * inverses retirés, espaces réduites (« @everyone **Nitro** » → « everyone Nitro »).
+ * Nom en texte seul : mentions retirées (l'identifiant Discord d'un tiers ne
+ * sort pas), émoji personnalisé réduit à son nom, balisage Markdown, chevrons,
+ * « @ » et barres obliques inverses retirés, espaces réduites
+ * (« @everyone **Nitro** » → « everyone Nitro »).
  *
  * @param name Nom déjà nettoyé de ses invisibles.
  * @returns Le nom sans caractère de balisage.
  */
 export function withoutMarkup(name: string): string {
-  return name.replace(MARKUP_CHARACTERS, " ").replace(/\s+/gu, " ").trim();
+  return name
+    .replace(CUSTOM_EMOJI, " $1 ")
+    .replace(MENTION, " ")
+    .replace(MARKUP_CHARACTERS, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
 }
 
 /**
@@ -134,8 +141,11 @@ export function prepareGetiText(text: string): GetiPreparedText {
       .replace(MARKDOWN, " ")
       .replace(/[\u2018\u2019\u00B4]/gu, "'")
       .replace(/[^\S\n]+/gu, " ");
-  const plain = prepare(" $1 ").normalize("NFD").replace(DIACRITICS, "");
-  return { clean: prepare(" "), plain, lower: plain.toLowerCase() };
+  // Sans émoji de serveur (le cas courant) les deux formes sont les mêmes : un seul passage.
+  const hasEmoji = bounded.includes("<:") || bounded.includes("<a:");
+  const clean = prepare(" ");
+  const plain = (hasEmoji ? prepare(" $1 ") : clean).normalize("NFD").replace(DIACRITICS, "");
+  return { clean, plain, lower: plain.toLowerCase() };
 }
 
 /** Échappe un texte pour l'insérer tel quel dans une expression régulière. */
