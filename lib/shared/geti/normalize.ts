@@ -61,6 +61,37 @@ export function getiDisplayText(raw: unknown): string {
     .trimEnd();
 }
 
+/**
+ * Retire les passages masqués (`||…||`) : l'auteur les a cachés derrière un clic
+ * sur Discord, ni la page ni l'analyse ne les lisent (une étiquette tirée d'un
+ * passage masqué le montrerait). Parcours linéaire, sans borne de longueur ;
+ * une marque `||` sans fermante (ou `||||`, vide) reste du texte, comme sur Discord.
+ *
+ * @param text Texte d'annonce.
+ * @param replacement Ce qui remplace chaque passage (une espace pour l'analyse, un mot neutre pour la page).
+ * @returns Le texte sans contenu masqué.
+ */
+export function getiWithoutSpoilers(text: string, replacement: string): string {
+  if (!text.includes("||")) return text;
+  let out = "";
+  let from = 0;
+  let search = 0;
+  for (;;) {
+    const open = text.indexOf("||", search);
+    if (open === -1) break;
+    const close = text.indexOf("||", open + 2);
+    if (close === -1) break;
+    if (close === open + 2) {
+      search = close + 2;
+      continue;
+    }
+    out += text.slice(from, open) + replacement;
+    from = close + 2;
+    search = from;
+  }
+  return out + text.slice(from);
+}
+
 const USER_MENTION = /<@[!&]?\d{1,22}>/gu;
 const CHANNEL_MENTION = /<#\d{1,22}>/gu;
 const MASS_MENTION = /@(everyone|here)(?![\p{L}\p{N}])/giu;

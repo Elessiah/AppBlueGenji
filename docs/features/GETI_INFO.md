@@ -620,9 +620,10 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
   qui répondent à un critère actif (`getiChipMatches`) sont mises en avant — plus
   vives, cochées, et préfixées pour un lecteur d'écran (jamais la couleur seule).
 - **Texte** : toujours un nœud de texte (`getiPostBodyText`) — **une** marque de
-  citation suivie d'une espace (celle du relais ; « >4000 » reste), balisage par
-  paires au bord d'un mot (« xX__Sniper__Xx » reste), passage masqué `||…||` →
-  « [masqué] » / « [hidden] » (jamais son contenu), mention → mot neutre (jamais un
+  citation suivie d'une espace ou seule sur sa ligne (celle du relais ; « >4000 » reste), balisage par
+  paires au bord d'un mot (« xX__Sniper__Xx » reste ; `**` / `~~` restés seuls retirés),
+  code rendu tel quel (aucun balisage retiré dedans, langue d'un bloc ```` ```txt ```` ôtée), passage masqué `||…||`, quelle que soit sa longueur →
+  « [masqué] » / « [hidden] » (jamais son contenu ; l'analyse ne le lit pas non plus : aucune étiquette n'en vient — `getiWithoutSpoilers`), mention → mot neutre (jamais un
   identifiant), émoji de serveur → son nom, horodatage `<t:…>` → date ou heure à
   l'heure de Paris (`getiTimestampLabel`, `R` écrit comme `f`), lien laissé en texte. Replié au-delà
   de 420 caractères ou 7 lignes (« Lire la suite ») ; une fois la page chargée, le
@@ -666,6 +667,6 @@ l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lec
 
 - `GetiLayout` (client) enveloppe filtres et résultats : pendant un changement de filtre, la grille porte `aria-busy` + `data-pending` (liseré pointillé, jamais d'opacité : contraste 4,5:1) et le panneau annonce « Mise à jour… » (`<output>`).
 - « Réinitialiser » rend le focus au bouton Filtres (mobile) ou au titre du panneau avant de disparaître ; sur mobile, un bouton « Voir les N annonces » referme le panneau.
-- Liste indisponible : filtres masqués, « Aucune annonce à afficher » en ligne, la panne en notification (`showError`) et bouton « Réessayer » (`GetiRetry`, `router.refresh()`) ; pm2 reçoit `[geti] post list unavailable: <code>` (code seul).
+- Liste indisponible : filtres masqués, « Annonces non chargées » / « Posts not loaded » en ligne (jamais un « aucune annonce », qui se lirait comme une recherche vide), la panne en notification (`showError`, redite si « Réessayer » revient encore sans liste) et bouton « Réessayer » (`GetiRetry`, `router.refresh()`) ; pm2 reçoit `[geti] post list unavailable: <code>` (code, à défaut nom de la classe d'erreur ; une ligne par minute au plus, avec le nombre d'échecs tus — `logGetiListFailure`). Une écriture qui échoue en cours de route oublie aussi la lecture partagée.
 - La date exacte de publication / modification est un texte du pied de carte (plus d'infobulle) ; le repli de copie rend le focus au bouton.
 - Onglets anglais au pluriel (Players, Teams, Subs, Staff, Scrims, Casters).

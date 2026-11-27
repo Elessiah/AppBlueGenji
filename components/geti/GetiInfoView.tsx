@@ -3,7 +3,7 @@ import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
-import { listGetiPostsShared } from "@/lib/server/geti/posts";
+import { listGetiPostsShared, logGetiListFailure } from "@/lib/server/geti/posts";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -17,7 +17,6 @@ import {
   getiAgeOptions,
   getiCategoryPath,
   getiChannelUrl,
-  getiErrorCode,
   getiPageFilter,
   getiPageHref,
   parseGetiPageQuery,
@@ -56,8 +55,8 @@ export async function GetiInfoView({
   // Base injoignable : la page reste lisible (carte, onglets, bouton « Publier »).
   const listed: GetiPostPage | null = await listGetiPostsShared(filter, { page: query.page }, now).catch(
     (error: unknown) => {
-      // Un code seul (jamais le message, qui peut citer la requête) : la panne se voit dans pm2.
-      console.warn("[geti] post list unavailable:", getiErrorCode(error));
+      // Un code seul (jamais le message, qui peut citer la requête), une ligne par minute au plus.
+      logGetiListFailure(error);
       return null;
     },
   );

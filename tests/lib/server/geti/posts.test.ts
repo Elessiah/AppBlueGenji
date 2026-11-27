@@ -10,9 +10,11 @@ import {
   getiTrustedBots,
   listGetiPosts,
   listGetiPostsShared,
+  logGetiListFailure,
   purgeExpiredGetiPosts,
   reconcileGetiChannel,
   refreshStaleGetiPosts,
+  resetGetiListFailureLog,
   startGetiPostsPurgeClock,
   upsertGetiPosts,
 } from "@/lib/server/geti/posts";
@@ -805,5 +807,98 @@ describe("listGetiPostsShared", () => {
     const page = await listGetiPostsShared({ category: "lft" }, {}, NOW);
 
     expect(page.total).toBe(1);
+  });
+});
+
+describe("écriture échouée en cours de route", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+
+  function shared() {
+    const execute = executeMock([row()]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    return execute;
+  }
+
+  it("deleteGetiPosts_secondChunkFails_forgetsScansAndRethrows", async () => {
+    const execute = shared();
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    const failing = jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 200 }]).mockRejectedValueOnce(new Error("ECONNRESET"));
+    const ids = Array.from({ length: 201 }, (_, index) => String(100000000000000000 + index * 1000));
+
+    await expect(deleteGetiPosts(executor(failing), ids)).rejects.toThrow("ECONNRESET");
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("upsertGetiPosts_rowFails_forgetsScans", async () => {
+    const execute = shared();
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    const failing = jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 1 }]).mockRejectedValueOnce(new Error("down"));
+    const posts = [
+      getiPushedPost({ postedAt: "2026-11-27T10:00:00.000Z" }),
+      getiPushedPost({ messageId: "100000000000000999", postedAt: "2026-11-27T10:00:00.000Z" }),
+    ];
+
+    await expect(upsertGetiPosts(executor(failing), posts, NOW)).rejects.toThrow("down");
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("purgeExpiredGetiPosts_failure_forgetsScans", async () => {
+    const execute = shared();
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    const failing = jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 3 }]).mockRejectedValueOnce(new Error("down"));
+
+    await expect(purgeExpiredGetiPosts(executor(failing), NOW)).rejects.toThrow("down");
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("logGetiListFailure", () => {
+  beforeEach(() => {
+    resetGetiListFailureLog();
+  });
+
+  function warnSpy() {
+    return jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  }
+
+  it("logGetiListFailure_first_logsCodeOnly", () => {
+    const warn = warnSpy();
+
+    const logged = logGetiListFailure(Object.assign(new Error("SELECT secret"), { code: "ECONNREFUSED" }), NOW);
+
+    expect(logged).toBe(true);
+    expect(warn).toHaveBeenCalledWith("[geti] post list unavailable:", "ECONNREFUSED", "");
+    warn.mockRestore();
+  });
+
+  it("logGetiListFailure_withinMinute_silenced", () => {
+    const warn = warnSpy();
+    logGetiListFailure(new Error("down"), NOW);
+
+    const logged = logGetiListFailure(new Error("down"), NOW + 59_999);
+
+    expect(logged).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("logGetiListFailure_afterMinute_logsSilencedCount", () => {
+    const warn = warnSpy();
+    logGetiListFailure(new Error("down"), NOW);
+    logGetiListFailure(new Error("down"), NOW + 1000);
+
+    const logged = logGetiListFailure(new TypeError("bug"), NOW + 60_000);
+
+    expect(logged).toBe(true);
+    expect(warn).toHaveBeenLastCalledWith("[geti] post list unavailable:", "TypeError", "(+1 since last line)");
+    warn.mockRestore();
   });
 });

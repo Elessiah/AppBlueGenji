@@ -18,6 +18,7 @@ import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { toIso } from "@/lib/server/serialization";
 import type { GetiPushedPost, GetiReconcileRequest } from "@/lib/server/geti/wire";
+import { getiErrorCode } from "@/lib/shared/geti/page";
 import {
   GETI_CATEGORIES,
   getiCategoryOfChannel,
@@ -122,32 +123,37 @@ export async function upsertGetiPosts(
   const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0 };
   const emptied: string[] = [];
   const trusted = getiTrustedBots();
-  for (const post of posts) {
-    if (post.postedAt.getTime() < getiRetentionCutoff(post.category, now).getTime()) {
-      outcome.expired += 1;
-      continue;
+  try {
+    for (const post of posts) {
+      if (post.postedAt.getTime() < getiRetentionCutoff(post.category, now).getTime()) {
+        outcome.expired += 1;
+        continue;
+      }
+      const parsed = parseGetiPost(post.raw, trusted);
+      if (isNotAnnouncement(parsed, post.raw)) {
+        outcome.emptied += 1;
+        emptied.push(post.messageId);
+        continue;
+      }
+      await executor.execute(UPSERT_SQL, [
+        post.messageId,
+        post.channelId,
+        post.category,
+        post.source,
+        parsed.authorId,
+        parsed.authorTag?.slice(0, AUTHOR_TAG_MAX) ?? null,
+        JSON.stringify(post.raw),
+        JSON.stringify(parsed),
+        post.postedAt,
+        post.editedAt,
+      ]);
+      outcome.stored += 1;
     }
-    const parsed = parseGetiPost(post.raw, trusted);
-    if (isNotAnnouncement(parsed, post.raw)) {
-      outcome.emptied += 1;
-      emptied.push(post.messageId);
-      continue;
-    }
-    await executor.execute(UPSERT_SQL, [
-      post.messageId,
-      post.channelId,
-      post.category,
-      post.source,
-      parsed.authorId,
-      parsed.authorTag?.slice(0, AUTHOR_TAG_MAX) ?? null,
-      JSON.stringify(post.raw),
-      JSON.stringify(parsed),
-      post.postedAt,
-      post.editedAt,
-    ]);
-    outcome.stored += 1;
+    if (emptied.length > 0) await deleteGetiPosts(executor, emptied);
+  } catch (error) {
+    forgetGetiScans();
+    throw error;
   }
-  if (emptied.length > 0) await deleteGetiPosts(executor, emptied);
   if (outcome.stored > 0) forgetGetiScans();
   return outcome;
 }
@@ -155,13 +161,18 @@ export async function upsertGetiPosts(
 /** Retire des annonces par identifiant de message Discord ; rend le nombre de lignes retirées. */
 export async function deleteGetiPosts(executor: GetiExecutor, messageIds: readonly string[]): Promise<number> {
   let removed = 0;
-  for (let start = 0; start < messageIds.length; start += DELETE_CHUNK) {
-    const chunk = messageIds.slice(start, start + DELETE_CHUNK);
-    const [result] = await executor.execute(
-      `DELETE FROM bg_geti_posts WHERE message_id IN (${chunk.map(() => "?").join(", ")})`,
-      [...chunk],
-    );
-    removed += affected(result);
+  try {
+    for (let start = 0; start < messageIds.length; start += DELETE_CHUNK) {
+      const chunk = messageIds.slice(start, start + DELETE_CHUNK);
+      const [result] = await executor.execute(
+        `DELETE FROM bg_geti_posts WHERE message_id IN (${chunk.map(() => "?").join(", ")})`,
+        [...chunk],
+      );
+      removed += affected(result);
+    }
+  } catch (error) {
+    forgetGetiScans();
+    throw error;
   }
   if (removed > 0) forgetGetiScans();
   return removed;
@@ -200,17 +211,22 @@ export async function reconcileGetiChannel(
  */
 export async function purgeExpiredGetiPosts(executor: GetiExecutor, now: number = Date.now()): Promise<number> {
   let removed = 0;
-  for (const category of GETI_CATEGORIES) {
-    const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ?`, [
-      category,
-      getiRetentionCutoff(category, now),
+  try {
+    for (const category of GETI_CATEGORIES) {
+      const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ?`, [
+        category,
+        getiRetentionCutoff(category, now),
+      ]);
+      removed += affected(result);
+    }
+    const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE posted_at < ?`, [
+      new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS),
     ]);
     removed += affected(result);
+  } catch (error) {
+    forgetGetiScans();
+    throw error;
   }
-  const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE posted_at < ?`, [
-    new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS),
-  ]);
-  removed += affected(result);
   if (removed > 0) forgetGetiScans();
   return removed;
 }
@@ -463,7 +479,8 @@ const GETI_SCAN_CACHE_PREFIX = "geti:scan:";
  * modification, suppression, réconciliation, purge, réanalyse). Chaque requête
  * est validée seule (pas de transaction), donc la page ne sert jamais, après la
  * réponse au bot, une annonce supprimée sur Discord — `/rgpd` promet son retrait
- * « aussitôt ».
+ * « aussitôt ». Une écriture qui échoue en cours de route oublie aussi : les
+ * requêtes passées avant l'échec sont déjà validées.
  */
 function forgetGetiScans(): void {
   invalidateCachedPrefix(GETI_SCAN_CACHE_PREFIX);
@@ -489,4 +506,34 @@ export async function listGetiPostsShared(
     scanGetiPosts(filter, await getDatabase(), now),
   );
   return pageOfStored(stored, filter, page, now);
+}
+
+/** Une ligne de pm2 par minute au plus quand la liste est illisible : chaque visite la redemanderait. */
+export const GETI_LIST_FAILURE_LOG_MS = 60_000;
+let lastListFailureLog = Number.NEGATIVE_INFINITY;
+let silencedListFailures = 0;
+
+/**
+ * Consigne dans pm2 l'échec de lecture de la liste publique : un code seul
+ * (`getiErrorCode`, jamais le message, qui peut citer la requête), au plus une
+ * fois par {@link GETI_LIST_FAILURE_LOG_MS}, avec le nombre d'échecs tus depuis.
+ *
+ * @returns `true` si une ligne a été écrite.
+ */
+export function logGetiListFailure(error: unknown, now: number = Date.now()): boolean {
+  if (now - lastListFailureLog < GETI_LIST_FAILURE_LOG_MS) {
+    silencedListFailures += 1;
+    return false;
+  }
+  const silenced = silencedListFailures;
+  lastListFailureLog = now;
+  silencedListFailures = 0;
+  console.warn("[geti] post list unavailable:", getiErrorCode(error), silenced > 0 ? `(+${silenced} since last line)` : "");
+  return true;
+}
+
+/** Tests : oublie la dernière ligne consignée. */
+export function resetGetiListFailureLog(): void {
+  lastListFailureLog = Number.NEGATIVE_INFINITY;
+  silencedListFailures = 0;
 }
