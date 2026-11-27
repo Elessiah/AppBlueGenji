@@ -780,7 +780,7 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
       missingInBoth(
         [
           "La lecture des annonces de recrutement transmises au site repose elle aussi sur son intérêt légitime",
-          "dans le cache de messages de Discord, qui garde jusqu'à 200 messages de chaque salon (les derniers reçus ou relus)",
+          "dans le cache de messages de Discord, qui garde jusqu'à 200 messages de chaque salon (les derniers reçus, ou relus un à un après la modification d'un message qu'il n'avait plus)",
           "si son exclusion ne peut être vérifiée sur le moment, son annonce passe et le salon est relu toutes les cinq minutes",
           "à chaque nouvelle session Discord",
           "après un envoi au site en échec ou une lecture d'un salon en échec passager",
@@ -790,7 +790,7 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
         ],
         [
           "Reading the recruitment posts passed to the website also rests on its legitimate interest",
-          "in Discord's message cache, which keeps up to 200 messages of each channel (the latest received or read again)",
+          "in Discord's message cache, which keeps up to 200 messages of each channel (the latest received, or fetched again one by one after an edit of a message it no longer held)",
           "if their exclusion cannot be checked at that moment, their post goes through and the channel is read again every five minutes",
           "at each new Discord session",
           "after a failed sending to the website or a temporarily failed read of a channel",

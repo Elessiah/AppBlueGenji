@@ -404,7 +404,10 @@ celle d'un message est effacée par la purge horaire 14 jours après son
 enregistrement (le message est alors trop vieux pour revenir). Pas encore
 d'écran : le geste se fait par la route (le lot de la page pourra y brancher un
 bouton). Table absente : l'écriture d'un lot échoue en `503`, le bot réessaie —
-rien n'est recopié sans savoir si son auteur s'y est opposé.
+rien n'est recopié sans savoir si son auteur s'y est opposé. Une sauvegarde restaurée
+ne connaît pas une opposition enregistrée après elle : il faut l'enregistrer de
+nouveau (`/rgpd`, T21 et `PRIVACY_CHANGES` le disent ; le journal des
+suppressions ne porte que les suppressions de compte).
 
 ### Lecture — `listGetiPosts(filter, page, executor?, now?)`
 

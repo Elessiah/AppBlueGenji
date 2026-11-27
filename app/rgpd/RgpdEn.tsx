@@ -269,9 +269,9 @@ export function RgpdEn({
             post, when GETI Bot deletes or edits its relay, which the association does not control. A deletion made
             while the bot is stopped is only seen at its next reading of the channels, within the last 5,000 messages of
             each channel, and so is a message erased by its author&apos;s ban from the Discord server, which Discord does
-            not report to the bot; failing that, the post leaves at the end of its retention period (an encrypted backup
+            not report to the bot; failing that, or if the channel is deleted or closed to the bot, the post leaves at the end of its retention period (an encrypted backup
             copy may keep the removed post or its previous version for {BACKUP_RETENTION_DAYS} days at most). A
-            post&apos;s text may mention other people (a teammate, a contact): they have the same rights as its author.
+            post&apos;s text may mention other people (a teammate, a contact): like the author, they can exercise their rights over the post that mentions them and obtain its removal.
             Basis: the association&apos;s legitimate interest (helping players and teams find each other), for posts that
             are already public; their author — including the author of a post relayed from another server, who cannot
             delete it here — can object and ask for removal (see{" "}
@@ -319,7 +319,7 @@ export function RgpdEn({
           cannot be edited one by one. If one of them ever had to be restored, the <strong>account
           deletions</strong> made since are applied again before the service resumes; other erasures after the
           archive (a tag or BattleTag removed, a means of logging in unlinked, a visibility or notification
-          setting changed, a report purged…) are not, and would come back with it. Uploaded images (avatar,
+          setting changed, a report purged, an objection to the copying of recruitment posts…) are not, and would come back with it. Uploaded images (avatar,
           logo) are removed from the backup within the hour.
         </p>
         <p id="donnees-connexion" style={{ marginTop: 8, ...NOTE_STYLE }}>

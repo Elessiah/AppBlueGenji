@@ -329,10 +329,10 @@ function RgpdFr({
             GETI Bot supprime ou modifie son relais, ce que l&apos;association ne maîtrise pas. Une suppression faite
             pendant un arrêt du bot n&apos;est vue qu&apos;à sa relecture suivante des salons, dans la limite des 5 000 derniers
             messages de chaque salon, de même qu&apos;un message effacé par le bannissement de son auteur du serveur
-            Discord, dont Discord ne prévient pas le bot ; à défaut, l&apos;annonce part au terme de sa garde (une copie de
+            Discord, dont Discord ne prévient pas le bot ; à défaut, ou si le salon est supprimé ou fermé au bot, l&apos;annonce part au terme de sa garde (une copie de
             sauvegarde chiffrée peut garder l&apos;annonce retirée ou son ancienne version {BACKUP_RETENTION_DAYS} jours au
-            plus). Le texte d&apos;une annonce peut citer d&apos;autres personnes (coéquipier, contact) : elles ont les mêmes
-            droits que son auteur. Base : l&apos;intérêt légitime de l&apos;association (aider joueurs et équipes à se
+            plus). Le texte d&apos;une annonce peut citer d&apos;autres personnes (coéquipier, contact) : elles peuvent, comme
+            lui, exercer leurs droits sur l&apos;annonce qui les cite et en obtenir le retrait. Base : l&apos;intérêt légitime de l&apos;association (aider joueurs et équipes à se
             trouver), pour des annonces déjà publiques ; leur auteur — y compris celui d&apos;une annonce relayée depuis un
             autre serveur, qui ne peut pas la supprimer ici — peut s&apos;y opposer et en demander le retrait (voir{" "}
             <a href="#exercer-vos-droits">« Exercer vos droits »</a>) : ses annonces sont alors retirées et ne sont plus recopiées, l&apos;association ne gardant pour cela que l&apos;identifiant Discord de l&apos;auteur (ou celui de l&apos;annonce visée), tant que l&apos;opposition tient ({GETI_RETENTION_MAX_DAYS} jours pour une seule annonce). Registre des traitements : fiche T21.
@@ -424,7 +424,7 @@ function RgpdFr({
           être restaurée, les <strong>suppressions de compte</strong> intervenues depuis sont
           réappliquées avant la remise en service ; les autres effacements postérieurs à
           l'archive (un tag ou un BattleTag retiré, un moyen de connexion détaché, un réglage de
-          visibilité ou de notification modifié, un signalement purgé…) ne le sont pas, et
+          visibilité ou de notification modifié, un signalement purgé, une opposition à la recopie des annonces de recrutement…) ne le sont pas, et
           reviendraient avec elle. Les images téléversées (avatar, logo) sont retirées de la sauvegarde dans
           l'heure.
         </p>
