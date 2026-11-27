@@ -90,11 +90,21 @@ const GETI_SERVER_LINK = String.raw`\[([^\n]{1,200}?)\]\(https?:\/\/[^)\s]*\)`;
 /**
  * Première ligne d'un relais du bot GETI :
  * « <@id>*(pseudo)* sur [Serveur](invitation) », puis le texte cité (« > … »).
+ * Le pseudo peut porter une parenthèse fermante (« Bob :) ») : il court
+ * jusqu'à la première « ) » suivie de « sur », « on » ou « from » et du lien.
  */
 const GETI_HEADER = new RegExp(
-  String.raw`^\s*<@!?(\d{15,22})>[^\S\n]*[*_]*\(((?:\\.|[^)\n\\]){1,64})\)[*_]*[^\S\n]*(?:sur|on|from)[^\S\n]*${GETI_SERVER_LINK}[^\S\n]*(?:\n|$)`,
+  String.raw`^\s*<@!?(\d{15,22})>[^\S\n]*[*_]*\(((?:\\.|[^\n\\]){1,64}?)\)[*_]*[^\S\n]*(?:sur|on|from)[^\S\n]*${GETI_SERVER_LINK}[^\S\n]*(?:\n|$)`,
   "iu",
 );
+/**
+ * Première ligne qui s'ouvre comme un en-tête GETI (mention en tête) sans s'y
+ * lire en entier : écrite par le bot GETI avec le pseudo et le nom de serveur
+ * que d'autres choisissent, elle n'est jamais lue pour le texte, ni pour le
+ * pseudo ou le serveur ; seule sa mention de tête, qu'écrit le bot, nomme l'auteur.
+ */
+const GETI_HEADER_LIKE_LINE = /^\s*<@!?(\d{15,22})>[^\n]*(?:\n|$)/u;
+
 /**
  * Réponse de service d'un bot de relais à celui qui vient de publier (« Ton
  * annonce a été publié dans 32 autres channels. », lien d'invitation du bot) :
@@ -120,7 +130,7 @@ const BOT_NOTICE = new RegExp(
 export function isGetiBotNotice(raw: GetiRawPost): boolean {
   const source: GetiRawPost = typeof raw === "object" && raw !== null ? raw : {};
   if (source.author?.bot !== true) return false;
-  const descriptions = embedsOf(source).map((embed) => text(embed.description));
+  const descriptions = embedsOf(source).map(({ embed }) => text(embed.description));
   if (descriptions.some((description) => GETI_HEADER.test(description))) return false;
   return BOT_NOTICE.test([text(source.content), ...descriptions].join("\n"));
 }
@@ -236,12 +246,12 @@ type RelayContent = {
   originServer: string | null;
 };
 
-function embedsOf(raw: GetiRawPost): GetiRawEmbed[] {
-  return Array.isArray(raw.embeds)
-    ? raw.embeds
-        .slice(0, EMBEDS_MAX)
-        .filter((embed): embed is GetiRawEmbed => typeof embed === "object" && embed !== null)
-    : [];
+function embedsOf(raw: GetiRawPost): { embed: GetiRawEmbed; leading: boolean }[] {
+  if (!Array.isArray(raw.embeds)) return [];
+  // « Premier encart » = position 0 du message : un encart illisible en tête ne fait pas d'un encart suivant le premier.
+  return raw.embeds.slice(0, EMBEDS_MAX).flatMap((embed: unknown, index) =>
+    typeof embed === "object" && embed !== null ? [{ embed: embed as GetiRawEmbed, leading: index === 0 }] : [],
+  );
 }
 
 /** Champs d'un encart, une ligne chacun : « Nom : valeur ». */
@@ -338,7 +348,7 @@ type EmbedReading = {
 };
 
 /** Lit un encart : en-tête GETI et ligne « Sent from » ne comptent que du bot qui les écrit. */
-function readEmbed(embed: GetiRawEmbed, trust: RelayTrust): EmbedReading {
+function readEmbed(embed: GetiRawEmbed, trust: RelayTrust, leading: boolean): EmbedReading {
   const description = text(embed.description);
   const headerMatch = GETI_HEADER.exec(description);
   const header: RelayAuthor | null =
@@ -360,10 +370,20 @@ function readEmbed(embed: GetiRawEmbed, trust: RelayTrust): EmbedReading {
       : null;
   const lineServer = trusted !== null && trailerId === null ? serverName(trusted[1]) : null;
   // En-tête ou ligne « Sent from » qui ne vient pas de son bot : le texte du joueur, affiché tel quel.
-  const start = header === null || headerMatch === null ? 0 : headerMatch[0].length;
+  // Un en-tête du bot GETI illisible (pseudo ou serveur hors forme) est écarté aussi : le pseudo et le
+  // nom de serveur qu'il porte sont choisis par d'autres, qui y écriraient « Contact : <@quelqu'un> ».
+  const headerLike = trust.geti && header === null ? GETI_HEADER_LIKE_LINE.exec(description) : null;
+  const start = header !== null && headerMatch !== null ? headerMatch[0].length : (headerLike?.[0].length ?? 0);
+  // Sa mention de tête, elle, est écrite par le bot GETI avant tout texte choisi par d'autres : l'auteur
+  // reste connu (une opposition sur cet auteur le couvre), sans pseudo ni serveur. Dans son premier
+  // encart seulement : sans le reste de l'en-tête, rien ne dit qu'un encart suivant (transféré, ajouté)
+  // s'ouvre sur sa mention plutôt que sur un texte choisi par d'autres. Un en-tête complet et les
+  // libellés hors citation, eux, se lisent dans tout encart (le texte du joueur y est cité).
+  const leadingMention = headerLike !== null && leading ? { id: headerLike[1], tag: null, originServer: null } : null;
+  const named = header ?? leadingMention;
   const end = trusted === null ? undefined : Math.max(start, trusted.index);
   const parts = [text(embed.title), description.slice(start, end), ...embedFieldLines(embed)];
-  return { parts, header, trailer, embedTag, lineServer };
+  return { parts, header: named, trailer, embedTag, lineServer };
 }
 
 /**
@@ -373,7 +393,7 @@ function readEmbed(embed: GetiRawEmbed, trust: RelayTrust): EmbedReading {
  * l'en-tête.
  */
 function relayContent(raw: GetiRawPost, trust: RelayTrust): RelayContent {
-  const readings = embedsOf(raw).map((embed) => readEmbed(embed, trust));
+  const readings = embedsOf(raw).map(({ embed, leading }) => readEmbed(embed, trust, leading));
   const parts = [text(raw.content), ...readings.flatMap((reading) => reading.parts)];
   const body = parts.filter((part) => part.trim() !== "").join("\n");
   if (!trust.geti && !trust.site) {
