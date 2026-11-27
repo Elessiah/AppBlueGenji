@@ -61,6 +61,72 @@ export function getiDisplayText(raw: unknown): string {
     .trimEnd();
 }
 
+/**
+ * Code en ligne ou en bloc (`` `…` ``, ```` ```…``` ````), par paires, contenu borné :
+ * Discord l'affiche tel quel, une marque `||` ou `**` y est du texte.
+ */
+export const GETI_CODE_SPAN = /(`{1,3})([^`]{1,4096}?)\1/gu;
+
+/** Plages `[début, fin[` du code d'un texte ({@link GETI_CODE_SPAN}), dans l'ordre. */
+export function getiCodeRanges(text: string): Array<[number, number]> {
+  if (!text.includes("`")) return [];
+  const ranges: Array<[number, number]> = [];
+  for (const match of text.matchAll(GETI_CODE_SPAN)) {
+    const index = match.index ?? 0;
+    ranges.push([index, index + match[0].length]);
+  }
+  return ranges;
+}
+
+/**
+ * Prochaine marque `||` hors code à partir de `from` (−1 sinon). `ranges` est
+ * parcouru une fois, dans l'ordre : `cursor` garde la première plage utile.
+ */
+function nextSpoilerMark(text: string, from: number, ranges: Array<[number, number]>, cursor: { at: number }): number {
+  let search = from;
+  for (;;) {
+    const mark = text.indexOf("||", search);
+    if (mark === -1) return -1;
+    while (cursor.at < ranges.length && ranges[cursor.at][1] <= mark) cursor.at += 1;
+    const range = ranges[cursor.at];
+    // Une marque (ou sa seconde barre) dans du code : du texte, on reprend après le code.
+    if (range !== undefined && mark + 1 >= range[0] && mark < range[1]) {
+      search = range[1];
+      continue;
+    }
+    return mark;
+  }
+}
+
+/**
+ * Retire les passages masqués (`||…||`) : l'auteur les a cachés derrière un clic
+ * sur Discord, ni la page ni l'analyse ne les lisent (une étiquette tirée d'un
+ * passage masqué le montrerait). Même règle que Discord (`\|\|([\s\S]+?)\|\|`) :
+ * au moins un caractère masqué, qui peut être une barre (`||||x||` masque `||x`) ;
+ * une marque dans du code (`` `||` ``) est du texte. Parcours linéaire, sans
+ * borne de longueur ; une marque `||` sans fermante reste du texte.
+ *
+ * @param text Texte d'annonce.
+ * @param replacement Ce qui remplace chaque passage (une espace pour l'analyse, un mot neutre pour la page).
+ * @returns Le texte sans contenu masqué.
+ */
+export function getiWithoutSpoilers(text: string, replacement: string): string {
+  if (!text.includes("||")) return text;
+  const ranges = getiCodeRanges(text);
+  const cursor = { at: 0 };
+  let out = "";
+  let from = 0;
+  for (;;) {
+    const open = nextSpoilerMark(text, from, ranges, cursor);
+    if (open === -1) break;
+    const close = nextSpoilerMark(text, open + 3, ranges, cursor);
+    if (close === -1) break;
+    out += text.slice(from, open) + replacement;
+    from = close + 2;
+  }
+  return out + text.slice(from);
+}
+
 const USER_MENTION = /<@[!&]?\d{1,22}>/gu;
 const CHANNEL_MENTION = /<#\d{1,22}>/gu;
 const MASS_MENTION = /@(everyone|here)(?![\p{L}\p{N}])/giu;

@@ -364,8 +364,9 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
   autres channels. », lien d'invitation du bot) n'est pas une annonce ;
   `upsertGetiPosts` l'écarte comme un message vide (compté `emptied`, retiré
   s'il était gardé). Un relais à en-tête GETI n'en est jamais une.
-- **Analyses déjà gardées** : une ligne analysée avant ce lot (sans clé
-  `"closed"` dans `parsed_json`) est réanalysée à la lecture depuis son
+- **Analyses déjà gardées** : chaque analyse est gardée avec sa version en
+  dernière clé (`"analysisVersion":2}` — 2 : passages masqués non lus) ; une ligne
+  d'une version antérieure est réanalysée à la lecture depuis son
   `raw_json` par `listGetiPosts` (seules ces lignes remontent leur message brut) ;
   message brut illisible : `dates`, `levels` et `closed` vides. Hors requête,
   l’horloge de purge horaire (`refreshStaleGetiPosts`, 5 000 lignes au plus par
@@ -373,8 +374,8 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
   illisible garde son analyse, champs ajoutés vides ; une ligne sans texte ou
   avis du bot est retirée) : la lecture ne les réanalyse plus (~0,3 ms chacune,
   jusqu’à 3 000 par page sinon). L’écriture ne touche qu’une ligne encore
-  ancienne. `closed` naît dans ce lot : aucune ligne gardée ne porte d’analyse
-  plus ancienne avec la clé.
+  ancienne. Avancer la version (`ANALYSIS_VERSION`) quand l'analyse change ce
+  qu'elle lit : les lignes gardées sont alors refaites.
 - **Faux positifs écartés** (revue) : une tranche d'âge (« âge : 16-20 ») n'est
   pas un horaire ; « 2/3 joueurs », « 1/12 places » ne sont pas des dates, et
   « 31/12 » lu un 1er janvier l'est (année précédente) ; « recrutement /
@@ -620,9 +621,11 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
   qui répondent à un critère actif (`getiChipMatches`) sont mises en avant — plus
   vives, cochées, et préfixées pour un lecteur d'écran (jamais la couleur seule).
 - **Texte** : toujours un nœud de texte (`getiPostBodyText`) — **une** marque de
-  citation suivie d'une espace (celle du relais ; « >4000 » reste), balisage par
-  paires au bord d'un mot (« xX__Sniper__Xx » reste), passage masqué `||…||` →
-  « [masqué] » / « [hidden] » (jamais son contenu), mention → mot neutre (jamais un
+  citation suivie d'une espace ou seule sur sa ligne (celle du relais ; « >4000 » reste), balisage par
+  paires au bord d'un mot (« xX__Sniper__Xx » reste ; `**` / `~~` restés seuls retirés quand ils collent
+  un mot ou finissent le texte, gardés entre deux chiffres « 5**2 », deux espaces ou seuls sur leur ligne),
+  code rendu tel quel (aucune marque retirée dedans, citation et titre compris ; langue d'un bloc ```` ```txt ```` ôtée), passage masqué `||…||` (règle de Discord : `||||x||` masque `||x` ; un `||` dans du code est du texte), quelle que soit sa longueur →
+  « [masqué] » / « [hidden] » (jamais son contenu ; l'analyse ne le lit pas non plus : aucune étiquette n'en vient — `getiWithoutSpoilers`), mention → mot neutre (jamais un
   identifiant), émoji de serveur → son nom, horodatage `<t:…>` → date ou heure à
   l'heure de Paris (`getiTimestampLabel`, `R` écrit comme `f`), lien laissé en texte. Replié au-delà
   de 420 caractères ou 7 lignes (« Lire la suite ») ; une fois la page chargée, le
@@ -666,7 +669,7 @@ l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lec
 
 - `GetiLayout` (client) enveloppe filtres et résultats : pendant un changement de filtre, la grille porte `aria-busy` + `data-pending` (liseré pointillé, jamais d'opacité : contraste 4,5:1) et le panneau annonce « Mise à jour… » (`<output>`).
 - « Réinitialiser » rend le focus au bouton Filtres (mobile) ou au titre du panneau avant de disparaître ; sur mobile, un bouton « Voir les N annonces » referme le panneau.
-- Liste indisponible : filtres masqués, « Aucune annonce à afficher » en ligne, la panne en notification (`showError`) et bouton « Réessayer » (`GetiRetry`, `router.refresh()`) ; pm2 reçoit `[geti] post list unavailable: <code>` (code seul).
+- Liste indisponible : filtres masqués, « Annonces non chargées » / « Posts not loaded » en ligne (jamais un « aucune annonce », qui se lirait comme une recherche vide), la panne en notification (`showError`, redite si « Réessayer » revient encore sans liste) et bouton « Réessayer » (`GetiRetry`, `router.refresh()`) ; pm2 reçoit `[geti] post list unavailable: <code>` (code, à défaut nom de la classe d'erreur ; une ligne par minute au plus, avec le nombre d'échecs tus — `logGetiListFailure`). Une écriture qui échoue en cours de route oublie aussi la lecture partagée.
 - La date exacte de publication / modification est un texte du pied de carte (plus d'infobulle) ; le repli de copie rend le focus au bouton.
 - Onglets anglais au pluriel (Players, Teams, Subs, Staff, Scrims, Casters).
 

@@ -28,6 +28,7 @@ import {
   NOT_AFTER_WORD,
   getiDisplayText,
   getiSafeText,
+  getiWithoutSpoilers,
   prepareGetiText,
   withoutMarkup,
 } from "@/lib/shared/geti/normalize";
@@ -427,7 +428,7 @@ function contentOf(raw: GetiRawPost, options: GetiParseOptions): RelayContent & 
  * « je cherche un joueur » sont les rôles **recherchés** ; ceux d'une annonce
  * « je cherche une équipe » sont ceux de l'auteur — même champ, lu pareil.
  * Un passage barré (`~~…~~`) n'est pas lu, sauf si toute l'annonce l'est :
- * elle est alors `closed`.
+ * elle est alors `closed`. Un passage masqué (`||…||`) n'est jamais lu.
  *
  * Un bot (ou un webhook) peut se faire passer pour n'importe qui : seul le
  * relais d'un bot listé dans `options` nomme un auteur ; sans liste, aucun
@@ -441,7 +442,8 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
   const source: GetiRawPost = typeof raw === "object" && raw !== null ? raw : {};
   const content = contentOf(source, options);
   const displayed = getiDisplayText(content.body);
-  const { analysed, closed } = withoutStruck(displayed);
+  // Un passage masqué (`||…||`) n'est jamais lu : aucune étiquette ne le dévoile.
+  const { analysed, closed } = withoutStruck(getiWithoutSpoilers(displayed, " "));
   const prepared = prepareGetiText(analysed);
   const roleTokens = findGetiRoleTokens(prepared.lower);
   const category = isCategory(source.category)

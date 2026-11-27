@@ -12,6 +12,7 @@ import type { Metadata } from "next";
 import { INTL_LOCALE, SITE_TIME_ZONE, type Locale } from "@/lib/shared/locales";
 
 export { GETI_OFFICIAL_INVITE_CODE, GETI_OFFICIAL_INVITE_URL } from "@/lib/shared/discord";
+import { GETI_CODE_SPAN, getiWithoutSpoilers } from "@/lib/shared/geti/normalize";
 import { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";
 import {
   GETI_CATEGORIES,
@@ -603,10 +604,11 @@ export const GETI_TEXT_COLLAPSE_CHARS = 420;
 export const GETI_TEXT_COLLAPSE_LINES = 7;
 
 /**
- * Une seule marque de citation en tête de ligne, suivie d'une espace — comme
- * Discord, qui n'imbrique pas les citations et laisse « >4000 » en texte.
+ * Une seule marque de citation en tête de ligne, suivie d'une espace ou seule
+ * sur sa ligne (ligne vide d'une citation) — comme Discord, qui n'imbrique pas
+ * les citations et laisse « >4000 » en texte.
  */
-const QUOTE_PREFIX = /^[ \t]*(?:>>>|>) /u;
+const QUOTE_PREFIX = /^[ \t]*(?:>>>|>)(?: |$)/u;
 
 function stripLineMarks(line: string): string {
   const rest = line.replace(QUOTE_PREFIX, "").trimStart();
@@ -617,19 +619,63 @@ function stripLineMarks(line: string): string {
 }
 
 /**
- * Passage masqué (`||…||`) : l'auteur l'a caché derrière un clic sur Discord,
- * la page ne le montre jamais. Borné pour rester linéaire sur un texte hostile.
- */
-const SPOILER = /\|\|(?:[^|]|\|(?!\|)){1,1000}\|\|/gu;
-/**
  * Balisage par paires (gras, souligné, barré) **au bord d'un mot** : « xX__Sniper__Xx »
  * reste tel quel, un pseudo écrit dans le texte se recopie juste. Contenu borné.
  */
 const PAIRED_MARKUP = [String.raw`\*\*`, "__", "~~"].map(
   (mark) => new RegExp(String.raw`(?<![\p{L}\p{N}])${mark}(?=\S)([\s\S]{0,300}?\S)${mark}(?![\p{L}\p{N}])`, "gu"),
 );
-/** Code en ligne ou en bloc, par paires : la marque part, le texte reste. */
-const CODE = /(`{1,3})([^`]{1,1000}?)\1/gu;
+/** Langue d'un bloc de code (« ```txt ») : une étiquette de mise en forme, pas du texte. */
+const CODE_LANGUAGE = /^[\w+#.-]{1,20}\n/u;
+/** Marques de gras et de barré restées seules (paire coupée, contenu trop long). */
+const LEFTOVER_MARKS = /\*{2,}|~{2,}/gu;
+
+/**
+ * Une marque restée seule est-elle du texte ? Entre deux chiffres (« 5**2 »),
+ * entre deux espaces (« a ~~~ b ») ou seule sur sa ligne (un séparateur « ~~~~ ») :
+ * oui, elle reste. Collée à un mot ou en bout de texte (« **LFS**s », « Team ~~ ») : non.
+ */
+function leftoverMarkIsText(text: string, index: number, length: number): boolean {
+  const before = text[index - 1];
+  const after = text[index + length];
+  const lineStart = before === undefined || before === "\n";
+  const lineEnd = after === undefined || after === "\n";
+  if (lineStart && lineEnd) return true;
+  if (before === undefined || after === undefined) return false;
+  return (/\d/u.test(before) && /\d/u.test(after)) || (/[ \t]/u.test(before) && /[ \t]/u.test(after));
+}
+
+/** Balisage par paires retiré d'un passage hors code, puis ses marques restées seules. */
+function withoutPairedMarkup(text: string): string {
+  let out = text;
+  for (const pattern of PAIRED_MARKUP) out = out.replace(pattern, "$1");
+  return out.replace(LEFTOVER_MARKS, (mark: string, index: number, whole: string) =>
+    leftoverMarkIsText(whole, index, mark.length) ? mark : "",
+  );
+}
+
+/**
+ * Passage hors code : marques de ligne (citation, titre, `-#`) retirées des seules
+ * lignes qui commencent vraiment (`atLineStart` pour la première), puis le balisage par paires.
+ */
+function withoutMarkupOutside(text: string, atLineStart: boolean): string {
+  const lines = text.split("\n").map((line, index) => (index > 0 || atLineStart ? stripLineMarks(line) : line));
+  return withoutPairedMarkup(lines.join("\n"));
+}
+
+/** Le texte, code compris : le code garde son contenu exact (aucune marque n'y est retirée). */
+function withoutMarkupOutsideCode(text: string): string {
+  let out = "";
+  let from = 0;
+  for (const match of text.matchAll(GETI_CODE_SPAN)) {
+    const index = match.index ?? 0;
+    const [whole, fence, inner] = match;
+    out += withoutMarkupOutside(text.slice(from, index), from === 0 || text[from - 1] === "\n");
+    out += fence === "```" ? inner.replace(CODE_LANGUAGE, "") : inner;
+    from = index + whole.length;
+  }
+  return out + withoutMarkupOutside(text.slice(from), from === 0 || text[from - 1] === "\n");
+}
 /** Horodatage Discord `<t:secondes:style>`, rendu en date lisible à l'heure du site. */
 const TIMESTAMP = /<t:(\d{1,12})(?::([a-zA-Z]))?>/gu;
 
@@ -664,11 +710,7 @@ export function getiTimestampLabel(seconds: number, style: string | undefined, l
  * le rendu reste un nœud de texte, un lien reste du texte.
  */
 export function getiPostBodyText(text: string, labels: GetiMentionLabels, locale: Locale = "fr"): string {
-  let body = text
-    .split("\n")
-    .map(stripLineMarks)
-    .join("\n")
-    .replace(SPOILER, labels.spoiler)
+  const body = getiWithoutSpoilers(text, labels.spoiler)
     .replace(/<@&\d{1,25}>/g, labels.role)
     .replace(/<@!?\d{1,25}>/g, labels.member)
     .replace(/<#\d{1,25}>/g, labels.channel)
@@ -676,9 +718,7 @@ export function getiPostBodyText(text: string, labels: GetiMentionLabels, locale
     .replace(TIMESTAMP, (_match, seconds: string, style: string | undefined) =>
       getiTimestampLabel(Number(seconds), style, locale),
     );
-  for (const pattern of PAIRED_MARKUP) body = body.replace(pattern, "$1");
-  return body
-    .replace(CODE, "$2")
+  return withoutMarkupOutsideCode(body)
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -714,10 +754,16 @@ export function getiRefreshIntervalMs(mode: string): number | null {
   return mode === "FULL" ? GETI_REFRESH_INTERVAL_MS : null;
 }
 
-/** Code court d'une erreur de lecture (`ER_PARSE_ERROR`, `ECONNREFUSED`…), sinon « unknown ». */
+/**
+ * Code court d'une erreur de lecture (`ER_PARSE_ERROR`, `ECONNREFUSED`…), à
+ * défaut le nom de sa classe (`TypeError` : un défaut du code, pas une panne de
+ * la base), sinon « unknown ». Jamais le message, qui peut citer la requête.
+ */
 export function getiErrorCode(error: unknown): string {
   const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
-  return typeof code === "string" && /^[A-Z0-9_]{1,40}$/u.test(code) ? code : "unknown";
+  if (typeof code === "string" && /^[A-Z0-9_]{1,40}$/u.test(code)) return code;
+  const name = error instanceof Error ? error.name : undefined;
+  return typeof name === "string" && /^[A-Za-z]{1,40}$/u.test(name) ? name : "unknown";
 }
 
 /**

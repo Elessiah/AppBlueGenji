@@ -19,6 +19,7 @@ import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { toIso } from "@/lib/server/serialization";
 import type { GetiPushedPost, GetiReconcileRequest } from "@/lib/server/geti/wire";
+import { getiErrorCode } from "@/lib/shared/geti/page";
 import {
   GETI_CATEGORIES,
   getiCategoryOfChannel,
@@ -125,33 +126,38 @@ export async function upsertGetiPosts(
   const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0 };
   const emptied: string[] = [];
   const trusted = getiTrustedBots();
-  for (const post of posts) {
-    if (post.postedAt.getTime() < getiRetentionCutoff(post.category, now).getTime()) {
-      outcome.expired += 1;
-      continue;
+  try {
+    for (const post of posts) {
+      if (post.postedAt.getTime() < getiRetentionCutoff(post.category, now).getTime()) {
+        outcome.expired += 1;
+        continue;
+      }
+      const parsed = parseGetiPost(post.raw, trusted);
+      if (isNotAnnouncement(parsed, post.raw)) {
+        outcome.emptied += 1;
+        emptied.push(post.messageId);
+        continue;
+      }
+      await executor.execute(UPSERT_SQL, [
+        post.messageId,
+        post.channelId,
+        post.category,
+        post.source,
+        parsed.authorId,
+        parsed.authorTag?.slice(0, AUTHOR_TAG_MAX) ?? null,
+        JSON.stringify(post.raw),
+        storedAnalysis(parsed),
+        post.postedAt,
+        post.editedAt,
+      ]);
+      outcome.stored += 1;
+      onStored?.(post, parsed);
     }
-    const parsed = parseGetiPost(post.raw, trusted);
-    if (isNotAnnouncement(parsed, post.raw)) {
-      outcome.emptied += 1;
-      emptied.push(post.messageId);
-      continue;
-    }
-    await executor.execute(UPSERT_SQL, [
-      post.messageId,
-      post.channelId,
-      post.category,
-      post.source,
-      parsed.authorId,
-      parsed.authorTag?.slice(0, AUTHOR_TAG_MAX) ?? null,
-      JSON.stringify(post.raw),
-      JSON.stringify(parsed),
-      post.postedAt,
-      post.editedAt,
-    ]);
-    outcome.stored += 1;
-    onStored?.(post, parsed);
+    if (emptied.length > 0) await deleteGetiPosts(executor, emptied);
+  } catch (error) {
+    forgetGetiScans();
+    throw error;
   }
-  if (emptied.length > 0) await deleteGetiPosts(executor, emptied);
   if (outcome.stored > 0) forgetGetiScans();
   return outcome;
 }
@@ -159,13 +165,18 @@ export async function upsertGetiPosts(
 /** Retire des annonces par identifiant de message Discord ; rend le nombre de lignes retirées. */
 export async function deleteGetiPosts(executor: GetiExecutor, messageIds: readonly string[]): Promise<number> {
   let removed = 0;
-  for (let start = 0; start < messageIds.length; start += DELETE_CHUNK) {
-    const chunk = messageIds.slice(start, start + DELETE_CHUNK);
-    const [result] = await executor.execute(
-      `DELETE FROM bg_geti_posts WHERE message_id IN (${chunk.map(() => "?").join(", ")})`,
-      [...chunk],
-    );
-    removed += affected(result);
+  try {
+    for (let start = 0; start < messageIds.length; start += DELETE_CHUNK) {
+      const chunk = messageIds.slice(start, start + DELETE_CHUNK);
+      const [result] = await executor.execute(
+        `DELETE FROM bg_geti_posts WHERE message_id IN (${chunk.map(() => "?").join(", ")})`,
+        [...chunk],
+      );
+      removed += affected(result);
+    }
+  } catch (error) {
+    forgetGetiScans();
+    throw error;
   }
   if (removed > 0) forgetGetiScans();
   return removed;
@@ -204,17 +215,22 @@ export async function reconcileGetiChannel(
  */
 export async function purgeExpiredGetiPosts(executor: GetiExecutor, now: number = Date.now()): Promise<number> {
   let removed = 0;
-  for (const category of GETI_CATEGORIES) {
-    const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ?`, [
-      category,
-      getiRetentionCutoff(category, now),
+  try {
+    for (const category of GETI_CATEGORIES) {
+      const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ?`, [
+        category,
+        getiRetentionCutoff(category, now),
+      ]);
+      removed += affected(result);
+    }
+    const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE posted_at < ?`, [
+      new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS),
     ]);
     removed += affected(result);
+  } catch (error) {
+    forgetGetiScans();
+    throw error;
   }
-  const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE posted_at < ?`, [
-    new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS),
-  ]);
-  removed += affected(result);
   if (removed > 0) forgetGetiScans();
   return removed;
 }
@@ -274,13 +290,30 @@ type GetiPostRow = RowDataPacket & {
 /** Champs ajoutés à l'analyse après les premières annonces gardées : vides si le message brut est illisible. */
 const ADDED_FIELDS: Partial<GetiParsedPost> = { dates: [], levels: [], closed: false };
 /**
- * Message brut d'une analyse gardée avant l'ajout de `closed` (le dernier champ
- * ajouté, avec `dates` et `levels`) : relu et réanalysé à la lecture, sans quoi
- * un filtre de niveau écarterait l'annonce. `JSON.stringify` écrit toujours la
- * clé `"closed":` ; dans le texte d'une annonce, un guillemet est échappé (`\"`).
- * Les autres lignes ne remontent pas leur message brut (jusqu'à 60 000 octets).
+ * Version de l'analyse gardée, écrite en **dernière** clé (`storedAnalysis`) :
+ * avancée quand l'analyse change ce qu'elle lit — 2 : un passage masqué
+ * (`||…||`) n'est plus lu, une analyse plus ancienne en a tiré des étiquettes.
  */
-const STALE_RAW_JSON = `IF(parsed_json LIKE '%"closed":%', NULL, raw_json) AS stale_raw_json`;
+const ANALYSIS_VERSION = 2;
+/**
+ * Une analyse gardée à la version courante : `JSON.stringify` écrit la clé en
+ * dernier, `…,"analysisVersion":2}` ; dans le texte d'une annonce, un guillemet
+ * est échappé (`\"`), un texte ne peut pas la contrefaire.
+ */
+const CURRENT_ANALYSIS = `parsed_json LIKE '%"analysisVersion":${ANALYSIS_VERSION}}'`;
+
+/** L'analyse à garder, marquée de sa version. */
+function storedAnalysis(parsed: object): string {
+  return JSON.stringify({ ...parsed, analysisVersion: ANALYSIS_VERSION });
+}
+
+/**
+ * Message brut d'une analyse gardée à une version antérieure (`CURRENT_ANALYSIS`) :
+ * relu et réanalysé à la lecture, sans quoi une étiquette tirée d'un passage
+ * masqué, ou un champ manquant (`dates`, `levels`, `closed`), sortirait sur la
+ * page. Les autres lignes ne remontent pas leur message brut (jusqu'à 60 000 octets).
+ */
+const STALE_RAW_JSON = `IF(${CURRENT_ANALYSIS}, NULL, raw_json) AS stale_raw_json`;
 
 /** Analyse d'une ligne : celle gardée, ou celle du message brut quand elle précède les derniers champs. */
 function analysisOf(row: GetiPostRow): unknown {
@@ -306,10 +339,10 @@ function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): string | nul
   try {
     const raw: GetiPushedPost["raw"] = JSON.parse(String(row.raw_json));
     const parsed = parseGetiPost(raw, trusted);
-    return isNotAnnouncement(parsed, raw) ? null : JSON.stringify(parsed);
+    return isNotAnnouncement(parsed, raw) ? null : storedAnalysis(parsed);
   } catch {
     try {
-      return JSON.stringify({ ...ADDED_FIELDS, ...JSON.parse(String(row.parsed_json)) });
+      return storedAnalysis({ ...ADDED_FIELDS, ...JSON.parse(String(row.parsed_json)) });
     } catch {
       return null;
     }
@@ -317,7 +350,41 @@ function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): string | nul
 }
 
 /**
- * Réécrit l'analyse des lignes gardées avant le dernier champ ajouté (`closed`) :
+ * Réécrit un lot de lignes anciennes ; rend les lignes réécrites et celles à retirer
+ * (pas une annonce). Une écriture qui échoue en cours de route oublie aussi la
+ * lecture partagée : les réécritures déjà faites sont gardées.
+ */
+async function rewriteChunk(
+  executor: GetiExecutor,
+  rows: RowDataPacket[],
+  trusted: GetiParseOptions,
+): Promise<{ written: number; gone: string[] }> {
+  const gone: string[] = [];
+  let written = 0;
+  try {
+    for (const row of rows) {
+      const messageId = String(row.message_id);
+      const next = reanalysed(row, trusted);
+      if (next === null) {
+        gone.push(messageId);
+        continue;
+      }
+      const [result] = await executor.execute(
+        `UPDATE bg_geti_posts SET parsed_json = ? WHERE message_id = ? AND NOT ${CURRENT_ANALYSIS}`,
+        [next, messageId],
+      );
+      written += affected(result);
+    }
+  } catch (error) {
+    forgetGetiScans();
+    throw error;
+  }
+  if (written > 0) forgetGetiScans();
+  return { written, gone };
+}
+
+/**
+ * Réécrit l'analyse des lignes gardées à une version antérieure (`ANALYSIS_VERSION`) :
  * relues de leur message brut par la version courante de l'analyse, une seule fois,
  * hors du chemin d'une requête (la lecture les réanalyse sinon à chaque page, ~0,3 ms
  * chacune). Un message brut illisible garde son analyse, champs ajoutés vides : la
@@ -334,25 +401,10 @@ export async function refreshStaleGetiPosts(executor: GetiExecutor): Promise<num
   for (let chunk = 0; chunk < REFRESH_CHUNKS_MAX; chunk += 1) {
     const [rows] = await executor.execute<RowDataPacket[]>(
       `SELECT message_id, raw_json, parsed_json FROM bg_geti_posts
-        WHERE parsed_json NOT LIKE '%"closed":%' ORDER BY id LIMIT ${REFRESH_CHUNK}`,
+        WHERE NOT ${CURRENT_ANALYSIS} ORDER BY id LIMIT ${REFRESH_CHUNK}`,
     );
     if (rows.length === 0) return done;
-    const gone: string[] = [];
-    let written = 0;
-    for (const row of rows) {
-      const messageId = String(row.message_id);
-      const next = reanalysed(row, trusted);
-      if (next === null) {
-        gone.push(messageId);
-        continue;
-      }
-      const [result] = await executor.execute(
-        `UPDATE bg_geti_posts SET parsed_json = ? WHERE message_id = ? AND parsed_json NOT LIKE '%"closed":%'`,
-        [next, messageId],
-      );
-      written += affected(result);
-    }
-    if (written > 0) forgetGetiScans();
+    const { written, gone } = await rewriteChunk(executor, rows, trusted);
     const removed = gone.length > 0 ? await deleteGetiPosts(executor, gone) : 0;
     done += written + removed;
     // Rien n'a bougé (ligne qui résiste) : relire le même lot ne ferait que boucler.
@@ -373,6 +425,9 @@ function storedPostOf(row: GetiPostRow, now: number): GetiStoredPost | null {
   const postedAt = toIso(row.posted_at);
   if (!isParsedPost(parsed) || postedAt === null) return null;
   if (Date.parse(postedAt) < getiRetentionCutoff(row.category, now).getTime()) return null;
+  // La marque de version reste en base : l'annonce rendue ne la porte pas.
+  const analysis: GetiParsedPost & { analysisVersion?: unknown } = { ...ADDED_FIELDS, ...parsed, postedAt };
+  delete analysis.analysisVersion;
   return {
     messageId: String(row.message_id),
     channelId: String(row.channel_id),
@@ -382,7 +437,7 @@ function storedPostOf(row: GetiPostRow, now: number): GetiStoredPost | null {
     authorId: row.author_id,
     // La date gardée fait foi pour le filtre d'âge, pas celle recopiée dans l'analyse.
     // Une analyse gardée avant l'ajout d'un champ (dates, niveaux, clôture), au message brut illisible, le reçoit vide.
-    parsed: { ...ADDED_FIELDS, ...parsed, postedAt },
+    parsed: analysis,
     postedAt,
     editedAt: toIso(row.edited_at),
   };
@@ -469,7 +524,8 @@ const GETI_SCAN_CACHE_PREFIX = "geti:scan:";
  * modification, suppression, réconciliation, purge, réanalyse). Chaque requête
  * est validée seule (pas de transaction), donc la page ne sert jamais, après la
  * réponse au bot, une annonce supprimée sur Discord — `/rgpd` promet son retrait
- * « aussitôt ».
+ * « aussitôt ». Une écriture qui échoue en cours de route oublie aussi : les
+ * requêtes passées avant l'échec sont déjà validées.
  */
 function forgetGetiScans(): void {
   invalidateCachedPrefix(GETI_SCAN_CACHE_PREFIX);
@@ -495,4 +551,34 @@ export async function listGetiPostsShared(
     scanGetiPosts(filter, await getDatabase(), now),
   );
   return pageOfStored(stored, filter, page, now);
+}
+
+/** Une ligne de pm2 par minute au plus quand la liste est illisible : chaque visite la redemanderait. */
+export const GETI_LIST_FAILURE_LOG_MS = 60_000;
+let lastListFailureLog = Number.NEGATIVE_INFINITY;
+let silencedListFailures = 0;
+
+/**
+ * Consigne dans pm2 l'échec de lecture de la liste publique : un code seul
+ * (`getiErrorCode`, jamais le message, qui peut citer la requête), au plus une
+ * fois par {@link GETI_LIST_FAILURE_LOG_MS}, avec le nombre d'échecs tus depuis.
+ *
+ * @returns `true` si une ligne a été écrite.
+ */
+export function logGetiListFailure(error: unknown, now: number = Date.now()): boolean {
+  if (now - lastListFailureLog < GETI_LIST_FAILURE_LOG_MS) {
+    silencedListFailures += 1;
+    return false;
+  }
+  const silenced = silencedListFailures;
+  lastListFailureLog = now;
+  silencedListFailures = 0;
+  console.warn("[geti] post list unavailable:", getiErrorCode(error), silenced > 0 ? `(+${silenced} since last line)` : "");
+  return true;
+}
+
+/** Tests : oublie la dernière ligne consignée. */
+export function resetGetiListFailureLog(): void {
+  lastListFailureLog = Number.NEGATIVE_INFINITY;
+  silencedListFailures = 0;
 }

@@ -174,7 +174,7 @@
     "beyondLink": "Go to page {page}",
     "emptyReset": "Reset the filters",
     "unavailable": "Posts are temporarily unavailable.",
-    "none": "No posts to show.",
+    "none": "Posts not loaded.",
     "retry": "Try again",
     "pagination": "Post pages",
     "previous": "Newer posts",
