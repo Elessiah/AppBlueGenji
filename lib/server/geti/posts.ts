@@ -111,21 +111,23 @@ export function getiTrustedBots(): GetiParseOptions {
 /** Valeurs d'une ligne écrite, dans l'ordre des colonnes de `upsertSql`. */
 type GetiRowValues = (string | Date | null)[];
 
-/** Version d'une ligne : sa modification, sinon sa publication (colonnes 9 et 8). */
-function rowVersion(row: Readonly<GetiRowValues>): number {
-  const at = row[9] ?? row[8];
-  return at instanceof Date ? at.getTime() : 0;
+/** Version d'une annonce poussée : sa modification, sinon sa publication. */
+function pushedVersion(post: GetiPushedPost): number {
+  return (post.editedAt ?? post.postedAt).getTime();
 }
 
-/** Une ligne par message : la version la plus récente, la plus tardive du lot à égalité. */
-function newestPerMessage(rows: readonly GetiRowValues[]): Map<string, GetiRowValues> {
-  const newest = new Map<string, GetiRowValues>();
-  for (const row of rows) {
-    const id = String(row[0]);
-    const kept = newest.get(id);
-    if (kept === undefined || rowVersion(row) >= rowVersion(kept)) newest.set(id, row);
+/**
+ * Une annonce par message : la version la plus récente, la plus tardive du lot
+ * à égalité. Le tri se fait avant l'analyse : une ancienne version vide ne
+ * retire pas la version récente écrite dans le même lot.
+ */
+function newestPerMessage(posts: readonly GetiPushedPost[]): GetiPushedPost[] {
+  const newest = new Map<string, GetiPushedPost>();
+  for (const post of posts) {
+    const kept = newest.get(post.messageId);
+    if (kept === undefined || pushedVersion(post) >= pushedVersion(kept)) newest.set(post.messageId, post);
   }
-  return newest;
+  return [...newest.values()];
 }
 
 /**
@@ -142,7 +144,9 @@ export async function upsertGetiPosts(
   const emptied: string[] = [];
   const rows: GetiRowValues[] = [];
   const trusted = getiTrustedBots();
-  for (const post of posts) {
+  // Un même message deux fois dans un lot (création puis modification) ne compte qu'une annonce : sa
+  // version la plus récente décide seule (écrite ou retirée), et les compteurs comptent des messages.
+  for (const post of newestPerMessage(posts)) {
     if (post.postedAt.getTime() < getiRetentionCutoff(post.category, now).getTime()) {
       outcome.expired += 1;
       continue;
@@ -167,15 +171,11 @@ export async function upsertGetiPosts(
     ]);
     outcome.stored += 1;
   }
-  // Un même message deux fois dans un lot (création puis modification) ne compte qu'une annonce : sa
-  // version la plus récente est écrite (la plus tardive à égalité), et `stored` compte des messages, comme `withheld`.
-  const unique = [...newestPerMessage(rows).values()];
-  outcome.stored = unique.length;
-  if (unique.length > 0) {
-    await executor.execute(upsertSql(unique.length), unique.flat());
+  if (rows.length > 0) {
+    await executor.execute(upsertSql(rows.length), rows.flat());
     // Une annonce dont l'auteur (ou le message) fait l'objet d'une opposition ne reste pas : le bot
     // la repousserait sinon à chaque rattrapage, tant que le message est sur Discord.
-    outcome.withheld = await withholdObjectedGetiPosts(executor, unique.map((row) => String(row[0])));
+    outcome.withheld = await withholdObjectedGetiPosts(executor, rows.map((row) => String(row[0])));
     outcome.stored -= outcome.withheld;
   }
   if (emptied.length > 0) await deleteGetiPosts(executor, emptied);

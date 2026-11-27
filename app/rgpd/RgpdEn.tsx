@@ -264,7 +264,7 @@ export function RgpdEn({
             relayed post, the dates and the criteria read automatically in the text (rank, role, region, platform,
             language, availability, stated minimum age, team name), as well as the message as the bot passed it (to redo that reading when it improves), with no link to an account of the site — whether the author has one or not. A
             scrim search is kept {GETI_RETENTION_DAYS.lfs} days after its publication on Discord, the other posts{" "}
-            {GETI_RETENTION_DAYS.lfp} days; deleting the post on Discord removes it from the site at once, editing it
+            {GETI_RETENTION_DAYS.lfp} days; deleting the post on Discord removes it from the site at once (a message erased by its author&apos;s ban from the Discord server, which Discord does not report to the bot, only leaves at the next reading of the channels, at the latest at the end of its retention period), editing it
             replaces the previous version. Basis: the association&apos;s legitimate interest (helping players and teams
             find each other), for posts that are already public; their author can object and ask for removal (see
             “Exercising your rights”): their posts are then removed and no longer copied, the association keeping for that only the author&apos;s Discord identifier (or that of the targeted post), as long as the objection stands ({GETI_RETENTION_MAX_DAYS} days for a single post). Register of processing activities: record T21.

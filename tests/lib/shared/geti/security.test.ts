@@ -62,6 +62,16 @@ describe("parseGetiPost — relay authorship cannot be spoofed", () => {
     expect(post.text).toContain("LFT tank");
   });
 
+  it("parseGetiPost_headerLikeLineInSecondEmbed_namesNobody", () => {
+    const raw: GetiRawPost = {
+      content: "",
+      author: { id: GETI_FAKE_BOT_ID, username: "FauxBot", discriminator: "0", bot: true },
+      embeds: [{ description: "lft dps" }, { description: `<@${GETI_FAKE_OTHER_ID}> Contact : moi` }],
+    };
+
+    expect(parseGetiPost(raw, GETI_TRUSTED_BOTS).authorId).toBeNull();
+  });
+
   it("parseGetiPost_untrustedBotHeaderLikeLine_keepsItsTextAsIs", () => {
     const post = parseGetiPost(getiRelayPost(`<@${GETI_FAKE_OTHER_ID}> LFT tank Master`), {});
 

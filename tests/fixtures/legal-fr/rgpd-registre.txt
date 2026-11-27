@@ -906,7 +906,7 @@ Données sensibles
 Aucune
 Conservation
 Recherches de scrim : 7 jours après leur publication sur Discord ; les autres annonces : 14 jours ; puis effacées par une purge horaire, hors les copies de sauvegarde chiffrées (T09, 30 jours au plus)
-Avant ce terme : retirée dès que le message est supprimé sur Discord (par son auteur ou la modération du salon ; pour une annonce relayée, quand son relais y est supprimé) ; une modification remplace la version précédente, dont rien n'est gardé
+Avant ce terme : retirée dès que le message est supprimé sur Discord (par son auteur ou la modération du salon ; pour une annonce relayée, quand son relais y est supprimé ; un message effacé par le bannissement de son auteur du serveur Discord, dont Discord ne prévient pas le bot, ne part qu'à la relecture suivante des salons, au plus tard au terme de sa garde) ; une modification remplace la version précédente, dont rien n'est gardé
 Oppositions : celle d'un auteur, jusqu'à ce qu'il la retire ; celle d'une seule annonce, 14 jours (au-delà, l'annonce est trop ancienne pour revenir), puis effacée par la purge horaire
 Destinataires
 Visiteurs du site, y compris sans compte : la page des annonces, quand elle est en ligne, montre le texte de l'annonce, le pseudo Discord de son auteur, le serveur d'origine et la date — ce que les serveurs abonnés montrent déjà

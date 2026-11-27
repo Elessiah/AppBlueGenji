@@ -297,7 +297,7 @@ type EmbedReading = {
 };
 
 /** Lit un encart : en-tête GETI et ligne « Sent from » ne comptent que du bot qui les écrit. */
-function readEmbed(embed: GetiRawEmbed, trust: RelayTrust): EmbedReading {
+function readEmbed(embed: GetiRawEmbed, trust: RelayTrust, leading: boolean): EmbedReading {
   const description = text(embed.description);
   const headerMatch = GETI_HEADER.exec(description);
   const header: RelayAuthor | null =
@@ -324,8 +324,11 @@ function readEmbed(embed: GetiRawEmbed, trust: RelayTrust): EmbedReading {
   const headerLike = trust.geti && header === null ? GETI_HEADER_LIKE_LINE.exec(description) : null;
   const start = header !== null && headerMatch !== null ? headerMatch[0].length : (headerLike?.[0].length ?? 0);
   // Sa mention de tête, elle, est écrite par le bot GETI avant tout texte choisi par d'autres : l'auteur
-  // reste connu (une opposition sur cet auteur le couvre), sans pseudo ni serveur.
-  const named = header ?? (headerLike === null ? null : { id: headerLike[1], tag: null, originServer: null });
+  // reste connu (une opposition sur cet auteur le couvre), sans pseudo ni serveur. Dans son premier
+  // encart seulement : sans le reste de l'en-tête, rien ne dit qu'un encart suivant (transféré, ajouté)
+  // s'ouvre sur sa mention plutôt que sur un texte choisi par d'autres.
+  const leadingMention = headerLike !== null && leading ? { id: headerLike[1], tag: null, originServer: null } : null;
+  const named = header ?? leadingMention;
   const end = trusted === null ? undefined : Math.max(start, trusted.index);
   const parts = [text(embed.title), description.slice(start, end), ...embedFieldLines(embed)];
   return { parts, header: named, trailer, embedTag, lineServer };
@@ -338,7 +341,7 @@ function readEmbed(embed: GetiRawEmbed, trust: RelayTrust): EmbedReading {
  * l'en-tête.
  */
 function relayContent(raw: GetiRawPost, trust: RelayTrust): RelayContent {
-  const readings = embedsOf(raw).map((embed) => readEmbed(embed, trust));
+  const readings = embedsOf(raw).map((embed, index) => readEmbed(embed, trust, index === 0));
   const parts = [text(raw.content), ...readings.flatMap((reading) => reading.parts)];
   const body = parts.filter((part) => part.trim() !== "").join("\n");
   if (!trust.geti && !trust.site) {

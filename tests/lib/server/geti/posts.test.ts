@@ -238,6 +238,35 @@ describe("upsertGetiPosts", () => {
     expect(String(values[7])).toContain("LFT tank Master");
   });
 
+  it("upsertGetiPosts_olderEmptyVersionThenNewerTextInBatch_writesTheNewerAndDeletesNothing", async () => {
+    const execute = executeMock([], 1);
+    const posts = [
+      getiPushedPost({ id: "100000000000000916", content: "  " }),
+      getiPushedPost({ id: "100000000000000916", content: "LFT tank Master", editedAt: new Date(NOW - 60_000).toISOString() }),
+    ];
+
+    const outcome = await upsertGetiPosts(executor(execute), posts, NOW);
+
+    expect(outcome).toEqual({ stored: 1, emptied: 0, expired: 0, withheld: 0 });
+    expect(execute).not.toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE message_id IN (?)", ["100000000000000916"]);
+    const values: unknown[] = Array.isArray(execute.mock.calls[0][1]) ? execute.mock.calls[0][1] : [];
+    expect(String(values[7])).toContain("LFT tank Master");
+  });
+
+  it("upsertGetiPosts_newerEmptyVersionAfterOlderText_deletesAndWritesNothing", async () => {
+    const execute = executeMock([], 1);
+    const posts = [
+      getiPushedPost({ id: "100000000000000917", content: "LFT tank Master" }),
+      getiPushedPost({ id: "100000000000000917", content: "  ", editedAt: new Date(NOW - 60_000).toISOString() }),
+    ];
+
+    const outcome = await upsertGetiPosts(executor(execute), posts, NOW);
+
+    expect(outcome).toEqual({ stored: 0, emptied: 1, expired: 0, withheld: 0 });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE message_id IN (?)", ["100000000000000917"]);
+  });
+
   it("upsertGetiPosts_expiredAndEmptiedMixedWithKept_writesOnlyTheKeptOnes", async () => {
     const execute = executeMock([], 1);
     const posts = [

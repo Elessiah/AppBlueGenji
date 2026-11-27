@@ -439,7 +439,11 @@ l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
   leur durée de garde.
 - Opposition sur un auteur : un en-tête GETI illisible (pseudo ou serveur hors
   forme) garde l'auteur par sa mention de tête, écrite par GETI Bot — sans
-  pseudo ni serveur —, pour que l'opposition le couvre.
+  pseudo ni serveur —, pour que l'opposition le couvre. Dans le premier encart
+  seulement : la ligne de tête d'un encart suivant ne nomme personne.
+- Un lot qui porte deux versions d'un même message n'en garde que la plus
+  récente (modification, sinon publication), avant l'analyse : une ancienne
+  version vide ne retire pas la version récente du même lot.
 - Rattrapage au démarrage et à chaque nouvelle session Discord : historique de
   chaque salon sur sa fenêtre de garde (pages de 100, pause entre deux pages,
   5 000 messages au plus par salon), puis `reconcile` avec la liste des annonces
@@ -451,7 +455,7 @@ l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
   un abandon déclenche un rattrapage complet, retenté toutes les cinq minutes.
   Le bot ne plante jamais et ne journalise (pm2) que des nombres et des
   identifiants de salon.
-- Intentions `Guilds`, `GuildMessages`, `MessageContent`, `GuildModeration` ; permissions
+- Intentions `Guilds`, `GuildMessages`, `MessageContent` ; permissions
   **Voir le salon** et **Voir les anciens messages** sur les six salons. Sur
   Discord, le bot n'écrit **rien**.
 - Déploiement : l'ordre ne casse rien (un bot plus récent que le site reçoit des
