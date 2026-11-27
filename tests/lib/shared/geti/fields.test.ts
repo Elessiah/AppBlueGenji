@@ -547,3 +547,87 @@ describe("faux négatifs écartés (revue 2)", () => {
     expect(parseGetiText("team We are looking").teamName).toBeNull();
   });
 });
+
+describe("champs secondaires — revue 3", () => {
+  it.each([
+    { text: "lfp +20 inscrits" },
+    { text: "rdv dans +15 min" },
+    { text: "20+ kills par game" },
+  ])(
+    "« $text » : un nombre suivi d'un autre mot n'est pas un âge",
+    ({ text }) => {
+      expect(parseGetiText(text).minAge).toBeNull();
+    },
+  );
+
+  it.each([{ text: "lvl 20+ dps" }, { text: "top 20+ en ladder" }])(
+    "« $text » : un niveau n'est pas un âge",
+    ({ text }) => {
+      expect(parseGetiText(text).minAge).toBeNull();
+    },
+  );
+
+  it.each([
+    { text: "18+ dps", expected: 18 },
+    { text: "+18 FR", expected: 18 },
+    { text: "16+ et motivé", expected: 16 },
+  ])(
+    "« $text » : un âge suivi d'un mot d'annonce est lu",
+    ({ text, expected }) => {
+      expect(parseGetiText(text).minAge).toBe(expected);
+    },
+  );
+
+  it.each([
+    { text: "j'ai bien eu ta candidature, lft na" },
+    { text: "j'ai plus eu de team, na" },
+  ])(
+    "« $text » : « eu » derrière « avoir » et un adverbe est le participe",
+    ({ text }) => {
+      expect(parseGetiText(text).regions).toEqual(["NA"]);
+    },
+  );
+
+  it("« 20-23h par soir » est une plage horaire, pas une durée", () => {
+    expect(parseGetiText("dispo 20-23h par soir").availability.times).toEqual([
+      { from: 1200, to: 1380 },
+    ]);
+  });
+
+  it("« 2-3h par soir » reste une durée", () => {
+    expect(parseGetiText("dispo 2-3h par soir").availability.times).toEqual([]);
+  });
+
+  it.each([
+    { text: "Team Phoenix We are looking for a tank", expected: "Phoenix" },
+    { text: "Team Nova I need a healer", expected: "Nova" },
+    { text: "team Phoenix On cherche un tank", expected: "Phoenix" },
+  ])(
+    "« $text » : un pronom suivi d'un verbe de sa langue ne fait pas partie du nom",
+    ({ text, expected }) => {
+      expect(parseGetiText(text).teamName).toBe(expected);
+    },
+  );
+
+  it.each([{ text: "Team Game On" }, { text: "Team Game On, lft dps" }])(
+    "« $text » : « On » en capitale à la fin du nom est gardé",
+    ({ text }) => {
+      expect(parseGetiText(text).teamName).toBe("Game On");
+    },
+  );
+
+  it.each([
+    { text: "thanks a lot for the support, tank" },
+    { text: "thank you very much for your support, tank" },
+    { text: "merci pour tout votre soutien, tank" },
+  ])("« $text » : un remerciement n'ajoute pas le Support", ({ text }) => {
+    expect(parseGetiText(text).roles).toEqual(["TANK"]);
+  });
+
+  it.each([
+    { text: "thx we need a support" },
+    { text: "merci de jouer le support" },
+  ])("« $text » : le Support reste un rôle", ({ text }) => {
+    expect(parseGetiText(text).roles).toEqual(["SUPPORT"]);
+  });
+});
