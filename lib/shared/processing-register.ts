@@ -1964,6 +1964,8 @@ const ACTIVITIES = registerActivities({
         `Automatically comparing each new post (T21) with the active alerts of its category and notifying the account one of whose alerts matches: push notification on its subscribed devices (T12) and, if its Discord account is certified, a Discord direct message delivered by the bot (T08); the message carries only the alert's name and a link to the page, neither a username nor the post's text; at most one notification per alert every ${GETI_ALERT_COOLDOWN_MINUTES} minutes; no decision follows from it`),
       frEn("Ne jamais prévenir deux fois pour la même annonce : une trace technique associe l'alerte à l'identifiant Discord du message déjà signalé",
         "Never notifying twice for the same post: a technical record ties the alert to the Discord identifier of the message already reported"),
+      frEn("Ne pas prévenir un compte de sa propre annonce : l'identifiant Discord lié au compte (T01) est comparé, au moment de la correspondance, à celui de l'auteur de l'annonce (T21), sans rien garder de plus",
+        "Not notifying an account of its own post: the Discord identifier linked to the account (T01) is compared, at matching time, with that of the post's author (T21), and nothing more is kept"),
     ],
     legalBasis: frEn("Exécution du service demandé par le compte (RGPD, art. 6.1.b, conditions d'utilisation) : une alerte n'existe que parce que le compte la crée, et il la met en pause ou la supprime à tout moment ; la notification push repose en outre sur le consentement donné sur chaque appareil (T12), et le sujet « Alertes d'annonces GETI » coupé dans « Mon profil » coupe aussi le message privé Discord",
       "Performance of the service the account asked for (GDPR, art. 6.1.b, terms of use): an alert exists only because the account creates it, and the account pauses or deletes it at any time; the push notification also relies on the consent given on each device (T12), and turning off the “GETI post alerts” topic in “My profile” also turns off the Discord direct message"),
@@ -1978,6 +1980,8 @@ const ACTIVITIES = registerActivities({
         "State (active, paused), creation date, date of the last notification"),
       frEn("Trace des annonces déjà signalées : identifiant de l'alerte et identifiant Discord du message",
         "Record of the posts already reported: identifier of the alert and Discord identifier of the message"),
+      frEn("Identifiant Discord lié au compte (T01), lu seulement pour écarter sa propre annonce",
+        "Discord identifier linked to the account (T01), read only to leave out its own post"),
     ],
     sensitiveData: frEn("Aucune", "None"),
     retention: [

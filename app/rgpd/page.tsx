@@ -341,7 +341,8 @@ function RgpdFr({
             trace technique des annonces déjà signalées. Quand une nouvelle annonce correspond, le compte est prévenu
             par notification push sur ses appareils abonnés et, si son compte Discord est certifié, par message privé
             Discord — au plus une fois toutes les {GETI_ALERT_COOLDOWN_MINUTES} minutes par alerte, sans pseudo ni texte
-            de l&apos;annonce (le nom de l&apos;alerte et un lien). Le sujet « Alertes d&apos;annonces GETI » de « Mon profil »
+            de l&apos;annonce (le nom de l&apos;alerte et un lien) ; sa propre annonce ne le prévient pas (l&apos;identifiant
+            Discord lié au compte est comparé à celui de l&apos;auteur, sans rien garder de plus). Le sujet « Alertes d&apos;annonces GETI » de « Mon profil »
             coupe les deux. Une alerte est gardée jusqu&apos;à sa suppression par le compte ; l&apos;effacement du compte emporte
             toutes ses alertes, et la trace des annonces déjà signalées est effacée au bout de{" "}
             {GETI_ALERT_HIT_RETENTION_DAYS} jours. Base : l&apos;exécution du service demandé par le compte. Registre des

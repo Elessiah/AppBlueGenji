@@ -505,6 +505,40 @@ async function scanGetiPosts(filter: GetiFilter, db: GetiExecutor, now: number):
   return posts;
 }
 
+/** Identifiants lus par requête `IN (…)` (`readStoredGetiPosts`). */
+const STORED_READ_CHUNK = 100;
+
+/**
+ * La version **gardée** des annonces demandées, lue comme la page la lit : une
+ * analyse gardée à une version antérieure est réanalysée depuis le message
+ * brut, une ligne illisible ou sortie de la garde de sa catégorie n'est pas
+ * rendue, une annonce retirée n'est plus là (les alertes,
+ * `lib/server/geti/alerts.ts`).
+ */
+export async function readStoredGetiPosts(
+  executor: GetiExecutor,
+  messageIds: readonly string[],
+  now: number = Date.now(),
+): Promise<GetiStoredPost[]> {
+  const ids = [...new Set(messageIds)];
+  const posts: GetiStoredPost[] = [];
+  for (let start = 0; start < ids.length; start += STORED_READ_CHUNK) {
+    const chunk = ids.slice(start, start + STORED_READ_CHUNK);
+    const [rows] = await executor.execute<GetiPostRow[]>(
+      `SELECT message_id, channel_id, category, source, author_id, author_tag, parsed_json, ${STALE_RAW_JSON},
+              posted_at, edited_at
+         FROM bg_geti_posts
+        WHERE message_id IN (${chunk.map(() => "?").join(", ")})`,
+      [...chunk],
+    );
+    for (const row of rows) {
+      const post = storedPostOf(row, now);
+      if (post) posts.push(post);
+    }
+  }
+  return posts;
+}
+
 /** Filtre en mémoire les annonces lues, puis découpe la page demandée. */
 function pageOfStored(stored: readonly GetiStoredPost[], filter: GetiFilter, page: GetiPageRequest, now: number): GetiPostPage {
   const pageSize = pageNumber(page.pageSize, GETI_PAGE_SIZE_DEFAULT, GETI_PAGE_SIZE_MAX);

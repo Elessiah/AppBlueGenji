@@ -788,12 +788,15 @@ attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
    chaque démarrage, ne prévient personne. Une annonce ancienne **modifiée**
    à l'instant compte comme récente : si elle correspond désormais à une
    alerte qui ne l'avait jamais vue, elle prévient une fois. Ce tri se refait
-   sur la **version gardée**, relue dans `bg_geti_posts` : une version plus
+   sur la **version gardée**, relue dans `bg_geti_posts` comme la page la lit
+   (`readStoredGetiPosts` : une analyse d'une version antérieure est
+   réanalysée depuis le message brut) : une version plus
    ancienne arrivée après une modification (l'enregistrement la laisse de
    côté) est jugée sur la version gardée — fermée, elle ne prévient pas — et
    une annonce retirée entre-temps ne prévient pas.
 2. Une lecture des alertes actives des catégories du lot (`paused = 0`, au plus
-   `GETI_ALERT_SCAN_MAX` ; borne atteinte = avertissement chiffré dans pm2),
+   `GETI_ALERT_SCAN_MAX`, lue avec une ligne de plus : seule cette ligne en trop
+   — des alertes restent non lues — déclenche l'avertissement chiffré dans pm2),
    avec l'identifiant Discord du compte : **sa propre annonce ne prévient pas
    son auteur**.
 3. Correspondance en mémoire par `matchingGetiAlerts` → `matchesGetiFilter`,
@@ -802,7 +805,9 @@ attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
    traces déjà là puis un seul `INSERT IGNORE INTO bg_geti_alert_hits` à
    plusieurs lignes pour les autres (par paquets de 500) ; une insertion qui
    ne pose rien (passe simultanée) ne prévient pas (modification, second
-   rattrapage, envoi en double : rien).
+   rattrapage, envoi en double : rien) ; une insertion qui en pose une partie
+   seulement relit les traces datées de cette passe (date à la seconde) et ne
+   compte que celles-là.
 5. **Délai par alerte**, réservé en une instruction : `UPDATE bg_geti_alerts
    SET last_notified_at = ? WHERE id = ? AND paused = 0 AND (last_notified_at
    IS NULL OR last_notified_at <= ?)` + `affectedRows`. Une annonce arrivée
@@ -811,8 +816,9 @@ attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
 6. Envoi (`notifyUsers`) au compte, s'il existe encore et n'est pas suspendu.
    Un envoi qui ne joint personne (compte suspendu ou effacé) ou qui échoue
    **rend** le délai (date précédente remise, si personne ne l'a reprise) et
-   retire la trace de l'annonce : une autre alerte du compte peut prévenir, et
-   une modification récente de l'annonce aussi.
+   retire les traces que la passe a posées pour cette alerte (toutes ses
+   annonces du lot) : une autre alerte du compte peut prévenir, et une
+   modification récente de ces annonces aussi.
 
 **Borne du coût** : par lot (20 annonces au plus), une relecture des annonces
 récentes, une lecture d'au plus 2 000 alertes, deux instructions par annonce

@@ -27,9 +27,8 @@ import {
   GETI_ALERT_SCAN_MAX,
 } from "@/lib/shared/geti/alerts";
 import type { GetiParsedPost } from "@/lib/shared/geti";
-import { parsedGetiPost } from "../../../helpers/geti";
-import { GETI_FAKE_AUTHOR_ID } from "../../../helpers/geti";
-import { GETI_FAKE_MESSAGE_ID } from "../../../helpers/geti-ingest";
+import { GETI_FAKE_AUTHOR_ID, parsedGetiPost } from "../../../helpers/geti";
+import { GETI_FAKE_MESSAGE_ID, getiPushedPost } from "../../../helpers/geti-ingest";
 import { connectionMock, fakeConnection, fakePool, type SqlMock, type SqlQuery } from "../../../helpers/sql-double";
 
 /** Alertes GETI : création sous plafond, changement, suppression, effacement, passe d'alertes. */
@@ -372,8 +371,11 @@ describe("notifyGetiAlerts", () => {
   function storedRow(messageId: string, parsed: GetiParsedPost = parsedGetiPost({ category: "lfp", roles: ["TANK"] })) {
     return {
       message_id: messageId,
+      channel_id: "100000000000000800",
       category: parsed.category,
+      source: "direct",
       parsed_json: JSON.stringify(parsed),
+      stale_raw_json: null,
       posted_at: new Date(NOW - MINUTE_MS),
       edited_at: null,
     };
@@ -393,18 +395,24 @@ describe("notifyGetiAlerts", () => {
       stored?: (messageId: string) => unknown;
       seen?: number[];
       newHit?: boolean;
+      /** Traces réellement posées par l'insertion (recouvrement partiel), et celles relues comme posées par cette passe. */
+      inserted?: number;
+      mine?: number[];
       reserved?: boolean;
     } = {},
   ): SqlMock {
-    const { alerts = [activeAlertRow()], stored = (id: string) => storedRow(id), seen = [], newHit = true, reserved = true } = options;
+    const { alerts = [activeAlertRow()], stored = (id: string) => storedRow(id), seen = [], newHit = true, inserted, mine = [], reserved = true } = options;
     return jest.fn<SqlQuery>(async (sql: string, params?: unknown) => {
       const values = (params ?? []) as unknown[];
       if (sql.includes("FROM bg_geti_posts")) {
         return [values.map((id) => stored(String(id))).filter((row) => row !== null)];
       }
+      if (sql.includes("SELECT alert_id FROM bg_geti_alert_hits") && sql.includes("created_at = ?")) {
+        return [mine.map((id) => ({ alert_id: id }))];
+      }
       if (sql.includes("SELECT alert_id FROM bg_geti_alert_hits")) return [seen.map((id) => ({ alert_id: id }))];
       if (sql.includes("SELECT")) return [alerts];
-      if (sql.includes("INSERT IGNORE")) return [{ affectedRows: newHit ? values.length / 3 : 0 }];
+      if (sql.includes("INSERT IGNORE")) return [{ affectedRows: inserted ?? (newHit ? values.length / 3 : 0) }];
       if (sql.startsWith("UPDATE") && sql.includes("paused = 0")) return [{ affectedRows: reserved ? 1 : 0 }];
       return [{ affectedRows: 1 }];
     });
@@ -575,7 +583,7 @@ describe("notifyGetiAlerts", () => {
       7,
       new Date(NOW),
     ]);
-    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_alert_hits WHERE alert_id = ? AND message_id = ?", [
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_alert_hits WHERE alert_id = ? AND message_id IN (?)", [
       7,
       GETI_FAKE_MESSAGE_ID,
     ]);
@@ -593,15 +601,86 @@ describe("notifyGetiAlerts", () => {
     logged.mockRestore();
   });
 
-  it("notifyGetiAlerts_scanCapReached_warnsWithACountOnly", async () => {
+  it("notifyGetiAlerts_exactlyTheScanCap_doesNotWarn", async () => {
     const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
     const capped = Array.from({ length: GETI_ALERT_SCAN_MAX }, (_, index) => activeAlertRow({ id: index + 1, search: "?role=support" }));
     const execute = alertsDatabase({ alerts: capped });
 
     await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
 
-    expect(warned).toHaveBeenCalledWith("[geti] borne des alertes lues atteinte:", GETI_ALERT_SCAN_MAX);
+    expect(warned).not.toHaveBeenCalled();
     warned.mockRestore();
+  });
+
+  it("notifyGetiAlerts_oneMoreThanTheScanCap_warnsWithACountOnlyAndIgnoresTheExtraRow", async () => {
+    const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const capped = Array.from({ length: GETI_ALERT_SCAN_MAX }, (_, index) => activeAlertRow({ id: index + 1, search: "?role=support" }));
+    const extra = activeAlertRow({ id: GETI_ALERT_SCAN_MAX + 1 });
+    const execute = alertsDatabase({ alerts: [...capped, extra] });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(warned).toHaveBeenCalledWith("[geti] borne des alertes lues atteinte:", GETI_ALERT_SCAN_MAX);
+    expect(outcome).toEqual({ matched: 0, notified: 0 });
+    expect(execute.mock.calls[1][0]).toContain(`LIMIT ${GETI_ALERT_SCAN_MAX + 1}`);
+    warned.mockRestore();
+  });
+
+  it("notifyGetiAlerts_storedRowAtAnOlderAnalysisClosedSince_isJudgedOnItsReanalysis", async () => {
+    const { closed, ...older } = parsedGetiPost({ category: "lfp", roles: ["TANK"] });
+    const raw = getiPushedPost({ content: "~~LFP tank~~" }).raw;
+    const execute = alertsDatabase({
+      stored: (id) => ({ ...storedRow(id), parsed_json: JSON.stringify(older), stale_raw_json: JSON.stringify(raw) }),
+    });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(closed).toBe(false);
+    expect(outcome).toEqual({ matched: 0, notified: 0 });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("notifyGetiAlerts_partialOverlapWithAConcurrentPass_notifiesOnlyTheHitsItInserted", async () => {
+    const execute = alertsDatabase({
+      alerts: [activeAlertRow({ id: 7, user_id: 1 }), activeAlertRow({ id: 8, user_id: 2 })],
+      inserted: 1,
+      mine: [8],
+    });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome).toEqual({ matched: 1, notified: 1 });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ id: 8 }), expect.anything());
+  });
+
+  it("notifyGetiAlerts_nowWithMilliseconds_writesAndRereadsTheHitAtTheSecond", async () => {
+    const execute = alertsDatabase({
+      alerts: [activeAlertRow({ id: 7, user_id: 1 }), activeAlertRow({ id: 8, user_id: 2 })],
+      inserted: 1,
+      mine: [8],
+    });
+
+    await notifyGetiAlerts([freshPost()], NOW + 789, fakePool({ execute }), send);
+
+    const insert = execute.mock.calls.find(([sql]) => sql.startsWith("INSERT IGNORE"));
+    const reread = execute.mock.calls.find(([sql]) => sql.includes("created_at = ?"));
+    expect(insert?.[1]).toEqual([7, GETI_FAKE_MESSAGE_ID, new Date(NOW), 8, GETI_FAKE_MESSAGE_ID, new Date(NOW)]);
+    expect(reread?.[1]).toEqual([GETI_FAKE_MESSAGE_ID, new Date(NOW), 7, 8]);
+  });
+
+  it("notifyGetiAlerts_sendFailsAfterTwoPostsMatchedTheAlert_releasesBothTraces", async () => {
+    const second = freshPost({ messageId: "100000000000000902" });
+    const execute = alertsDatabase();
+    send.mockResolvedValue(false);
+
+    await notifyGetiAlerts([freshPost(), second], NOW, fakePool({ execute }), send);
+
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_alert_hits WHERE alert_id = ? AND message_id IN (?, ?)", [
+      7,
+      GETI_FAKE_MESSAGE_ID,
+      second.messageId,
+    ]);
   });
 
   it("notifyGetiAlerts_cooldownNotElapsed_keepsTheHitButDoesNotSend", async () => {

@@ -12,6 +12,7 @@ import {
   listGetiPostsShared,
   logGetiListFailure,
   purgeExpiredGetiPosts,
+  readStoredGetiPosts,
   reconcileGetiChannel,
   refreshStaleGetiPosts,
   resetGetiListFailureLog,
@@ -971,5 +972,68 @@ describe("version de l'analyse gardée", () => {
     const page = await listGetiPosts({}, {}, executor(execute), NOW);
 
     expect(page.posts[0].parsed).not.toHaveProperty("analysisVersion");
+  });
+});
+
+describe("readStoredGetiPosts", () => {
+  const OTHER_ID = "100000000000000902";
+
+  it("readStoredGetiPosts_knownIds_returnsTheStoredVersions", async () => {
+    const execute = executeMock([row(), row({ message_id: OTHER_ID })]);
+
+    const posts = await readStoredGetiPosts(executor(execute), [GETI_FAKE_MESSAGE_ID, OTHER_ID], NOW);
+
+    expect(posts.map((post) => post.messageId)).toEqual([GETI_FAKE_MESSAGE_ID, OTHER_ID]);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(String(execute.mock.calls[0][0])).toContain("WHERE message_id IN (?, ?)");
+    expect(String(execute.mock.calls[0][0])).toContain("AS stale_raw_json");
+  });
+
+  it("readStoredGetiPosts_duplicateIds_queriesEachIdOnce", async () => {
+    const execute = executeMock([]);
+
+    await readStoredGetiPosts(executor(execute), [GETI_FAKE_MESSAGE_ID, GETI_FAKE_MESSAGE_ID], NOW);
+
+    expect(execute.mock.calls[0][1]).toEqual([GETI_FAKE_MESSAGE_ID]);
+  });
+
+  it("readStoredGetiPosts_moreIdsThanAChunk_splitsTheReads", async () => {
+    const execute = executeMock([]);
+    const ids = Array.from({ length: 101 }, (_, index) => `1000000000000${String(index).padStart(5, "0")}`);
+
+    await readStoredGetiPosts(executor(execute), ids, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[1][1]).toEqual([ids[100]]);
+  });
+
+  it("readStoredGetiPosts_rowAtAnOlderAnalysis_isReanalysedFromItsRawMessage", async () => {
+    const { levels, ...older } = parsedGetiPost({ text: "LFT support adv" });
+    const raw = getiPushedPost({ content: "LFT support adv" }).raw;
+    const execute = executeMock([row({ parsed_json: JSON.stringify(older), stale_raw_json: JSON.stringify(raw) })]);
+
+    const [post] = await readStoredGetiPosts(executor(execute), [GETI_FAKE_MESSAGE_ID], NOW);
+
+    expect(levels).toEqual([]);
+    expect(post.parsed.levels).toEqual(["ADVANCED"]);
+  });
+
+  it("readStoredGetiPosts_unreadableRow_isLeftOut", async () => {
+    const execute = executeMock([row({ parsed_json: "{pas du json" })]);
+
+    await expect(readStoredGetiPosts(executor(execute), [GETI_FAKE_MESSAGE_ID], NOW)).resolves.toEqual([]);
+  });
+
+  it("readStoredGetiPosts_rowPastItsCategoryRetention_isLeftOut", async () => {
+    const execute = executeMock([row({ posted_at: storedDate(15 * DAY_MS) })]);
+
+    await expect(readStoredGetiPosts(executor(execute), [GETI_FAKE_MESSAGE_ID], NOW)).resolves.toEqual([]);
+  });
+
+  it("readStoredGetiPosts_noIds_runsNoQuery", async () => {
+    const execute = executeMock([]);
+
+    await expect(readStoredGetiPosts(executor(execute), [], NOW)).resolves.toEqual([]);
+    expect(execute).not.toHaveBeenCalled();
   });
 });

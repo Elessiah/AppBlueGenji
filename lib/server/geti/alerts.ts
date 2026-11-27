@@ -13,7 +13,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
-import type { GetiExecutor } from "@/lib/server/geti/posts";
+import { readStoredGetiPosts, type GetiExecutor } from "@/lib/server/geti/posts";
 import { ignoreMissingTable, isMissingTableError, rowsOrEmptyIfMissingTable } from "@/lib/server/mysql-errors";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { toIso } from "@/lib/server/serialization";
@@ -289,13 +289,13 @@ async function loadActiveAlerts(db: GetiExecutor, categories: readonly GetiCateg
        JOIN bg_users u ON u.id = a.user_id
       WHERE a.paused = 0 AND a.category IN (${categories.map(() => "?").join(", ")})
       ORDER BY a.id
-      LIMIT ${GETI_ALERT_SCAN_MAX}`,
+      LIMIT ${GETI_ALERT_SCAN_MAX + 1}`,
     [...categories],
   );
-  // Borne atteinte : les alertes suivantes ne sont pas lues — signalé dans pm2 (un nombre seul).
-  if (rows.length >= GETI_ALERT_SCAN_MAX) console.warn("[geti] borne des alertes lues atteinte:", rows.length);
+  // Une ligne de plus que la borne : seule elle dit que des alertes restent non lues — signalé dans pm2 (un nombre seul).
+  if (rows.length > GETI_ALERT_SCAN_MAX) console.warn("[geti] borne des alertes lues atteinte:", GETI_ALERT_SCAN_MAX);
   const alerts: ActiveAlert[] = [];
-  for (const row of rows) {
+  for (const row of rows.slice(0, GETI_ALERT_SCAN_MAX)) {
     if (!isCategory(row.category)) continue;
     const lastNotifiedAt = toIso(row.last_notified_at);
     alerts.push({
@@ -311,61 +311,30 @@ async function loadActiveAlerts(db: GetiExecutor, categories: readonly GetiCateg
   return alerts;
 }
 
-type StoredPostRow = RowDataPacket & {
-  message_id: string;
-  category: string;
-  parsed_json: string;
-  posted_at: Date | string;
-  edited_at: Date | string | null;
-};
-
-/** Identifiants lus par requête `IN (…)`. */
-const STORED_READ_CHUNK = 100;
-
-function storedAlertPostOf(row: StoredPostRow): GetiAlertPost | null {
-  const postedAt = toIso(row.posted_at);
-  if (!isCategory(row.category) || postedAt === null) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(String(row.parsed_json));
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== "object" || parsed === null || typeof (parsed as { text?: unknown }).text !== "string") {
-    return null;
-  }
-  const editedAt = toIso(row.edited_at);
-  return {
-    messageId: String(row.message_id),
-    category: row.category,
-    parsed: parsed as GetiParsedPost,
-    postedAt: new Date(postedAt),
-    editedAt: editedAt === null ? null : new Date(editedAt),
-  };
-}
-
 /**
  * La version **gardée** des annonces reçues : celle que l'enregistrement a
  * retenue (une version plus ancienne arrivée après une modification ne
- * remplace rien) ; une annonce retirée entre-temps n'est plus là.
+ * remplace rien), lue comme la page la lit (`readStoredGetiPosts` : une
+ * analyse ancienne est réanalysée) ; une annonce retirée entre-temps n'est
+ * plus là.
  */
-async function loadStoredVersions(db: GetiExecutor, posts: readonly GetiAlertPost[]): Promise<GetiAlertPost[]> {
-  const ids = [...new Set(posts.map((post) => post.messageId))];
-  const stored: GetiAlertPost[] = [];
-  for (let start = 0; start < ids.length; start += STORED_READ_CHUNK) {
-    const chunk = ids.slice(start, start + STORED_READ_CHUNK);
-    const [rows] = await db.execute<StoredPostRow[]>(
-      `SELECT message_id, category, parsed_json, posted_at, edited_at
-         FROM bg_geti_posts
-        WHERE message_id IN (${chunk.map(() => "?").join(", ")})`,
-      [...chunk],
-    );
-    for (const row of rows) {
-      const post = storedAlertPostOf(row);
-      if (post) stored.push(post);
-    }
-  }
-  return stored;
+async function loadStoredVersions(
+  db: GetiExecutor,
+  posts: readonly GetiAlertPost[],
+  now: number,
+): Promise<GetiAlertPost[]> {
+  const stored = await readStoredGetiPosts(
+    db,
+    posts.map((post) => post.messageId),
+    now,
+  );
+  return stored.map((post) => ({
+    messageId: post.messageId,
+    category: post.category,
+    parsed: post.parsed,
+    postedAt: new Date(post.postedAt),
+    editedAt: post.editedAt === null ? null : new Date(post.editedAt),
+  }));
 }
 
 /** Une annonce ouverte, publiée ou modifiée récemment : la seule qui prévient. */
@@ -400,12 +369,18 @@ async function sendAlert(alert: ActiveAlert, post: GetiAlertPost): Promise<boole
   return true;
 }
 
-type AlertHit = { alert: ActiveAlert; post: GetiAlertPost };
+/**
+ * Une alerte touchée : la première annonce nouvellement vue (celle envoyée) et
+ * toutes les annonces dont cette passe a posé la trace (rendues si l'envoi ne
+ * joint personne).
+ */
+type AlertHit = { alert: ActiveAlert; post: GetiAlertPost; messageIds: string[] };
 
 /**
  * Pose la trace de chaque couple (alerte, annonce) qui correspond ; rend, par
- * alerte, la première annonce **nouvellement** vue (`affectedRows` de
- * l'`INSERT IGNORE`), et compte les couples neufs dans `outcome.matched`.
+ * alerte, la première annonce **nouvellement** vue (trace posée par cette
+ * passe) et la liste de ses annonces neuves, et compte les couples neufs dans
+ * `outcome.matched`.
  */
 async function recordAlertHits(
   db: GetiExecutor,
@@ -423,7 +398,9 @@ async function recordAlertHits(
     for (let start = 0; start < matched.length; start += HIT_CHUNK) {
       for (const alert of await insertNewHits(db, post, matched.slice(start, start + HIT_CHUNK), now)) {
         outcome.matched += 1;
-        if (!firstHit.has(alert.id)) firstHit.set(alert.id, { alert, post });
+        const hit = firstHit.get(alert.id);
+        if (hit) hit.messageIds.push(post.messageId);
+        else firstHit.set(alert.id, { alert, post, messageIds: [post.messageId] });
       }
     }
   }
@@ -435,10 +412,12 @@ const HIT_CHUNK = 500;
 
 /**
  * Pose en une instruction les traces (alerte, annonce) qui n'existent pas
- * encore et rend les alertes nouvellement touchées. Une passe simultanée qui
- * a posé les mêmes traces entre la lecture et l'écriture (`affectedRows` nul)
- * ne prévient pas une seconde fois ; un recouvrement partiel, plus rare,
- * reste borné par le délai de chaque alerte.
+ * encore et rend les alertes dont **cette** passe a posé la trace. Une passe
+ * simultanée qui a posé les mêmes traces entre la lecture et l'écriture
+ * (`affectedRows` nul) ne prévient pas une seconde fois ; sur un recouvrement
+ * partiel (`affectedRows` plus petit que les traces écrites), seules les
+ * traces portant la date de cette passe comptent — deux passes de la même
+ * seconde restent bornées par le délai de chaque alerte.
  */
 async function insertNewHits(
   db: GetiExecutor,
@@ -454,18 +433,30 @@ async function insertNewHits(
   const seenIds = new Set(seen.map((row) => Number(row.alert_id)));
   const unseen = alerts.filter((alert) => !seenIds.has(alert.id));
   if (unseen.length === 0) return [];
-  const at = new Date(now);
+  // À la seconde : la colonne `DATETIME` n'en garde pas moins, et la relecture d'un recouvrement compare cette valeur.
+  const at = new Date(Math.floor(now / 1000) * 1000);
   const [result] = await db.execute(
     `INSERT IGNORE INTO bg_geti_alert_hits (alert_id, message_id, created_at) VALUES ${unseen.map(() => "(?, ?, ?)").join(", ")}`,
     unseen.flatMap((alert) => [alert.id, post.messageId, at]),
   );
-  return affected(result) === 0 ? [] : unseen;
+  const inserted = affected(result);
+  if (inserted === 0) return [];
+  if (inserted === unseen.length) return unseen;
+  const [mine] = await db.execute<(RowDataPacket & { alert_id: number })[]>(
+    `SELECT alert_id FROM bg_geti_alert_hits
+      WHERE message_id = ? AND created_at = ? AND alert_id IN (${unseen.map(() => "?").join(", ")})`,
+    [post.messageId, at, ...unseen.map((alert) => alert.id)],
+  );
+  const mineIds = new Set(mine.map((row) => Number(row.alert_id)));
+  return unseen.filter((alert) => mineIds.has(alert.id));
 }
 
 /**
  * Un envoi qui n'a joint personne (compte suspendu ou effacé, panne) rend le
  * délai réservé — seulement s'il n'a pas été repris entre-temps — et retire
- * la trace de l'annonce : une modification récente pourra encore prévenir.
+ * les traces que cette passe a posées pour l'alerte (toutes ses annonces du
+ * lot, pas seulement celle envoyée) : une modification récente pourra encore
+ * prévenir.
  */
 async function releaseReservation(db: GetiExecutor, hit: AlertHit, reservedAt: Date): Promise<void> {
   try {
@@ -474,10 +465,13 @@ async function releaseReservation(db: GetiExecutor, hit: AlertHit, reservedAt: D
       hit.alert.id,
       reservedAt,
     ]);
-    await db.execute(`DELETE FROM bg_geti_alert_hits WHERE alert_id = ? AND message_id = ?`, [
-      hit.alert.id,
-      hit.post.messageId,
-    ]);
+    for (let start = 0; start < hit.messageIds.length; start += HIT_CHUNK) {
+      const chunk = hit.messageIds.slice(start, start + HIT_CHUNK);
+      await db.execute(
+        `DELETE FROM bg_geti_alert_hits WHERE alert_id = ? AND message_id IN (${chunk.map(() => "?").join(", ")})`,
+        [hit.alert.id, ...chunk],
+      );
+    }
   } catch (error) {
     console.error("[geti] délai d'alerte non rendu", failureReason(error));
   }
@@ -538,8 +532,8 @@ async function sendReservedAlerts(
  * - Au plus une notification par alerte toutes les
  *   `GETI_ALERT_COOLDOWN_MINUTES`, réservée en une instruction
  *   (`UPDATE … WHERE last_notified_at …` + `affectedRows`), et une seule par
- *   compte et par lot ; un envoi qui ne joint personne rend le délai et la
- *   trace.
+ *   compte et par lot ; un envoi qui ne joint personne rend le délai et les
+ *   traces posées.
  *
  * Coût : une relecture des annonces récentes, une lecture des alertes actives
  * des catégories du lot (au plus `GETI_ALERT_SCAN_MAX` lignes, borne signalée
@@ -563,7 +557,7 @@ export async function notifyGetiAlerts(
     const received = posts.filter((post) => isAlertable(post, now));
     if (received.length === 0) return outcome;
     const db = executor ?? (await getDatabase());
-    const fresh = (await loadStoredVersions(db, received)).filter((post) => isAlertable(post, now));
+    const fresh = (await loadStoredVersions(db, received, now)).filter((post) => isAlertable(post, now));
     if (fresh.length === 0) return outcome;
     const alerts = await loadActiveAlerts(db, [...new Set(fresh.map((post) => post.category))]);
     if (alerts.length === 0) return outcome;
