@@ -55,6 +55,7 @@ function row(overrides: Record<string, unknown> = {}, parsed: Partial<GetiParsed
     author_id: "100000000000000001",
     author_tag: "fauxjoueur",
     parsed_json: JSON.stringify(parsedGetiPost({ text: "LFT support", ...parsed })),
+    stale_raw_json: null,
     posted_at: storedDate(2 * 60 * 60 * 1000),
     edited_at: null,
     ...overrides,
@@ -416,6 +417,36 @@ describe("listGetiPosts", () => {
 
     expect([dates, levels, closed]).toEqual([[], [], false]);
     expect(page.posts[0].parsed).toMatchObject({ dates: [], levels: [], closed: false });
+  });
+
+  it("listGetiPosts_rowParsedBeforeDatesLevelsClosedExisted_isReparsedFromItsRawMessage", async () => {
+    const { dates, levels, closed, ...older } = parsedGetiPost({ text: "LFT support adv" });
+    const raw = getiPushedPost({ content: "LFT support adv, ~~ancien texte~~" }).raw;
+    const execute = executeMock([row({ parsed_json: JSON.stringify(older), stale_raw_json: JSON.stringify(raw) })]);
+
+    const page = await listGetiPosts({ levels: ["ADVANCED"] }, {}, executor(execute), NOW);
+
+    expect([dates, levels, closed]).toEqual([[], [], false]);
+    expect(page.posts).toHaveLength(1);
+    expect(page.posts[0].parsed.levels).toEqual(["ADVANCED"]);
+  });
+
+  it("listGetiPosts_staleRowWithUnreadableRawMessage_keepsStoredAnalysisWithEmptyFields", async () => {
+    const { dates, levels, closed, ...older } = parsedGetiPost({ text: "LFT support" });
+    const execute = executeMock([row({ parsed_json: JSON.stringify(older), stale_raw_json: "{pas du json" })]);
+
+    const page = await listGetiPosts({}, {}, executor(execute), NOW);
+
+    expect([dates, levels, closed]).toEqual([[], [], false]);
+    expect(page.posts[0].parsed).toMatchObject({ text: "LFT support", dates: [], levels: [], closed: false });
+  });
+
+  it("listGetiPosts_query_readsRawMessageOnlyForAnalysesWithoutClosedKey", async () => {
+    const execute = executeMock([]);
+
+    await listGetiPosts({}, {}, executor(execute), NOW);
+
+    expect(String(execute.mock.calls[0][0])).toContain(`IF(parsed_json LIKE '%"closed":%', NULL, raw_json) AS stale_raw_json`);
   });
 
   it("listGetiPosts_noExecutorGiven_readsFromThePool", async () => {

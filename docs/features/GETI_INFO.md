@@ -246,18 +246,21 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   remerciement relié par « pour / for / de / du » (« merci pour tout votre
   soutien », « thanks a lot for the support », « thank you very much for your
   support ») n'est pas un rôle — « je serai ton support », « thx we need a
-  support », « merci de jouer le support » en sont.
+  support », « merci de jouer le support » en sont. « hs » seul derrière « être »
+  ou un appareil (« mon micro est hs », « casque hs ») veut dire « hors service ».
 - **Région** : mêmes mots que le relais du bot, plus l'Océanie et le drapeau
   européen. « eu » derrière un auxiliaire ou un adverbe (« j'ai eu », « il a eu »,
   « jamais eu ») est le participe d'« avoir », pas l'Europe ; « a » ne compte que
   derrière son sujet (« de NA à EU », « ouvert à tout EU » restent l'Europe), et
   « bien / plus / tout / assez » que derrière une forme d'« avoir » (« j'ai bien
-  eu » est le participe, « plus EU que NA » l'Europe).
+  eu » est le participe, « plus EU que NA » l'Europe) ; « on a bien eu » est le
+  participe, « de NA à tout EU » l'Europe.
 - **Langues** : mots (« francophone », « english »), drapeaux, sigles **en liste**
   (« FR/EN ») ou derrière « langue : » — seuls, « EN », « ES » ou « DE » sont des
   mots courants.
 - **Plateformes** : « hybrid(e) », « crossplay » — et « mixed » dans une recherche
-  de scrim — valent PC **et** console.
+  de scrim — valent PC **et** console ; « hybrid » près d'un mode de carte ou du
+  mot « map » (« maps: control, hybrid, push ») est le mode, pas la plateforme.
 - **Jours** : noms complets, fautes courantes comprises (« mecredi »,
   « wenesday ») ; les abréviations (« mar », « jeu », « mon » sont des mots) ne
   se lisent que devant une date ou une heure (« Tue 20-22 », « sam 28/11 ») ou
@@ -361,9 +364,16 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
   autres channels. », lien d'invitation du bot) n'est pas une annonce ;
   `upsertGetiPosts` l'écarte comme un message vide (compté `emptied`, retiré
   s'il était gardé). Un relais à en-tête GETI n'en est jamais une.
-- **Analyses déjà gardées** : `listGetiPosts` donne `dates`, `levels` et
-  `closed` vides à une ligne analysée avant ce lot ; le rattrapage du bot la
-  réanalyse.
+- **Analyses déjà gardées** : une ligne analysée avant ce lot (sans clé
+  `"closed"` dans `parsed_json`) est réanalysée à la lecture depuis son
+  `raw_json` par `listGetiPosts` (seules ces lignes remontent leur message brut) ;
+  message brut illisible : `dates`, `levels` et `closed` vides.
+- **Faux positifs écartés** (revue) : une tranche d'âge (« âge : 16-20 ») n'est
+  pas un horaire ; « 2/3 joueurs », « 1/12 places » ne sont pas des dates, et
+  « 31/12 » lu un 1er janvier l'est (année précédente) ; « recrutement /
+  inscriptions / candidatures open » n'est pas le niveau Open ; « +18 de
+  préférence », « 18+ ou mature » sont un âge ; dans une recherche d'équipe
+  (`lft`), le mot devant « recherche » est le pseudo du joueur, pas une équipe.
 
 Limites connues : le rôle d'une recherche de remplaçant donné par la seule
 mention d'un rôle Discord (`<@&id>`) n'est pas lu ; le pool de héros, l'âge du

@@ -242,19 +242,41 @@ type GetiPostRow = RowDataPacket & {
   author_id: string | null;
   author_tag: string | null;
   parsed_json: string;
+  /** Message brut, lu seulement pour une analyse gardée avant le dernier champ ajouté (`STALE_RAW_JSON`). */
+  stale_raw_json?: string | null;
   posted_at: string;
   edited_at: string | null;
 };
 
-/** Champs ajoutés à l'analyse après les premières annonces gardées : vides par défaut. */
+/** Champs ajoutés à l'analyse après les premières annonces gardées : vides si le message brut est illisible. */
 const ADDED_FIELDS: Partial<GetiParsedPost> = { dates: [], levels: [], closed: false };
+/**
+ * Message brut d'une analyse gardée avant l'ajout de `closed` (le dernier champ
+ * ajouté, avec `dates` et `levels`) : relu et réanalysé à la lecture, sans quoi
+ * un filtre de niveau écarterait l'annonce. `JSON.stringify` écrit toujours la
+ * clé `"closed":` ; dans le texte d'une annonce, un guillemet est échappé (`\"`).
+ * Les autres lignes ne remontent pas leur message brut (jusqu'à 60 000 octets).
+ */
+const STALE_RAW_JSON = `IF(parsed_json LIKE '%"closed":%', NULL, raw_json) AS stale_raw_json`;
+
+/** Analyse d'une ligne : celle gardée, ou celle du message brut quand elle précède les derniers champs. */
+function analysisOf(row: GetiPostRow): unknown {
+  if (row.stale_raw_json !== null && row.stale_raw_json !== undefined) {
+    try {
+      return parseGetiPost(JSON.parse(row.stale_raw_json), getiTrustedBots());
+    } catch {
+      // Message brut illisible : l'analyse gardée, champs ajoutés vides.
+    }
+  }
+  return JSON.parse(row.parsed_json);
+}
 
 /** Une ligne en annonce rendue ; `null` si elle est illisible, ou sortie de la fenêtre de garde de sa catégorie. */
 function storedPostOf(row: GetiPostRow, now: number): GetiStoredPost | null {
   if (!isCategory(row.category) || !isSource(row.source)) return null;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(row.parsed_json);
+    parsed = analysisOf(row);
   } catch {
     return null;
   }
@@ -269,7 +291,7 @@ function storedPostOf(row: GetiPostRow, now: number): GetiStoredPost | null {
     authorTag: row.author_tag,
     authorId: row.author_id,
     // La date gardée fait foi pour le filtre d'âge, pas celle recopiée dans l'analyse.
-    // Une analyse gardée avant l'ajout d'un champ (dates, niveaux, clôture) le reçoit vide.
+    // Une analyse gardée avant l'ajout d'un champ (dates, niveaux, clôture), au message brut illisible, le reçoit vide.
     parsed: { ...ADDED_FIELDS, ...parsed, postedAt },
     postedAt,
     editedAt: toIso(row.edited_at),
@@ -320,7 +342,8 @@ export async function listGetiPosts(
   }
   // `LIMIT` écrit en dur (constante entière) : `execute` n'accepte pas partout un paramètre lié à cette place.
   const [rows] = await db.execute<GetiPostRow[]>(
-    `SELECT message_id, channel_id, category, source, author_id, author_tag, parsed_json, posted_at, edited_at
+    `SELECT message_id, channel_id, category, source, author_id, author_tag, parsed_json, ${STALE_RAW_JSON},
+            posted_at, edited_at
        FROM bg_geti_posts
       WHERE ${where.join(" AND ")}
       ORDER BY posted_at DESC, id DESC

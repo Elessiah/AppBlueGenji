@@ -597,3 +597,76 @@ describe("matchesGetiFilter — niveaux et annonces closes", () => {
     expect(matchesGetiFilter(parsedGetiPost({ closed: true }), {}, NOW)).toBe(true);
   });
 });
+
+describe("revue std 1 — faux positifs et faux négatifs", () => {
+  it("parseGetiPost_ageBracketBeforeUnitlessRange_readsNoTime", () => {
+    expect(parseIn("lfp", "Recherche DPS, âge : 16-20, FR").availability.times).toEqual([]);
+  });
+
+  it("parseGetiPost_unitlessRangeWithoutAgeWord_staysTime", () => {
+    expect(parseIn("lfs", "LFS EU PC 20-22 CET").availability.times).toEqual([{ from: 1200, to: 1320 }]);
+  });
+
+  it("parseGetiPost_hybridInMapList_isNotBothPlatforms", () => {
+    expect(parseIn("lfs", "LFS PC 3k5 20-22 CET, maps: control, hybrid, push").platforms).toEqual(["PC"]);
+  });
+
+  it("parseGetiPost_hybridTeam_isBothPlatforms", () => {
+    expect(parseIn("lfs", "LFS EU Hybrid team 3k 21-23 CET").platforms).toEqual(["PC", "CONSOLE"]);
+  });
+
+  it("parseGetiPost_lftNameBeforeVerb_readsNoTeam", () => {
+    expect(parseIn("lft", "Lucas recherche une équipe FR Diamant DPS").teamName).toBeNull();
+  });
+
+  it("parseGetiPost_lfpNameBeforeVerb_readsTeam", () => {
+    expect(parseIn("lfp", "Blue Sonate recherche un tank").teamName).toBe("Blue Sonate");
+  });
+
+  it("parseGetiPost_openAfterRecruitmentWord_isNotLevel", () => {
+    expect(parseIn("lfp", "Team Nova — Recrutement open ! Cherche tank adv").levels).toEqual(["ADVANCED"]);
+  });
+
+  it("parseGetiPost_plusEighteenDePreference_readsAge", () => {
+    expect(parseIn("lfp", "Team Phoenix recrute, +18 de préférence").minAge).toBe(18);
+  });
+
+  it("parseGetiPost_eighteenPlusOuMature_readsAge", () => {
+    expect(parseIn("lfp", "LFP tank, 18+ ou mature").minAge).toBe(18);
+  });
+
+  it("parseGetiPost_hsAfterDeviceVerb_isNotHitscan", () => {
+    const parsed = parseIn("lft", "Main support Diamant, mon micro est hs en ce moment");
+
+    expect(parsed.roles).toEqual(["SUPPORT"]);
+    expect(parsed.subRoles).toEqual(["MAIN_SUPPORT"]);
+  });
+
+  it("parseGetiPost_bareHsInList_isHitscan", () => {
+    const parsed = parseIn("lft", "LFT | HS ~ 3K PC");
+
+    expect(parsed.roles).toEqual(["DPS"]);
+    expect(parsed.subRoles).toEqual(["HITSCAN"]);
+  });
+
+  it("parseGetiPost_onABienEu_isNotEurope", () => {
+    expect(parseIn("lft", "NA player, on a bien eu des scrims").regions).toEqual(["NA"]);
+  });
+
+  it("parseGetiPost_deNaAToutEu_staysEurope", () => {
+    expect(parseIn("lft", "dispo de NA à tout EU").regions).toEqual(["EU", "NA"]);
+  });
+
+  it("parseGetiPost_fractionBeforeCountWord_isNotDate", () => {
+    const parsed = parseIn("lfp", "Il nous manque 1/12 places, cherche 2/3 joueurs", "2026-11-27T10:00:00.000Z");
+
+    expect(parsed.dates).toEqual([]);
+  });
+
+  it("parseGetiPost_lastDayOfYearReadOnFirstJanuary_isDate", () => {
+    // 1er janvier 2027, 0 h 30 à Paris.
+    const parsed = parseIn("lfs", "Scrim dispo 31/12 et 01/01", "2026-12-31T23:30:00.000Z");
+
+    expect(parsed.dates).toEqual(["2026-12-31", "2027-01-01"]);
+  });
+});

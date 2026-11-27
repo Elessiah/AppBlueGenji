@@ -469,7 +469,7 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
     dates,
     levels: parseGetiLevels(prepared.lower),
     closed,
-    teamName: parseGetiTeamName(prepared.clean),
+    teamName: parseGetiTeamName(prepared.clean, category === "lft"),
     staffRoles: parseGetiStaffRoles(prepared.lower),
     minAge: parseGetiMinAge(prepared.lower),
     postedAt,

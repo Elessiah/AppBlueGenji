@@ -71,6 +71,19 @@ const SUB_ROLE_PARENT: Readonly<Record<GetiSubRole, GetiRole>> = {
 /** Abréviations de deux lettres, ambiguës derrière un nombre (« 20 ms » de ping). */
 const SHORT_ABBREVIATIONS = new Set(["mt", "ot", "ms", "fs", "hs"]);
 /**
+ * « hs » seul est aussi « hors service » : derrière « être » ou un appareil
+ * (« mon micro est hs », « casque hs », « un peu hs »), ce n'est pas un rôle.
+ */
+const OUT_OF_ORDER_WORDS = [
+  "est sont suis es etait etaient sera serai seront",
+  "micro mic casque headset ecran clavier souris internet connexion wifi box fibre",
+  "peu trop completement totalement carrement grave",
+].join(" ");
+const OUT_OF_ORDER_BEFORE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:${OUT_OF_ORDER_WORDS.split(" ").join("|")})\s$`,
+  "u",
+);
+/**
  * « flex » est aussi un verbe : « can flex to Juno », « peut flex sur Ana »,
  * « flex on other heroes » ne disent pas un joueur polyvalent.
  */
@@ -115,6 +128,13 @@ function isNotFlexRole(lower: string, start: number, end: number, previous: Geti
   return previous?.role === "TANK" && lower.slice(previous.end, start) === " ";
 }
 
+/** Mot d'un alias de rôle qui dit autre chose ici : ping (« 20 ms »), « micro hs », « merci pour votre soutien ». */
+function isNotRoleWord(lower: string, key: string, start: number): boolean {
+  if (SHORT_ABBREVIATIONS.has(key) && /\d\s?$/u.test(lower.slice(Math.max(0, start - 2), start))) return true;
+  if (key === "hs" && OUT_OF_ORDER_BEFORE.test(lower.slice(Math.max(0, start - 16), start))) return true;
+  return POLITE_WORDS.has(key) && POLITE_BEFORE.test(lower.slice(Math.max(0, start - 60), start));
+}
+
 /**
  * Repère les rôles d'un texte préparé.
  *
@@ -128,8 +148,7 @@ export function findGetiRoleTokens(lower: string): GetiRoleToken[] {
     const kind = ROLE_TABLE.lookup.get(key);
     if (kind === undefined) continue;
     const start = match.index;
-    if (SHORT_ABBREVIATIONS.has(key) && /\d\s?$/u.test(lower.slice(Math.max(0, start - 2), start))) continue;
-    if (POLITE_WORDS.has(key) && POLITE_BEFORE.test(lower.slice(Math.max(0, start - 60), start))) continue;
+    if (isNotRoleWord(lower, key, start)) continue;
     if (key === "flex" && isNotFlexRole(lower, start, start + match[0].length, tokens.at(-1))) continue;
     tokens.push(
       isSubRole(kind)
