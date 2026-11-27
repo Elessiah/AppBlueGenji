@@ -67,7 +67,7 @@ describe("GetiSpotlight — encart de l'accueil", () => {
 
   it("getiSpotlight_lede_hasInfoHintWithHowTo : la marche à suivre est derrière le « i »", () => {
     const html = french();
-    expect(html).toContain("Toutes les annonces de recrutement Overwatch du réseau GETI, réunies sur une seule page.");
+    expect(html).toContain("Toutes les annonces Overwatch du réseau GETI (équipes, joueurs, scrims, staff, casts), réunies sur une seule page.");
     expect(html).toMatch(/<button [^>]*aria-controls="geti-spotlight-hint"[^>]*aria-label="Plus d&#x27;infos : Annonces GETI"|<button [^>]*aria-label="Plus d&#x27;infos : Annonces GETI"[^>]*aria-controls="geti-spotlight-hint"/);
     expect(html).toMatch(/id="geti-spotlight-hint"[^>]*hidden[^>]*>[^<]*Filtre par rôle, rang et disponibilités, puis contacte l&#x27;auteur de l&#x27;annonce sur Discord\./);
   });
@@ -121,5 +121,23 @@ describe("accueil — place de l'encart GETI", () => {
     expect(ticker).toBeGreaterThan(-1);
     expect(spotlight).toBeGreaterThan(ticker);
     expect(board).toBeGreaterThan(spotlight);
+  });
+});
+
+describe("encart GETI — cibles tactiles", () => {
+  const css = readSource("components/cyber/landing/GetiSpotlight.module.css");
+  const rule = (selector: string) => css.slice(css.indexOf(`${selector} {`)).split("}")[0];
+
+  it("garde à chaque raccourci de catégorie une hauteur d'au moins 44 px", () => {
+    expect(rule(".category")).toContain("min-height: 44px;");
+  });
+
+  it("garde au bouton principal une hauteur d'au moins 44 px", () => {
+    expect(rule(".cta")).toContain("min-height: 44px;");
+  });
+
+  it("n'ajoute pas de marge au paragraphe d'appel : l'écart vient de son enveloppe", () => {
+    expect(rule(".lede")).toContain("margin: 0;");
+    expect(rule(".ledeRow")).toContain("margin: 18px 0 0;");
   });
 });

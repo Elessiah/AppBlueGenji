@@ -251,9 +251,9 @@ describe("PublicNavPanel — page courante", () => {
   it("ouvre sur les annonces GETI, puis les pages hors compétition", () => {
     expect(PUBLIC_NAV_LINKS.map((l) => l.href)).toEqual([
       "/geti-info",
-      "/recrutement",
       "/bot",
       "/association",
+      "/recrutement",
       "/benevoles",
     ]);
   });
@@ -377,5 +377,23 @@ describe("PublicHeader — menu du compte", () => {
     const source = readSource("components/cyber/landing/PublicHeader.tsx");
     expect(source).toContain("<AccountMenu pseudo={user.pseudo}");
     expect(source).not.toContain('aria-label="Mon profil"');
+  });
+});
+
+describe("menu burger — cibles tactiles et focus", () => {
+  const css = readSource("components/cyber/landing/PublicNavMenu.module.css");
+  const rule = (selector: string) => css.slice(css.indexOf(`${selector} {`)).split("}")[0];
+
+  it("garde au bouton burger une hauteur d'au moins 44 px", () => {
+    expect(rule(".burger")).toContain("min-height: 44px;");
+  });
+
+  it("garde à chaque lien du panneau une hauteur d'au moins 44 px", () => {
+    expect(rule(".link")).toContain("min-height: 44px;");
+    expect(rule(".link")).toContain("display: flex;");
+  });
+
+  it("écarte l'anneau de focus de l'entrée mise en avant de sa bordure", () => {
+    expect(css).toMatch(/\.linkFeatured:focus-visible \{\s*outline-offset: 4px;/);
   });
 });

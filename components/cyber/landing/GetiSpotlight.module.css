@@ -51,7 +51,7 @@
 }
 
 .lede {
-  margin: 18px 0 0;
+  margin: 0;
   max-width: 560px;
   color: var(--ink-mute);
   line-height: 1.75;
@@ -66,6 +66,11 @@
   gap: 14px;
 }
 
+/* Bouton principal : cible tactile d'au moins 44 px. */
+.cta {
+  min-height: 44px;
+}
+
 .categoriesLabel {
   margin: 6px 0 0;
   font-family: var(--font-mono);
@@ -78,7 +83,7 @@
 .categories {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -87,7 +92,7 @@
 .category {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 14px;
   font-size: 13px;
   color: var(--ink);

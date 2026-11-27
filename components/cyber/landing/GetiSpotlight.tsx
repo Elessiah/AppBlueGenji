@@ -43,7 +43,7 @@ export function GetiSpotlight({ locale = DEFAULT_LOCALE }: Readonly<{ locale?: L
           </div>
 
           <div className={styles.side}>
-            <CyberButton variant="primary" asChild>
+            <CyberButton variant="primary" className={styles.cta} asChild>
               <LocaleLink href={getiCategoryPath(GETI_DEFAULT_CATEGORY)}>{t("geti.cta")}</LocaleLink>
             </CyberButton>
             <p id="geti-spotlight-categories" className={styles.categoriesLabel}>

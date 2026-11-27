@@ -23,9 +23,9 @@ type NavLink = { href: string; labelKey: ShellKey; featured?: boolean };
  */
 export const PUBLIC_NAV_LINKS: readonly NavLink[] = [
   { href: "/geti-info", labelKey: "nav.links.geti", featured: true },
-  { href: "/recrutement", labelKey: "nav.links.recruitment" },
   { href: "/bot", labelKey: "nav.links.bot" },
   { href: "/association", labelKey: "nav.links.association" },
+  { href: "/recrutement", labelKey: "nav.links.recruitment" },
   { href: "/benevoles", labelKey: "nav.links.volunteers" },
 ];
 

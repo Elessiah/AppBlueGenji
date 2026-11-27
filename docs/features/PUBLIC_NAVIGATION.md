@@ -36,7 +36,7 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
 
 | Menu burger | Pied de page |
 |---|---|
-| **Annonces GETI** (`/geti-info`, mise en avant) · Recrutement · Bot · L'asso · Bénévoles | COMPÉTITIONS : Tournois, Classement (`/classement`), Bot · ASSOCIATION : Manifeste, Bénévoles, Partenaires · CONTACT (courriel, tag et serveur Discord, `FooterContact`) · LÉGAL (voir `LEGAL_PAGE.md`) |
+| **Annonces GETI** (`/geti-info`, mise en avant) · Bot · L'asso · Recrutement · Bénévoles | COMPÉTITIONS : Tournois, Classement (`/classement`), Bot · ASSOCIATION : Manifeste, Bénévoles, Partenaires · CONTACT (courriel, tag et serveur Discord, `FooterContact`) · LÉGAL (voir `LEGAL_PAGE.md`) |
 
 L'adresse `/geti-info` est écrite en clair dans `PUBLIC_NAV_LINKS` (un test la tient
 égale à `GETI_PAGE_PATH`) : importer `lib/shared/geti/page.ts` dans ce composant client
