@@ -2,7 +2,7 @@ import { getCurrentUser, type AuthUser } from "@/lib/server/auth";
 import { getDatabase } from "@/lib/server/database";
 import { unexpectedFailureCode } from "@/lib/server/failure-reason";
 import { liftGetiObjection, parseGetiObjection, recordGetiObjection, type GetiObjection } from "@/lib/server/geti/objections";
-import { forgetGetiListScans } from "@/lib/server/geti/posts";
+import { forgetGetiListScans, refreshStaleGetiPosts } from "@/lib/server/geti/posts";
 import { fail, ok } from "@/lib/server/http";
 import { readJsonBodyOrFallback } from "@/lib/server/request-body";
 import { auditStaffAction } from "@/lib/server/staff-audit";
@@ -26,14 +26,19 @@ async function staffObjection(req: Request): Promise<{ refusal: Response } | { u
  * `POST /api/admin/geti/objections` — l'auteur d'annonces GETI s'y oppose
  * (RGPD, art. 21) : `{ authorId }` (toutes ses annonces, présentes et à venir)
  * ou `{ messageId }` (une annonce). Les annonces couvertes sont retirées
- * sur-le-champ et ne sont plus recopiées ; rend `{ removed }`. Permission
+ * sur-le-champ (une ligne d'analyse ancienne est d'abord réécrite, auteur relu
+ * compris) et ne sont plus recopiées ; rend `{ removed }`. Permission
  * `moderation` ; le geste est tracé dans pm2, avec son auteur.
  */
 export async function POST(req: Request) {
   const checked = await staffObjection(req);
   if ("refusal" in checked) return checked.refusal;
   try {
-    const removed = await recordGetiObjection(await getDatabase(), checked.objection);
+    const db = await getDatabase();
+    const removed = await recordGetiObjection(db, checked.objection);
+    // Une ligne ancienne, lue à l'affichage depuis son message brut, peut nommer un auteur que ses
+    // colonnes ignorent encore : la réécrire tout de suite rejoue l'opposition sur l'auteur relu.
+    await refreshStaleGetiPosts(db);
     forgetGetiListScans();
     auditStaffAction(`[geti] opposition enregistrée (${checked.objection.kind}) : ${removed} annonce(s) retirée(s)`, checked.user);
     return ok({ removed });

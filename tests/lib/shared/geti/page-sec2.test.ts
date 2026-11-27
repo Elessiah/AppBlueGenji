@@ -46,35 +46,20 @@ describe("parseGetiPost — passage masqué", () => {
   });
 });
 
+/** Cas `[nom, entrée, attendu]` : un tableau typé, pas `as const`. */
+const BODY_CASES: [name: string, input: string, expected: string][] = [
+  ["bareQuoteLine_stripped", "> LFT tank\n>\n> dispo ce soir", "LFT tank\n\ndispo ce soir"],
+  ["longSpoiler_masked", `contact ||${"y".repeat(1001)}||`, "contact [masqué]"],
+  ["fencedCodeLanguage_dropped", "```txt\nAna__main```", "Ana__main"],
+  ["markupInsideInlineCode_kept", "pseudo `**x**`", "pseudo **x**"],
+  ["leftoverBold_removed", "**LFS**s ce soir", "LFSs ce soir"],
+  ["leftoverStrike_removed", "Team ~~", "Team"],
+  ["intrawordUnderscores_kept", "xX__Sniper__Xx", "xX__Sniper__Xx"],
+];
+
 describe("getiPostBodyText — sécurité 2", () => {
-  it("getiPostBodyText_bareQuoteLine_stripped", () => {
-    expect(getiPostBodyText("> LFT tank\n>\n> dispo ce soir", LABELS)).toBe("LFT tank\n\ndispo ce soir");
-  });
-
-  it("getiPostBodyText_longSpoiler_masked", () => {
-    const secret = "y".repeat(1001);
-
-    expect(getiPostBodyText(`contact ||${secret}||`, LABELS)).toBe("contact [masqué]");
-  });
-
-  it("getiPostBodyText_fencedCodeLanguage_dropped", () => {
-    expect(getiPostBodyText("```txt\nAna__main```", LABELS)).toBe("Ana__main");
-  });
-
-  it("getiPostBodyText_markupInsideInlineCode_kept", () => {
-    expect(getiPostBodyText("pseudo `**x**`", LABELS)).toBe("pseudo **x**");
-  });
-
-  it("getiPostBodyText_leftoverBold_removed", () => {
-    expect(getiPostBodyText("**LFS**s ce soir", LABELS)).toBe("LFSs ce soir");
-  });
-
-  it("getiPostBodyText_leftoverStrike_removed", () => {
-    expect(getiPostBodyText("Team ~~", LABELS)).toBe("Team");
-  });
-
-  it("getiPostBodyText_intrawordUnderscores_kept", () => {
-    expect(getiPostBodyText("xX__Sniper__Xx", LABELS)).toBe("xX__Sniper__Xx");
+  it.each(BODY_CASES)("getiPostBodyText_%s", (_name, input, expected) => {
+    expect(getiPostBodyText(input, LABELS)).toBe(expected);
   });
 });
 

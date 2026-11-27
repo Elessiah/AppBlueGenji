@@ -7,25 +7,20 @@ import { parseGetiText } from "@/tests/helpers/geti";
 
 const LABELS = { member: "@membre", role: "@rôle", channel: "#salon", spoiler: "[masqué]" };
 
+/** Cas `[nom, entrée, attendu]` : un tableau typé, pas `as const`. */
+type Case = [name: string, input: string, expected: string];
+
+const SPOILER_CASES: Case[] = [
+  ["barsInsideInlineCode_codeIgnoredAndRealSpoilerHidden", "use `||` then ||secret||", "use `||` then #"],
+  ["codeInsideSpoiler_wholePassageHidden", "||a `b` c|| d", "# d"],
+  ["onlyBarsInCode_unchanged", "`||x||`", "`||x||`"],
+  ["fourBarsAlone_keptLiteral", "||||", "||||"],
+  ["threeBarsThenText_hidesBarAndText", "|||a|| fin", "# fin"],
+];
+
 describe("getiWithoutSpoilers — code et barres", () => {
-  it("getiWithoutSpoilers_barsInsideInlineCode_codeIgnoredAndRealSpoilerHidden", () => {
-    expect(getiWithoutSpoilers("use `||` then ||secret||", "#")).toBe("use `||` then #");
-  });
-
-  it("getiWithoutSpoilers_codeInsideSpoiler_wholePassageHidden", () => {
-    expect(getiWithoutSpoilers("||a `b` c|| d", "#")).toBe("# d");
-  });
-
-  it("getiWithoutSpoilers_onlyBarsInCode_unchanged", () => {
-    expect(getiWithoutSpoilers("`||x||`", "#")).toBe("`||x||`");
-  });
-
-  it("getiWithoutSpoilers_fourBarsAlone_keptLiteral", () => {
-    expect(getiWithoutSpoilers("||||", "#")).toBe("||||");
-  });
-
-  it("getiWithoutSpoilers_threeBarsThenText_hidesBarAndText", () => {
-    expect(getiWithoutSpoilers("|||a|| fin", "#")).toBe("# fin");
+  it.each(SPOILER_CASES)("getiWithoutSpoilers_%s", (_name, input, expected) => {
+    expect(getiWithoutSpoilers(input, "#")).toBe(expected);
   });
 });
 
@@ -42,29 +37,18 @@ describe("getiCodeRanges", () => {
   });
 });
 
+const BODY_CASES: Case[] = [
+  ["spoilerAfterCodeBars_neverShown", "use `||` then ||secret 17 ans||", "use || then [masqué]"],
+  ["headingAndQuoteInsideFence_keptVerbatim", "```\n# config\n> note\n```", "# config\n> note"],
+  ["hashAfterInlineCode_notStrippedAsHeading", "`x` # hi", "x # hi"],
+  ["powerBetweenDigits_kept", "score 5**2", "score 5**2"],
+  ["separatorBetweenSpaces_kept", "a ~~~ b", "a ~~~ b"],
+  ["separatorAloneOnLine_kept", "LFT\n~~~~\nEU", "LFT\n~~~~\nEU"],
+];
+
 describe("getiPostBodyText — sécurité 3", () => {
-  it("getiPostBodyText_spoilerAfterCodeBars_neverShown", () => {
-    expect(getiPostBodyText("use `||` then ||secret 17 ans||", LABELS)).toBe("use || then [masqué]");
-  });
-
-  it("getiPostBodyText_headingAndQuoteInsideFence_keptVerbatim", () => {
-    expect(getiPostBodyText("```\n# config\n> note\n```", LABELS)).toBe("# config\n> note");
-  });
-
-  it("getiPostBodyText_hashAfterInlineCode_notStrippedAsHeading", () => {
-    expect(getiPostBodyText("`x` # hi", LABELS)).toBe("x # hi");
-  });
-
-  it("getiPostBodyText_powerBetweenDigits_kept", () => {
-    expect(getiPostBodyText("score 5**2", LABELS)).toBe("score 5**2");
-  });
-
-  it("getiPostBodyText_separatorBetweenSpaces_kept", () => {
-    expect(getiPostBodyText("a ~~~ b", LABELS)).toBe("a ~~~ b");
-  });
-
-  it("getiPostBodyText_separatorAloneOnLine_kept", () => {
-    expect(getiPostBodyText("LFT\n~~~~\nEU", LABELS)).toBe("LFT\n~~~~\nEU");
+  it.each(BODY_CASES)("getiPostBodyText_%s", (_name, input, expected) => {
+    expect(getiPostBodyText(input, LABELS)).toBe(expected);
   });
 });
 

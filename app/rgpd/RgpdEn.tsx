@@ -266,8 +266,8 @@ export function RgpdEn({
             substitute, staff, a scrim, a cast): those a member writes there, and those GETI Bot — the bot of a
             third-party announcement network, which sends each post to every subscribed Discord server — relays there.
             What is kept: the post&apos;s text, its author&apos;s Discord username and identifier, the server of origin of a
-            relayed post, the dates and the criteria read automatically in the text (rank, role, region, platform,
-            language, availability, stated minimum age, team name), as well as the message as the bot passed it (to redo that reading when it improves), with no link to an account of the site — whether the author has one or not. A
+            relayed post, the dates and the criteria read automatically in the text (rank, division level, role, region, platform,
+            language, availability and target dates, stated minimum age, team name, closed post), as well as the message as the bot passed it (to redo that reading when it improves), with no link to an account of the site — whether the author has one or not. A
             scrim search is kept {GETI_RETENTION_DAYS.lfs} days after its publication in the association&apos;s channel
             (for a relayed post, that of its relay), the other posts {GETI_RETENTION_DAYS.lfp} days. Deleting the post
             from the channel removes it from the site at once, editing it replaces the previous version — for a relayed

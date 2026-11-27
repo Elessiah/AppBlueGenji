@@ -26,7 +26,7 @@ import { parsePushedPost } from "@/lib/server/geti/wire";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { GETI_CHANNEL_IDS, parseGetiPost, type GetiParsedPost } from "@/lib/shared/geti";
 import { GETI_BOT_USER_ID, GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS, getiRetentionCutoff, getiRetentionMs } from "@/lib/shared/geti/ingest";
-import { GETI_TRUSTED_BOTS, parsedGetiPost } from "../../../helpers/geti";
+import { GETI_FAKE_AUTHOR_ID, GETI_TRUSTED_BOTS, parsedGetiPost } from "../../../helpers/geti";
 import {
   GETI_FAKE_MESSAGE_ID,
   GETI_FAKE_RELAYED_AUTHOR_ID,
@@ -1005,7 +1005,77 @@ describe("refreshStaleGetiPosts", () => {
     expect(done).toBe(1);
     expect(update.sql).toContain(STALE_SELECT);
     expect(JSON.parse(String(update.params[0]))).toMatchObject({ levels: ["ADVANCED"], dates: [], closed: false });
-    expect(update.params[1]).toBe(GETI_FAKE_MESSAGE_ID);
+    expect(update.params[3]).toBe(GETI_FAKE_MESSAGE_ID);
+  });
+
+  it("refreshStaleGetiPosts_oldRow_rewritesAuthorColumnsFromReanalysis", async () => {
+    const raw = getiPushedPost({ content: "LFT support adv" }).raw;
+    const execute = once([{ ...stale(JSON.stringify(raw)), author_id: null, author_tag: null }]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    const update = updateOf(execute);
+    expect(update.sql).toContain("author_id = ?, author_tag = ?");
+    expect(update.params.slice(1, 3)).toEqual([GETI_FAKE_AUTHOR_ID, "fauxjoueur"]);
+  });
+
+  it("refreshStaleGetiPosts_removedRow_deleteGuardedByStillStale", async () => {
+    const execute = once([stale(JSON.stringify(getiPushedPost({ content: "" }).raw))]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    const remove = execute.mock.calls.find(([sql]) => String(sql).startsWith("DELETE"));
+    expect(String(remove?.[0])).toContain(STALE_SELECT);
+  });
+
+  it("refreshStaleGetiPosts_rewrittenRow_withholdsObjectedAuthors", async () => {
+    const execute = once([stale(JSON.stringify(getiPushedPost({ content: "LFT support" }).raw))]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining("bg_geti_objections"), [GETI_FAKE_MESSAGE_ID]);
+    const statements = execute.mock.calls.map(([sql]) => String(sql));
+    const update = statements.findIndex((sql) => sql.startsWith("UPDATE"));
+    const withhold = statements.findIndex((sql) => sql.includes("bg_geti_objections"));
+    expect(update).toBeGreaterThanOrEqual(0);
+    expect(withhold).toBeGreaterThan(update);
+  });
+
+  it("refreshStaleGetiPosts_laterUpdateFails_stillWithholdsTheRowsAlreadyRewritten", async () => {
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support" }).raw);
+    const rows = [stale(raw), { ...stale(raw), message_id: "100000000000000999" }];
+    let updates = 0;
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.trimStart().startsWith("SELECT")) return [rows];
+      if (sql.startsWith("UPDATE")) {
+        updates += 1;
+        if (updates === 2) throw new Error("deadlock");
+      }
+      return [{ affectedRows: 1 }];
+    });
+
+    await expect(refreshStaleGetiPosts(executor(execute))).rejects.toThrow("deadlock");
+
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining("bg_geti_objections"), [GETI_FAKE_MESSAGE_ID]);
+  });
+
+  it("refreshStaleGetiPosts_withholdFails_rethrowsTheWithholdFailure", async () => {
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support" }).raw);
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.trimStart().startsWith("SELECT")) return [[stale(raw)]];
+      if (sql.includes("bg_geti_objections")) throw new Error("no table");
+      return [{ affectedRows: 1 }];
+    });
+
+    await expect(refreshStaleGetiPosts(executor(execute))).rejects.toThrow("no table");
+  });
+
+  it("refreshStaleGetiPosts_rowRewrittenMeanwhile_noWithhold", async () => {
+    const execute = once([stale(JSON.stringify(getiPushedPost({ content: "LFT support" }).raw))], 0);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(execute.mock.calls.some(([sql]) => String(sql).includes("bg_geti_objections"))).toBe(false);
   });
 
   it("refreshStaleGetiPosts_unreadableRawMessage_removesTheRowInsteadOfCertifyingItsAnalysis", async () => {
