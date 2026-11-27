@@ -74,14 +74,21 @@ export function getiSafeText(text: string): string {
 }
 
 /**
- * Nom en texte seul : balisage Markdown, chevrons, « @ » et barres obliques
- * inverses retirés, espaces réduites (« @everyone **Nitro** » → « everyone Nitro »).
+ * Nom en texte seul : mentions retirées (l'identifiant Discord d'un tiers ne
+ * sort pas), émoji personnalisé réduit à son nom, balisage Markdown, chevrons,
+ * « @ » et barres obliques inverses retirés, espaces réduites
+ * (« @everyone **Nitro** » → « everyone Nitro »).
  *
  * @param name Nom déjà nettoyé de ses invisibles.
  * @returns Le nom sans caractère de balisage.
  */
 export function withoutMarkup(name: string): string {
-  return name.replace(MARKUP_CHARACTERS, " ").replace(/\s+/gu, " ").trim();
+  return name
+    .replace(CUSTOM_EMOJI, " $1 ")
+    .replace(MENTION, " ")
+    .replace(MARKUP_CHARACTERS, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
 }
 
 /**

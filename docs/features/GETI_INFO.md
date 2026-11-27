@@ -63,12 +63,18 @@ aucun message réel n'a été lu. Le format du relais GETI a été connu depuis
   encart, `authorTag`.
 
 **Usurpation d'auteur.** Pseudo et identifiant viennent toujours de la même
-source. Notre relais s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête
-GETI : quand l'en-tête et la ligne « Sent from » nomment deux comptes différents,
-personne n'est désigné. Un bot ou un webhook peut écrire n'importe quel en-tête :
-`parseGetiPost(raw, { relayBotIds })` ne lit l'auteur que des bots listés — les
-autres gardent leur texte, sans auteur ni serveur d'origine. **Le lot 2 passe la
-liste** (bot GETI et notre bot) ; sans elle, tout bot est cru.
+source. Un bot ou un webhook peut écrire n'importe quel en-tête, et notre relais
+s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête GETI :
+`parseGetiPost(raw, { getiBotIds, siteBotIds })` ne croit chaque bot que pour
+son propre format. Un bot de `getiBotIds` nomme l'auteur par son en-tête (ou un
+libellé hors citation, `>` et `>>>` compris) ; un bot de `siteBotIds`, par sa
+seule ligne « Sent from » — un en-tête ou un libellé dans son encart est le
+texte du joueur, et une ligne sans « by <@id> » ne nomme personne (le pseudo de
+la ligne d'auteur, écrite par le bot, reste). Un bot listé des deux côtés lit
+les deux ; s'ils nomment deux comptes différents, personne n'est désigné. Un bot
+absent des listes, ou toute annonce de bot **sans liste**, garde son texte, sans
+auteur ni serveur d'origine. **Le lot 2 passe les deux listes** (bot GETI, notre
+bot).
 
 Le jeu `tests/fixtures/geti/posts.json` est **de synthèse** (tournures courantes
 du recrutement Overwatch, en français et en anglais ; pseudos, identifiants,
@@ -126,8 +132,13 @@ texte**, jamais comme du balisage ; un identifiant qui n'est pas un identifiant
 Discord (15 à 22 chiffres) est rendu `null`.
 
 - `teamName` et `originServer` ne gardent aucun caractère de balisage ni de
-  mention (astérisque, tiret bas, tilde, accent grave, barre verticale, chevrons, « @ » et barre oblique inverse retirés, `withoutMarkup`) :
-  « @everyone **Nitro** » devient « everyone Nitro ».
+  mention (`withoutMarkup`) : une mention `<@id>` / `<#id>` est retirée en
+  entier (l'identifiant d'un tiers ne sort pas), un émoji `<:nom:id>` garde son
+  nom, puis astérisque, tiret bas, tilde, accent grave, barre verticale,
+  chevrons, « @ » et barre oblique inverse sont retirés : « @everyone **Nitro** »
+  devient « everyone Nitro ».
+- `authorTag` suit la même règle, tiret bas gardé (il fait partie de bien des
+  pseudos) : un en-tête `(**faux_nitro** @everyone)` donne « faux_nitro everyone ».
 - `text` garde le balisage de l'annonce mais aucune mention active
   (`getiSafeText`) : `<@id>` et `<@&id>` deviennent « @… » (l'identifiant d'un
   tiers ne sort pas), `<#id>` « #… », `@everyone` / `@here` perdent leur « @ ».
@@ -245,9 +256,12 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
 - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
 - **Âge** : publiée depuis `maxAgeHours` au plus ; une annonce sans date, ou
   datée de plus de 5 minutes dans le futur, est écartée.
-- **Filtre enregistré** (JSON relu pour les alertes) : un rôle inconnu
-  (« constructor ») ou une borne de rang qui n'est pas un rang (palier inconnu,
-  division hors de 1–5) est ignoré, jamais une erreur.
+- **Filtre enregistré** (JSON relu pour les alertes) : rien n'y est une
+  erreur. Un filtre `null` ne filtre rien ; une liste qui n'en est pas une
+  (`"regions":"EU"`) est ignorée ; un rôle inconnu (« constructor ») aussi ; une
+  borne de rang qui n'est pas un rang (palier inconnu, division hors de 1–5) est
+  ouverte, et deux bornes invalides valent un critère absent ; un
+  `maxAgeHours` écrit en texte (`"24"`) est lu comme un nombre.
 - **Champ non lu** (rang, rôle, région, plateforme, langue) : l'annonce est
   écartée, sauf `includeUnknown: true` — le lot 3 décide du réglage par défaut de
   la page.

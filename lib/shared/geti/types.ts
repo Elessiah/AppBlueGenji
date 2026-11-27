@@ -142,11 +142,16 @@ export type GetiRawPost = {
 /** Réglages de l'analyse. */
 export type GetiParseOptions = {
   /**
-   * Identifiants des bots relais de confiance. Absent : tout bot l'est. Donné :
-   * le relais d'un autre bot (ou d'un webhook) garde son texte, mais ni auteur
-   * ni serveur d'origine.
+   * Bots GETI : leur en-tête (`<@id>*(pseudo)* sur [Serveur](…)`) et leurs
+   * libellés hors citation nomment l'auteur.
    */
-  relayBotIds?: readonly string[];
+  getiBotIds?: readonly string[];
+  /**
+   * Nos bots : leur dernière ligne (`*Sent from : [Serveur](…)* by <@id>`)
+   * nomme l'auteur ; le reste de l'encart est le texte du joueur, jamais lu
+   * comme un auteur.
+   */
+  siteBotIds?: readonly string[];
 };
 
 /**
