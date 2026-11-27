@@ -185,14 +185,7 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   (3 500 à 3 600), « 3.2-3k », « 3.3/4k » (3 300 à 4 000) ; derrière son
   libellé sans « k » : « SR 3.6-3.7 », « elo : 3.2 » ; et, dans une recherche de
   scrim ou de remplaçant seulement, le décimal nu (« LFS EU PC 3.6 »,
-  « adv 4.5+ »). Table classique d'Overwatch, antérieure à Émeraude et à
-  Champion, qui n'y ont **aucune** tranche : moins de 1 500 Bronze, 1 500
-  Argent, 2 000 Or, 2 500 Platine, 3 000 Diamant, 3 500 Master, 4 000 et plus
-  Grand Maître (« 4k » ≈ Grand Maître ; « 4k5 » plafonne à Grand Maître 1,
-  « 4.5k+ » monte jusqu'à Champion 1) ; 100 points par division, 5 en bas de la
-  tranche, 1 en haut. Une fourchette à cheval sur 3 000 (« 2900-3100 » :
-  Platine 1 à Diamant 4) recouvre donc Émeraude dans un filtre ; « Gold 2k »
-  reste Or. Un horaire voisin ne fait pas d'un SR
+  « adv 4.5+ »). Correspondance : la table ci-dessous. Un horaire voisin ne fait pas d'un SR
   un numéro (« 3500 21-23 », « 4k 20-22 CET »), « loi 1901 » n'est pas un SR,
   et « champion » en titre n'est pas un rang (« S10 Intermediate Champion »,
   « champion de France »). Un nombre est
@@ -206,6 +199,20 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   SR), année (« 2025 », « 2025-2026 », et dès 1950 derrière un mot de date : « né
   en 2005 », « nés avant 2008 »). « sr » / « elo »
   collé l'emporte sur tout contexte.
+- **Table SR → rang** (échelle 0–5 000, en vigueur depuis l'ajout d'Émeraude
+  entre Platine et Diamant, qui a décalé de 500 points les paliers
+  inférieurs) : Bronze 0–999 (environ 200 SR par division) ; Argent
+  1 000–1 499 ; Or 1 500–1 999 ; Platine 2 000–2 499 ; Émeraude 2 500–2 999 ;
+  Diamant 3 000–3 499 ; Master (« Maîtrise ») 3 500–3 999 ; Grand Maître
+  (« Grande maîtrise ») 4 000–4 499 ; Champion (« Virtuose ») 4 500–5 000.
+  D'Argent à Champion, 100 SR par division, la division 5 en bas de la tranche
+  (Émeraude 5 = 2 500–2 599, Émeraude 1 = 2 900–2 999). Donc « 4k » = Grand
+  Maître 5, « 3500 » = Master 5, « 2k » = Platine 5. « Top 500 » est une notion
+  à part, sans tranche de SR.
+- **Noms français du jeu** : « Maîtrise » (lu avec une division seulement —
+  « maîtrise de soi » est un mot courant), « Grande maîtrise » (pas « une
+  grande maîtrise du jeu »), « Virtuose » (= Champion ; pas « un virtuose
+  de… »).
 - **Par rôle** : le rôle écrit contre le rang, sur la même ligne, devant
   (« tank m2 / dps d1 ») ou derrière (« M2 tank, D1 dps ») ; une liste de rôles
   partage la fourchette (« tank/dps : d3-m2 »). Un second rang qui suit le
