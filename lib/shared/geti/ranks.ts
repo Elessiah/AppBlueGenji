@@ -25,6 +25,9 @@ import {
 } from "@/lib/shared/geti/types";
 
 const DIVISIONS = 5;
+/** Position de chaque palier : lue à chaque comparaison de filtre, jamais recherchée dans la liste. */
+const TIER_INDEX: ReadonlyMap<GetiTier, number> = new Map(GETI_TIERS.map((tier, index) => [tier, index]));
+const GRANDMASTER_BASE = GETI_TIERS.indexOf("GRANDMASTER") * DIVISIONS;
 /** Valeur du plus haut rang (Champion 1). */
 export const GETI_RANK_TOP = GETI_TIERS.length * DIVISIONS - 1;
 
@@ -35,7 +38,7 @@ export const GETI_RANK_TOP = GETI_TIERS.length * DIVISIONS - 1;
  * @returns Sa valeur.
  */
 export function getiRankValue(rank: GetiRank): number {
-  return GETI_TIERS.indexOf(rank.tier) * DIVISIONS + (DIVISIONS - rank.division);
+  return (TIER_INDEX.get(rank.tier) ?? 0) * DIVISIONS + (DIVISIONS - rank.division);
 }
 
 /**
@@ -294,7 +297,7 @@ type ValueRange = { min: number; max: number };
 type RankGroup = ValueRange & { start: number; end: number };
 
 function tierSpan(tier: GetiTier, first: string | undefined, second: string | undefined): ValueRange {
-  const base = GETI_TIERS.indexOf(tier) * DIVISIONS;
+  const base = (TIER_INDEX.get(tier) ?? 0) * DIVISIONS;
   if (first === undefined) return { min: base, max: base + DIVISIONS - 1 };
   const a = base + DIVISIONS - Number(first);
   const b = second === undefined ? a : base + DIVISIONS - Number(second);
@@ -304,7 +307,7 @@ function tierSpan(tier: GetiTier, first: string | undefined, second: string | un
 /** Rang d'un ancien SR : 500 points par palier, 100 par division, plafonné à Grand Maître 1. */
 function srValue(sr: number): number {
   const steps = Math.floor((sr - 1000) / 100);
-  return Math.min(GETI_TIERS.indexOf("GRANDMASTER") * DIVISIONS + DIVISIONS - 1, Math.max(0, steps));
+  return Math.min(GRANDMASTER_BASE + DIVISIONS - 1, Math.max(0, steps));
 }
 
 function isYear(value: number): boolean {
@@ -343,7 +346,7 @@ function tierTokens(lower: string): { tokens: RankToken[]; joined: RankToken[] }
     if (isLetterRank(lower, match)) tokens.push(tokenOf(match, tierSpan(TIER_LETTERS[match[1]], match[2], match[3])));
   }
   for (const match of lower.matchAll(TOP_500)) {
-    tokens.push(tokenOf(match, { min: GETI_TIERS.indexOf("GRANDMASTER") * DIVISIONS, max: GETI_RANK_TOP }));
+    tokens.push(tokenOf(match, { min: GRANDMASTER_BASE, max: GETI_RANK_TOP }));
   }
   return { tokens, joined };
 }
@@ -391,13 +394,21 @@ function srTokens(lower: string): RankToken[] {
 
 /** « gold à plat », « du gm au champ » : un rang juste avant le mot de liaison confirme le second. */
 const JOINED_GAP = /^ (?:a|au|du) $/u;
+const JOINED_GAP_LENGTHS = [3, 4];
 
 function rawTokens(lower: string): RankToken[] {
   const { tokens, joined } = tierTokens(lower);
   const kept = [...tokens, ...srTokens(lower)];
+  // Le mot de liaison fait 3 ou 4 caractères (« a », « au », « du » entre deux espaces) :
+  // seul un rang qui finit là peut confirmer le jeton, inutile de les passer tous en revue.
+  const ends = new Set(kept.map((rank) => rank.end));
   for (const token of joined) {
-    if (kept.some((rank) => rank.end <= token.start && JOINED_GAP.test(lower.slice(rank.end, token.start)))) {
+    const confirmed = JOINED_GAP_LENGTHS.some(
+      (length) => ends.has(token.start - length) && JOINED_GAP.test(lower.slice(token.start - length, token.start)),
+    );
+    if (confirmed) {
       kept.push(token);
+      ends.add(token.end);
     }
   }
   return kept;
@@ -503,6 +514,18 @@ function isSameRoleGap(gap: string): boolean {
  */
 type OwnedGroup = { group: RankGroup; owner: RoleRun };
 
+/** Premier indice d'une liste ordonnée dont l'élément vérifie `test` (faux avant, vrai après). */
+function firstRunIndex(runs: readonly RoleRun[], test: (run: RoleRun) => boolean): number {
+  let low = 0;
+  let high = runs.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (test(runs[middle])) high = middle;
+    else low = middle + 1;
+  }
+  return low;
+}
+
 /** Rôle écrit contre un groupe, devant puis derrière, parmi ceux qui n'ont pas encore servi. */
 function adjacentRun(
   lower: string,
@@ -510,8 +533,11 @@ function adjacentRun(
   runs: readonly RoleRun[],
   used: ReadonlySet<RoleRun>,
 ): RoleRun | undefined {
-  const before = runs.findLast((run) => run.end <= group.start);
-  const after = runs.find((run) => run.start >= group.end);
+  // Les plages de rôles sont rangées dans l'ordre du texte : recherche dichotomique.
+  const afterIndex = firstRunIndex(runs, (run) => run.start >= group.end);
+  const beforeIndex = firstRunIndex(runs, (run) => run.end > group.start) - 1;
+  const before = beforeIndex >= 0 ? runs[beforeIndex] : undefined;
+  const after = runs[afterIndex];
   const candidates = [
     before !== undefined && isRoleRankGap(lower.slice(before.end, group.start)) ? before : undefined,
     after !== undefined && isRoleRankGap(lower.slice(group.end, after.start)) ? after : undefined,

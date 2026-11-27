@@ -81,8 +81,10 @@ export type GetiPreparedText = {
  * @returns Ses formes d'analyse.
  */
 export function prepareGetiText(text: string): GetiPreparedText {
+  // La forme de compatibilité peut multiplier la longueur (« ﷺ » donne 18 lettres) : on borne à nouveau.
   const clean = text
     .normalize("NFKC")
+    .slice(0, GETI_TEXT_MAX * 2)
     .replace(URL_LIKE, " ")
     .replace(CUSTOM_EMOJI, " $1 ")
     .replace(TIMESTAMP, " ")

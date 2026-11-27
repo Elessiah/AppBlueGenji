@@ -522,12 +522,12 @@ const FRENCH_VERB_AFTER = new RegExp(
   "u",
 );
 
+const NAME_MARKS = /\p{M}/gu;
+const NAME_SYMBOLS = /[^\p{L}\p{N}]/gu;
+const TIER_LIKE = /^[bsgpdmc][1-5]$/u;
+
 function nameKey(word: string): string {
-  return word
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]/gu, "");
+  return word.normalize("NFD").replace(NAME_MARKS, "").toLowerCase().replace(NAME_SYMBOLS, "");
 }
 
 /**
@@ -555,7 +555,7 @@ type NameWordPlace = { index: number; last: boolean; following: string };
 
 function isNameWord(word: string, place: NameWordPlace): boolean {
   const key = nameKey(word);
-  if (key === "" || NOT_A_NAME.has(key) || /^[bsgpdmc][1-5]$/u.test(key)) return false;
+  if (key === "" || NOT_A_NAME.has(key) || TIER_LIKE.test(key)) return false;
   const verbAfter = verbAfterPronoun(key);
   if (verbAfter === null) return true;
   return place.index > 0 && place.last && CAPITALISED.test(word) && !verbAfter.test(place.following);
