@@ -33,7 +33,7 @@ Serveur Discord `676570513023172637` (`GETI_GUILD_ID`). Une catégorie par salon
 Ces annonces sont publiques : chaque message est relayé à tous les serveurs
 abonnés au réseau.
 
-### Format réel : non observé au lot 1
+### Format réel : non observé au lot 1 (constaté au lot 2, § Récupération)
 
 L'échantillon en lecture seule prévu (`GET /channels/{id}/messages` avec le
 jeton du bot local) a été refusé dès le premier salon (**403**) et arrêté là :
@@ -191,9 +191,10 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
 
 ## Questions ouvertes pour les lots suivants
 
-- Format réel des messages (relais en encart ou messages de joueurs) : à
-  constater au lot 2 ; ajuster `relayContent` (`parse-post.ts`) si le relais GETI
-  range l'auteur ailleurs.
+- Format réel des messages : constaté au lot 2 (§ Récupération — annonces
+  directes et relais de GETI Bot, en-tête lu par `relayContent`). Reste à régler
+  l'analyse sur les textes réels et à mesurer le taux de reconnaissance (rang,
+  rôle, région) : lot GETI-TUNE, sur des annonces réelles **anonymisées**.
 - Accès du bot de production aux six salons (`Voir le salon`, `Lire l'historique`)
   à vérifier avant le rattrapage de 14 jours.
 - « Top 500 » et l'ancien SR sont des approximations assumées.
