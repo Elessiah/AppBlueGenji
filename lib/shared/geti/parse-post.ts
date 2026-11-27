@@ -46,7 +46,7 @@ const DISCRIMINATOR = /^\d{4}$/u;
  */
 const AUTHOR_MENTION = new RegExp(
   [
-    String.raw`^[^\p{L}\p{N}<\n]*(?:by|par|from|author|auteur|contact)\s*:?\s*<@!?(\d{15,22})>`,
+    String.raw`^[^\p{L}\p{N}<>\n]*(?:by|par|from|author|auteur|contact)\s*:?\s*<@!?(\d{15,22})>`,
     String.raw`${NOT_AFTER_WORD}(?:author|auteur|contact)\s*:\s*<@!?(\d{15,22})>`,
     String.raw`${NOT_AFTER_WORD}(?:posted|sent|written|post[ée]e?|publi[ée]e?|envoy[ée]e?|[ée]crite?)\s+(?:by|par)\s*:?\s*<@!?(\d{15,22})>`,
   ].join("|"),
@@ -63,14 +63,19 @@ const SENT_FROM = new RegExp(
   "iu",
 );
 /**
- * En-tête d'un relais de GETI Bot, en tête de la description de son encart :
- * « <@id>*(pseudo)* sur [Serveur](invitation) », puis l'annonce citée (« > … »).
- * Le nom du serveur peut lui-même porter des crochets (« [TAG] Nom »).
+ * Lien vers le serveur d'origine d'un relais GETI. Le nom du serveur porte
+ * souvent lui-même des crochets (« [TAG] Nom ») — la forme la plus courante du
+ * flux réel — : il court jusqu'au « ]( » qui ouvre l'invitation, sur la ligne.
  */
-const GETI_RELAY_HEADER =
-  /^\s*<@!?(\d{15,22})>\s*\*\(([^\n]{1,80}?)\)\*\s+sur\s+\[([^\n]{1,200}?)\]\(https?:\/\/[^)\s]*\)[^\S\n]*\n*/u;
-/** Marque de citation Discord en début de ligne (« > »). */
-const QUOTE_MARK = /^[^\S\n]*>[^\S\n]?/gmu;
+const GETI_SERVER_LINK = String.raw`\[([^\n]{1,200}?)\]\(https?:\/\/[^)\s]*\)`;
+/**
+ * Première ligne d'un relais du bot GETI :
+ * « <@id>*(pseudo)* sur [Serveur](invitation) », puis le texte cité (« > … »).
+ */
+const GETI_HEADER = new RegExp(
+  String.raw`^\s*<@!?(\d{15,22})>[^\S\n]*[*_]*\(((?:\\.|[^)\n\\]){1,64})\)[*_]*[^\S\n]*(?:sur|on|from)[^\S\n]*${GETI_SERVER_LINK}[^\S\n]*(?:\n|$)`,
+  "iu",
+);
 /** Pseudo entre parenthèses derrière un nom d'affichage : « Nom (@pseudo) ». */
 const HANDLE_IN_PARENTHESES = /\(@?([\w.]{2,32}(?:#\d{4})?)\)\s*$/u;
 
@@ -151,6 +156,15 @@ function mentionedAuthorId(body: string): string | null {
   return labelled?.slice(1).find((id) => id !== undefined) ?? null;
 }
 
+/** Retire les échappements Markdown (« \_ », « \] »). */
+function unescapeMarkdown(value: string): string {
+  return value.replace(/\\(.)/gu, "$1");
+}
+
+function serverName(value: string): string | null {
+  return visibleText(unescapeMarkdown(value)).slice(0, ORIGIN_SERVER_MAX) || null;
+}
+
 /** Texte, auteur et origine d'un relais : tout se lit dans les encarts du bot. */
 function relayContent(raw: GetiRawPost): RelayContent {
   const parts: string[] = [text(raw.content)];
@@ -158,22 +172,23 @@ function relayContent(raw: GetiRawPost): RelayContent {
   let authorId: string | null = null;
   let tag: string | null = null;
   for (const embed of embedsOf(raw)) {
-    tag ??= embedAuthorTag(embed.authorName);
-    let description = text(embed.description);
-    const header = GETI_RELAY_HEADER.exec(description);
+    const description = text(embed.description);
+    // L'en-tête GETI nomme l'auteur : il passe avant toute mention du texte cité.
+    const header = GETI_HEADER.exec(description);
     if (header !== null) {
-      // Relais de GETI Bot : l'auteur, son pseudo et le serveur d'origine sont dans l'en-tête, l'annonce est citée dessous.
       authorId ??= header[1];
-      tag ??= authorTag(header[2], null);
-      originServer ??= visibleText(header[3]).slice(0, ORIGIN_SERVER_MAX) || null;
-      description = description.slice(header[0].length).replace(QUOTE_MARK, "");
+      tag ??= embedAuthorTag(unescapeMarkdown(header[2]));
+      originServer ??= serverName(header[3]);
     }
+    tag ??= embedAuthorTag(embed.authorName);
     const trailer = SENT_FROM.exec(description);
     if (trailer !== null) {
-      originServer ??= visibleText(trailer[1].replace(/\\(.)/gu, "$1")).slice(0, ORIGIN_SERVER_MAX) || null;
+      originServer ??= serverName(trailer[1]);
       authorId ??= trailer[2] ?? null;
     }
-    parts.push(text(embed.title), description.slice(0, trailer?.index), ...embedFieldLines(embed));
+    const start = header === null ? 0 : header[0].length;
+    const end = trailer === null ? undefined : Math.max(start, trailer.index);
+    parts.push(text(embed.title), description.slice(start, end), ...embedFieldLines(embed));
   }
   const body = parts.filter((part) => part.trim() !== "").join("\n");
   return { body, authorTag: tag, authorId: authorId ?? mentionedAuthorId(body), originServer };

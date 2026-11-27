@@ -51,8 +51,13 @@ const SUB_ROLE_PARENT: Readonly<Record<GetiSubRole, GetiRole>> = {
 const SHORT_ABBREVIATIONS = new Set(["mt", "ot", "ms", "fs"]);
 /** « support » et « soutien » sont aussi des mots de politesse (« merci pour votre soutien »). */
 const POLITE_WORDS = new Set(["support", "supports", "soutien"]);
+/**
+ * Un remerciement juste avant : « merci pour votre soutien », « thanks for the
+ * support », « merci à tous pour le soutien ». « je serai ton support » ou
+ * « merci de jouer le support » restent un rôle.
+ */
 const POLITE_BEFORE = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:votre|vos|ton|tes|your|(?:merci|thanks?|thank you|thx)(?: [\p{L}']+){0,3} (?:le|du|the|this|ce))\s$`,
+  String.raw`${NOT_AFTER_WORD}(?:merci|thanks?|thank you|thx)(?: (?:beaucoup|bcp|encore|infiniment|a|tous|toutes|all|so|much|again|everyone|guys|you|pour|for|de|d'avance))*(?: (?:votre|vos|ton|tes|ta|your|le|du|the|this|ce))?\s$`,
   "u",
 );
 

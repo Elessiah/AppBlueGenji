@@ -65,18 +65,30 @@ const PARTICIPLE_BEFORE = new Set(
   [
     "ai as a avons avez ont avais avait avions aviez avaient aurai auras aura aurons aurez auront",
     "aurais aurait aurions auriez auraient aie aies ait ayons ayez aient avoir ayant",
-    "pas plus jamais deja bien toujours enfin souvent rien tout beaucoup trop assez presque vraiment",
+    "pas jamais deja toujours enfin souvent rien beaucoup trop presque vraiment",
   ]
     .join(" ")
     .split(" "),
 );
-const WORD_BEFORE = /(\p{L}+)[^\p{L}\p{N}\n]*$/u;
+/**
+ * « a » (accents ôtés, « à » s'y confond) n'est l'auxiliaire que derrière son
+ * sujet : « il a eu », « on a eu », mais « de NA à EU ».
+ */
+const A_SUBJECTS = new Set(["il", "elle", "on", "qui", "ca", "cela", "y", "n"]);
+const WORDS_BEFORE = /(?:(\p{L}+)[^\p{L}\p{N}\n]+)?(\p{L}+)[^\p{L}\p{N}\n]*$/u;
+
+function isParticiple(before: string): boolean {
+  const words = WORDS_BEFORE.exec(before);
+  if (words === null) return false;
+  const [, subject, previous] = words;
+  if (previous === "a") return subject !== undefined && A_SUBJECTS.has(subject);
+  return PARTICIPLE_BEFORE.has(previous);
+}
 
 /** « eu » est la région, sauf derrière un auxiliaire ou un adverbe (« j'ai eu une team »). */
 function hasEuWord(lower: string): boolean {
   for (const match of lower.matchAll(EU_WORD)) {
-    const previous = WORD_BEFORE.exec(lower.slice(Math.max(0, match.index - 20), match.index));
-    if (previous === null || !PARTICIPLE_BEFORE.has(previous[1])) return true;
+    if (!isParticiple(lower.slice(Math.max(0, match.index - 30), match.index))) return true;
   }
   return false;
 }
@@ -240,8 +252,11 @@ const TIME_RANGE = new RegExp(
   "gu",
 );
 const TIME_SINGLE = new RegExp(String.raw`(?<![\p{L}\p{N}:#+])${TIME_ATOM}${NOT_BEFORE_WORD}`, "gu");
-/** Une durée n'est pas une heure : « 2h par jour », « 3h de jeu ». */
-const DURATION_AFTER = /^\s?(?:par|de jeu|de scrim|per|a day|\/\s?(?:jour|soir|day|night|semaine|week))/u;
+/** Une durée n'est pas une heure : « 2h par jour », « 3h de jeu » (pas « parfois », « partout »). */
+const DURATION_AFTER =
+  /^\s?(?:par(?!\p{L})|de jeu|de scrim|per(?!\p{L})|a day|\/\s?(?:jour|soir|day|night|semaine|week))/u;
+/** Au-delà, deux heures écrites (« 20h-23h par soir ») sont une plage horaire, pas une durée. */
+const DURATION_HOURS_MAX = 6;
 
 type TimeParts = {
   hour: number;
@@ -277,6 +292,18 @@ function isDuration(lower: string, end: number): boolean {
   return DURATION_AFTER.test(lower.slice(end, end + 12));
 }
 
+/**
+ * Une fourchette devant « par jour » est une durée si sa première borne n'a pas
+ * d'unité (« 2-3h ») ou si ses deux bornes sont de petits nombres d'heures
+ * (« 1h-2h ») ; « 20h-23h par soir » reste une plage horaire.
+ */
+function isDurationRange(lower: string, end: number, first: TimeParts, second: TimeParts): boolean {
+  if (!isDuration(lower, end)) return false;
+  if (!first.explicit) return true;
+  const plain = (parts: TimeParts) => parts.meridiem === undefined && parts.hour <= DURATION_HOURS_MAX;
+  return plain(first) && plain(second);
+}
+
 function timeRange(first: TimeParts, second: TimeParts): GetiTimeRange | null {
   const from = toMinutes(first, first.meridiem ?? second.meridiem);
   const to = toMinutes(second, second.meridiem);
@@ -293,7 +320,7 @@ function parseTimeRanges(lower: string): { times: GetiTimeRange[]; rest: string 
     // « 3-5 joueurs » : sans unité sur la seconde heure, ce n'est pas un horaire.
     if (!second.explicit) continue;
     const end = match.index + match[0].length;
-    const range = isDuration(lower, end) ? "duration" : timeRange(first, second);
+    const range = isDurationRange(lower, end, first, second) ? "duration" : timeRange(first, second);
     if (range === null) continue;
     if (range !== "duration") times.push(range);
     // La fourchette lue est effacée : ses heures ne se relisent pas une à une.
@@ -389,11 +416,11 @@ export function parseGetiStaffRoles(lower: string): GetiStaffRole[] {
 
 const AGE = String.raw`(1[3-9]|2[0-5])`;
 /**
- * Derrière « 18+ » ou « +18 » sans mot d'âge : la fin, une ponctuation ou un mot
- * d'âge. « +20 joueurs », « 15+ heures » ou « 20+ scrims » sont des nombres.
+ * « 18+ » ou « +18 » est un âge, sauf devant ce qu'il compte : « +20 joueurs »,
+ * « 15+ heures », « 20+ scrims » sont des nombres ; « 18+ dps », « +18 FR » des âges.
  */
-const AGE_FOLLOW = new RegExp(
-  String.raw`^[^\S\n]*(?:$|[^\p{L}\p{N}\s]|\n|(?:ans?|yo|y/o|years?|old|only|seulement|uniquement|obligatoire|requis|required|min|minimum|mini|svp|pls|please)${NOT_BEFORE_WORD})`,
+const AGE_COUNTED_AFTER = new RegExp(
+  String.raw`^[^\S\n]*(?:de[^\S\n]+)?(?:joueu(?:r|se)s?|players?|membres?|members?|personnes?|people|gens|h|hrs?|heures?|hours?|jours?|days?|mois|months?|semaines?|weeks?|scrims?|games?|parties|matchs?|matches|wins?|victoires?|tournois?|tournaments?|viewers?|vues|views|abonnes?|followers?|subs?|equipes|teams|rosters|places?|slots?|sr|elo|k|€|\$|euros?|%|ms|fps|hz)${NOT_BEFORE_WORD}`,
   "u",
 );
 type AgePattern = { pattern: RegExp; unlabelled: boolean };
@@ -428,7 +455,7 @@ export function parseGetiMinAge(lower: string): number | null {
   for (const { pattern, unlabelled } of MIN_AGE_PATTERNS) {
     for (const match of lower.matchAll(pattern)) {
       const end = match.index + match[0].length;
-      if (!unlabelled || AGE_FOLLOW.test(lower.slice(end, end + 16))) return Number(match[1]);
+      if (!unlabelled || !AGE_COUNTED_AFTER.test(lower.slice(end, end + 20))) return Number(match[1]);
     }
   }
   return ADULT.test(lower) ? ADULT_AGE : null;
@@ -460,11 +487,17 @@ const NOT_A_NAME = new Set(
     "cherche recherche recrute looking seeking need needs is are est qui de du des en a au and et for pour",
     "competitive competitif compet chill serieuse serieux tryhard semi francaise francophone",
     "name nom discord role roles rang rank region plateforme platform contact",
-    "je j nous on il elle ils elles vous tu we i you they he she notre nos votre vos mon ma mes my our your",
+    "je j nous on il elle ils elles vous tu notre nos votre vos mon ma mes",
   ]
     .join(" ")
     .split(" "),
 );
+/**
+ * Pronoms anglais : un nom en capitales peut en finir un (« Team Game I »,
+ * « Team Ride Or Die » n'en a pas, « Team Not You »), pas en ouvrir un
+ * (« team We are looking »). « on » reste français (« team Phoenix On cherche »).
+ */
+const ENGLISH_PRONOUNS = new Set(["we", "i", "you", "they", "he", "she", "my", "our", "your"]);
 
 function nameKey(word: string): string {
   return word
@@ -474,18 +507,30 @@ function nameKey(word: string): string {
     .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
-/** Dans la phrase, un article derrière « team » ouvre une phrase (« team La plus chill »), pas un nom. */
+/**
+ * Dans la phrase, un article derrière « team » ouvre une phrase (« team la plus
+ * chill », « team La plus chill »), pas un nom — sauf en capitale devant un mot
+ * en capitale (« team La Horde », « équipe The Owls »).
+ */
 const LEADING_ARTICLES = new Set(["le", "la", "les", "l", "un", "une", "des", "the", "a", "an", "ce", "cette", "this"]);
+const CAPITALISED = /^\p{Lu}/u;
 
-function isNameWord(word: string): boolean {
+function opensSentence(candidate: string): boolean {
+  const [first = "", second = ""] = candidate.split(/\s+/u).filter((word) => word !== "");
+  if (!LEADING_ARTICLES.has(nameKey(first))) return false;
+  return !(CAPITALISED.test(first) && CAPITALISED.test(second));
+}
+
+function isNameWord(word: string, index: number): boolean {
   const key = nameKey(word);
-  return key !== "" && !NOT_A_NAME.has(key) && !/^[bsgpdmc][1-5]$/u.test(key);
+  if (key === "" || NOT_A_NAME.has(key) || /^[bsgpdmc][1-5]$/u.test(key)) return false;
+  return !ENGLISH_PRONOUNS.has(key) || (index > 0 && CAPITALISED.test(word));
 }
 
 function cleanTeamName(candidate: string): string | null {
   const words = candidate.split(/\s+/u).filter((word) => word !== "");
   // Le nom s'arrête au premier mot du vocabulaire d'annonce : « Blue Phoenix EU ».
-  const stop = words.findIndex((word) => !isNameWord(word));
+  const stop = words.findIndex((word, index) => !isNameWord(word, index));
   const kept = stop === -1 ? words : words.slice(0, stop);
   const name = visibleText(kept.join(" ")).replace(/[.'-]+$/u, "");
   // Mots en capitale seulement : « 5 joueurs dont 2 tanks » n'est pas un nom.
@@ -508,7 +553,7 @@ export function parseGetiTeamName(clean: string): string | null {
     if (name !== null) return name;
   }
   for (const match of clean.matchAll(TEAM_INLINE)) {
-    if (LEADING_ARTICLES.has(nameKey(match[1].split(/\s/u)[0]))) continue;
+    if (opensSentence(match[1])) continue;
     const name = cleanTeamName(match[1]);
     if (name !== null) return name;
   }

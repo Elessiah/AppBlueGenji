@@ -477,3 +477,73 @@ describe("faux positifs du texte courant", () => {
     expect(parseGetiText("lft soutien m2").roles).toEqual(["SUPPORT"]);
   });
 });
+
+
+describe("faux négatifs écartés (revue 2)", () => {
+  it.each(["lfp 18+ dps d1", "lfp +18 tank", "lfp 18+ team chill", "LFT 18+ FR EU"])("« %s » porte un âge de 18 ans", (text) => {
+    expect(parseGetiText(text).minAge).toBe(18);
+  });
+
+  it("« 20+ teams inscrites » n'est pas un âge", () => {
+    expect(parseGetiText("lfp, 20+ teams inscrites").minAge).toBeNull();
+  });
+
+  it("« 20h-23h par soir » reste une plage horaire", () => {
+    expect(parseGetiText("dispo 20h-23h par soir").availability.times).toEqual([{ from: 1200, to: 1380 }]);
+  });
+
+  it("« parfois » n'est pas « par » : la plage horaire reste lue", () => {
+    expect(parseGetiText("lft dps, dispo 20h-23h parfois plus").availability.times).toEqual([{ from: 1200, to: 1380 }]);
+  });
+
+  it("« 21h-23h per day » reste une plage horaire", () => {
+    expect(parseGetiText("21h-23h per day").availability.times).toEqual([{ from: 1260, to: 1380 }]);
+  });
+
+  it("« 1h-2h par jour » reste une durée", () => {
+    expect(parseGetiText("lft 1h-2h par jour").availability.times).toEqual([]);
+  });
+
+  it.each(["lft, je serai ton support m1", "je peux être votre support", "merci de jouer le support"])(
+    "« %s » garde le Support",
+    (text) => {
+      expect(parseGetiText(text).roles).toEqual(["SUPPORT"]);
+    },
+  );
+
+  it("« merci à tous pour le soutien » n'ajoute pas le Support", () => {
+    expect(parseGetiText("merci à tous pour le soutien, tank").roles).toEqual(["TANK"]);
+  });
+
+  it("« de NA à EU » garde l'Europe", () => {
+    expect(parseGetiText("lft dps, de NA à EU").regions).toEqual(["EU", "NA"]);
+  });
+
+  it("« ouvert à tout EU » garde l'Europe", () => {
+    expect(parseGetiText("ouvert à tout EU").regions).toEqual(["EU"]);
+  });
+
+  it("« plus EU que NA » garde l'Europe", () => {
+    expect(parseGetiText("plus EU que NA").regions).toEqual(["EU", "NA"]);
+  });
+
+  it("« il a eu » n'est pas l'Europe", () => {
+    expect(parseGetiText("il a eu une team NA").regions).toEqual(["NA"]);
+  });
+
+  it("« The Owls » en capitales derrière « équipe » est un nom", () => {
+    expect(parseGetiText("notre équipe The Owls recrute").teamName).toBe("The Owls");
+  });
+
+  it("« La Horde » en capitales derrière « team » est un nom", () => {
+    expect(parseGetiText("notre team La Horde cherche un tank").teamName).toBe("La Horde");
+  });
+
+  it("un pronom anglais en capitale finit un nom (« Team Game I »)", () => {
+    expect(parseGetiText("Team Game I recrute").teamName).toBe("Game I");
+  });
+
+  it("un pronom anglais n'ouvre pas un nom (« team We are looking »)", () => {
+    expect(parseGetiText("team We are looking").teamName).toBeNull();
+  });
+});

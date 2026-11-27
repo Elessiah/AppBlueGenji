@@ -33,20 +33,25 @@ Serveur Discord `676570513023172637` (`GETI_GUILD_ID`). Une catégorie par salon
 Ces annonces sont publiques : chaque message est relayé à tous les serveurs
 abonnés au réseau.
 
-### Format réel : non observé au lot 1 (constaté au lot 2, § Récupération)
+### Format réel
 
 L'échantillon en lecture seule prévu (`GET /channels/{id}/messages` avec le
 jeton du bot local) a été refusé dès le premier salon (**403**) et arrêté là :
-aucun message réel n'a été lu. L'analyse est donc écrite pour les **deux formes
-possibles**, sans en supposer une :
+aucun message réel n'a été lu. Le format du relais GETI a été connu depuis
+(annonces directes de joueurs et en-tête du relais) ; l'analyse lit :
 
 - **message d'un joueur** — l'auteur Discord est l'auteur de l'annonce, le texte
   est le contenu ;
-- **relais d'un bot** (`author.bot`) — l'auteur est lu dans l'encart : ligne
+- **relais du bot GETI** — la description de l'encart s'ouvre sur l'en-tête
+  `<@id>*(pseudo)* sur [Serveur](invitation)`, puis une ligne vide et le texte
+  cité (`> …`). L'en-tête donne `authorId`, `authorTag` et `originServer`, passe
+  avant toute mention du texte cité (« > contact <@id> » vise un tiers) et est
+  retiré du texte : le nom du serveur n'apporte ni rôle, ni rang, ni région ;
+- **autre relais d'un bot** (`author.bot`) — l'auteur est lu dans l'encart : ligne
   d'auteur (`pseudo`, `pseudo#1234`, `Nom (@pseudo)`), mention derrière un libellé
   net (`by`/`par`/`Contact` en tête de ligne, `Auteur :`, `posté par`…) ; une
-  mention sans libellé, ou dans une phrase (« remplaçant de <@id> »), ne désigne
-  personne : elle peut viser un tiers ; titre, description et
+  mention sans libellé, dans une phrase (« remplaçant de <@id> ») ou dans une
+  citation (`> …`), ne désigne personne : elle peut viser un tiers ; titre, description et
   champs de l'encart forment le texte. La dernière ligne des relais de **notre**
   bot (`*Sent from : [Serveur](invitation)* by <@id>`, `buildServiceMessage`) est
   retirée du texte et donne `originServer` et `authorId`.
@@ -125,8 +130,14 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
 - **Initiale + division** collées : « d3 », « m1 » (`b s g p d m c`). Une initiale
   seule n'est jamais un rang. « argent » n'est lu que suivi d'une division ; « or »
   n'est pas lu (mot trop courant) — « gold » l'est. Derrière « saison », « depuis
-  la », « ex- » (« depuis la s2 », « ex-G2 ») ou devant « esport », ce n'est pas
-  un rang.
+  la », « jouer à », collée à « ex- » (« depuis la s2 », « je joue à D2 »,
+  « ex-G2 ») ou devant « esport », ce n'est pas un rang ; « ex d1 », « ancien
+  m1 », « depuis d2 » en sont.
+- **Abréviations** : « gm », « gm3 », « gm5+ », « diam », « dia », « plat »,
+  « plat1 », « plat+ », « champ », « top500 », « t500 »… Celles qui sont aussi des
+  mots courants ne sont écartées, sans division, que dans leur sens courant :
+  « gm » de salut en tête de ligne (« gm tout le monde », « gm les gars »),
+  « un plat de pâtes », « à plat » (mais « jusqu'à plat »), « champ de bataille ».
 - **Fourchettes** : « diam 3-1 », « d3-m2 », « plat à diam », « d3 to m2 ».
   Plusieurs rangs dispersés : du plus bas au plus haut.
 - **Bornes ouvertes** : « master+ », « min d2 », « au moins diamant » → jusqu'à
@@ -134,12 +145,15 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
   la borne vaut au bout où elle est écrite (« diam ou master+ » → Champion 1),
   sauf si l'autre bout est lui-même une borne (« min d3 max m1 »).
 - **Top 500** : Grand Maître 5 → Champion 1.
-- **Ancien SR** : « 3500 sr », « 4400+ », « 3000-3500 », « 4k2 », « 3.9k » —
-  500 points par palier, 100 par division, plafonné à Grand Maître 1. Un nombre nu
-  ou deux années (« 2025-2026 ») ne sont pas un SR, ni un nombre suivi d'une unité
-  (« 1500+ heures », « 1k€ »). « 4k » seul n'est lu qu'avec « sr »/« elo » ou
-  contre un rôle (« tank 4k ») : sinon c'est un montant (« cashprize 1k », « écran
-  4k »).
+- **Ancien SR** : « 4k » (≈ Grand Maître), « 3.5k », « 4k5 », « 3k+ »,
+  « 3k-4k », « 3500 », « 4200 », « 2800-3200 », « 3500+ », « 3500 sr » — 500
+  points par palier, 100 par division, plafonné à Grand Maître 1. Un nombre est
+  un SR sauf contexte net : unité derrière (« 1500+ heures », « 4k 144hz »,
+  « 1k abonnés », « 1200 followers », « 2000 balles », « 1k€ »), montant ou
+  écran devant (« cashprize », « budget », « $ », « écran / résolution 4k »),
+  identifiant (« code 3456 », « id 3500 »), suite de chiffres d'un numéro
+  (« 06 1234 5678 »), année (« en 2025 », « 2025-2026 »). « sr » / « elo »
+  collé l'emporte sur tout contexte.
 - **Par rôle** : le rôle écrit contre le rang, sur la même ligne, devant
   (« tank m2 / dps d1 ») ou derrière (« M2 tank, D1 dps ») ; une liste de rôles
   partage la fourchette (« tank/dps : d3-m2 »). Un second rang qui suit le
@@ -150,11 +164,14 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
 
 - **Rôles** : français, anglais, abrégés (« heal », « supp », « mt », « fdps »…).
   « flex dps » / « flex support » sont des sous-rôles, pas le rôle Flex. « ms »
-  derrière un nombre est un ping ; « support » / « soutien » de politesse
-  (« merci pour votre soutien », « thanks for the support ») n'est pas un rôle.
+  derrière un nombre est un ping ; « support » / « soutien » juste après un
+  remerciement (« merci pour votre soutien », « merci à tous pour le soutien »,
+  « thanks for the support ») n'est pas un rôle — « je serai ton support »,
+  « merci de jouer le support » en sont.
 - **Région** : mêmes mots que le relais du bot, plus l'Océanie et le drapeau
-  européen. « eu » derrière un auxiliaire ou un adverbe (« j'ai eu », « jamais
-  eu ») est le participe d'« avoir », pas l'Europe.
+  européen. « eu » derrière un auxiliaire ou un adverbe (« j'ai eu », « il a eu »,
+  « jamais eu ») est le participe d'« avoir », pas l'Europe ; « a » ne compte que
+  derrière son sujet (« de NA à EU », « ouvert à tout EU » restent l'Europe).
 - **Langues** : mots (« francophone », « english »), drapeaux, sigles **en liste**
   (« FR/EN ») ou derrière « langue : » — seuls, « EN », « ES » ou « DE » sont des
   mots courants.
@@ -162,15 +179,21 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
   fourchettes (« lundi au jeudi »), « week-end », « en semaine », « tous les
   soirs ».
 - **Horaires** : « 21h-23h », « 20h30 », « 20-23h », « 8-11pm », « 20:30 » ; une
-  durée (« 2h par jour », « 2-3h par soir ») n'en est pas un. Fuseau : « CET », « CEST », « UTC+1 »,
+  durée (« 2h par jour », « 2-3h par soir », « 1h-2h par jour ») n'en est pas un ;
+  deux vraies heures (« 20h-23h par soir », « 21h-23h per day ») restent une
+  plage, et « parfois » n'est pas « par ». Fuseau : « CET », « CEST », « UTC+1 »,
   « heure française » (= `Europe/Paris`).
 - **Nom d'équipe** : derrière un libellé (« Équipe : … », « Team: … ») ou dans la
   phrase après « team / équipe / structure / roster », mots en capitale seulement,
   arrêté au premier mot du vocabulaire d'annonce (« Team Blue Phoenix EU ») ; sans
   capitale (« Roster : 5 joueurs »), ou derrière « team » un pronom ou un article
-  (« Team Je cherche », « team La plus chill »), pas de nom.
-- **Âge minimal** : « 18+ », « +16 », « 17 ans minimum », « majeur » ; « 18+ » /
-  « +18 » suivis d'un nom (« +20 joueurs », « 15+ heures ») sont des nombres.
+  (« Team Je cherche », « team La plus chill »), pas de nom — sauf un article en
+  capitale devant un mot en capitale (« équipe The Owls », « team La Horde »). Un
+  pronom anglais en capitale peut finir un nom (« Team Game I »), pas l'ouvrir ;
+  « on » reste français (« Team Game On » donne « Game »).
+- **Âge minimal** : « 18+ », « +18 », « 17 ans minimum », « majeur », y compris
+  suivis d'un mot (« 18+ dps », « +18 FR ») ; devant ce qu'ils comptent
+  (« +20 joueurs », « 15+ heures », « 20+ teams ») ce sont des nombres.
 
 ## Filtre — `matchesGetiFilter(post, filter, now?)`
 
@@ -191,10 +214,9 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
 
 ## Questions ouvertes pour les lots suivants
 
-- Format réel des messages : constaté au lot 2 (§ Récupération — annonces
-  directes et relais de GETI Bot, en-tête lu par `relayContent`). Reste à régler
-  l'analyse sur les textes réels et à mesurer le taux de reconnaissance (rang,
-  rôle, région) : lot GETI-TUNE, sur des annonces réelles **anonymisées**.
+- Format réel des messages : l'en-tête du relais GETI et les messages directs
+  de joueurs sont lus ; le lot 2 ajoute des annonces réelles anonymisées et mesure
+  le taux de reconnaissance.
 - Accès du bot de production aux six salons (`Voir le salon`, `Lire l'historique`)
   à vérifier avant le rattrapage de 14 jours.
 - « Top 500 » et l'ancien SR sont des approximations assumées.
@@ -220,9 +242,9 @@ Deux sortes d'annonces vivent dans les six salons, et **les deux sont gardées**
 
 L'en-tête du relais donne l'identifiant de l'auteur, son pseudo (celui qui se
 copie) et le serveur d'origine — dont le nom peut porter des crochets
-(`[TAG] Nom`). `parseGetiPost` le lit (`GETI_RELAY_HEADER`), le retire du texte
-et ôte les marques de citation ; l'auteur de l'en-tête prime sur toute mention
-du texte. Le message de **tout autre bot** (le nôtre compris), un message système
+(`[TAG] Nom`, la forme la plus courante : `GETI_SERVER_LINK`). `parseGetiPost`
+le lit (`GETI_HEADER`) et le retire du texte, qui garde ses marques de citation
+(`> …`) ; l'auteur de l'en-tête prime sur toute mention du texte. Le message de **tout autre bot** (le nôtre compris), un message système
 ou un message sans texte n'est pas une annonce : ni poussé par le bot, ni gardé
 par le site. Le réglage de l'analyse sur les textes réels est un lot à part
 (GETI-TUNE).

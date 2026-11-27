@@ -35,13 +35,19 @@ describe("parseGetiPost — relais de GETI Bot", () => {
   it("parseGetiPost_getiRelay_keepsOnlyThePostInTheText", () => {
     const parsed = parseGetiPost(relay(`${HEADER}\n\n> LFP tank Master 3, EU, PC`));
 
-    expect(parsed.text).toBe("LFP tank Master 3, EU, PC");
+    expect(parsed.text).toBe("> LFP tank Master 3, EU, PC");
   });
 
-  it("parseGetiPost_getiRelayOverSeveralLines_dropsEveryQuoteMark", () => {
+  it("parseGetiPost_getiRelayOverSeveralLines_keepsEveryLineOfThePost", () => {
     const parsed = parseGetiPost(relay(`${HEADER}\n\n> LFP tank\n> Master 3\nEU, PC`));
 
-    expect(parsed.text).toBe("LFP tank\nMaster 3\nEU, PC");
+    expect(parsed.text).toBe("> LFP tank\n> Master 3\nEU, PC");
+  });
+
+  it("parseGetiPost_getiRelayFromAServerWithoutBrackets_readsItsName", () => {
+    const description = `<@${AUTHOR_ID}>*(fauxpseudo)* sur [Faux Serveur](https://discord.gg/fauxcode)\n\n> LFP tank`;
+
+    expect(parseGetiPost(relay(description)).originServer).toBe("Faux Serveur");
   });
 
   it("parseGetiPost_getiRelay_readsTheFieldsOfThePost", () => {
