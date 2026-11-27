@@ -368,11 +368,11 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
   dernière clé (`"analysisVersion":2}` — 2 : passages masqués non lus) ; une ligne
   d'une version antérieure est réanalysée à la lecture depuis son
   `raw_json` par `listGetiPosts` (seules ces lignes remontent leur message brut) ;
-  message brut illisible : `dates`, `levels` et `closed` vides. Hors requête,
+  message brut illisible : la ligne n'est pas rendue (son analyse ancienne a pu
+  lire un passage masqué). Hors requête,
   l’horloge de purge horaire (`refreshStaleGetiPosts`, 5 000 lignes au plus par
   passage) réécrit ces lignes une fois (une ligne dont le message brut est
-  illisible garde son analyse, champs ajoutés vides ; une ligne sans texte ou
-  avis du bot est retirée) : la lecture ne les réanalyse plus (~0,3 ms chacune,
+  illisible est retirée, comme une ligne sans texte ou un avis du bot) : la lecture ne les réanalyse plus (~0,3 ms chacune,
   jusqu’à 3 000 par page sinon). L’écriture ne touche qu’une ligne encore
   ancienne. Avancer la version (`ANALYSIS_VERSION`) quand l'analyse change ce
   qu'elle lit : les lignes gardées sont alors refaites.
@@ -624,7 +624,7 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
   citation suivie d'une espace ou seule sur sa ligne (celle du relais ; « >4000 » reste), balisage par
   paires au bord d'un mot (« xX__Sniper__Xx » reste ; `**` / `~~` restés seuls retirés quand ils collent
   un mot ou finissent le texte, gardés entre deux chiffres « 5**2 », deux espaces ou seuls sur leur ligne),
-  code rendu tel quel (aucune marque retirée dedans, citation et titre compris ; langue d'un bloc ```` ```txt ```` ôtée), passage masqué `||…||` (règle de Discord : `||||x||` masque `||x` ; un `||` dans du code est du texte), quelle que soit sa longueur →
+  code rendu tel quel (aucune marque retirée dedans, citation et titre compris ; langue d'un bloc ```` ```txt ```` ôtée), passage masqué `||…||` (lu de gauche à droite comme Discord : `||||x||` masque `||x` ; un `||` dans un code ouvert avant lui est du texte ; un passage ouvert avant un code se ferme au premier `||` qui suit, même dans un accent grave ; code sans borne de longueur, motif neuf par usage — `getiCodeSpan()`), quelle que soit sa longueur →
   « [masqué] » / « [hidden] » (jamais son contenu ; l'analyse ne le lit pas non plus : aucune étiquette n'en vient — `getiWithoutSpoilers`), mention → mot neutre (jamais un
   identifiant), émoji de serveur → son nom, horodatage `<t:…>` → date ou heure à
   l'heure de Paris (`getiTimestampLabel`, `R` écrit comme `f`), lien laissé en texte. Replié au-delà

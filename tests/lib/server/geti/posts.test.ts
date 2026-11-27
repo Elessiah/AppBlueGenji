@@ -451,14 +451,13 @@ describe("listGetiPosts", () => {
     expect(page.posts[0].parsed.levels).toEqual(["ADVANCED"]);
   });
 
-  it("listGetiPosts_staleRowWithUnreadableRawMessage_keepsStoredAnalysisWithEmptyFields", async () => {
-    const { dates, levels, closed, ...older } = parsedGetiPost({ text: "LFT support" });
+  it("listGetiPosts_staleRowWithUnreadableRawMessage_notRendered", async () => {
+    const older = parsedGetiPost({ text: "LFT support", teamName: "SecretSquad" });
     const execute = executeMock([row({ parsed_json: JSON.stringify(older), stale_raw_json: "{pas du json" })]);
 
     const page = await listGetiPosts({}, {}, executor(execute), NOW);
 
-    expect([dates, levels, closed]).toEqual([[], [], false]);
-    expect(page.posts[0].parsed).toMatchObject({ text: "LFT support", dates: [], levels: [], closed: false });
+    expect(page.posts).toEqual([]);
   });
 
   it("listGetiPosts_query_readsRawMessageOnlyForAnalysesOfAnOlderVersion", async () => {
@@ -631,12 +630,14 @@ describe("refreshStaleGetiPosts", () => {
     expect(update.params[1]).toBe(GETI_FAKE_MESSAGE_ID);
   });
 
-  it("refreshStaleGetiPosts_unreadableRawMessage_keepsTheAnalysisWithEmptyFieldsSoItIsNotRetried", async () => {
+  it("refreshStaleGetiPosts_unreadableRawMessage_removesTheRowInsteadOfCertifyingItsAnalysis", async () => {
     const execute = once([stale("{pas du json", "LFT support")]);
 
-    await refreshStaleGetiPosts(executor(execute));
+    const done = await refreshStaleGetiPosts(executor(execute));
 
-    expect(JSON.parse(String(updateOf(execute).params[0]))).toMatchObject({ text: "LFT support", dates: [], levels: [], closed: false });
+    expect(done).toBe(1);
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining("DELETE FROM bg_geti_posts"), [GETI_FAKE_MESSAGE_ID]);
+    expect(execute.mock.calls.some(([sql]) => String(sql).startsWith("UPDATE"))).toBe(false);
   });
 
   it("refreshStaleGetiPosts_rawAndAnalysisBothUnreadable_removesTheRow", async () => {
@@ -932,13 +933,14 @@ describe("version de l'analyse gardée", () => {
     expect(JSON.parse(String(updateParams(execute)[0]))).toMatchObject({ minAge: null, teamName: null, analysisVersion: 2 });
   });
 
-  it("refreshStaleGetiPosts_unreadableRaw_rewrittenWithCurrentVersion", async () => {
-    const older = JSON.stringify(parsedGetiPost({ text: "LFT support" }));
+  it("refreshStaleGetiPosts_unreadableRawWithSpoilerDerivedTeam_neverStampedCurrent", async () => {
+    const older = JSON.stringify(parsedGetiPost({ text: "LFT support", teamName: "SecretSquad" }));
     const execute = onceThenEmpty([{ message_id: GETI_FAKE_MESSAGE_ID, raw_json: "{pas du json", parsed_json: older }]);
 
     await refreshStaleGetiPosts(executor(execute));
 
-    expect(String(updateParams(execute)[0])).toMatch(/"analysisVersion":2\}$/);
+    expect(execute.mock.calls.some(([sql]) => String(sql).startsWith("UPDATE"))).toBe(false);
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining("DELETE FROM bg_geti_posts"), [GETI_FAKE_MESSAGE_ID]);
   });
 
   it("refreshStaleGetiPosts_updateFailsMidChunk_forgetsSharedScanAndRethrows", async () => {

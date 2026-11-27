@@ -281,7 +281,7 @@ type GetiPostRow = RowDataPacket & {
   edited_at: string | null;
 };
 
-/** Champs ajoutés à l'analyse après les premières annonces gardées : vides si le message brut est illisible. */
+/** Champs ajoutés à l'analyse après les premières annonces gardées : vides dans une analyse qui ne les porte pas. */
 const ADDED_FIELDS: Partial<GetiParsedPost> = { dates: [], levels: [], closed: false };
 /**
  * Version de l'analyse gardée, écrite en **dernière** clé (`storedAnalysis`) :
@@ -309,13 +309,17 @@ function storedAnalysis(parsed: object): string {
  */
 const STALE_RAW_JSON = `IF(${CURRENT_ANALYSIS}, NULL, raw_json) AS stale_raw_json`;
 
-/** Analyse d'une ligne : celle gardée, ou celle du message brut quand elle précède les derniers champs. */
+/**
+ * Analyse d'une ligne : celle gardée à la version courante, ou celle de son message
+ * brut. Une analyse plus ancienne dont le message brut est illisible n'est pas
+ * rendue (`null`) : ses étiquettes ont pu être lues dans un passage masqué.
+ */
 function analysisOf(row: GetiPostRow): unknown {
   if (row.stale_raw_json !== null && row.stale_raw_json !== undefined) {
     try {
       return parseGetiPost(JSON.parse(row.stale_raw_json), getiTrustedBots());
     } catch {
-      // Message brut illisible : l'analyse gardée, champs ajoutés vides.
+      return null;
     }
   }
   return JSON.parse(row.parsed_json);
@@ -326,8 +330,9 @@ const REFRESH_CHUNK = 200;
 const REFRESH_CHUNKS_MAX = 25;
 
 /**
- * Nouvelle analyse (JSON) d'une ligne ancienne : celle du message brut ; à défaut, la gardée,
- * champs ajoutés vides. `null` : pas une annonce, ou ni message brut ni analyse lisibles.
+ * Nouvelle analyse (JSON) d'une ligne ancienne, celle de son message brut. `null` :
+ * pas une annonce, ou message brut illisible — l'analyse gardée n'est pas certifiée
+ * à la version courante (elle a pu lire un passage masqué), la ligne est retirée.
  */
 function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): string | null {
   try {
@@ -335,11 +340,7 @@ function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): string | nul
     const parsed = parseGetiPost(raw, trusted);
     return isNotAnnouncement(parsed, raw) ? null : storedAnalysis(parsed);
   } catch {
-    try {
-      return storedAnalysis({ ...ADDED_FIELDS, ...JSON.parse(String(row.parsed_json)) });
-    } catch {
-      return null;
-    }
+    return null;
   }
 }
 
@@ -381,9 +382,9 @@ async function rewriteChunk(
  * Réécrit l'analyse des lignes gardées à une version antérieure (`ANALYSIS_VERSION`) :
  * relues de leur message brut par la version courante de l'analyse, une seule fois,
  * hors du chemin d'une requête (la lecture les réanalyse sinon à chaque page, ~0,3 ms
- * chacune). Un message brut illisible garde son analyse, champs ajoutés vides : la
- * ligne cesse d'être « ancienne » et n'est plus relue. Une ligne qui n'est pas une
- * annonce (sans texte, avis du bot) est retirée, comme à l'enregistrement. L'écriture
+ * chacune). Une ligne au message brut illisible est retirée (son analyse ancienne a
+ * pu lire un passage masqué), comme une ligne qui n'est pas une annonce (sans texte,
+ * avis du bot), à l'enregistrement. L'écriture
  * ne touche qu'une ligne encore ancienne : une modification arrivée entre-temps gagne.
  *
  * @param executor Pool ou connexion.

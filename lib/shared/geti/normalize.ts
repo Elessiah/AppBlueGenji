@@ -62,16 +62,28 @@ export function getiDisplayText(raw: unknown): string {
 }
 
 /**
- * Code en ligne ou en bloc (`` `…` ``, ```` ```…``` ````), par paires, contenu borné :
- * Discord l'affiche tel quel, une marque `||` ou `**` y est du texte.
+ * Motif du code en ligne ou en bloc (`` `…` ``, ```` ```…``` ````), par paires :
+ * Discord l'affiche tel quel, une marque `||` ou `**` y est du texte. Contenu sans
+ * accent grave et sans borne de longueur (Discord n'en met pas) : le contenu
+ * s'arrête au premier accent grave, la recherche reste linéaire.
  */
-export const GETI_CODE_SPAN = /(`{1,3})([^`]{1,4096}?)\1/gu;
+const GETI_CODE_SPAN_SOURCE = "(`{1,3})([^`]+?)\\1";
 
-/** Plages `[début, fin[` du code d'un texte ({@link GETI_CODE_SPAN}), dans l'ordre. */
+/**
+ * Expression neuve du code ({@link GETI_CODE_SPAN_SOURCE}) : globale, donc à
+ * état (`lastIndex`) — une par usage, jamais partagée entre deux appels.
+ *
+ * @param flags `gu` (parcours) ou `yu` (code commençant exactement à `lastIndex`).
+ */
+export function getiCodeSpan(flags: "gu" | "yu" = "gu"): RegExp {
+  return new RegExp(GETI_CODE_SPAN_SOURCE, flags);
+}
+
+/** Plages `[début, fin[` du code d'un texte ({@link getiCodeSpan}), dans l'ordre. */
 export function getiCodeRanges(text: string): Array<[number, number]> {
   if (!text.includes("`")) return [];
   const ranges: Array<[number, number]> = [];
-  for (const match of text.matchAll(GETI_CODE_SPAN)) {
+  for (const match of text.matchAll(getiCodeSpan())) {
     const index = match.index ?? 0;
     ranges.push([index, index + match[0].length]);
   }
@@ -79,32 +91,33 @@ export function getiCodeRanges(text: string): Array<[number, number]> {
 }
 
 /**
- * Prochaine marque `||` hors code à partir de `from` (−1 sinon). `ranges` est
- * parcouru une fois, dans l'ordre : `cursor` garde la première plage utile.
+ * Prochaine marque `||` ouvrante hors code à partir de `from` (−1 sinon), lue de
+ * gauche à droite comme Discord : un code qui **commence avant** la marque la
+ * couvre (on reprend après lui) ; une marque qui commence avant le code l'emporte.
  */
-function nextSpoilerMark(text: string, from: number, ranges: Array<[number, number]>, cursor: { at: number }): number {
-  let search = from;
-  for (;;) {
-    const mark = text.indexOf("||", search);
-    if (mark === -1) return -1;
-    while (cursor.at < ranges.length && ranges[cursor.at][1] <= mark) cursor.at += 1;
-    const range = ranges[cursor.at];
-    // Une marque (ou sa seconde barre) dans du code : du texte, on reprend après le code.
-    if (range !== undefined && mark + 1 >= range[0] && mark < range[1]) {
-      search = range[1];
-      continue;
-    }
-    return mark;
+function nextOpeningMark(text: string, from: number, code: RegExp): number {
+  let mark = text.indexOf("||", from);
+  let tick = text.indexOf("`", from);
+  // Chaque tour avance au-delà d'un accent grave ; `mark` n'est recherchée à nouveau que dépassée : parcours linéaire.
+  while (mark !== -1 && tick !== -1 && tick < mark) {
+    code.lastIndex = tick;
+    const span = code.exec(text);
+    const search = span === null ? tick + 1 : tick + span[0].length;
+    if (search > mark) mark = text.indexOf("||", search);
+    tick = text.indexOf("`", search);
   }
+  return mark;
 }
 
 /**
  * Retire les passages masqués (`||…||`) : l'auteur les a cachés derrière un clic
  * sur Discord, ni la page ni l'analyse ne les lisent (une étiquette tirée d'un
- * passage masqué le montrerait). Même règle que Discord (`\|\|([\s\S]+?)\|\|`) :
- * au moins un caractère masqué, qui peut être une barre (`||||x||` masque `||x`) ;
- * une marque dans du code (`` `||` ``) est du texte. Parcours linéaire, sans
- * borne de longueur ; une marque `||` sans fermante reste du texte.
+ * passage masqué le montrerait). Même lecture que Discord, de gauche à droite :
+ * un code ouvert avant une marque la rend littérale (`` `||` ``) ; une marque
+ * ouverte avant un code l'emporte, et le passage se ferme à la **première**
+ * marque `||` qui suit (`\|\|([\s\S]+?)\|\|`), fût-elle dans un accent grave —
+ * au moins un caractère masqué, qui peut être une barre (`||||x||` masque `||x`).
+ * Parcours linéaire, sans borne de longueur ; une marque sans fermante reste du texte.
  *
  * @param text Texte d'annonce.
  * @param replacement Ce qui remplace chaque passage (une espace pour l'analyse, un mot neutre pour la page).
@@ -112,14 +125,13 @@ function nextSpoilerMark(text: string, from: number, ranges: Array<[number, numb
  */
 export function getiWithoutSpoilers(text: string, replacement: string): string {
   if (!text.includes("||")) return text;
-  const ranges = getiCodeRanges(text);
-  const cursor = { at: 0 };
+  const code = getiCodeSpan("yu");
   let out = "";
   let from = 0;
   for (;;) {
-    const open = nextSpoilerMark(text, from, ranges, cursor);
+    const open = nextOpeningMark(text, from, code);
     if (open === -1) break;
-    const close = nextSpoilerMark(text, open + 3, ranges, cursor);
+    const close = text.indexOf("||", open + 3);
     if (close === -1) break;
     out += text.slice(from, open) + replacement;
     from = close + 2;
