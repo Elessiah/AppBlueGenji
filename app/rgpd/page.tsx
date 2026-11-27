@@ -321,7 +321,7 @@ function RgpdFr({
             écrit, et celles que GETI Bot — le bot d&apos;un réseau tiers d&apos;annonces, qui diffuse chaque annonce à tous les
             serveurs Discord abonnés — y relaie. Sont gardés le texte de l&apos;annonce, le pseudo et l&apos;identifiant
             Discord de son auteur, le serveur d&apos;origine d&apos;une annonce relayée, les dates et les critères lus
-            automatiquement dans le texte (rang, rôle, région, plateforme, langue, disponibilités), sans lien avec un
+            automatiquement dans le texte (rang, rôle, région, plateforme, langue, disponibilités, âge minimal annoncé, nom d&apos;équipe), sans lien avec un
             compte du site — que l&apos;auteur en ait un ou non. Une recherche de scrim est gardée{" "}
             {GETI_RETENTION_DAYS.lfs} jours après sa publication sur Discord, les autres annonces{" "}
             {GETI_RETENTION_DAYS.lfp} jours ; supprimer l&apos;annonce sur Discord la retire du site aussitôt, la modifier

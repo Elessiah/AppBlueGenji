@@ -141,10 +141,17 @@ describe("parseGetiPageQuery", () => {
     expect([query.rankMin, query.rankMax]).toEqual([D3, M2]);
   });
 
-  it("des heures inversées sont remises dans l'ordre", () => {
-    const query = parseGetiPageQuery("lfs", { hfrom: "23", hto: "20" });
+  it("des heures inversées restent telles quelles : un créneau qui passe minuit", () => {
+    const query = parseGetiPageQuery("lfs", { hfrom: "22", hto: "2" });
 
-    expect([query.hourFrom, query.hourTo]).toEqual([20, 23]);
+    expect([query.hourFrom, query.hourTo]).toEqual([22, 2]);
+  });
+
+  it("le début du créneau va de 0h à 23h, la fin de 1h à 24h", () => {
+    expect(parseGetiPageQuery("lfs", { hfrom: "24" }).hourFrom).toBeNull();
+    expect(parseGetiPageQuery("lfs", { hfrom: "0" }).hourFrom).toBe(0);
+    expect(parseGetiPageQuery("lfs", { hto: "0" }).hourTo).toBeNull();
+    expect(parseGetiPageQuery("lfs", { hto: "1" }).hourTo).toBe(1);
   });
 
   it("24 h est une heure valide", () => {
@@ -284,8 +291,8 @@ describe("getiPostChips", () => {
     const post = parsedGetiPost({ ranks: { min: D3, max: M2, byRole: { DPS: getiRange(M2), TANK: getiRange(D3) } } });
 
     expect(getiPostChips(post)).toEqual([
-      { kind: "rank", role: "TANK", min: D3, max: D3 },
-      { kind: "rank", role: "DPS", min: M2, max: M2 },
+      { kind: "rank", role: "TANK", min: D3, max: D3, overall: { min: D3, max: M2 } },
+      { kind: "rank", role: "DPS", min: M2, max: M2, overall: { min: D3, max: M2 } },
     ]);
   });
 
@@ -425,8 +432,22 @@ describe("getiClockLabel", () => {
     expect(getiClockLabel(1205)).toBe("20h05");
   });
 
-  it("minuit en fin de journée s'écrit 0h", () => {
-    expect(getiClockLabel(1440)).toBe("0h");
+  it("la fin de journée s'écrit 24h, distincte de minuit pile", () => {
+    expect(getiClockLabel(1440)).toBe("24h");
+    expect(getiClockLabel(0)).toBe("0h");
+  });
+
+  it("en anglais, l'heure s'écrit sur 24 h avec deux-points", () => {
+    expect(getiClockLabel(1260, "en")).toBe("21:00");
+    expect(getiClockLabel(1205, "en")).toBe("20:05");
+    expect(getiClockLabel(0, "en")).toBe("00:00");
+    expect(getiClockLabel(1440, "en")).toBe("24:00");
+  });
+
+  it("une valeur hors journée ou illisible est ramenée dans la journée", () => {
+    expect(getiClockLabel(-30)).toBe("0h");
+    expect(getiClockLabel(5000)).toBe("24h");
+    expect(getiClockLabel(Number.NaN)).toBe("0h");
   });
 });
 

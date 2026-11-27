@@ -88,6 +88,42 @@ test.describe("GETI Info — page publique", () => {
     await expect(page.getByTestId("geti-count")).toBeVisible();
   });
 
+  test("un créneau de nuit reste tel quel dans l'adresse et les listes d'heures", async ({ page }) => {
+    await page.goto("/geti-info/lfs?hfrom=22&hto=2");
+    const filters = page.getByRole("form", { name: "Filtres" });
+    await expect(filters.getByLabel("Entre (heure)")).toHaveValue("22");
+    await expect(filters.getByLabel("et (heure)")).toHaveValue("2");
+    // La fin de journée s'écrit « 24h », pas un second « 0h ».
+    await expect(filters.getByLabel("et (heure)").locator("option", { hasText: /^24h$/ })).toHaveCount(1);
+    await expect(filters.getByLabel("et (heure)").locator("option", { hasText: /^0h$/ })).toHaveCount(0);
+  });
+
+  test("base seedée : le créneau de nuit garde l'annonce de 23h à 1h", async ({ page }) => {
+    await page.goto("/geti-info/lfs?hfrom=22&hto=2");
+    const posts = page.getByTestId("geti-post");
+    test.skip((await posts.count()) === 0, "Aucune annonce : base absente ou non seedée."); // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
+    await expect(posts.filter({ hasText: "Team Test Nocturne" })).toHaveCount(1);
+    await expect(posts.filter({ hasText: "Team Test Aurore" })).toHaveCount(1);
+    // 20h-22h touche la borne de 22h ; « jeudi 20h » (heure seule) n'y tombe pas.
+    await expect(posts.filter({ hasText: "Team Test Boréale" })).toHaveCount(1);
+    await expect(posts.filter({ hasText: "jeudi 20h" })).toHaveCount(0);
+  });
+
+  test("base seedée : texte hors extraits, page au-delà de la dernière", async ({ page }) => {
+    await page.goto("/geti-info/lfp");
+    test.skip((await page.getByTestId("geti-post").count()) === 0, "Aucune annonce : base absente ou non seedée."); // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
+    await expect(page.locator("div[data-nosnippet] [data-testid=geti-post]").first()).toBeVisible();
+
+    await page.goto("/geti-info/lfp?p=50");
+    const beyond = page.getByTestId("geti-beyond");
+    await expect(beyond).toContainText("Cette page n'existe plus");
+    await expect(page.getByRole("navigation", { name: /pagination|pages/i })).toHaveCount(0);
+    await expect(page.getByText(/Page 50 sur/)).toHaveCount(0);
+    await beyond.getByRole("link", { name: "Aller à la page 1" }).click();
+    await expect(page).toHaveURL(/\/geti-info\/lfp$/);
+    await expect(page.getByTestId("geti-post").first()).toBeVisible();
+  });
+
   test("à 375 px, les filtres se replient derrière un bouton et rien ne déborde", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto("/geti-info/lfp");
@@ -107,8 +143,14 @@ test.describe("GETI Info — page publique", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.getByRole("heading", { level: 2, name: "Looking for a sub" })).toBeVisible();
     const tabs = page.getByRole("navigation", { name: "Looking for" });
-    await expect(tabs.getByRole("link", { name: "A cast" })).toHaveAttribute("href", "/en/geti-info/lfcast");
+    await expect(tabs.getByRole("link", { name: "Casters" })).toHaveAttribute("href", "/en/geti-info/lfcast");
     await expect(page.getByRole("button", { name: "Publish a post" })).toBeVisible();
+  });
+
+  test("en anglais, les heures s'écrivent 21:00", async ({ page }) => {
+    await page.goto("/en/geti-info/lfs?hto=24");
+    await expect(page.getByLabel("and (hour)")).toHaveValue("24");
+    await expect(page.getByLabel("and (hour)").locator("option", { hasText: /^24:00$/ })).toHaveCount(1);
   });
 
   test("base seedée : annonces, pseudo copié en un clic, étiquettes mises en avant", async ({ page, context }) => {

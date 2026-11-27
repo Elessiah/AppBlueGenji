@@ -222,6 +222,50 @@
   align-items: start;
 }
 
+.layout[data-single="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Changement de filtre en attente de son rendu : l'ancienne liste ne passe pas pour la réponse. */
+.layout[data-pending="true"] .results {
+  opacity: 0.6;
+}
+
+.pendingNote {
+  margin-right: auto;
+  padding-left: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--blue-300);
+}
+
+.applyRow {
+  display: none;
+}
+
+.applyButton {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid rgba(var(--blue-500-rgb), 0.55);
+  border-radius: var(--r-cy-md);
+  background: rgba(var(--blue-500-rgb), 0.16);
+  color: var(--blue-100);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.applyButton:hover {
+  border-color: var(--blue-500);
+}
+
+.applyButton:focus-visible,
+.panelTitle:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 2px;
+}
+
 .filtersBar {
   display: none;
   align-items: center;
@@ -492,7 +536,7 @@
 }
 
 /* Étiquette qui répond à la recherche : plus vive, cerclée, cochée (jamais la couleur seule). */
-.chipMatch {
+.chips .chipMatch {
   border-color: var(--blue-300);
   background: rgba(var(--blue-500-rgb), 0.24);
   color: var(--blue-100);
@@ -683,8 +727,13 @@
     display: none;
   }
 
-  .panelHead .reset {
+  .panelHead .reset,
+  .panelTitle {
     display: none;
+  }
+
+  .applyRow {
+    display: block;
   }
 }
 

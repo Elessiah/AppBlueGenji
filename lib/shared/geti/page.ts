@@ -5,7 +5,9 @@
  *
  * Module pur : importable côté serveur comme côté client.
  */
+import { getiStoredRankRange, getiStoredTimeSlot, getiTimeSlotMatches } from "@/lib/shared/geti/filter";
 import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
+import type { Locale } from "@/lib/shared/locales";
 
 export { GETI_OFFICIAL_INVITE_CODE, GETI_OFFICIAL_INVITE_URL } from "@/lib/shared/discord";
 import { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";
@@ -107,7 +109,10 @@ export type GetiPageQuery = {
   platforms: GetiPlatform[];
   languages: GetiLanguage[];
   days: GetiDay[];
-  /** Créneau voulu, en heures entières (0–24). */
+  /**
+   * Créneau voulu, en heures entières (début 0–23, fin 1–24). Un début après la
+   * fin (« entre 22h et 2h ») est un créneau qui passe minuit.
+   */
   hourFrom: number | null;
   hourTo: number | null;
   /** Âge maximal en jours ; `null` : toute la durée de garde. */
@@ -224,17 +229,15 @@ export function parseGetiPageQuery(category: GetiCategory, params: GetiSearchPar
     fields.includes(field) ? listParam(params, name, domain) : [];
   const ranked = fields.includes("ranks");
   const timed = fields.includes("time");
-  // Bornes inversées : remises dans l'ordre plutôt que de rendre une liste vide.
+  // Rangs inversés : remis dans l'ordre plutôt que de rendre une liste vide. Les
+  // heures, elles, ne s'échangent pas : « 22h → 2h » est un créneau de nuit.
   const [rankMin, rankMax] = ordered(
     ranked ? parseGetiRankSlug(rawValues(params, GETI_PARAMS.rankMin)[0]) : null,
     ranked ? parseGetiRankSlug(rawValues(params, GETI_PARAMS.rankMax)[0]) : null,
     getiRankValue,
   );
-  const [hourFrom, hourTo] = ordered(
-    timed ? intParam(params, GETI_PARAMS.hourFrom, 0, 24) : null,
-    timed ? intParam(params, GETI_PARAMS.hourTo, 0, 24) : null,
-    (hour) => hour,
-  );
+  const hourFrom = timed ? intParam(params, GETI_PARAMS.hourFrom, 0, 23) : null;
+  const hourTo = timed ? intParam(params, GETI_PARAMS.hourTo, 1, 24) : null;
   const ageDays = intParam(params, GETI_PARAMS.ageDays, 1, GETI_RETENTION_DAYS[category]);
   return {
     rankMin,
@@ -286,6 +289,17 @@ export function getiPageSearch(query: GetiPageQuery): string {
   // Les virgules restent lisibles dans une adresse partagée.
   const text = search.toString().replaceAll("%2C", ",");
   return text === "" ? "" : `?${text}`;
+}
+
+/**
+ * Paramètres d'adresse d'un état de filtres **tel que le serveur le rendra** :
+ * relus comme une adresse (rangs inversés remis dans l'ordre, valeurs hors
+ * catégorie retirées). Un changement de filtre attend ce rendu-là, pas l'état
+ * brut du panneau, sinon l'attente ne se lèverait jamais.
+ */
+export function getiNormalizedSearch(category: GetiCategory, query: GetiPageQuery): string {
+  const params = Object.fromEntries(new URLSearchParams(getiPageSearch(query)));
+  return getiPageSearch(parseGetiPageQuery(category, params));
 }
 
 /** Adresse (sans préfixe de langue) d'une catégorie avec ses filtres. */
@@ -343,9 +357,65 @@ export function getiPageFilter(category: GetiCategory, query: GetiPageQuery): Ge
   };
 }
 
+/**
+ * Les filtres reçoivent-ils l'état rendu par le serveur ? Tant qu'un changement
+ * de filtre attend son rendu (`pending`), le rendu d'un changement plus ancien
+ * est ignoré : il déferait le dernier geste. Sans attente (retour arrière, lien
+ * partagé), l'adresse rendue fait foi.
+ *
+ * Appelée à **chaque** rendu du serveur, même s'il redonne l'adresse
+ * précédente (un geste défait avant son rendu) : l'attente atteinte se lève.
+ *
+ * @param pending Adresse normalisée (`getiNormalizedSearch`) du dernier changement en attente, ou `null`.
+ * @param serverSearch Paramètres de l'état que le serveur vient de rendre.
+ * @returns `adopt` : reprendre l'état du serveur ; `pending` : l'attente qui reste.
+ */
+export function getiFilterSync(
+  pending: string | null,
+  serverSearch: string,
+): { adopt: boolean; pending: string | null } {
+  if (pending !== null && pending !== serverSearch) return { adopt: false, pending };
+  return { adopt: true, pending: null };
+}
+
+/**
+ * Le clic sur ce lien remplace-t-il la page de cet onglet ? Seul ce cas rend la
+ * main à l'adresse affichée (`GetiFilters`) : un lien ouvert ailleurs
+ * (`target`), un téléchargement ou une ancre de la même page laisse le dernier
+ * changement de filtre en attente.
+ *
+ * @param link Cible (`href` résolu ou relatif), `target` et présence de `download`.
+ * @param here Adresse complète de la page affichée.
+ */
+export function getiLinkNavigatesTab(
+  link: Readonly<{ href: string; target: string; download: boolean }>,
+  here: string,
+): boolean {
+  if (link.download) return false;
+  if (link.target !== "" && link.target.toLowerCase() !== "_self") return false;
+  let url: URL;
+  let current: URL;
+  try {
+    current = new URL(here);
+    url = new URL(link.href, current);
+  } catch {
+    return false;
+  }
+  if (url.origin !== current.origin) return false;
+  // Ancre de la même page : rien n'est rechargé.
+  return !(url.pathname === current.pathname && url.search === current.search && url.hash !== "");
+}
+
 /** Une donnée lue dans l'annonce, à rendre en étiquette. */
 export type GetiChip =
-  | { kind: "rank"; role: GetiRankedRole | null; min: GetiRank; max: GetiRank }
+  | {
+      kind: "rank";
+      role: GetiRankedRole | null;
+      min: GetiRank;
+      max: GetiRank;
+      /** Rang par rôle : fourchette globale de l'annonce, que le filtre compare quand aucun rôle voulu n'a son rang. */
+      overall?: { min: GetiRank; max: GetiRank } | null;
+    }
   | { kind: "role"; value: GetiRole }
   | { kind: "subRole"; value: GetiSubRole }
   | { kind: "staffRole"; value: GetiStaffRole }
@@ -365,30 +435,48 @@ const MAX_DATE_CHIPS = 4;
 const RANKED_ROLES: readonly GetiRankedRole[] = ["TANK", "DPS", "SUPPORT"];
 
 /** Les données lues dans une annonce, dans l'ordre d'affichage. */
+/** Liste d'une analyse gardée : un champ absent ou abîmé vaut une liste vide (la carte reste rendue). */
+function listOf<T>(values: readonly T[] | null | undefined): readonly T[] {
+  return Array.isArray(values) ? values : [];
+}
+
+/** Analyse gardée, champs peut-être absents (ligne écrite à la main, analyse ancienne). */
+type StoredAnalysis = Partial<GetiParsedPost>;
+
+/**
+ * Les données lues dans une annonce, dans l'ordre d'affichage. Une analyse
+ * gardée incomplète (champ absent) donne moins d'étiquettes, jamais une erreur.
+ */
 export function getiPostChips(post: GetiParsedPost): GetiChip[] {
+  const stored: StoredAnalysis = post;
   const chips: GetiChip[] = [];
-  if (post.teamName) chips.push({ kind: "team", name: post.teamName });
+  if (stored.teamName) chips.push({ kind: "team", name: stored.teamName });
+  const byRole = stored.ranks?.byRole ?? {};
+  const overall = getiStoredRankRange(stored.ranks);
   const perRole = RANKED_ROLES.flatMap((role): GetiChip[] => {
-    const range = post.ranks.byRole[role];
-    return range ? [{ kind: "rank", role, min: range.min, max: range.max }] : [];
+    const range = Object.hasOwn(byRole, role) ? getiStoredRankRange(byRole[role]) : null;
+    return range === null ? [] : [{ kind: "rank", role, min: range.min, max: range.max, overall }];
   });
   if (perRole.length > 0) chips.push(...perRole);
-  else if (post.ranks.min && post.ranks.max) {
-    chips.push({ kind: "rank", role: null, min: post.ranks.min, max: post.ranks.max });
+  else if (overall !== null) chips.push({ kind: "rank", role: null, min: overall.min, max: overall.max });
+  for (const value of listOf(stored.roles)) chips.push({ kind: "role", value });
+  for (const value of listOf(stored.subRoles)) chips.push({ kind: "subRole", value });
+  for (const value of listOf(stored.staffRoles)) chips.push({ kind: "staffRole", value });
+  for (const value of listOf(stored.levels)) chips.push({ kind: "level", value });
+  for (const value of listOf(stored.regions)) chips.push({ kind: "region", value });
+  for (const value of listOf(stored.platforms)) chips.push({ kind: "platform", value });
+  for (const value of listOf(stored.languages)) chips.push({ kind: "language", value });
+  const availability = stored.availability;
+  for (const value of listOf(availability?.days)) chips.push({ kind: "day", value });
+  const slots = listOf<unknown>(availability?.times).flatMap((slot) => {
+    const valid = getiStoredTimeSlot(slot);
+    return valid === null ? [] : [valid];
+  });
+  for (const slot of slots.slice(0, MAX_TIME_CHIPS)) {
+    chips.push({ kind: "time", from: slot.from, to: slot.to, timezone: availability?.timezone ?? null });
   }
-  for (const value of post.roles) chips.push({ kind: "role", value });
-  for (const value of post.subRoles) chips.push({ kind: "subRole", value });
-  for (const value of post.staffRoles) chips.push({ kind: "staffRole", value });
-  for (const value of post.levels) chips.push({ kind: "level", value });
-  for (const value of post.regions) chips.push({ kind: "region", value });
-  for (const value of post.platforms) chips.push({ kind: "platform", value });
-  for (const value of post.languages) chips.push({ kind: "language", value });
-  for (const value of post.availability.days) chips.push({ kind: "day", value });
-  for (const slot of post.availability.times.slice(0, MAX_TIME_CHIPS)) {
-    chips.push({ kind: "time", from: slot.from, to: slot.to, timezone: post.availability.timezone });
-  }
-  for (const iso of post.dates.slice(0, MAX_DATE_CHIPS)) chips.push({ kind: "date", iso });
-  if (post.minAge !== null) chips.push({ kind: "minAge", age: post.minAge });
+  for (const iso of listOf(stored.dates).slice(0, MAX_DATE_CHIPS)) chips.push({ kind: "date", iso });
+  if (typeof stored.minAge === "number") chips.push({ kind: "minAge", age: stored.minAge });
   return chips;
 }
 
@@ -398,34 +486,58 @@ function included<T>(values: readonly T[] | null | undefined, value: T): boolean
   return (values ?? []).includes(value);
 }
 
-function rankChipMatches(chip: { min: GetiRank; max: GetiRank }, filter: GetiFilter): boolean {
+function isRankedRole(role: unknown): role is GetiRankedRole {
+  return RANKED_ROLES.some((known) => known === role);
+}
+
+function rankChipMatches(
+  chip: Extract<GetiChip, { kind: "rank" }>,
+  filter: GetiFilter,
+  cardRoles: readonly GetiRankedRole[] | null,
+): boolean {
   const min = filter.ranks?.min ?? null;
   const max = filter.ranks?.max ?? null;
   if (min === null && max === null) return false;
+  // Comme le filtre : avec des rôles voulus, seul le rang de ces rôles compte —
+  // sauf si la carte n'en porte aucun (ou qu'aucun rôle n'est voulu) ; le filtre
+  // compare alors la fourchette globale de l'annonce, que l'étiquette porte.
+  const wantedRoles = (filter.roles ?? []).filter(isRankedRole);
+  const usesOverall =
+    cardRoles === null ? wantedRoles.length === 0 : !wantedRoles.some((role) => cardRoles.includes(role));
+  if (chip.role !== null && !usesOverall && !wantedRoles.includes(chip.role)) return false;
+  // `overall: null` : l'annonce n'a pas de fourchette globale lisible, le filtre n'a rien à comparer.
+  if (usesOverall && chip.role !== null && chip.overall === null) return false;
+  const range = usesOverall && chip.role !== null && chip.overall ? chip.overall : chip;
   const low = min === null ? 0 : getiRankValue(min);
   const high = max === null ? GETI_RANK_TOP : getiRankValue(max);
-  return getiRankValue(chip.max) >= low && getiRankValue(chip.min) <= high;
+  return getiRankValue(range.max) >= low && getiRankValue(range.min) <= high;
 }
 
 function timeChipMatches(chip: { from: number; to: number | null }, filter: GetiFilter): boolean {
   const from = filter.time?.from ?? null;
   const to = filter.time?.to ?? null;
   if (from === null && to === null) return false;
-  const low = from ?? 0;
-  const high = to ?? DAY_MINUTES;
-  if (chip.to === null) return chip.from >= low && chip.from <= high;
-  const end = chip.to < chip.from ? DAY_MINUTES : chip.to;
-  return end >= low && chip.from <= high;
+  return getiTimeSlotMatches(chip, from, to);
 }
 
 /**
  * L'étiquette répond-elle à un critère **actif** de la recherche ? Sert à la
  * mettre en avant ; un critère absent ne met rien en avant.
+ *
+ * @param chips Toutes les étiquettes de la carte : un rang par rôle se juge
+ *   comme le filtre, qui retombe sur la fourchette globale quand l'annonce ne
+ *   donne le rang d'aucun rôle voulu. Sans elles, seul le rôle de l'étiquette compte.
  */
-export function getiChipMatches(chip: GetiChip, filter: GetiFilter): boolean {
+export function getiChipMatches(chip: GetiChip, filter: GetiFilter, chips?: readonly GetiChip[]): boolean {
   switch (chip.kind) {
     case "rank":
-      return rankChipMatches(chip, filter);
+      return rankChipMatches(
+        chip,
+        filter,
+        chips
+          ? chips.flatMap((entry) => (entry.kind === "rank" && entry.role !== null ? [entry.role] : []))
+          : null,
+      );
     case "role":
       // « Flex » répond à tout rôle voulu, comme dans le filtre.
       return included(filter.roles, chip.value) || (chip.value === "FLEX" && (filter.roles ?? []).length > 0);
@@ -450,12 +562,17 @@ export function getiChipMatches(chip: GetiChip, filter: GetiFilter): boolean {
   }
 }
 
-/** « 21h », « 20h30 » : une heure de l'annonce, sur 24 h. */
-export function getiClockLabel(minutes: number): string {
-  const safe = Math.min(DAY_MINUTES, Math.max(0, Math.trunc(minutes)));
-  const hours = Math.floor(safe / 60) % 24;
-  const rest = safe % 60;
-  return rest === 0 ? `${hours}h` : `${hours}h${String(rest).padStart(2, "0")}`;
+/**
+ * Une heure sur 24 h, à l'écriture de la langue : « 21h », « 20h30 » en
+ * français, « 21:00 », « 20:30 » en anglais. La fin de journée (1440) s'écrit
+ * « 24h » / « 24:00 », jamais « 0h » (elle se confondrait avec minuit pile).
+ */
+export function getiClockLabel(minutes: number, locale: Locale = "fr"): string {
+  const safe = Math.min(DAY_MINUTES, Math.max(0, Math.trunc(Number.isFinite(minutes) ? minutes : 0)));
+  const hours = Math.floor(safe / 60);
+  const rest = String(safe % 60).padStart(2, "0");
+  if (locale === "en") return `${String(hours).padStart(2, "0")}:${rest}`;
+  return rest === "00" ? `${hours}h` : `${hours}h${rest}`;
 }
 
 /** Mots neutres qui remplacent les mentions Discord d'une annonce. */

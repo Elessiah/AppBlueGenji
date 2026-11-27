@@ -55,30 +55,30 @@ function PublishDialog({
           </button>
         </header>
         <ScrollArea orientation="y" className={styles.modalScroll} ariaLabel={text.title}>
-        <p className={styles.modalText}>{text.intro}</p>
-        <ol className={styles.steps}>
-          <li>
-            <p className={styles.modalText}>{text.stepChannel}</p>
-            <CyberButton variant="primary" asChild>
-              <a href={channelUrl} target="_blank" rel="noopener noreferrer">
-                {getiText(locale, text.channelLink, { category: categoryTitle })}
-                <span className="sr-only"> {text.newTab}</span>
-              </a>
-            </CyberButton>
-            <p className={styles.modalNote}>
-              {text.notMember}{" "}
-              <a href={ourInviteUrl} target="_blank" rel="noopener noreferrer" className={styles.modalLink}>
-                {text.joinOurs}
-                <span className="sr-only"> {text.newTab}</span>
-              </a>
-            </p>
-          </li>
-          <li>
-            <p className={styles.modalText}>{text.stepGeti}</p>
-            {card}
-          </li>
-        </ol>
-        <p className={styles.modalNote}>{text.rules}</p>
+          <p className={styles.modalText}>{text.intro}</p>
+          <ol className={styles.steps}>
+            <li>
+              <p className={styles.modalText}>{text.stepChannel}</p>
+              <CyberButton variant="primary" asChild>
+                <a href={channelUrl} target="_blank" rel="noopener noreferrer">
+                  {getiText(locale, text.channelLink, { category: categoryTitle })}
+                  <span className="sr-only"> {text.newTab}</span>
+                </a>
+              </CyberButton>
+              <p className={styles.modalNote}>
+                {text.notMember}{" "}
+                <a href={ourInviteUrl} target="_blank" rel="noopener noreferrer" className={styles.modalLink}>
+                  {text.joinOurs}
+                  <span className="sr-only"> {text.newTab}</span>
+                </a>
+              </p>
+            </li>
+            <li>
+              <p className={styles.modalText}>{text.stepGeti}</p>
+              {card}
+            </li>
+          </ol>
+          <p className={styles.modalNote}>{text.rules}</p>
         </ScrollArea>
         <div className={styles.modalActions}>
           <CyberButton variant="ghost" onClick={onClose}>

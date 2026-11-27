@@ -16,7 +16,7 @@ import { GETI_INGEST_ERRORS } from "@/lib/server/geti/wire";
 
 /**
  * Plafond d'appels du bot, toutes routes GETI confondues : un rattrapage de
- * quatorze jours sur six salons tient en quelques centaines de lots, loin
+ * de la durée de garde (14 jours, 7 pour les scrims) sur six salons tient en quelques centaines de lots, loin
  * dessous ; au-delà, c'est une boucle folle, que le site refuse (429) au lieu
  * d'écrire en base à chaque tour.
  */

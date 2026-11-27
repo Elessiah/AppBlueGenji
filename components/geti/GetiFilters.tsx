@@ -1,7 +1,7 @@
 "use client";
 
 import { SlidersHorizontal } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -23,6 +23,9 @@ import {
   getiActiveFilterCount,
   getiAllRanks,
   getiClockLabel,
+  getiFilterSync,
+  getiLinkNavigatesTab,
+  getiNormalizedSearch,
   getiPageHref,
   getiPageSearch,
   getiRankSlug,
@@ -31,12 +34,15 @@ import {
   type GetiPageQuery,
 } from "@/lib/shared/geti/page";
 import { getiRankLabel, getiText, type GetiDataText, type GetiMessages } from "@/lib/shared/geti/page-text";
+import { useGetiPending } from "./GetiLayout";
 import styles from "./geti.module.css";
 
 type FiltersText = GetiMessages["filters"];
 
 const ALL_RANKS = getiAllRanks();
-const HOURS = Array.from({ length: 25 }, (_, hour) => hour);
+/** Début du créneau : 0h à 23h ; fin : 1h à 24h (fin de journée). Un début après la fin passe minuit. */
+const HOURS_FROM = Array.from({ length: 24 }, (_, hour) => hour);
+const HOURS_TO = Array.from({ length: 24 }, (_, hour) => hour + 1);
 
 /** Clés de l'état qui portent une liste de choix. */
 type ListKey = "roles" | "subRoles" | "staffRoles" | "levels" | "regions" | "platforms" | "languages" | "days";
@@ -70,6 +76,22 @@ function Group({
   );
 }
 
+/** Focus d'une cible qui survit à « Réinitialiser » : le bouton Filtres s'il est affiché (mobile), sinon le titre. */
+function focusStableTarget(toggle: HTMLElement | null, title: HTMLElement | null): void {
+  const visible = toggle !== null && toggle.getClientRects().length > 0;
+  (visible ? toggle : title)?.focus({ preventScroll: true });
+}
+
+/** Bouton « Réinitialiser » : présent seulement tant qu'un filtre est actif. */
+function ResetButton({ active, text, onReset }: Readonly<{ active: number; text: FiltersText; onReset: () => void }>) {
+  if (active === 0) return null;
+  return (
+    <button type="button" className={styles.reset} onClick={onReset} aria-label={text.resetLabel}>
+      {text.reset}
+    </button>
+  );
+}
+
 /**
  * Filtres d'une catégorie d'annonces (`docs/features/GETI_INFO.md` § Page).
  *
@@ -84,6 +106,7 @@ export function GetiFilters({
   fields,
   ageOptions,
   retentionDays,
+  total,
   text,
   data,
 }: Readonly<{
@@ -92,6 +115,8 @@ export function GetiFilters({
   fields: readonly GetiFilterField[];
   ageOptions: readonly number[];
   retentionDays: number;
+  /** Annonces de la liste affichée (bouton « Voir les annonces » sur mobile). */
+  total: number;
   text: FiltersText;
   data: GetiDataText;
 }>) {
@@ -99,21 +124,71 @@ export function GetiFilters({
   const router = useLocaleRouter();
   const panelId = useId();
   const [open, setOpen] = useState(false);
+  const setPending = useGetiPending();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const [draft, setDraft] = useState(query);
   // L'adresse fait foi : un retour arrière ou un lien partagé remet les contrôles d'accord.
   const serverSearch = getiPageSearch(query);
-  const lastServerSearch = useRef(serverSearch);
+  // Dernière adresse demandée par un changement de filtre (normalisée comme le serveur la
+  // rendra), tant que son rendu n'est pas arrivé : le rendu d'un changement plus ancien ne
+  // doit pas défaire le dernier geste.
+  const pendingSearch = useRef<string | null>(null);
+  // Navigations de filtre en cours : une fois toutes rendues, plus rien n'est attendu
+  // (un geste défait vers l'adresse déjà affichée ne produit parfois aucun rendu).
+  const [navigating, startNavigation] = useTransition();
   useEffect(() => {
-    if (lastServerSearch.current === serverSearch) return;
-    lastServerSearch.current = serverSearch;
-    setDraft(query);
+    // Chaque rendu du serveur (nouvel objet `query`) passe ici, même à adresse égale :
+    // un geste défait avant son rendu lève aussi l'attente.
+    const sync = getiFilterSync(pendingSearch.current, serverSearch);
+    pendingSearch.current = sync.pending;
+    if (sync.adopt) setDraft(query);
   }, [serverSearch, query]);
+  useEffect(() => {
+    if (!navigating) pendingSearch.current = null;
+    setPending(navigating);
+  }, [navigating, setPending]);
+  useEffect(() => {
+    // Retour arrière ou avant, ou lien suivi (pagination, « Réinitialiser » de la liste) :
+    // l'adresse affichée reprend la main sur les contrôles.
+    const release = () => {
+      pendingSearch.current = null;
+    };
+    const releaseOnLink = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      // Seul un lien qui remplace cette page compte : pas un nouvel onglet, un téléchargement, une ancre.
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (
+        link instanceof HTMLAnchorElement &&
+        getiLinkNavigatesTab(
+          { href: link.href, target: link.target, download: link.hasAttribute("download") },
+          globalThis.location.href,
+        )
+      ) {
+        release();
+      }
+    };
+    window.addEventListener("popstate", release);
+    document.addEventListener("click", releaseOnLink, true);
+    return () => {
+      window.removeEventListener("popstate", release);
+      document.removeEventListener("click", releaseOnLink, true);
+    };
+  }, []);
 
   const apply = (next: GetiPageQuery) => {
     // Tout changement de filtre revient à la première page.
     const first = { ...next, page: 1 };
     setDraft(first);
-    router.replace(getiPageHref(category, first), { scroll: false });
+    pendingSearch.current = getiNormalizedSearch(category, first);
+    startNavigation(() => router.replace(getiPageHref(category, first), { scroll: false }));
+  };
+
+  // Les boutons « Réinitialiser » disparaissent avec le dernier filtre : le focus passe à
+  // une cible qui reste (le bouton Filtres sur mobile, le titre du panneau sinon).
+  const resetAll = () => {
+    focusStableTarget(toggleRef.current, titleRef.current);
+    apply({ ...emptyGetiPageQuery() });
   };
 
   const active = getiActiveFilterCount(draft);
@@ -175,7 +250,7 @@ export function GetiFilters({
     );
   };
 
-  const hourSelect = (key: "hourFrom" | "hourTo", label: string) => {
+  const hourSelect = (key: "hourFrom" | "hourTo", label: string, hours: readonly number[]) => {
     const id = `${panelId}-${key}`;
     const value = draft[key];
     return (
@@ -189,9 +264,9 @@ export function GetiFilters({
           }
         >
           <option value="">{text.any}</option>
-          {HOURS.map((hour) => (
+          {hours.map((hour) => (
             <option key={hour} value={hour}>
-              {getiClockLabel(hour * 60)}
+              {getiClockLabel(hour * 60, locale)}
             </option>
           ))}
         </select>
@@ -206,6 +281,7 @@ export function GetiFilters({
       <div className={styles.filtersBar}>
         <button
           type="button"
+          ref={toggleRef}
           className={styles.filtersToggle}
           aria-expanded={open}
           aria-controls={panelId}
@@ -214,16 +290,7 @@ export function GetiFilters({
           <SlidersHorizontal size={15} aria-hidden="true" />
           {active > 0 ? getiText(locale, text.toggleActive, { count: active }) : text.toggle}
         </button>
-        {active > 0 ? (
-          <button
-            type="button"
-            className={styles.reset}
-            onClick={() => apply({ ...emptyGetiPageQuery() })}
-            aria-label={text.resetLabel}
-          >
-            {text.reset}
-          </button>
-        ) : null}
+        <ResetButton active={active} text={text} onReset={resetAll} />
       </div>
 
       <form
@@ -234,17 +301,11 @@ export function GetiFilters({
         onSubmit={(event) => event.preventDefault()}
       >
         <div className={styles.panelHead}>
-          <h3 className={styles.panelTitle}>{text.title}</h3>
-          {active > 0 ? (
-            <button
-              type="button"
-              className={styles.reset}
-              onClick={() => apply({ ...emptyGetiPageQuery() })}
-              aria-label={text.resetLabel}
-            >
-              {text.reset}
-            </button>
-          ) : null}
+          <h3 ref={titleRef} tabIndex={-1} className={styles.panelTitle}>
+            {text.title}
+          </h3>
+          <output className={styles.pendingNote}>{navigating ? text.updating : ""}</output>
+          <ResetButton active={active} text={text} onReset={resetAll} />
         </div>
 
         {has("staffRoles") ? checks("staffRoles", text.staffRoles, GETI_STAFF_ROLES, data.staffRoles) : null}
@@ -303,8 +364,8 @@ export function GetiFilters({
             }
           >
             <div className={styles.pair}>
-              {hourSelect("hourFrom", text.hourFrom)}
-              {hourSelect("hourTo", text.hourTo)}
+              {hourSelect("hourFrom", text.hourFrom, HOURS_FROM)}
+              {hourSelect("hourTo", text.hourTo, HOURS_TO)}
             </div>
           </Group>
         ) : null}
@@ -359,6 +420,18 @@ export function GetiFilters({
             </InfoHint>
           </InfoHintRow>
         </Group>
+        <div className={styles.applyRow}>
+          <button
+            type="button"
+            className={styles.applyButton}
+            onClick={() => {
+              setOpen(false);
+              toggleRef.current?.focus({ preventScroll: true });
+            }}
+          >
+            {getiText(locale, text.apply, { count: total })}
+          </button>
+        </div>
       </form>
     </div>
   );

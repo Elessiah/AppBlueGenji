@@ -8,7 +8,7 @@ import { parseUpsertBody } from "@/lib/server/geti/wire";
  * `SITE_INTERNAL_TOKEN`, boucle locale) : un lot d'annonces des six salons
  * sources, créées, modifiées ou relues au rattrapage. Chacune est analysée ici
  * et remplace la version gardée. Rend des **nombres** : `stored`, `emptied`
- * (sans texte), `expired` (hors des quatorze jours), `rejected` (forme
+ * (sans texte), `expired` (hors de la durée de garde de sa catégorie : 7 jours pour un scrim, 14 sinon), `rejected` (forme
  * inattendue).
  */
 export function POST(req: Request) {
