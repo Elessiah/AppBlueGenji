@@ -99,6 +99,14 @@ const GETI_HEADER = new RegExp(
   "iu",
 );
 /**
+ * Première ligne qui s'ouvre comme un en-tête GETI (mention en tête) sans s'y
+ * lire en entier : écrite par le bot GETI avec le pseudo et le nom de serveur
+ * que d'autres choisissent, elle n'est jamais lue pour le texte, ni pour le
+ * pseudo ou le serveur ; seule sa mention de tête, qu'écrit le bot, nomme l'auteur.
+ */
+const GETI_HEADER_LIKE_LINE = /^\s*<@!?(\d{15,22})>[^\n]*(?:\n|$)/u;
+
+/**
  * Réponse de service d'un bot de relais à celui qui vient de publier (« Ton
  * annonce a été publié dans 32 autres channels. », lien d'invitation du bot) :
  * ce n'est pas une annonce.
@@ -146,13 +154,6 @@ function withoutStruck(displayed: string): { analysed: string; closed: boolean }
   return { analysed: closed ? displayed.replace(STRUCK, " $1 ") : kept, closed };
 }
 
-/**
- * Première ligne qui s'ouvre comme un en-tête GETI (mention en tête) sans s'y
- * lire en entier : écrite par le bot GETI avec le pseudo et le nom de serveur
- * que d'autres choisissent, elle n'est jamais lue pour le texte, ni pour le
- * pseudo ou le serveur ; seule sa mention de tête, qu'écrit le bot, nomme l'auteur.
- */
-const GETI_HEADER_LIKE_LINE = /^\s*<@!?(\d{15,22})>[^\n]*(?:\n|$)/u;
 /**
  * Pseudo Discord lisible sur une ligne d'auteur d'encart : nouveau format
  * (« faux.pseudo ») ou ancien (« Faux Pseudo#4821 »). Un nom d'affichage libre
@@ -471,7 +472,8 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
   const postedAt = isoDate(source.postedAt);
   // Scrim ou remplaçant — d'après le salon, ou le mot-clé d'une annonce postée
   // ailleurs (« LFSub » dans le salon des joueurs) : une soirée précise, à un SR donné.
-  const oneEvening = [category, detectGetiCategory(prepared.lower)].some((kind) => kind === "lfs" || kind === "lfsub");
+  const kinds = [category, detectGetiCategory(prepared.lower)];
+  const oneEvening = kinds.some((kind) => kind === "lfs" || kind === "lfsub");
   const dates = parseGetiDates(prepared.lower, postedAt, oneEvening);
   return {
     category,
@@ -490,7 +492,7 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
     dates,
     levels: parseGetiLevels(prepared.lower),
     closed,
-    teamName: parseGetiTeamName(prepared.clean, category === "lft"),
+    teamName: parseGetiTeamName(prepared.clean, kinds.includes("lft"), kinds.includes("lfs")),
     staffRoles: parseGetiStaffRoles(prepared.lower),
     minAge: parseGetiMinAge(prepared.lower),
     postedAt,

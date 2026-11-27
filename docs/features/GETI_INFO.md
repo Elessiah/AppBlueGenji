@@ -264,7 +264,8 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
 - **Jours** : noms complets, fautes courantes comprises (« mecredi »,
   « wenesday ») ; les abréviations (« mar », « jeu », « mon » sont des mots) ne
   se lisent que devant une date ou une heure (« Tue 20-22 », « sam 28/11 ») ou
-  en liste ponctuée (« lun/mer/ven », « lun-ven ») ; fourchettes sur une ligne
+  en liste ponctuée (« lun/mer/ven », « lun-ven », « lun, mer, ven » — deux
+  mots séparés d'une seule virgule, « ce jeu, mon rang », sont une phrase) ; fourchettes sur une ligne
   (« lundi au jeudi » — deux puces « - Mardi », « - Dimanche » sont deux
   jours), « week-end », « en semaine », « tous les soirs », « 7/7j ». Le jour de
   semaine de chaque date lue s'y ajoute.
@@ -278,9 +279,10 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   le jour même de la publication.
 - **Niveaux** (`levels`, `parseGetiLevels`) : divisions de la ligue FACEIT —
   « open », « inter(mediate) », « adv(anced) », « expert », nuancés ou non
-  (« high open », « HighOpen », « low-mid advanced »). « int » et « exp » ne
-  sont lus que nuancés ou collés à un autre niveau (« adv/exp ») ; « DMs open »,
-  « position open for trials » ne sont pas un niveau.
+  (« high open », « HighOpen », « low-mid advanced »). « int » n'est lu que
+  nuancé ou collé à un autre niveau, « exp » que collé (« adv/exp » ; « low exp »
+  est l'expérience) ; « DMs open », « position open for trials », « open
+  minded », « open d'esprit » ne sont pas un niveau.
 - **Passages barrés** : `~~…~~` n'est pas lu (« ~~Mardi 24/11~~ Mercredi
   25/11 » ne cherche plus que mercredi). Texte entièrement barré : `closed`,
   et son contenu reste lu.
@@ -293,7 +295,7 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   dès 19 h à la barre) — « 3-5 joueurs », « 18-25 ans », « 22/11 », « 15/20 »
   n'en sont pas. Fuseau : « CET », « CEST », « BST », « EET », « UTC+1 »,
   « heure française » (= `Europe/Paris`), et « cet » / « cest » en minuscules
-  derrière une heure.
+  derrière une heure — pas le démonstratif (« 15h cet après-midi », « 18 cet été »).
 - **Nom d'équipe** : derrière un libellé (« Équipe : … », « Team: … ») ou dans la
   phrase après « team / équipe / structure / roster », mots en capitale seulement,
   arrêté au premier mot du vocabulaire d'annonce (« Team Blue Phoenix EU ») ; sans
@@ -371,17 +373,23 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
   message brut illisible : la ligne n'est pas rendue (son analyse ancienne a pu
   lire un passage masqué). Hors requête,
   l’horloge de purge horaire (`refreshStaleGetiPosts`, 5 000 lignes au plus par
-  passage) réécrit ces lignes une fois (une ligne dont le message brut est
-  illisible est retirée, comme une ligne sans texte ou un avis du bot) : la lecture ne les réanalyse plus (~0,3 ms chacune,
-  jusqu’à 3 000 par page sinon). L’écriture ne touche qu’une ligne encore
-  ancienne. Avancer la version (`ANALYSIS_VERSION`) quand l'analyse change ce
-  qu'elle lit : les lignes gardées sont alors refaites.
+  passage) réécrit ces lignes une fois, colonnes d'auteur comprises (ce que la
+  page affiche et ce que vise une opposition ; une ligne dont l'auteur relu fait
+  l'objet d'une opposition est retirée), puis vide le cache des listes (une ligne
+  dont le message brut est illisible est retirée, comme une ligne sans texte ou
+  un avis du bot) : la lecture ne les réanalyse plus (~0,3 ms chacune,
+  jusqu’à 3 000 par page sinon). L’écriture comme le retrait ne touchent
+  qu’une ligne encore ancienne. Avancer la version (`ANALYSIS_VERSION`) quand
+  l'analyse change ce qu'elle lit : les lignes gardées sont alors refaites.
 - **Faux positifs écartés** (revue) : une tranche d'âge (« âge : 16-20 ») n'est
-  pas un horaire ; « 2/3 joueurs », « 1/12 places » ne sont pas des dates, et
+  pas un horaire ; « 2/3 joueurs », « 1/12 places », « 1/2 tanks » ne sont pas des dates, et
   « 31/12 » lu un 1er janvier l'est (année précédente) ; « recrutement /
   inscriptions / candidatures open » n'est pas le niveau Open ; « +18 de
   préférence », « 18+ ou mature » sont un âge ; dans une recherche d'équipe
-  (`lft`), le mot devant « recherche » est le pseudo du joueur, pas une équipe.
+  (`lft`, salon ou mot-clé), le mot devant « recherche » est le pseudo du joueur,
+  pas une équipe, comme partout devant « cherche une équipe / team » (« Kevin
+  cherche une équipe en tant que coach ») — sauf « X recrute une team » et une
+  recherche de scrim. Un mot de nom compte 32 caractères au plus (coût borné).
 
 Limites connues : le rôle d'une recherche de remplaçant donné par la seule
 mention d'un rôle Discord (`<@&id>`) n'est pas lu ; le pool de héros, l'âge du
