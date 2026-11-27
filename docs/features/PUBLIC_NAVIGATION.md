@@ -15,10 +15,14 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
 - **Les annonces GETI en tête du menu burger, mises en avant.** `/geti-info` est une
   fonction principale du site : son entrée (« Annonces GETI » / « GETI posts »,
   `featured`) ouvre la liste, encadrée et teintée glacier (`.linkFeatured` — bordure
-  et graisse, pas la seule couleur), et reste page courante sur chaque catégorie
-  (`/geti-info/lfs`) — alors `.linkFeatured.linkActive` : bordure pleine, fond
-  plus soutenu et trait intérieur à gauche, pour que la page courante se voie
-  aussi sur l'entrée déjà mise en avant.
+  et graisse, pas la seule couleur). Elle mène à l'adresse canonique de la liste par
+  défaut, `/geti-info/lfp` (`GETI_DEFAULT_LIST_PATH`, comme le bouton de l'accueil :
+  une seule adresse par liste), et reste page courante sur toute la rubrique
+  (`section: "/geti-info"`, donc aussi sur `/geti-info/lfs`) — alors
+  `.linkFeatured.linkActive` : bordure pleine, fond plus soutenu, trait intérieur.
+- **La page courante se voit autrement que par la couleur**, sur toute entrée du
+  menu : `.linkActive` pose un trait intérieur à gauche en plus de la teinte
+  (WCAG 1.4.1), et `aria-current="page"` la dit aux lecteurs d'écran.
 - **Rien dans le menu burger ne mène à la partie compétitive.** « Tournois »,
   « Équipes », « Classement » et « Joueurs » en sont sortis (GETI-NAV) : on entre
   dans la compétition par l'accueil (tableau des tournois, classement, calendrier),
@@ -36,7 +40,7 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
 
 | Menu burger | Pied de page |
 |---|---|
-| **Annonces GETI** (`/geti-info`, mise en avant) · Bot · L'asso · Recrutement · Bénévoles | COMPÉTITIONS : Tournois, Classement (`/classement`), Bot · ASSOCIATION : Manifeste, Bénévoles, Partenaires · CONTACT (courriel, tag et serveur Discord, `FooterContact`) · LÉGAL (voir `LEGAL_PAGE.md`) |
+| **Annonces GETI** (`/geti-info/lfp`, mise en avant) · Bot · L'asso · Recrutement · Bénévoles | COMPÉTITIONS : Tournois, Classement (`/classement`), Bot · ASSOCIATION : Manifeste, Bénévoles, Partenaires · CONTACT (courriel, tag et serveur Discord, `FooterContact`) · LÉGAL (voir `LEGAL_PAGE.md`) |
 
 L'adresse vient de `lib/shared/geti/path.ts` (`GETI_PAGE_PATH`, module sans aucune
 dépendance, que `page.ts` réexporte) : `PublicNavMenu`, composant client de l'en-tête de

@@ -14,6 +14,8 @@ import {
   listGetiAlerts,
   notifyGetiAlerts,
   purgeGetiAlertHits,
+  scheduleGetiAlerts,
+  GETI_ALERT_QUEUE_MAX,
   updateGetiAlert,
   type GetiAlertPost,
   type GetiAlertSender,
@@ -350,9 +352,37 @@ describe("purgeGetiAlertHits", () => {
     const removed = await purgeGetiAlertHits(fakePool({ execute }), NOW);
 
     expect(removed).toBe(3);
-    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_alert_hits WHERE created_at < ?", [
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_alert_hits WHERE created_at < ? LIMIT 5000", [
       new Date(NOW - GETI_ALERT_HIT_RETENTION_DAYS * 24 * 60 * MINUTE_MS),
     ]);
+  });
+
+  it("purgeGetiAlertHits_fullBatch_runsAnotherPassUntilShort", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([{ affectedRows: 5000 }])
+      .mockResolvedValueOnce([{ affectedRows: 5000 }])
+      .mockResolvedValueOnce([{ affectedRows: 12 }]);
+
+    const removed = await purgeGetiAlertHits(fakePool({ execute }), NOW);
+
+    expect(removed).toBe(10012);
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("purgeGetiAlertHits_tableMissingMidway_returnsRemovedSoFar", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([{ affectedRows: 5000 }])
+      .mockRejectedValueOnce(missingTable());
+
+    await expect(purgeGetiAlertHits(fakePool({ execute }), NOW)).resolves.toBe(5000);
+  });
+
+  it("purgeGetiAlertHits_otherFailure_throws", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("boom"));
+
+    await expect(purgeGetiAlertHits(fakePool({ execute }), NOW)).rejects.toThrow("boom");
   });
 
   it("purgeGetiAlertHits_missingTable_returnsZero", async () => {
@@ -490,8 +520,12 @@ describe("notifyGetiAlerts", () => {
 
     await notifyGetiAlerts([freshPost(), lfs], NOW, fakePool({ execute }), send);
 
-    expect(execute.mock.calls[1][0]).toContain("WHERE a.paused = 0 AND a.category IN (?, ?)");
-    expect(execute.mock.calls[1][1]).toEqual(["lfp", "lfs"]);
+    const reads = execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_geti_alerts a"));
+    expect(reads.map(([sql]) => sql)).toEqual([
+      expect.stringContaining("WHERE a.paused = 0 AND a.category = ?"),
+      expect.stringContaining("WHERE a.paused = 0 AND a.category = ?"),
+    ]);
+    expect(reads.map(([, params]) => params)).toEqual([["lfp"], ["lfs"]]);
   });
 
   it("notifyGetiAlerts_postAlreadySeenByTheAlert_doesNotNotifyAgain", async () => {
@@ -692,6 +726,25 @@ describe("notifyGetiAlerts", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("notifyGetiAlerts_alertAlreadyInItsDelay_writesNothingAndDoesNotSend", async () => {
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ last_notified_at: new Date(NOW - MINUTE_MS) })] });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome).toEqual({ matched: 1, notified: 0 });
+    expect(sqlOf(execute).some((sql) => sql.startsWith("UPDATE"))).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("notifyGetiAlerts_delayElapsedAtReading_reservesAndSends", async () => {
+    const past = new Date(NOW - (GETI_ALERT_COOLDOWN_MINUTES + 1) * MINUTE_MS);
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ last_notified_at: past })] });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome.notified).toBe(1);
+  });
+
   it("notifyGetiAlerts_twoAlertsOfTheSameAccount_sendsOneNotification", async () => {
     const execute = alertsDatabase({ alerts: [activeAlertRow({ id: 7 }), activeAlertRow({ id: 8, search: "" })] });
 
@@ -772,6 +825,42 @@ describe("notifyGetiAlerts", () => {
     expect(notification.discord?.message("fr")).toContain(`https://site.test/geti-info/lfp?role=tank#post-${GETI_FAKE_MESSAGE_ID}`);
   });
 
+  it("notifyGetiAlerts_defaultSenderTwoAccounts_readsTheRecipientsOnce", async () => {
+    jest.mocked(loadNotificationRecipients).mockResolvedValue([
+      { userId: USER_ID, discord: null },
+      { userId: 43, discord: null },
+    ]);
+    jest.mocked(notifyUsers).mockResolvedValue({ discord: null, discordUnreachedUserIds: [], pushed: 0 });
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ id: 7 }), activeAlertRow({ id: 8, user_id: 43 })] });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }));
+
+    expect(outcome).toEqual({ matched: 2, notified: 2 });
+    expect(loadNotificationRecipients).toHaveBeenCalledTimes(1);
+    expect(loadNotificationRecipients).toHaveBeenCalledWith([USER_ID, 43], "certified", { excludeSuspended: true });
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+  });
+
+  it("notifyGetiAlerts_defaultSenderEveryAlertCooling_readsNoRecipient", async () => {
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ last_notified_at: new Date(NOW - MINUTE_MS) })] });
+
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }));
+
+    expect(loadNotificationRecipients).not.toHaveBeenCalled();
+  });
+
+  it("notifyGetiAlerts_defaultSenderRecipientsUnreadable_releasesTheReservation", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(loadNotificationRecipients).mockRejectedValue(new Error("base"));
+    const execute = alertsDatabase();
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }));
+
+    expect(outcome).toEqual({ matched: 1, notified: 0 });
+    expect(sqlOf(execute).some((sql) => sql.startsWith("DELETE FROM bg_geti_alert_hits"))).toBe(true);
+    logged.mockRestore();
+  });
+
   it("notifyGetiAlerts_defaultSenderWithErasedOrSuspendedAccount_sendsNothing", async () => {
     jest.mocked(loadNotificationRecipients).mockResolvedValue([]);
 
@@ -790,5 +879,57 @@ describe("notifyGetiAlerts", () => {
 
     expect(outcome).toEqual({ matched: 1, notified: 0 });
     logged.mockRestore();
+  });
+});
+
+describe("scheduleGetiAlerts", () => {
+  const flush = async () => {
+    for (let i = 0; i < 20; i += 1) await Promise.resolve();
+  };
+
+  it("scheduleGetiAlerts_onlyBackfilledPosts_startsNoPass", async () => {
+    scheduleGetiAlerts([freshPost({ postedAt: new Date(NOW - 5 * 24 * 60 * MINUTE_MS) })], NOW);
+    await flush();
+
+    expect(getDatabase).not.toHaveBeenCalled();
+  });
+
+  it("scheduleGetiAlerts_twoBatches_runTheSecondPassOnlyAfterTheFirstEnds", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.includes("FROM bg_geti_posts")) await gate;
+      return [[]];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const recent = freshPost({ postedAt: new Date() });
+
+    scheduleGetiAlerts([recent]);
+    scheduleGetiAlerts([recent]);
+    await flush();
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("scheduleGetiAlerts_queueFull_dropsTheBatchAndWarns", async () => {
+    const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const gate = new Promise<void>(() => undefined);
+    const execute = jest.fn<SqlQuery>(async () => {
+      await gate;
+      return [[]];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const recent = freshPost({ postedAt: new Date() });
+
+    for (let i = 0; i < GETI_ALERT_QUEUE_MAX; i += 1) scheduleGetiAlerts([recent]);
+    scheduleGetiAlerts([recent]);
+
+    expect(warned).toHaveBeenCalledWith("[geti] file des alertes pleine:", GETI_ALERT_QUEUE_MAX);
+    warned.mockRestore();
   });
 });

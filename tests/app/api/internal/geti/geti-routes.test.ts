@@ -6,7 +6,7 @@ jest.mock("@/lib/server/geti/posts", () => ({
   deleteGetiPosts: jest.fn(),
   reconcileGetiChannel: jest.fn(),
 }));
-jest.mock("@/lib/server/geti/alerts", () => ({ notifyGetiAlerts: jest.fn(async () => ({ matched: 0, notified: 0 })) }));
+jest.mock("@/lib/server/geti/alerts", () => ({ scheduleGetiAlerts: jest.fn() }));
 
 import { POST as deletePosts } from "@/app/api/internal/geti/posts/delete/route";
 import { POST as upsertPosts } from "@/app/api/internal/geti/posts/route";
@@ -57,7 +57,7 @@ beforeEach(() => {
   resetRateLimit();
   process.env.SITE_INTERNAL_TOKEN = TOKEN;
   jest.mocked(getDatabase).mockResolvedValue(pool);
-  jest.mocked(upsertGetiPosts).mockResolvedValue({ stored: 1, emptied: 0, expired: 0 });
+  jest.mocked(upsertGetiPosts).mockResolvedValue({ stored: 1, emptied: 0, expired: 0, withheld: 0 });
   jest.mocked(deleteGetiPosts).mockResolvedValue(1);
   jest.mocked(reconcileGetiChannel).mockResolvedValue(2);
 });
@@ -130,7 +130,7 @@ describe("POST /api/internal/geti/posts", () => {
     const response = await callUpsert({ posts: [getiWirePost(), { id: "illisible" }] });
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ stored: 1, emptied: 0, expired: 0, rejected: 1 });
+    expect(await response.json()).toEqual({ stored: 1, emptied: 0, expired: 0, withheld: 0, rejected: 1 });
     expect(upsertGetiPosts).toHaveBeenCalledWith(
       pool,
       [expect.objectContaining({ messageId: GETI_FAKE_MESSAGE_ID })],

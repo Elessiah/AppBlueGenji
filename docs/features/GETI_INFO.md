@@ -368,11 +368,11 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
   dernière clé (`"analysisVersion":2}` — 2 : passages masqués non lus) ; une ligne
   d'une version antérieure est réanalysée à la lecture depuis son
   `raw_json` par `listGetiPosts` (seules ces lignes remontent leur message brut) ;
-  message brut illisible : `dates`, `levels` et `closed` vides. Hors requête,
+  message brut illisible : la ligne n'est pas rendue (son analyse ancienne a pu
+  lire un passage masqué). Hors requête,
   l’horloge de purge horaire (`refreshStaleGetiPosts`, 5 000 lignes au plus par
   passage) réécrit ces lignes une fois (une ligne dont le message brut est
-  illisible garde son analyse, champs ajoutés vides ; une ligne sans texte ou
-  avis du bot est retirée) : la lecture ne les réanalyse plus (~0,3 ms chacune,
+  illisible est retirée, comme une ligne sans texte ou un avis du bot) : la lecture ne les réanalyse plus (~0,3 ms chacune,
   jusqu’à 3 000 par page sinon). L’écriture ne touche qu’une ligne encore
   ancienne. Avancer la version (`ANALYSIS_VERSION`) quand l'analyse change ce
   qu'elle lit : les lignes gardées sont alors refaites.
@@ -420,7 +420,12 @@ L'en-tête du relais donne l'identifiant de l'auteur, son pseudo (celui qui se
 copie) et le serveur d'origine — dont le nom peut porter des crochets
 (`[TAG] Nom`, la forme la plus courante : `GETI_SERVER_LINK`). `parseGetiPost`
 le lit (`GETI_HEADER`) et le retire du texte, qui garde ses marques de citation
-(`> …`) ; l'auteur de l'en-tête prime sur toute mention du texte. Le message de **tout autre bot** (le nôtre compris), un message système
+(`> …`) ; l'auteur de l'en-tête prime sur toute mention du texte. Le pseudo
+peut porter une parenthèse fermante (`Bob :)`). Une première ligne de GETI Bot
+qui s'ouvre sur une mention sans se lire en entier comme un en-tête est écartée,
+texte et auteur compris (`GETI_HEADER_LIKE_LINE`) : son pseudo et son nom de
+serveur sont choisis par d'autres, qui y écriraient « Contact : <@quelqu'un> »
+pour se faire passer pour un tiers. Le message de **tout autre bot** (le nôtre compris), un message système
 ou un message sans texte n'est pas une annonce : ni poussé par le bot, ni gardé
 par le site. Un message de GETI Bot dont le premier encart ne s'ouvre pas sur l'en-tête d'un
 relais — mention de l'auteur, `(pseudo)`, puis `sur`/`on`/`from` (l'avis « Ton
@@ -467,29 +472,61 @@ lu borné (413), réponses en **nombres** seulement, refus par **code**
 
 | Route | Corps | Effet | Réponse |
 | --- | --- | --- | --- |
-| `POST /api/internal/geti/posts` | `{ posts: [{ id, channelId, content, author{id,username,discriminator,bot}, embeds[{authorName,title,description,fields,footerText}], postedAt, editedAt }] }` — 20 au plus, 512 Kio | crée ou remplace chaque annonce, analysée ici | `{ stored, emptied, expired, rejected }` |
+| `POST /api/internal/geti/posts` | `{ posts: [{ id, channelId, content, author{id,username,discriminator,bot}, embeds[{authorName,title,description,fields,footerText}], postedAt, editedAt }] }` — 20 au plus, 512 Kio | crée ou remplace chaque annonce, analysée ici | `{ stored, emptied, expired, withheld, rejected }` |
 | `POST /api/internal/geti/posts/delete` | `{ ids: [...] }` — 100 au plus | retire ces messages | `{ removed }` |
 | `POST /api/internal/geti/reconcile` | `{ channelId, since, until, ids: [...] }` — 10 000 identifiants au plus | retire toute annonce gardée du salon, publiée entre `since` (ramené à la fenêtre de garde) et `until`, absente de `ids` | `{ removed }` |
 
 Tout champ est tenu pour non fiable (`lib/server/geti/wire.ts`) : typé, borné,
 écarté s'il n'a pas la forme attendue (`rejected`). Un message sans texte après
-analyse (`emptied`) est retiré s'il était gardé.
+analyse (`emptied`) est retiré s'il était gardé. Un lot s'écrit en **une seule
+instruction** multi-lignes (atomique, un aller-retour) ; le plafond d'appels du
+bot (1 200 par minute, 429 avec `Retry-After`, que le bot attend) est loin
+au-dessus du débit d'un rattrapage (environ 400 par minute au pire).
 
 ### Purge
 
 `purgeExpiredGetiPosts`, lancée par `startGetiPostsPurgeClock`
 (`instrumentation.ts`, horloge `geti-posts-purge` : 3 minutes après le
 démarrage, puis toutes les heures) : par catégorie selon sa durée, puis toute
-ligne plus vieille que la plus longue. Suppression définitive — une horloge, pas
+ligne plus vieille que la plus longue, par lots de 500 lignes (`DELETE … LIMIT`,
+100 passages au plus par condition : après une longue panne, le reste attend
+l'heure suivante). Suppression définitive — une horloge, pas
 le trafic ni le bot : un site sans visite ou un bot arrêté ne garde rien au-delà
 de la durée annoncée.
+
+### Opposition (RGPD, art. 21) — `lib/server/geti/objections.ts`
+
+Retirer une ligne de `bg_geti_posts` ne suffit pas : le bot repousse l'annonce
+à chaque rattrapage tant que le message est sur Discord. Une opposition
+s'enregistre dans `bg_geti_objections` (`kind` = `author` + identifiant Discord
+de l'auteur : toutes ses annonces, présentes et à venir ; `message` + identifiant
+du message : une annonce). `POST /api/admin/geti/objections` (`{ authorId }` ou
+`{ messageId }`, l'un des deux exactement ; permission `moderation` ; geste tracé
+dans pm2 avec son auteur) l'enregistre et retire sur-le-champ ce qu'elle couvre
+(`{ removed }`) ; `DELETE` sur la même route, même corps, la lève (`{ lifted }` —
+les annonces encore sur Discord reviennent au prochain rattrapage). À chaque lot
+poussé, `upsertGetiPosts` retire **après** l'écriture les messages couverts
+(`withheld` dans le bilan) : une opposition enregistrée pendant l'écriture
+l'emporte quel que soit l'ordre. Celle d'un auteur tient jusqu'à sa levée ;
+celle d'un message est effacée par la purge horaire 14 jours après son
+enregistrement (le message est alors trop vieux pour revenir). Pas encore
+d'écran : le geste se fait par la route (le lot de la page pourra y brancher un
+bouton). Table absente : l'écriture d'un lot échoue en `503`, le bot réessaie —
+rien n'est recopié sans savoir si son auteur s'y est opposé. Une sauvegarde restaurée
+ne connaît pas une opposition enregistrée après elle : il faut l'enregistrer de
+nouveau (`/rgpd`, T21 et `PRIVACY_CHANGES` le disent ; le journal des
+suppressions ne porte que les suppressions de compte).
 
 ### Lecture — `listGetiPosts(filter, page, executor?, now?)`
 
 `lib/server/geti/posts.ts`, pour la page du lot 3 et les alertes du lot 5 :
 annonces de la plus récente à la plus ancienne, `GetiPostPage`
 (`posts`, `total`, `page`, `pageSize` — 30 par défaut, 100 au plus). La
-catégorie et l'âge se filtrent en SQL, le reste par `matchesGetiFilter` sur
+catégorie et l'âge se filtrent en SQL (3 000 lignes lues au plus — au-delà,
+un avertissement pm2 —, sans le message brut), la lecture sur le pool étant gardée
+10 secondes par catégorie et âge (8 lectures au plus, oubliées à chaque
+écriture, suppression ou purge ; une lecture partie avant un oubli n'est pas
+gardée) ; le reste par `matchesGetiFilter` sur
 l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
 `channelId`, `category`, `source`, `authorTag`, `authorId`, `parsed`,
 `postedAt`, `editedAt` — jamais le message brut.
@@ -499,7 +536,33 @@ l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
 - Écoute `messageCreate`, `messageUpdate`, `messageDelete`, `messageDeleteBulk`
   sur les six salons seulement ; partiel `Message` activé (sans lui, la
   modification ou la suppression d'un message hors cache n'est jamais annoncée) ;
-  un message partiel est relu avant d'être poussé.
+  un message partiel est relu avant d'être poussé ; une relecture qui échoue
+  autrement que par « message inconnu » (panne passagère de Discord) fait relire
+  son salon au passage des cinq minutes.
+- Annonces directes d'un utilisateur exclu du relais (table `Ban`, `checkBan`) :
+  ni poussées, ni comptées présentes (la réconciliation les retire du site) ;
+  `/ban` et `/unban` lancent un rattrapage complet (`requestGetiResync`), qui
+  retire du site ses annonces déjà copiées ou les y remet.
+- Bannissement Discord d'un membre : **non écouté** (`guildBanAdd` n'arrive qu'à
+  un bot qui a « Bannir des membres » ou « Voir les logs du serveur », que le
+  relais n'a pas à recevoir). Les messages qu'il efface, que Discord ne signale
+  pas un à un, restent sur le site jusqu'au prochain rattrapage ou à la fin de
+  leur durée de garde.
+- Opposition sur un auteur : un en-tête GETI illisible (pseudo ou serveur hors
+  forme) garde l'auteur par sa mention de tête, écrite par GETI Bot — sans
+  pseudo ni serveur —, pour que l'opposition le couvre. Dans le premier encart
+  du message seulement (position 0, même si un encart illisible la tient) : la
+  mention de tête d'un en-tête illisible dans un encart suivant ne nomme
+  personne. Un en-tête complet et les libellés hors citation (« Contact :
+  <@id> ») se lisent, eux, dans tout encart — le texte du joueur y est cité.
+- Une annonce vidée (pièce jointe seule, texte effacé) n'est retirée que si sa
+  version est au moins aussi récente que la version gardée : un ancien envoi
+  vide, retenté après la modification, ne retire pas l'annonce à jour.
+- `stored` compte les annonces acceptées : une version plus ancienne que la
+  version gardée y figure, sans rien écrire.
+- Un lot qui porte deux versions d'un même message n'en garde que la plus
+  récente (modification, sinon publication), avant l'analyse : une ancienne
+  version vide ne retire pas la version récente du même lot.
 - Rattrapage au démarrage et à chaque nouvelle session Discord : historique de
   chaque salon sur sa fenêtre de garde (pages de 100, pause entre deux pages,
   5 000 messages au plus par salon), puis `reconcile` avec la liste des annonces
@@ -530,7 +593,9 @@ politique de confidentialité du bot. Le seed pose quatorze annonces de synthès
 
 `tests/lib/server/geti/` (`wire`, `posts`, `schema-and-clock`),
 `tests/app/api/internal/geti/geti-routes.test.ts`,
-`tests/lib/shared/geti/geti-bot-relay.test.ts` (en-tête du relais) ; fabriques
+`tests/lib/shared/geti/geti-bot-relay.test.ts` (en-tête du relais),
+`tests/lib/server/geti/objections.test.ts`,
+`tests/app/api/admin/geti-objections.test.ts` (oppositions) ; fabriques
 dans `tests/helpers/geti-ingest.ts`.
 
 ## Page publique `/geti-info` (lot 3)
@@ -624,7 +689,7 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
   citation suivie d'une espace ou seule sur sa ligne (celle du relais ; « >4000 » reste), balisage par
   paires au bord d'un mot (« xX__Sniper__Xx » reste ; `**` / `~~` restés seuls retirés quand ils collent
   un mot ou finissent le texte, gardés entre deux chiffres « 5**2 », deux espaces ou seuls sur leur ligne),
-  code rendu tel quel (aucune marque retirée dedans, citation et titre compris ; langue d'un bloc ```` ```txt ```` ôtée), passage masqué `||…||` (règle de Discord : `||||x||` masque `||x` ; un `||` dans du code est du texte), quelle que soit sa longueur →
+  code rendu tel quel (aucune marque retirée dedans, citation et titre compris ; langue d'un bloc ```` ```txt ```` ôtée), passage masqué `||…||` (lu de gauche à droite comme Discord : `||||x||` masque `||x` ; un `||` dans un code ouvert avant lui est du texte ; un passage ouvert avant un code se ferme au premier `||` qui suit, même dans un accent grave ; code sans borne de longueur, motif neuf par usage — `getiCodeSpan()`), quelle que soit sa longueur →
   « [masqué] » / « [hidden] » (jamais son contenu ; l'analyse ne le lit pas non plus : aucune étiquette n'en vient — `getiWithoutSpoilers`), mention → mot neutre (jamais un
   identifiant), émoji de serveur → son nom, horodatage `<t:…>` → date ou heure à
   l'heure de Paris (`getiTimestampLabel`, `R` écrit comme `f`), lien laissé en texte. Replié au-delà
@@ -679,16 +744,18 @@ La page est une **fonction principale** du site : on y arrive de deux endroits, 
 chaque page vitrine et dès l'accueil.
 
 - **Menu burger** (`PublicNavMenu`, `PUBLIC_NAVIGATION.md`) : « Annonces GETI » /
-  « GETI posts » ouvre la liste, mise en avant, vers `/geti-info` ; les entrées de la
+  « GETI posts » ouvre la liste, mise en avant, vers l'adresse canonique `/geti-info/lfp`
+  (`GETI_DEFAULT_LIST_PATH`), page courante sur toute la rubrique ; les entrées de la
   partie compétitive (Tournois, Équipes, Classement, Joueurs) en sont sorties. La
   barre des connectés (`SiteNav`) ne change pas.
 - **Accueil** (`components/cyber/landing/GetiSpotlight.tsx`, juste après le bandeau
-  défilant) : une carte avec une phrase d'appel (la marche à suivre — filtrer, puis
-  contacter l'auteur sur Discord — derrière un `<InfoHint>`), le bouton « Voir les
+  défilant) : une carte avec une accroche courte (les types d'annonces ; ce que la page
+  réunit et la marche à suivre — filtrer, puis contacter l'auteur sur Discord —
+  derrière un `<InfoHint>`), le bouton « Voir les
   annonces GETI » et un raccourci par catégorie (« Parcourir : Équipes qui recrutent,
   Joueurs sans équipe, Remplaçants recherchés, Staff, Scrims, Casts » →
   `/geti-info/<catégorie>`). Le bouton vise l'adresse canonique `/geti-info/lfp`
-  (celle que déclare `/geti-info`) : une seule adresse par liste. Les raccourcis
+  (celle que déclare `/geti-info`), comme l'entrée du menu : une seule adresse par liste. Les raccourcis
   nomment **ce que la liste contient**, pas l'intention de l'auteur comme les
   onglets de la page (« Je cherche un joueur » = annonces d'équipes qui recrutent) :
   un capitaine qui cherche un joueur n'y est pas envoyé vers d'autres équipes. Composant
@@ -746,7 +813,8 @@ close ne prévient jamais.
 | `GETI_ALERT_NAME_MAX` | 60 | Nom facultatif (contrôles et caractères de direction retirés) |
 | `GETI_ALERT_COOLDOWN_MINUTES` | 10 | Au plus une notification par alerte sur cette durée |
 | `GETI_ALERT_FRESH_MINUTES` | 30 | Âge maximal (publication ou modification) d'une annonce qui prévient |
-| `GETI_ALERT_SCAN_MAX` | 2000 | Alertes actives lues par lot reçu |
+| `GETI_ALERT_SCAN_MAX` | 2000 | Alertes actives lues par catégorie et par lot reçu |
+| `GETI_ALERT_QUEUE_MAX` | 100 | Passes d'alertes en attente de leur tour (au-delà : lot abandonné, avertissement pm2) |
 | `GETI_ALERT_HIT_RETENTION_DAYS` | 15 | Garde des traces « déjà signalée » |
 
 ### Tables
@@ -794,8 +862,9 @@ attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
    ancienne arrivée après une modification (l'enregistrement la laisse de
    côté) est jugée sur la version gardée — fermée, elle ne prévient pas — et
    une annonce retirée entre-temps ne prévient pas.
-2. Une lecture des alertes actives des catégories du lot (`paused = 0`, au plus
-   `GETI_ALERT_SCAN_MAX`, lue avec une ligne de plus : seule cette ligne en trop
+2. Une lecture **par catégorie** du lot des alertes actives (`paused = 0`, suit
+   l'index `(category, paused)` sans tri, au plus `GETI_ALERT_SCAN_MAX` par
+   catégorie, lue avec une ligne de plus : seule cette ligne en trop
    — des alertes restent non lues — déclenche l'avertissement chiffré dans pm2),
    avec l'identifiant Discord du compte : **sa propre annonce ne prévient pas
    son auteur**.
@@ -808,17 +877,27 @@ attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
    rattrapage, envoi en double : rien) ; une insertion qui en pose une partie
    seulement relit les traces datées de cette passe (date à la seconde) et ne
    compte que celles-là.
-5. **Délai par alerte**, réservé en une instruction : `UPDATE bg_geti_alerts
+5. **Délai par alerte** : une alerte déjà dans son délai à la lecture est
+   écartée en mémoire (aucune écriture) ; sinon il se réserve en une instruction : `UPDATE bg_geti_alerts
    SET last_notified_at = ? WHERE id = ? AND paused = 0 AND (last_notified_at
    IS NULL OR last_notified_at <= ?)` + `affectedRows`. Une annonce arrivée
    pendant le délai garde sa trace et ne sera pas signalée plus tard : elle se
    lit sur la page. Une seule notification **réussie** par compte et par lot.
-6. Envoi (`notifyUsers`) au compte, s'il existe encore et n'est pas suspendu.
+6. Envoi (`notifyUsers`) au compte, s'il existe encore et n'est pas suspendu :
+   les destinataires de tous les comptes à prévenir se lisent ensemble (par
+   paquets de 500), pas une requête par alerte, et les envois partent l'un
+   après l'autre.
    Un envoi qui ne joint personne (compte suspendu ou effacé) ou qui échoue
    **rend** le délai (date précédente remise, si personne ne l'a reprise) et
    retire les traces que la passe a posées pour cette alerte (toutes ses
    annonces du lot) : une autre alerte du compte peut prévenir, et une
    modification récente de ces annonces aussi.
+
+**Passes en file** : `scheduleGetiAlerts` (route d'enregistrement) met la passe
+d'un lot en file, **une à la fois** (au plus `GETI_ALERT_QUEUE_MAX` en attente) :
+sans cela deux lots rapprochés enverraient en même temps des appels au bot qui
+s'additionnent (coupe-circuit). Seules les annonces encore récentes entrent en
+file ; le rattrapage n'en met aucune.
 
 **Borne du coût** : par lot (20 annonces au plus), une relecture des annonces
 récentes, une lecture d'au plus 2 000 alertes, deux instructions par annonce
@@ -835,7 +914,8 @@ sur les catégories d'un lot, les plus récentes ne sont pas lues — à revoir
   prévenir. Pas d'expiration automatique : elle ne coûte rien tant qu'aucune
   annonce n'y correspond, et son propriétaire la voit dans sa liste.
 - Les traces `bg_geti_alert_hits` sont purgées au bout de 15 jours par
-  l'horloge `geti-posts-purge` (`purgeGetiAlertHits`), et partent avec l'alerte.
+  l'horloge `geti-posts-purge` (`purgeGetiAlertHits`, par lots de 5 000 lignes,
+  100 passages au plus par heure), et partent avec l'alerte.
 - **Effacement du compte** : l'anonymisation garde la ligne `bg_users`, la
   cascade ne joue donc pas — `anonymizeAccount` appelle
   `deleteGetiAlertsOfUser` (traces puis alertes, chaque instruction avec sa

@@ -41,6 +41,7 @@ const STEPS: { label: string; sql: string }[] = [
   { label: "membres du bureau", sql: "DELETE FROM bg_bureau_members" },
   // Identifiants de message factices du seed (`SEED_GETI_MESSAGE_PREFIX`, `geti.ts`).
   { label: "annonces GETI", sql: "DELETE FROM bg_geti_posts WHERE message_id LIKE '1000000000000009%'" },
+  { label: "oppositions GETI", sql: "DELETE FROM bg_geti_objections WHERE target_id LIKE '1000000000000009%' OR target_id LIKE '1000000000000001%'" },
   { label: "chiffres de l'association", sql: "DELETE FROM bg_about_stats WHERE label LIKE 'Test -%'" },
   // Équipes héritées préfixées « Team_ » (underscore échappé pour LIKE).
   { label: "matchs (équipes Team_)", sql: String.raw`DELETE FROM bg_matches WHERE team1_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\_%') OR team2_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\_%')` },

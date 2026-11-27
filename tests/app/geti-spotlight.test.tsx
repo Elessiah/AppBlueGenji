@@ -8,6 +8,7 @@ jest.mock("next/navigation", () => ({
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { GetiSpotlight } from "@/components/cyber/landing/GetiSpotlight";
+import { PUBLIC_NAV_LINKS } from "@/components/cyber/landing/PublicNavMenu";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { LANDING_CLIENT_NAMESPACES } from "@/lib/shared/landing-text";
@@ -65,17 +66,23 @@ describe("GetiSpotlight — encart de l'accueil", () => {
     expect(cta.href).toBe(firstChip.href);
   });
 
+  it("menuAndSpotlight_sameList_shareOneAddress : le menu et le bouton de l'accueil mènent à la même adresse", () => {
+    const [cta] = links(french());
+    expect(cta.href).toBe(PUBLIC_NAV_LINKS[0].href);
+  });
+
   it("getiSpotlight_lede_hasInfoHintWithHowTo : la marche à suivre est derrière le « i »", () => {
     const html = french();
-    expect(html).toContain("Toutes les annonces Overwatch du réseau GETI (équipes, joueurs, scrims, staff, casts), réunies sur une seule page.");
+    expect(html).toMatch(/<p [^>]*>Équipes, joueurs, scrims, staff, casts : tout le réseau GETI sur une page\.<\/p>/);
     expect(html).toMatch(/<button [^>]*aria-controls="geti-spotlight-hint"[^>]*aria-label="Plus d&#x27;infos : Annonces GETI"|<button [^>]*aria-label="Plus d&#x27;infos : Annonces GETI"[^>]*aria-controls="geti-spotlight-hint"/);
-    expect(html).toMatch(/id="geti-spotlight-hint"[^>]*hidden[^>]*>[^<]*Filtre par rôle, rang et disponibilités, puis contacte l&#x27;auteur de l&#x27;annonce sur Discord\./);
+    expect(html).toMatch(/id="geti-spotlight-hint"[^>]*hidden[^>]*>[^<]*Les annonces Overwatch publiées sur les serveurs du réseau GETI\. Filtre par rôle, rang et disponibilités, puis contacte l&#x27;auteur de l&#x27;annonce sur Discord\./);
   });
 
   it("getiSpotlight_english_infoHint : le « i » parle anglais sous /en", () => {
     const html = english();
     expect(html).toContain("GETI posts");
-    expect(html).toContain("Filter by role, rank and availability, then contact the post&#x27;s author on Discord.");
+    expect(html).toContain("Teams, players, scrims, staff, casts: the whole GETI network on one page.");
+    expect(html).toContain("The Overwatch posts published on the GETI network servers. Filter by role, rank and availability, then contact the post&#x27;s author on Discord.");
   });
 
   it("ne laisse aucun texte français dans le rendu anglais", () => {
@@ -90,7 +97,7 @@ describe("GetiSpotlight — encart de l'accueil", () => {
     expect(html).toMatch(
       /<h2 id="geti-spotlight-title"[^>]*>Un joueur, une équipe, un scrim \? <span[^>]*>Les annonces GETI sont ici\.<\/span><\/h2>/,
     );
-        expect(html).toMatch(/<ul [^>]*aria-labelledby="geti-spotlight-categories"/);
+    expect(html).toMatch(/<ul [^>]*aria-labelledby="geti-spotlight-categories"/);
   });
 
   it("donne à chaque lien un texte visible distinct", () => {

@@ -93,7 +93,7 @@ import {
   GETI_ALERT_HIT_RETENTION_DAYS,
   GETI_ALERT_MAX_PER_USER,
 } from "@/lib/shared/geti/alerts";
-import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
+import { GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS } from "@/lib/shared/geti/ingest";
 import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
 
@@ -267,12 +267,20 @@ export function RgpdEn({
             third-party announcement network, which sends each post to every subscribed Discord server — relays there.
             What is kept: the post&apos;s text, its author&apos;s Discord username and identifier, the server of origin of a
             relayed post, the dates and the criteria read automatically in the text (rank, role, region, platform,
-            language, availability, stated minimum age, team name), with no link to an account of the site — whether the author has one or not. A
-            scrim search is kept {GETI_RETENTION_DAYS.lfs} days after its publication on Discord, the other posts{" "}
-            {GETI_RETENTION_DAYS.lfp} days; deleting the post on Discord removes it from the site at once, editing it
-            replaces the previous version. Basis: the association&apos;s legitimate interest (helping players and teams
-            find each other), for posts that are already public; their author can object and ask for removal (see
-            “Exercising your rights”). Register of processing activities: record T21.
+            language, availability, stated minimum age, team name), as well as the message as the bot passed it (to redo that reading when it improves), with no link to an account of the site — whether the author has one or not. A
+            scrim search is kept {GETI_RETENTION_DAYS.lfs} days after its publication in the association&apos;s channel
+            (for a relayed post, that of its relay), the other posts {GETI_RETENTION_DAYS.lfp} days. Deleting the post
+            from the channel removes it from the site at once, editing it replaces the previous version — for a relayed
+            post, when GETI Bot deletes or edits its relay, which the association does not control. A deletion made
+            while the bot is stopped is only seen at its next reading of the channels, within the last 5,000 messages of
+            each channel, and so is a message erased by its author&apos;s ban from the Discord server, which Discord does
+            not report to the bot; failing that, or if the channel is deleted or closed to the bot, the post leaves at the end of its retention period (an encrypted backup
+            copy may keep the removed post or its previous version for {BACKUP_RETENTION_DAYS} days at most). A
+            post&apos;s text may mention other people (a teammate, a contact): like the author, they can exercise their rights over the post that mentions them and obtain its removal.
+            Basis: the association&apos;s legitimate interest (helping players and teams find each other), for posts that
+            are already public; their author — including the author of a post relayed from another server, who cannot
+            delete it here — can object and ask for removal (see{" "}
+            <a href="#exercer-vos-droits">“Exercising your rights”</a>): their posts are then removed and no longer copied, the association keeping for that only the author&apos;s Discord identifier (or that of the targeted post), as long as the objection stands ({GETI_RETENTION_MAX_DAYS} days for a single post). Register of processing activities: record T21.
           </p>
           <p id="alertes-geti">
             <strong>Post alerts.</strong> On the posts page, a signed-in account can create alerts (
@@ -329,7 +337,7 @@ export function RgpdEn({
           cannot be edited one by one. If one of them ever had to be restored, the <strong>account
           deletions</strong> made since are applied again before the service resumes; other erasures after the
           archive (a tag or BattleTag removed, a means of logging in unlinked, a visibility or notification
-          setting changed, a report purged…) are not, and would come back with it. Uploaded images (avatar,
+          setting changed, a report purged, an objection to the copying of recruitment posts…) are not, and would come back with it. Uploaded images (avatar,
           logo) are removed from the backup within the hour.
         </p>
         <p id="donnees-connexion" style={{ marginTop: 8, ...NOTE_STYLE }}>

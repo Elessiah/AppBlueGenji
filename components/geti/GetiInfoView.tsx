@@ -58,17 +58,18 @@ export async function GetiInfoView({
   const filter = getiPageFilter(category, query);
   const now = Date.now();
   // Base injoignable : la page reste lisible (carte, onglets, bouton « Publier »).
-  const listed: GetiPostPage | null = await listGetiPostsShared(filter, { page: query.page }, now).catch(
-    (error: unknown) => {
+  // La session se lit en même temps que la liste (deux lectures indépendantes) ; les alertes du compte, après.
+  const [listed, viewer] = await Promise.all([
+    listGetiPostsShared(filter, { page: query.page }, now).catch((error: unknown): GetiPostPage | null => {
       // Un code seul (jamais le message, qui peut citer la requête), une ligne par minute au plus.
       logGetiListFailure(error);
       return null;
-    },
-  );
+    }),
+    getCurrentUser().catch(() => null),
+  ]);
   const activeFilters = getiActiveFilterCount(query);
   // Les alertes du compte connecté, s'il y en a un : la page reste publique, et
   // se rend sans elles si la session ou la table ne se lisent pas.
-  const viewer = await getCurrentUser().catch(() => null);
   const alerts: GetiAlert[] = viewer ? await listGetiAlerts(viewer.id).catch(() => []) : [];
   const categoryTitles = Object.fromEntries(
     GETI_CATEGORIES.map((entry) => [entry, m.categories[entry].title]),

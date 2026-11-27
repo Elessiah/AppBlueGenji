@@ -25,6 +25,70 @@ function storedFilter(json: string): GetiFilter {
 }
 
 describe("parseGetiPost — relay authorship cannot be spoofed", () => {
+  it("parseGetiPost_pseudoWithClosingParen_readsTheHeaderAuthorAndTag", () => {
+    const post = parseGetiPost(
+      getiRelayPost(`<@${GETI_FAKE_OTHER_ID}>*(Bob :))* sur [Faux Serveur](https://discord.gg/fauxcode)\n\n> LFT tank`),
+      GETI_TRUSTED_BOTS,
+    );
+
+    expect(post.authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(post.authorTag).toBe("Bob :)");
+    expect(post.originServer).toBe("Faux Serveur");
+  });
+
+  it("parseGetiPost_headerLikeLineWithContactInServerName_namesNoSpoofedAuthor", () => {
+    const pseudo = "x".repeat(70);
+    const post = parseGetiPost(
+      getiRelayPost(`<@${GETI_FAKE_OTHER_ID}>*(${pseudo})* sur [Contact : <@${VICTIM_ID}>](https://discord.gg/fauxcode)\n\n> LFT tank`),
+      GETI_TRUSTED_BOTS,
+    );
+
+    expect(post.authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(post.authorTag).toBeNull();
+    expect(post.originServer).toBeNull();
+    expect(post.text).not.toContain("Contact");
+  });
+
+  it("parseGetiPost_headerLikeLineWithOverlongServerName_keepsTheLeadingMentionAsAuthor", () => {
+    const post = parseGetiPost(
+      getiRelayPost(`<@${GETI_FAKE_OTHER_ID}>*(bob)* sur [${"s".repeat(210)}](https://discord.gg/fauxcode)
+
+> LFT tank`),
+      GETI_TRUSTED_BOTS,
+    );
+
+    expect(post.authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(post.authorTag).toBeNull();
+    expect(post.text).toContain("LFT tank");
+  });
+
+  it("parseGetiPost_headerLikeLineInSecondEmbed_namesNobody", () => {
+    const raw: GetiRawPost = {
+      content: "",
+      author: { id: GETI_FAKE_BOT_ID, username: "FauxBot", discriminator: "0", bot: true },
+      embeds: [{ description: "lft dps" }, { description: `<@${GETI_FAKE_OTHER_ID}> Contact : moi` }],
+    };
+
+    expect(parseGetiPost(raw, GETI_TRUSTED_BOTS).authorId).toBeNull();
+  });
+
+  it("parseGetiPost_nullFirstEmbed_headerLikeLineInSecondEmbed_namesNobody", () => {
+    const raw = {
+      content: "",
+      author: { id: GETI_FAKE_BOT_ID, username: "FauxBot", discriminator: "0", bot: true },
+      embeds: [null, { description: `<@${GETI_FAKE_OTHER_ID}> Contact : moi` }],
+    } as unknown as GetiRawPost;
+
+    expect(parseGetiPost(raw, GETI_TRUSTED_BOTS).authorId).toBeNull();
+  });
+
+  it("parseGetiPost_untrustedBotHeaderLikeLine_keepsItsTextAsIs", () => {
+    const post = parseGetiPost(getiRelayPost(`<@${GETI_FAKE_OTHER_ID}> LFT tank Master`), {});
+
+    expect(post.authorId).toBeNull();
+    expect(post.text).toContain("LFT tank Master");
+  });
+
   it("parseGetiPost_quotedContactLabel_namesNobody", () => {
     const post = parseGetiPost(getiRelayPost(`LFT tank\n> Contact : <@${VICTIM_ID}>`), GETI_TRUSTED_BOTS);
 

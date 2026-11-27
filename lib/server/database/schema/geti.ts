@@ -32,11 +32,33 @@ export async function createGetiTables(db: Pool): Promise<void> {
         UNIQUE KEY uniq_bg_geti_posts_message (message_id),
         KEY idx_bg_geti_posts_category (category, posted_at),
         KEY idx_bg_geti_posts_channel (channel_id, posted_at),
-        KEY idx_bg_geti_posts_posted (posted_at)
+        KEY idx_bg_geti_posts_posted (posted_at),
+        KEY idx_bg_geti_posts_author (author_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
   } catch {
     // Table déjà présente, ou création refusée : les routes du bot répondent GETI_UNAVAILABLE.
+  }
+
+  try {
+    // Oppositions (RGPD, art. 21 — `lib/server/geti/objections.ts`) : un auteur
+    // (`kind` = `author`, son identifiant Discord) ou un message (`message`)
+    // dont les annonces ne sont plus recopiées. Celle d'un auteur tient jusqu'à
+    // sa levée ; celle d'un message part avec la purge horaire, passée la plus
+    // longue durée de garde.
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_geti_objections (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        kind VARCHAR(8) NOT NULL,
+        target_id VARCHAR(22) NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_bg_geti_objections_target (kind, target_id),
+        KEY idx_bg_geti_objections_created (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table absente : l'écriture d'un lot échoue (GETI_UNAVAILABLE, le bot réessaie) plutôt que de
+    // recopier une annonce sans savoir si son auteur s'y est opposé.
   }
 
   // Alertes sur une recherche (`docs/features/GETI_INFO.md` § Alertes) : la

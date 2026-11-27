@@ -65,7 +65,7 @@ test.describe("Header landing", () => {
     }).toPass();
 
     await expect(nav.getByRole("link").first()).toHaveText("Annonces GETI");
-    await expect(nav.getByRole("link", { name: "Annonces GETI" })).toHaveAttribute("href", "/geti-info");
+    await expect(nav.getByRole("link", { name: "Annonces GETI" })).toHaveAttribute("href", "/geti-info/lfp");
     for (const name of ["Tournois", "Équipes", "Classement", "Joueurs"]) {
       await expect(nav.getByRole("link", { name, exact: true })).toHaveCount(0);
     }

@@ -15,7 +15,7 @@ import { getDatabase, withConnection } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import { readStoredGetiPosts, type GetiExecutor } from "@/lib/server/geti/posts";
 import { ignoreMissingTable, isMissingTableError, rowsOrEmptyIfMissingTable } from "@/lib/server/mysql-errors";
-import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
+import { loadNotificationRecipients, notifyUsers, type NotificationRecipient } from "@/lib/server/notify";
 import { toIso } from "@/lib/server/serialization";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { GETI_CATEGORIES, type GetiCategory, type GetiFilter, type GetiParsedPost } from "@/lib/shared/geti";
@@ -224,17 +224,34 @@ export async function exportGetiAlerts(userId: number, executor?: GetiExecutor):
   }));
 }
 
-/** Retire les traces d'annonces vues plus vieilles que la garde ; rend le nombre de lignes retirées. */
+/** Traces effacées par instruction de la purge, et passages au plus (le reste attend l'heure suivante). */
+const HIT_PURGE_BATCH = 5000;
+const HIT_PURGE_MAX_BATCHES = 100;
+
+/**
+ * Retire les traces d'annonces vues plus vieilles que la garde ; rend le
+ * nombre de lignes retirées. Par lots : une table qui a grossi (jusqu'à
+ * `GETI_ALERT_SCAN_MAX` traces par annonce reçue) ne tient ni ses verrous ni
+ * le journal binaire en une seule instruction.
+ */
 export async function purgeGetiAlertHits(executor: GetiExecutor, now: number = Date.now()): Promise<number> {
+  const before = new Date(now - GETI_ALERT_HIT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  let removed = 0;
   try {
-    const [result] = await executor.execute(`DELETE FROM bg_geti_alert_hits WHERE created_at < ?`, [
-      new Date(now - GETI_ALERT_HIT_RETENTION_DAYS * 24 * 60 * 60 * 1000),
-    ]);
-    return affected(result);
+    for (let pass = 0; pass < HIT_PURGE_MAX_BATCHES; pass += 1) {
+      const [result] = await executor.execute(
+        `DELETE FROM bg_geti_alert_hits WHERE created_at < ? LIMIT ${HIT_PURGE_BATCH}`,
+        [before],
+      );
+      const count = affected(result);
+      removed += count;
+      if (count < HIT_PURGE_BATCH) break;
+    }
   } catch (error) {
-    if (isMissingTableError(error)) return 0;
+    if (isMissingTableError(error)) return removed;
     throw error;
   }
+  return removed;
 }
 
 /** Une annonce qui vient d'être enregistrée, telle que la correspondance la lit. */
@@ -281,16 +298,22 @@ export type GetiAlertOutcome = {
   notified: number;
 };
 
-async function loadActiveAlerts(db: GetiExecutor, categories: readonly GetiCategory[]): Promise<ActiveAlert[]> {
+/**
+ * Les alertes actives d'une catégorie, au plus `GETI_ALERT_SCAN_MAX`, dans
+ * l'ordre de leur identifiant. Une requête par catégorie : `(category, paused)`
+ * porte déjà l'identifiant, la lecture suit l'index sans tri (un `IN` sur
+ * plusieurs catégories trierait toutes les alertes actives avant de couper).
+ */
+async function loadActiveAlertsOf(db: GetiExecutor, category: GetiCategory): Promise<ActiveAlert[]> {
   // `LIMIT` écrit en dur (constante entière), comme `listGetiPosts`.
   const [rows] = await db.execute<ActiveAlertRow[]>(
     `SELECT a.id, a.user_id, a.category, a.name, a.search, a.last_notified_at, u.discord_id
        FROM bg_geti_alerts a
        JOIN bg_users u ON u.id = a.user_id
-      WHERE a.paused = 0 AND a.category IN (${categories.map(() => "?").join(", ")})
+      WHERE a.paused = 0 AND a.category = ?
       ORDER BY a.id
       LIMIT ${GETI_ALERT_SCAN_MAX + 1}`,
-    [...categories],
+    [category],
   );
   // Une ligne de plus que la borne : seule elle dit que des alertes restent non lues — signalé dans pm2 (un nombre seul).
   if (rows.length > GETI_ALERT_SCAN_MAX) console.warn("[geti] borne des alertes lues atteinte:", GETI_ALERT_SCAN_MAX);
@@ -308,6 +331,12 @@ async function loadActiveAlerts(db: GetiExecutor, categories: readonly GetiCateg
       ownerDiscordId: row.discord_id === null ? null : String(row.discord_id),
     });
   }
+  return alerts;
+}
+
+async function loadActiveAlerts(db: GetiExecutor, categories: readonly GetiCategory[]): Promise<ActiveAlert[]> {
+  const alerts: ActiveAlert[] = [];
+  for (const category of categories) alerts.push(...(await loadActiveAlertsOf(db, category)));
   return alerts;
 }
 
@@ -347,26 +376,53 @@ function isOwnPost(alert: ActiveAlert, post: GetiAlertPost): boolean {
   return alert.ownerDiscordId !== null && post.parsed.authorId === alert.ownerDiscordId;
 }
 
-/** Prévient le propriétaire d'une alerte ; `true` si l'envoi a été tenté vers un compte joignable. */
-async function sendAlert(alert: ActiveAlert, post: GetiAlertPost): Promise<boolean> {
-  // Compte Discord **certifié** seulement ; un compte suspendu garde ses alertes mais n'est plus prévenu.
-  const recipients = await loadNotificationRecipients([alert.userId], "certified", { excludeSuspended: true });
-  if (recipients.length === 0) return false;
+/** Comptes lus par requête `IN (…)` pour les destinataires d'une passe. */
+const RECIPIENT_CHUNK = 500;
+
+/**
+ * L'envoi par défaut d'une passe : les destinataires de **tous** les comptes à
+ * prévenir se lisent en quelques requêtes, à la première alerte envoyée
+ * (compte Discord **certifié** seulement ; un compte suspendu garde ses alertes
+ * mais n'est plus prévenu), au lieu d'une lecture par alerte. Chaque alerte part
+ * ensuite par `notifyUsers` (son lien et son nom lui sont propres).
+ */
+function recipientSender(userIds: readonly number[]): GetiAlertSender {
   const siteBase = siteCanonicalBase();
-  const notice = {
-    alertId: alert.id,
-    category: alert.category,
-    name: alert.name,
-    search: alert.search,
-    messageId: post.messageId,
+  let loaded: Promise<Map<number, NotificationRecipient>> | null = null;
+  const load = async (): Promise<Map<number, NotificationRecipient>> => {
+    const recipients = new Map<number, NotificationRecipient>();
+    for (let start = 0; start < userIds.length; start += RECIPIENT_CHUNK) {
+      const chunk = userIds.slice(start, start + RECIPIENT_CHUNK);
+      for (const recipient of await loadNotificationRecipients(chunk, "certified", { excludeSuspended: true })) {
+        recipients.set(recipient.userId, recipient);
+      }
+    }
+    return recipients;
   };
-  await notifyUsers(recipients, {
-    topic: "GETI_ALERT",
-    push: (locale) => getiAlertPush(notice, locale),
-    discord: { message: (locale) => getiAlertDm(notice, siteBase, locale), context: "geti-alert" },
-    dmFollowsTopic: true,
-  });
-  return true;
+  return async (alert, post) => {
+    loaded ??= load();
+    const recipient = (await loaded).get(alert.userId);
+    if (recipient === undefined) return false;
+    const notice = {
+      alertId: alert.id,
+      category: alert.category,
+      name: alert.name,
+      search: alert.search,
+      messageId: post.messageId,
+    };
+    await notifyUsers([recipient], {
+      topic: "GETI_ALERT",
+      push: (locale) => getiAlertPush(notice, locale),
+      discord: { message: (locale) => getiAlertDm(notice, siteBase, locale), context: "geti-alert" },
+      dmFollowsTopic: true,
+    });
+    return true;
+  };
+}
+
+/** Une alerte déjà dans son délai, telle que la lecture l'a vue : rien à réserver, aucune écriture. */
+function isCoolingDown(alert: ActiveAlert, cooledBefore: Date): boolean {
+  return alert.lastNotifiedAt !== null && alert.lastNotifiedAt.getTime() > cooledBefore.getTime();
 }
 
 /**
@@ -477,6 +533,12 @@ async function releaseReservation(db: GetiExecutor, hit: AlertHit, reservedAt: D
   }
 }
 
+/** Les comptes dont une alerte touchée peut encore partir : les seuls dont le destinataire se lit. */
+function usersToNotify(hits: readonly AlertHit[], now: number): number[] {
+  const cooledBefore = new Date(now - GETI_ALERT_COOLDOWN_MINUTES * 60_000);
+  return [...new Set(hits.filter((hit) => !isCoolingDown(hit.alert, cooledBefore)).map((hit) => hit.alert.userId))];
+}
+
 /**
  * Réserve le délai de chaque alerte touchée (une instruction, `affectedRows`)
  * et prévient son compte — un seul envoi réussi par compte ; rend le nombre de
@@ -495,7 +557,7 @@ async function sendReservedAlerts(
   const notifiedUsers = new Set<number>();
   for (const hit of hits) {
     const { alert, post } = hit;
-    if (notifiedUsers.has(alert.userId)) continue;
+    if (notifiedUsers.has(alert.userId) || isCoolingDown(alert, cooledBefore)) continue;
     const [reserved] = await db.execute(
       `UPDATE bg_geti_alerts SET last_notified_at = ?
         WHERE id = ? AND paused = 0 AND (last_notified_at IS NULL OR last_notified_at <= ?)`,
@@ -548,7 +610,7 @@ export async function notifyGetiAlerts(
   posts: readonly GetiAlertPost[],
   now: number = Date.now(),
   executor?: GetiExecutor,
-  send: GetiAlertSender = sendAlert,
+  send?: GetiAlertSender,
 ): Promise<GetiAlertOutcome> {
   const outcome: GetiAlertOutcome = { matched: 0, notified: 0 };
   try {
@@ -563,9 +625,40 @@ export async function notifyGetiAlerts(
     if (alerts.length === 0) return outcome;
 
     const firstHits = await recordAlertHits(db, fresh, alerts, now, outcome);
-    outcome.notified = await sendReservedAlerts(db, firstHits, now, send);
+    outcome.notified = await sendReservedAlerts(db, firstHits, now, send ?? recipientSender(usersToNotify(firstHits, now)));
   } catch (error) {
     if (!isMissingTableError(error)) console.error("[geti] passe d'alertes impossible", failureReason(error));
   }
   return outcome;
+}
+
+/** Passes d'alertes en attente de leur tour, au plus ; une de plus est abandonnée (signalé dans pm2). */
+export const GETI_ALERT_QUEUE_MAX = 100;
+
+let queueTail: Promise<unknown> = Promise.resolve();
+let queued = 0;
+
+/**
+ * Met en file la passe d'alertes d'un lot reçu : les passes se suivent **une à
+ * une** plutôt que de se chevaucher. Deux lots rapprochés lanceraient sinon
+ * deux passes qui lisent les mêmes alertes et envoient en même temps — des
+ * appels au bot qui s'ajoutent d'un coup (coupe-circuit) pour des comptes que
+ * la première passe est déjà en train de prévenir. Seules les annonces encore
+ * récentes entrent en file (le rattrapage du bot n'en met aucune) ; une passe
+ * jugée à son tour, pas à l'arrivée du lot. Ne lève jamais.
+ */
+export function scheduleGetiAlerts(posts: readonly GetiAlertPost[], now: number = Date.now()): void {
+  const alertable = posts.filter((post) => isAlertable(post, now));
+  if (alertable.length === 0) return;
+  if (queued >= GETI_ALERT_QUEUE_MAX) {
+    console.warn("[geti] file des alertes pleine:", GETI_ALERT_QUEUE_MAX);
+    return;
+  }
+  queued += 1;
+  queueTail = queueTail
+    .then(() => notifyGetiAlerts(alertable))
+    .catch(() => undefined)
+    .finally(() => {
+      queued -= 1;
+    });
 }

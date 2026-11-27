@@ -12,7 +12,7 @@ import type { Metadata } from "next";
 import { INTL_LOCALE, SITE_TIME_ZONE, type Locale } from "@/lib/shared/locales";
 
 export { GETI_OFFICIAL_INVITE_CODE, GETI_OFFICIAL_INVITE_URL } from "@/lib/shared/discord";
-import { GETI_CODE_SPAN, getiWithoutSpoilers } from "@/lib/shared/geti/normalize";
+import { getiCodeSpan, getiWithoutSpoilers } from "@/lib/shared/geti/normalize";
 import { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";
 import {
   GETI_CATEGORIES,
@@ -667,7 +667,7 @@ function withoutMarkupOutside(text: string, atLineStart: boolean): string {
 function withoutMarkupOutsideCode(text: string): string {
   let out = "";
   let from = 0;
-  for (const match of text.matchAll(GETI_CODE_SPAN)) {
+  for (const match of text.matchAll(getiCodeSpan())) {
     const index = match.index ?? 0;
     const [whole, fence, inner] = match;
     out += withoutMarkupOutside(text.slice(from, index), from === 0 || text[from - 1] === "\n");
