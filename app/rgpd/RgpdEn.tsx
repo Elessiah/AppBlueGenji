@@ -262,7 +262,7 @@ export function RgpdEn({
             third-party announcement network, which sends each post to every subscribed Discord server — relays there.
             What is kept: the post&apos;s text, its author&apos;s Discord username and identifier, the server of origin of a
             relayed post, the dates and the criteria read automatically in the text (rank, role, region, platform,
-            language, availability), with no link to an account of the site — whether the author has one or not. A
+            language, availability, stated minimum age, team name), with no link to an account of the site — whether the author has one or not. A
             scrim search is kept {GETI_RETENTION_DAYS.lfs} days after its publication on Discord, the other posts{" "}
             {GETI_RETENTION_DAYS.lfp} days; deleting the post on Discord removes it from the site at once, editing it
             replaces the previous version. Basis: the association&apos;s legitimate interest (helping players and teams

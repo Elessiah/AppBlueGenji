@@ -766,6 +766,32 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
     ).toEqual([]);
   });
 
+  it("privacyPolicy_getiPosts_siteIsARecipientFrAndEn", () => {
+    expect(
+      missingInBoth(
+        ["ainsi que les annonces des salons de recrutement Overwatch du serveur de l'association"],
+        ["as well as the posts of the Overwatch recruitment channels of the association's server"],
+      ),
+    ).toEqual([]);
+  });
+
+  it("privacyPolicy_getiPosts_legitimateInterestAndMemoryOnlyFrAndEn", () => {
+    expect(
+      missingInBoth(
+        [
+          "La lecture des annonces de recrutement transmises au site repose elle aussi sur son intérêt légitime",
+          "il ne les tient en mémoire que le temps de les remettre au site",
+          "à chaque reconnexion à Discord",
+        ],
+        [
+          "Reading the recruitment posts passed to the website also rests on its legitimate interest",
+          "it only holds them in memory until they reach the website",
+          "at each reconnection to Discord",
+        ],
+      ),
+    ).toEqual([]);
+  });
+
   it("privacyPolicy_voiceChannels_legitimateInterestFrAndEn", () => {
     expect(
       missingInBoth(
