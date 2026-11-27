@@ -2391,6 +2391,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui est gardé : rien du texte, ni par le site ni par le bot (il reste dans les messages reçus) ; seul un compteur des envois de chaque membre du staff par tournoi, effacé au plus tard un quart d'heure après la fin de sa fenêtre d'une heure, borne leur nombre. L'envoi est noté au journal du staff sur Discord, gardé un an, sans nommer son auteur ni citer le texte ; les journaux du serveur gardent son auteur et la longueur du texte, selon leur rotation. Depuis Discord, le bot transmet au site l'identifiant Discord de qui lance la commande et son message, sans les garder ; le site garde cet identifiant (ou, depuis sa page, le numéro du compte) en mémoire seulement, onze minutes au plus, pour plafonner les appels.",
     ],
   },
+  {
+    // GETI-INGEST — annonces de recrutement Overwatch des salons d'annonces du
+    // serveur Discord recopiées par le site (`docs/features/GETI_INFO.md`) :
+    // registre T21 (et T08), /rgpd (FR et EN), politique du bot. Datée comme
+    // `REGISTER_UPDATED_AT` — tout avancer ensemble si la mise en ligne glisse.
+    id: "2026-11-annonces-de-recrutement-overwatch",
+    publishedAt: "2026-11-28",
+    title: "Annonces de recrutement Overwatch recopiées sur le site",
+    links: [
+      { href: "/rgpd/registre#t21", label: "Lire la fiche T21 du registre" },
+      { href: "/rgpd#annonces-geti", label: "Lire le paragraphe « Annonces de recrutement Overwatch »" },
+    ],
+    summary: "Le site recopie les annonces de recrutement Overwatch publiées dans les salons d'annonces du serveur Discord de l'association — écrites sur place, ou relayées par GETI Bot depuis les serveurs abonnés à son réseau —, pour les réunir sur une page de recherche. Une recherche de scrim y est gardée 7 jours, les autres annonces 14 jours.",
+    details: [
+      "Ce qui est recopié : le texte de l'annonce, le pseudo et l'identifiant Discord de son auteur, le serveur d'origine d'une annonce relayée, les dates, et les critères lus automatiquement dans le texte (rang, rôle, région, plateforme, langue, disponibilités) pour filtrer les annonces. Rien n'est rattaché à un compte du site, et le bot de l'association, qui lit ces salons pour le site, n'en garde rien. Base : l'intérêt légitime de l'association à aider joueurs et équipes à se trouver, pour des annonces déjà publiques.",
+      "Combien de temps, et comment retirer une annonce : 7 jours après sa publication sur Discord pour une recherche de scrim, 14 jours pour les autres, puis un effacement automatique. Supprimer l'annonce sur Discord la retire du site aussitôt ; la modifier remplace l'ancienne version, dont rien n'est gardé. Son auteur peut aussi s'y opposer et en demander le retrait à l'association (formulaire de signalement, catégorie RGPD).",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

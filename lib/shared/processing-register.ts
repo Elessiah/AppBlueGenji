@@ -90,9 +90,10 @@ import { ACCOUNT_REACTIVATION_DAYS, REACTIVATION_TICKET_MINUTES } from "@/lib/sh
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { STAFF_MESSAGE_SENDS_PER_WINDOW, STAFF_MESSAGE_WINDOW_MINUTES } from "@/lib/shared/tournament-staff-message";
 import { PLANNING_HISTORY_WEEKS, PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
+import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-26";
+export const REGISTER_UPDATED_AT = "2026-11-28";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -1005,6 +1006,8 @@ const ACTIVITIES = registerActivities({
     subPurposes: [
       frEn("Relais des annonces entre les salons des serveurs partenaires, répercussion des modifications et suppressions, temps de recharge, compteur de messages de /stats, statistiques du tableau de bord, retrait des copies d'un utilisateur exclu",
         "Relaying announcements between the channels of partner servers, passing on edits and deletions, cooldowns, /stats message counter, dashboard statistics, removal of the copies of an excluded user"),
+      frEn("Lecture des annonces de recrutement Overwatch des salons d'annonces du serveur Discord de l'association (créées, modifiées, supprimées) et transmission au site, qui les recopie (T21) ; le bot n'en garde rien et n'écrit rien dans ces salons",
+        "Reading the Overwatch recruitment posts of the announcement channels of the association's Discord server (created, edited, deleted) and passing them to the site, which copies them (T21); the bot keeps none of it and writes nothing in those channels"),
       frEn("Exclusion d'un utilisateur du relais par la modération — valable pour tout le réseau de serveurs partenaires (modération communautaire), d'où la liste des exclusions ouverte aux administrateurs de chaque serveur",
         "Exclusion of a user from the relay by moderation — valid for the whole network of partner servers (community moderation), hence the list of exclusions open to the administrators of each server"),
       frEn("Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)",
@@ -1879,6 +1882,61 @@ const ACTIVITIES = registerActivities({
       frEn("Motif d'un désistement lu du seul staff des tournois", "A withdrawal's reason read by the tournament staff only"),
       frEn("Page et routes réservées aux comptes qui tiennent un rôle du planning ; un administrateur qui incarne un rôle n'y a que l'accès de ce rôle (aucun en vue joueur)",
         "Page and routes reserved for accounts holding a schedule role; an administrator impersonating a role only has that role's access (none in player view)"),
+    ],
+  },
+  T21: {
+    name: frEn("Annonces de recrutement Overwatch (GETI Info)", "Overwatch recruitment posts (GETI Info)"),
+    purpose: frEn("Réunir sur le site, pour les consulter et y chercher, les annonces de recrutement Overwatch publiées dans les salons d'annonces du serveur Discord de l'association",
+      "Gathering on the site, to browse and search them, the Overwatch recruitment posts published in the announcement channels of the association's Discord server"),
+    subPurposes: [
+      frEn("Recopier, en vue de leur affichage sur le site, les annonces publiques de ces salons (recherche de joueur, d'équipe, de remplaçant, de staff, de scrim, de cast) : celles qu'un membre y écrit directement, et celles que GETI Bot — le bot d'un réseau tiers d'annonces, qui diffuse chaque annonce à tous les serveurs Discord abonnés — y relaie depuis ces serveurs",
+        "Copying, to display them on the site, the public posts of those channels (looking for a player, a team, a substitute, staff, a scrim, a cast): those a member writes there directly, and those GETI Bot — the bot of a third-party announcement network, which sends each post to every subscribed Discord server — relays there from those servers"),
+      frEn("Lire automatiquement dans le texte de l'annonce les critères qu'elle donne (rang, rôle, région, plateforme, langue, disponibilités, âge minimal annoncé, nom d'équipe), pour permettre de filtrer les annonces ; aucune décision n'en découle",
+        "Automatically reading in the post's text the criteria it gives (rank, role, region, platform, language, availability, stated minimum age, team name), so that posts can be filtered; no decision follows from it"),
+      frEn("Suivre Discord : une annonce modifiée sur Discord est remplacée par sa nouvelle version, une annonce supprimée sur Discord est retirée du site sans délai ; au redémarrage du bot, les annonces supprimées pendant son arrêt sont retirées",
+        "Following Discord: a post edited on Discord is replaced by its new version, a post deleted on Discord is removed from the site at once; when the bot restarts, the posts deleted while it was stopped are removed"),
+    ],
+    legalBasis: frEn("Intérêt légitime de l'association (RGPD, art. 6.1.f : aider les joueurs et les équipes de la communauté à se trouver), pour des annonces que leurs auteurs ont rendues publiques afin d'être contactés, et que le réseau diffuse déjà à tous les serveurs abonnés ; les données ne sont pas recueillies auprès de l'auteur lui-même (art. 14) : l'information est donnée par la politique de confidentialité du site ; droit d'opposition (art. 21) : supprimer l'annonce sur Discord la retire du site, et l'auteur peut aussi en demander le retrait à l'association",
+      "Legitimate interest of the association (GDPR, art. 6.1.f: helping the community's players and teams find each other), for posts their authors made public in order to be contacted, and which the network already sends to every subscribed server; the data are not collected from the author themselves (art. 14): the information is given by the site's privacy policy; right to object (art. 21): deleting the post on Discord removes it from the site, and the author can also ask the association to remove it"),
+    dataSubjects: [
+      frEn("Auteurs des annonces : utilisateurs de Discord, qu'ils aient ou non un compte sur le site",
+        "Authors of the posts: Discord users, whether or not they have an account on the site"),
+      frEn("Personnes que l'auteur cite dans le texte de son annonce", "People the author mentions in the text of their post"),
+    ],
+    dataCategories: [
+      frEn("Texte de l'annonce, tel que publié sur Discord", "Text of the post, as published on Discord"),
+      frEn("Pseudo et identifiant Discord de l'auteur ; pour une annonce relayée, nom du serveur Discord d'où elle vient",
+        "Discord username and identifier of the author; for a relayed post, name of the Discord server it comes from"),
+      frEn("Identifiants Discord du message et du salon, dates de publication et de dernière modification, origine (écrite dans le salon, ou relayée)",
+        "Discord identifiers of the message and the channel, dates of publication and of last edit, origin (written in the channel, or relayed)"),
+      frEn("Critères lus dans le texte : rang, rôle, région, plateforme, langue, disponibilités, âge minimal annoncé, nom d'équipe",
+        "Criteria read in the text: rank, role, region, platform, language, availability, stated minimum age, team name"),
+      frEn("Aucun rattachement à un compte du site", "No link to an account of the site"),
+    ],
+    sensitiveData: frEn("Aucune", "None"),
+    retention: [
+      frEn(`Recherches de scrim : ${GETI_RETENTION_DAYS.lfs} jours après leur publication sur Discord ; les autres annonces : ${GETI_RETENTION_DAYS.lfp} jours ; puis effacées par une purge horaire, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
+        `Scrim searches: ${GETI_RETENTION_DAYS.lfs} days after their publication on Discord; the other posts: ${GETI_RETENTION_DAYS.lfp} days; then erased by an hourly purge, apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`),
+      frEn("Avant ce terme : retirée dès que le message est supprimé sur Discord (par son auteur ou la modération du salon ; pour une annonce relayée, quand son relais y est supprimé) ; une modification remplace la version précédente, dont rien n'est gardé",
+        "Before that term: removed as soon as the message is deleted on Discord (by its author or the channel's moderation; for a relayed post, when its relay there is deleted); an edit replaces the previous version, of which nothing is kept"),
+    ],
+    recipients: [
+      frEn("Visiteurs du site, y compris sans compte : la page des annonces, quand elle est en ligne, montre le texte de l'annonce, le pseudo Discord de son auteur, le serveur d'origine et la date — ce que les serveurs abonnés montrent déjà",
+        "Visitors of the site, including without an account: the posts page, when it is online, shows the post's text, its author's Discord username, the server of origin and the date — what the subscribed servers already show"),
+      frEn("Le bot Discord de l'association (T08), qui lit les messages de ces salons et les transmet au site, sur le même serveur, sans les garder",
+        "The association's Discord bot (T08), which reads the messages of those channels and passes them to the site, on the same server, without keeping them"),
+      frEn("Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)",
+        "The association's technical manager, who is also the site's host (database)"),
+    ],
+    transfers: [
+      frEn("Aucun", "None"),
+    ],
+    security: [
+      ...COMMON_SECURITY,
+      frEn("Transmission du bot au site sur le serveur lui-même, sans passer par Internet, protégée par un secret propre",
+        "Transmission from the bot to the site on the server itself, without going through the Internet, protected by its own secret"),
+      frEn("Texte d'une annonce toujours affiché comme du texte, jamais interprété",
+        "A post's text always displayed as text, never interpreted"),
     ],
   },
 });

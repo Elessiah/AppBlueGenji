@@ -147,7 +147,7 @@ function fakeId(prefix: string, index: number): string {
 
 /** Description de l'encart d'un relais de GETI Bot : en-tête, puis l'annonce citée. */
 function relayDescription(authorId: string, post: SeedGetiPost): string {
-  return `<@${authorId}>*(${post.author})* sur [${post.relayedFrom}](https://discord.gg/test)\n\n> ${post.text}`;
+  return `<@${authorId}>*(${post.author})* sur [${post.relayedFrom}](https://example.com/test-invite)\n\n> ${post.text}`;
 }
 
 /** Le corps tel que le bot le pousserait. */

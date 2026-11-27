@@ -1265,6 +1265,15 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What is kept: none of the text, neither by the site nor by the bot (it stays in the messages received); only a counter of each staff member's sendings per tournament, erased at the latest a quarter of an hour after its one-hour window ends, caps their number. The sending is noted in the staff log on Discord, kept for a year, without naming its author or quoting the text; the server logs keep its author and the length of the text, according to their rotation. From Discord, the bot sends the site the Discord identifier of whoever runs the command and their message, without keeping them; the site keeps that identifier (or, from its page, the account number) in memory only, eleven minutes at most, to cap the calls.",
     ],
   },
+  "2026-11-annonces-de-recrutement-overwatch": {
+    linkLabels: ["Read record T21 of the register", "Read the “Overwatch recruitment posts” paragraph"],
+    title: "Overwatch recruitment posts copied to the site",
+    summary: "The site copies the Overwatch recruitment posts published in the announcement channels of the association's Discord server — written there, or relayed by GETI Bot from the servers subscribed to its network — to gather them on a search page. A scrim search is kept there 7 days, the other posts 14 days.",
+    details: [
+      "What is copied: the post's text, its author's Discord username and identifier, the server of origin of a relayed post, the dates, and the criteria read automatically in the text (rank, role, region, platform, language, availability) to filter the posts. Nothing is linked to an account of the site, and the association's bot, which reads those channels for the site, keeps none of it. Basis: the association's legitimate interest in helping players and teams find each other, for posts that are already public.",
+      "How long, and how to remove a post: 7 days after its publication on Discord for a scrim search, 14 days for the others, then an automatic erasure. Deleting the post on Discord removes it from the site at once; editing it replaces the previous version, of which nothing is kept. Its author can also object and ask the association to remove it (report form, GDPR category).",
+    ],
+  },
 };
 
 /**

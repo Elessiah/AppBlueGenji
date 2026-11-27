@@ -88,6 +88,7 @@ import {
   type AudienceOptOutReason,
 } from "@/lib/shared/site-visits";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
 import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
 
@@ -253,6 +254,20 @@ export function RgpdEn({
             of a channel by the referees or administrators can name its author, in the server logs). What it keeps,
             what the bot holds in memory and for how long: paragraph{" "}
             <a href="#salons-vocaux">“Team voice channels”</a>.
+          </p>
+          <p id="annonces-geti">
+            <strong>Overwatch recruitment posts.</strong> The site copies, to gather them on a search page, the public
+            posts of the announcement channels of the association&apos;s Discord server (looking for a player, a team, a
+            substitute, staff, a scrim, a cast): those a member writes there, and those GETI Bot — the bot of a
+            third-party announcement network, which sends each post to every subscribed Discord server — relays there.
+            What is kept: the post&apos;s text, its author&apos;s Discord username and identifier, the server of origin of a
+            relayed post, the dates and the criteria read automatically in the text (rank, role, region, platform,
+            language, availability), with no link to an account of the site — whether the author has one or not. A
+            scrim search is kept {GETI_RETENTION_DAYS.lfs} days after its publication on Discord, the other posts{" "}
+            {GETI_RETENTION_DAYS.lfp} days; deleting the post on Discord removes it from the site at once, editing it
+            replaces the previous version. Basis: the association&apos;s legitimate interest (helping players and teams
+            find each other), for posts that are already public; their author can object and ask for removal (see
+            “Exercising your rights”). Register of processing activities: record T21.
           </p>
           <p id="age-minimum">
             <strong>Minimum age.</strong> You must be at least {SITE_MINIMUM_AGE} years old to create an account

@@ -104,6 +104,7 @@ import {
   TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
   TEAM_NOTICE_DMS_HOURLY_CAP,
 } from "@/lib/shared/team-invite-notice";
+import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
 import { ExtraScopes } from "./ExtraScopes";
 import styles from "./page.module.css";
 
@@ -312,6 +313,21 @@ function RgpdFr({
             l&apos;association ouvre un salon vocal à chaque équipe d&apos;un match ; le site n&apos;enregistre jamais qui s&apos;y trouve
             (seul le vidage d&apos;un salon par l&apos;arbitrage peut nommer son auteur, dans les journaux du serveur). Ce qu&apos;il garde, ce que le bot tient en mémoire et pour combien de temps : paragraphe{" "}
             <a href="#salons-vocaux">« Salons vocaux d&apos;équipe »</a>.
+          </p>
+          <p id="annonces-geti">
+            <strong>Annonces de recrutement Overwatch.</strong> Le site recopie, pour les réunir sur une page de
+            recherche, les annonces publiques des salons d&apos;annonces du serveur Discord de l&apos;association
+            (recherche de joueur, d&apos;équipe, de remplaçant, de staff, de scrim, de cast) : celles qu&apos;un membre y
+            écrit, et celles que GETI Bot — le bot d&apos;un réseau tiers d&apos;annonces, qui diffuse chaque annonce à tous les
+            serveurs Discord abonnés — y relaie. Sont gardés le texte de l&apos;annonce, le pseudo et l&apos;identifiant
+            Discord de son auteur, le serveur d&apos;origine d&apos;une annonce relayée, les dates et les critères lus
+            automatiquement dans le texte (rang, rôle, région, plateforme, langue, disponibilités), sans lien avec un
+            compte du site — que l&apos;auteur en ait un ou non. Une recherche de scrim est gardée{" "}
+            {GETI_RETENTION_DAYS.lfs} jours après sa publication sur Discord, les autres annonces{" "}
+            {GETI_RETENTION_DAYS.lfp} jours ; supprimer l&apos;annonce sur Discord la retire du site aussitôt, la modifier
+            remplace l&apos;ancienne version. Base : l&apos;intérêt légitime de l&apos;association (aider joueurs et équipes à se
+            trouver), pour des annonces déjà publiques ; leur auteur peut s&apos;y opposer et en demander le retrait (voir
+            « Exercer vos droits »). Registre des traitements : fiche T21.
           </p>
           <p id="age-minimum">
             <strong>Âge minimum.</strong> Il faut avoir au moins {SITE_MINIMUM_AGE} ans pour
