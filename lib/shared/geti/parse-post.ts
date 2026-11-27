@@ -21,13 +21,21 @@ import {
   parseGetiStaffRoles,
   parseGetiTeamName,
 } from "@/lib/shared/geti/fields";
-import { GETI_TEXT_MAX, NOT_AFTER_WORD, getiDisplayText, prepareGetiText } from "@/lib/shared/geti/normalize";
+import {
+  GETI_TEXT_MAX,
+  NOT_AFTER_WORD,
+  getiDisplayText,
+  getiSafeText,
+  prepareGetiText,
+  withoutMarkup,
+} from "@/lib/shared/geti/normalize";
 import { parseGetiRanks } from "@/lib/shared/geti/ranks";
 import { findGetiRoleTokens, getiRolesOf, getiSubRolesOf } from "@/lib/shared/geti/roles";
 import {
   GETI_CATEGORIES,
   GETI_CHANNEL_IDS,
   type GetiCategory,
+  type GetiParseOptions,
   type GetiParsedPost,
   type GetiRawEmbed,
   type GetiRawPost,
@@ -68,7 +76,7 @@ const AUTHOR_MENTION = new RegExp(
 const SENT_FROM_LINK = String.raw`\[((?:\\.|[^\]\\])*)\]\([^)\s]*\)`;
 const SENT_FROM_AUTHOR = String.raw`(?:\s*by\s*<@!?(\d{15,22})>)?`;
 const SENT_FROM = new RegExp(
-  String.raw`\n*[*_]*Sent from\s?:\s?${SENT_FROM_LINK}[*_]*${SENT_FROM_AUTHOR}\s*$`,
+  String.raw`(?:^|\n)\n*[*_]*Sent from\s?:\s?${SENT_FROM_LINK}[*_]*${SENT_FROM_AUTHOR}\s*$`,
   "iu",
 );
 /**
@@ -133,8 +141,14 @@ function withoutStruck(displayed: string): { analysed: string; closed: boolean }
   return { analysed: closed ? displayed.replace(STRUCK, " $1 ") : kept, closed };
 }
 
-/** Pseudo entre parenthèses derrière un nom d'affichage : « Nom (@pseudo) ». */
-const HANDLE_IN_PARENTHESES = /\(@?([\w.]{2,32}(?:#\d{4})?)\)\s*$/u;
+/**
+ * Pseudo Discord lisible sur une ligne d'auteur d'encart : nouveau format
+ * (« faux.pseudo ») ou ancien (« Faux Pseudo#4821 »). Un nom d'affichage libre
+ * (« Admin (@staff) ») n'en est pas un : son auteur l'écrit à sa guise.
+ */
+const USERNAME_SHAPE = /^(?:[\w.]{2,32}|[^#@:`()\n]{2,32}#\d{4})$/u;
+/** Ligne citée (« > … ») : le texte relayé d'un joueur, jamais l'en-tête du bot. */
+const QUOTED_LINE = /^\s*>/u;
 
 /** Un texte brut, borné : aucun motif ne lit plus que ce qu'une annonce peut porter. */
 function text(value: unknown): string {
@@ -173,13 +187,20 @@ function authorTag(username: unknown, discriminator: unknown): string | null {
   return DISCRIMINATOR.test(suffix) && suffix !== "0000" ? `${name}#${suffix}` : name;
 }
 
-/** Pseudo lu dans la ligne d'auteur d'un encart : « pseudo », « pseudo#1234 », « Nom (@pseudo) ». */
-function embedAuthorTag(authorName: unknown): string | null {
-  const shown = visibleText(text(authorName));
-  const handle = HANDLE_IN_PARENTHESES.exec(shown);
-  const [name, suffix] = (handle === null ? shown : handle[1]).split(/#(?=\d{4}$)/u);
+/** Pseudo écrit tel quel (« pseudo », « pseudo#1234 ») : l'ancien suffixe séparé. */
+function splitTag(value: string): string | null {
+  const [name, suffix] = value.split(/#(?=\d{4}$)/u);
   return authorTag(name, suffix);
 }
+
+/** Pseudo lu dans la ligne d'auteur d'un encart, s'il a la forme d'un pseudo Discord. */
+function embedAuthorTag(authorName: unknown): string | null {
+  const shown = visibleText(text(authorName)).replace(/^@+/u, "");
+  return USERNAME_SHAPE.test(shown) ? splitTag(shown) : null;
+}
+
+/** Auteur nommé par une partie du relais que le bot écrit (en-tête, dernière ligne). */
+type RelayAuthor = { id: string | null; tag: string | null; originServer: string | null };
 
 type RelayContent = {
   body: string;
@@ -207,14 +228,25 @@ function embedFieldLines(embed: GetiRawEmbed): string[] {
 }
 
 /**
- * Auteur d'un relais sans ligne « Sent from » : la mention derrière un libellé,
- * sinon personne. Une mention sans libellé peut viser un tiers (« duo avec
- * <@id> ») : la deviner enverrait les lecteurs vers quelqu'un qui n'a rien écrit.
+ * Auteur d'un relais sans en-tête ni ligne « Sent from » : la mention derrière
+ * un libellé, sinon personne. Une mention sans libellé peut viser un tiers
+ * (« duo avec <@id> »), une ligne citée (« > Contact : <@id> ») est le texte du
+ * joueur, et deux libellés qui nomment deux comptes différents se contredisent
+ * (le second peut être écrit par le joueur) : personne n'est désigné.
  */
 function mentionedAuthorId(body: string): string | null {
-  let last: RegExpMatchArray | null = null;
-  for (const match of body.matchAll(AUTHOR_MENTION)) last = match;
-  return last?.slice(1).find((id) => id !== undefined) ?? null;
+  const unquoted = body
+    .split("\n")
+    .filter((line) => !QUOTED_LINE.test(line))
+    .join("\n");
+  let found: string | null = null;
+  for (const match of unquoted.matchAll(AUTHOR_MENTION)) {
+    const id = match.slice(1).find((group) => group !== undefined) ?? null;
+    if (id === null) continue;
+    if (found !== null && found !== id) return null;
+    found = id;
+  }
+  return found;
 }
 
 /** Retire les échappements Markdown (« \_ », « \] »). */
@@ -222,43 +254,87 @@ function unescapeMarkdown(value: string): string {
   return value.replace(/\\(.)/gu, "$1");
 }
 
+/** Nom du serveur d'origine, en texte seul : ni balisage, ni mention, ni « @everyone ». */
 function serverName(value: string): string | null {
-  return visibleText(unescapeMarkdown(value)).slice(0, ORIGIN_SERVER_MAX) || null;
+  return withoutMarkup(visibleText(unescapeMarkdown(value))).slice(0, ORIGIN_SERVER_MAX).trim() || null;
+}
+
+/** Ligne « Sent from » qui clôt une description, en tête de ligne seulement (jamais « > Sent from »). */
+function trailerOf(description: string): RegExpExecArray | null {
+  const windowStart = Math.max(0, description.length - TRAILER_WINDOW);
+  const trailer = SENT_FROM.exec(description.slice(windowStart));
+  if (trailer === null) return null;
+  trailer.index += windowStart;
+  const startsLine = trailer[0].startsWith("\n") || trailer.index === 0 || description[trailer.index - 1] === "\n";
+  return startsLine ? trailer : null;
+}
+
+/**
+ * Auteur d'un relais : celui que nomment l'en-tête GETI et la ligne « Sent
+ * from » de notre bot. Deux sources qui nomment deux comptes différents se
+ * contredisent (l'une est écrite par le joueur : notre relais s'ouvre sur son
+ * texte) : personne n'est désigné. Pseudo et identifiant viennent de la même
+ * source.
+ */
+function relayAuthor(header: RelayAuthor | null, trailer: RelayAuthor | null): RelayAuthor | null {
+  const named = [trailer, header].filter((source): source is RelayAuthor => source !== null && source.id !== null);
+  if (named.length === 0) return null;
+  const originServer = trailer?.originServer ?? header?.originServer ?? null;
+  if (named.some((source) => source.id !== named[0].id)) return { id: null, tag: null, originServer };
+  return { id: named[0].id, tag: named[0].tag, originServer };
 }
 
 /** Texte, auteur et origine d'un relais : tout se lit dans les encarts du bot. */
 function relayContent(raw: GetiRawPost): RelayContent {
   const parts: string[] = [text(raw.content)];
-  let originServer: string | null = null;
-  let authorId: string | null = null;
-  let tag: string | null = null;
+  let header: RelayAuthor | null = null;
+  let trailer: RelayAuthor | null = null;
+  let lineTag: string | null = null;
+  let lineServer: string | null = null;
   for (const embed of embedsOf(raw)) {
     const description = text(embed.description);
-    // L'en-tête GETI nomme l'auteur : il passe avant toute mention du texte cité.
-    const header = GETI_HEADER.exec(description);
-    if (header !== null) {
-      authorId ??= header[1];
-      tag ??= embedAuthorTag(unescapeMarkdown(header[2]));
-      originServer ??= serverName(header[3]);
+    const headerMatch = GETI_HEADER.exec(description);
+    if (headerMatch !== null) {
+      header ??= {
+        id: headerMatch[1],
+        tag: splitTag(visibleText(unescapeMarkdown(headerMatch[2]))),
+        originServer: serverName(headerMatch[3]),
+      };
     }
-    tag ??= embedAuthorTag(embed.authorName);
-    const windowStart = Math.max(0, description.length - TRAILER_WINDOW);
-    const trailer = SENT_FROM.exec(description.slice(windowStart));
-    if (trailer !== null) {
-      trailer.index += windowStart;
-      originServer ??= serverName(trailer[1]);
-      authorId ??= trailer[2] ?? null;
+    const embedTag = embedAuthorTag(embed.authorName);
+    lineTag ??= embedTag;
+    const trailerMatch = trailerOf(description);
+    if (trailerMatch !== null) {
+      const id = trailerMatch[2] ?? null;
+      // Notre bot écrit le pseudo de l'auteur sur la ligne d'auteur de ce même encart.
+      if (id === null) lineServer ??= serverName(trailerMatch[1]);
+      else trailer ??= { id, tag: embedTag, originServer: serverName(trailerMatch[1]) };
     }
-    const start = header === null ? 0 : header[0].length;
-    const end = trailer === null ? undefined : Math.max(start, trailer.index);
+    const start = headerMatch === null ? 0 : headerMatch[0].length;
+    const end = trailerMatch === null ? undefined : Math.max(start, trailerMatch.index);
     parts.push(text(embed.title), description.slice(start, end), ...embedFieldLines(embed));
   }
   const body = parts.filter((part) => part.trim() !== "").join("\n");
-  return { body, authorTag: tag, authorId: authorId ?? mentionedAuthorId(body), originServer };
+  const named = relayAuthor(header, trailer);
+  if (named !== null) {
+    return { body, authorTag: named.tag, authorId: named.id, originServer: named.originServer ?? lineServer };
+  }
+  // Sans source du bot : une mention libellée, dont le pseudo ne se devine pas (la
+  // ligne d'auteur peut nommer un autre compte) ; sinon le seul pseudo de cette ligne.
+  const mentioned = mentionedAuthorId(body);
+  return { body, authorTag: mentioned === null ? lineTag : null, authorId: mentioned, originServer: lineServer };
 }
 
-function contentOf(raw: GetiRawPost): RelayContent & { relayed: boolean } {
-  if (raw.author?.bot === true) return { ...relayContent(raw), relayed: true };
+function contentOf(raw: GetiRawPost, options: GetiParseOptions): RelayContent & { relayed: boolean } {
+  if (raw.author?.bot === true) {
+    const relay = relayContent(raw);
+    const allowed = options.relayBotIds;
+    const trusted = allowed === undefined || allowed.includes(snowflake(raw.author.id) ?? "");
+    // Un bot ou un webhook inconnu se fait passer pour qui il veut : son texte se lit, son auteur non.
+    return trusted
+      ? { ...relay, relayed: true }
+      : { ...relay, authorTag: null, authorId: null, originServer: null, relayed: true };
+  }
   return {
     body: text(raw.content),
     authorTag: authorTag(raw.author?.username, raw.author?.discriminator),
@@ -278,12 +354,16 @@ function contentOf(raw: GetiRawPost): RelayContent & { relayed: boolean } {
  * Un passage barré (`~~…~~`) n'est pas lu, sauf si toute l'annonce l'est :
  * elle est alors `closed`.
  *
+ * Un bot (ou un webhook) peut se faire passer pour n'importe qui : avec
+ * `options.relayBotIds`, seul le relais de l'un de ces bots nomme un auteur.
+ *
  * @param raw Message Discord brut, non fiable.
+ * @param options Bots relais de confiance (lot 2 : bot GETI et notre bot).
  * @returns L'annonce analysée ; un message vide rend des champs vides.
  */
-export function parseGetiPost(raw: GetiRawPost): GetiParsedPost {
+export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}): GetiParsedPost {
   const source: GetiRawPost = typeof raw === "object" && raw !== null ? raw : {};
-  const content = contentOf(source);
+  const content = contentOf(source, options);
   const displayed = getiDisplayText(content.body);
   const { analysed, closed } = withoutStruck(displayed);
   const prepared = prepareGetiText(analysed);
@@ -302,7 +382,7 @@ export function parseGetiPost(raw: GetiRawPost): GetiParsedPost {
     authorId: content.authorId,
     relayed: content.relayed,
     originServer: content.originServer,
-    text: displayed,
+    text: getiSafeText(displayed),
     ranks: parseGetiRanks(prepared.lower, roleTokens, oneEvening),
     roles: getiRolesOf(roleTokens),
     subRoles: getiSubRolesOf(roleTokens),

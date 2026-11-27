@@ -147,7 +147,22 @@ export type GetiRawPost = {
   editedAt?: string | null;
 };
 
-/** Annonce analysée : données simples, jamais de balisage. */
+/** Réglages de l'analyse. */
+export type GetiParseOptions = {
+  /**
+   * Identifiants des bots relais de confiance. Absent : tout bot l'est. Donné :
+   * le relais d'un autre bot (ou d'un webhook) garde son texte, mais ni auteur
+   * ni serveur d'origine.
+   */
+  relayBotIds?: readonly string[];
+};
+
+/**
+ * Annonce analysée : énumérations, nombres et textes nettoyés. Les noms
+ * (`authorTag`, `teamName`, `originServer`) n'ont aucun caractère de balisage ;
+ * `text` garde le balisage de l'annonce, sans mention active (voir
+ * `getiSafeText`).
+ */
 export type GetiParsedPost = {
   category: GetiCategory | null;
   /** Pseudo Discord de l'auteur (à copier), `null` s'il est illisible. */
@@ -157,7 +172,7 @@ export type GetiParsedPost = {
   relayed: boolean;
   /** Serveur d'origine d'un relais (« Sent from »), s'il est nommé. */
   originServer: string | null;
-  /** Texte de l'annonce, nettoyé de ses invisibles, sans la ligne de relais. */
+  /** Texte de l'annonce, nettoyé de ses invisibles, sans la ligne de relais ni mention active. */
   text: string;
   ranks: GetiRanks;
   roles: GetiRole[];
