@@ -50,22 +50,23 @@ function toggled<T>(values: readonly T[], domain: readonly T[], value: T, on: bo
 
 /** Groupe de contrôles nommé par son titre ; l'explication (« i ») se pose à côté du titre. */
 function Group({
-  id,
   label,
   hint,
   separated = false,
   children,
-}: Readonly<{ id: string; label: string; hint?: ReactNode; separated?: boolean; children: ReactNode }>) {
+}: Readonly<{ label: string; hint?: ReactNode; separated?: boolean; children: ReactNode }>) {
   return (
-    <div className={styles.group} role="group" aria-labelledby={id}>
+    <fieldset className={styles.group}>
+      {/* La légende nomme le groupe ; le titre visible, lui, partage sa rangée avec le « i ». */}
+      <legend className="sr-only">{label}</legend>
       <InfoHintRow separated={separated}>
-        <span id={id} className={styles.legend}>
+        <span className={styles.legend} aria-hidden="true">
           {label}
         </span>
         {hint}
       </InfoHintRow>
       {children}
-    </div>
+    </fieldset>
   );
 }
 
@@ -127,7 +128,7 @@ export function GetiFilters({
   ) => {
     const selected = draft[key] as readonly string[];
     return (
-      <Group id={`${panelId}-${key}`} label={legend} hint={hint}>
+      <Group label={legend} hint={hint}>
         <div className={styles.checks} data-tap-zone="">
           {domain.map((value) => (
             <label key={value} className={styles.check}>
@@ -250,7 +251,6 @@ export function GetiFilters({
 
         {has("ranks") ? (
           <Group
-            id={`${panelId}-ranks`}
             label={text.ranks}
             hint={
               <InfoHint id={`${panelId}-ranks-hint`} subject={text.ranksHintSubject}>
@@ -295,7 +295,6 @@ export function GetiFilters({
 
         {has("time") ? (
           <Group
-            id={`${panelId}-time`}
             label={text.time}
             hint={
               <InfoHint id={`${panelId}-time-hint`} subject={text.timeHintSubject}>
@@ -332,7 +331,7 @@ export function GetiFilters({
           </div>
         </div>
 
-        <Group id={`${panelId}-options`} label={text.options}>
+        <Group label={text.options}>
           <InfoHintRow separated>
             <label className={styles.check}>
               <input

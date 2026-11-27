@@ -27,6 +27,14 @@ export const DISCORD_INVITE_CODE = "GB9ESEBZFW";
 export const DISCORD_INVITE_URL = `https://discord.gg/${DISCORD_INVITE_CODE}`;
 
 /**
+ * Invitation du serveur officiel de GETI, le réseau tiers dont le bot relaie
+ * les annonces de recrutement (`docs/features/GETI_INFO.md` § Page). Écrite
+ * ici comme toute invitation : une seule source dans le dépôt.
+ */
+export const GETI_OFFICIAL_INVITE_CODE = "geti-geeking-time-318519377752227840";
+export const GETI_OFFICIAL_INVITE_URL = `https://discord.gg/${GETI_OFFICIAL_INVITE_CODE}`;
+
+/**
  * Invitation **publique** donnée par l'association pour le **check-in** des
  * matchs (demande du 2026-10-09) : le rappel de 10 h aux joueurs la porte, le
  * salon de check-in ouvrant un quart d'heure avant le coup d'envoi

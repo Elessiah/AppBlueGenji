@@ -6,6 +6,8 @@
  * Module pur : importable côté serveur comme côté client.
  */
 import { GETI_RETENTION_DAYS } from "@/lib/shared/geti/ingest";
+
+export { GETI_OFFICIAL_INVITE_CODE, GETI_OFFICIAL_INVITE_URL } from "@/lib/shared/discord";
 import { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";
 import {
   GETI_CATEGORIES,
@@ -41,9 +43,6 @@ export const GETI_PAGE_PATH = "/geti-info";
 /** Catégorie rendue par `/geti-info` tout court. */
 export const GETI_DEFAULT_CATEGORY: GetiCategory = "lfp";
 
-/** Invitation du serveur officiel de GETI (le réseau qui relaie les annonces). */
-export const GETI_OFFICIAL_INVITE_CODE = "geti-geeking-time-318519377752227840";
-export const GETI_OFFICIAL_INVITE_URL = `https://discord.gg/${GETI_OFFICIAL_INVITE_CODE}`;
 /** Nom du serveur officiel de GETI. */
 export const GETI_OFFICIAL_SERVER_NAME = "GETI \u2014 Geeking Time";
 

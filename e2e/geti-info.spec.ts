@@ -34,7 +34,7 @@ test.describe("GETI Info — page publique", () => {
 
   test("la carte du serveur officiel de GETI mène à son invitation, sans cadre", async ({ page }) => {
     await page.goto("/geti-info/lft");
-    const card = page.getByRole("complementary", { name: "Serveur Discord officiel de GETI" });
+    const card = page.getByRole("region", { name: "Serveur Discord officiel de GETI" });
     await expect(card.getByRole("link", { name: /Rejoindre/ })).toHaveAttribute("href", GETI_INVITE);
     await expect(page.locator("iframe")).toHaveCount(0);
   });

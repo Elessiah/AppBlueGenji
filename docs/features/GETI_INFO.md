@@ -530,7 +530,7 @@ des bornes inversées sont remises dans l'ordre.
 - Le filtre du moteur a reçu quatre critères pour la page : `subRoles`,
   `staffRoles`, `days`, `time` (créneau en minutes ; un horaire de l'annonce doit
   le recouper, une heure seule y tomber) — `matchesGetiFilter`.
-- `GetiFilters` (client) : groupes nommés (`role="group"`), cases et listes
+- `GetiFilters` (client) : groupes nommés (`<fieldset>` + légende), cases et listes
   natives, « i » (`InfoHint`) pour le rang, le rôle, le niveau, l'horaire et les
   deux réglages d'affichage. Chaque changement réécrit l'adresse
   (`router.replace`, sans défilement, retour à la page 1) ; le compteur de

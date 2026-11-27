@@ -173,7 +173,7 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, l
   if (listed === null) {
     return (
       <section className={styles.results} aria-labelledby="geti-category-title">
-        <p className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
+        <p /* NOSONAR S6819 — compteur de résultats annoncé à chaque filtre, pas une sortie de formulaire */ className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
           {m.results.unavailable}
         </p>
       </section>
@@ -182,7 +182,7 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, l
   const data = getiDataText(m);
   return (
     <section className={styles.results} aria-labelledby="geti-category-title">
-      <p className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
+      <p /* NOSONAR S6819 — compteur de résultats annoncé à chaque filtre, pas une sortie de formulaire */ className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
         {getiText(locale, filtered ? m.results.countFiltered : m.results.count, { count: listed.total })}
       </p>
       {listed.posts.length === 0 ? (

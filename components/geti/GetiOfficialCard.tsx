@@ -31,7 +31,7 @@ export function GetiOfficialCard({
 }>) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
-    <aside className={styles.official} aria-label={text.regionLabel}>
+    <section className={styles.official} aria-label={text.regionLabel}>
       <span className={styles.officialLogo} aria-hidden="true">
         {GETI_OFFICIAL_SERVER_NAME.charAt(0)}
       </span>
@@ -50,7 +50,7 @@ export function GetiOfficialCard({
       >
         {text.join}
       </a>
-    </aside>
+    </section>
   );
 }
 
