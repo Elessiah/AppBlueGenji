@@ -1,4 +1,4 @@
-import { test, expect } from "./helpers/test";
+import { test, expect, type Page } from "./helpers/test";
 
 /**
  * Page publique des annonces GETI (`/geti-info`, `docs/features/GETI_INFO.md`
@@ -10,6 +10,12 @@ import { test, expect } from "./helpers/test";
  * les contrôles qui portent sur des annonces ne jouent que sur une base seedée.
  */
 const GETI_INVITE = "https://discord.gg/geti-geeking-time-318519377752227840";
+
+/** Sans base (CI), la liste est indisponible et ses filtres ne sont pas rendus : ces contrôles ne jouent pas. */
+async function skipWithoutList(page: Page): Promise<void> {
+  const unavailable = await page.getByTestId("geti-count").filter({ hasText: /non chargées|not loaded/ }).count();
+  test.skip(unavailable > 0, "Liste indisponible : base absente."); // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
+}
 
 test.describe("GETI Info — page publique", () => {
   test("six catégories, chacune à son adresse", async ({ page }) => {
@@ -59,6 +65,7 @@ test.describe("GETI Info — page publique", () => {
 
   test("un filtre coché au clavier s'écrit dans l'adresse, et se réinitialise", async ({ page }) => {
     await page.goto("/geti-info/lfp");
+    await skipWithoutList(page);
     const filters = page.getByRole("form", { name: "Filtres" });
     const tank = filters.getByRole("group", { name: "Rôle" }).getByRole("checkbox", { name: "Tank", exact: true });
     // Rejoué jusqu'à ce que la page réponde : une touche reçue avant l'hydratation ne fait rien.
@@ -79,6 +86,7 @@ test.describe("GETI Info — page publique", () => {
 
   test("une adresse partagée rétablit les filtres ; chaque catégorie n'offre que les siens", async ({ page }) => {
     await page.goto("/geti-info/lfs?rmin=diamond-3&lvl=advanced&day=tue");
+    await skipWithoutList(page);
     const filters = page.getByRole("form", { name: "Filtres" });
     await expect(filters.getByLabel("Rang minimum")).toHaveValue("diamond-3");
     await expect(filters.getByRole("checkbox", { name: "Avancé" })).toBeChecked();
@@ -90,6 +98,7 @@ test.describe("GETI Info — page publique", () => {
 
   test("un créneau de nuit reste tel quel dans l'adresse et les listes d'heures", async ({ page }) => {
     await page.goto("/geti-info/lfs?hfrom=22&hto=2");
+    await skipWithoutList(page);
     const filters = page.getByRole("form", { name: "Filtres" });
     await expect(filters.getByLabel("Entre (heure)")).toHaveValue("22");
     await expect(filters.getByLabel("et (heure)")).toHaveValue("2");
@@ -127,6 +136,7 @@ test.describe("GETI Info — page publique", () => {
   test("à 375 px, les filtres se replient derrière un bouton et rien ne déborde", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto("/geti-info/lfp");
+    await skipWithoutList(page);
     const toggle = page.getByRole("button", { name: /^Filtres/ });
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(page.getByRole("form", { name: "Filtres" })).toBeHidden();
@@ -149,6 +159,7 @@ test.describe("GETI Info — page publique", () => {
 
   test("en anglais, les heures s'écrivent 21:00", async ({ page }) => {
     await page.goto("/en/geti-info/lfs?hto=24");
+    await skipWithoutList(page);
     await expect(page.getByLabel("and (hour)")).toHaveValue("24");
     await expect(page.getByLabel("and (hour)").locator("option", { hasText: /^24:00$/ })).toHaveCount(1);
   });
