@@ -67,7 +67,7 @@ source. Un bot ou un webhook peut écrire n'importe quel en-tête, et notre rela
 s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête GETI :
 `parseGetiPost(raw, { getiBotIds, siteBotIds })` ne croit chaque bot que pour
 son propre format. Un bot de `getiBotIds` nomme l'auteur par son en-tête (ou un
-libellé hors citation, `>` et `>>>` compris) ; un bot de `siteBotIds`, par sa
+libellé hors citation, `>` et `>>>` compris — un `>>>` ne cite que la fin de son propre morceau : message, titre, description ou champ) ; un bot de `siteBotIds`, par sa
 seule ligne « Sent from » — un en-tête ou un libellé dans son encart est le
 texte du joueur, et une ligne sans « by <@id> » ne nomme personne (le pseudo de
 la ligne d'auteur, écrite par le bot, reste). Un bot listé des deux côtés lit
@@ -137,8 +137,12 @@ Discord (15 à 22 chiffres) est rendu `null`.
   nom, puis astérisque, tiret bas, tilde, accent grave, barre verticale,
   chevrons, « @ » et barre oblique inverse sont retirés : « @everyone **Nitro** »
   devient « everyone Nitro ».
-- `authorTag` suit la même règle, tiret bas gardé (il fait partie de bien des
-  pseudos) : un en-tête `(**faux_nitro** @everyone)` donne « faux_nitro everyone ».
+- `authorTag` : mentions, « @ » et chevrons retirés, émoji de serveur réduit à
+  son nom ; le balisage n'est retiré qu'au bord d'un mot, tiret bas gardé (ils
+  font partie de bien des pseudos : « Star*Lord#1234 » reste tel quel) : un
+  en-tête `(**faux_nitro** @everyone)` donne « faux_nitro everyone ».
+- Un en-tête GETI ou une ligne « Sent from » écrits par un autre bot que le
+  leur restent dans `text` : c'est le texte du joueur, affiché tel quel.
 - `text` garde le balisage de l'annonce mais aucune mention active
   (`getiSafeText`) : `<@id>` et `<@&id>` deviennent « @… » (l'identifiant d'un
   tiers ne sort pas), `<#id>` « #… », `@everyone` / `@here` perdent leur « @ ».
@@ -260,8 +264,11 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
   erreur. Un filtre `null` ne filtre rien ; une liste qui n'en est pas une
   (`"regions":"EU"`) est ignorée ; un rôle inconnu (« constructor ») aussi ; une
   borne de rang qui n'est pas un rang (palier inconnu, division hors de 1–5) est
-  ouverte, et deux bornes invalides valent un critère absent ; un
-  `maxAgeHours` écrit en texte (`"24"`) est lu comme un nombre.
+  ouverte, et deux bornes invalides valent un critère absent ; une division
+  écrite en texte (`"3"`) est lue comme un nombre ; un `maxAgeHours` écrit en
+  texte (`"24"`) aussi, mais un texte illisible (`"24h"`, `""`) n'est jamais lu
+  comme « sans limite » : rien ne passe ; `includeUnknown: "true"` vaut `true` ;
+  une catégorie inconnue (`"LFP"`) est ignorée.
 - **Champ non lu** (rang, rôle, région, plateforme, langue) : l'annonce est
   écartée, sauf `includeUnknown: true` — le lot 3 décide du réglage par défaut de
   la page.

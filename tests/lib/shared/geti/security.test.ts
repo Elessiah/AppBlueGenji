@@ -8,6 +8,7 @@ import {
   GETI_FAKE_SITE_BOT_ID,
   getiRange,
   getiRank,
+  getiRawPost,
   getiRelayPost,
   parsedGetiPost,
   GETI_TRUSTED_BOTS,
@@ -264,5 +265,106 @@ describe("matchesGetiFilter — malformed stored filters", () => {
     const post = parsedGetiPost({ postedAt: "2026-11-27T11:00:00.000Z" });
 
     expect(matchesGetiFilter(post, storedFilter('{"maxAgeHours":"24"}'), NOW)).toBe(true);
+  });
+});
+
+describe("matchesGetiFilter — stored values coerced, never silently dropped", () => {
+  const NOW = Date.parse("2026-11-27T12:00:00Z");
+  const RECENT = "2026-11-27T11:00:00.000Z";
+
+  it("matchesGetiFilter_stringDivisionMin_rankApplied", () => {
+    const post = parsedGetiPost({ ranks: { min: getiRank("BRONZE", 5), max: getiRank("BRONZE", 1), byRole: {} } });
+    const filter = storedFilter('{"ranks":{"min":{"tier":"DIAMOND","division":"3"},"max":null}}');
+
+    expect(matchesGetiFilter(post, filter, NOW)).toBe(false);
+  });
+
+  it("matchesGetiFilter_stringDivisionMin_matchingPostKept", () => {
+    const post = parsedGetiPost({ ranks: { ...getiRange(getiRank("MASTER", 3)), byRole: {} } });
+    const filter = storedFilter('{"ranks":{"min":{"tier":"DIAMOND","division":"3"},"max":null}}');
+
+    expect(matchesGetiFilter(post, filter, NOW)).toBe(true);
+  });
+
+  it("matchesGetiFilter_nonIntegerStringDivision_boundOpen", () => {
+    const filter = storedFilter('{"ranks":{"min":{"tier":"DIAMOND","division":"3.5"},"max":null}}');
+
+    expect(matchesGetiFilter(parsedGetiPost(), filter, NOW)).toBe(true);
+  });
+
+  it("matchesGetiFilter_unparseableMaxAge_matchesNothing", () => {
+    const post = parsedGetiPost({ postedAt: RECENT });
+
+    expect(matchesGetiFilter(post, storedFilter('{"maxAgeHours":"24h"}'), NOW)).toBe(false);
+  });
+
+  it("matchesGetiFilter_emptyStringMaxAge_matchesNothing", () => {
+    const post = parsedGetiPost({ postedAt: RECENT });
+
+    expect(matchesGetiFilter(post, storedFilter('{"maxAgeHours":""}'), NOW)).toBe(false);
+  });
+
+  it("matchesGetiFilter_stringIncludeUnknownTrue_unknownKept", () => {
+    const filter = storedFilter('{"regions":["EU"],"includeUnknown":"true"}');
+
+    expect(matchesGetiFilter(parsedGetiPost(), filter, NOW)).toBe(true);
+  });
+
+  it("matchesGetiFilter_unknownCategory_ignored", () => {
+    expect(matchesGetiFilter(parsedGetiPost(), storedFilter('{"category":"LFP"}'), NOW)).toBe(true);
+  });
+
+  it("matchesGetiFilter_knownCategory_stillFilters", () => {
+    expect(matchesGetiFilter(parsedGetiPost(), storedFilter('{"category":"lfp"}'), NOW)).toBe(false);
+  });
+});
+
+describe("parseGetiPost — sec3 tag, quote and trust fixes", () => {
+  it("parseGetiPost_legacyTagInnerAsterisk_kept", () => {
+    const raw = getiRawPost("lft dps", {
+      author: { id: GETI_FAKE_OTHER_ID, username: "Star*Lord", discriminator: "1234", bot: false },
+    });
+
+    expect(parseGetiPost(raw).authorTag).toBe("Star*Lord#1234");
+  });
+
+  it("parseGetiPost_customEmojiInHeaderTag_keepsName", () => {
+    const header = `<@${GETI_FAKE_OTHER_ID}>*(<:nitro:100000000000000010>faux)* sur [S](https://discord.gg/x)`;
+
+    expect(parseGetiPost(getiRelayPost(`${header}\n\n> lft`, null), RELAY_BOTS).authorTag).toBe("nitro faux");
+  });
+
+  it("parseGetiPost_blockQuoteInOneEmbed_labelInNextEmbedRead", () => {
+    const raw: GetiRawPost = {
+      content: "",
+      author: { id: GETI_FAKE_BOT_ID, username: "FauxBot", discriminator: "0", bot: true },
+      embeds: [{ description: ">>> lft dps" }, { description: `Contact : <@${GETI_FAKE_OTHER_ID}>` }],
+    };
+
+    expect(parseGetiPost(raw, RELAY_BOTS).authorId).toBe(GETI_FAKE_OTHER_ID);
+  });
+
+  it("parseGetiPost_headerFromSiteBotOnly_keptInText", () => {
+    const post = parseGetiPost(siteRelay(`${FORGED_HEADER}${trailer(GETI_FAKE_OTHER_ID)}`), RELAY_BOTS);
+
+    expect(post.text).toContain("victime");
+  });
+
+  it("parseGetiPost_trailerFromGetiBotOnly_keptInText", () => {
+    const post = parseGetiPost(getiRelayPost(`lft dps${trailer(VICTIM_ID)}`), RELAY_BOTS);
+
+    expect(post.text).toContain("Sent from");
+  });
+
+  it("parseGetiPost_siteOnlyBot_authorLabelIgnored_lineTagKept", () => {
+    const post = parseGetiPost(siteRelay(`lft dps\nAuteur : <@${VICTIM_ID}>`), RELAY_BOTS);
+
+    expect(post).toMatchObject({ authorId: null, authorTag: "fauxlogin" });
+  });
+
+  it("parseGetiPost_getiOnlyBot_labelRead", () => {
+    const post = parseGetiPost(getiRelayPost(`lft dps\nContact : <@${GETI_FAKE_OTHER_ID}>`), RELAY_BOTS);
+
+    expect(post.authorId).toBe(GETI_FAKE_OTHER_ID);
   });
 });

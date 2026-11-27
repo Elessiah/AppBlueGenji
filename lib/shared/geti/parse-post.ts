@@ -20,7 +20,9 @@ import {
   parseGetiTeamName,
 } from "@/lib/shared/geti/fields";
 import {
+  CUSTOM_EMOJI,
   GETI_TEXT_MAX,
+  MENTION,
   NOT_AFTER_WORD,
   getiDisplayText,
   getiSafeText,
@@ -93,8 +95,13 @@ const GETI_HEADER = new RegExp(
 const USERNAME_SHAPE = /^(?:[\w.]{2,32}|[^#@:`()\n]{2,32}#\d{4})$/u;
 /** Ligne citée (« > … ») : le texte relayé d'un joueur, jamais l'en-tête du bot. */
 const QUOTED_LINE = /^\s*>/u;
-const TAG_MENTION = /<(?:@[!&]?|#)\d{1,22}>/gu;
-const TAG_MARKUP = /[\\*~`|<>@]+/gu;
+/**
+ * Balisage au bord d'un mot (« **Nitro** », « ||x|| ») : retiré. À l'intérieur
+ * d'un ancien pseudo (« Star*Lord#1234 »), il en fait partie et reste.
+ */
+const TAG_EDGE_MARKUP = /(?<=^|\s)[*~`|]+|[*~`|]+(?=\s|$)/gu;
+/** Ni « @ » (aucun pseudo n'en porte) ni chevron (reste d'une mention). */
+const TAG_SYMBOLS = /[<>@]+/gu;
 /** Citation en bloc (« >>> ») : jusqu'à la fin du message. */
 const BLOCK_QUOTE = /^\s*>>>\s/u;
 
@@ -129,10 +136,18 @@ export function getiCategoryOfChannel(channelId: unknown): GetiCategory | null {
 
 /**
  * Pseudo en texte seul : ni mention, ni balisage, ni « @ » (« **Nitro** @everyone »
- * → « Nitro everyone »). Le tiret bas reste : il fait partie de bien des pseudos.
+ * → « Nitro everyone ») ; un émoji de serveur laisse son nom. Le tiret bas reste :
+ * il fait partie de bien des pseudos.
  */
 function tagText(value: string): string {
-  return value.replace(TAG_MENTION, " ").replace(TAG_MARKUP, " ").replace(/\s+/gu, " ").trim();
+  return value
+    .replace(CUSTOM_EMOJI, " $1 ")
+    .replace(MENTION, " ")
+    .replace(/\\(.)/gu, "$1")
+    .replace(TAG_SYMBOLS, " ")
+    .replace(TAG_EDGE_MARKUP, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
 }
 
 /** Pseudo copiable : nettoyé, sans « @ » de tête, avec l'ancien suffixe s'il existe. */
@@ -191,13 +206,8 @@ function embedFieldLines(embed: GetiRawEmbed): string[] {
  * différents se contredisent
  * (le second peut être écrit par le joueur) : personne n'est désigné.
  */
-function mentionedAuthorId(body: string): string | null {
-  const lines = body.split("\n");
-  // « >>> » cite la ligne et toutes celles qui suivent, même sans « > ».
-  const blockStart = lines.findIndex((line) => BLOCK_QUOTE.test(line));
-  const unquoted = (blockStart === -1 ? lines : lines.slice(0, blockStart))
-    .filter((line) => !QUOTED_LINE.test(line))
-    .join("\n");
+function mentionedAuthorId(parts: readonly string[]): string | null {
+  const unquoted = parts.map(unquotedLines).join("\n");
   let found: string | null = null;
   for (const match of unquoted.matchAll(AUTHOR_MENTION)) {
     const id = match.slice(1).find((group) => group !== undefined) ?? null;
@@ -206,6 +216,17 @@ function mentionedAuthorId(body: string): string | null {
     found = id;
   }
   return found;
+}
+
+/**
+ * Lignes non citées d'un morceau (message, titre, description, champ) :
+ * « >>> » cite la ligne et toutes celles qui suivent **dans ce morceau**,
+ * même sans « > » ; Discord ne cite pas au-delà.
+ */
+function unquotedLines(part: string): string {
+  const lines = part.split("\n");
+  const blockStart = lines.findIndex((line) => BLOCK_QUOTE.test(line));
+  return (blockStart === -1 ? lines : lines.slice(0, blockStart)).filter((line) => !QUOTED_LINE.test(line)).join("\n");
 }
 
 /** Retire les échappements Markdown (« \_ », « \] »). */
@@ -282,8 +303,9 @@ function readEmbed(embed: GetiRawEmbed, trust: RelayTrust): EmbedReading {
       ? { id: trailerId, tag: embedTag, originServer: serverName(trusted[1]) }
       : null;
   const lineServer = trusted !== null && trailerId === null ? serverName(trusted[1]) : null;
-  const start = headerMatch === null ? 0 : headerMatch[0].length;
-  const end = trailerMatch === null ? undefined : Math.max(start, trailerMatch.index);
+  // En-tête ou ligne « Sent from » qui ne vient pas de son bot : le texte du joueur, affiché tel quel.
+  const start = header === null || headerMatch === null ? 0 : headerMatch[0].length;
+  const end = trusted === null ? undefined : Math.max(start, trusted.index);
   const parts = [text(embed.title), description.slice(start, end), ...embedFieldLines(embed)];
   return { parts, header, trailer, embedTag, lineServer };
 }
@@ -316,7 +338,7 @@ function relayContent(raw: GetiRawPost, trust: RelayTrust): RelayContent {
   // (dans notre relais, tout le texte est celui du joueur), dont le pseudo ne se
   // devine pas (la ligne d'auteur peut nommer un autre compte) ; sinon le seul
   // pseudo de la ligne d'auteur, qu'écrit le bot.
-  const mentioned = trust.geti ? mentionedAuthorId(body) : null;
+  const mentioned = trust.geti ? mentionedAuthorId(parts) : null;
   const lineTag = first((reading) => reading.embedTag);
   return { body, authorTag: mentioned === null ? lineTag : null, authorId: mentioned, originServer: lineServer };
 }

@@ -21,8 +21,8 @@ export const NOT_BEFORE_WORD = String.raw`(?![\p{L}\p{N}])`;
 
 const URL_LIKE = /(?:https?:\/\/|discord\.gg\/|www\.)\S+/giu;
 /** Émoji de serveur `<:nom:id>` : son nom porte souvent le rang ou le rôle. */
-const CUSTOM_EMOJI = /<a?:(\w{1,32}):\d{1,22}>/gu;
-const MENTION = /<(?:@[!&]?|#)\d{1,22}>/gu;
+export const CUSTOM_EMOJI = /<a?:(\w{1,32}):\d{1,22}>/gu;
+export const MENTION = /<(?:@[!&]?|#)\d{1,22}>/gu;
 const TIMESTAMP = /<t:\d{1,16}(?::[a-zA-Z])?>/gu;
 const MARKDOWN = /[*_~`|]+|^[ \t]*(?:>{1,3}|#{1,3}|-#)[ \t]+/gmu;
 const REGIONAL_INDICATORS = /[\u{1F1E6}-\u{1F1FF}]/gu;
