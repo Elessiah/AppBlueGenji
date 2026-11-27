@@ -89,14 +89,13 @@ export type GetiUpsertOutcome = {
 };
 
 /**
- * Bots dont l'analyse croit les relais : GETI Bot (son en-tête nomme l'auteur)
- * et notre bot (`DISCORD_BOT_CLIENT_ID`, l'identifiant de l'application est
- * celui du compte du bot), s'il est configuré. Sans cette liste,
- * `parseGetiPost` ne nomme l'auteur d'aucun relais.
+ * Bots dont l'analyse croit les relais : GETI Bot seul (son en-tête nomme
+ * l'auteur). Notre bot n'y figure pas : ses messages ne sont pas des annonces
+ * (`parsePushedPost` les refuse avant l'analyse), le croire ne servirait à
+ * rien. Sans cette liste, `parseGetiPost` ne nomme l'auteur d'aucun relais.
  */
-export function getiTrustedBots(env: Readonly<Record<string, string | undefined>> = process.env): GetiParseOptions {
-  const siteBotId = env.DISCORD_BOT_CLIENT_ID?.trim() ?? "";
-  return { getiBotIds: [GETI_BOT_USER_ID], siteBotIds: /^\d{15,22}$/u.test(siteBotId) ? [siteBotId] : [] };
+export function getiTrustedBots(): GetiParseOptions {
+  return { getiBotIds: [GETI_BOT_USER_ID], siteBotIds: [] };
 }
 
 /**

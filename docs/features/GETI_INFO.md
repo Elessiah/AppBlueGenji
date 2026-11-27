@@ -314,11 +314,12 @@ copie) et le serveur d'origine — dont le nom peut porter des crochets
 le lit (`GETI_HEADER`) et le retire du texte, qui garde ses marques de citation
 (`> …`) ; l'auteur de l'en-tête prime sur toute mention du texte. Le message de **tout autre bot** (le nôtre compris), un message système
 ou un message sans texte n'est pas une annonce : ni poussé par le bot, ni gardé
-par le site. Un message de GETI Bot dont le premier encart ne s'ouvre pas sur la mention
-de l'auteur (l'avis « Ton annonce a été publié dans … ») n'en est pas une non plus
+par le site. Un message de GETI Bot dont le premier encart ne s'ouvre pas sur l'en-tête d'un
+relais — mention de l'auteur, `(pseudo)`, puis `sur`/`on`/`from` (l'avis « Ton
+annonce a été publié dans … », même s'il mentionne l'auteur) — n'en est pas une non plus
 (`isGetiRelay`, `isGetiRelayMessage` côté bot). L'analyse ne croit l'en-tête
-que des bots listés (`getiTrustedBots` : GETI Bot, et notre bot par
-`DISCORD_BOT_CLIENT_ID`). Le réglage de l'analyse sur les textes réels est un lot à part
+que des bots listés (`getiTrustedBots` : GETI Bot seul — notre bot n'y est pas,
+ses messages étant refusés avant l'analyse). Le réglage de l'analyse sur les textes réels est un lot à part
 (GETI-TUNE).
 
 ### Durées de garde, par catégorie

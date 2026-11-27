@@ -780,13 +780,15 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
       missingInBoth(
         [
           "La lecture des annonces de recrutement transmises au site repose elle aussi sur son intérêt légitime",
-          "il ne les tient en mémoire que le temps de les remettre au site",
-          "à chaque reconnexion à Discord",
+          "dans le cache de messages de Discord, qui garde les 200 derniers messages reçus de chaque salon",
+          "à chaque nouvelle session Discord",
+          "après un envoi au site ou une lecture d'un salon en échec",
         ],
         [
           "Reading the recruitment posts passed to the website also rests on its legitimate interest",
-          "it only holds them in memory until they reach the website",
-          "at each reconnection to Discord",
+          "in Discord's message cache, which keeps the latest 200 messages received in each channel",
+          "at each new Discord session",
+          "after a failed sending to the website or a failed read of a channel",
         ],
       ),
     ).toEqual([]);

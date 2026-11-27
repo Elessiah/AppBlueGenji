@@ -112,4 +112,12 @@ describe("isGetiRelay — relais ou avis de GETI Bot", () => {
   it("isGetiRelay_mentionNotAtTheStart_returnsFalse", () => {
     expect(isGetiRelay([{ description: `LFP tank ${HEADER}` }])).toBe(false);
   });
+
+  it("isGetiRelay_mentionThenNotice_returnsFalse", () => {
+    expect(isGetiRelay([{ description: `<@${AUTHOR_ID}> Ton annonce a été publiée dans 32 autres channels.` }])).toBe(false);
+  });
+
+  it("isGetiRelay_englishHeaderWithOn_returnsTrue", () => {
+    expect(isGetiRelay([{ description: `<@${AUTHOR_ID}> (fauxpseudo) on [Faux Serveur](https://discord.gg/fauxcode)\n\n> LFT dps` }])).toBe(true);
+  });
 });

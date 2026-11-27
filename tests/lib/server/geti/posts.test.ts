@@ -89,19 +89,8 @@ describe("durées de garde", () => {
 });
 
 describe("getiTrustedBots", () => {
-  it("getiTrustedBots_botClientIdSet_trustsGetiBotAndOurBot", () => {
-    expect(getiTrustedBots({ DISCORD_BOT_CLIENT_ID: " 100000000000000092 " })).toEqual({
-      getiBotIds: [GETI_BOT_USER_ID],
-      siteBotIds: ["100000000000000092"],
-    });
-  });
-
-  it("getiTrustedBots_botClientIdMissing_trustsGetiBotOnly", () => {
-    expect(getiTrustedBots({})).toEqual({ getiBotIds: [GETI_BOT_USER_ID], siteBotIds: [] });
-  });
-
-  it("getiTrustedBots_botClientIdNotASnowflake_trustsGetiBotOnly", () => {
-    expect(getiTrustedBots({ DISCORD_BOT_CLIENT_ID: "abc" })).toEqual({ getiBotIds: [GETI_BOT_USER_ID], siteBotIds: [] });
+  it("getiTrustedBots_always_trustsGetiBotOnly", () => {
+    expect(getiTrustedBots()).toEqual({ getiBotIds: [GETI_BOT_USER_ID], siteBotIds: [] });
   });
 });
 
