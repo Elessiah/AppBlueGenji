@@ -37,6 +37,16 @@ describe("createGetiTables", () => {
     expect(ddl).toContain("UNIQUE KEY uniq_bg_geti_objections_target (kind, target_id)");
   });
 
+  it("createGetiTables_called_cascadesAlertTracesWithTheirAlert", async () => {
+    const execute = jest.fn<SqlQuery>(async () => [{}]);
+
+    await createGetiTables(fakePool({ execute }));
+
+    const ddl = String(execute.mock.calls[3][0]);
+    expect(ddl).toContain("CREATE TABLE IF NOT EXISTS bg_geti_alert_hits");
+    expect(ddl).toContain("REFERENCES bg_geti_alerts(id) ON DELETE CASCADE");
+  });
+
   it("createGetiTables_creationRefused_doesNotThrow", async () => {
     const execute = jest.fn<SqlQuery>(async () => {
       throw new Error("CREATE command denied");

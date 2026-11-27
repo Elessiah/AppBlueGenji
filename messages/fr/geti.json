@@ -77,6 +77,8 @@
   },
   "alerts": {
     "button": "Créer une alerte",
+    "loadFailed": "La fenêtre des alertes n'a pas pu s'ouvrir. Réessaie dans un instant.",
+    "reloading": "Le site vient d'être mis à jour : recharge la page pour ouvrir les alertes.",
     "hintSubject": "les alertes",
     "hint": "Une alerte garde la catégorie et les filtres affichés : tu es prévenu quand une nouvelle annonce y correspond, au plus une fois toutes les {minutes} minutes par alerte.",
     "title": "Alertes d'annonces",

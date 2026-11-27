@@ -167,9 +167,8 @@ export async function updateGetiAlert(userId: number, alertId: number, patch: Ge
 export async function deleteGetiAlert(userId: number, alertId: number): Promise<boolean> {
   const db = await getDatabase();
   const [result] = await db.execute(`DELETE FROM bg_geti_alerts WHERE id = ? AND user_id = ?`, [alertId, userId]);
-  if (affected(result) === 0) return false;
-  await db.execute(`DELETE FROM bg_geti_alert_hits WHERE alert_id = ?`, [alertId]);
-  return true;
+  // Les traces partent avec l'alerte (`ON DELETE CASCADE`) : une seule instruction, jamais une alerte supprimée avec une erreur rendue.
+  return affected(result) > 0;
 }
 
 /**

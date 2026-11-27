@@ -77,6 +77,8 @@
   },
   "alerts": {
     "button": "Create an alert",
+    "loadFailed": "The alerts window couldn't open. Try again in a moment.",
+    "reloading": "The site has just been updated: reload the page to open the alerts.",
     "hintSubject": "alerts",
     "hint": "An alert saves the category and filters shown: you are notified when a new post matches them, at most once every {minutes} minutes per alert.",
     "title": "Post alerts",

@@ -1,5 +1,5 @@
 /**
- * Fenêtre « Alertes d'annonces » (`components/geti/GetiAlerts.tsx`) : ce
+ * Fenêtre « Alertes d'annonces » (`components/geti/GetiAlertsDialog.tsx`, chargée par `GetiAlerts.tsx`) : ce
  * qu'elle rend selon la session et les alertes du compte (rendu serveur,
  * portail remplacé par son contenu). Les gestes (créer, mettre en pause,
  * supprimer) sont joués de bout en bout par `e2e/geti-info.spec.ts`.
@@ -13,7 +13,8 @@ jest.mock("react-dom", () => {
 jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: () => ({ current: null }) }));
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { GetiAlerts, GetiAlertsDialog, type GetiAlertsProps } from "@/components/geti/GetiAlerts";
+import { GetiAlerts } from "@/components/geti/GetiAlerts";
+import { GetiAlertsDialog, type GetiAlertsProps } from "@/components/geti/GetiAlertsDialog";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { ToastProvider } from "@/components/ui/toast";
@@ -84,6 +85,23 @@ describe("GetiAlerts", () => {
     expect(html).toContain("Créer une alerte");
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).not.toContain('role="dialog"');
+  });
+});
+
+describe("GetiAlerts — chargement de la fenêtre", () => {
+  it("GetiAlerts_dialogCode_isLoadedOnDemandNotImportedStatically", () => {
+    const code = readSource("components/geti/GetiAlerts.tsx");
+
+    expect(code).toContain('import("./GetiAlertsDialog")');
+    expect(code).not.toContain('import { GetiAlertsDialog');
+    expect(code).toContain("onceLoader");
+    expect(code).toContain("onFocus={preload}");
+  });
+
+  it("GetiAlerts_loadFailure_isSaidInBothLanguages", () => {
+    expect(frGeti.alerts.loadFailed).not.toBe("");
+    expect(enGeti.alerts.loadFailed).not.toBe("");
+    expect(frGeti.alerts.reloading).not.toBe(enGeti.alerts.reloading);
   });
 });
 
@@ -176,7 +194,7 @@ describe("textes des alertes", () => {
   });
 
   it("getiAlerts_deletion_goesThroughTheConfirmationDialogNeverWindowConfirm", () => {
-    const code = readSource("components/geti/GetiAlerts.tsx");
+    const code = readSource("components/geti/GetiAlertsDialog.tsx");
 
     expect(code).toContain("<ConfirmActionDialog");
     expect(code).not.toContain("window.confirm");
@@ -185,14 +203,14 @@ describe("textes des alertes", () => {
   it("GetiAlerts_twoActionsInFlight_applyEachAnswerToTheCurrentList", () => {
     // Pause d'une alerte puis suppression d'une autre, réponses dans le désordre :
     // chaque réponse part de la liste du moment, jamais de celle capturée au clic.
-    const code = readSource("components/geti/GetiAlerts.tsx");
+    const code = readSource("components/geti/GetiAlertsDialog.tsx");
 
     expect(code.match(/setAlerts\(\(current\) =>/g)).toHaveLength(3);
     expect(code).not.toMatch(/setAlerts\((\[|alerts\.)/);
   });
 
   it("GetiAlerts_unexpectedBodiesAndSession_areHandledWithoutSilentFailure", () => {
-    const code = readSource("components/geti/GetiAlerts.tsx");
+    const code = readSource("components/geti/GetiAlertsDialog.tsx");
 
     // Un 200 au corps illisible = erreur générique, jamais un geste muet.
     expect(code).not.toContain("await response.json()) as { alert: GetiAlert }");
@@ -204,7 +222,7 @@ describe("textes des alertes", () => {
   });
 
   it("GetiAlerts_keyboardFocus_followsRenamingAndDeletion", () => {
-    const code = readSource("components/geti/GetiAlerts.tsx");
+    const code = readSource("components/geti/GetiAlertsDialog.tsx");
 
     expect(code).toContain("renameInput.current?.focus()");
     expect(code).toContain("renameButton.current?.focus()");

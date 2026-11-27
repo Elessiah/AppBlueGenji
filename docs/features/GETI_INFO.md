@@ -908,6 +908,20 @@ Hors rattrapage, un lot porte une annonce. Au-delà de 2 000 alertes actives
 sur les catégories d'un lot, les plus récentes ne sont pas lues — à revoir
 (index par critère) si ce nombre approche.
 
+**Croissance des traces** : une trace par couple (alerte, annonce) qui
+correspond, y compris pour une alerte alors dans son délai — la trace **est** ce
+qui empêche une modification tardive de prévenir une seconde fois, elle vit donc
+aussi longtemps que l'annonce (15 jours, purge par lots). Borne : alertes
+d'une catégorie (≤ 2 000 lues) × annonces récentes de cette catégorie sur 15
+jours ; seules les annonces **récentes** posent des traces (le rattrapage n'en
+pose aucune). À surveiller si le nombre d'alertes « sans filtre » grossit.
+
+**Fenêtre côté client** : `GetiAlerts` ne rend que le bouton ; la fenêtre
+(`GetiAlertsDialog`, formulaire, liste, confirmation) est un morceau chargé au
+premier clic, au survol ou au focus du bouton (`onceLoader`, un échec se retente
+et se dit par un toast). La liste des alertes du compte est lue côté serveur au
+rendu de la page, en parallèle de la liste d'annonces pour la session.
+
 ### Durée de garde, effacement, export
 
 - Une alerte vit jusqu'à sa suppression par le compte ; la pause la garde sans
@@ -927,7 +941,7 @@ sur les catégories d'un lot, les plus récentes ne sont pas lues — à revoir
   `2026-11-alertes-d-annonces-geti` de `PRIVACY_CHANGES` (FR et EN),
   `/rgpd#alertes-geti` (FR et EN).
 
-### Interface (`components/geti/GetiAlerts.tsx`)
+### Interface (`components/geti/GetiAlerts.tsx`, fenêtre `GetiAlertsDialog.tsx`)
 
 Bouton « Créer une alerte » dans l'en-tête de la catégorie, avec son
 `InfoHint`. Sa fenêtre (portée dans `body`, `useDialogBehavior`) montre, pour un

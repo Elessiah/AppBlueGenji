@@ -237,15 +237,12 @@ describe("updateGetiAlert", () => {
 });
 
 describe("deleteGetiAlert", () => {
-  it("deleteGetiAlert_ownedAlert_deletesItAndItsHits", async () => {
+  it("deleteGetiAlert_ownedAlert_deletesItInOneStatementTheHitsCascade", async () => {
     const execute = executeMock([], 1);
     useDatabase(execute);
 
     await expect(deleteGetiAlert(USER_ID, 7)).resolves.toBe(true);
-    expect(execute.mock.calls).toEqual([
-      ["DELETE FROM bg_geti_alerts WHERE id = ? AND user_id = ?", [7, USER_ID]],
-      ["DELETE FROM bg_geti_alert_hits WHERE alert_id = ?", [7]],
-    ]);
+    expect(execute.mock.calls).toEqual([["DELETE FROM bg_geti_alerts WHERE id = ? AND user_id = ?", [7, USER_ID]]]);
   });
 
   it("deleteGetiAlert_alertOfAnotherAccount_returnsFalseAndKeepsHits", async () => {
