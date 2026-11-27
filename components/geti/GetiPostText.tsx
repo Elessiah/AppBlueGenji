@@ -24,8 +24,12 @@ export function GetiPostText({
     const element = textRef.current;
     if (!long || open || !element) return;
     const measure = () => setOverflowing(element.scrollHeight > element.clientHeight + 1);
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
+    // `ResizeObserver` mesure d'office à l'observation, après la mise en page : pas de lecture
+    // synchrone par carte au montage (une mise en page forcée par annonce).
+    if (typeof ResizeObserver === "undefined") {
+      measure();
+      return;
+    }
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();

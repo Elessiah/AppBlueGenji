@@ -14,6 +14,7 @@
  */
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { cached } from "@/lib/server/cache";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { toIso } from "@/lib/server/serialization";
 import type { GetiPushedPost, GetiReconcileRequest } from "@/lib/server/geti/wire";
@@ -409,9 +410,11 @@ export async function listGetiPosts(
   now: number = Date.now(),
 ): Promise<GetiPostPage> {
   const db = executor ?? (await getDatabase());
-  const pageSize = pageNumber(page.pageSize, GETI_PAGE_SIZE_DEFAULT, GETI_PAGE_SIZE_MAX);
-  const requested = pageNumber(page.page, 1, Number.MAX_SAFE_INTEGER);
+  return pageOfStored(await scanGetiPosts(filter, db, now), filter, page, now);
+}
 
+/** Lecture SQL et analyse des annonces gardées de la catégorie et de l'âge voulus (le reste du filtre se joue en mémoire). */
+async function scanGetiPosts(filter: GetiFilter, db: GetiExecutor, now: number): Promise<GetiStoredPost[]> {
   const where = ["posted_at >= ?"];
   const params: (Date | string)[] = [listSince(filter, now)];
   if (isCategory(filter.category)) {
@@ -428,13 +431,43 @@ export async function listGetiPosts(
       LIMIT ${GETI_LIST_SCAN_MAX}`,
     params,
   );
-  // L'âge est déjà joué en SQL sur la date gardée : le filtre en mémoire ne le rejoue pas.
-  const rest: GetiFilter = { ...filter, maxAgeHours: null };
-  const matching: GetiStoredPost[] = [];
+  const posts: GetiStoredPost[] = [];
   for (const row of rows) {
     const post = storedPostOf(row, now);
-    if (post && matchesGetiFilter(post.parsed, rest, now)) matching.push(post);
+    if (post) posts.push(post);
   }
+  return posts;
+}
+
+/** Filtre en mémoire les annonces lues, puis découpe la page demandée. */
+function pageOfStored(stored: readonly GetiStoredPost[], filter: GetiFilter, page: GetiPageRequest, now: number): GetiPostPage {
+  const pageSize = pageNumber(page.pageSize, GETI_PAGE_SIZE_DEFAULT, GETI_PAGE_SIZE_MAX);
+  const requested = pageNumber(page.page, 1, Number.MAX_SAFE_INTEGER);
+  // L'âge est déjà joué en SQL sur la date gardée : le filtre en mémoire ne le rejoue pas.
+  const rest: GetiFilter = { ...filter, maxAgeHours: null };
+  const matching = stored.filter((post) => matchesGetiFilter(post.parsed, rest, now));
   const start = (requested - 1) * pageSize;
   return { posts: matching.slice(start, start + pageSize), total: matching.length, page: requested, pageSize };
+}
+
+/** Durée de vie de la lecture partagée de la page publique : une annonce modifiée sur Discord s'y voit en quelques secondes. */
+export const GETI_SCAN_CACHE_TTL_MS = 10_000;
+
+/**
+ * Comme {@link listGetiPosts} pour la page publique : la lecture SQL (jusqu'à
+ * {@link GETI_LIST_SCAN_MAX} lignes à analyser) est **mutualisée** par catégorie
+ * et âge (`cached`, vol unique), le filtre et la pagination restent par demande.
+ * Cent visiteurs, actualisations de fond comprises, coûtent une lecture par fenêtre.
+ */
+export async function listGetiPostsShared(
+  filter: GetiFilter,
+  page: GetiPageRequest = {},
+  now: number = Date.now(),
+): Promise<GetiPostPage> {
+  const age = typeof filter.maxAgeHours === "number" && Number.isFinite(filter.maxAgeHours) ? filter.maxAgeHours : 0;
+  const key = `geti:scan:${isCategory(filter.category) ? filter.category : "all"}:${age}`;
+  const stored = await cached(key, GETI_SCAN_CACHE_TTL_MS, async () =>
+    scanGetiPosts(filter, await getDatabase(), now),
+  );
+  return pageOfStored(stored, filter, page, now);
 }

@@ -629,7 +629,7 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
 - `GetiOfficialCard` en tête de chaque catégorie : **notre** carte (la CSP interdit
   tout cadre, aucune image n'est chargée de chez Discord), bouton « Rejoindre »
   vers l'invitation. La fréquentation (`lib/server/geti/community.ts`, invitation
-  publique de Discord, 1,2 s au plus, cache de 30 min, échec compris) est rendue
+  publique de Discord, 0,8 s au plus, succès gardé 30 min, échec une minute seulement et journalisé par code) est rendue
   sous `Suspense` : elle ne retient jamais la page et disparaît si Discord se tait.
 - « Publier une annonce » (`GetiPublishButton`, modale portée dans `body`) : on ne
   publie pas sur le site mais dans le salon Discord de la catégorie
@@ -639,7 +639,7 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
 ### Fraîcheur
 
 Aucun flux : `GetiRefresher` relit la page (`router.refresh()`) au retour sur
-l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement
+l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lecture SQL des annonces est mutualisée 10 s par catégorie et âge — `listGetiPostsShared`, `cached` à vol unique —, le filtre et la page restent par demande ; un geste de filtre attend 300 ms de calme avant de naviguer, « Réinitialiser » part tout de suite ; la fenêtre « Publier » rend sa carte elle-même à l'ouverture)
 (`getiRefreshIntervalMs`, `CLIENT_POWER_MODES.md`) ; un onglet caché ne demande rien.
 
 ### Textes, tests, seed

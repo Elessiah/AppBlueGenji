@@ -235,3 +235,32 @@ describe("GetiLayout, GetiRetry et finitions UI (cycle ui 1)", () => {
     }
   });
 });
+
+describe("coût de la page (perf 1)", () => {
+  it("filtres : la navigation est différée, la réinitialisation est immédiate", () => {
+    const source = readSource("components/geti/GetiFilters.tsx");
+    expect(source).toContain("GETI_FILTER_DEBOUNCE_MS");
+    expect(source).toContain("setTimeout(go, GETI_FILTER_DEBOUNCE_MS)");
+    expect(source).toContain("apply({ ...emptyGetiPageQuery() }, true)");
+    expect(source).toContain("useEffect(() => cancelNavigation, [])");
+  });
+
+  it("la page lit la liste mutualisée et construit ses libellés une fois", () => {
+    const source = readSource("components/geti/GetiInfoView.tsx");
+    expect(source).toContain("listGetiPostsShared(");
+    expect(source.match(/getiDataText\(m\)/g)).toHaveLength(1);
+  });
+
+  it("la carte officielle de la fenêtre Publier n'est plus portée par le serveur", () => {
+    const publish = readSource("components/geti/GetiPublishButton.tsx");
+    const card = readSource("components/geti/GetiOfficialCard.tsx");
+    expect(publish).toContain("official: OfficialText");
+    expect(publish).not.toContain("card: ReactNode");
+    expect(card).not.toContain("lib/server");
+  });
+
+  it("le texte long ne mesure pas de façon synchrone quand l'observateur existe", () => {
+    const source = readSource("components/geti/GetiPostText.tsx");
+    expect(source.indexOf("measure();")).toBeGreaterThan(source.indexOf('typeof ResizeObserver === "undefined"'));
+  });
+});
