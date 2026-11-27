@@ -12,6 +12,7 @@ import {
   aliasTable,
   getiFlagCodes,
   inReferenceOrder,
+  withoutMarkup,
   type GetiPreparedText,
 } from "@/lib/shared/geti/normalize";
 import {
@@ -953,7 +954,7 @@ function cleanTeamName(candidate: string, following = "", skipLeading = false): 
   );
   const kept = stop === -1 ? words : words.slice(0, stop);
   if (kept.length === 1 && NOT_A_NAME_ALONE.has(nameKey(kept[0]))) return null;
-  const name = visibleText(kept.join(" ")).replace(/[.'-]+$/u, "");
+  const name = withoutMarkup(visibleText(kept.join(" "))).replace(/[.'-]+$/u, "");
   // Mots en capitale seulement : « 5 joueurs dont 2 tanks » n'est pas un nom.
   if (!/\p{Lu}/u.test(name)) return null;
   return name.length > GETI_TEAM_NAME_MAX ? null : name;

@@ -252,7 +252,7 @@
     "expected": {
       "category": "lft",
       "relayed": true,
-      "authorTag": "faux.handle",
+      "authorTag": null,
       "authorId": "100000000000000003",
       "originServer": null,
       "teamName": null,
@@ -532,8 +532,8 @@
           "division": 3
         },
         "max": {
-          "tier": "GRANDMASTER",
-          "division": 1
+          "tier": "CHAMPION",
+          "division": 5
         },
         "byRole": {}
       },
@@ -589,11 +589,11 @@
     "expected": {
       "ranks": {
         "min": {
-          "tier": "PLATINUM",
+          "tier": "EMERALD",
           "division": 2
         },
         "max": {
-          "tier": "PLATINUM",
+          "tier": "EMERALD",
           "division": 2
         },
         "byRole": {}

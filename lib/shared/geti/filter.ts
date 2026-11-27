@@ -5,9 +5,33 @@
  * Module pur : importable côté serveur comme côté client.
  */
 import { GETI_RANK_TOP, getiRankValue } from "@/lib/shared/geti/ranks";
-import type { GetiFilter, GetiParsedPost, GetiRankRange } from "@/lib/shared/geti/types";
+import {
+  GETI_ROLES,
+  GETI_TIERS,
+  type GetiFilter,
+  type GetiParsedPost,
+  type GetiRank,
+  type GetiRankRange,
+  type GetiRankedRole,
+} from "@/lib/shared/geti/types";
 
 const HOUR_MS = 3_600_000;
+/** Avance tolérée d'une date de publication sur l'horloge (horloges décalées). */
+const CLOCK_SKEW_MS = 5 * 60_000;
+
+/** Rôle à rang propre : une valeur enregistrée (« constructor ») n'en est pas un. */
+function isRankedRole(role: unknown): role is GetiRankedRole {
+  return role !== "FLEX" && GETI_ROLES.some((known) => known === role);
+}
+
+/** Borne de rang enregistrée, lue seulement si elle est un vrai rang. */
+function rankValue(rank: GetiRank | null | undefined, fallback: number): number {
+  if (typeof rank !== "object" || rank === null) return fallback;
+  const { tier, division } = rank as { tier?: unknown; division?: unknown };
+  const knownTier = GETI_TIERS.some((known) => known === tier);
+  const knownDivision = typeof division === "number" && Number.isInteger(division) && division >= 1 && division <= 5;
+  return knownTier && knownDivision ? getiRankValue(rank) : fallback;
+}
 
 function wanted<T>(values: readonly T[] | null | undefined): readonly T[] {
   return values ?? [];
@@ -34,7 +58,7 @@ function matchesRoles(post: GetiParsedPost, filter: GetiFilter, includeUnknown: 
  */
 function rankRangesOf(post: GetiParsedPost, filter: GetiFilter): GetiRankRange[] {
   const perRole = wanted(filter.roles).flatMap((role) => {
-    const range = role === "FLEX" ? undefined : post.ranks.byRole[role];
+    const range = isRankedRole(role) && Object.hasOwn(post.ranks.byRole, role) ? post.ranks.byRole[role] : undefined;
     return range === undefined ? [] : [range];
   });
   if (perRole.length > 0) return perRole;
@@ -47,8 +71,8 @@ function matchesRanks(post: GetiParsedPost, filter: GetiFilter, includeUnknown: 
   if (min === null && max === null) return true;
   const ranges = rankRangesOf(post, filter);
   if (ranges.length === 0) return includeUnknown;
-  const low = min === null ? 0 : getiRankValue(min);
-  const high = max === null ? GETI_RANK_TOP : getiRankValue(max);
+  const low = rankValue(min, 0);
+  const high = rankValue(max, GETI_RANK_TOP);
   // Deux fourchettes se recoupent, bornes comprises.
   return ranges.some((range) => getiRankValue(range.max) >= low && getiRankValue(range.min) <= high);
 }
@@ -79,7 +103,8 @@ function matchesAge(post: GetiParsedPost, maxAgeHours: number | null | undefined
   // Une annonce sans date ne peut pas être dite récente.
   if (post.postedAt === null) return false;
   const posted = Date.parse(post.postedAt);
-  return !Number.isNaN(posted) && now - posted <= maxAgeHours * HOUR_MS;
+  // Une date dans le futur n'est pas récente : elle resterait en tête des années durant.
+  return !Number.isNaN(posted) && posted <= now + CLOCK_SKEW_MS && now - posted <= maxAgeHours * HOUR_MS;
 }
 
 /**

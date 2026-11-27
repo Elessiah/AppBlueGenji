@@ -76,13 +76,23 @@ const TIER_ALIASES: Readonly<Record<GetiTier, readonly string[]>> = {
     "diam",
     "dia",
   ],
-  MASTER: ["master", "masters", "maitre", "maitres", "mastre"],
-  GRANDMASTER: ["grand master", "grand masters", "grand maitre", "grand maitres", "gm", "gms"],
-  CHAMPION: ["champion", "champions", "champ", "champs"],
+  // Noms français du jeu : « Maîtrise », « Grande maîtrise », « Virtuose » (= Champion).
+  MASTER: ["master", "masters", "maitre", "maitres", "mastre", "maitrise"],
+  GRANDMASTER: [
+    "grand master",
+    "grand masters",
+    "grand maitre",
+    "grand maitres",
+    "grande maitrise",
+    "gm",
+    "gms",
+  ],
+  CHAMPION: ["champion", "champions", "champ", "champs", "virtuose", "virtuoses"],
 };
 
 /** Alias lus seulement suivis d'une division. */
-const NEEDS_DIVISION = new Set(["argent"]);
+// « maîtrise » est d'abord un mot courant (« maîtrise de soi ») : lu avec une division seulement.
+const NEEDS_DIVISION = new Set(["argent", "maitrise"]);
 
 /**
  * Abréviations qui sont aussi des mots courants, écartées sans division dans
@@ -139,6 +149,10 @@ const COMMON_WORD_SENSES: Readonly<Record<string, CommonSense>> = {
   // Un titre, pas un rang : « S10 Intermediate Champion », « champion de France ».
   champion: { before: wordBefore(TITLE_BEFORE), after: wordAfter(TITLE_AFTER, true) },
   champions: { before: wordBefore(TITLE_BEFORE), after: wordAfter(TITLE_AFTER, true) },
+  // « une grande maîtrise du jeu », « un virtuose de la souris » : pas des rangs.
+  grandemaitrise: { before: wordBefore("une d'une avec sa ta ma leur"), after: wordAfter("de du des", true) },
+  virtuose: { before: wordBefore("un une en"), after: wordAfter("de du des", true) },
+  virtuoses: { before: wordBefore("des les"), after: wordAfter("de du des", true) },
 };
 
 /**
@@ -355,27 +369,22 @@ function tierSpan(tier: GetiTier, first: string | undefined, second: string | un
   return { min: Math.min(a, b), max: Math.max(a, b) };
 }
 
-/**
- * Paliers du SR, par tranche de 500 points depuis 1 000 : la table classique
- * d'Overwatch, antérieure à Émeraude et à Champion, qui n'y ont **aucune**
- * tranche — moins de 1 500 Bronze, 1 500 Argent, 2 000 Or, 2 500 Platine,
- * 3 000 Diamant, 3 500 Master, 4 000 et plus Grand Maître.
- */
-const SR_TIERS: readonly GetiTier[] = ["BRONZE", "SILVER", "GOLD", "PLATINUM", "DIAMOND", "MASTER", "GRANDMASTER"];
-const SR_BASE = 1000;
-const SR_PER_TIER = 500;
+/** Bronze court de 0 à 999 SR : environ 200 par division. */
+const SR_BRONZE_TOP = 1000;
+const SR_PER_BRONZE_DIVISION = 200;
+/** D'Argent à Champion : 500 SR par palier, 100 par division. */
 const SR_PER_DIVISION = 100;
 
 /**
- * Rang d'un SR : 500 points par palier, 100 par division (5 en bas de la
- * tranche, 1 en haut), plafonné à Grand Maître 1. Une fourchette à cheval sur
- * 3 000 (« 2900-3100 ») va de Platine 1 à Diamant 4 et recouvre donc Émeraude.
+ * Rang d'un SR, sur l'échelle 0–5 000 en vigueur depuis l'ajout d'Émeraude :
+ * Bronze 0–999, Argent 1 000, Or 1 500, Platine 2 000, Émeraude 2 500, Diamant
+ * 3 000, Master 3 500, Grand Maître 4 000, Champion 4 500–5 000. La division 5
+ * est le bas de la tranche (Émeraude 5 = 2 500–2 599, Émeraude 1 = 2 900–2 999) ;
+ * plafonné à Champion 1. « Top 500 » est une autre notion, sans tranche de SR.
  */
 function srValue(sr: number): number {
-  const points = Math.max(0, sr - SR_BASE);
-  const band = Math.min(SR_TIERS.length - 1, Math.floor(points / SR_PER_TIER));
-  const division = Math.min(DIVISIONS - 1, Math.floor((points - band * SR_PER_TIER) / SR_PER_DIVISION));
-  return GETI_TIERS.indexOf(SR_TIERS[band]) * DIVISIONS + division;
+  if (sr < SR_BRONZE_TOP) return Math.max(0, Math.floor(sr / SR_PER_BRONZE_DIVISION));
+  return Math.min(GETI_RANK_TOP, DIVISIONS + Math.floor((sr - SR_BRONZE_TOP) / SR_PER_DIVISION));
 }
 
 function srSpan(first: number, second: number): ValueRange {

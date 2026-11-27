@@ -49,13 +49,27 @@ aucun message réel n'a été lu. Le format du relais GETI a été connu depuis
   avant toute mention du texte cité (« > contact <@id> » vise un tiers) et est
   retiré du texte : le nom du serveur n'apporte ni rôle, ni rang, ni région ;
 - **autre relais d'un bot** (`author.bot`) — l'auteur est lu dans l'encart : ligne
-  d'auteur (`pseudo`, `pseudo#1234`, `Nom (@pseudo)`), mention derrière un libellé
-  net (`by`/`par`/`Contact` en tête de ligne, `Auteur :`, `posté par`…) ; une
-  mention sans libellé, dans une phrase (« remplaçant de <@id> ») ou dans une
-  citation (`> …`), ne désigne personne : elle peut viser un tiers ; titre, description et
-  champs de l'encart forment le texte. La dernière ligne des relais de **notre**
-  bot (`*Sent from : [Serveur](invitation)* by <@id>`, `buildServiceMessage`) est
-  retirée du texte et donne `originServer` et `authorId`.
+  d'auteur si elle a la forme d'un pseudo (`pseudo`, `pseudo#1234` ; un nom
+  d'affichage libre comme `Admin (@staff)` n'en donne aucun), mention derrière un
+  libellé net (`by`/`par`/`Contact` en tête de ligne, `Auteur :`, `posté par`…) ;
+  une mention sans libellé, dans une phrase (« remplaçant de <@id> ») ou sur une
+  ligne citée (`> Contact : <@id>`), ne désigne personne : elle peut viser un
+  tiers ; deux libellés qui nomment deux comptes différents non plus (le second
+  peut être écrit par le joueur). L'identifiant lu d'une mention ne s'accompagne
+  d'aucun pseudo : la ligne d'auteur pourrait nommer un autre compte. Titre,
+  description et champs de l'encart forment le texte. La dernière ligne des
+  relais de **notre** bot (`*Sent from : [Serveur](invitation)* by <@id>`,
+  `buildServiceMessage`, en tête de ligne : jamais `> Sent from`) est retirée du
+  texte et donne `originServer`, `authorId` et, par la ligne d'auteur de cet
+  encart, `authorTag`.
+
+**Usurpation d'auteur.** Pseudo et identifiant viennent toujours de la même
+source. Notre relais s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête
+GETI : quand l'en-tête et la ligne « Sent from » nomment deux comptes différents,
+personne n'est désigné. Un bot ou un webhook peut écrire n'importe quel en-tête :
+`parseGetiPost(raw, { relayBotIds })` ne lit l'auteur que des bots listés — les
+autres gardent leur texte, sans auteur ni serveur d'origine. **Le lot 2 passe la
+liste** (bot GETI et notre bot) ; sans elle, tout bot est cru.
 
 Le jeu `tests/fixtures/geti/posts.json` est **de synthèse** (tournures courantes
 du recrutement Overwatch, en français et en anglais ; pseudos, identifiants,
@@ -115,6 +129,15 @@ direction retirés ; `visibleText` pour les noms) et bornés. Ils s'affichent **
 texte**, jamais comme du balisage ; un identifiant qui n'est pas un identifiant
 Discord (15 à 22 chiffres) est rendu `null`.
 
+- `teamName` et `originServer` ne gardent aucun caractère de balisage ni de
+  mention (astérisque, tiret bas, tilde, accent grave, barre verticale, chevrons, « @ » et barre oblique inverse retirés, `withoutMarkup`) :
+  « @everyone **Nitro** » devient « everyone Nitro ».
+- `text` garde le balisage de l'annonce mais aucune mention active
+  (`getiSafeText`) : `<@id>` et `<@&id>` deviennent « @… » (l'identifiant d'un
+  tiers ne sort pas), `<#id>` « #… », `@everyone` / `@here` perdent leur « @ ».
+- Avant tout message Discord, ces textes passent encore par `discordInline` /
+  `discordQuote`.
+
 ### Préparation du texte
 
 Avant lecture : NFKC (lettres « de fantaisie »), liens, mentions, horodatages
@@ -162,14 +185,7 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   (3 500 à 3 600), « 3.2-3k », « 3.3/4k » (3 300 à 4 000) ; derrière son
   libellé sans « k » : « SR 3.6-3.7 », « elo : 3.2 » ; et, dans une recherche de
   scrim ou de remplaçant seulement, le décimal nu (« LFS EU PC 3.6 »,
-  « adv 4.5+ »). Table classique d'Overwatch, antérieure à Émeraude et à
-  Champion, qui n'y ont **aucune** tranche : moins de 1 500 Bronze, 1 500
-  Argent, 2 000 Or, 2 500 Platine, 3 000 Diamant, 3 500 Master, 4 000 et plus
-  Grand Maître (« 4k » ≈ Grand Maître ; « 4k5 » plafonne à Grand Maître 1,
-  « 4.5k+ » monte jusqu'à Champion 1) ; 100 points par division, 5 en bas de la
-  tranche, 1 en haut. Une fourchette à cheval sur 3 000 (« 2900-3100 » :
-  Platine 1 à Diamant 4) recouvre donc Émeraude dans un filtre ; « Gold 2k »
-  reste Or. Un horaire voisin ne fait pas d'un SR
+  « adv 4.5+ »). Correspondance : la table ci-dessous. Un horaire voisin ne fait pas d'un SR
   un numéro (« 3500 21-23 », « 4k 20-22 CET »), « loi 1901 » n'est pas un SR,
   et « champion » en titre n'est pas un rang (« S10 Intermediate Champion »,
   « champion de France »). Un nombre est
@@ -183,6 +199,20 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   SR), année (« 2025 », « 2025-2026 », et dès 1950 derrière un mot de date : « né
   en 2005 », « nés avant 2008 »). « sr » / « elo »
   collé l'emporte sur tout contexte.
+- **Table SR → rang** (échelle 0–5 000, en vigueur depuis l'ajout d'Émeraude
+  entre Platine et Diamant, qui a décalé de 500 points les paliers
+  inférieurs) : Bronze 0–999 (environ 200 SR par division) ; Argent
+  1 000–1 499 ; Or 1 500–1 999 ; Platine 2 000–2 499 ; Émeraude 2 500–2 999 ;
+  Diamant 3 000–3 499 ; Master (« Maîtrise ») 3 500–3 999 ; Grand Maître
+  (« Grande maîtrise ») 4 000–4 499 ; Champion (« Virtuose ») 4 500–5 000.
+  D'Argent à Champion, 100 SR par division, la division 5 en bas de la tranche
+  (Émeraude 5 = 2 500–2 599, Émeraude 1 = 2 900–2 999). Donc « 4k » = Grand
+  Maître 5, « 3500 » = Master 5, « 2k » = Platine 5. « Top 500 » est une notion
+  à part, sans tranche de SR.
+- **Noms français du jeu** : « Maîtrise » (lu avec une division seulement —
+  « maîtrise de soi » est un mot courant), « Grande maîtrise » (pas « une
+  grande maîtrise du jeu »), « Virtuose » (= Champion ; pas « un virtuose
+  de… »).
 - **Par rôle** : le rôle écrit contre le rang, sur la même ligne, devant
   (« tank m2 / dps d1 ») ou derrière (« M2 tank, D1 dps ») ; une liste de rôles
   partage la fourchette (« tank/dps : d3-m2 »). Un second rang qui suit le
@@ -279,8 +309,11 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
   comprises. Avec des rôles voulus et un rang par rôle dans l'annonce, seuls les
   rangs de ces rôles comptent ; sinon la fourchette globale.
 - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
-- **Âge** : publiée depuis `maxAgeHours` au plus ; une annonce sans date est
-  écartée.
+- **Âge** : publiée depuis `maxAgeHours` au plus ; une annonce sans date, ou
+  datée de plus de 5 minutes dans le futur, est écartée.
+- **Filtre enregistré** (JSON relu pour les alertes) : un rôle inconnu
+  (« constructor ») ou une borne de rang qui n'est pas un rang (palier inconnu,
+  division hors de 1–5) est ignoré, jamais une erreur.
 - **Annonces closes** : écartées avec `hideClosed: true`.
 - **Champ non lu** (rang, rôle, région, plateforme, langue, niveau) : l'annonce est
   écartée, sauf `includeUnknown: true` — le lot 3 décide du réglage par défaut de

@@ -72,11 +72,11 @@ describe("relay trailer and author labels after the bounds", () => {
     expect(parseGetiPost(getiRelayPost(`LFT tank\nby<@${AUTHOR_ID}>`)).authorId).toBe(AUTHOR_ID);
   });
 
-  it("the last labelled mention wins", () => {
+  it("two labelled mentions of different accounts name nobody", () => {
     const other = "100000000000000002";
     const post = parseGetiPost(getiRelayPost(`by <@${other}>\nby <@${AUTHOR_ID}>`));
 
-    expect(post.authorId).toBe(AUTHOR_ID);
+    expect(post.authorId).toBeNull();
   });
 });
 
