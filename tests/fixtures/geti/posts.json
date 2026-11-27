@@ -1,0 +1,375 @@
+[
+  {
+    "name": "lft-fr-texte-libre",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "LFT 🇫🇷 EU PC\nDPS hitscan Master 2 (peak GM5)\nDispo du lundi au jeudi 21h-23h\n18+",
+      "author": { "id": "100000000000000001", "username": "fauxjoueur_01", "discriminator": "0" },
+      "postedAt": "2026-11-20T18:30:00.000Z"
+    },
+    "expected": {
+      "category": "lft",
+      "authorTag": "fauxjoueur_01",
+      "authorId": "100000000000000001",
+      "relayed": false,
+      "roles": ["DPS"],
+      "subRoles": ["HITSCAN"],
+      "ranks": {
+        "min": { "tier": "MASTER", "division": 2 },
+        "max": { "tier": "GRANDMASTER", "division": 5 },
+        "byRole": { "DPS": { "min": { "tier": "MASTER", "division": 2 }, "max": { "tier": "MASTER", "division": 2 } } }
+      },
+      "regions": ["EU"],
+      "platforms": ["PC"],
+      "languages": ["FR"],
+      "availability": { "days": ["MON", "TUE", "WED", "THU"], "times": [{ "from": 1260, "to": 1380 }], "timezone": null },
+      "minAge": 18,
+      "postedAt": "2026-11-20T18:30:00.000Z",
+      "edited": false
+    }
+  },
+  {
+    "name": "lfp-fr-equipe-dans-la-phrase",
+    "raw": {
+      "channelId": "679323677874978826",
+      "content": "**LFP** — La team Blue Falcons recherche un main tank et un flex support\nRang : Diamant 3 à Master 5\nScrims mardi, jeudi et dimanche à partir de 20h30 (heure française)\nFR uniquement, majeurs de préférence",
+      "author": { "id": "100000000000000004", "username": "faux.capitaine", "discriminator": "0" },
+      "postedAt": "2026-11-21T10:00:00.000Z",
+      "editedAt": "2026-11-21T10:05:00.000Z"
+    },
+    "expected": {
+      "category": "lfp",
+      "authorTag": "faux.capitaine",
+      "teamName": "Blue Falcons",
+      "roles": ["TANK", "SUPPORT"],
+      "subRoles": ["MAIN_TANK", "FLEX_SUPPORT"],
+      "ranks": {
+        "min": { "tier": "DIAMOND", "division": 3 },
+        "max": { "tier": "MASTER", "division": 5 },
+        "byRole": {}
+      },
+      "languages": ["FR"],
+      "availability": { "days": ["TUE", "THU", "SUN"], "times": [{ "from": 1230, "to": null }], "timezone": "Europe/Paris" },
+      "minAge": 18,
+      "edited": true
+    }
+  },
+  {
+    "name": "lfp-en-equipe-top-500",
+    "raw": {
+      "channelId": "679323677874978826",
+      "content": "LFP | Team Nova Kitsune (EU, PC) is looking for a hitscan DPS, GM1+ / top 500\nScrims Mon-Thu 8-11pm CET, English speaking\nDM me",
+      "author": { "id": "100000000000000005", "username": "fakemanager", "discriminator": "0" }
+    },
+    "expected": {
+      "category": "lfp",
+      "teamName": "Nova Kitsune",
+      "roles": ["DPS"],
+      "subRoles": ["HITSCAN"],
+      "ranks": {
+        "min": { "tier": "GRANDMASTER", "division": 5 },
+        "max": { "tier": "CHAMPION", "division": 1 },
+        "byRole": {}
+      },
+      "regions": ["EU"],
+      "platforms": ["PC"],
+      "languages": ["EN"],
+      "availability": { "days": [], "times": [{ "from": 1200, "to": 1380 }], "timezone": "CET" },
+      "postedAt": null
+    }
+  },
+  {
+    "name": "lft-en-rang-par-role",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "LFT NA — Tank M2 / DPS D1 / Supp GM5, flex if needed. 3.9k peak in OW1. Available weekends and weekdays after 7pm.",
+      "author": { "id": "100000000000000006", "username": "fakeplayer.na", "discriminator": "0" }
+    },
+    "expected": {
+      "category": "lft",
+      "roles": ["TANK", "DPS", "SUPPORT", "FLEX"],
+      "ranks": {
+        "min": { "tier": "DIAMOND", "division": 1 },
+        "max": { "tier": "GRANDMASTER", "division": 5 },
+        "byRole": {
+          "TANK": { "min": { "tier": "MASTER", "division": 2 }, "max": { "tier": "MASTER", "division": 2 } },
+          "DPS": { "min": { "tier": "DIAMOND", "division": 1 }, "max": { "tier": "DIAMOND", "division": 1 } },
+          "SUPPORT": { "min": { "tier": "GRANDMASTER", "division": 5 }, "max": { "tier": "GRANDMASTER", "division": 5 } }
+        }
+      },
+      "regions": ["NA"],
+      "availability": {
+        "days": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
+        "times": [{ "from": 1140, "to": null }],
+        "timezone": null
+      }
+    }
+  },
+  {
+    "name": "lfsub-fr-ce-soir",
+    "raw": {
+      "channelId": "679323726717911090",
+      "content": "lfsub ce soir 21h tournoi, besoin d'un heal diam+ EU",
+      "author": { "id": "100000000000000007", "username": "fauxcoach", "discriminator": "0" }
+    },
+    "expected": {
+      "category": "lfsub",
+      "roles": ["SUPPORT"],
+      "ranks": {
+        "min": { "tier": "DIAMOND", "division": 5 },
+        "max": { "tier": "CHAMPION", "division": 1 },
+        "byRole": { "SUPPORT": { "min": { "tier": "DIAMOND", "division": 5 }, "max": { "tier": "CHAMPION", "division": 1 } } }
+      },
+      "regions": ["EU"],
+      "availability": { "days": [], "times": [{ "from": 1260, "to": null }], "timezone": null }
+    }
+  },
+  {
+    "name": "lfstaff-fr-structure",
+    "raw": {
+      "channelId": "679323814106103819",
+      "content": "LFSTAFF : structure Crimson Owls cherche un coach et un analyste, niveau Master minimum, FR/EN. Contact en MP.",
+      "author": { "id": "100000000000000008", "username": "fauxpresident", "discriminator": "0" }
+    },
+    "expected": {
+      "category": "lfstaff",
+      "teamName": "Crimson Owls",
+      "staffRoles": ["COACH", "ANALYST"],
+      "roles": [],
+      "ranks": {
+        "min": { "tier": "MASTER", "division": 5 },
+        "max": { "tier": "CHAMPION", "division": 1 },
+        "byRole": {}
+      },
+      "languages": ["FR", "EN"]
+    }
+  },
+  {
+    "name": "lfs-en-equipe-en-libelle",
+    "raw": {
+      "channelId": "930074663340605451",
+      "content": "LFS EU PC — tonight 9pm CEST, bo3 or 2 maps, Diamond 2 - Master 4 avg.\nTeam: Silent Wolves",
+      "author": { "id": "100000000000000009", "username": "fakecaptain", "discriminator": "0" }
+    },
+    "expected": {
+      "category": "lfs",
+      "teamName": "Silent Wolves",
+      "ranks": {
+        "min": { "tier": "DIAMOND", "division": 2 },
+        "max": { "tier": "MASTER", "division": 4 },
+        "byRole": {}
+      },
+      "regions": ["EU"],
+      "platforms": ["PC"],
+      "availability": { "days": [], "times": [{ "from": 1260, "to": null }], "timezone": "CEST" }
+    }
+  },
+  {
+    "name": "lfs-fr-niveau",
+    "raw": {
+      "channelId": "930074663340605451",
+      "content": "lfs ce soir 21h-23h, niveau plat/diam, 2 maps, serveur EU",
+      "author": { "id": "100000000000000010", "username": "fauxmanager", "discriminator": "0" }
+    },
+    "expected": {
+      "category": "lfs",
+      "ranks": {
+        "min": { "tier": "PLATINUM", "division": 5 },
+        "max": { "tier": "DIAMOND", "division": 1 },
+        "byRole": {}
+      },
+      "regions": ["EU"],
+      "availability": { "days": [], "times": [{ "from": 1260, "to": 1380 }], "timezone": null }
+    }
+  },
+  {
+    "name": "lfcast-fr-finale",
+    "raw": {
+      "channelId": "1085116755925536828",
+      "content": "LFCAST — on cherche un caster et un observateur pour la finale samedi 20h, tournoi Overwatch FR",
+      "author": { "id": "100000000000000011", "username": "fauxorga", "discriminator": "0" }
+    },
+    "expected": {
+      "category": "lfcast",
+      "staffRoles": ["CASTER", "OBSERVER"],
+      "languages": ["FR"],
+      "ranks": { "min": null, "max": null, "byRole": {} },
+      "availability": { "days": ["SAT"], "times": [{ "from": 1200, "to": null }], "timezone": null }
+    }
+  },
+  {
+    "name": "relais-de-notre-bot",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "",
+      "author": { "id": "100000000000000090", "username": "FauxBot", "discriminator": "1234", "bot": true },
+      "embeds": [
+        {
+          "authorName": "fauxpseudo",
+          "description": "lft dps d3-m5 eu pc dispo tous les soirs\n\n*Sent from : [Serveur \\[Test\\]](https://discord.gg/fauxcode)* by <@100000000000000002>"
+        }
+      ]
+    },
+    "expected": {
+      "category": "lft",
+      "relayed": true,
+      "authorTag": "fauxpseudo",
+      "authorId": "100000000000000002",
+      "originServer": "Serveur [Test]",
+      "text": "lft dps d3-m5 eu pc dispo tous les soirs",
+      "roles": ["DPS"],
+      "ranks": {
+        "min": { "tier": "DIAMOND", "division": 3 },
+        "max": { "tier": "MASTER", "division": 5 },
+        "byRole": { "DPS": { "min": { "tier": "DIAMOND", "division": 3 }, "max": { "tier": "MASTER", "division": 5 } } }
+      },
+      "regions": ["EU"],
+      "platforms": ["PC"],
+      "availability": { "days": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"], "times": [], "timezone": null }
+    }
+  },
+  {
+    "name": "relais-en-champs",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "",
+      "author": { "id": "100000000000000091", "username": "FauxRelais", "bot": true },
+      "embeds": [
+        {
+          "authorName": "Faux Nom (@faux.handle)",
+          "title": "Recherche d'équipe",
+          "fields": [
+            { "name": "Rôle", "value": "Main Support" },
+            { "name": "Rang", "value": "Grand Maître 3" },
+            { "name": "Région", "value": "Europe" },
+            { "name": "Plateforme", "value": "PC" },
+            { "name": "Contact", "value": "<@100000000000000003>" }
+          ],
+          "footerText": "Relais"
+        }
+      ]
+    },
+    "expected": {
+      "category": "lft",
+      "relayed": true,
+      "authorTag": "faux.handle",
+      "authorId": "100000000000000003",
+      "originServer": null,
+      "teamName": null,
+      "roles": ["SUPPORT"],
+      "subRoles": ["MAIN_SUPPORT"],
+      "ranks": {
+        "min": { "tier": "GRANDMASTER", "division": 3 },
+        "max": { "tier": "GRANDMASTER", "division": 3 },
+        "byRole": {}
+      },
+      "regions": ["EU"],
+      "platforms": ["PC"]
+    }
+  },
+  {
+    "name": "lft-ancien-pseudo-console",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "LFT support plat 1 console ps5, dispo week-end",
+      "author": { "id": "100000000000000012", "username": "VieuxCompte", "discriminator": "4821" }
+    },
+    "expected": {
+      "authorTag": "VieuxCompte#4821",
+      "roles": ["SUPPORT"],
+      "ranks": {
+        "min": { "tier": "PLATINUM", "division": 1 },
+        "max": { "tier": "PLATINUM", "division": 1 },
+        "byRole": { "SUPPORT": { "min": { "tier": "PLATINUM", "division": 1 }, "max": { "tier": "PLATINUM", "division": 1 } } }
+      },
+      "platforms": ["CONSOLE"],
+      "availability": { "days": ["SAT", "SUN"], "times": [], "timezone": null }
+    }
+  },
+  {
+    "name": "lfp-capitales-fautes-emojis",
+    "raw": {
+      "channelId": "679323677874978826",
+      "content": "🔥 RECHERCHE JOUEURS 🔥\n<:tank:111111111111111111> TANK : DIAMAND 2 MINI\n<:dps:111111111111111112> DPS : PLATINIUM 1 - DIAMANT 3\n𝐄𝐔 / PC / 🇫🇷🇬🇧",
+      "author": { "id": "100000000000000013", "username": "fauxrecruteur", "discriminator": "0" }
+    },
+    "expected": {
+      "category": "lfp",
+      "teamName": null,
+      "roles": ["TANK", "DPS"],
+      "ranks": {
+        "min": { "tier": "PLATINUM", "division": 1 },
+        "max": { "tier": "CHAMPION", "division": 1 },
+        "byRole": {
+          "TANK": { "min": { "tier": "DIAMOND", "division": 2 }, "max": { "tier": "CHAMPION", "division": 1 } },
+          "DPS": { "min": { "tier": "PLATINUM", "division": 1 }, "max": { "tier": "DIAMOND", "division": 3 } }
+        }
+      },
+      "regions": ["EU"],
+      "platforms": ["PC"],
+      "languages": ["FR", "EN"]
+    }
+  },
+  {
+    "name": "lft-ancien-sr",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "lft main tank 4k2 peak, currently 3900-4100 sr, eu, english/german",
+      "author": { "id": "100000000000000014", "username": "fakeveteran", "discriminator": "0" }
+    },
+    "expected": {
+      "roles": ["TANK"],
+      "subRoles": ["MAIN_TANK"],
+      "ranks": {
+        "min": { "tier": "MASTER", "division": 1 },
+        "max": { "tier": "GRANDMASTER", "division": 3 },
+        "byRole": { "TANK": { "min": { "tier": "GRANDMASTER", "division": 3 }, "max": { "tier": "GRANDMASTER", "division": 3 } } }
+      },
+      "regions": ["EU"],
+      "languages": ["EN", "DE"]
+    }
+  },
+  {
+    "name": "lfp-role-apres-le-rang",
+    "raw": {
+      "channelId": "679323677874978826",
+      "content": "LFP EU\nM2 tank, D1 dps\nlangue : en\nmin 17 ans",
+      "author": { "id": "100000000000000015", "username": "fauxowner", "discriminator": "0" }
+    },
+    "expected": {
+      "roles": ["TANK", "DPS"],
+      "ranks": {
+        "min": { "tier": "DIAMOND", "division": 1 },
+        "max": { "tier": "MASTER", "division": 2 },
+        "byRole": {
+          "TANK": { "min": { "tier": "MASTER", "division": 2 }, "max": { "tier": "MASTER", "division": 2 } },
+          "DPS": { "min": { "tier": "DIAMOND", "division": 1 }, "max": { "tier": "DIAMOND", "division": 1 } }
+        }
+      },
+      "regions": ["EU"],
+      "languages": ["EN"],
+      "minAge": 17
+    }
+  },
+  {
+    "name": "message-sans-donnee",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "Salut, quelqu'un pour jouer ?",
+      "author": { "id": "100000000000000016", "username": "fauxvisiteur", "discriminator": "0" }
+    },
+    "expected": {
+      "category": "lft",
+      "roles": [],
+      "subRoles": [],
+      "ranks": { "min": null, "max": null, "byRole": {} },
+      "regions": [],
+      "platforms": [],
+      "languages": [],
+      "availability": { "days": [], "times": [], "timezone": null },
+      "teamName": null,
+      "staffRoles": [],
+      "minAge": null
+    }
+  }
+]

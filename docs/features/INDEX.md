@@ -200,6 +200,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 
 - `BOT_INTEGRATION.md` — Appels app → bot, flux d'activité anonymisé.
 - `TOURNAMENT_STAFF_MESSAGE.md` — Message du staff aux participants d'un tournoi (`/message-tournoi` ou bouton de la fiche) : catégories, nombres seuls, MP + push signés « le staff », plafond par staff et tournoi ; seul appel bot → site (`SITE_INTERNAL_TOKEN`).
+- `GETI_INFO.md` — Annonces de recrutement Overwatch (GETI) : salons sources, analyse d'une annonce (`parseGetiPost` : rangs, rôles, région, plateforme, langues, disponibilités), filtre (`matchesGetiFilter`), décision bot → site.
 - `LOG_BATCHING.md` — Journal Discord par lots : 5 min de silence relancées par chaque ligne, envoi immédiat à 5 lignes, un message par lot (salon, tournoi, catégorie de geste ; `kind` log ou alert sur chaque appel) ; arrêt propre qui vide les lots.
 - `BOT_DM_LANGUAGE.md` — Langue des messages privés Discord : celle du compte, sinon un message bilingue (FR puis EN) ; salons en français.
 - `BOT_PAGE.md` — Pages `/bot` et `/bot/docs`.
