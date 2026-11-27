@@ -31,7 +31,8 @@ const TIMESTAMP = /<t:\d{1,16}(?::[a-zA-Z])?>/gu;
  * Une barre verticale seule est un séparateur de l'auteur (« Tank | Flex
  * DPS ») : elle reste, pour que « tank » et « flex » ne se lisent pas ensemble.
  */
-const MARKDOWN = /[*_~`]+|\|{2,}|^[ \t]*(?:>{1,3}|#{1,3}|-#)[ \t]+/gmu;
+const MARKDOWN = /[*_~`]+|\|{2,}/gu;
+const LINE_PREFIX = /^[ \t]*(?:>{1,3}|#{1,3}|-#)[ \t]+/gmu;
 const REGIONAL_INDICATORS = /[\u{1F1E6}-\u{1F1FF}]/gu;
 const PICTOGRAPHS = /\p{Extended_Pictographic}|\uFE0F|\u200D|\u20E3|\p{Emoji_Modifier}/gu;
 const DIACRITICS = /\p{M}/gu;
@@ -97,6 +98,7 @@ export function prepareGetiText(text: string): GetiPreparedText {
       .replace(MENTION, " ")
       .replace(REGIONAL_INDICATORS, " ")
       .replace(PICTOGRAPHS, " ")
+      .replace(LINE_PREFIX, " ")
       .replace(MARKDOWN, " ")
       .replace(/[\u2018\u2019\u00B4]/gu, "'")
       .replace(/[^\S\n]+/gu, " ");

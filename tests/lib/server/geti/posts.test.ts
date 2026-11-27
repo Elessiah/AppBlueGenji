@@ -135,6 +135,26 @@ describe("upsertGetiPosts", () => {
     expect(sql.trimEnd().endsWith(`edited_at = ${guard}, VALUES(edited_at), edited_at)`)).toBe(true);
   });
 
+  it("upsertGetiPosts_botPublicationNotice_isCountedEmptiedAndRemovedNotStored", async () => {
+    const execute = executeMock();
+    const notice = getiPushedPost(
+      getiWireRelay("", {
+        embeds: [
+          {
+            description:
+              "Ton annonce a été publié dans **32 autres channels**.\n[=> Invite FauxBot](https://discord.com/oauth2/authorize?client_id=100000000000000090)",
+          },
+        ],
+      }),
+    );
+
+    const outcome = await upsertGetiPosts(executor(execute), [notice], NOW);
+
+    expect(outcome).toEqual({ stored: 0, emptied: 1, expired: 0 });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(String(execute.mock.calls[0][0])).toContain("DELETE FROM bg_geti_posts");
+  });
+
   it("upsertGetiPosts_teamSearchJustOlderThanFourteenDays_isCountedExpiredAndNotWritten", async () => {
     const execute = executeMock();
     const post = getiPushedPost({ postedAt: new Date(NOW - 14 * DAY_MS - 1).toISOString() });
@@ -375,6 +395,16 @@ describe("listGetiPosts", () => {
         editedAt: new Date(edited).toISOString(),
       },
     ]);
+  });
+
+  it("listGetiPosts_rowParsedBeforeDatesLevelsClosedExisted_getsThemEmpty", async () => {
+    const { dates, levels, closed, ...older } = parsedGetiPost({ text: "LFT support" });
+    const execute = executeMock([row({ parsed_json: JSON.stringify(older) })]);
+
+    const page = await listGetiPosts({}, {}, executor(execute), NOW);
+
+    expect([dates, levels, closed]).toEqual([[], [], false]);
+    expect(page.posts[0].parsed).toMatchObject({ dates: [], levels: [], closed: false });
   });
 
   it("listGetiPosts_noExecutorGiven_readsFromThePool", async () => {

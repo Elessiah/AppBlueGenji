@@ -5,7 +5,7 @@ import { parseGetiPost, type GetiParsedPost, type GetiRawPost } from "@/lib/shar
 
 type GetiFixture = { name: string; raw: GetiRawPost; expected: Partial<GetiParsedPost> };
 
-// Annonces de synthèse, écrites sur les tournures courantes du recrutement
+// Annonces de synthèse et annonces réelles réécrites (« reel-… », lot 2b), sur les tournures du recrutement
 // Overwatch (FR et EN) : pseudos, identifiants, équipes et serveurs y sont faux.
 const fixtures: GetiFixture[] = JSON.parse(
   readFileSync(path.join(process.cwd(), "tests", "fixtures", "geti", "posts.json"), "utf8"),

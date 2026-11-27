@@ -74,7 +74,7 @@
       "regions": ["EU"],
       "platforms": ["PC"],
       "languages": ["EN"],
-      "availability": { "days": [], "times": [{ "from": 1200, "to": 1380 }], "timezone": "CET" },
+      "availability": { "days": ["MON", "TUE", "WED", "THU"], "times": [{ "from": 1200, "to": 1380 }], "timezone": "CET" },
       "postedAt": null
     }
   },
@@ -396,6 +396,590 @@
       "ranks": { "min": { "tier": "MASTER", "division": 1 }, "max": { "tier": "MASTER", "division": 1 }, "byRole": { "TANK": { "min": { "tier": "MASTER", "division": 1 }, "max": { "tier": "MASTER", "division": 1 } } } },
       "availability": { "days": [], "times": [{ "from": 1200, "to": 1380 }], "timezone": null },
       "teamName": null
+    }
+  },
+  {
+    "name": "reel-lfs-fourchette-centaines-jour-barre",
+    "raw": {
+      "channelId": "930074663340605451",
+      "content": "",
+      "author": {
+        "id": "100000000000000090",
+        "username": "FauxBotGeti",
+        "discriminator": "0",
+        "bot": true
+      },
+      "embeds": [
+        {
+          "description": "<@100000000000000011>*(fauxpseudo_11)* sur [[FAUX] Faux Serveur 11](https://discord.gg/fauxcode)\n\n> LFS EU PC 3k4-5 21-23 CET\n\n~~Mardi/Tuesday 24/11~~\nJeudi/Thursday 26/11"
+        }
+      ],
+      "postedAt": "2026-11-23T17:00:00.000Z"
+    },
+    "expected": {
+      "category": "lfs",
+      "authorTag": "fauxpseudo_11",
+      "originServer": "[FAUX] Faux Serveur 11",
+      "ranks": {
+        "min": {
+          "tier": "DIAMOND",
+          "division": 1
+        },
+        "max": {
+          "tier": "MASTER",
+          "division": 5
+        },
+        "byRole": {}
+      },
+      "regions": [
+        "EU"
+      ],
+      "platforms": [
+        "PC"
+      ],
+      "availability": {
+        "days": [
+          "THU"
+        ],
+        "times": [
+          {
+            "from": 1260,
+            "to": 1380
+          }
+        ],
+        "timezone": "CET"
+      },
+      "dates": [
+        "2026-11-26"
+      ],
+      "levels": [],
+      "closed": false
+    }
+  },
+  {
+    "name": "reel-lfs-niveaux-demain",
+    "raw": {
+      "channelId": "930074663340605451",
+      "content": "",
+      "author": {
+        "id": "100000000000000090",
+        "username": "FauxBotGeti",
+        "discriminator": "0",
+        "bot": true
+      },
+      "embeds": [
+        {
+          "description": "<@100000000000000012>*(fauxpseudo_12)* sur [[FAUX] Faux Serveur 12](https://discord.gg/fauxcode)\n\n> LFS |EU |PC| High Int/Adv |21 - 23 CET tomorrow (sunday 29/11)"
+        }
+      ],
+      "postedAt": "2026-11-28T15:00:00.000Z"
+    },
+    "expected": {
+      "ranks": {
+        "min": null,
+        "max": null,
+        "byRole": {}
+      },
+      "regions": [
+        "EU"
+      ],
+      "platforms": [
+        "PC"
+      ],
+      "availability": {
+        "days": [
+          "SUN"
+        ],
+        "times": [
+          {
+            "from": 1260,
+            "to": 1380
+          }
+        ],
+        "timezone": "CET"
+      },
+      "dates": [
+        "2026-11-29"
+      ],
+      "levels": [
+        "INTERMEDIATE",
+        "ADVANCED"
+      ]
+    }
+  },
+  {
+    "name": "reel-lfs-plusieurs-equipes",
+    "raw": {
+      "channelId": "930074663340605451",
+      "content": "",
+      "author": {
+        "id": "100000000000000090",
+        "username": "FauxBotGeti",
+        "discriminator": "0",
+        "bot": true
+      },
+      "embeds": [
+        {
+          "description": "<@100000000000000013>*(fauxpseudo_13)* sur [[FAUX] Faux Serveur 13](https://discord.gg/fauxcode)\n\n> [EU] [PC] **Saturday 28/11/26**\n\n**LFS**\n\nFaux Lynx 4.2k-4.3k [20-22 CET]\nFaux Orca 4.5k Mid Open [21-23 CET]\n\nPlease DM me with which team you are booking for"
+        }
+      ],
+      "postedAt": "2026-11-27T12:00:00.000Z"
+    },
+    "expected": {
+      "ranks": {
+        "min": {
+          "tier": "GRANDMASTER",
+          "division": 3
+        },
+        "max": {
+          "tier": "CHAMPION",
+          "division": 5
+        },
+        "byRole": {}
+      },
+      "regions": [
+        "EU"
+      ],
+      "platforms": [
+        "PC"
+      ],
+      "availability": {
+        "days": [
+          "SAT"
+        ],
+        "times": [
+          {
+            "from": 1200,
+            "to": 1320
+          },
+          {
+            "from": 1260,
+            "to": 1380
+          }
+        ],
+        "timezone": "CET"
+      },
+      "dates": [
+        "2026-11-28"
+      ],
+      "levels": [
+        "OPEN"
+      ],
+      "teamName": null
+    }
+  },
+  {
+    "name": "reel-lfs-hybride-quantieme",
+    "raw": {
+      "channelId": "930074663340605451",
+      "content": "",
+      "author": {
+        "id": "100000000000000090",
+        "username": "FauxBotGeti",
+        "discriminator": "0",
+        "bot": true
+      },
+      "embeds": [
+        {
+          "description": "<@100000000000000014>*(fauxpseudo_14)* sur [[FAUX] Faux Serveur 14](https://discord.gg/fauxcode)\n\n> LFS EU HYBRID 2k8 - 21-23 CEST\n\nWednesday 25 - Mercredi 25"
+        }
+      ],
+      "postedAt": "2026-11-24T10:00:00.000Z"
+    },
+    "expected": {
+      "ranks": {
+        "min": {
+          "tier": "EMERALD",
+          "division": 2
+        },
+        "max": {
+          "tier": "EMERALD",
+          "division": 2
+        },
+        "byRole": {}
+      },
+      "regions": [
+        "EU"
+      ],
+      "platforms": [
+        "PC",
+        "CONSOLE"
+      ],
+      "availability": {
+        "days": [
+          "WED"
+        ],
+        "times": [
+          {
+            "from": 1260,
+            "to": 1380
+          }
+        ],
+        "timezone": "CEST"
+      },
+      "dates": [
+        "2026-11-25"
+      ]
+    }
+  },
+  {
+    "name": "reel-lfs-sans-jour-decimal-nu",
+    "raw": {
+      "channelId": "930074663340605451",
+      "content": "",
+      "author": {
+        "id": "100000000000000090",
+        "username": "FauxBotGeti",
+        "discriminator": "0",
+        "bot": true
+      },
+      "embeds": [
+        {
+          "description": "<@100000000000000015>*(fauxpseudo_15)* sur [[FAUX] Faux Serveur 15](https://discord.gg/fauxcode)\n\n> LFS EU PC ONLY | SR 3.6-3.7 | No BANS | h21-23 CET"
+        }
+      ],
+      "postedAt": "2026-11-25T16:30:00.000Z"
+    },
+    "expected": {
+      "ranks": {
+        "min": {
+          "tier": "MASTER",
+          "division": 4
+        },
+        "max": {
+          "tier": "MASTER",
+          "division": 3
+        },
+        "byRole": {}
+      },
+      "regions": [
+        "EU"
+      ],
+      "platforms": [
+        "PC"
+      ],
+      "availability": {
+        "days": [
+          "WED"
+        ],
+        "times": [
+          {
+            "from": 1260,
+            "to": 1380
+          }
+        ],
+        "timezone": "CET"
+      },
+      "dates": [
+        "2026-11-25"
+      ],
+      "closed": false
+    }
+  },
+  {
+    "name": "reel-lfsub-direct-clos",
+    "raw": {
+      "channelId": "679323726717911090",
+      "content": "~~LFSub Tank 3k5 ce soir 21H <@&100000000000000031>~~",
+      "author": {
+        "id": "100000000000000016",
+        "username": "fauxmembre_16",
+        "discriminator": "0"
+      },
+      "postedAt": "2026-11-24T16:00:00.000Z"
+    },
+    "expected": {
+      "category": "lfsub",
+      "authorTag": "fauxmembre_16",
+      "relayed": false,
+      "roles": [
+        "TANK"
+      ],
+      "ranks": {
+        "min": {
+          "tier": "MASTER",
+          "division": 5
+        },
+        "max": {
+          "tier": "MASTER",
+          "division": 5
+        },
+        "byRole": {
+          "TANK": {
+            "min": {
+              "tier": "MASTER",
+              "division": 5
+            },
+            "max": {
+              "tier": "MASTER",
+              "division": 5
+            }
+          }
+        }
+      },
+      "availability": {
+        "days": [
+          "TUE"
+        ],
+        "times": [
+          {
+            "from": 1260,
+            "to": null
+          }
+        ],
+        "timezone": null
+      },
+      "dates": [
+        "2026-11-24"
+      ],
+      "closed": true
+    }
+  },
+  {
+    "name": "reel-lft-fiche",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "",
+      "author": {
+        "id": "100000000000000090",
+        "username": "FauxBotGeti",
+        "discriminator": "0",
+        "bot": true
+      },
+      "embeds": [
+        {
+          "description": "<@100000000000000017>*(fauxpseudo_17)* sur [[FAUX] Faux Serveur 17](https://discord.gg/fauxcode)\n\n> LFT FR/EU PC 3K5\nRôle : flex Dps\nExp : Scrim jusqu'en 3k8\nPick rang : GM5\nHero Pool : Reaper / Genji / Mei\nAge : 19\nDispo : 7/7j\nContact : fauxjoueur_07\n\nJe cherche une team sérieuse pour try hard.\nMore info DM"
+        }
+      ],
+      "postedAt": "2026-11-20T09:00:00.000Z"
+    },
+    "expected": {
+      "roles": [
+        "DPS"
+      ],
+      "subRoles": [
+        "FLEX_DPS"
+      ],
+      "ranks": {
+        "min": {
+          "tier": "MASTER",
+          "division": 5
+        },
+        "max": {
+          "tier": "GRANDMASTER",
+          "division": 5
+        },
+        "byRole": {}
+      },
+      "regions": [
+        "EU"
+      ],
+      "platforms": [
+        "PC"
+      ],
+      "languages": [
+        "FR"
+      ],
+      "availability": {
+        "days": [
+          "MON",
+          "TUE",
+          "WED",
+          "THU",
+          "FRI",
+          "SAT",
+          "SUN"
+        ],
+        "times": [],
+        "timezone": null
+      },
+      "dates": [],
+      "levels": [],
+      "minAge": null,
+      "teamName": null
+    }
+  },
+  {
+    "name": "reel-lft-emeraude-initiale",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "",
+      "author": {
+        "id": "100000000000000090",
+        "username": "FauxBotGeti",
+        "discriminator": "0",
+        "bot": true
+      },
+      "embeds": [
+        {
+          "description": "<@100000000000000018>*(fauxpseudo_18)* sur [[FAUX] Faux Serveur 18](https://discord.gg/fauxcode)\n\n> LFT FR/EU\nRôle : Main supp\nRank : E5\ncoachable\n\nMp pour plus d'info"
+        }
+      ],
+      "postedAt": "2026-11-21T09:00:00.000Z"
+    },
+    "expected": {
+      "roles": [
+        "SUPPORT"
+      ],
+      "subRoles": [
+        "MAIN_SUPPORT"
+      ],
+      "ranks": {
+        "min": {
+          "tier": "EMERALD",
+          "division": 5
+        },
+        "max": {
+          "tier": "EMERALD",
+          "division": 5
+        },
+        "byRole": {}
+      },
+      "regions": [
+        "EU"
+      ],
+      "languages": [
+        "FR"
+      ]
+    }
+  },
+  {
+    "name": "reel-lft-division-titre",
+    "raw": {
+      "channelId": "679323773559635999",
+      "content": "",
+      "author": {
+        "id": "100000000000000090",
+        "username": "FauxBotGeti",
+        "discriminator": "0",
+        "bot": true
+      },
+      "embeds": [
+        {
+          "description": "<@100000000000000019>*(fauxpseudo_19)* sur [[FAUX] Faux Serveur 19](https://discord.gg/fauxcode)\n\n> LFT Faceit S11 FDPS\nS10 Intermediate Champion\nGM1 currently - Peak C3\nCan flex to other heroes\nDMs open for more info"
+        }
+      ],
+      "postedAt": "2026-11-21T10:00:00.000Z"
+    },
+    "expected": {
+      "roles": [
+        "DPS"
+      ],
+      "subRoles": [
+        "FLEX_DPS"
+      ],
+      "ranks": {
+        "min": {
+          "tier": "GRANDMASTER",
+          "division": 1
+        },
+        "max": {
+          "tier": "CHAMPION",
+          "division": 3
+        },
+        "byRole": {}
+      },
+      "levels": [
+        "INTERMEDIATE"
+      ]
+    }
+  },
+  {
+    "name": "reel-lfp-structure-postes-en-barres",
+    "raw": {
+      "channelId": "679323677874978826",
+      "content": "",
+      "author": {
+        "id": "100000000000000090",
+        "username": "FauxBotGeti",
+        "discriminator": "0",
+        "bot": true
+      },
+      "embeds": [
+        {
+          "description": "<@100000000000000020>*(fauxpseudo_20)* sur [[FAUX] Faux Serveur 20](https://discord.gg/fauxcode)\n\n> __**LFP FR 3k2-3k5**__\n\nLa structure **Faux Verdict Esport** ouvre ses recrutements pour son roster **NOVA**.\n\n**Postes recherchés :** Tank | Flex DPS | Support Main\n\n- <:Emeraude:100000000000000042> Émeraude minimum\n- Structure associative sous loi 1901\n- 3 soirs par semaine (20-23)\n- 18 ans minimum"
+        }
+      ],
+      "postedAt": "2026-11-22T11:00:00.000Z"
+    },
+    "expected": {
+      "roles": [
+        "TANK",
+        "DPS",
+        "SUPPORT"
+      ],
+      "subRoles": [
+        "FLEX_DPS",
+        "MAIN_SUPPORT"
+      ],
+      "ranks": {
+        "min": {
+          "tier": "EMERALD",
+          "division": 5
+        },
+        "max": {
+          "tier": "CHAMPION",
+          "division": 1
+        },
+        "byRole": {}
+      },
+      "languages": [
+        "FR"
+      ],
+      "availability": {
+        "days": [],
+        "times": [
+          {
+            "from": 1200,
+            "to": 1380
+          }
+        ],
+        "timezone": null
+      },
+      "dates": [],
+      "teamName": "Faux Verdict Esport",
+      "minAge": 18
+    }
+  },
+  {
+    "name": "reel-lfstaff-recrute-roster-sr",
+    "raw": {
+      "channelId": "679323814106103819",
+      "content": "",
+      "author": {
+        "id": "100000000000000090",
+        "username": "FauxBotGeti",
+        "discriminator": "0",
+        "bot": true
+      },
+      "embeds": [
+        {
+          "description": "<@100000000000000021>*(fauxpseudo_21)* sur [[FAUX] Faux Serveur 21](https://discord.gg/fauxcode)\n\n> # FAUSSE HORDE RECRUTE\n\n<:LogoFaux:100000000000000041> ROSTER 4K3 : nous cherchons un **coach** et un/e **Manageur.euse**\nNiveau HighOpen, scrims 4 soirs par semaine."
+        }
+      ],
+      "postedAt": "2026-11-19T11:00:00.000Z"
+    },
+    "expected": {
+      "ranks": {
+        "min": {
+          "tier": "GRANDMASTER",
+          "division": 2
+        },
+        "max": {
+          "tier": "GRANDMASTER",
+          "division": 2
+        },
+        "byRole": {}
+      },
+      "staffRoles": [
+        "COACH",
+        "MANAGER"
+      ],
+      "teamName": "FAUSSE HORDE",
+      "levels": [
+        "OPEN"
+      ],
+      "roles": []
     }
   }
 ]

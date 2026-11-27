@@ -22,12 +22,13 @@ export const GETI_CHANNEL_IDS: Readonly<Record<GetiCategory, string>> = Object.f
   lfcast: "1085116755925536828",
 });
 
-/** Paliers Overwatch, du plus bas au plus haut. */
+/** Paliers Overwatch, du plus bas au plus haut (Émeraude se place entre Platine et Diamant). */
 export const GETI_TIERS = [
   "BRONZE",
   "SILVER",
   "GOLD",
   "PLATINUM",
+  "EMERALD",
   "DIAMOND",
   "MASTER",
   "GRANDMASTER",

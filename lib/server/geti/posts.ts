@@ -21,6 +21,7 @@ import {
   GETI_CATEGORIES,
   getiCategoryOfChannel,
   matchesGetiFilter,
+  isGetiBotNotice,
   parseGetiPost,
   type GetiCategory,
   type GetiFilter,
@@ -104,7 +105,8 @@ export async function upsertGetiPosts(
       continue;
     }
     const parsed = parseGetiPost(post.raw);
-    if (parsed.text.trim() === "") {
+    // Sans texte, ou réponse de service du bot (« Ton annonce a été publié… ») : pas une annonce.
+    if (parsed.text.trim() === "" || isGetiBotNotice(post.raw)) {
       outcome.emptied += 1;
       emptied.push(post.messageId);
       continue;
@@ -231,6 +233,9 @@ type GetiPostRow = RowDataPacket & {
   edited_at: string | null;
 };
 
+/** Champs ajoutés à l'analyse après les premières annonces gardées : vides par défaut. */
+const ADDED_FIELDS: Partial<GetiParsedPost> = { dates: [], levels: [], closed: false };
+
 /** Une ligne en annonce rendue ; `null` si elle est illisible, ou sortie de la fenêtre de garde de sa catégorie. */
 function storedPostOf(row: GetiPostRow, now: number): GetiStoredPost | null {
   if (!isCategory(row.category) || !isSource(row.source)) return null;
@@ -252,7 +257,7 @@ function storedPostOf(row: GetiPostRow, now: number): GetiStoredPost | null {
     authorId: row.author_id,
     // La date gardée fait foi pour le filtre d'âge, pas celle recopiée dans l'analyse.
     // Une analyse gardée avant l'ajout d'un champ (dates, niveaux, clôture) le reçoit vide.
-    parsed: { dates: [], levels: [], closed: false, ...parsed, postedAt },
+    parsed: { ...ADDED_FIELDS, ...parsed, postedAt },
     postedAt,
     editedAt: toIso(row.edited_at),
   };

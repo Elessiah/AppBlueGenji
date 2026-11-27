@@ -2,12 +2,12 @@
  * Rangs Overwatch lus dans une annonce GETI.
  *
  * Porté de `extractRanks` du bot (Marvel Rivals, paliers seuls) et étendu à
- * Overwatch : paliers Bronze → Champion, divisions 5 → 1, formes abrégées
+ * Overwatch : paliers Bronze → Champion (Émeraude compris), divisions 5 → 1, formes abrégées
  * (« d3 », « gm1 »), fourchettes (« d3-m2 », « diam 3-1 »), bornes ouvertes
  * (« master+ », « max d1 »), « top 500 », SR de scrim (« 3500 sr », « 4k2 »,
  * « 3k4-5 », « 3.4-3.5k », « SR 3.6-3.7 ») et rang par rôle (« tank m2 / dps d1 »).
  *
- * Un rang vaut un entier de 0 (Bronze 5) à 39 (Champion 1) ; un palier sans
+ * Un rang vaut un entier de 0 (Bronze 5) à 44 (Champion 1) ; un palier sans
  * division couvre ses cinq divisions.
  *
  * Module pur : importable côté serveur comme côté client.
@@ -59,6 +59,7 @@ const TIER_ALIASES: Readonly<Record<GetiTier, readonly string[]>> = {
   SILVER: ["silver", "silvers", "argent"],
   GOLD: ["gold", "golds"],
   PLATINUM: ["platinum", "platine", "platines", "platinium", "platnium", "plat", "plats"],
+  EMERALD: ["emeraude", "emeraudes", "emerald", "emeralds", "emer", "eme"],
   DIAMOND: [
     "diamond",
     "diamonds",
@@ -111,7 +112,7 @@ const TITLE_BEFORE =
 const TITLE_AFTER = "de du des of";
 /** « GM tous rôles », « GM all roles », « GM, Master » : une liste de rangs, pas un salut. */
 const GM_LIST_AFTER = new RegExp(
-  String.raw`^[^\S\n]*(?:[,/&-][^\S\n]*|(?:tous|toutes|all|les)[^\S\n]+(?:les[^\S\n]+)?)(?:roles?|rangs?|ranks?|tanks?|dps|supp(?:ort)?s?|heal(?:er)?s?|flex|bronze|silver|gold|plat(?:ine|inum)?|diam(?:ant|ond)?s?|masters?|maitres?|champ(?:ion)?s?|top\s?500|t500|[bsgpdmc][1-5])${NOT_BEFORE_WORD}`,
+  String.raw`^[^\S\n]*(?:[,/&-][^\S\n]*|(?:tous|toutes|all|les)[^\S\n]+(?:les[^\S\n]+)?)(?:roles?|rangs?|ranks?|tanks?|dps|supp(?:ort)?s?|heal(?:er)?s?|flex|bronze|silver|gold|plat(?:ine|inum)?|eme(?:r|raude|rald)?s?|diam(?:ant|ond)?s?|masters?|maitres?|champ(?:ion)?s?|top\s?500|t500|[bsgpedmc][1-5])${NOT_BEFORE_WORD}`,
   "u",
 );
 const COMMON_WORD_SENSES: Readonly<Record<string, CommonSense>> = {
@@ -147,7 +148,7 @@ function wordSense(lower: string, key: string, match: RegExpExecArray): WordSens
   const sense = COMMON_WORD_SENSES[key];
   if (sense === undefined || match[2] !== undefined) return "rank";
   const end = match.index + match[0].length;
-  const before = lower.slice(Math.max(0, match.index - 12), match.index);
+  const before = lower.slice(Math.max(0, match.index - 16), match.index);
   const after = lower.slice(end, end + 30);
   if (/^\s?\+/u.test(after)) return "rank";
   // « gm » salue en tête de ligne seulement, et pas devant une liste de rangs.
@@ -167,6 +168,7 @@ const TIER_LETTERS: Readonly<Record<string, GetiTier>> = {
   s: "SILVER",
   g: "GOLD",
   p: "PLATINUM",
+  e: "EMERALD",
   d: "DIAMOND",
   m: "MASTER",
   c: "CHAMPION",
@@ -178,8 +180,24 @@ const NAMED_RANK = new RegExp(
   "gu",
 );
 const LETTER_RANK = new RegExp(
-  String.raw`${NOT_AFTER_WORD}([bsgpdmc])([1-5])(?:[-–/]([1-5]))?${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}([bsgpedmc])([1-5])(?:[-–/]([1-5]))?${NOT_BEFORE_WORD}`,
   "gu",
+);
+/**
+ * « e3 » est d'abord autre chose (un salon, une salle, un événement) : lu comme
+ * Émeraude 3 seulement en contexte de rang — derrière un libellé ou un rôle
+ * (« rank : e5 », « tank e2 »), ou relié à un autre rang (« e3-d5 », « p1 / e4 »).
+ */
+const RANK_WORDS = String.raw`[bsgpdmc][1-5]|gm[1-5]?|plat\p{L}*|diam\p{L}*|masters?|gold|silver|bronze|champ\p{L}*`;
+const ROLE_WORDS = String.raw`tanks?|dps|supp?(?:orts?)?|heal(?:er)?s?|hs|hitscan|fdps|flex|ms|fs|mt|ot`;
+const LINK = String.raw`[^\S\n]*(?:[:=()>~/,&–-][^\S\n]*)*(?:(?:a|au|to|et|and|ou|or)[^\S\n]+)?`;
+const EMERALD_LETTER_BEFORE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:rang|rank|peak|pick|elo|current|currently|actuel|actuellement|niveau|level|lvl|${ROLE_WORDS}|${RANK_WORDS})${LINK}$`,
+  "u",
+);
+const EMERALD_LETTER_AFTER = new RegExp(
+  String.raw`^${LINK}(?:peak|${ROLE_WORDS}|${RANK_WORDS})${NOT_BEFORE_WORD}`,
+  "u",
 );
 /**
  * Une initiale + chiffre n'est pas un rang derrière « saison » (« depuis la s2 »)
@@ -335,12 +353,14 @@ function tierSpan(tier: GetiTier, first: string | undefined, second: string | un
 }
 
 /**
- * Rang d'un SR : 500 points par palier, 100 par division — 3 000 = Diamant 5,
- * 4 000 = Grand Maître 5, 4 500 = Champion 5 (l'échelle des annonces de scrim,
- * où « 4.5k+ » se lit couramment), plafonné à Champion 1.
+ * Rang d'un SR : 500 points par palier, 100 par division — 2 500 = Émeraude 5,
+ * 3 000 = Diamant 5, 3 500 = Master 5, 4 000 = Grand Maître 5, 4 500 =
+ * Champion 5 (l'échelle des annonces de scrim, où « 4.5k+ » se lit couramment),
+ * plafonné à Champion 1. Sous 3 000, Émeraude décale d'un palier l'ancienne
+ * échelle : 2 000 = Platine 5, 1 000 = Argent 5.
  */
 function srValue(sr: number): number {
-  const steps = Math.floor((sr - 1000) / 100);
+  const steps = Math.floor((sr - 500) / 100);
   return Math.min(GETI_RANK_TOP, Math.max(0, steps));
 }
 
@@ -363,6 +383,10 @@ function isLetterRank(lower: string, match: RegExpExecArray): boolean {
   const before = lower.slice(Math.max(0, match.index - 12), match.index);
   if (NOT_LETTER_RANK_BEFORE.test(before)) return false;
   if (match[1] === "s" && SEASON_SINCE_BEFORE.test(before)) return false;
+  if (match[1] === "e") {
+    const context = lower.slice(Math.max(0, match.index - 24), match.index);
+    if (!EMERALD_LETTER_BEFORE.test(context) && !EMERALD_LETTER_AFTER.test(lower.slice(end, end + 24))) return false;
+  }
   return !NOT_LETTER_RANK_AFTER.test(lower.slice(end, end + 12));
 }
 
@@ -421,14 +445,19 @@ function decimalRangeEnd(thousands: number, digit: number): number {
   return digit >= thousands && digit <= 5 ? digit * 1000 : thousands * 1000 + digit * 100;
 }
 
-/** SR, en milliers ou en chiffres ; `scrim` lit aussi le décimal nu (« 3.6 »). */
-function srTokens(lower: string, scrim: boolean): RankToken[] {
-  const tokens: RankToken[] = [];
-  for (const match of scrim ? lower.matchAll(SR_BARE_DECIMAL) : []) {
+/** SR décimal « 3.6 » ou « 3.6-3.7 » : nu (scrim seulement) ou derrière son libellé. */
+function decimalSrTokens(lower: string, scrim: boolean): RankToken[] {
+  const matches = [...(scrim ? lower.matchAll(SR_BARE_DECIMAL) : []), ...lower.matchAll(SR_LABELLED_DECIMAL)];
+  return matches.map((match) => {
     const first = Number(match[1]) * 1000 + Number(match[2]) * 100;
     const second = match[3] === undefined ? first : Number(match[3]) * 1000 + Number(match[4]) * 100;
-    tokens.push(tokenOf(match, srSpan(first, second)));
-  }
+    return tokenOf(match, srSpan(first, second));
+  });
+}
+
+/** SR en milliers : « 3.4-3.5k », « 3.5-6k », « 4k », « 3k4-5 ». */
+function thousandSrTokens(lower: string): RankToken[] {
+  const tokens: RankToken[] = [];
   for (const match of lower.matchAll(SR_DECIMAL_RANGE)) {
     if (isNotRank(lower, match, false)) continue;
     const thousands = Number(match[1]);
@@ -437,11 +466,6 @@ function srTokens(lower: string, scrim: boolean): RankToken[] {
       match[5] === undefined
         ? Number(match[3]) * 1000 + Number(match[4]) * 100
         : decimalRangeEnd(thousands, Number(match[5]));
-    tokens.push(tokenOf(match, srSpan(first, second)));
-  }
-  for (const match of lower.matchAll(SR_LABELLED_DECIMAL)) {
-    const first = Number(match[1]) * 1000 + Number(match[2]) * 100;
-    const second = match[3] === undefined ? first : Number(match[3]) * 1000 + Number(match[4]) * 100;
     tokens.push(tokenOf(match, srSpan(first, second)));
   }
   for (const match of lower.matchAll(SR_THOUSANDS)) {
@@ -453,6 +477,12 @@ function srTokens(lower: string, scrim: boolean): RankToken[] {
     const second = match[4] === undefined ? first : thousands + Number(match[4]) * 100;
     tokens.push(tokenOf(match, srSpan(first, second)));
   }
+  return tokens;
+}
+
+/** SR, en milliers ou en chiffres ; `scrim` lit aussi le décimal nu (« 3.6 »). */
+function srTokens(lower: string, scrim: boolean): RankToken[] {
+  const tokens: RankToken[] = [...decimalSrTokens(lower, scrim), ...thousandSrTokens(lower)];
   for (const match of lower.matchAll(SR_NUMBER)) {
     const span = srNumberSpan(lower, match);
     const rank = match[3] !== undefined || !isNotRank(lower, match, true);

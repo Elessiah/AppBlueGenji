@@ -78,6 +78,36 @@ const GETI_HEADER = new RegExp(
   String.raw`^\s*<@!?(\d{15,22})>[^\S\n]*[*_]*\(((?:\\.|[^)\n\\]){1,64})\)[*_]*[^\S\n]*(?:sur|on|from)[^\S\n]*${GETI_SERVER_LINK}[^\S\n]*(?:\n|$)`,
   "iu",
 );
+/**
+ * Réponse de service d'un bot de relais à celui qui vient de publier (« Ton
+ * annonce a été publié dans 32 autres channels. », lien d'invitation du bot) :
+ * ce n'est pas une annonce.
+ */
+const BOT_NOTICE = new RegExp(
+  [
+    String.raw`(?:ton|votre|ta)\s+(?:annonce|message|post)\s+a\s+[ée]t[ée]\s+(?:publi|envoy|relay|partag|supprim|modifi)[ée]e?`,
+    String.raw`your\s+(?:ad|post|message|announcement)\s+(?:has\s+been|was)\s+(?:published|posted|sent|relayed|shared|deleted|edited)`,
+    String.raw`discord(?:app)?\.com\/(?:api\/)?oauth2\/authorize\?`,
+  ].join("|"),
+  "iu",
+);
+
+/**
+ * Dit si un message est une réponse de service d'un bot (confirmation de
+ * publication, invitation du bot) plutôt qu'une annonce : à ne pas garder.
+ * Un relais qui porte l'en-tête GETI est toujours une annonce.
+ *
+ * @param raw Message Discord brut, non fiable.
+ * @returns `true` pour une réponse de service.
+ */
+export function isGetiBotNotice(raw: GetiRawPost): boolean {
+  const source: GetiRawPost = typeof raw === "object" && raw !== null ? raw : {};
+  if (source.author?.bot !== true) return false;
+  const descriptions = embedsOf(source).map((embed) => text(embed.description));
+  if (descriptions.some((description) => GETI_HEADER.test(description))) return false;
+  return BOT_NOTICE.test([text(source.content), ...descriptions].join("\n"));
+}
+
 /** Passage barré : ce qui n'est plus d'actualité (un jour pris, une annonce close). */
 const STRUCK = /~~([^~]+(?:~(?!~)[^~]*)*)~~/gu;
 /** Ce qui n'est pas du texte : citation, mentions, émojis de serveur, balisage, ponctuation. */

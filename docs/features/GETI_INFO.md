@@ -9,6 +9,7 @@ cinq lots ; ce document grandit avec eux.
 | --- | --- | --- |
 | 1. GETI-PARSER | Analyse d'une annonce et filtre (`lib/shared/geti/`), jeu d'annonces anonymisées | **fait** |
 | 2. GETI-INGEST | Bot → site : création, modification, suppression, rattrapage ; table, purge, mentions légales (§ Récupération) | **fait** |
+| 2b. GETI-TUNE | Réglage de l'analyse sur les annonces réelles : Émeraude, SR de scrim, dates, niveaux, annonces closes (§ Réglage) | **fait** |
 | 3. GETI-PAGE | Page, six catégories, filtres, copie du pseudo, carte d'invitation, « Publier » | à venir |
 | 4. GETI-NAV | Menu et mention sur l'accueil | à venir |
 | 5. GETI-ALERTS | Alertes sur un filtre enregistré | à venir |
@@ -92,6 +93,9 @@ bot. Point d'entrée : `@/lib/shared/geti`.
 | `platforms` | `PC`, `CONSOLE` |
 | `languages` | `FR`, `EN`, `ES`, `DE`, `IT`, `PT`, `NL`, `PL`, `AR` |
 | `availability` | `days` (`MON`…`SUN`), `times` (minutes depuis minuit, `to` nul pour une heure seule), `timezone` |
+| `dates` | Dates visées, « AAAA-MM-JJ » à l'heure de Paris, triées (14 au plus) ; vide sans date de publication |
+| `levels` | Niveaux de division cités : `OPEN`, `INTERMEDIATE`, `ADVANCED`, `EXPERT` |
+| `closed` | `true` quand tout le texte est barré (`~~…~~`) : annonce close |
 | `teamName` | Nom d'équipe, 40 caractères au plus |
 | `staffRoles` | `COACH`, `MANAGER`, `ANALYST`, `CASTER`, `OBSERVER`, `GRAPHIC`, `COMMUNITY` |
 | `minAge` | Âge minimal (13–25 ; « majeur » = 18) |
@@ -121,14 +125,18 @@ retirés. Un mot n'est lu qu'entier (« peu » ne contient pas « eu »).
 ### Rangs
 
 Porté d'`extractRanks` du bot (Marvel Rivals, paliers seuls) et étendu à
-Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
-`getiRankFromValue`).
+Overwatch. Neuf paliers — Bronze, Argent, Or, Platine, **Émeraude**, Diamant,
+Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
+(`getiRankValue`, `getiRankFromValue`).
 
 - **Palier seul** (« diamant ») : ses cinq divisions. **Palier + division**
   (« Master 2 », « gm1 ») : un rang. Alias français, anglais et fautes courantes
   (« platinium », « diamand », « grand-maître »).
-- **Initiale + division** collées : « d3 », « m1 » (`b s g p d m c`). Une initiale
-  seule n'est jamais un rang. « argent » n'est lu que suivi d'une division ; « or »
+- **Initiale + division** collées : « d3 », « m1 » (`b s g p e d m c`). Une initiale
+  seule n'est jamais un rang. « e3 » (Émeraude 3) n'est lu qu'en contexte de
+  rang : derrière un libellé ou un rôle (« rank : e5 », « tank e2 ») ou relié à
+  un autre rang (« e3-d5 », « p1 / e4 »). Émeraude s'écrit aussi « émeraude »,
+  « emerald », « eme », « emer » (« 2eme » n'en est pas). « argent » n'est lu que suivi d'une division ; « or »
   n'est pas lu (mot trop courant) — « gold » l'est. Derrière « saison », « depuis
   la », « jouer à », collée à « ex- » (« depuis la s2 », « je joue à D2 »,
   « ex-G2 ») ou devant « esport », ce n'est pas un rang, ni « depuis s1 » (une
@@ -147,9 +155,20 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
   la borne vaut au bout où elle est écrite (« diam ou master+ » → Champion 1),
   sauf si l'autre bout est lui-même une borne (« min d3 max m1 »).
 - **Top 500** : Grand Maître 5 → Champion 1.
-- **Ancien SR** : « 4k » (≈ Grand Maître), « 3.5k », « 4k5 », « 3k+ »,
-  « 3k-4k », « 3500 », « 4200 », « 2800-3200 », « 3500+ », « 3500 sr » — 500
-  points par palier, 100 par division, plafonné à Grand Maître 1. Un nombre est
+- **SR** (l'« elo » des équipes et des scrims) : « 4k » (≈ Grand Maître),
+  « 3.5k », « 4k5 », « 3k+ », « 3k-4k », « 3500 », « 4200 », « 2800-3200 »,
+  « 3500+ », « 3500 sr », « 5000 » ; fourchettes de centaines « 3k4-5 »,
+  « 2k5/7 » ; seconde borne seule à porter le « k » : « 3.4-3.5k », « 3.5-6k »
+  (3 500 à 3 600), « 3.2-3k », « 3.3/4k » (3 300 à 4 000) ; derrière son
+  libellé sans « k » : « SR 3.6-3.7 », « elo : 3.2 » ; et, dans une recherche de
+  scrim ou de remplaçant seulement, le décimal nu (« LFS EU PC 3.6 »,
+  « adv 4.5+ »). 500 points par palier, 100 par division : 2 500 = Émeraude 5,
+  3 000 = Diamant 5, 3 500 = Master 5, 4 000 = Grand Maître 5, 4 500 =
+  Champion 5, plafonné à Champion 1 (sous 3 000, Émeraude décale d'un palier
+  l'ancienne échelle : 1 000 = Argent 5). Un horaire voisin ne fait pas d'un SR
+  un numéro (« 3500 21-23 », « 4k 20-22 CET »), « loi 1901 » n'est pas un SR,
+  et « champion » en titre n'est pas un rang (« S10 Intermediate Champion »,
+  « champion de France »). Un nombre est
   un SR sauf contexte net : unité derrière (« 1500+ heures », « 4k 144hz »,
   « 1k abonnés », « 1200 followers », « 1200 personnes », « 3000 inscrits »,
   « 2000 balles », « 1k€ »), montant ou
@@ -168,8 +187,12 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
 
 ### Autres champs
 
-- **Rôles** : français, anglais, abrégés (« heal », « supp », « mt », « fdps »…).
-  « flex dps » / « flex support » sont des sous-rôles, pas le rôle Flex. « ms »
+- **Rôles** : français, anglais, abrégés (« heal », « supp », « mt », « fdps »,
+  « hs » = hitscan…). « flex dps » / « flex support » sont des sous-rôles, pas le
+  rôle Flex, rôle en tête aussi (« dps flex », « support main ») ; « tank flex »
+  est un tank seul, « flex to / on / sur » un verbe. Une barre verticale sépare
+  deux postes (« Tank | Flex DPS »), et un alias ne se lit jamais à cheval sur
+  deux lignes. « ms »
   derrière un nombre est un ping ; « support » / « soutien » juste après un
   remerciement relié par « pour / for / de / du » (« merci pour tout votre
   soutien », « thanks a lot for the support », « thank you very much for your
@@ -184,14 +207,41 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
 - **Langues** : mots (« francophone », « english »), drapeaux, sigles **en liste**
   (« FR/EN ») ou derrière « langue : » — seuls, « EN », « ES » ou « DE » sont des
   mots courants.
-- **Jours** : noms complets seulement (« mar », « jeu », « mon » sont des mots),
-  fourchettes (« lundi au jeudi »), « week-end », « en semaine », « tous les
-  soirs ».
+- **Plateformes** : « hybrid(e) », « crossplay » — et « mixed » dans une recherche
+  de scrim — valent PC **et** console.
+- **Jours** : noms complets, fautes courantes comprises (« mecredi »,
+  « wenesday ») ; les abréviations (« mar », « jeu », « mon » sont des mots) ne
+  se lisent que devant une date ou une heure (« Tue 20-22 », « sam 28/11 ») ou
+  en liste ponctuée (« lun/mer/ven », « lun-ven ») ; fourchettes sur une ligne
+  (« lundi au jeudi » — deux puces « - Mardi », « - Dimanche » sont deux
+  jours), « week-end », « en semaine », « tous les soirs », « 7/7j ». Le jour de
+  semaine de chaque date lue s'y ajoute.
+- **Dates** (`dates`, `parseGetiDates`) : « 26/11 », « 22/11/26 », « Thursday
+  26 » (le quantième doit tomber sur le jour nommé), « ce soir », « today »,
+  « demain », résolues depuis la date de publication, à l'heure de Paris, dans
+  une fenêtre de −1 à +60 jours (« 4/5 jours », « 9/10 » ne sont pas des
+  dates). Une recherche de **scrim ou de remplaçant** (salon, ou mot-clé
+  `lfs` / `lfsub` du texte) vise des soirées : un jour nommé sans date donne sa
+  prochaine occurrence (six jours au plus), un horaire sans jour ou un « now »
+  le jour même de la publication.
+- **Niveaux** (`levels`, `parseGetiLevels`) : divisions de la ligue FACEIT —
+  « open », « inter(mediate) », « adv(anced) », « expert », nuancés ou non
+  (« high open », « HighOpen », « low-mid advanced »). « int » et « exp » ne
+  sont lus que nuancés ou collés à un autre niveau (« adv/exp ») ; « DMs open »,
+  « position open for trials » ne sont pas un niveau.
+- **Passages barrés** : `~~…~~` n'est pas lu (« ~~Mardi 24/11~~ Mercredi
+  25/11 » ne cherche plus que mercredi). Texte entièrement barré : `closed`,
+  et son contenu reste lu.
 - **Horaires** : « 21h-23h », « 20h30 », « 20-23h », « 8-11pm », « 20:30 » ; une
   durée (« 2h par jour », « 2-3h par soir », « 1h-2h par jour ») n'en est pas un ;
   au-delà de 6 h (« 20h-23h par soir », « 20-23h par soir », « 21h-23h per day »), c'est une
-  plage, et « parfois » n'est pas « par ». Fuseau : « CET », « CEST », « UTC+1 »,
-  « heure française » (= `Europe/Paris`).
+  plage, et « parfois » n'est pas « par ». Sans unité, la forme des scrims :
+  « 20-22 CET », « 21/23 CET », « 21.15-23 CET », « h21-23 », « 20 CET » ; sans
+  fuseau derrière, seulement en soirée (« 20-22 » dès 13 h au tiret, « 21/23 »
+  dès 19 h à la barre) — « 3-5 joueurs », « 18-25 ans », « 22/11 », « 15/20 »
+  n'en sont pas. Fuseau : « CET », « CEST », « BST », « EET », « UTC+1 »,
+  « heure française » (= `Europe/Paris`), et « cet » / « cest » en minuscules
+  derrière une heure.
 - **Nom d'équipe** : derrière un libellé (« Équipe : … », « Team: … ») ou dans la
   phrase après « team / équipe / structure / roster », mots en capitale seulement,
   arrêté au premier mot du vocabulaire d'annonce (« Team Blue Phoenix EU ») ; sans
@@ -201,7 +251,11 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
   pronom en capitale peut finir un nom (« Team Game I », « Team Game On »), pas
   l'ouvrir, et pas quand un verbe de sa langue le suit (« Team Nova I need »,
   « team Phoenix On cherche » donnent « Nova », « Phoenix ») ; limite assumée :
-  « Team Game On recrute » donne « Game ».
+  « Team Game On recrute » donne « Game ». À défaut : un nom devant un suffixe de
+  structure (« Chroma Esport », « ELEVEN Academy », « Clay Family ») ou juste
+  devant le verbe de l'annonce (« MTP RECRUTE », « Verdict Astral recherche »,
+  « L'association Blue Sonate recherche »). Un SR (« Roster 3K »), un mot seul
+  comme « E-sport » ou le nom d'un émoji de serveur ne nomment personne.
 - **Âge minimal** : « 18+ », « +18 », « 17 ans minimum », « majeur ». « 18+ » ou
   « +18 » nu n'est un âge que suivi de la fin, d'une ponctuation, d'un mot d'âge
   ou d'un mot d'annonce (rôle, région, langue, plateforme : « 18+ dps », « +18
@@ -212,7 +266,8 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
 ## Filtre — `matchesGetiFilter(post, filter, now?)`
 
 Critères de `GetiFilter` : `category`, `ranks` (`min`, `max`), `roles`,
-`regions`, `platforms`, `languages`, `maxAgeHours`, `includeUnknown`. Un critère
+`regions`, `platforms`, `languages`, `levels`, `hideClosed`, `maxAgeHours`,
+`includeUnknown`. Un critère
 absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passer
 (ET) ; dans un critère à plusieurs valeurs, une seule suffit (OU).
 
@@ -222,7 +277,8 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
 - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
 - **Âge** : publiée depuis `maxAgeHours` au plus ; une annonce sans date est
   écartée.
-- **Champ non lu** (rang, rôle, région, plateforme, langue) : l'annonce est
+- **Annonces closes** : écartées avec `hideClosed: true`.
+- **Champ non lu** (rang, rôle, région, plateforme, langue, niveau) : l'annonce est
   écartée, sauf `includeUnknown: true` — le lot 3 décide du réglage par défaut de
   la page.
 
@@ -233,12 +289,35 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
   le taux de reconnaissance.
 - Accès du bot de production aux six salons (`Voir le salon`, `Lire l'historique`)
   à vérifier avant le rattrapage de 14 jours.
-- « Top 500 » et l'ancien SR sont des approximations assumées.
+- « Top 500 » et la correspondance SR → rang sont des approximations assumées.
+
+## Réglage sur les annonces réelles (lot 2b)
+
+L'analyse a été mesurée puis réglée sur 695 messages réels des salons (14
+jours ; `lfcast` n'en portait aucun). L'échantillon est une donnée personnelle :
+il n'entre pas dans le dépôt, seules des annonces **réécrites** (faux pseudos,
+identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
+
+- **Réponses de service** — `isGetiBotNotice(raw)` : la confirmation qu'un bot
+  de relais adresse à celui qui publie (« Ton annonce a été publié dans 32
+  autres channels. », lien d'invitation du bot) n'est pas une annonce ;
+  `upsertGetiPosts` l'écarte comme un message vide (compté `emptied`, retiré
+  s'il était gardé). Un relais à en-tête GETI n'en est jamais une.
+- **Analyses déjà gardées** : `listGetiPosts` donne `dates`, `levels` et
+  `closed` vides à une ligne analysée avant ce lot ; le rattrapage du bot la
+  réanalyse.
+
+Limites connues : le rôle d'une recherche de remplaçant donné par la seule
+mention d'un rôle Discord (`<@&id>`) n'est pas lu ; le pool de héros, l'âge du
+joueur (« 19 ans », non extrait à dessein), le format d'un scrim (« bo3 » —
+absent de l'échantillon) et les postes d'administration ou de modération ne
+sont pas des champs ; « 20 22 / 21 23 » (sans séparateur) n'est pas un horaire.
 
 ## Tests
 
 `tests/lib/shared/geti/` — `ranks.test.ts`, `fields.test.ts`,
-`parse-post.test.ts`, `filter.test.ts`, `fixtures.test.ts` (jeu
+`parse-post.test.ts`, `filter.test.ts`, `tune.test.ts` (tournures réelles du
+lot 2b), `fixtures.test.ts` (jeu
 `tests/fixtures/geti/posts.json`) ; fabriques dans `tests/helpers/geti.ts`.
 
 ## Récupération (lot 2) — le bot pousse, le site garde

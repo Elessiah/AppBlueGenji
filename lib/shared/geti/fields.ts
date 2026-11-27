@@ -495,7 +495,11 @@ function uniqueSortedTimes(times: readonly GetiTimeRange[]): GetiTimeRange[] {
 }
 
 /** Sigles de fuseau lus en capitales seulement (« est » est un mot français). */
-const TIMEZONE_CODE = /(?<![\p{L}\p{N}])(CEST|CET|BST|EET|(?:UTC|GMT)(?:\s?[+-]\s?\d{1,2})?)(?![\p{L}\p{N}])/u;
+const UTC_OFFSET = String.raw`(?:UTC|GMT)(?:\s?[+-]\s?\d{1,2})?`;
+const TIMEZONE_CODE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(CEST|CET|BST|EET|${UTC_OFFSET})${NOT_BEFORE_WORD}`,
+  "u",
+);
 /** … ou en minuscules derrière une heure : « 20-22 cet », « 21h cest » (« cet été » n'en est pas un). */
 const TIMEZONE_AFTER_TIME = /\d ?h? ?\(?(cest|cet)(?![\p{L}\p{N}])/u;
 const PARIS_TIME = new RegExp(
@@ -563,6 +567,46 @@ const TODAY = new RegExp(
 );
 const TOMORROW = new RegExp(String.raw`${NOT_AFTER_WORD}(?:demain|tomorrow|tmrw|tmr)${NOT_BEFORE_WORD}`, "u");
 
+/** Jour gardé s'il reste proche de la publication (`today`), `null` sinon. */
+function nearDay(day: number | null, today: number): number | null {
+  return day !== null && day >= today - DAY_MS && day <= today + DATE_WINDOW_DAYS * DAY_MS ? day : null;
+}
+
+/** Année écrite d'une date : « 26 » vaut 2026. */
+function writtenYear(year: string): number {
+  return Number(year.length === 2 ? `20${year}` : year);
+}
+
+/** Dates « jour/mois » : dans l'année de la publication, sinon la suivante, ou dans l'année écrite. */
+function numericDates(lower: string, today: number): number[] {
+  const year = new Date(today).getUTCFullYear();
+  const found: number[] = [];
+  for (const match of lower.matchAll(NUMERIC_DATE)) {
+    const [day, month] = [Number(match[1]), Number(match[2])];
+    const years = match[3] === undefined ? [year, year + 1] : [writtenYear(match[3])];
+    const date = years.map((candidate) => nearDay(civilDay(candidate, month, day), today)).find((near) => near !== null);
+    if (date !== undefined && date !== null) found.push(date);
+  }
+  return found;
+}
+
+/** Jour nommé et quantième : ce mois-ci, sinon le suivant ; le quantième doit tomber sur le jour nommé. */
+function namedDayDates(lower: string, today: number): number[] {
+  const year = new Date(today).getUTCFullYear();
+  const month = new Date(today).getUTCMonth() + 1;
+  const found: number[] = [];
+  for (const match of lower.matchAll(NAMED_DAY_NUMBER)) {
+    const named = DAY_TABLE.lookup.get(aliasKey(match[1]));
+    const day = Number(match[2]);
+    const next = month === 12 ? civilDay(year + 1, 1, day) : civilDay(year, month + 1, day);
+    const date = [civilDay(year, month, day), next]
+      .map((candidate) => nearDay(candidate, today))
+      .find((near) => near !== null && weekdayOf(isoDay(near)) === named);
+    if (date !== undefined && date !== null) found.push(date);
+  }
+  return found;
+}
+
 /** Au-delà, les jours cités sont une disponibilité habituelle, pas des soirées précises. */
 const EVENING_DAYS_MAX = 6;
 /** « now », « asap » : pour tout de suite. */
@@ -600,29 +644,7 @@ export function parseGetiDates(lower: string, postedAt: string | null, sameDay =
   const posted = postedAt === null ? Number.NaN : Date.parse(postedAt);
   if (Number.isNaN(posted)) return [];
   const today = parisDay(posted);
-  const year = new Date(today).getUTCFullYear();
-  const near = (day: number | null) =>
-    day !== null && day >= today - DAY_MS && day <= today + DATE_WINDOW_DAYS * DAY_MS ? day : null;
-  const found: number[] = [];
-  for (const match of lower.matchAll(NUMERIC_DATE)) {
-    const [day, month] = [Number(match[1]), Number(match[2])];
-    const written = match[3] === undefined ? null : Number(match[3].length === 2 ? `20${match[3]}` : match[3]);
-    const date =
-      written === null
-        ? (near(civilDay(year, month, day)) ?? near(civilDay(year + 1, month, day)))
-        : near(civilDay(written, month, day));
-    if (date !== null) found.push(date);
-  }
-  for (const match of lower.matchAll(NAMED_DAY_NUMBER)) {
-    const named = DAY_TABLE.lookup.get(aliasKey(match[1]));
-    const month = new Date(today).getUTCMonth() + 1;
-    const next = month === 12 ? civilDay(year + 1, 1, Number(match[2])) : civilDay(year, month + 1, Number(match[2]));
-    // Ce mois-ci, sinon le suivant ; le quantième doit tomber sur le jour nommé.
-    const date = [civilDay(year, month, Number(match[2])), next]
-      .map(near)
-      .find((day) => day !== null && weekdayOf(isoDay(day)) === named);
-    if (date !== undefined && date !== null) found.push(date);
-  }
+  const found: number[] = [...numericDates(lower, today), ...namedDayDates(lower, today)];
   if (TODAY.test(lower)) found.push(today);
   if (TOMORROW.test(lower)) found.push(today + DAY_MS);
   if (sameDay) found.push(...eveningDays(lower, today, found));
@@ -832,7 +854,7 @@ const LABEL_END = /\s[-–—]\s|[,;•·(\[]|\s{2,}/u;
 const NOT_A_NAME = new Set(
   [
     "fr eu na en pc ow ow2 overwatch lfp lft lfs lfsub lfstaff lfcast",
-    "bronze silver gold plat platine platinum diam diamant diamond master masters gm grandmaster champion top500",
+    "bronze silver gold plat platine platinum emeraude emerald diam diamant diamond master masters gm grandmaster champion top500",
     "tank dps support supp heal flex console ps5 xbox",
     "cherche recherche recrute looking seeking need needs is are est qui de du des en a au and et for pour",
     "competitive competitif compet chill serieuse serieux tryhard semi francaise francophone",
@@ -953,14 +975,20 @@ export function parseGetiTeamName(clean: string): string | null {
     const name = cleanTeamName(match[1], clean.slice(end, end + 16));
     if (name !== null) return name;
   }
+  return structureName(clean);
+}
+
+/** À défaut de « team … » : le nom devant un suffixe de structure, sinon devant le verbe de l'annonce. */
+function structureName(clean: string): string | null {
   for (const match of clean.matchAll(TEAM_SUFFIXED)) {
     const name = cleanTeamName(`${match[1]} ${match[2]}`, "", true);
     // Le suffixe seul ne nomme rien : il faut au moins un mot devant lui.
-    if (name !== null && name.includes(" ")) return name;
+    if (name?.includes(" ") === true) return name;
   }
   for (const match of clean.matchAll(TEAM_BEFORE_VERB)) {
     const name = cleanTeamName(match[1], "", true);
-    if (name !== null && name === match[1].trim().split(/\s+/u).slice(-name.split(" ").length).join(" ")) return name;
+    // Le nom doit toucher le verbe : « Blue Sonate FR recherche » ne nomme personne.
+    if (name !== null && match[1].trimEnd().endsWith(name)) return name;
   }
   return null;
 }

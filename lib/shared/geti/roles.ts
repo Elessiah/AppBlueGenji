@@ -106,6 +106,16 @@ function isSubRole(kind: RoleKind): kind is GetiSubRole {
 }
 
 /**
+ * « flex » qui ne dit pas un joueur polyvalent : le verbe (« can flex to
+ * Juno »), ou l'adjectif d'un tank (« tank flex » : un tank qui joue tous les
+ * tanks).
+ */
+function isNotFlexRole(lower: string, start: number, end: number, previous: GetiRoleToken | undefined): boolean {
+  if (FLEX_VERB_AFTER.test(lower.slice(end, end + 8))) return true;
+  return previous?.role === "TANK" && lower.slice(previous.end, start) === " ";
+}
+
+/**
  * Repère les rôles d'un texte préparé.
  *
  * @param lower Texte sans accents, en minuscules (`prepareGetiText`).
@@ -120,10 +130,7 @@ export function findGetiRoleTokens(lower: string): GetiRoleToken[] {
     const start = match.index;
     if (SHORT_ABBREVIATIONS.has(key) && /\d\s?$/u.test(lower.slice(Math.max(0, start - 2), start))) continue;
     if (POLITE_WORDS.has(key) && POLITE_BEFORE.test(lower.slice(Math.max(0, start - 60), start))) continue;
-    if (key === "flex" && FLEX_VERB_AFTER.test(lower.slice(start + match[0].length, start + match[0].length + 8))) continue;
-    // « tank flex » : un tank qui joue tous les tanks, pas un joueur polyvalent en plus.
-    const previous = tokens.at(-1);
-    if (key === "flex" && previous?.role === "TANK" && lower.slice(previous.end, start) === " ") continue;
+    if (key === "flex" && isNotFlexRole(lower, start, start + match[0].length, tokens.at(-1))) continue;
     tokens.push(
       isSubRole(kind)
         ? { start, end: start + match[0].length, role: SUB_ROLE_PARENT[kind], subRole: kind }
