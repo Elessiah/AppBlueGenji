@@ -33,8 +33,12 @@ import { fakePool, type SqlMock, type SqlQuery } from "../../../helpers/sql-doub
 const NOW = Date.parse("2026-11-27T12:00:00.000Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Base simulée : `rows` pour une lecture, `affectedRows` pour une écriture ; aucune opposition enregistrée. */
 function executeMock(rows: unknown[] = [], affectedRows = 0): SqlMock {
-  return jest.fn<SqlQuery>(async (sql: string) => (sql.trimStart().startsWith("SELECT") ? [rows] : [{ affectedRows }]));
+  return jest.fn<SqlQuery>(async (sql: string) => {
+    if (sql.trimStart().startsWith("SELECT")) return [rows];
+    return [{ affectedRows: sql.includes("bg_geti_objections") ? 0 : affectedRows }];
+  });
 }
 
 function executor(execute: SqlMock) {
@@ -108,8 +112,8 @@ describe("upsertGetiPosts", () => {
 
     const outcome = await upsertGetiPosts(executor(execute), [post], NOW);
 
-    expect(outcome).toEqual({ stored: 1, emptied: 0, expired: 0 });
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(outcome).toEqual({ stored: 1, emptied: 0, expired: 0, withheld: 0 });
+    expect(execute).toHaveBeenCalledTimes(2);
     const [sql, params] = execute.mock.calls[0];
     expect(sql).toContain("INSERT INTO bg_geti_posts");
     expect(params).toEqual([
@@ -155,7 +159,7 @@ describe("upsertGetiPosts", () => {
 
     const outcome = await upsertGetiPosts(executor(execute), [post], NOW);
 
-    expect(outcome).toEqual({ stored: 0, emptied: 0, expired: 1 });
+    expect(outcome).toEqual({ stored: 0, emptied: 0, expired: 1, withheld: 0 });
     expect(execute).not.toHaveBeenCalled();
   });
 
@@ -174,7 +178,7 @@ describe("upsertGetiPosts", () => {
 
     const outcome = await upsertGetiPosts(executor(execute), [post], NOW);
 
-    expect(outcome).toEqual({ stored: 0, emptied: 0, expired: 1 });
+    expect(outcome).toEqual({ stored: 0, emptied: 0, expired: 1, withheld: 0 });
   });
 
   it("upsertGetiPosts_scrimExactlySevenDaysOld_isStored", async () => {
@@ -197,7 +201,7 @@ describe("upsertGetiPosts", () => {
     const outcome = await upsertGetiPosts(executor(execute), posts, NOW);
 
     expect(outcome.stored).toBe(3);
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(2);
     const [sql, params] = execute.mock.calls[0];
     expect(String(sql).match(/\(\?, \?, \?, \?, \?, \?, \?, \?, \?, \?\)/g)).toHaveLength(3);
     expect(params).toHaveLength(30);
@@ -215,8 +219,8 @@ describe("upsertGetiPosts", () => {
 
     const outcome = await upsertGetiPosts(executor(execute), posts, NOW);
 
-    expect(outcome).toEqual({ stored: 1, emptied: 1, expired: 1 });
-    expect(execute).toHaveBeenCalledTimes(2);
+    expect(outcome).toEqual({ stored: 1, emptied: 1, expired: 1, withheld: 0 });
+    expect(execute).toHaveBeenCalledTimes(3);
     expect(execute.mock.calls[0][1]).toHaveLength(10);
   });
 
@@ -226,9 +230,32 @@ describe("upsertGetiPosts", () => {
 
     const outcome = await upsertGetiPosts(executor(execute), [post], NOW);
 
-    expect(outcome).toEqual({ stored: 0, emptied: 1, expired: 0 });
+    expect(outcome).toEqual({ stored: 0, emptied: 1, expired: 0, withheld: 0 });
     expect(execute).toHaveBeenCalledTimes(1);
     expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE message_id IN (?)", [GETI_FAKE_MESSAGE_ID]);
+  });
+});
+
+describe("upsertGetiPosts — oppositions", () => {
+  it("upsertGetiPosts_objectedRowsWithheld_countsWithheldAndSubtractsFromStored", async () => {
+    const execute = jest.fn<SqlQuery>(async (sql: string) => [{ affectedRows: sql.includes("bg_geti_objections") ? 1 : 2 }]);
+    const posts = [getiPushedPost({ id: "100000000000000931" }), getiPushedPost({ id: "100000000000000932" })];
+
+    const outcome = await upsertGetiPosts(executor(execute), posts, NOW);
+
+    expect(outcome).toEqual({ stored: 1, emptied: 0, expired: 0, withheld: 1 });
+    const [sql, params] = execute.mock.calls[1];
+    expect(sql).toContain("DELETE FROM bg_geti_posts");
+    expect(sql).toContain("bg_geti_objections");
+    expect(params).toEqual(["100000000000000931", "100000000000000932"]);
+  });
+
+  it("upsertGetiPosts_noRowsToWrite_skipsTheObjectionCheck", async () => {
+    const execute = executeMock();
+
+    await upsertGetiPosts(executor(execute), [getiPushedPost({ postedAt: new Date(NOW - 20 * DAY_MS).toISOString() })], NOW);
+
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 
@@ -358,7 +385,7 @@ describe("purgeExpiredGetiPosts", () => {
 
     await purgeExpiredGetiPosts(executor(execute), NOW);
 
-    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ? LIMIT 500", [new Date(NOW - 14 * DAY_MS)]);
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ? LIMIT 500", [new Date(NOW - 14 * DAY_MS)]);
   });
 
   it("purgeExpiredGetiPosts_fullBatch_runsAgainUntilABatchIsShort", async () => {
@@ -367,8 +394,9 @@ describe("purgeExpiredGetiPosts", () => {
 
     const removed = await purgeExpiredGetiPosts(executor(execute), NOW);
 
-    // Première catégorie : trois passages (500, 500, 20) ; les autres et la condition finale : un passage chacune.
-    expect(execute).toHaveBeenCalledTimes(3 + 6);
+    // Première catégorie : trois passages (500, 500, 20) ; les autres et la condition finale : un passage
+    // chacune ; puis la purge des oppositions.
+    expect(execute).toHaveBeenCalledTimes(3 + 6 + 1);
     expect(removed).toBe(1020);
   });
 
@@ -377,7 +405,17 @@ describe("purgeExpiredGetiPosts", () => {
 
     await purgeExpiredGetiPosts(executor(execute), NOW);
 
-    expect(execute).toHaveBeenCalledTimes(100 * 7);
+    expect(execute).toHaveBeenCalledTimes(100 * 7 + 1);
+  });
+
+  it("purgeExpiredGetiPosts_always_purgesStaleMessageObjections", async () => {
+    const execute = executeMock();
+
+    await purgeExpiredGetiPosts(executor(execute), NOW);
+
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_objections WHERE kind = 'message' AND created_at < ?", [
+      new Date(NOW - 14 * DAY_MS),
+    ]);
   });
 
   it("purgeExpiredGetiPosts_rowsRemoved_returnsTheirTotal", async () => {
@@ -404,7 +442,7 @@ describe("startGetiPostsPurgeClock", () => {
 
     await run();
 
-    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ? LIMIT 500", [expect.any(Date)]);
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ? LIMIT 500", [expect.any(Date)]);
   });
 });
 
@@ -461,6 +499,20 @@ describe("listGetiPosts", () => {
     await listGetiPosts();
 
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPosts_forgetDuringScan_doesNotCacheTheStaleRows", async () => {
+    const execute = jest.fn<SqlQuery>(async () => {
+      // Une suppression arrive pendant la lecture : ce qu'elle rend est déjà périmé.
+      forgetGetiListScans();
+      return [[row()]];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+
+    await listGetiPosts();
+    await listGetiPosts();
+
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it("listGetiPosts_otherCategory_scansAgain", async () => {

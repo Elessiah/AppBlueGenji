@@ -88,11 +88,19 @@ const GETI_SERVER_LINK = String.raw`\[([^\n]{1,200}?)\]\(https?:\/\/[^)\s]*\)`;
 /**
  * Première ligne d'un relais du bot GETI :
  * « <@id>*(pseudo)* sur [Serveur](invitation) », puis le texte cité (« > … »).
+ * Le pseudo peut porter une parenthèse fermante (« Bob :) ») : il court
+ * jusqu'à la première « ) » suivie de « sur », « on » ou « from » et du lien.
  */
 const GETI_HEADER = new RegExp(
-  String.raw`^\s*<@!?(\d{15,22})>[^\S\n]*[*_]*\(((?:\\.|[^)\n\\]){1,64})\)[*_]*[^\S\n]*(?:sur|on|from)[^\S\n]*${GETI_SERVER_LINK}[^\S\n]*(?:\n|$)`,
+  String.raw`^\s*<@!?(\d{15,22})>[^\S\n]*[*_]*\(((?:\\.|[^\n\\]){1,64}?)\)[*_]*[^\S\n]*(?:sur|on|from)[^\S\n]*${GETI_SERVER_LINK}[^\S\n]*(?:\n|$)`,
   "iu",
 );
+/**
+ * Première ligne qui s'ouvre comme un en-tête GETI (mention en tête) sans s'y
+ * lire en entier : écrite par le bot GETI avec le pseudo et le nom de serveur
+ * que d'autres choisissent, elle n'est jamais lue pour l'auteur ni pour le texte.
+ */
+const GETI_HEADER_LIKE_LINE = /^\s*<@!?\d{15,22}>[^\n]*(?:\n|$)/u;
 /**
  * Pseudo Discord lisible sur une ligne d'auteur d'encart : nouveau format
  * (« faux.pseudo ») ou ancien (« Faux Pseudo#4821 »). Un nom d'affichage libre
@@ -310,7 +318,10 @@ function readEmbed(embed: GetiRawEmbed, trust: RelayTrust): EmbedReading {
       : null;
   const lineServer = trusted !== null && trailerId === null ? serverName(trusted[1]) : null;
   // En-tête ou ligne « Sent from » qui ne vient pas de son bot : le texte du joueur, affiché tel quel.
-  const start = header === null || headerMatch === null ? 0 : headerMatch[0].length;
+  // Un en-tête du bot GETI illisible (pseudo ou serveur hors forme) est écarté aussi : le pseudo et le
+  // nom de serveur qu'il porte sont choisis par d'autres, qui y écriraient « Contact : <@quelqu'un> ».
+  const headerLike = trust.geti && header === null ? GETI_HEADER_LIKE_LINE.exec(description) : null;
+  const start = header !== null && headerMatch !== null ? headerMatch[0].length : (headerLike?.[0].length ?? 0);
   const end = trusted === null ? undefined : Math.max(start, trusted.index);
   const parts = [text(embed.title), description.slice(start, end), ...embedFieldLines(embed)];
   return { parts, header, trailer, embedTag, lineServer };

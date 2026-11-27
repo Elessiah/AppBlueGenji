@@ -15,6 +15,7 @@ import {
   reconcileGetiChannel,
   upsertGetiPosts,
 } from "../geti/posts";
+import { liftGetiObjection, recordGetiObjection } from "../geti/objections";
 import { parsePushedPost, type GetiPushedPost } from "../geti/wire";
 import { GETI_CATEGORIES, GETI_CHANNEL_IDS, type GetiCategory } from "@/lib/shared/geti";
 import { GETI_BOT_USER_ID, getiRetentionMs } from "@/lib/shared/geti/ingest";
@@ -205,6 +206,26 @@ export async function createGetiPosts(db: Pool): Promise<void> {
   const beforePurge = await mine();
   await purgeExpiredGetiPosts(db, now);
   const afterPurge = await mine();
+
+  // Oppositions sur la vraie base : une sur un message, une sur un auteur — leurs annonces poussées
+  // ensuite ne restent pas ; levées, elles reviennent à la poussée suivante.
+  const objectedMessage = pushed(wirePost({ category: "lft", ageHours: 2, author: "test_geti_oppose", text: "LFT opposé" }, 93, now));
+  const objectedAuthor = pushed(wirePost({ category: "lfp", ageHours: 2, author: "test_geti_oppose", text: "LFP opposé" }, 94, now));
+  const authorObjection = { kind: "author" as const, targetId: fakeId("1000000000000001", 94) };
+  const messageObjection = { kind: "message" as const, targetId: objectedMessage.messageId };
+  await recordGetiObjection(db, messageObjection);
+  await recordGetiObjection(db, authorObjection);
+  const objected = await upsertGetiPosts(db, [objectedMessage, objectedAuthor], now);
+  const lifted = (await liftGetiObjection(db, messageObjection)) && (await liftGetiObjection(db, authorObjection));
+  const restored = await upsertGetiPosts(db, [objectedMessage, objectedAuthor], now);
+  const objectionRemoved = await recordGetiObjection(db, messageObjection);
+  await liftGetiObjection(db, messageObjection);
+  await deleteGetiPosts(db, [objectedAuthor.messageId]);
+  if (objected.withheld !== 2 || objected.stored !== 0 || !lifted || restored.stored !== 2 || objectionRemoved !== 1) {
+    throw new Error(
+      `annonces GETI : oppositions inattendues (${objected.withheld} écartée(s), ${restored.stored} rétablie(s), ${objectionRemoved} retirée(s))`,
+    );
+  }
   if (
     outcome.stored !== posts.length + 1 ||
     outcome.expired !== expired.length ||

@@ -16,6 +16,7 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { toIso } from "@/lib/server/serialization";
+import { purgeStaleGetiObjections, withholdObjectedGetiPosts } from "@/lib/server/geti/objections";
 import type { GetiPushedPost, GetiReconcileRequest } from "@/lib/server/geti/wire";
 import {
   GETI_CATEGORIES,
@@ -92,6 +93,8 @@ export type GetiUpsertOutcome = {
   emptied: number;
   /** Annonces publiées avant la fenêtre de garde de leur catégorie : ni gardées ni rendues. */
   expired: number;
+  /** Annonces qu'une opposition couvre (`objections.ts`) : retirées aussitôt écrites, jamais rendues. */
+  withheld: number;
 };
 
 /**
@@ -114,7 +117,7 @@ export async function upsertGetiPosts(
   posts: readonly GetiPushedPost[],
   now: number = Date.now(),
 ): Promise<GetiUpsertOutcome> {
-  const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0 };
+  const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0, withheld: 0 };
   const emptied: string[] = [];
   const rows: (string | Date | null)[][] = [];
   const trusted = getiTrustedBots();
@@ -143,7 +146,13 @@ export async function upsertGetiPosts(
     ]);
     outcome.stored += 1;
   }
-  if (rows.length > 0) await executor.execute(upsertSql(rows.length), rows.flat());
+  if (rows.length > 0) {
+    await executor.execute(upsertSql(rows.length), rows.flat());
+    // Une annonce dont l'auteur (ou le message) fait l'objet d'une opposition ne reste pas : le bot
+    // la repousserait sinon à chaque rattrapage, tant que le message est sur Discord.
+    outcome.withheld = await withholdObjectedGetiPosts(executor, rows.map((row) => String(row[0])));
+    outcome.stored -= outcome.withheld;
+  }
   if (emptied.length > 0) await deleteGetiPosts(executor, emptied);
   forgetGetiListScans();
   return outcome;
@@ -202,6 +211,7 @@ export async function purgeExpiredGetiPosts(executor: GetiExecutor, now: number 
   }
   removed += await deleteInBatches(executor, "posted_at < ?", [new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS)]);
   if (removed > 0) forgetGetiListScans();
+  await purgeStaleGetiObjections(executor, now);
   return removed;
 }
 
@@ -315,9 +325,16 @@ const SCAN_TTL_MS = 10_000;
 /** Lectures gardées au plus (une par catégorie et âge voulu) : la clé vient du visiteur, la mémoire ne grandit pas avec. */
 const SCAN_CACHE_MAX = 8;
 const scanCache = new Map<string, { at: number; rows: GetiPostRow[] }>();
+/**
+ * Compte des oublis : une lecture partie avant un oubli ne garde pas ce
+ * qu'elle a lu (une annonce supprimée pendant sa requête resterait sinon
+ * servie dix secondes).
+ */
+let scanGeneration = 0;
 
 /** Oublie les lectures gardées : une écriture, une suppression ou une purge vient de changer la table. */
 export function forgetGetiListScans(): void {
+  scanGeneration += 1;
   scanCache.clear();
 }
 
@@ -332,6 +349,7 @@ async function scanGetiRows(filter: GetiFilter, given: GetiExecutor | undefined,
   const key = `${isCategory(filter.category) ? filter.category : ""}|${String(filter.maxAgeHours ?? "")}`;
   const kept = given === undefined ? scanCache.get(key) : undefined;
   if (kept && Date.now() - kept.at < SCAN_TTL_MS) return kept.rows;
+  const generation = scanGeneration;
   // `LIMIT` écrit en dur (constante entière) : `execute` n'accepte pas partout un paramètre lié à cette place.
   const [rows] = await db.execute<GetiPostRow[]>(
     `SELECT message_id, channel_id, category, source, author_id, author_tag, parsed_json, posted_at, edited_at
@@ -344,7 +362,7 @@ async function scanGetiRows(filter: GetiFilter, given: GetiExecutor | undefined,
   if (rows.length >= GETI_LIST_SCAN_MAX) {
     console.warn(`[geti] lecture des annonces tronquée à ${GETI_LIST_SCAN_MAX} lignes : filtres et total incomplets`);
   }
-  if (given === undefined) {
+  if (given === undefined && generation === scanGeneration) {
     if (scanCache.size >= SCAN_CACHE_MAX) scanCache.delete(String(scanCache.keys().next().value));
     scanCache.set(key, { at: Date.now(), rows });
   }

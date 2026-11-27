@@ -321,13 +321,13 @@ function RgpdFr({
             écrit, et celles que GETI Bot — le bot d&apos;un réseau tiers d&apos;annonces, qui diffuse chaque annonce à tous les
             serveurs Discord abonnés — y relaie. Sont gardés le texte de l&apos;annonce, le pseudo et l&apos;identifiant
             Discord de son auteur, le serveur d&apos;origine d&apos;une annonce relayée, les dates et les critères lus
-            automatiquement dans le texte (rang, rôle, région, plateforme, langue, disponibilités, âge minimal annoncé, nom d&apos;équipe), sans lien avec un
+            automatiquement dans le texte (rang, rôle, région, plateforme, langue, disponibilités, âge minimal annoncé, nom d&apos;équipe), ainsi que le message tel que le bot l&apos;a transmis (pour refaire cette lecture quand elle s&apos;améliore), sans lien avec un
             compte du site — que l&apos;auteur en ait un ou non. Une recherche de scrim est gardée{" "}
             {GETI_RETENTION_DAYS.lfs} jours après sa publication sur Discord, les autres annonces{" "}
             {GETI_RETENTION_DAYS.lfp} jours ; supprimer l&apos;annonce sur Discord la retire du site aussitôt, la modifier
             remplace l&apos;ancienne version. Base : l&apos;intérêt légitime de l&apos;association (aider joueurs et équipes à se
             trouver), pour des annonces déjà publiques ; leur auteur peut s&apos;y opposer et en demander le retrait (voir
-            « Exercer vos droits »). Registre des traitements : fiche T21.
+            « Exercer vos droits ») : ses annonces sont alors retirées et ne sont plus recopiées, l&apos;association ne gardant pour cela que l&apos;identifiant Discord de l&apos;auteur (ou celui de l&apos;annonce visée), tant que l&apos;opposition tient ({GETI_RETENTION_DAYS.lfp} jours pour une seule annonce). Registre des traitements : fiche T21.
           </p>
           <p id="age-minimum">
             <strong>Âge minimum.</strong> Il faut avoir au moins {SITE_MINIMUM_AGE} ans pour

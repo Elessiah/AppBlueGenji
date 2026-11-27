@@ -25,6 +25,35 @@ function storedFilter(json: string): GetiFilter {
 }
 
 describe("parseGetiPost — relay authorship cannot be spoofed", () => {
+  it("parseGetiPost_pseudoWithClosingParen_readsTheHeaderAuthorAndTag", () => {
+    const post = parseGetiPost(
+      getiRelayPost(`<@${GETI_FAKE_OTHER_ID}>*(Bob :))* sur [Faux Serveur](https://discord.gg/fauxcode)\n\n> LFT tank`),
+      GETI_TRUSTED_BOTS,
+    );
+
+    expect(post.authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(post.authorTag).toBe("Bob :)");
+    expect(post.originServer).toBe("Faux Serveur");
+  });
+
+  it("parseGetiPost_headerLikeLineWithContactInServerName_namesNoSpoofedAuthor", () => {
+    const pseudo = "x".repeat(70);
+    const post = parseGetiPost(
+      getiRelayPost(`<@${GETI_FAKE_OTHER_ID}>*(${pseudo})* sur [Contact : <@${VICTIM_ID}>](https://discord.gg/fauxcode)\n\n> LFT tank`),
+      GETI_TRUSTED_BOTS,
+    );
+
+    expect(post.authorId).toBeNull();
+    expect(post.text).not.toContain("Contact");
+  });
+
+  it("parseGetiPost_untrustedBotHeaderLikeLine_keepsItsTextAsIs", () => {
+    const post = parseGetiPost(getiRelayPost(`<@${GETI_FAKE_OTHER_ID}> LFT tank Master`), {});
+
+    expect(post.authorId).toBeNull();
+    expect(post.text).toContain("LFT tank Master");
+  });
+
   it("parseGetiPost_quotedContactLabel_namesNobody", () => {
     const post = parseGetiPost(getiRelayPost(`LFT tank\n> Contact : <@${VICTIM_ID}>`), GETI_TRUSTED_BOTS);
 

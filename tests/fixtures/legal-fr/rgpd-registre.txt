@@ -358,7 +358,7 @@ Finalité principale
 Fournir les services du bot sur les serveurs Discord partenaires
 Sous-finalités
 Relais des annonces entre les salons des serveurs partenaires, répercussion des modifications et suppressions, temps de recharge, compteur de messages de /stats, statistiques du tableau de bord, retrait des copies d'un utilisateur exclu
-Lecture des annonces de recrutement Overwatch des salons d'annonces du serveur Discord de l'association (créées, modifiées, supprimées) et transmission au site, qui les recopie (T21) ; le bot n'en enregistre rien (il ne les tient qu'en mémoire : la lecture de l'historique des salons, sa file d'envoi, et le cache de messages de Discord, les 200 derniers messages reçus de chaque salon) et n'écrit rien dans ces salons
+Lecture des annonces de recrutement Overwatch des salons d'annonces du serveur Discord de l'association (créées, modifiées, supprimées ; sauf celles d'un utilisateur exclu du relais) et transmission au site, qui les recopie (T21) ; le bot n'en enregistre rien (il ne les tient qu'en mémoire : la lecture de l'historique des salons, sa file d'envoi, et le cache de messages de Discord, les 200 derniers messages reçus de chaque salon) et n'écrit rien dans ces salons
 Exclusion d'un utilisateur du relais par la modération — valable pour tout le réseau de serveurs partenaires (modération communautaire), d'où la liste des exclusions ouverte aux administrateurs de chaque serveur
 Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)
 Confirmation des adhésions à l'association et rappels programmés sur ses serveurs
@@ -890,7 +890,7 @@ Recopier, en vue de leur affichage sur le site, les annonces publiques de ces sa
 Lire automatiquement dans le texte de l'annonce les critères qu'elle donne (rang, rôle, région, plateforme, langue, disponibilités, âge minimal annoncé, nom d'équipe), pour permettre de filtrer les annonces ; aucune décision n'en découle
 Suivre Discord : une annonce modifiée sur Discord est remplacée par sa nouvelle version, une annonce supprimée sur Discord est retirée du site sans délai ; au redémarrage du bot (et à chaque nouvelle session Discord), les annonces supprimées pendant son arrêt sont retirées, dans la limite des 5 000 derniers messages de chaque salon ; au-delà, ou pour un salon que le bot n'a pas pu lire, elles partent à l'échéance de leur durée de garde
 Base légale
-Intérêt légitime de l'association (RGPD, art. 6.1.f : aider les joueurs et les équipes de la communauté à se trouver), pour des annonces que leurs auteurs ont rendues publiques afin d'être contactés, et que le réseau diffuse déjà à tous les serveurs abonnés ; les données ne sont pas recueillies auprès de l'auteur lui-même (art. 14) : l'information est donnée par la politique de confidentialité du site ; droit d'opposition (art. 21) : supprimer l'annonce sur Discord la retire du site, et l'auteur peut aussi en demander le retrait à l'association
+Intérêt légitime de l'association (RGPD, art. 6.1.f : aider les joueurs et les équipes de la communauté à se trouver), pour des annonces que leurs auteurs ont rendues publiques afin d'être contactés, et que le réseau diffuse déjà à tous les serveurs abonnés ; les données ne sont pas recueillies auprès de l'auteur lui-même (art. 14) : l'information est donnée par la politique de confidentialité du site ; droit d'opposition (art. 21) : supprimer l'annonce sur Discord la retire du site, et l'auteur peut aussi en demander le retrait à l'association, qui retire alors ses annonces et n'en recopie plus aucune tant que l'opposition tient
 Personnes concernées
 Auteurs des annonces : utilisateurs de Discord, qu'ils aient ou non un compte sur le site
 Personnes que l'auteur cite dans le texte de son annonce
@@ -899,16 +899,20 @@ Texte de l'annonce, tel que publié sur Discord
 Pseudo et identifiant Discord de l'auteur ; pour une annonce relayée, nom du serveur Discord d'où elle vient
 Identifiants Discord du message et du salon, dates de publication et de dernière modification, origine (écrite dans le salon, ou relayée)
 Critères lus dans le texte : rang, rôle, région, plateforme, langue, disponibilités, âge minimal annoncé, nom d'équipe
+Message tel que le bot l'a transmis (contenu et encarts), gardé à côté de sa lecture pour la refaire quand elle s'améliore
+Oppositions : identifiant Discord de l'auteur qui s'oppose, ou identifiant de l'annonce visée, et date
 Aucun rattachement à un compte du site
 Données sensibles
 Aucune
 Conservation
 Recherches de scrim : 7 jours après leur publication sur Discord ; les autres annonces : 14 jours ; puis effacées par une purge horaire, hors les copies de sauvegarde chiffrées (T09, 30 jours au plus)
 Avant ce terme : retirée dès que le message est supprimé sur Discord (par son auteur ou la modération du salon ; pour une annonce relayée, quand son relais y est supprimé) ; une modification remplace la version précédente, dont rien n'est gardé
+Oppositions : celle d'un auteur, jusqu'à ce qu'il la retire ; celle d'une seule annonce, 14 jours (au-delà, l'annonce est trop ancienne pour revenir), puis effacée par la purge horaire
 Destinataires
 Visiteurs du site, y compris sans compte : la page des annonces, quand elle est en ligne, montre le texte de l'annonce, le pseudo Discord de son auteur, le serveur d'origine et la date — ce que les serveurs abonnés montrent déjà
 Le bot Discord de l'association (T08), qui lit les messages de ces salons et les transmet au site, sur le même serveur, sans les enregistrer (en mémoire seulement : lecture de l'historique, file d'envoi, cache de messages de Discord)
 Responsable technique de l'association, qui est aussi l'hébergeur du site (base de données)
+Staff de modération de l'association, qui enregistre les oppositions et leur levée
 Transferts hors UE
 Aucun
 Sécurité
