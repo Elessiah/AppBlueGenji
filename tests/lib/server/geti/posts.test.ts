@@ -153,8 +153,7 @@ describe("upsertGetiPosts", () => {
         embeds: [
           {
             description:
-              "Ton annonce a été publié dans **32 autres channels**.
-[=> Invite FauxBot](https://discord.com/oauth2/authorize?client_id=100000000000000090)",
+              "Ton annonce a été publié dans **32 autres channels**.\n[=> Invite FauxBot](https://discord.com/oauth2/authorize?client_id=100000000000000090)",
           },
         ],
       },
