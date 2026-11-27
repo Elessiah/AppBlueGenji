@@ -24,7 +24,7 @@ import { parsePushedPost } from "@/lib/server/geti/wire";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { GETI_CHANNEL_IDS, parseGetiPost, type GetiParsedPost } from "@/lib/shared/geti";
 import { GETI_BOT_USER_ID, GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS, getiRetentionCutoff, getiRetentionMs } from "@/lib/shared/geti/ingest";
-import { GETI_FAKE_AUTHOR_ID, GETI_FAKE_OTHER_ID, GETI_TRUSTED_BOTS, parsedGetiPost } from "../../../helpers/geti";
+import { GETI_FAKE_AUTHOR_ID, GETI_TRUSTED_BOTS, parsedGetiPost } from "../../../helpers/geti";
 import {
   GETI_FAKE_MESSAGE_ID,
   GETI_FAKE_RELAYED_AUTHOR_ID,
