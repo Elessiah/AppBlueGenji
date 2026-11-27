@@ -123,7 +123,7 @@ describe("upsertGetiPosts", () => {
       "100000000000000001",
       "fauxjoueur",
       JSON.stringify(post.raw),
-      JSON.stringify(parseGetiPost(post.raw)),
+      JSON.stringify({ ...parseGetiPost(post.raw), analysisVersion: 2 }),
       new Date("2026-11-27T10:00:00.000Z"),
       new Date("2026-11-27T11:00:00.000Z"),
     ]);
@@ -389,7 +389,7 @@ describe("startGetiPostsPurgeClock", () => {
 
     await run();
 
-    expect(String(execute.mock.calls.at(-1)?.[0])).toContain(`parsed_json NOT LIKE '%"closed":%'`);
+    expect(String(execute.mock.calls.at(-1)?.[0])).toContain(`NOT parsed_json LIKE '%"analysisVersion":2}'`);
   });
 });
 
@@ -461,12 +461,12 @@ describe("listGetiPosts", () => {
     expect(page.posts[0].parsed).toMatchObject({ text: "LFT support", dates: [], levels: [], closed: false });
   });
 
-  it("listGetiPosts_query_readsRawMessageOnlyForAnalysesWithoutClosedKey", async () => {
+  it("listGetiPosts_query_readsRawMessageOnlyForAnalysesOfAnOlderVersion", async () => {
     const execute = executeMock([]);
 
     await listGetiPosts({}, {}, executor(execute), NOW);
 
-    expect(String(execute.mock.calls[0][0])).toContain(`IF(parsed_json LIKE '%"closed":%', NULL, raw_json) AS stale_raw_json`);
+    expect(String(execute.mock.calls[0][0])).toContain(`IF(parsed_json LIKE '%"analysisVersion":2}', NULL, raw_json) AS stale_raw_json`);
   });
 
   it("listGetiPosts_noExecutorGiven_readsFromThePool", async () => {
@@ -587,7 +587,7 @@ describe("listGetiPosts", () => {
 });
 
 describe("refreshStaleGetiPosts", () => {
-  const STALE_SELECT = `parsed_json NOT LIKE '%"closed":%'`;
+  const STALE_SELECT = `NOT parsed_json LIKE '%"analysisVersion":2}'`;
 
   function updateOf(execute: SqlMock): { sql: string; params: unknown[] } {
     const call = execute.mock.calls.find(([sql]) => String(sql).startsWith("UPDATE"));
@@ -900,5 +900,74 @@ describe("logGetiListFailure", () => {
     expect(logged).toBe(true);
     expect(warn).toHaveBeenLastCalledWith("[geti] post list unavailable:", "TypeError", "(+1 since last line)");
     warn.mockRestore();
+  });
+});
+
+describe("version de l'analyse gardée", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+
+  function updateParams(execute: SqlMock): unknown[] {
+    const call = execute.mock.calls.find(([sql]) => String(sql).startsWith("UPDATE"));
+    return Array.isArray(call?.[1]) ? call[1] : [];
+  }
+
+  function onceThenEmpty(rows: unknown[]): SqlMock {
+    let selects = 0;
+    return jest.fn<SqlQuery>(async (sql: string) => {
+      if (!sql.trimStart().startsWith("SELECT")) return [{ affectedRows: 1 }];
+      selects += 1;
+      return [selects === 1 ? rows : []];
+    });
+  }
+
+  it("refreshStaleGetiPosts_rowOfOlderVersionWithClosedKey_isReanalysedWithoutHiddenText", async () => {
+    const raw = getiPushedPost({ content: "LFT tank ||+18 team SecretSquad||" }).raw;
+    const older = JSON.stringify(parsedGetiPost({ text: "LFT tank", minAge: 18, teamName: "SecretSquad" }));
+    const execute = onceThenEmpty([{ message_id: GETI_FAKE_MESSAGE_ID, raw_json: JSON.stringify(raw), parsed_json: older }]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(JSON.parse(String(updateParams(execute)[0]))).toMatchObject({ minAge: null, teamName: null, analysisVersion: 2 });
+  });
+
+  it("refreshStaleGetiPosts_unreadableRaw_rewrittenWithCurrentVersion", async () => {
+    const older = JSON.stringify(parsedGetiPost({ text: "LFT support" }));
+    const execute = onceThenEmpty([{ message_id: GETI_FAKE_MESSAGE_ID, raw_json: "{pas du json", parsed_json: older }]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(String(updateParams(execute)[0])).toMatch(/"analysisVersion":2\}$/);
+  });
+
+  it("refreshStaleGetiPosts_updateFailsMidChunk_forgetsSharedScanAndRethrows", async () => {
+    const execute = executeMock([row()]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support adv" }).raw);
+    const rows = [
+      { message_id: GETI_FAKE_MESSAGE_ID, raw_json: raw, parsed_json: "{}" },
+      { message_id: "100000000000000999", raw_json: raw, parsed_json: "{}" },
+    ];
+    const failing = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([rows])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockRejectedValueOnce(new Error("ECONNRESET"));
+
+    await expect(refreshStaleGetiPosts(executor(failing))).rejects.toThrow("ECONNRESET");
+    await listGetiPostsShared({ category: "lft" }, {}, NOW);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPosts_currentVersionRow_postHasNoAnalysisVersionKey", async () => {
+    const parsed = { ...parsedGetiPost({ text: "LFT support" }), analysisVersion: 2 };
+    const execute = executeMock([row({ parsed_json: JSON.stringify(parsed) })]);
+
+    const page = await listGetiPosts({}, {}, executor(execute), NOW);
+
+    expect(page.posts[0].parsed).not.toHaveProperty("analysisVersion");
   });
 });

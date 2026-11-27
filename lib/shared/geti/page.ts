@@ -11,7 +11,7 @@ import type { Metadata } from "next";
 import { INTL_LOCALE, SITE_TIME_ZONE, type Locale } from "@/lib/shared/locales";
 
 export { GETI_OFFICIAL_INVITE_CODE, GETI_OFFICIAL_INVITE_URL } from "@/lib/shared/discord";
-import { getiWithoutSpoilers } from "@/lib/shared/geti/normalize";
+import { GETI_CODE_SPAN, getiWithoutSpoilers } from "@/lib/shared/geti/normalize";
 import { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";
 import {
   GETI_CATEGORIES,
@@ -624,32 +624,56 @@ function stripLineMarks(line: string): string {
 const PAIRED_MARKUP = [String.raw`\*\*`, "__", "~~"].map(
   (mark) => new RegExp(String.raw`(?<![\p{L}\p{N}])${mark}(?=\S)([\s\S]{0,300}?\S)${mark}(?![\p{L}\p{N}])`, "gu"),
 );
-/** Code en ligne ou en bloc, par paires : la marque part, le texte reste, tel quel. */
-const CODE = /(`{1,3})([^`]{1,4096}?)\1/gu;
 /** Langue d'un bloc de code (« ```txt ») : une étiquette de mise en forme, pas du texte. */
 const CODE_LANGUAGE = /^[\w+#.-]{1,20}\n/u;
-/** Marques de gras et de barré restées seules (paire coupée, contenu trop long) : retirées. */
+/** Marques de gras et de barré restées seules (paire coupée, contenu trop long). */
 const LEFTOVER_MARKS = /\*{2,}|~{2,}/gu;
+
+/**
+ * Une marque restée seule est-elle du texte ? Entre deux chiffres (« 5**2 »),
+ * entre deux espaces (« a ~~~ b ») ou seule sur sa ligne (un séparateur « ~~~~ ») :
+ * oui, elle reste. Collée à un mot ou en bout de texte (« **LFS**s », « Team ~~ ») : non.
+ */
+function leftoverMarkIsText(text: string, index: number, length: number): boolean {
+  const before = text[index - 1];
+  const after = text[index + length];
+  const lineStart = before === undefined || before === "\n";
+  const lineEnd = after === undefined || after === "\n";
+  if (lineStart && lineEnd) return true;
+  if (before === undefined || after === undefined) return false;
+  return (/\d/u.test(before) && /\d/u.test(after)) || (/[ \t]/u.test(before) && /[ \t]/u.test(after));
+}
 
 /** Balisage par paires retiré d'un passage hors code, puis ses marques restées seules. */
 function withoutPairedMarkup(text: string): string {
   let out = text;
   for (const pattern of PAIRED_MARKUP) out = out.replace(pattern, "$1");
-  return out.replace(LEFTOVER_MARKS, "");
+  return out.replace(LEFTOVER_MARKS, (mark: string, index: number, whole: string) =>
+    leftoverMarkIsText(whole, index, mark.length) ? mark : "",
+  );
 }
 
-/** Le texte, code compris : le code garde son contenu exact (aucun balisage n'y est retiré). */
+/**
+ * Passage hors code : marques de ligne (citation, titre, `-#`) retirées des seules
+ * lignes qui commencent vraiment (`atLineStart` pour la première), puis le balisage par paires.
+ */
+function withoutMarkupOutside(text: string, atLineStart: boolean): string {
+  const lines = text.split("\n").map((line, index) => (index > 0 || atLineStart ? stripLineMarks(line) : line));
+  return withoutPairedMarkup(lines.join("\n"));
+}
+
+/** Le texte, code compris : le code garde son contenu exact (aucune marque n'y est retirée). */
 function withoutMarkupOutsideCode(text: string): string {
   let out = "";
   let from = 0;
-  for (const match of text.matchAll(CODE)) {
+  for (const match of text.matchAll(GETI_CODE_SPAN)) {
     const index = match.index ?? 0;
     const [whole, fence, inner] = match;
-    out += withoutPairedMarkup(text.slice(from, index));
+    out += withoutMarkupOutside(text.slice(from, index), from === 0 || text[from - 1] === "\n");
     out += fence === "```" ? inner.replace(CODE_LANGUAGE, "") : inner;
     from = index + whole.length;
   }
-  return out + withoutPairedMarkup(text.slice(from));
+  return out + withoutMarkupOutside(text.slice(from), from === 0 || text[from - 1] === "\n");
 }
 /** Horodatage Discord `<t:secondes:style>`, rendu en date lisible à l'heure du site. */
 const TIMESTAMP = /<t:(\d{1,12})(?::([a-zA-Z]))?>/gu;
@@ -685,7 +709,7 @@ export function getiTimestampLabel(seconds: number, style: string | undefined, l
  * le rendu reste un nœud de texte, un lien reste du texte.
  */
 export function getiPostBodyText(text: string, labels: GetiMentionLabels, locale: Locale = "fr"): string {
-  const body = getiWithoutSpoilers(text.split("\n").map(stripLineMarks).join("\n"), labels.spoiler)
+  const body = getiWithoutSpoilers(text, labels.spoiler)
     .replace(/<@&\d{1,25}>/g, labels.role)
     .replace(/<@!?\d{1,25}>/g, labels.member)
     .replace(/<#\d{1,25}>/g, labels.channel)

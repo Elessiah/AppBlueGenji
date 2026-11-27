@@ -22,8 +22,9 @@ describe("getiWithoutSpoilers", () => {
     expect(getiWithoutSpoilers(`contact ||${secret}|| fin`, "#")).toBe("contact # fin");
   });
 
-  it("getiWithoutSpoilers_emptyPair_keptLiteralAndLaterPairReplaced", () => {
-    expect(getiWithoutSpoilers("|||| puis ||secret||", "#")).toBe("|||| puis #");
+  it("getiWithoutSpoilers_fourBarsThenText_hidesLikeDiscord", () => {
+    // Discord : `\|\|([\s\S]+?)\|\|` — le contenu masqué peut commencer par une barre.
+    expect(getiWithoutSpoilers("|||| puis ||secret||", "#")).toBe("#secret||");
   });
 
   it("getiWithoutSpoilers_unclosed_keptLiteral", () => {
@@ -37,7 +38,7 @@ describe("getiWithoutSpoilers", () => {
 
 describe("parseGetiPost — passage masqué", () => {
   it("parseGetiPost_ageAndTeamInsideSpoiler_noChipFromHiddenText", () => {
-    const parsed = parseGetiText("LFT tank ||17 ans, team SecretSquad||");
+    const parsed = parseGetiText("LFT tank ||+18, team SecretSquad||");
 
     expect(parsed.minAge).toBeNull();
     expect(parsed.teamName).toBeNull();
