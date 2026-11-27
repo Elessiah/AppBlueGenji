@@ -370,23 +370,33 @@ function analysisOf(row: GetiPostRow): unknown {
 const REFRESH_CHUNK = 200;
 const REFRESH_CHUNKS_MAX = 25;
 
+/** Ligne réécrite : analyse (JSON) et auteur, celui que l'analyse courante désigne. */
+type GetiRefreshedRow = { parsedJson: string; authorId: string | null; authorTag: string | null };
+
 /**
- * Nouvelle analyse (JSON) d'une ligne ancienne : celle du message brut ; à défaut, la gardée,
- * champs ajoutés vides. `null` : pas une annonce, ou ni message brut ni analyse lisibles.
+ * Nouvelle analyse d'une ligne ancienne : celle du message brut, auteur compris (les
+ * colonnes d'auteur sont ce que la page affiche et ce que vise une opposition) ; à
+ * défaut, la gardée, champs ajoutés vides, auteur inchangé. `null` : pas une annonce,
+ * ou ni message brut ni analyse lisibles.
  */
-function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): string | null {
+function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): GetiRefreshedRow | null {
+  const kept = { authorId: row.author_id === null ? null : String(row.author_id), authorTag: row.author_tag === null ? null : String(row.author_tag) };
   try {
     const raw: GetiPushedPost["raw"] = JSON.parse(String(row.raw_json));
     const parsed = parseGetiPost(raw, trusted);
-    return isNotAnnouncement(parsed, raw) ? null : JSON.stringify(parsed);
+    if (isNotAnnouncement(parsed, raw)) return null;
+    return { parsedJson: JSON.stringify(parsed), authorId: parsed.authorId, authorTag: parsed.authorTag?.slice(0, AUTHOR_TAG_MAX) ?? null };
   } catch {
     try {
-      return JSON.stringify({ ...ADDED_FIELDS, ...JSON.parse(String(row.parsed_json)) });
+      return { parsedJson: JSON.stringify({ ...ADDED_FIELDS, ...JSON.parse(String(row.parsed_json)) }), ...kept };
     } catch {
       return null;
     }
   }
 }
+
+/** Une ligne encore ancienne : une modification enregistrée entre la lecture et l'écriture l'a rendue courante. */
+const STILL_STALE = `parsed_json NOT LIKE '%"closed":%'`;
 
 /**
  * Réécrit l'analyse des lignes gardées avant le dernier champ ajouté (`closed`) :
@@ -394,8 +404,9 @@ function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): string | nul
  * hors du chemin d'une requête (la lecture les réanalyse sinon à chaque page, ~0,3 ms
  * chacune). Un message brut illisible garde son analyse, champs ajoutés vides : la
  * ligne cesse d'être « ancienne » et n'est plus relue. Une ligne qui n'est pas une
- * annonce (sans texte, avis du bot) est retirée, comme à l'enregistrement. L'écriture
- * ne touche qu'une ligne encore ancienne : une modification arrivée entre-temps gagne.
+ * annonce (sans texte, avis du bot) est retirée, comme à l'enregistrement ; une ligne
+ * dont l'auteur réanalysé fait l'objet d'une opposition aussi. L'écriture comme le
+ * retrait ne touchent qu'une ligne encore ancienne : une modification arrivée entre-temps gagne.
  *
  * @param executor Pool ou connexion.
  * @returns Le nombre de lignes réécrites ou retirées.
@@ -405,12 +416,12 @@ export async function refreshStaleGetiPosts(executor: GetiExecutor): Promise<num
   let done = 0;
   for (let chunk = 0; chunk < REFRESH_CHUNKS_MAX; chunk += 1) {
     const [rows] = await executor.execute<RowDataPacket[]>(
-      `SELECT message_id, raw_json, parsed_json FROM bg_geti_posts
-        WHERE parsed_json NOT LIKE '%"closed":%' ORDER BY id LIMIT ${REFRESH_CHUNK}`,
+      `SELECT message_id, author_id, author_tag, raw_json, parsed_json FROM bg_geti_posts
+        WHERE ${STILL_STALE} ORDER BY id LIMIT ${REFRESH_CHUNK}`,
     );
-    if (rows.length === 0) return done;
+    if (rows.length === 0) break;
     const gone: string[] = [];
-    let written = 0;
+    const rewritten: string[] = [];
     for (const row of rows) {
       const messageId = String(row.message_id);
       const next = reanalysed(row, trusted);
@@ -419,17 +430,34 @@ export async function refreshStaleGetiPosts(executor: GetiExecutor): Promise<num
         continue;
       }
       const [result] = await executor.execute(
-        `UPDATE bg_geti_posts SET parsed_json = ? WHERE message_id = ? AND parsed_json NOT LIKE '%"closed":%'`,
-        [next, messageId],
+        `UPDATE bg_geti_posts SET parsed_json = ?, author_id = ?, author_tag = ? WHERE message_id = ? AND ${STILL_STALE}`,
+        [next.parsedJson, next.authorId, next.authorTag, messageId],
       );
-      written += affected(result);
+      if (affected(result) > 0) rewritten.push(messageId);
     }
-    const removed = gone.length > 0 ? await deleteGetiPosts(executor, gone) : 0;
-    done += written + removed;
+    const removed = await deleteStaleGetiPosts(executor, gone);
+    // Un auteur désormais lu peut faire l'objet d'une opposition : sa ligne part, comme à l'enregistrement.
+    await withholdObjectedGetiPosts(executor, rewritten);
+    done += rewritten.length + removed;
     // Rien n'a bougé (ligne qui résiste) : relire le même lot ne ferait que boucler.
-    if (written + removed === 0 || rows.length < REFRESH_CHUNK) return done;
+    if (rewritten.length + removed === 0 || rows.length < REFRESH_CHUNK) break;
   }
+  if (done > 0) forgetGetiListScans();
   return done;
+}
+
+/** Retire des lignes encore anciennes (`STILL_STALE`) : une version enregistrée depuis la lecture reste. */
+async function deleteStaleGetiPosts(executor: GetiExecutor, messageIds: readonly string[]): Promise<number> {
+  let removed = 0;
+  for (let start = 0; start < messageIds.length; start += DELETE_CHUNK) {
+    const chunk = messageIds.slice(start, start + DELETE_CHUNK);
+    const [result] = await executor.execute(
+      `DELETE FROM bg_geti_posts WHERE message_id IN (${chunk.map(() => "?").join(", ")}) AND ${STILL_STALE}`,
+      [...chunk],
+    );
+    removed += affected(result);
+  }
+  return removed;
 }
 
 /** Une ligne en annonce rendue ; `null` si elle est illisible, ou sortie de la fenêtre de garde de sa catégorie. */

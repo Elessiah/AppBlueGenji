@@ -470,7 +470,8 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
   const postedAt = isoDate(source.postedAt);
   // Scrim ou remplaçant — d'après le salon, ou le mot-clé d'une annonce postée
   // ailleurs (« LFSub » dans le salon des joueurs) : une soirée précise, à un SR donné.
-  const oneEvening = [category, detectGetiCategory(prepared.lower)].some((kind) => kind === "lfs" || kind === "lfsub");
+  const kinds = [category, detectGetiCategory(prepared.lower)];
+  const oneEvening = kinds.some((kind) => kind === "lfs" || kind === "lfsub");
   const dates = parseGetiDates(prepared.lower, postedAt, oneEvening);
   return {
     category,
@@ -489,7 +490,7 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
     dates,
     levels: parseGetiLevels(prepared.lower),
     closed,
-    teamName: parseGetiTeamName(prepared.clean, category === "lft"),
+    teamName: parseGetiTeamName(prepared.clean, kinds.includes("lft"), kinds.includes("lfs")),
     staffRoles: parseGetiStaffRoles(prepared.lower),
     minAge: parseGetiMinAge(prepared.lower),
     postedAt,

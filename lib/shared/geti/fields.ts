@@ -298,18 +298,25 @@ function abbreviatedDays(lower: string): GetiDay[] {
   }
   for (const list of lower.matchAll(DAY_ABBREVIATION_LIST)) {
     const days = [...list[0].matchAll(DAY_ABBREVIATION_WORD)].flatMap((word) => dayOf(word[1]) ?? []);
-    // « lun-ven », « mon-fri » : la fourchette entière.
-    if (days.length === 2 && /^\p{L}+\.?\s?[–-]/u.test(list[0])) {
-      for (let index = GETI_DAYS.indexOf(days[0]); ; index = (index + 1) % GETI_DAYS.length) {
-        found.push(GETI_DAYS[index]);
-        if (GETI_DAYS[index] === days[1]) break;
-      }
-    } else if (new Set(days).size > 1) {
-      // Deux abréviations différentes au moins : « sun sun » ou « mer mer » ne sont pas des jours.
-      found.push(...days);
-    }
+    found.push(...listedDays(list[0], days));
   }
   return found;
+}
+
+/** Jours d'une liste d'abréviations (`list`, ses jours `days`). */
+function listedDays(list: string, days: readonly GetiDay[]): GetiDay[] {
+  // « lun-ven », « mon-fri » : la fourchette entière.
+  if (days.length === 2 && /^\p{L}+\.?\s?[–-]/u.test(list)) {
+    const range: GetiDay[] = [];
+    for (let index = GETI_DAYS.indexOf(days[0]); ; index = (index + 1) % GETI_DAYS.length) {
+      range.push(GETI_DAYS[index]);
+      if (GETI_DAYS[index] === days[1]) return range;
+    }
+  }
+  // Deux abréviations différentes au moins : « sun sun » ou « mer mer » ne sont pas des jours. Deux mots
+  // séparés d'une virgule seule sont une phrase (« ce jeu, mon rang ») : « lun/mer », « lun, mer, ven » restent lus.
+  const commaPair = days.length === 2 && /^[^/&–-]*$/u.test(list);
+  return new Set(days).size > 1 && !commaPair ? [...days] : [];
 }
 
 function parseDays(lower: string): GetiDay[] {
@@ -363,9 +370,11 @@ const UNITLESS_RANGE = new RegExp(
 /** Sans fuseau, la barre oblique ne se lit qu'en fin de soirée : « 21/23 », pas « 15/20 ». */
 const SLASH_FROM_HOUR = 19;
 const SLASH_SPAN_MAX_HOURS = 4;
+/** « cet » démonstratif, pas un fuseau : « 15h cet après-midi », « 18 cet été ». */
+const CET_DEMONSTRATIVE = String.raw`\s(?:ete|apres|aprem|apm|hiver|automne|instant|horaire|evenement|event|endroit)${NOT_BEFORE_WORD}`;
 /** Heure seule sans unité, devant son fuseau : « 20 CET ». */
 const UNITLESS_SINGLE = new RegExp(
-  String.raw`(?<![\p{L}\p{N}:#+.,/–-])(\d{1,2})(?:[.:](\d{2}))?(?= ?\(?(?:cest|cet)${NOT_BEFORE_WORD})`,
+  String.raw`(?<![\p{L}\p{N}:#+.,/–-])(\d{1,2})(?:[.:](\d{2}))?(?= ?\(?(?:cest|cet)${NOT_BEFORE_WORD}(?!${CET_DEMONSTRATIVE}))`,
   "gu",
 );
 /** Une tranche d'âge devant la fourchette : « âge : 16-20 », « âgés de 18-25 », « tranche 16-22 ». */
@@ -533,7 +542,7 @@ const TIMEZONE_CODE = new RegExp(
   "u",
 );
 /** … ou en minuscules derrière une heure : « 20-22 cet », « 21h cest » (« cet été » n'en est pas un). */
-const TIMEZONE_AFTER_TIME = /\d ?h? ?\(?(cest|cet)(?![\p{L}\p{N}])/u;
+const TIMEZONE_AFTER_TIME = new RegExp(String.raw`\d ?h? ?\(?(cest|cet)(?![\p{L}\p{N}]|${CET_DEMONSTRATIVE})`, "u");
 const PARIS_TIME = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:heure francaise|heure de paris|heure de france|french time|paris time)${NOT_BEFORE_WORD}`,
   "u",
@@ -581,9 +590,9 @@ function civilDay(year: number, month: number, day: number): number | null {
   return date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? time : null;
 }
 
-/** « 26/11 », « 22/11/26 », « 02/12/2026 » — pas « 4/5 jours », « 3/4 soirs », « 2/3 joueurs », « 1/12 places ». */
+/** « 26/11 », « 22/11/26 », « 02/12/2026 » — pas « 4/5 jours », « 3/4 soirs », « 2/3 joueurs », « 1/12 places », « 1/2 tanks ». */
 const NUMERIC_DATE = new RegExp(
-  String.raw`(?<![\p{L}\p{N}/.,:–-])(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?(?![\p{N}/]|\s?(?:jours?|j|soirs?|fois|days?|nights?|semaines?|h|joueu(?:r|se)s?|players?|places?|slots?|spots?|personnes?|membres?|members?|postes?)${NOT_BEFORE_WORD})`,
+  String.raw`(?<![\p{L}\p{N}/.,:–-])(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?(?![\p{N}/]|\s?(?:jours?|j|soirs?|fois|days?|nights?|semaines?|h|joueu(?:r|se)s?|players?|places?|slots?|spots?|personnes?|membres?|members?|postes?|tanks?|dps|supp(?:ort)?s?|heal(?:er)?s?|flex|mains?|subs?|remplacants?|roles?)${NOT_BEFORE_WORD})`,
   "gu",
 );
 /** Début d'un nom de mois, collé au quantième : « Friday 27NOV ». */
@@ -718,17 +727,22 @@ const LEVEL_WORD = new RegExp(
 );
 /**
  * Abréviations qui sont d'abord autre chose (« exp : 200 h de scrim », un
- * entier) : lues seulement nuancées (« low int ») ou collées à un autre niveau
- * (« adv/exp », « open-adv-inter »).
+ * entier) : lues seulement nuancées (« low int », pas « low exp ») ou collées
+ * à un autre niveau (« adv/exp », « open-adv-inter »).
  */
 const LEVEL_NEEDS_CONTEXT = new Set(["int", "exp"]);
+/** « exp » nuancé est d'abord l'expérience (« low exp accepté ») : lu seulement collé à un autre niveau. */
+const LEVEL_NEEDS_JOIN = new Set(["exp"]);
 const LEVEL_JOIN = /^\s?(?:[/,&>→–-]|-+>|to|a)\s?(?:(?:high|low|mid|haut|bas)[\s-]?)?$/u;
 /** « open » au sens courant : « DMs open », « position open for trials », « open to all ». */
 const OPEN_COMMON_BEFORE = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:dms?|mps?|pms?|positions?|postes?|spots?|slots?|tryouts?|trials?|recrutements?|recruitments?|recruiting|inscriptions?|candidatures?|applications?|apps|is|are|est|sont|still|now|toujours|always)\s$`,
   "u",
 );
+/** … et derrière : « open to all », « open for trials ». */
 const OPEN_COMMON_AFTER = new RegExp(String.raw`^\s(?:for|to|a|aux|pour|until|jusqu)${NOT_BEFORE_WORD}`, "u");
+/** « open minded », « open-mind », « open d'esprit » : un trait de caractère. */
+const OPEN_MINDED = new RegExp(String.raw`^(?:[\s-]?minded|[\s-]?mind${NOT_BEFORE_WORD}|\sd'?\s?esprit)`, "u");
 
 type LevelMatch = { start: number; end: number; key: string; level: GetiLevel; nuanced: boolean };
 
@@ -755,7 +769,11 @@ export function parseGetiLevels(lower: string): GetiLevel[] {
       return first !== undefined && second !== undefined && LEVEL_JOIN.test(lower.slice(first.end, second.start));
     });
   const found = matches.filter((match, index) => {
-    if (match.nuanced || joined(index)) return true;
+    // « open-minded » n'est jamais un niveau, même collé à un autre (« low int, open-minded »).
+    if (match.key === "open" && OPEN_MINDED.test(lower.slice(match.end, match.end + 12))) return false;
+    if (joined(index)) return true;
+    if (LEVEL_NEEDS_JOIN.has(match.key)) return false;
+    if (match.nuanced) return true;
     if (LEVEL_NEEDS_CONTEXT.has(match.key)) return false;
     if (match.key !== "open") return true;
     return (
@@ -868,7 +886,8 @@ const TEAM_LABEL_WORDS = String.raw`nom\s+(?:de\s+(?:la\s+|l'\s?)?|d'\s?)?(?:${T
  * la ligne peut être plus longue — « Équipe : Blue Phoenix — nous cherchons… ».
  */
 const TEAM_LABEL = new RegExp(String.raw`^[ \t]*(?:${TEAM_LABEL_WORDS})\s?[:=]\s?(.{1,80})`, "imu");
-const NAME_TOKEN = String.raw`[\p{Lu}\p{N}][\p{L}\p{N}'.-]*`;
+/** Mot d'un nom, borné : un long « A-A-A-… » ne fait pas relire tout le reste du texte depuis chaque tiret. */
+const NAME_TOKEN = String.raw`[\p{Lu}\p{N}][\p{L}\p{N}'.-]{0,31}`;
 const TEAM_INLINE = new RegExp(
   String.raw`(?<![\p{L}\p{N}])${TEAM_WORD} +(${NAME_TOKEN}(?: +${NAME_TOKEN}){0,2})`,
   "gu",
@@ -883,6 +902,8 @@ const TEAM_BEFORE_VERB = new RegExp(
   String.raw`(?<![\p{L}\p{N}])(${NAME_TOKEN}(?: +${NAME_TOKEN}){0,2}) +(?:[Rr]ecrute|RECRUTE|[Rr]echerche|RECHERCHE|[Cc]herche|CHERCHE|is looking|are looking|is recruiting|IS LOOKING|ARE LOOKING|IS RECRUITING)(?![\p{L}\p{N}])`,
   "gu",
 );
+/** Ce que cherche un joueur, derrière le verbe : « cherche une équipe », « is looking for a team » (pas « recrute une team »). */
+const SEEKS_A_TEAM = /^\s+(?:[\p{L}']+\s+){0,2}?(?:[ée]quipe|team|structure|club|roster)s?(?![\p{L}\p{N}])/iu;
 /** Fin d'un nom derrière un libellé : première ponctuation de séparation. */
 const LABEL_END = /\s[-–—]\s|[,;•·(\[]|\s{2,}/u;
 
@@ -1001,9 +1022,10 @@ function cleanTeamName(candidate: string, following = "", skipLeading = false): 
  *
  * @param clean Texte à la casse et aux accents gardés (`prepareGetiText`).
  * @param playerSearch `true` pour un joueur qui cherche une équipe (`lft`) : le mot devant le verbe n'est pas lu.
+ * @param scrimSearch `true` pour une recherche de scrim (`lfs`) : « X cherche une équipe » y nomme l'équipe X.
  * @returns Le nom, ou `null` quand rien de net n'est lu.
  */
-export function parseGetiTeamName(clean: string, playerSearch = false): string | null {
+export function parseGetiTeamName(clean: string, playerSearch = false, scrimSearch = false): string | null {
   const label = TEAM_LABEL.exec(clean);
   if (label !== null) {
     const name = cleanTeamName(label[1].split(LABEL_END)[0]);
@@ -1015,15 +1037,16 @@ export function parseGetiTeamName(clean: string, playerSearch = false): string |
     const name = cleanTeamName(match[1], clean.slice(end, end + 16));
     if (name !== null) return name;
   }
-  return structureName(clean, playerSearch);
+  return structureName(clean, playerSearch, scrimSearch);
 }
 
 /**
  * À défaut de « team … » : le nom devant un suffixe de structure, sinon devant
  * le verbe de l'annonce — sauf pour un joueur qui cherche une équipe
- * (« Lucas recherche une team » : son pseudo, pas une équipe).
+ * (« Lucas recherche une team » : son pseudo, pas une équipe), où que
+ * l'annonce soit postée (« Kevin cherche une équipe en tant que coach »).
  */
-function structureName(clean: string, playerSearch: boolean): string | null {
+function structureName(clean: string, playerSearch: boolean, scrimSearch: boolean): string | null {
   for (const match of clean.matchAll(TEAM_SUFFIXED)) {
     const name = cleanTeamName(`${match[1]} ${match[2]}`, "", true);
     // Le suffixe seul ne nomme rien : il faut au moins un mot devant lui.
@@ -1031,6 +1054,10 @@ function structureName(clean: string, playerSearch: boolean): string | null {
   }
   if (playerSearch) return null;
   for (const match of clean.matchAll(TEAM_BEFORE_VERB)) {
+    const end = match.index + match[0].length;
+    // « X recrute une team » : une structure qui recrute un roster, elle, se nomme bien.
+    const recruits = /recru/iu.test(match[0].slice(match[1].length));
+    if (!scrimSearch && !recruits && SEEKS_A_TEAM.test(clean.slice(end, end + 32))) continue;
     const name = cleanTeamName(match[1], "", true);
     // Le nom doit toucher le verbe : « Blue Sonate FR recherche » ne nomme personne.
     if (name !== null && match[1].trimEnd().endsWith(name)) return name;
