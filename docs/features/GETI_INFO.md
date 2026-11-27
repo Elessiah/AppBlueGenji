@@ -511,7 +511,9 @@ de l'auteur : toutes ses annonces, présentes et à venir ; `message` + identifi
 du message : une annonce). `POST /api/admin/geti/objections` (`{ authorId }` ou
 `{ messageId }`, l'un des deux exactement ; permission `moderation` ; geste tracé
 dans pm2 avec son auteur) l'enregistre et retire sur-le-champ ce qu'elle couvre
-(`{ removed }`) ; `DELETE` sur la même route, même corps, la lève (`{ lifted }` —
+(`{ removed }`), puis réécrit les lignes d'analyse ancienne (`refreshStaleGetiPosts`) :
+leur auteur relu, que leurs colonnes ignoraient encore, tombe sous l'opposition
+(échec : `500`, l'opposition gardée se rejoue) ; `DELETE` sur la même route, même corps, la lève (`{ lifted }` —
 les annonces encore sur Discord reviennent au prochain rattrapage). À chaque lot
 poussé, `upsertGetiPosts` retire **après** l'écriture les messages couverts
 (`withheld` dans le bilan) : une opposition enregistrée pendant l'écriture

@@ -7,11 +7,16 @@ jest.mock("@/lib/server/geti/objections", () => {
   return { ...actual, recordGetiObjection: jest.fn(), liftGetiObjection: jest.fn() };
 });
 jest.mock("@/lib/server/staff-audit");
+jest.mock("@/lib/server/geti/posts", () => {
+  const actual = jest.requireActual<typeof import("@/lib/server/geti/posts")>("@/lib/server/geti/posts");
+  return { ...actual, refreshStaleGetiPosts: jest.fn() };
+});
 
 import { DELETE, POST } from "@/app/api/admin/geti/objections/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getDatabase } from "@/lib/server/database";
 import { liftGetiObjection, recordGetiObjection } from "@/lib/server/geti/objections";
+import { refreshStaleGetiPosts } from "@/lib/server/geti/posts";
 import { auditStaffAction } from "@/lib/server/staff-audit";
 import { authUser } from "../../../helpers/auth-user";
 import { fakePool } from "../../../helpers/sql-double";
@@ -36,6 +41,7 @@ beforeEach(() => {
   jest.mocked(getDatabase).mockResolvedValue(pool);
   jest.mocked(recordGetiObjection).mockResolvedValue(2);
   jest.mocked(liftGetiObjection).mockResolvedValue(true);
+  jest.mocked(refreshStaleGetiPosts).mockResolvedValue(0);
 });
 
 describe("POST /api/admin/geti/objections", () => {
@@ -76,6 +82,27 @@ describe("POST /api/admin/geti/objections", () => {
     expect(await response.json()).toEqual({ removed: 2 });
     expect(recordGetiObjection).toHaveBeenCalledWith(pool, { kind: "author", targetId: AUTHOR_ID });
     expect(auditStaffAction).toHaveBeenCalledWith(expect.stringContaining("opposition enregistrée"), admin);
+  });
+
+  it("POST_validAuthor_rewritesOldRowsAfterRecordingSoTheirReanalysedAuthorIsWithheld", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    await POST(request("POST", { authorId: AUTHOR_ID }));
+
+    expect(refreshStaleGetiPosts).toHaveBeenCalledWith(pool);
+    expect(jest.mocked(recordGetiObjection).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(refreshStaleGetiPosts).mock.invocationCallOrder[0],
+    );
+  });
+
+  it("POST_refreshFails_returns500SoTheObjectionIsReplayed", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(refreshStaleGetiPosts).mockRejectedValue(new Error("deadlock"));
+
+    const response = await POST(request("POST", { authorId: AUTHOR_ID }));
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ error: "GETI_OBJECTION_FAILED" });
   });
 
   it("POST_databaseFailure_returns500", async () => {

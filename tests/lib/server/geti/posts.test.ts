@@ -994,6 +994,40 @@ describe("refreshStaleGetiPosts", () => {
     await refreshStaleGetiPosts(executor(execute));
 
     expect(execute).toHaveBeenCalledWith(expect.stringContaining("bg_geti_objections"), [GETI_FAKE_MESSAGE_ID]);
+    const statements = execute.mock.calls.map(([sql]) => String(sql));
+    const update = statements.findIndex((sql) => sql.startsWith("UPDATE"));
+    const withhold = statements.findIndex((sql) => sql.includes("bg_geti_objections"));
+    expect(update).toBeGreaterThanOrEqual(0);
+    expect(withhold).toBeGreaterThan(update);
+  });
+
+  it("refreshStaleGetiPosts_laterUpdateFails_stillWithholdsTheRowsAlreadyRewritten", async () => {
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support" }).raw);
+    const rows = [stale(raw), { ...stale(raw), message_id: "100000000000000999" }];
+    let updates = 0;
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.trimStart().startsWith("SELECT")) return [rows];
+      if (sql.startsWith("UPDATE")) {
+        updates += 1;
+        if (updates === 2) throw new Error("deadlock");
+      }
+      return [{ affectedRows: 1 }];
+    });
+
+    await expect(refreshStaleGetiPosts(executor(execute))).rejects.toThrow("deadlock");
+
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining("bg_geti_objections"), [GETI_FAKE_MESSAGE_ID]);
+  });
+
+  it("refreshStaleGetiPosts_withholdFails_rethrowsTheWithholdFailure", async () => {
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support" }).raw);
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.trimStart().startsWith("SELECT")) return [[stale(raw)]];
+      if (sql.includes("bg_geti_objections")) throw new Error("no table");
+      return [{ affectedRows: 1 }];
+    });
+
+    await expect(refreshStaleGetiPosts(executor(execute))).rejects.toThrow("no table");
   });
 
   it("refreshStaleGetiPosts_rowRewrittenMeanwhile_noWithhold", async () => {

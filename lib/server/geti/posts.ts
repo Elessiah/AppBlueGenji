@@ -434,12 +434,14 @@ const STILL_STALE = `NOT ${CURRENT_ANALYSIS}`;
 /**
  * Réécrit un lot de lignes anciennes, retire celles qui ne sont plus à garder (pas
  * une annonce, message brut illisible, auteur réanalysé visé par une opposition) ;
- * rend le nombre de lignes réécrites ou retirées. Une écriture qui échoue en cours
- * de route oublie aussi la lecture partagée : les réécritures déjà faites sont gardées.
+ * rend le nombre de lignes réécrites ou retirées. Les oppositions sont rejouées sur
+ * les lignes déjà réécrites même si une écriture suivante échoue (une ligne réécrite
+ * n'est plus relue) ; un échec en cours de route oublie aussi la lecture partagée.
  */
 async function rewriteChunk(executor: GetiExecutor, rows: RowDataPacket[], trusted: GetiParseOptions): Promise<number> {
   const gone: string[] = [];
   const rewritten: string[] = [];
+  const failures: unknown[] = [];
   let removed = 0;
   try {
     for (const row of rows) {
@@ -456,14 +458,18 @@ async function rewriteChunk(executor: GetiExecutor, rows: RowDataPacket[], trust
       if (affected(result) > 0) rewritten.push(messageId);
     }
     removed = await deleteStaleGetiPosts(executor, gone);
+  } catch (error) {
+    failures.push(error);
+  }
+  try {
     // Un auteur désormais lu peut faire l'objet d'une opposition : sa ligne part, comme à l'enregistrement.
     await withholdObjectedGetiPosts(executor, rewritten);
   } catch (error) {
-    forgetGetiListScans();
-    throw error;
+    failures.push(error);
   }
   const done = rewritten.length + removed;
-  if (done > 0) forgetGetiListScans();
+  if (failures.length > 0 || done > 0) forgetGetiListScans();
+  if (failures.length > 0) throw failures[0];
   return done;
 }
 
@@ -485,7 +491,7 @@ export async function refreshStaleGetiPosts(executor: GetiExecutor): Promise<num
   let done = 0;
   for (let chunk = 0; chunk < REFRESH_CHUNKS_MAX; chunk += 1) {
     const [rows] = await executor.execute<RowDataPacket[]>(
-      `SELECT message_id, author_id, author_tag, raw_json, parsed_json FROM bg_geti_posts
+      `SELECT message_id, raw_json, parsed_json FROM bg_geti_posts
         WHERE ${STILL_STALE} ORDER BY id LIMIT ${REFRESH_CHUNK}`,
     );
     if (rows.length === 0) break;
