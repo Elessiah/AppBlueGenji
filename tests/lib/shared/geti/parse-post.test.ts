@@ -48,6 +48,29 @@ describe("getiDisplayText", () => {
   });
 });
 
+describe("prepareGetiText — server emoji", () => {
+  it("a server emoji name is read in plain and lower but not in clean", () => {
+    const prepared = prepareGetiText("<:Grandmaster:123456789012345678> ELDRAVEN");
+
+    expect(prepared.plain).toContain("Grandmaster");
+    expect(prepared.lower).toContain("grandmaster");
+    expect(prepared.clean).not.toContain("Grandmaster");
+  });
+
+  it("a text without server emoji gives the same clean and plain when it has no accent", () => {
+    const prepared = prepareGetiText("LFT **tank** diamond");
+
+    expect(prepared.plain).toBe(prepared.clean);
+  });
+
+  it("an accented text without server emoji keeps clean accented and plain without", () => {
+    const prepared = prepareGetiText("Équipe");
+
+    expect(prepared.clean).toBe("Équipe");
+    expect(prepared.plain).toBe("Equipe");
+  });
+});
+
 describe("prepareGetiText", () => {
   it("retire liens, mentions, balisage et pictogrammes", () => {
     const prepared = prepareGetiText("**LFP** https://discord.gg/fauxcode <@100000000000000001> \u{1F525} tank");

@@ -1,7 +1,7 @@
 /**
  * Champs secondaires d'une annonce GETI : région, plateforme, langues,
- * disponibilités, nom d'équipe, postes de staff, âge minimal, mot-clé de
- * catégorie.
+ * disponibilités, dates, niveau de division, nom d'équipe, postes de staff,
+ * âge minimal, mot-clé de catégorie.
  *
  * Module pur : importable côté serveur comme côté client.
  */
@@ -19,6 +19,7 @@ import {
   GETI_CATEGORIES,
   GETI_DAYS,
   GETI_LANGUAGES,
+  GETI_LEVELS,
   GETI_PLATFORMS,
   GETI_REGIONS,
   GETI_STAFF_ROLES,
@@ -26,6 +27,7 @@ import {
   type GetiCategory,
   type GetiDay,
   type GetiLanguage,
+  type GetiLevel,
   type GetiPlatform,
   type GetiRegion,
   type GetiStaffRole,
@@ -80,15 +82,22 @@ const AMBIGUOUS_ADVERBS = new Set(["bien", "plus", "tout", "assez"]);
  * sujet : « il a eu », « on a eu », mais « de NA à EU ».
  */
 const A_SUBJECTS = new Set(["il", "elle", "on", "qui", "ca", "cela", "y", "n"]);
-const WORDS_BEFORE = /(?:(\p{L}+)[^\p{L}\p{N}\n]+)?(\p{L}+)[^\p{L}\p{N}\n]*$/u;
+/** Les trois derniers mots, sans franchir un chiffre ni une ligne (sans regex à retour arrière). */
+function lastWords(before: string): (string | undefined)[] {
+  const tail = before.split(/[\n\p{N}]/u).at(-1) ?? "";
+  const words = tail.match(/\p{L}+/gu) ?? [];
+  return [words.at(-3), words.at(-2), words.at(-1)];
+}
 
 function isParticiple(before: string): boolean {
-  const words = WORDS_BEFORE.exec(before);
-  if (words === null) return false;
-  const [, subject, previous] = words;
+  const [third, subject, previous] = lastWords(before);
+  if (previous === undefined) return false;
   if (previous === "a") return subject !== undefined && A_SUBJECTS.has(subject);
-  // « à tout EU » : derrière « a », l'adverbe reste ambigu et la région l'emporte.
-  if (AMBIGUOUS_ADVERBS.has(previous)) return subject !== undefined && subject !== "a" && AVOIR.has(subject);
+  if (AMBIGUOUS_ADVERBS.has(previous)) {
+    // « on a bien eu » : « a » derrière son sujet ; « de NA à tout EU » : la région.
+    if (subject === "a") return third !== undefined && A_SUBJECTS.has(third);
+    return subject !== undefined && AVOIR.has(subject);
+  }
   return PARTICIPLE_BEFORE.has(previous);
 }
 
@@ -120,14 +129,46 @@ const PLATFORM_ALIASES: Readonly<Record<GetiPlatform, readonly string[]>> = {
 };
 
 const findPlatforms = aliasFinder(GETI_PLATFORMS, PLATFORM_ALIASES);
+/** Équipe qui mêle PC et console : les deux plateformes. */
+const BOTH_PLATFORMS = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:hybrid|hybride|hybrides|cross[\s-]?play|cross[\s-]?plate?form|cross[\s-]?plateforme)${NOT_BEFORE_WORD}`,
+  "u",
+);
+const BOTH_PLATFORMS_ALL = new RegExp(BOTH_PLATFORMS.source, "gu");
+/**
+ * « Hybrid » est aussi un mode de carte : cité près d'un autre mode ou du mot
+ * « map » (« maps: control, hybrid, push »), il ne dit pas la plateforme.
+ */
+const MAP_MODE_WORDS = "maps? cartes? modes? control controle push escort escorte flashpoint clash assault assaut koth";
+const MAP_MODE_NEAR = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:${MAP_MODE_WORDS.split(" ").join("|")})${NOT_BEFORE_WORD}`,
+  "u",
+);
+const MAP_MODE_REACH = 30;
+
+/** Une mention « hybrid » ou « crossplay » qui dit la plateforme, pas le mode de carte. */
+function saysBothPlatforms(lower: string): boolean {
+  for (const match of lower.matchAll(BOTH_PLATFORMS_ALL)) {
+    const end = match.index + match[0].length;
+    const around = lower.slice(Math.max(0, match.index - MAP_MODE_REACH), end + MAP_MODE_REACH);
+    if (!match[0].includes("hybrid") || !MAP_MODE_NEAR.test(around)) return true;
+  }
+  return false;
+}
+
+/** « mixed », dans une recherche de scrim, dit la même chose ; ailleurs, c'est une équipe mixte. */
+const MIXED = new RegExp(String.raw`${NOT_AFTER_WORD}mixed${NOT_BEFORE_WORD}`, "u");
 
 /**
- * Plateformes citées.
+ * Plateformes citées ; « hybrid », « crossplay » (et « mixed » pour un scrim)
+ * valent PC **et** console.
  *
  * @param lower Texte sans accents, en minuscules.
+ * @param scrim `true` pour une recherche de scrim (`lfs`).
  * @returns Les plateformes, dans l'ordre de `GETI_PLATFORMS`.
  */
-export function parseGetiPlatforms(lower: string): GetiPlatform[] {
+export function parseGetiPlatforms(lower: string, scrim = false): GetiPlatform[] {
+  if (saysBothPlatforms(lower) || (scrim && MIXED.test(lower))) return [...GETI_PLATFORMS];
   return findPlatforms(lower);
 }
 
@@ -201,31 +242,89 @@ export function parseGetiLanguages(prepared: GetiPreparedText, rawText: string):
   return inReferenceOrder(GETI_LANGUAGES, found);
 }
 
-/** Noms complets seulement : « mar », « jeu », « mon » ou « sun » sont des mots courants. */
+/** Noms complets (fautes courantes comprises) ; les abréviations se lisent à part, en contexte. */
 const DAY_ALIASES: Readonly<Record<GetiDay, readonly string[]>> = {
   MON: ["lundi", "lundis", "monday", "mondays"],
   TUE: ["mardi", "mardis", "tuesday", "tuesdays"],
-  WED: ["mercredi", "mercredis", "wednesday", "wednesdays"],
-  THU: ["jeudi", "jeudis", "thursday", "thursdays"],
+  WED: ["mercredi", "mercredis", "mecredi", "mercedi", "wednesday", "wednesdays", "wenesday", "wednesay"],
+  THU: ["jeudi", "jeudis", "thursday", "thursdays", "thurday"],
   FRI: ["vendredi", "vendredis", "friday", "fridays"],
   SAT: ["samedi", "samedis", "saturday", "saturdays"],
   SUN: ["dimanche", "dimanches", "sunday", "sundays"],
 };
+/**
+ * Abréviations : « mar », « jeu », « mon » ou « sun » sont aussi des mots
+ * courants — lues seulement devant une date ou une heure (« Tue 20-22 »,
+ * « sam 28/11 », « ven. 21h ») ou en liste ponctuée (« lun/mer/ven »,
+ * « mon-fri ») ; « mon jeu » reste « mon jeu ».
+ */
+const DAY_ABBREVIATIONS: Readonly<Record<GetiDay, readonly string[]>> = {
+  MON: ["lun", "mon"],
+  TUE: ["mar", "tue", "tues"],
+  WED: ["mer", "wed"],
+  THU: ["jeu", "thu", "thur", "thurs"],
+  FRI: ["ven", "fri"],
+  SAT: ["sam", "sat"],
+  SUN: ["dim", "sun"],
+};
+const DAY_ABBREVIATION_TABLE = aliasTable(DAY_ABBREVIATIONS);
+const ABBREVIATION = `(${DAY_ABBREVIATION_TABLE.pattern})`;
+const DAY_ABBREVIATION_DATED = new RegExp(
+  String.raw`${NOT_AFTER_WORD}${ABBREVIATION}\.?\s?:?\s?(?=\d{1,2}\s?(?:[/h:–-]\s?\d|h${NOT_BEFORE_WORD}))`,
+  "gu",
+);
+const DAY_ABBREVIATION_LIST = new RegExp(
+  String.raw`${NOT_AFTER_WORD}${ABBREVIATION}\.?\s?[/,&–-]\s?${ABBREVIATION}\.?(?:\s?[/,&–-]\s?${ABBREVIATION}\.?)*${NOT_BEFORE_WORD}`,
+  "gu",
+);
+const DAY_ABBREVIATION_WORD = new RegExp(`${NOT_AFTER_WORD}${ABBREVIATION}${NOT_BEFORE_WORD}`, "gu");
 const DAY_TABLE = aliasTable(DAY_ALIASES);
 const DAY_RANGE = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(${DAY_TABLE.pattern})\s?(?:-|–|au|a|to|jusqu'?\s?au)\s?(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}`,
+  // Sur une ligne : « - Mardi » puis « - Dimanche » à la ligne sont deux jours, pas une fourchette.
+  String.raw`${NOT_AFTER_WORD}(${DAY_TABLE.pattern})[^\S\n]?(?:-|–|au|a|to|jusqu'?[^\S\n]?au)[^\S\n]?(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}`,
   "gu",
 );
 const DAY_SINGLE = new RegExp(`${NOT_AFTER_WORD}(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}`, "gu");
 const WEEKDAYS = new RegExp(String.raw`${NOT_AFTER_WORD}(?:en semaine|la semaine|weekdays?)${NOT_BEFORE_WORD}`, "u");
 const WEEKEND = new RegExp(String.raw`${NOT_AFTER_WORD}(?:week[\s-]?ends?)${NOT_BEFORE_WORD}`, "u");
 const EVERY_DAY = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:tous les jours|tous les soirs|chaque jour|chaque soir|every\s?day|every evening|7j/7|7/7)${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}(?:tous les jours|tous les soirs|chaque jour|chaque soir|every\s?day|every evening|7\s?j?\s?/\s?7\s?(?:j|jours?|days?)?)${NOT_BEFORE_WORD}`,
   "u",
 );
 
-function parseDays(lower: string): GetiDay[] {
+/** Jours abrégés lus en contexte : devant une date ou une heure, ou en liste. */
+function abbreviatedDays(lower: string): GetiDay[] {
   const found: GetiDay[] = [];
+  const dayOf = (text: string) => DAY_ABBREVIATION_TABLE.lookup.get(aliasKey(text));
+  for (const dated of lower.matchAll(DAY_ABBREVIATION_DATED)) {
+    const day = dayOf(dated[1]);
+    if (day !== undefined) found.push(day);
+  }
+  for (const list of lower.matchAll(DAY_ABBREVIATION_LIST)) {
+    const days = [...list[0].matchAll(DAY_ABBREVIATION_WORD)].flatMap((word) => dayOf(word[1]) ?? []);
+    found.push(...listedDays(list[0], days));
+  }
+  return found;
+}
+
+/** Jours d'une liste d'abréviations (`list`, ses jours `days`). */
+function listedDays(list: string, days: readonly GetiDay[]): GetiDay[] {
+  // « lun-ven », « mon-fri » : la fourchette entière.
+  if (days.length === 2 && /^\p{L}+\.?\s?[–-]/u.test(list)) {
+    const range: GetiDay[] = [];
+    for (let index = GETI_DAYS.indexOf(days[0]); ; index = (index + 1) % GETI_DAYS.length) {
+      range.push(GETI_DAYS[index]);
+      if (GETI_DAYS[index] === days[1]) return range;
+    }
+  }
+  // Deux abréviations différentes au moins : « sun sun » ou « mer mer » ne sont pas des jours. Deux mots
+  // séparés d'une virgule seule sont une phrase (« ce jeu, mon rang ») : « lun/mer », « lun, mer, ven » restent lus.
+  const commaPair = days.length === 2 && /^[^/&–-]*$/u.test(list);
+  return new Set(days).size > 1 && !commaPair ? [...days] : [];
+}
+
+function parseDays(lower: string): GetiDay[] {
+  const found: GetiDay[] = abbreviatedDays(lower);
   const dayOf = (text: string) => DAY_TABLE.lookup.get(aliasKey(text));
   for (const range of lower.matchAll(DAY_RANGE)) {
     const from = dayOf(range[1]);
@@ -259,6 +358,42 @@ const TIME_RANGE = new RegExp(
   "gu",
 );
 const TIME_SINGLE = new RegExp(String.raw`(?<![\p{L}\p{N}:#+])${TIME_ATOM}${NOT_BEFORE_WORD}`, "gu");
+/** Fuseau écrit derrière un horaire, en minuscules dans le texte préparé. */
+const ZONE_AFTER_PATTERN = new RegExp(String.raw`^ ?\(?(?:cest|cet|utc|gmt|bst|eet)${NOT_BEFORE_WORD}`, "u");
+/**
+ * Fourchette sans unité, la forme des recherches de scrim : « 20-22 CET »,
+ * « 21 - 23 », « 21/23 CET », « 21.15-23 CET », « h21-23 », « 20-22cest ».
+ * Sans fuseau derrière, elle n'est lue qu'en soirée (à partir de 13 h au
+ * tiret, de 19 h à la barre oblique) : « 3-5 joueurs », « 22/11 » ou
+ * « 15/20 » ne sont pas des horaires.
+ */
+const UNITLESS_RANGE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}:#+.,/–-])h?(\d{1,2})(?:[.:](\d{2}))? ?([-–/]) ?(\d{1,2})(?:[.:](\d{2}))?(?!\p{N}|(?!ces?t${NOT_BEFORE_WORD})\p{L}|[.,:/–-]\p{N})`,
+  "gu",
+);
+/** Sans fuseau, la barre oblique ne se lit qu'en fin de soirée : « 21/23 », pas « 15/20 ». */
+const SLASH_FROM_HOUR = 19;
+const SLASH_SPAN_MAX_HOURS = 4;
+/** « cet » démonstratif, pas un fuseau : « 15h cet après-midi », « 18 cet été ». */
+const CET_DEMONSTRATIVE = String.raw`\s(?:ete|apres|aprem|apm|hiver|automne|instant|horaire|evenement|event|endroit)${NOT_BEFORE_WORD}`;
+/** Heure seule sans unité, devant son fuseau : « 20 CET ». */
+const UNITLESS_SINGLE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}:#+.,/–-])(\d{1,2})(?:[.:](\d{2}))?(?= ?\(?(?:cest|cet)${NOT_BEFORE_WORD}(?!${CET_DEMONSTRATIVE}))`,
+  "gu",
+);
+/** Une tranche d'âge devant la fourchette : « âge : 16-20 », « âgés de 18-25 », « tranche 16-22 ». */
+const AGE_BEFORE_RANGE = new RegExp(
+  String.raw`(?<!\p{L})(?:ages?|agees?|tranche(?: d'?\s?age)?|age range)\s?(?:[:=]|de|entre|between)?\s?$`,
+  "u",
+);
+/** Ce qu'une fourchette sans unité compte quand ce n'est pas un horaire : « 18-25 ans », « 20-22 novembre ». */
+const NOT_A_TIME_AFTER = new RegExp(
+  String.raw`^ ?(?:%|€|(?:ans|yo|years?|joueu(?:r|se)s?|players?|personnes?|min|minutes?|k|sr|elo|jours?|days?|soirs?|fois|janv(?:ier)?|fev(?:r(?:ier)?)?|mars|avr(?:il)?|mai|juin|juil(?:let)?|aout|sept(?:embre)?|oct(?:obre|ober)?|nov(?:embre|ember)?|dec(?:embre|ember)?|january|february|march|april|may|june|july|august|september|jan|feb|mar|apr|jun|jul|aug|sep)${NOT_BEFORE_WORD})`,
+  "u",
+);
+const EVENING_FROM_HOUR = 13;
+/** Dernière heure d'une fourchette qui passe minuit : « 22-1 CET ». */
+const NIGHT_END_HOUR = 4;
 /** Une durée n'est pas une heure : « 2h par jour », « 3h de jeu » (pas « parfois », « partout »). */
 const DURATION_AFTER =
   /^\s?(?:par(?!\p{L})|de jeu|de scrim|per(?!\p{L})|a day|\/\s?(?:jour|soir|day|night|semaine|week))/u;
@@ -335,8 +470,53 @@ function parseTimeRanges(lower: string): { times: GetiTimeRange[]; rest: string 
   return { times, rest };
 }
 
+function minutesOf(hour: string, minutes: string | undefined): number | null {
+  const value = Number(hour) * 60 + Number(minutes ?? 0);
+  return Number(minutes ?? 0) >= 60 || value > 24 * 60 ? null : value;
+}
+
+/** Fourchette sans unité : avec un fuseau derrière, ou en soirée et écrite au tiret. */
+function unitlessRange(match: RegExpMatchArray, after: string): GetiTimeRange | null {
+  const from = minutesOf(match[1], match[2]);
+  const to = minutesOf(match[4], match[5]);
+  if (from === null || to === null || from === to || NOT_A_TIME_AFTER.test(after)) return null;
+  if (ZONE_AFTER_PATTERN.test(after)) return to > from || to <= NIGHT_END_HOUR * 60 ? { from, to } : null;
+  if (to <= from) return null;
+  if (match[3] === "/") {
+    return from >= SLASH_FROM_HOUR * 60 && to - from <= SLASH_SPAN_MAX_HOURS * 60 ? { from, to } : null;
+  }
+  return from >= EVENING_FROM_HOUR * 60 ? { from, to } : null;
+}
+
+/** Horaires sans unité (« 20-22 CET », « 20 CET »), effacés du texte une fois lus. */
+function parseUnitlessTimes(lower: string): { times: GetiTimeRange[]; rest: string } {
+  const times: GetiTimeRange[] = [];
+  let rest = lower;
+  const erase = (index: number, length: number) => {
+    rest = rest.slice(0, index) + " ".repeat(length) + rest.slice(index + length);
+  };
+  for (const match of lower.matchAll(UNITLESS_RANGE)) {
+    const end = match.index + match[0].length;
+    if (AGE_BEFORE_RANGE.test(lower.slice(Math.max(0, match.index - 20), match.index))) continue;
+    const range = unitlessRange(match, lower.slice(end, end + 12));
+    if (range === null) continue;
+    times.push(range);
+    erase(match.index, match[0].length);
+  }
+  for (const match of rest.matchAll(UNITLESS_SINGLE)) {
+    const from = minutesOf(match[1], match[2]);
+    if (from === null) continue;
+    times.push({ from, to: null });
+    erase(match.index, match[0].length);
+  }
+  return { times, rest };
+}
+
 function parseTimes(lower: string): GetiTimeRange[] {
-  const { times, rest } = parseTimeRanges(lower);
+  const explicit = parseTimeRanges(lower);
+  const unitless = parseUnitlessTimes(explicit.rest);
+  const times = [...explicit.times, ...unitless.times];
+  const rest = unitless.rest;
   for (const match of rest.matchAll(TIME_SINGLE)) {
     const parts = timeParts(match, 1);
     if (!parts.explicit) continue;
@@ -360,7 +540,13 @@ function uniqueSortedTimes(times: readonly GetiTimeRange[]): GetiTimeRange[] {
 }
 
 /** Sigles de fuseau lus en capitales seulement (« est » est un mot français). */
-const TIMEZONE_CODE = /(?<![\p{L}\p{N}])(CEST|CET|(?:UTC|GMT)(?:\s?[+-]\s?\d{1,2})?)(?![\p{L}\p{N}])/u;
+const UTC_OFFSET = String.raw`(?:UTC|GMT)(?:\s?[+-]\s?\d{1,2})?`;
+const TIMEZONE_CODE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(CEST|CET|BST|EET|${UTC_OFFSET})${NOT_BEFORE_WORD}`,
+  "u",
+);
+/** … ou en minuscules derrière une heure : « 20-22 cet », « 21h cest » (« cet été » n'en est pas un). */
+const TIMEZONE_AFTER_TIME = new RegExp(String.raw`\d ?h? ?\(?(cest|cet)(?![\p{L}\p{N}]|${CET_DEMONSTRATIVE})`, "u");
 const PARIS_TIME = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:heure francaise|heure de paris|heure de france|french time|paris time)${NOT_BEFORE_WORD}`,
   "u",
@@ -369,21 +555,240 @@ const PARIS_TIME = new RegExp(
 function parseTimezone(prepared: GetiPreparedText): string | null {
   if (PARIS_TIME.test(prepared.lower)) return "Europe/Paris";
   const code = TIMEZONE_CODE.exec(prepared.plain);
-  return code === null ? null : code[1].replace(/\s/gu, "");
+  if (code !== null) return code[1].replace(/\s/gu, "");
+  const afterTime = TIMEZONE_AFTER_TIME.exec(prepared.lower);
+  return afterTime === null ? null : afterTime[1].toUpperCase();
+}
+
+const DAY_MS = 86_400_000;
+/** Une date lue reste proche de la publication : au-delà, c'est autre chose (« 9/10 », une note). */
+const DATE_WINDOW_DAYS = 60;
+const DATE_MAX = 14;
+const PARIS_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Paris",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** Jour civil à Paris d'un instant, en millisecondes UTC à minuit de ce jour. */
+function parisDay(instant: number): number {
+  const parts = PARIS_DATE.formatToParts(new Date(instant));
+  const part = (type: string) => Number(parts.find((entry) => entry.type === type)?.value ?? 0);
+  return Date.UTC(part("year"), part("month") - 1, part("day"));
+}
+
+function isoDay(day: number): string {
+  return new Date(day).toISOString().slice(0, 10);
+}
+
+/** Jour de la semaine d'une date « AAAA-MM-JJ ». */
+function weekdayOf(date: string): GetiDay {
+  return GETI_DAYS[(new Date(`${date}T00:00:00.000Z`).getUTCDay() + 6) % 7];
+}
+
+/** Jour civil valide (le 31/02 n'existe pas), en millisecondes UTC, ou `null`. */
+function civilDay(year: number, month: number, day: number): number | null {
+  const time = Date.UTC(year, month - 1, day);
+  const date = new Date(time);
+  return date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? time : null;
+}
+
+/** « 26/11 », « 22/11/26 », « 02/12/2026 » — pas « 4/5 jours », « 3/4 soirs », « 2/3 joueurs », « 1/12 places », « 1/2 tanks ». */
+const NUMERIC_DATE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}/.,:–-])(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?(?![\p{N}/]|\s?(?:jours?|j|soirs?|fois|days?|nights?|semaines?|h|joueu(?:r|se)s?|players?|places?|slots?|spots?|personnes?|membres?|members?|postes?|tanks?|dps|supp(?:ort)?s?|heal(?:er)?s?|flex|mains?|subs?|remplacants?|roles?)${NOT_BEFORE_WORD})`,
+  "gu",
+);
+/** Début d'un nom de mois, collé au quantième : « Friday 27NOV ». */
+const MONTH_START = "(?:jan|fev|feb|mar|avr|apr|mai|may|jui|jun|jul|aou|aug|sep|oct|nov|dec)";
+/** Jour nommé suivi de son quantième : « Thursday 26 », « dimanche 29 ». */
+const NAMED_DAY_NUMBER = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(${DAY_TABLE.pattern})\s(\d{1,2})(?!\p{N}|(?!${MONTH_START})\p{L}|\s?[/h:.k]|\s?[–-]\s?\d)`,
+  "gu",
+);
+const TODAY = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:ce soir|tonight|today|aujourd'?\s?hui)${NOT_BEFORE_WORD}`,
+  "u",
+);
+const TOMORROW = new RegExp(String.raw`${NOT_AFTER_WORD}(?:demain|tomorrow|tmrw|tmr)${NOT_BEFORE_WORD}`, "u");
+
+/** Jour gardé s'il reste proche de la publication (`today`), `null` sinon. */
+function nearDay(day: number | null, today: number): number | null {
+  return day !== null && day >= today - DAY_MS && day <= today + DATE_WINDOW_DAYS * DAY_MS ? day : null;
+}
+
+/** Année écrite d'une date : « 26 » vaut 2026. */
+function writtenYear(year: string): number {
+  return Number(year.length === 2 ? `20${year}` : year);
+}
+
+/**
+ * Dates « jour/mois » : dans l'année de la publication, la suivante ou la
+ * précédente (« 31/12 » lu un 1er janvier), ou dans l'année écrite.
+ */
+function numericDates(lower: string, today: number): number[] {
+  const year = new Date(today).getUTCFullYear();
+  const found: number[] = [];
+  for (const match of lower.matchAll(NUMERIC_DATE)) {
+    const [day, month] = [Number(match[1]), Number(match[2])];
+    const years = match[3] === undefined ? [year, year + 1, year - 1] : [writtenYear(match[3])];
+    const date = years.map((candidate) => nearDay(civilDay(candidate, month, day), today)).find((near) => near !== null);
+    if (date !== undefined && date !== null) found.push(date);
+  }
+  return found;
+}
+
+/** Jour nommé et quantième : ce mois-ci, sinon le suivant ; le quantième doit tomber sur le jour nommé. */
+function namedDayDates(lower: string, today: number): number[] {
+  const year = new Date(today).getUTCFullYear();
+  const month = new Date(today).getUTCMonth() + 1;
+  const found: number[] = [];
+  for (const match of lower.matchAll(NAMED_DAY_NUMBER)) {
+    const named = DAY_TABLE.lookup.get(aliasKey(match[1]));
+    const day = Number(match[2]);
+    const next = month === 12 ? civilDay(year + 1, 1, day) : civilDay(year, month + 1, day);
+    const date = [civilDay(year, month, day), next]
+      .map((candidate) => nearDay(candidate, today))
+      .find((near) => near !== null && weekdayOf(isoDay(near)) === named);
+    if (date !== undefined && date !== null) found.push(date);
+  }
+  return found;
+}
+
+/** Au-delà, les jours cités sont une disponibilité habituelle, pas des soirées précises. */
+const EVENING_DAYS_MAX = 6;
+/** « now », « asap » : pour tout de suite. */
+const RIGHT_NOW = new RegExp(String.raw`${NOT_AFTER_WORD}(?:now|asap|maintenant|mtn)${NOT_BEFORE_WORD}`, "u");
+
+/**
+ * Soirées d'une recherche de scrim ou de remplaçant qui ne donne pas de date :
+ * un jour nommé (« Mardi 21h-23h ») vise sa prochaine occurrence, et un
+ * horaire sans jour (« LFS 3k5 20-22 CET ») ou un « now » le jour même de la
+ * publication.
+ */
+function eveningDays(lower: string, today: number, found: readonly number[]): number[] {
+  const dated = new Set(found.map((day) => weekdayOf(isoDay(day))));
+  const named = parseDays(lower).filter((day) => !dated.has(day));
+  if (named.length > EVENING_DAYS_MAX) return [];
+  if (named.length === 0) {
+    return found.length === 0 && (parseTimes(lower).length > 0 || RIGHT_NOW.test(lower)) ? [today] : [];
+  }
+  const todayIndex = GETI_DAYS.indexOf(weekdayOf(isoDay(today)));
+  return named.map((day) => today + ((GETI_DAYS.indexOf(day) - todayIndex + 7) % 7) * DAY_MS);
+}
+
+/**
+ * Dates visées par l'annonce (« 26/11 », « Thursday 26 », « ce soir »,
+ * « tomorrow »), résolues depuis la date de publication, à l'heure de Paris.
+ * Sans date de publication, rien n'est lu : une date sans année ne se situe pas.
+ *
+ * @param lower Texte sans accents, en minuscules.
+ * @param postedAt Date ISO de publication, ou `null`.
+ * @param sameDay `true` pour une recherche de scrim ou de remplaçant : un jour
+ *   nommé vise sa prochaine occurrence, un horaire sans jour le soir même.
+ * @returns Les dates « AAAA-MM-JJ », triées, sans doublon.
+ */
+export function parseGetiDates(lower: string, postedAt: string | null, sameDay = false): string[] {
+  const posted = postedAt === null ? Number.NaN : Date.parse(postedAt);
+  if (Number.isNaN(posted)) return [];
+  const today = parisDay(posted);
+  const found: number[] = [...numericDates(lower, today), ...namedDayDates(lower, today)];
+  if (TODAY.test(lower)) found.push(today);
+  if (TOMORROW.test(lower)) found.push(today + DAY_MS);
+  if (sameDay) found.push(...eveningDays(lower, today, found));
+  return [...new Set(found)]
+    .sort((a, b) => a - b)
+    .slice(0, DATE_MAX)
+    .map(isoDay);
 }
 
 /**
  * Disponibilités : jours cités, horaires (minutes depuis minuit) et fuseau.
  *
  * @param prepared Formes d'analyse du texte.
+ * @param dates Dates déjà lues (`parseGetiDates`) : leur jour de semaine s'ajoute aux jours cités.
  * @returns Les disponibilités, listes vides quand rien n'est lu.
  */
-export function parseGetiAvailability(prepared: GetiPreparedText): GetiAvailability {
+export function parseGetiAvailability(prepared: GetiPreparedText, dates: readonly string[] = []): GetiAvailability {
   return {
-    days: parseDays(prepared.lower),
+    days: inReferenceOrder(GETI_DAYS, [...parseDays(prepared.lower), ...dates.map(weekdayOf)]),
     times: parseTimes(prepared.lower),
     timezone: parseTimezone(prepared),
   };
+}
+
+const LEVEL_ALIASES: Readonly<Record<GetiLevel, readonly string[]>> = {
+  OPEN: ["open"],
+  INTERMEDIATE: ["intermediate", "intermediaire", "intermediaires", "inter", "int"],
+  ADVANCED: ["advanced", "adv"],
+  EXPERT: ["expert", "exp"],
+};
+const LEVEL_TABLE = aliasTable(LEVEL_ALIASES);
+/** Un niveau, avec sa nuance collée ou non devant : « high open », « HighOpen », « low-mid advanced ». */
+const LEVEL_WORD = new RegExp(
+  String.raw`${NOT_AFTER_WORD}((?:high|low|mid|haut|bas)[\s-]?)?(${LEVEL_TABLE.pattern})${NOT_BEFORE_WORD}`,
+  "gu",
+);
+/**
+ * Abréviations qui sont d'abord autre chose (« exp : 200 h de scrim », un
+ * entier) : lues seulement nuancées (« low int », pas « low exp ») ou collées
+ * à un autre niveau (« adv/exp », « open-adv-inter »).
+ */
+const LEVEL_NEEDS_CONTEXT = new Set(["int", "exp"]);
+/** « exp » nuancé est d'abord l'expérience (« low exp accepté ») : lu seulement collé à un autre niveau. */
+const LEVEL_NEEDS_JOIN = new Set(["exp"]);
+const LEVEL_JOIN = /^\s?(?:[/,&>→–-]|-+>|to|a)\s?(?:(?:high|low|mid|haut|bas)[\s-]?)?$/u;
+/** « open » au sens courant : « DMs open », « position open for trials », « open to all ». */
+const OPEN_COMMON_BEFORE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:dms?|mps?|pms?|positions?|postes?|spots?|slots?|tryouts?|trials?|recrutements?|recruitments?|recruiting|inscriptions?|candidatures?|applications?|apps|is|are|est|sont|still|now|toujours|always)\s$`,
+  "u",
+);
+/** … et derrière : « open to all », « open for trials ». */
+const OPEN_COMMON_AFTER = new RegExp(String.raw`^\s(?:for|to|a|aux|pour|until|jusqu)${NOT_BEFORE_WORD}`, "u");
+/** « open minded », « open-mind », « open d'esprit » : un trait de caractère. */
+const OPEN_MINDED = new RegExp(String.raw`^(?:[\s-]?minded|[\s-]?mind${NOT_BEFORE_WORD}|\sd'?\s?esprit)`, "u");
+
+type LevelMatch = { start: number; end: number; key: string; level: GetiLevel; nuanced: boolean };
+
+/**
+ * Niveaux de division cités (ligue FACEIT : Open, Intermediate, Advanced,
+ * Expert) — le niveau d'une équipe qui cherche un scrim ou un joueur, ou celui
+ * qu'un joueur vise.
+ *
+ * @param lower Texte sans accents, en minuscules.
+ * @returns Les niveaux, dans l'ordre de `GETI_LEVELS`.
+ */
+export function parseGetiLevels(lower: string): GetiLevel[] {
+  const matches: LevelMatch[] = [];
+  for (const match of lower.matchAll(LEVEL_WORD)) {
+    const key = aliasKey(match[2]);
+    const level = LEVEL_TABLE.lookup.get(key);
+    if (level === undefined) continue;
+    const end = match.index + match[0].length;
+    matches.push({ start: match.index, end, key, level, nuanced: match[1] !== undefined });
+  }
+  const joined = (index: number) =>
+    [index - 1, index].some((left) => {
+      const [first, second] = [matches[left], matches[left + 1]];
+      return first !== undefined && second !== undefined && LEVEL_JOIN.test(lower.slice(first.end, second.start));
+    });
+  const found = matches.filter((match, index) => {
+    // « open-minded » n'est jamais un niveau, même collé à un autre (« low int, open-minded »).
+    if (match.key === "open" && OPEN_MINDED.test(lower.slice(match.end, match.end + 12))) return false;
+    if (joined(index)) return true;
+    if (LEVEL_NEEDS_JOIN.has(match.key)) return false;
+    if (match.nuanced) return true;
+    if (LEVEL_NEEDS_CONTEXT.has(match.key)) return false;
+    if (match.key !== "open") return true;
+    return (
+      !OPEN_COMMON_BEFORE.test(lower.slice(Math.max(0, match.start - 12), match.start)) &&
+      !OPEN_COMMON_AFTER.test(lower.slice(match.end, match.end + 8))
+    );
+  });
+  return inReferenceOrder(
+    GETI_LEVELS,
+    found.map((match) => match.level),
+  );
 }
 
 const STAFF_ALIASES: Readonly<Record<GetiStaffRole, readonly string[]>> = {
@@ -427,7 +832,7 @@ const AGE = String.raw`(1[3-9]|2[0-5])`;
  * « +18 FR »). « +20 joueurs », « +15 min » ou « 20+ inscrits » sont des nombres.
  */
 const AGE_FOLLOW = new RegExp(
-  String.raw`^[^\S\n]*(?:$|[^\p{L}\p{N}\s]|\n|(?:ans?|yo|y/o|years?|old|only|seulement|uniquement|obligatoire|requis|required|minimum|mini|svp|pls|please|et|and|tank|tanks|dps|supp?|supports?|heal|heals|healers?|flex|fr|eu|na|eng?|euw|francais|francaise|francophones?|english|anglophones?|pc|console|ps5|xbox|team|equipe|lfp|lft|lfs|lfsub|lfstaff|lfcast)${NOT_BEFORE_WORD})`,
+  String.raw`^[^\S\n]*(?:$|[^\p{L}\p{N}\s]|\n|(?:ans?|yo|y/o|years?|old|only|seulement|uniquement|obligatoire|requis|required|minimum|mini|svp|pls|please|et|and|ou|or|de preference|preferable|preferably|preferred|prefere|idealement|ideally|conseille|recommande|recommended|souhaite|mature|matures|tank|tanks|dps|supp?|supports?|heal|heals|healers?|flex|fr|eu|na|eng?|euw|francais|francaise|francophones?|english|anglophones?|pc|console|ps5|xbox|team|equipe|lfp|lft|lfs|lfsub|lfstaff|lfcast)${NOT_BEFORE_WORD})`,
   "u",
 );
 /** … et pas derrière un mot qui en fait un niveau ou un délai : « lvl 20+ », « dans +15 min ». */
@@ -480,12 +885,29 @@ const TEAM_WORD = String.raw`(?:[Tt]eam|TEAM|[Éé]quipe|[Ee]quipe|[ÉE]QUIPE|[S
 const TEAM_NOUN = "[ée]quipe|team|structure";
 /** Libellés d'un nom d'équipe : « Nom de l'équipe », « Team name », « Équipe », « Roster ». */
 const TEAM_LABEL_WORDS = String.raw`nom\s+(?:de\s+(?:la\s+|l'\s?)?|d'\s?)?(?:${TEAM_NOUN})|team\s*name|${TEAM_NOUN}|roster`;
-const TEAM_LABEL = new RegExp(String.raw`^[ \t]*(?:${TEAM_LABEL_WORDS})\s?[:=]\s?(.{1,80})$`, "imu");
-const NAME_TOKEN = String.raw`[\p{Lu}\p{N}][\p{L}\p{N}'.-]*`;
+/**
+ * Seuls les 80 premiers caractères derrière le libellé sont lus (coût borné) :
+ * la ligne peut être plus longue — « Équipe : Blue Phoenix — nous cherchons… ».
+ */
+const TEAM_LABEL = new RegExp(String.raw`^[ \t]*(?:${TEAM_LABEL_WORDS})\s?[:=]\s?(.{1,80})`, "imu");
+/** Mot d'un nom, borné : un long « A-A-A-… » ne fait pas relire tout le reste du texte depuis chaque tiret. */
+const NAME_TOKEN = String.raw`[\p{Lu}\p{N}][\p{L}\p{N}'.-]{0,31}`;
 const TEAM_INLINE = new RegExp(
   String.raw`(?<![\p{L}\p{N}])${TEAM_WORD} +(${NAME_TOKEN}(?: +${NAME_TOKEN}){0,2})`,
   "gu",
 );
+/** Nom suivi de ce qui en fait une structure : « Chroma Esport », « ELEVEN Academy », « Clay Family ». */
+const TEAM_SUFFIXED = new RegExp(
+  String.raw`(?<![\p{L}\p{N}])(${NAME_TOKEN}(?: +${NAME_TOKEN}){0,2}) +(E-?[Ss]ports?|E-?SPORTS?|Gaming|GAMING|Academy|ACADEMY|Family|FAMILY)(?![\p{L}\p{N}])`,
+  "gu",
+);
+/** Nom en capitale juste devant le verbe de l'annonce : « MTP RECRUTE », « Verdict Astral recherche ». */
+const TEAM_BEFORE_VERB = new RegExp(
+  String.raw`(?<![\p{L}\p{N}])(${NAME_TOKEN}(?: +${NAME_TOKEN}){0,2}) +(?:[Rr]ecrute|RECRUTE|[Rr]echerche|RECHERCHE|[Cc]herche|CHERCHE|is looking|are looking|is recruiting|IS LOOKING|ARE LOOKING|IS RECRUITING)(?![\p{L}\p{N}])`,
+  "gu",
+);
+/** Ce que cherche un joueur, derrière le verbe : « cherche une équipe », « is looking for a team » (pas « recrute une team »). */
+const SEEKS_A_TEAM = /^\s+(?:[\p{L}']+\s+){0,2}?(?:[ée]quipe|team|structure|club|roster)s?(?![\p{L}\p{N}])/iu;
 /** Fin d'un nom derrière un libellé : première ponctuation de séparation. */
 const LABEL_END = /\s[-–—]\s|[,;•·(\[]|\s{2,}/u;
 
@@ -496,16 +918,24 @@ const LABEL_END = /\s[-–—]\s|[,;•·(\[]|\s{2,}/u;
 const NOT_A_NAME = new Set(
   [
     "fr eu na en pc ow ow2 overwatch lfp lft lfs lfsub lfstaff lfcast",
-    "bronze silver gold plat platine platinum diam diamant diamond master masters gm grandmaster champion top500",
+    "bronze silver gold plat platine platinum emeraude emerald diam diamant diamond master masters gm grandmaster champion top500",
     "tank dps support supp heal flex console ps5 xbox",
     "cherche recherche recrute looking seeking need needs is are est qui de du des en a au and et for pour",
     "competitive competitif compet chill serieuse serieux tryhard semi francaise francophone",
     "name nom discord role roles rang rank region plateforme platform contact",
     "je j nous il elle ils elles vous tu notre nos votre vos mon ma mes",
+    "equipe lequipe team structure lastructure roster association lassociation asso lasso staff",
+    "recrutement recrute recrutements bonjour hello salut chez join rejoins rejoindre avec with by",
+    "coach manager analyste analyst joueur joueuse joueurs joueuses player players hitscan hs fdps main sub",
+    "open inter intermediate advanced adv expert low mid high only mixed hybrid elo sr faceit cet cest utc gmt",
   ]
     .join(" ")
     .split(" "),
 );
+/** Mots qui, seuls, ne nomment personne : « la structure E-sport », « notre pôle Overwatch ». */
+const NOT_A_NAME_ALONE = new Set(["esport", "esports", "gaming", "academy", "family", "league", "ligue"]);
+/** Un SR n'est pas un nom : « Roster 3K », « ROSTER 4K3 ». */
+const SR_WORD = /^(?:[1-5]k\d?)+$/u;
 /**
  * Pronoms : un nom en capitales peut en finir un (« Team Game I », « Team Game
  * On », « Team Not You ») s'il en est le dernier mot et qu'un verbe de sa langue
@@ -525,7 +955,7 @@ const FRENCH_VERB_AFTER = new RegExp(
 
 const NAME_MARKS = /\p{M}/gu;
 const NAME_SYMBOLS = /[^\p{L}\p{N}]/gu;
-const TIER_LIKE = /^[bsgpdmc][1-5]$/u;
+const TIER_LIKE = /^[bsgpedmc][1-5]$/u;
 
 function nameKey(word: string): string {
   return word.normalize("NFD").replace(NAME_MARKS, "").toLowerCase().replace(NAME_SYMBOLS, "");
@@ -556,23 +986,33 @@ type NameWordPlace = { index: number; last: boolean; following: string };
 
 function isNameWord(word: string, place: NameWordPlace): boolean {
   const key = nameKey(word);
-  if (key === "" || NOT_A_NAME.has(key) || TIER_LIKE.test(key)) return false;
+  if (key === "" || NOT_A_NAME.has(key) || TIER_LIKE.test(key) || SR_WORD.test(key)) return false;
   const verbAfter = verbAfterPronoun(key);
   if (verbAfter === null) return true;
   return place.index > 0 && place.last && CAPITALISED.test(word) && !verbAfter.test(place.following);
 }
 
 /**
- * @param candidate Mots lus derrière « team » ou le libellé.
+ * @param candidate Mots lus derrière « team » ou le libellé, ou devant un verbe ou un suffixe.
  * @param following Texte qui suit le candidat (vide derrière un libellé).
+ * @param skipLeading `true` devant un verbe ou un suffixe : les premiers mots qui ne nomment rien sont passés.
  */
-function cleanTeamName(candidate: string, following = ""): string | null {
-  const words = candidate.split(/\s+/u).filter((word) => word !== "");
+function cleanTeamName(candidate: string, following = "", skipLeading = false): string | null {
+  const all = candidate.split(/\s+/u).filter((word) => word !== "");
+  // Devant un verbe ou un suffixe, les premiers mots sont souvent du vocabulaire, un article ou un
+  // horaire : « L'association Blue Sonate recrute », « La LND ASTRA cherche », « 20-23 CET Chroma Esport ».
+  const leads = (word: string) =>
+    !isNameWord(word, { index: 0, last: false, following: "" }) ||
+    !/\p{L}/u.test(word) ||
+    LEADING_ARTICLES.has(nameKey(word));
+  const first = skipLeading ? all.findIndex((word) => !leads(word)) : 0;
+  const words = first === -1 ? [] : all.slice(first);
   // Le nom s'arrête au premier mot du vocabulaire d'annonce : « Blue Phoenix EU ».
   const stop = words.findIndex(
     (word, index) => !isNameWord(word, { index, last: index === words.length - 1, following }),
   );
   const kept = stop === -1 ? words : words.slice(0, stop);
+  if (kept.length === 1 && NOT_A_NAME_ALONE.has(nameKey(kept[0]))) return null;
   const name = withoutMarkup(visibleText(kept.join(" "))).replace(/[.'-]+$/u, "");
   // Mots en capitale seulement : « 5 joueurs dont 2 tanks » n'est pas un nom.
   if (!/\p{Lu}/u.test(name)) return null;
@@ -585,9 +1025,11 @@ function cleanTeamName(candidate: string, following = ""): string | null {
  * Texte non fiable : rendu par `visibleText`, borné, jamais interprété.
  *
  * @param clean Texte à la casse et aux accents gardés (`prepareGetiText`).
+ * @param playerSearch `true` pour un joueur qui cherche une équipe (`lft`) : le mot devant le verbe n'est pas lu.
+ * @param scrimSearch `true` pour une recherche de scrim (`lfs`) : « X cherche une équipe » y nomme l'équipe X.
  * @returns Le nom, ou `null` quand rien de net n'est lu.
  */
-export function parseGetiTeamName(clean: string): string | null {
+export function parseGetiTeamName(clean: string, playerSearch = false, scrimSearch = false): string | null {
   const label = TEAM_LABEL.exec(clean);
   if (label !== null) {
     const name = cleanTeamName(label[1].split(LABEL_END)[0]);
@@ -598,6 +1040,31 @@ export function parseGetiTeamName(clean: string): string | null {
     const end = match.index + match[0].length;
     const name = cleanTeamName(match[1], clean.slice(end, end + 16));
     if (name !== null) return name;
+  }
+  return structureName(clean, playerSearch, scrimSearch);
+}
+
+/**
+ * À défaut de « team … » : le nom devant un suffixe de structure, sinon devant
+ * le verbe de l'annonce — sauf pour un joueur qui cherche une équipe
+ * (« Lucas recherche une team » : son pseudo, pas une équipe), où que
+ * l'annonce soit postée (« Kevin cherche une équipe en tant que coach »).
+ */
+function structureName(clean: string, playerSearch: boolean, scrimSearch: boolean): string | null {
+  for (const match of clean.matchAll(TEAM_SUFFIXED)) {
+    const name = cleanTeamName(`${match[1]} ${match[2]}`, "", true);
+    // Le suffixe seul ne nomme rien : il faut au moins un mot devant lui.
+    if (name?.includes(" ") === true) return name;
+  }
+  if (playerSearch) return null;
+  for (const match of clean.matchAll(TEAM_BEFORE_VERB)) {
+    const end = match.index + match[0].length;
+    // « X recrute une team » : une structure qui recrute un roster, elle, se nomme bien.
+    const recruits = /recru/iu.test(match[0].slice(match[1].length));
+    if (!scrimSearch && !recruits && SEEKS_A_TEAM.test(clean.slice(end, end + 32))) continue;
+    const name = cleanTeamName(match[1], "", true);
+    // Le nom doit toucher le verbe : « Blue Sonate FR recherche » ne nomme personne.
+    if (name !== null && match[1].trimEnd().endsWith(name)) return name;
   }
   return null;
 }

@@ -14,12 +14,33 @@ type RoleKind = GetiRole | GetiSubRole;
 const ROLE_ALIASES: Readonly<Record<RoleKind, readonly string[]>> = {
   MAIN_TANK: ["main tank", "mt"],
   OFF_TANK: ["off tank", "ot"],
-  TANK: ["tank", "tanks", "tanker", "tankeur"],
-  HITSCAN: ["hitscan dps", "dps hitscan", "hitscan", "hit scan"],
-  FLEX_DPS: ["flex dps", "fdps", "projectile dps", "dps projectile", "proj dps"],
+  TANK: ["tank", "tanks", "tanker", "tankeur", "flex tank"],
+  HITSCAN: ["hitscan dps", "dps hitscan", "hitscan", "hit scan", "hs dps", "dps hs", "hs"],
+  FLEX_DPS: ["flex dps", "dps flex", "fdps", "projectile dps", "dps projectile", "proj dps"],
   DPS: ["dps", "damage", "degats", "dmg"],
-  MAIN_SUPPORT: ["main support", "main supp", "main sup", "main heal", "main healer", "ms"],
-  FLEX_SUPPORT: ["flex support", "flex supp", "flex sup", "flex heal", "flex healer", "fs"],
+  MAIN_SUPPORT: [
+    "main support",
+    "main supp",
+    "main sup",
+    "main heal",
+    "main healer",
+    "support main",
+    "supp main",
+    "sup main",
+    "ms",
+  ],
+  FLEX_SUPPORT: [
+    "flex support",
+    "flex supp",
+    "flex sup",
+    "flex heal",
+    "flex healer",
+    "support flex",
+    "supp flex",
+    "sup flex",
+    "heal flex",
+    "fs",
+  ],
   SUPPORT: [
     "support",
     "supports",
@@ -48,7 +69,25 @@ const SUB_ROLE_PARENT: Readonly<Record<GetiSubRole, GetiRole>> = {
 };
 
 /** Abréviations de deux lettres, ambiguës derrière un nombre (« 20 ms » de ping). */
-const SHORT_ABBREVIATIONS = new Set(["mt", "ot", "ms", "fs"]);
+const SHORT_ABBREVIATIONS = new Set(["mt", "ot", "ms", "fs", "hs"]);
+/**
+ * « hs » seul est aussi « hors service » : derrière « être » ou un appareil
+ * (« mon micro est hs », « casque hs », « un peu hs »), ce n'est pas un rôle.
+ */
+const OUT_OF_ORDER_WORDS = [
+  "est sont suis es etait etaient sera serai seront",
+  "micro mic casque headset ecran clavier souris internet connexion wifi box fibre",
+  "peu trop completement totalement carrement grave",
+].join(" ");
+const OUT_OF_ORDER_BEFORE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:${OUT_OF_ORDER_WORDS.split(" ").join("|")})\s$`,
+  "u",
+);
+/**
+ * « flex » est aussi un verbe : « can flex to Juno », « peut flex sur Ana »,
+ * « flex on other heroes » ne disent pas un joueur polyvalent.
+ */
+const FLEX_VERB_AFTER = /^\s(?:to|on|onto|sur|vers|into)(?![\p{L}\p{N}])/u;
 /** « support » et « soutien » sont aussi des mots de politesse (« merci pour votre soutien »). */
 const POLITE_WORDS = new Set(["support", "supports", "soutien"]);
 /** Verbes qui font du mot un rôle tenu : « merci de jouer le support ». */
@@ -80,6 +119,23 @@ function isSubRole(kind: RoleKind): kind is GetiSubRole {
 }
 
 /**
+ * « flex » qui ne dit pas un joueur polyvalent : le verbe (« can flex to
+ * Juno »), ou l'adjectif d'un tank (« tank flex » : un tank qui joue tous les
+ * tanks).
+ */
+function isNotFlexRole(lower: string, start: number, end: number, previous: GetiRoleToken | undefined): boolean {
+  if (FLEX_VERB_AFTER.test(lower.slice(end, end + 8))) return true;
+  return previous?.role === "TANK" && lower.slice(previous.end, start) === " ";
+}
+
+/** Mot d'un alias de rôle qui dit autre chose ici : ping (« 20 ms »), « micro hs », « merci pour votre soutien ». */
+function isNotRoleWord(lower: string, key: string, start: number): boolean {
+  if (SHORT_ABBREVIATIONS.has(key) && /\d\s?$/u.test(lower.slice(Math.max(0, start - 2), start))) return true;
+  if (key === "hs" && OUT_OF_ORDER_BEFORE.test(lower.slice(Math.max(0, start - 16), start))) return true;
+  return POLITE_WORDS.has(key) && POLITE_BEFORE.test(lower.slice(Math.max(0, start - 60), start));
+}
+
+/**
  * Repère les rôles d'un texte préparé.
  *
  * @param lower Texte sans accents, en minuscules (`prepareGetiText`).
@@ -92,8 +148,8 @@ export function findGetiRoleTokens(lower: string): GetiRoleToken[] {
     const kind = ROLE_TABLE.lookup.get(key);
     if (kind === undefined) continue;
     const start = match.index;
-    if (SHORT_ABBREVIATIONS.has(key) && /\d\s?$/u.test(lower.slice(Math.max(0, start - 2), start))) continue;
-    if (POLITE_WORDS.has(key) && POLITE_BEFORE.test(lower.slice(Math.max(0, start - 60), start))) continue;
+    if (isNotRoleWord(lower, key, start)) continue;
+    if (key === "flex" && isNotFlexRole(lower, start, start + match[0].length, tokens.at(-1))) continue;
     tokens.push(
       isSubRole(kind)
         ? { start, end: start + match[0].length, role: SUB_ROLE_PARENT[kind], subRole: kind }

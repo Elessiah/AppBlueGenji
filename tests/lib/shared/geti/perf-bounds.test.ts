@@ -105,7 +105,7 @@ describe("rank token joins and role adjacency after the rewrites", () => {
 
   it("getiRankValue orders every tier", () => {
     expect(getiRankValue(getiRank("BRONZE", 5))).toBe(0);
-    expect(getiRankValue(getiRank("CHAMPION", 1))).toBe(39);
+    expect(getiRankValue(getiRank("CHAMPION", 1))).toBe(44);
   });
 });
 
@@ -139,3 +139,25 @@ describe("filterGetiPosts", () => {
   });
 });
 
+
+describe("new date, time, day and struck patterns — bounded cost", () => {
+  const hostile: Record<string, string> = {
+    "unitless ranges": "20/22 ".repeat(700),
+    "dashes after a number": "20-".repeat(1400),
+    "numeric dates": "12/".repeat(1400),
+    "abbreviated day lists": "lun/".repeat(1000),
+    "level qualifiers": "high ".repeat(800),
+    "unclosed strike marks": "~~a".repeat(1400),
+    "strike marks with tildes inside": "~~a~".repeat(1000),
+    "emoji names": "<:Grandmaster:1> ".repeat(240),
+    "hyphenated name before a verb": `${"A-".repeat(2000)} recherche`,
+    "hyphenated name before a suffix": `${"A-".repeat(2000)} Esport`,
+  };
+
+  it.each(Object.keys(hostile))("%s are parsed in bounded time", (name) => {
+    const text = hostile[name];
+
+    expect(timed(() => parseGetiText(text))).toBeLessThan(BUDGET_MS);
+    expect(timed(() => parseGetiText(`scrim ${text}`))).toBeLessThan(BUDGET_MS);
+  });
+});

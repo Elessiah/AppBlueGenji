@@ -106,6 +106,11 @@ function matchesAge(post: GetiParsedPost, stored: number | null | undefined, now
   return !Number.isNaN(posted) && posted <= now + CLOCK_SKEW_MS && now - posted <= maxAgeHours * HOUR_MS;
 }
 
+/** Option à deux états d'un filtre enregistré : `true`, ou « "true" » (JSON écrit à la main). */
+function isOn(value: unknown): boolean {
+  return value === true || value === "true";
+}
+
 /**
  * Dit si une annonce analysée passe un filtre. Chaque critère renseigné doit
  * passer (ET) ; dans un critère à plusieurs valeurs, une seule suffit (OU).
@@ -114,7 +119,8 @@ function matchesAge(post: GetiParsedPost, stored: number | null | undefined, now
  * - **Rangs** : la fourchette de l'annonce recoupe celle du filtre ; avec des
  *   rôles voulus et un rang par rôle dans l'annonce, seuls ces rôles comptent.
  * - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
- * - **Région, plateforme, langue** : une valeur voulue est dans l'annonce.
+ * - **Région, plateforme, langue, niveau** : une valeur voulue est dans l'annonce.
+ * - **Annonces closes** : écartées avec `hideClosed`.
  * - **Âge** : publiée depuis `maxAgeHours` au plus ; sans date, écartée.
  *
  * Une annonce où le critère n'a pas été lu est écartée, sauf `includeUnknown`.
@@ -131,17 +137,19 @@ function matchesAge(post: GetiParsedPost, stored: number | null | undefined, now
 export function matchesGetiFilter(post: GetiParsedPost, stored: GetiFilter, now: number = Date.now()): boolean {
   // Filtre enregistré : `null` ou une valeur qui n'est pas un objet ne filtre rien.
   const filter: GetiFilter = typeof stored === "object" && stored !== null ? stored : {};
-  const includeUnknown = filter.includeUnknown === true || (filter.includeUnknown as unknown) === "true";
+  const includeUnknown = isOn(filter.includeUnknown);
   // Une catégorie enregistrée inconnue (« "LFP" », 5) ne filtre rien, comme une liste invalide.
   const category = GETI_CATEGORIES.find((known) => known === filter.category);
   if (category !== undefined && post.category !== category) return false;
+  if (isOn(filter.hideClosed) && post.closed) return false;
   return (
     matchesAge(post, filter.maxAgeHours, now) &&
     matchesRoles(post, filter, includeUnknown) &&
     matchesRanks(post, filter, includeUnknown) &&
     matchesAny(post.regions, wanted(filter.regions), includeUnknown) &&
     matchesAny(post.platforms, wanted(filter.platforms), includeUnknown) &&
-    matchesAny(post.languages, wanted(filter.languages), includeUnknown)
+    matchesAny(post.languages, wanted(filter.languages), includeUnknown) &&
+    matchesAny(post.levels, wanted(filter.levels), includeUnknown)
   );
 }
 

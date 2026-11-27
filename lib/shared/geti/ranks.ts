@@ -2,12 +2,12 @@
  * Rangs Overwatch lus dans une annonce GETI.
  *
  * Porté de `extractRanks` du bot (Marvel Rivals, paliers seuls) et étendu à
- * Overwatch : paliers Bronze → Champion, divisions 5 → 1, formes abrégées
+ * Overwatch : paliers Bronze → Champion (Émeraude compris), divisions 5 → 1, formes abrégées
  * (« d3 », « gm1 »), fourchettes (« d3-m2 », « diam 3-1 »), bornes ouvertes
- * (« master+ », « max d1 »), « top 500 », ancien SR (« 3500 sr », « 4k2 »), et
- * rang par rôle (« tank m2 / dps d1 »).
+ * (« master+ », « max d1 »), « top 500 », SR de scrim (« 3500 sr », « 4k2 »,
+ * « 3k4-5 », « 3.4-3.5k », « SR 3.6-3.7 ») et rang par rôle (« tank m2 / dps d1 »).
  *
- * Un rang vaut un entier de 0 (Bronze 5) à 39 (Champion 1) ; un palier sans
+ * Un rang vaut un entier de 0 (Bronze 5) à 44 (Champion 1) ; un palier sans
  * division couvre ses cinq divisions.
  *
  * Module pur : importable côté serveur comme côté client.
@@ -62,6 +62,7 @@ const TIER_ALIASES: Readonly<Record<GetiTier, readonly string[]>> = {
   SILVER: ["silver", "silvers", "argent"],
   GOLD: ["gold", "golds"],
   PLATINUM: ["platinum", "platine", "platines", "platinium", "platnium", "plat", "plats"],
+  EMERALD: ["emeraude", "emeraudes", "emerald", "emeralds", "emer", "eme"],
   DIAMOND: [
     "diamond",
     "diamonds",
@@ -75,13 +76,23 @@ const TIER_ALIASES: Readonly<Record<GetiTier, readonly string[]>> = {
     "diam",
     "dia",
   ],
-  MASTER: ["master", "masters", "maitre", "maitres", "mastre"],
-  GRANDMASTER: ["grand master", "grand masters", "grand maitre", "grand maitres", "gm", "gms"],
-  CHAMPION: ["champion", "champions", "champ", "champs"],
+  // Noms français du jeu : « Maîtrise », « Grande maîtrise », « Virtuose » (= Champion).
+  MASTER: ["master", "masters", "maitre", "maitres", "mastre", "maitrise"],
+  GRANDMASTER: [
+    "grand master",
+    "grand masters",
+    "grand maitre",
+    "grand maitres",
+    "grande maitrise",
+    "gm",
+    "gms",
+  ],
+  CHAMPION: ["champion", "champions", "champ", "champs", "virtuose", "virtuoses"],
 };
 
 /** Alias lus seulement suivis d'une division. */
-const NEEDS_DIVISION = new Set(["argent"]);
+// « maîtrise » est d'abord un mot courant (« maîtrise de soi ») : lu avec une division seulement.
+const NEEDS_DIVISION = new Set(["argent", "maitrise"]);
 
 /**
  * Abréviations qui sont aussi des mots courants, écartées sans division dans
@@ -109,9 +120,12 @@ const JOIN_BEFORE = new Set(["a", "au", "du"]);
 const WORD_BEFORE = /(\p{L}+)\s$/u;
 
 const GREETED = "tout tous toutes a\\stous all everyone every1 les la\\steam the\\steam guys y'?all friends? frerots? la\\scommu chat";
+const TITLE_BEFORE =
+  "open inter intermediate intermediaire adv advanced avance expert division div faceit lan tournoi tournament cup";
+const TITLE_AFTER = "de du des of";
 /** « GM tous rôles », « GM all roles », « GM, Master » : une liste de rangs, pas un salut. */
 const GM_LIST_AFTER = new RegExp(
-  String.raw`^[^\S\n]*(?:[,/&-][^\S\n]*|(?:tous|toutes|all|les)[^\S\n]+(?:les[^\S\n]+)?)(?:roles?|rangs?|ranks?|tanks?|dps|supp(?:ort)?s?|heal(?:er)?s?|flex|bronze|silver|gold|plat(?:ine|inum)?|diam(?:ant|ond)?s?|masters?|maitres?|champ(?:ion)?s?|top\s?500|t500|[bsgpdmc][1-5])${NOT_BEFORE_WORD}`,
+  String.raw`^[^\S\n]*(?:[,/&-][^\S\n]*|(?:tous|toutes|all|les)[^\S\n]+(?:les[^\S\n]+)?)(?:roles?|rangs?|ranks?|tanks?|dps|supp(?:ort)?s?|heal(?:er)?s?|flex|bronze|silver|gold|plat(?:ine|inum)?|eme(?:r|raude|rald)?s?|diam(?:ant|ond)?s?|masters?|maitres?|champ(?:ion)?s?|top\s?500|t500|[bsgpedmc][1-5])${NOT_BEFORE_WORD}`,
   "u",
 );
 const COMMON_WORD_SENSES: Readonly<Record<string, CommonSense>> = {
@@ -132,6 +146,13 @@ const COMMON_WORD_SENSES: Readonly<Record<string, CommonSense>> = {
     before: wordBefore("le un du au ce mon ton son en\\splein"),
     after: wordAfter("de du des libre lexical", true),
   },
+  // Un titre, pas un rang : « S10 Intermediate Champion », « champion de France ».
+  champion: { before: wordBefore(TITLE_BEFORE), after: wordAfter(TITLE_AFTER, true) },
+  champions: { before: wordBefore(TITLE_BEFORE), after: wordAfter(TITLE_AFTER, true) },
+  // « une grande maîtrise du jeu », « un virtuose de la souris » : pas des rangs.
+  grandemaitrise: { before: wordBefore("une d'une avec sa ta ma leur"), after: wordAfter("de du des", true) },
+  virtuose: { before: wordBefore("un une en"), after: wordAfter("de du des", true) },
+  virtuoses: { before: wordBefore("des les"), after: wordAfter("de du des", true) },
 };
 
 /**
@@ -144,7 +165,7 @@ function wordSense(lower: string, key: string, match: RegExpExecArray): WordSens
   const sense = COMMON_WORD_SENSES[key];
   if (sense === undefined || match[2] !== undefined) return "rank";
   const end = match.index + match[0].length;
-  const before = lower.slice(Math.max(0, match.index - 12), match.index);
+  const before = lower.slice(Math.max(0, match.index - 16), match.index);
   const after = lower.slice(end, end + 30);
   if (/^\s?\+/u.test(after)) return "rank";
   // « gm » salue en tête de ligne seulement, et pas devant une liste de rangs.
@@ -164,6 +185,7 @@ const TIER_LETTERS: Readonly<Record<string, GetiTier>> = {
   s: "SILVER",
   g: "GOLD",
   p: "PLATINUM",
+  e: "EMERALD",
   d: "DIAMOND",
   m: "MASTER",
   c: "CHAMPION",
@@ -175,8 +197,24 @@ const NAMED_RANK = new RegExp(
   "gu",
 );
 const LETTER_RANK = new RegExp(
-  String.raw`${NOT_AFTER_WORD}([bsgpdmc])([1-5])(?:[-–/]([1-5]))?${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}([bsgpedmc])([1-5])(?:[-–/]([1-5]))?${NOT_BEFORE_WORD}`,
   "gu",
+);
+/**
+ * « e3 » est d'abord autre chose (un salon, une salle, un événement) : lu comme
+ * Émeraude 3 seulement en contexte de rang — derrière un libellé ou un rôle
+ * (« rank : e5 », « tank e2 »), ou relié à un autre rang (« e3-d5 », « p1 / e4 »).
+ */
+const RANK_WORDS = String.raw`[bsgpdmc][1-5]|gm[1-5]?|plat\p{L}*|diam\p{L}*|masters?|gold|silver|bronze|champ\p{L}*`;
+const ROLE_WORDS = String.raw`tanks?|dps|supp?(?:orts?)?|heal(?:er)?s?|hs|hitscan|fdps|flex|ms|fs|mt|ot`;
+const LINK = String.raw`[^\S\n]*(?:[:=()>~/,&–-][^\S\n]*)*(?:(?:a|au|to|et|and|ou|or)[^\S\n]+)?`;
+const EMERALD_LETTER_BEFORE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:rang|rank|peak|pick|elo|current|currently|actuel|actuellement|niveau|level|lvl|${ROLE_WORDS}|${RANK_WORDS})${LINK}$`,
+  "u",
+);
+const EMERALD_LETTER_AFTER = new RegExp(
+  String.raw`^${LINK}(?:peak|${ROLE_WORDS}|${RANK_WORDS})${NOT_BEFORE_WORD}`,
+  "u",
 );
 /**
  * Une initiale + chiffre n'est pas un rang derrière « saison » (« depuis la s2 »)
@@ -193,11 +231,33 @@ const NOT_LETTER_RANK_AFTER = /^[\s-]?(?:e-?sports?|gaming)(?![\p{L}\p{N}])/u;
 const SEASON_SINCE_BEFORE = new RegExp(String.raw`${NOT_AFTER_WORD}depuis\s?$`, "u");
 const TOP_500 = new RegExp(String.raw`${NOT_AFTER_WORD}(?:top\s?500|t500)${NOT_BEFORE_WORD}`, "gu");
 /**
- * Ancien SR en milliers : « 4k », « 4.2k », « 3k5 », « 3k+ » — un rang (« 4k »
- * ≈ Grand maître), sauf dans un contexte net qui en fait autre chose.
+ * SR en milliers : « 4k », « 4.2k », « 3k5 », « 3k+ » — un rang (« 4k »
+ * ≈ Grand maître), sauf dans un contexte net qui en fait autre chose. Une
+ * fourchette de centaines suit parfois le chiffre : « 3k4-5 », « 2k5/7 ».
  */
 const SR_THOUSANDS = new RegExp(
-  String.raw`(?<![\p{L}\p{N}.,#])([1-4])(?:[.,](\d))?k(\d)?(?:\s?(sr|elo))?${NOT_BEFORE_WORD}`,
+  String.raw`(?<![\p{L}\p{N}.,#])([1-5])(?:[.,](\d))?k(?:(\d)(?:[-/](\d)(?![\p{L}\p{N}.,:]))?)?(?:\s?(sr|elo))?${NOT_BEFORE_WORD}`,
+  "gu",
+);
+/**
+ * Fourchette dont seule la seconde borne porte le « k » : « 3.4-3.5k »,
+ * « 3.5-6k » (3 500 à 3 600), « 3.2-3k » (3 200 à 3 000), « 3.5/4k ».
+ */
+const SR_DECIMAL_RANGE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}.,#])([1-4])[.,](\d)\s?[-–/]\s?(?:([1-5])[.,](\d)|(\d))\s?k${NOT_BEFORE_WORD}`,
+  "gu",
+);
+/**
+ * SR décimal nu, lu dans une recherche de scrim ou de remplaçant seulement :
+ * « LFS EU PC 3.6-3.7 », « LFS 4.5 20-22 », « adv 4.5+ ».
+ */
+const SR_BARE_DECIMAL = new RegExp(
+  String.raw`(?<![\p{L}\p{N}.,#/:–-])([1-4])[.,](\d)(?:\s?[-–/]\s?([1-5])[.,](\d))?(?![\p{L}\p{N}]|[.,:/–-]\p{N}|\s?%)`,
+  "gu",
+);
+/** SR décimal derrière son libellé, sans « k » : « SR 3.6-3.7 », « elo : 3.2 ». */
+const SR_LABELLED_DECIMAL = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:sr|elo)\s?:?\s?([1-4])[.,](\d)(?:\s?[-–/]\s?([1-5])[.,](\d))?(?![\p{L}\p{N}.,])`,
   "gu",
 );
 /**
@@ -210,13 +270,14 @@ const COUNTED_AFTER = new RegExp(
 );
 /** … ou ce qui le précède : « écran 4k », « cashprize 1k », « $4k », « résolution 4k ». */
 const NOT_RANK_BEFORE = new RegExp(
-  String.raw`(?:${NOT_AFTER_WORD}(?:ecrans?|screens?|monitors?|moniteurs?|resolution|tv|televiseur|video|videos|stream|qualite|quality|cash\s?prize|prize\s?pool|prize|dotation|budget|prix|price|salaire|salary|recompense|reward|code|id|pin|tag|ref|numero|num|tel|telephone|phone)\s?:?\s?(?:de\s|en\s|of\s|in\s)?|[€$£]\s?)$`,
+  String.raw`(?:${NOT_AFTER_WORD}(?:ecrans?|screens?|monitors?|moniteurs?|resolution|tv|televiseur|video|videos|stream|qualite|quality|cash\s?prize|prize\s?pool|prize|dotation|budget|prix|price|salaire|salary|recompense|reward|code|id|pin|tag|ref|numero|num|tel|telephone|phone|loi|law)\s?:?\s?(?:de\s|en\s|of\s|in\s)?|[€$£]\s?)$`,
   "u",
 );
 /**
  * Suite de chiffres groupés (un numéro de téléphone) : un numéro, pas un SR.
  * Il en faut deux autres groupes autour, ou un groupe collé par « . » ou « - »,
- * ou un indicatif devant : « 4200 20 ans » garde son SR.
+ * ou un indicatif devant : « 4200 20 ans » garde son SR. Un horaire voisin n'est
+ * pas un groupe de numéro : « 3500 21-23 », « 20-22 3500 ».
  */
 const GROUPS_BEFORE = /(?:\d+[\s.-]){2,}$/u;
 const GROUPS_AFTER = /^(?:[\s.-]\d+){2,}/u;
@@ -225,15 +286,19 @@ const GROUP_AFTER = /^[\s.-]\d/u;
 const GLUED_GROUP_BEFORE = /\d{2}[.-]$/u;
 const GLUED_GROUP_AFTER = /^[.-]\d{2}/u;
 const PHONE_PREFIX = /(?:\+\d{1,3}|(?<!\d)0\d?)[\s.-]?$/u;
+const TIME_RANGE_AFTER = /^\s\d{1,2}\s?[-–/]\s?\d{1,2}(?!\p{N}|[\s.-]\d)/u;
+const TIME_RANGE_BEFORE = /(?<![\p{N}.-]|\d\s)\d{1,2}\s?[-–/]\s?\d{1,2}\s$/u;
 
-function isPhoneNumber(before: string, after: string): boolean {
+function isPhoneNumber(numbersBefore: string, numbersAfter: string): boolean {
+  const before = numbersBefore.replace(TIME_RANGE_BEFORE, "");
+  const after = numbersAfter.replace(TIME_RANGE_AFTER, "");
   if (GROUPS_BEFORE.test(before) || GROUPS_AFTER.test(after)) return true;
   if (GROUP_BEFORE.test(before) && GROUP_AFTER.test(after)) return true;
   return GLUED_GROUP_BEFORE.test(before) || GLUED_GROUP_AFTER.test(after) || PHONE_PREFIX.test(before);
 }
-/** Ancien SR en chiffres : « 3500 sr », « 4400+ », « 3500-4000 ». */
+/** SR en chiffres : « 3500 sr », « 4400+ », « 3500-4000 ». */
 const SR_NUMBER = new RegExp(
-  String.raw`(?<![\p{L}\p{N}.,#])([1-4]\d{3})(?:\s?[-–/]\s?([1-4]\d{3}))?(?:\s?(sr|elo)|(\+))?${NOT_BEFORE_WORD}`,
+  String.raw`(?<![\p{L}\p{N}.,#])([1-4]\d{3}|5000)(?:\s?[-–/]\s?([1-4]\d{3}|5000))?(?:\s?(sr|elo)|(\+))?${NOT_BEFORE_WORD}`,
   "gu",
 );
 
@@ -304,10 +369,27 @@ function tierSpan(tier: GetiTier, first: string | undefined, second: string | un
   return { min: Math.min(a, b), max: Math.max(a, b) };
 }
 
-/** Rang d'un ancien SR : 500 points par palier, 100 par division, plafonné à Grand Maître 1. */
+/** Bronze court de 0 à 999 SR : environ 200 par division. */
+const SR_BRONZE_TOP = 1000;
+const SR_PER_BRONZE_DIVISION = 200;
+/** D'Argent à Champion : 500 SR par palier, 100 par division. */
+const SR_PER_DIVISION = 100;
+
+/**
+ * Rang d'un SR, sur l'échelle 0–5 000 en vigueur depuis l'ajout d'Émeraude :
+ * Bronze 0–999, Argent 1 000, Or 1 500, Platine 2 000, Émeraude 2 500, Diamant
+ * 3 000, Master 3 500, Grand Maître 4 000, Champion 4 500–5 000. La division 5
+ * est le bas de la tranche (Émeraude 5 = 2 500–2 599, Émeraude 1 = 2 900–2 999) ;
+ * plafonné à Champion 1. « Top 500 » est une autre notion, sans tranche de SR.
+ */
 function srValue(sr: number): number {
-  const steps = Math.floor((sr - 1000) / 100);
-  return Math.min(GRANDMASTER_BASE + DIVISIONS - 1, Math.max(0, steps));
+  if (sr < SR_BRONZE_TOP) return Math.max(0, Math.floor(sr / SR_PER_BRONZE_DIVISION));
+  return Math.min(GETI_RANK_TOP, DIVISIONS + Math.floor((sr - SR_BRONZE_TOP) / SR_PER_DIVISION));
+}
+
+function srSpan(first: number, second: number): ValueRange {
+  const values = [srValue(first), srValue(second)];
+  return { min: Math.min(...values), max: Math.max(...values) };
 }
 
 function isYear(value: number): boolean {
@@ -324,6 +406,10 @@ function isLetterRank(lower: string, match: RegExpExecArray): boolean {
   const before = lower.slice(Math.max(0, match.index - 12), match.index);
   if (NOT_LETTER_RANK_BEFORE.test(before)) return false;
   if (match[1] === "s" && SEASON_SINCE_BEFORE.test(before)) return false;
+  if (match[1] === "e") {
+    const context = lower.slice(Math.max(0, match.index - 24), match.index);
+    if (!EMERALD_LETTER_BEFORE.test(context) && !EMERALD_LETTER_AFTER.test(lower.slice(end, end + 24))) return false;
+  }
   return !NOT_LETTER_RANK_AFTER.test(lower.slice(end, end + 12));
 }
 
@@ -362,31 +448,67 @@ function srNumberSpan(lower: string, match: RegExpExecArray): ValueRange | null 
   const before = lower.slice(Math.max(0, match.index - 12), match.index);
   const birthYear = (value: number) => value >= BIRTH_YEAR_MIN && value <= YEAR_MAX;
   if (!labelled && birthYear(first) && birthYear(second) && DATE_WORD_BEFORE.test(before)) return null;
-  const values = [srValue(first), srValue(second)];
-  return { min: Math.min(...values), max: Math.max(...values) };
+  return srSpan(first, second);
 }
 
-/** Le nombre vise autre chose qu'un rang : unité derrière, montant ou écran devant. */
-function isNotRank(lower: string, match: RegExpExecArray): boolean {
+/**
+ * Le nombre vise autre chose qu'un rang : unité derrière, montant ou écran
+ * devant, ou — pour un nombre sans « k » (`phone`) — chiffres d'un numéro.
+ */
+function isNotRank(lower: string, match: RegExpExecArray, phone: boolean): boolean {
   const end = match.index + match[0].length;
   const before = lower.slice(Math.max(0, match.index - 20), match.index);
   const after = lower.slice(end, end + 14);
-  return COUNTED_AFTER.test(after) || NOT_RANK_BEFORE.test(before) || isPhoneNumber(before, after);
+  if (COUNTED_AFTER.test(after) || NOT_RANK_BEFORE.test(before)) return true;
+  return phone && isPhoneNumber(before, after);
 }
 
-/** Ancien SR, en milliers ou en chiffres. */
-function srTokens(lower: string): RankToken[] {
+/** Seconde borne de « 3.5-6k » : des centaines (3 600), sauf un millier plausible (« 3.5-4k », « 3.2-3k »). */
+function decimalRangeEnd(thousands: number, digit: number): number {
+  return digit >= thousands && digit <= 5 ? digit * 1000 : thousands * 1000 + digit * 100;
+}
+
+/** SR décimal « 3.6 » ou « 3.6-3.7 » : nu (scrim seulement) ou derrière son libellé. */
+function decimalSrTokens(lower: string, scrim: boolean): RankToken[] {
+  const matches = [...(scrim ? lower.matchAll(SR_BARE_DECIMAL) : []), ...lower.matchAll(SR_LABELLED_DECIMAL)];
+  return matches.map((match) => {
+    const first = Number(match[1]) * 1000 + Number(match[2]) * 100;
+    const second = match[3] === undefined ? first : Number(match[3]) * 1000 + Number(match[4]) * 100;
+    return tokenOf(match, srSpan(first, second));
+  });
+}
+
+/** SR en milliers : « 3.4-3.5k », « 3.5-6k », « 4k », « 3k4-5 ». */
+function thousandSrTokens(lower: string): RankToken[] {
   const tokens: RankToken[] = [];
+  for (const match of lower.matchAll(SR_DECIMAL_RANGE)) {
+    if (isNotRank(lower, match, false)) continue;
+    const thousands = Number(match[1]);
+    const first = thousands * 1000 + Number(match[2]) * 100;
+    const second =
+      match[5] === undefined
+        ? Number(match[3]) * 1000 + Number(match[4]) * 100
+        : decimalRangeEnd(thousands, Number(match[5]));
+    tokens.push(tokenOf(match, srSpan(first, second)));
+  }
   for (const match of lower.matchAll(SR_THOUSANDS)) {
     if (match[2] !== undefined && match[3] !== undefined) continue;
     // « 4k sr » est un SR quoi qu'il y ait autour.
-    if (match[4] === undefined && isNotRank(lower, match)) continue;
-    const value = srValue(Number(match[1]) * 1000 + Number(match[2] ?? match[3] ?? 0) * 100);
-    tokens.push(tokenOf(match, { min: value, max: value }));
+    if (match[5] === undefined && isNotRank(lower, match, false)) continue;
+    const thousands = Number(match[1]) * 1000;
+    const first = thousands + Number(match[2] ?? match[3] ?? 0) * 100;
+    const second = match[4] === undefined ? first : thousands + Number(match[4]) * 100;
+    tokens.push(tokenOf(match, srSpan(first, second)));
   }
+  return tokens;
+}
+
+/** SR, en milliers ou en chiffres ; `scrim` lit aussi le décimal nu (« 3.6 »). */
+function srTokens(lower: string, scrim: boolean): RankToken[] {
+  const tokens: RankToken[] = [...decimalSrTokens(lower, scrim), ...thousandSrTokens(lower)];
   for (const match of lower.matchAll(SR_NUMBER)) {
     const span = srNumberSpan(lower, match);
-    const rank = match[3] !== undefined || !isNotRank(lower, match);
+    const rank = match[3] !== undefined || !isNotRank(lower, match, true);
     if (span !== null && rank) tokens.push(tokenOf(match, span, match[4] !== undefined));
   }
   return tokens;
@@ -396,9 +518,9 @@ function srTokens(lower: string): RankToken[] {
 const JOINED_GAP = /^ (?:a|au|du) $/u;
 const JOINED_GAP_LENGTHS = [3, 4];
 
-function rawTokens(lower: string): RankToken[] {
+function rawTokens(lower: string, scrim: boolean): RankToken[] {
   const { tokens, joined } = tierTokens(lower);
-  const kept = [...tokens, ...srTokens(lower)];
+  const kept = [...tokens, ...srTokens(lower, scrim)];
   // Le mot de liaison fait 3 ou 4 caractères (« a », « au », « du » entre deux espaces) :
   // seul un rang qui finit là peut confirmer le jeton, inutile de les passer tous en revue.
   const ends = new Set(kept.map((rank) => rank.end));
@@ -440,8 +562,8 @@ function withOpenMarkers(lower: string, token: RankToken): RankToken {
   return next;
 }
 
-function rankTokens(lower: string): RankToken[] {
-  const sorted = rawTokens(lower).sort((a, b) => a.start - b.start || b.end - a.end);
+function rankTokens(lower: string, scrim: boolean): RankToken[] {
+  const sorted = rawTokens(lower, scrim).sort((a, b) => a.start - b.start || b.end - a.end);
   const kept: RankToken[] = [];
   for (const token of sorted) {
     const previous = kept.at(-1);
@@ -581,11 +703,13 @@ function toRankRange(range: ValueRange): GetiRankRange {
  *
  * @param lower Texte sans accents, en minuscules (`prepareGetiText`).
  * @param roleTokens Rôles déjà repérés dans ce même texte.
+ * @param scrim `true` pour une recherche de scrim ou de remplaçant : un
+ *   décimal nu (« 3.6 », « 4.5+ ») y est un SR.
  * @returns Les rangs ; `min` et `max` valent `null` quand aucun rang n'est lu.
  */
-export function parseGetiRanks(lower: string, roleTokens: readonly GetiRoleToken[]): GetiRanks {
+export function parseGetiRanks(lower: string, roleTokens: readonly GetiRoleToken[], scrim = false): GetiRanks {
   const runs = roleRuns(lower, roleTokens);
-  const groups = rankGroups(lower, rankTokens(lower));
+  const groups = rankGroups(lower, rankTokens(lower, scrim));
   if (groups.length === 0) return { min: null, max: null, byRole: {} };
   const byRoleValues = ranksByRole(lower, groups, runs);
   const byRole: GetiRanks["byRole"] = {};

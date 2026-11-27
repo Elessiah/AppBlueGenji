@@ -22,12 +22,13 @@ export const GETI_CHANNEL_IDS: Readonly<Record<GetiCategory, string>> = Object.f
   lfcast: "1085116755925536828",
 });
 
-/** Paliers Overwatch, du plus bas au plus haut. */
+/** Paliers Overwatch, du plus bas au plus haut (Émeraude se place entre Platine et Diamant). */
 export const GETI_TIERS = [
   "BRONZE",
   "SILVER",
   "GOLD",
   "PLATINUM",
+  "EMERALD",
   "DIAMOND",
   "MASTER",
   "GRANDMASTER",
@@ -72,6 +73,13 @@ export type GetiLanguage = (typeof GETI_LANGUAGES)[number];
 /** Jours de la semaine, lundi en tête. */
 export const GETI_DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
 export type GetiDay = (typeof GETI_DAYS)[number];
+
+/**
+ * Niveaux de division (ligue FACEIT), du plus bas au plus haut : le niveau
+ * d'une équipe (« LFS EU PC adv »), ou celui qu'un joueur vise.
+ */
+export const GETI_LEVELS = ["OPEN", "INTERMEDIATE", "ADVANCED", "EXPERT"] as const;
+export type GetiLevel = (typeof GETI_LEVELS)[number];
 
 export const GETI_STAFF_ROLES = [
   "COACH",
@@ -179,6 +187,15 @@ export type GetiParsedPost = {
   platforms: GetiPlatform[];
   languages: GetiLanguage[];
   availability: GetiAvailability;
+  /**
+   * Dates visées (« 26/11 », « Thursday 26 », « ce soir »), « AAAA-MM-JJ » à
+   * l'heure de Paris, triées ; vide sans date de publication.
+   */
+  dates: string[];
+  /** Niveaux de division cités (« adv », « high open »). */
+  levels: GetiLevel[];
+  /** `true` quand tout le texte est barré (`~~…~~`) : l'annonce est close. */
+  closed: boolean;
   teamName: string | null;
   staffRoles: GetiStaffRole[];
   /** Âge minimal demandé ou annoncé (« 18+ », « majeur »). */
@@ -197,11 +214,14 @@ export type GetiFilter = {
   regions?: readonly GetiRegion[] | null;
   platforms?: readonly GetiPlatform[] | null;
   languages?: readonly GetiLanguage[] | null;
+  levels?: readonly GetiLevel[] | null;
+  /** `true` : une annonce close (texte entièrement barré) est écartée. */
+  hideClosed?: boolean;
   /** Âge maximal de l'annonce, en heures. */
   maxAgeHours?: number | null;
   /**
    * `true` : une annonce où le critère n'a pas été lu (rang, rôle, région,
-   * plateforme, langue) passe quand même. Par défaut elle est écartée.
+   * plateforme, langue, niveau) passe quand même. Par défaut elle est écartée.
    */
   includeUnknown?: boolean;
 };

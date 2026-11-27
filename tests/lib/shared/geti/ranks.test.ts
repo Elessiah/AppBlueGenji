@@ -15,23 +15,23 @@ function rangeOf(text: string) {
 describe("échelle des rangs", () => {
   it("getiRankValue : Bronze 5 vaut 0, Champion 1 vaut le sommet", () => {
     expect(getiRankValue(BRONZE_5)).toBe(0);
-    expect(getiRankValue(CHAMPION_1)).toBe(39);
-    expect(GETI_RANK_TOP).toBe(39);
+    expect(getiRankValue(CHAMPION_1)).toBe(44);
+    expect(GETI_RANK_TOP).toBe(44);
   });
 
   it("getiRankValue : une division de mieux vaut un de plus, un palier cinq", () => {
-    expect(getiRankValue(getiRank("DIAMOND", 3))).toBe(22);
-    expect(getiRankValue(getiRank("DIAMOND", 2))).toBe(23);
-    expect(getiRankValue(getiRank("MASTER", 3))).toBe(27);
+    expect(getiRankValue(getiRank("DIAMOND", 3))).toBe(27);
+    expect(getiRankValue(getiRank("DIAMOND", 2))).toBe(28);
+    expect(getiRankValue(getiRank("MASTER", 3))).toBe(32);
   });
 
   it("getiRankFromValue : rend le rang d'une valeur de l'échelle", () => {
-    expect(getiRankFromValue(22)).toEqual(getiRank("DIAMOND", 3));
+    expect(getiRankFromValue(27)).toEqual(getiRank("DIAMOND", 3));
   });
 
   it("getiRankFromValue : une valeur hors échelle est ramenée à la borne", () => {
     expect(getiRankFromValue(-1)).toEqual(BRONZE_5);
-    expect(getiRankFromValue(40)).toEqual(CHAMPION_1);
+    expect(getiRankFromValue(45)).toEqual(CHAMPION_1);
   });
 
   it("getiRankFromValue : une valeur non finie rend le bas de l'échelle", () => {
@@ -175,9 +175,9 @@ describe("rangs d'une annonce — ancien SR", () => {
     expect(rangeOf("lfs 3000-3500")).toEqual(getiRange(getiRank("DIAMOND", 5), getiRank("MASTER", 5)));
   });
 
-  it("1499 est encore Bronze, 1500 est Silver", () => {
-    expect(rangeOf("lft 1499 sr")).toEqual(getiRange(getiRank("BRONZE", 1)));
-    expect(rangeOf("lft 1500 sr")).toEqual(getiRange(getiRank("SILVER", 5)));
+  it("1499 est encore Silver, 1500 est Gold", () => {
+    expect(rangeOf("lft 1499 sr")).toEqual(getiRange(getiRank("SILVER", 1)));
+    expect(rangeOf("lft 1500 sr")).toEqual(getiRange(getiRank("GOLD", 5)));
   });
 
   it("3999 est encore Master, 4000 est Grand Maître", () => {
@@ -185,8 +185,10 @@ describe("rangs d'une annonce — ancien SR", () => {
     expect(rangeOf("lft 4000 sr")).toEqual(getiRange(getiRank("GRANDMASTER", 5)));
   });
 
-  it("le SR plafonne à Grand Maître 1 : Champion n'existait pas", () => {
-    expect(rangeOf("lft 4900 sr")).toEqual(getiRange(getiRank("GRANDMASTER", 1)));
+  it("4499 est encore Grand Maître, 4500 est Champion, 5000 plafonne à Champion 1", () => {
+    expect(rangeOf("lft 4499 sr")).toEqual(getiRange(getiRank("GRANDMASTER", 1)));
+    expect(rangeOf("lft 4500 sr")).toEqual(getiRange(getiRank("CHAMPION", 5)));
+    expect(rangeOf("lft 5000 sr")).toEqual(getiRange(getiRank("CHAMPION", 1)));
   });
 
   it("un nombre nu n'est pas un SR", () => {
@@ -353,11 +355,11 @@ describe("rangs d'une annonce — ancien SR", () => {
   it.each([
     { text: "lft 4k", expected: getiRange(getiRank("GRANDMASTER", 5)) },
     { text: "lft dps 3.5k", expected: getiRange(getiRank("MASTER", 5)) },
-    { text: "lft 4k5", expected: getiRange(getiRank("GRANDMASTER", 1)) },
+    { text: "lft 4k5", expected: getiRange(getiRank("CHAMPION", 5)) },
     { text: "lft 4000", expected: getiRange(getiRank("GRANDMASTER", 5)) },
     { text: "lft 3500", expected: getiRange(getiRank("MASTER", 5)) },
     { text: "lft dps 4200", expected: getiRange(getiRank("GRANDMASTER", 3)) },
-    { text: "lfp 2800-3200", expected: getiRange(getiRank("PLATINUM", 2), getiRank("DIAMOND", 3)) },
+    { text: "lfp 2800-3200", expected: getiRange(getiRank("EMERALD", 2), getiRank("DIAMOND", 3)) },
     { text: "lft 3500+", expected: getiRange(getiRank("MASTER", 5), CHAMPION_1) },
     { text: "lft 3k+", expected: getiRange(getiRank("DIAMOND", 5), CHAMPION_1) },
     { text: "lft 3k-4k", expected: getiRange(getiRank("DIAMOND", 5), getiRank("GRANDMASTER", 5)) },
