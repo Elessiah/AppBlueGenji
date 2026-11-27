@@ -157,7 +157,8 @@ export type GetiParseOptions = {
   /**
    * Nos bots : leur dernière ligne (`*Sent from : [Serveur](…)* by <@id>`)
    * nomme l'auteur ; le reste de l'encart est le texte du joueur, jamais lu
-   * comme un auteur.
+   * comme un auteur. Vide en production (`getiTrustedBots`) : nos messages
+   * sont refusés avant l'analyse ; la lecture reste pour un relais futur.
    */
   siteBotIds?: readonly string[];
 };

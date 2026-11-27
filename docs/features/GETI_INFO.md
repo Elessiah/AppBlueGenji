@@ -417,7 +417,7 @@ ou un message sans texte n'est pas une annonce : ni poussé par le bot, ni gard�
 par le site. Un message de GETI Bot dont le premier encart ne s'ouvre pas sur l'en-tête d'un
 relais — mention de l'auteur, `(pseudo)`, puis `sur`/`on`/`from` (l'avis « Ton
 annonce a été publié dans … », même s'il mentionne l'auteur) — n'en est pas une non plus
-(`isGetiRelay`, `isGetiRelayMessage` côté bot). L'analyse ne croit l'en-tête
+(`isGetiRelay`, `isGetiRelayMessage` côté bot ; cette garde est plus large que l'en-tête que lit l'analyse — tout relais dont l'auteur est lu la passe, ce que vérifie un test — : 671 des 672 relais de l'échantillon réel ont cette forme). L'analyse ne croit l'en-tête
 que des bots listés (`getiTrustedBots` : GETI Bot seul — notre bot n'y est pas,
 ses messages étant refusés avant l'analyse). Le réglage de l'analyse sur les textes réels est un lot à part
 (GETI-TUNE).
@@ -494,8 +494,11 @@ l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
   un message partiel est relu avant d'être poussé.
 - Rattrapage au démarrage et à chaque nouvelle session Discord : historique de
   chaque salon sur sa fenêtre de garde (pages de 100, pause entre deux pages,
-  5 000 messages au plus par salon), puis `reconcile` avec la liste des messages
-  encore présents — ce qui a été supprimé pendant l'arrêt du bot quitte le site.
+  5 000 messages au plus par salon), puis `reconcile` avec la liste des annonces
+  encore présentes, plus celles poussées en direct pendant le rattrapage — ce qui a
+  été supprimé, ou a cessé d'être une annonce, pendant l'arrêt du bot quitte le site.
+  Un salon que Discord refuse (salon disparu, accès ou permission retirés) ne
+  relance pas à lui seul de rattrapage ; un échec passager en relance un toutes les cinq minutes.
 - Site injoignable : file bornée en mémoire, reprises espacées puis abandon ;
   un abandon déclenche un rattrapage complet, retenté toutes les cinq minutes.
   Le bot ne plante jamais et ne journalise (pm2) que des nombres et des

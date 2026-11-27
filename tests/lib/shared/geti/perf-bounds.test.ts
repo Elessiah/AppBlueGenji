@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { filterGetiPosts, getiRankValue, parseGetiPost } from "@/lib/shared/geti";
-import { getiRank, getiRawPost, getiRelayPost, parseGetiText, parsedGetiPost, GETI_TRUSTED_BOTS } from "@/tests/helpers/geti";
+import { getiRank, getiRawPost, getiRelayPost, parseGetiText, parsedGetiPost, GETI_TRAILER_TRUSTED_BOTS, GETI_TRUSTED_BOTS } from "@/tests/helpers/geti";
 
 const BOT = { id: "100000000000000090", username: "FauxBot", discriminator: "0", bot: true };
 const AUTHOR_ID = "100000000000000001";
@@ -60,7 +60,7 @@ describe("parseGetiPost — bounded cost on hostile raw input", () => {
 describe("relay trailer and author labels after the bounds", () => {
   it("the « Sent from » trailer at the end of a long description is still read", () => {
     const description = `${"Cherche tank diamant. ".repeat(100)}\n\n*Sent from : [Mon Serveur](https://discord.gg/abc)* by <@${AUTHOR_ID}>`;
-    const post = parseGetiPost(getiRelayPost(description), GETI_TRUSTED_BOTS);
+    const post = parseGetiPost(getiRelayPost(description), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(post.originServer).toBe("Mon Serveur");
     expect(post.authorId).toBe(AUTHOR_ID);
