@@ -424,7 +424,7 @@ ou un message sans texte n'est pas une annonce : ni poussé par le bot, ni gard�
 par le site. Un message de GETI Bot dont le premier encart ne s'ouvre pas sur l'en-tête d'un
 relais — mention de l'auteur, `(pseudo)`, puis `sur`/`on`/`from` (l'avis « Ton
 annonce a été publié dans … », même s'il mentionne l'auteur) — n'en est pas une non plus
-(`isGetiRelay`, `isGetiRelayMessage` côté bot ; cette garde est plus large que l'en-tête que lit l'analyse — tout relais dont l'auteur est lu la passe, ce que vérifie un test — : 671 des 672 relais de l'échantillon réel ont cette forme). L'analyse ne croit l'en-tête
+(`isGetiRelay`, `isGetiRelayMessage` côté bot ; dans le premier encart, cette garde est plus large que l'en-tête que lit l'analyse — tout en-tête lu dans ce premier encart la passe, ce que vérifie un test ; un en-tête placé dans un encart suivant, ou un auteur seulement mentionné dans le texte, ne la passe pas — : 671 des 672 relais de l'échantillon réel ont cette forme). L'analyse ne croit l'en-tête
 que des bots listés (`getiTrustedBots` : GETI Bot seul — notre bot n'y est pas,
 ses messages étant refusés avant l'analyse). Le réglage de l'analyse sur les textes réels est un lot à part
 (GETI-TUNE).
