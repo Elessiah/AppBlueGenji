@@ -837,14 +837,19 @@ close ne prévient jamais.
   `ON DELETE CASCADE` : vers l'alerte, et vers l'annonce
   (`bg_geti_posts.message_id`, `fk_bg_geti_alert_hits_post`) — une annonce
   retirée (supprimée du salon, vidée, opposition, échue, réanalyse impossible)
-  emporte ses traces dans la même instruction : rien n'en reste (T21).
+  emporte ses traces dans la même instruction : rien n'en reste (T21). Une
+  annonce qui revient ensuite (texte rétabli après avoir été vidé, rattrapage)
+  compte comme nouvelle et peut prévenir encore : la promesse « jamais deux
+  fois » vaut tant que l'annonce reste sur le site (textes légaux).
   Une trace ne se pose que sur une annonce gardée (`INSERT IGNORE` écarte celle
   retirée entre-temps).
 
 Tables neuves : leur `CREATE TABLE` (`schema/geti.ts`) suffit ; seule la clé
 vers l'annonce est dans `RECENT_SCHEMA_CHANGES` (groupe de deux pas, pour les
 bases de développement qui avaient déjà la table : traces orphelines retirées,
-puis la clé ; ensuite des no-op). Table absente : la page se rend sans alertes, la passe
+puis la clé), joué seulement tant que `information_schema` ne montre pas la clé
+(table présente, `fk_bg_geti_alert_hits_post` absente) : ni balayage des traces
+à chaque démarrage, ni erreur quand la table manque. Table absente : la page se rend sans alertes, la passe
 d'alertes ne fait rien.
 
 ### Routes (`/api/geti/alerts`)
@@ -894,7 +899,7 @@ attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
    `authorId` nul, n'est pas reconnu : textes légaux formulés ainsi).
 3. Correspondance en mémoire par `matchingGetiAlerts` → `matchesGetiFilter`,
    le filtre de chaque alerte construit une seule fois par lot.
-4. **Jamais deux fois pour la même annonce** : par annonce, une lecture des
+4. **Jamais deux fois pour la même annonce** (tant qu'elle est gardée) : par annonce, une lecture des
    traces déjà là puis un seul `INSERT IGNORE INTO bg_geti_alert_hits` à
    plusieurs lignes pour les autres (par paquets de 500) ; une insertion qui
    ne pose rien (passe simultanée) ne prévient pas (modification, second
@@ -943,7 +948,7 @@ revoir (index par critère) si ce nombre approche.
 **Croissance des traces** : une trace par couple (alerte, annonce) qui
 correspond, y compris pour une alerte alors dans son délai — la trace **est** ce
 qui empêche une modification tardive de prévenir une seconde fois, elle vit donc
-aussi longtemps que l'annonce (elle part avec elle ; 15 jours au plus, purge par
+aussi longtemps que l'annonce gardée (elle part avec elle ; 15 jours au plus, purge par
 lots). Borne : alertes
 d'une catégorie (≤ 2 000 lues) × annonces récentes de cette catégorie sur 15
 jours ; seules les annonces **récentes** posent des traces (le rattrapage n'en

@@ -389,7 +389,7 @@ describe("sweepScheduleDeadlines", () => {
 
     expect(jest.mocked(withNamedLock).mock.calls[0][1]).toBe(SCHEDULE_DEADLINES_LOCK);
     expect(loadEntrantMatchLeaderIds).toHaveBeenCalledWith([100, 200]);
-    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[7], "proven", { matchDm: true }]);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls[0]).toEqual([[7], "certified", { matchDm: true }]);
     expect(notifyUsers).toHaveBeenCalledTimes(2);
     expect(jest.mocked(notifyUsers).mock.calls[0][1]).toMatchObject({ topic: "SCHEDULE_DEADLINE", dmFollowsTopic: true });
   });

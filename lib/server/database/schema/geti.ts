@@ -88,7 +88,8 @@ export async function createGetiTables(db: Pool): Promise<void> {
   }
 
   // Une ligne par couple (alerte, annonce) déjà vu : une alerte ne prévient
-  // jamais deux fois pour la même annonce (modification, rattrapage du bot).
+  // pas deux fois pour la même annonce tant qu'elle est gardée (modification,
+  // rattrapage du bot) ; une annonce retirée puis revenue compte comme nouvelle.
   // Part avec l'annonce (`ON DELETE CASCADE` sur `bg_geti_posts` : supprimée,
   // retirée sur opposition, échue — rien n'est gardé d'une annonce retirée,
   // registre T21) ou avec l'alerte ; purgée au-delà de la plus longue durée de

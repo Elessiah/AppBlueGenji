@@ -119,9 +119,9 @@ describe("politique et registre", () => {
     const fr = JSON.stringify(PRIVACY_POLICY.fr);
     const en = JSON.stringify(PRIVACY_POLICY.en);
     expect(fr).toContain("intérêt légitime (constitution des équipes, registre du site T03) pour les messages privés d'équipe");
-    expect(fr).toContain("auxquels chacun s'oppose par le même interrupteur de « Mon profil » ; exécution du service");
+    expect(fr).toContain("auxquels chacun s'oppose par le même interrupteur de « Mon profil » ; intérêt légitime (organiser les bénévoles");
     expect(en).toContain("legitimate interest (forming teams, the website's register T03) for team direct messages");
-    expect(en).toContain("which anyone objects to with the same switch in “My profile”; performance of the service");
+    expect(en).toContain("which anyone objects to with the same switch in “My profile”; legitimate interest (organising the volunteers");
   });
 
   it("droitsOpposition_teamDmList_parenthesisedSoTheAsideStaysPairedFrAndEn", () => {

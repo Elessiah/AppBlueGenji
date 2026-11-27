@@ -146,8 +146,8 @@ describe("registre — T22 (cycle juridique 1)", () => {
   it("registerT22_neverTwice_isPromisedPerAlertOnly", () => {
     const { fr, en } = record("T22");
 
-    expect(fr.subPurposes.join("\n")).toContain("Qu'une alerte ne prévienne jamais deux fois de la même annonce");
-    expect(en.subPurposes.join("\n")).toContain("Making sure an alert never notifies twice of the same post");
+    expect(fr.subPurposes.join("\n")).toContain("Qu'une alerte ne prévienne pas deux fois de la même annonce tant que celle-ci reste sur le site");
+    expect(en.subPurposes.join("\n")).toContain("Making sure an alert does not notify twice of the same post while it stays on the site");
   });
 });
 
@@ -219,5 +219,102 @@ describe("/rgpd — alertes d'annonces (cycle juridique 1)", () => {
     expect(source).toContain('<a href="#alertes-geti">alerts</a>');
     expect(source).toContain("are included in the export of the account&apos;s data.");
     expect(source).toContain("account keeps its alerts but is no longer notified.");
+  });
+});
+
+describe("cycle juridique 2 — « jamais deux fois » borné à l'annonce gardée, listes du bot complétées", () => {
+  const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-11-alertes-d-annonces-geti");
+  const english = PRIVACY_CHANGES_EN["2026-11-alertes-d-annonces-geti"];
+
+  it("rgpdAlerts_neverTwice_isBoundToPostStayingOnSiteFrAndEn", () => {
+    const fr = readSource("app/rgpd/page.tsx").replace(/\s+/g, " ");
+    const en = readSource("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ");
+
+    expect(fr).toContain("ne prévienne pas deux fois de la même annonce tant que celle-ci reste sur le site");
+    expect(fr).toContain("une annonce qui revient ensuite compte comme nouvelle");
+    expect(en).toContain("does not notify twice of the same post while it stays on the site");
+    expect(en).toContain("a post that comes back afterwards counts as new");
+  });
+
+  it("getiAlertPrivacyChange_traceLeaves_asSoonAsPostLeavesSiteFrAndEn", () => {
+    expect(entry?.details.join(" ")).toContain("dès qu'elle quitte le site (par exemple supprimée ou vidée de son texte");
+    expect(english?.details.join(" ")).toContain("as soon as it leaves the site (for instance deleted or emptied of its text");
+  });
+
+  it("getiAlertPrivacyChange_botListsCompleted_nothingChangesInWhatIsSent", () => {
+    expect(entry?.details.join(" ")).toContain("rien ne change dans ce qui est envoyé");
+    expect(english?.details.join(" ")).toContain("nothing changes in what is sent");
+  });
+
+  it("registerT22_retention_traceErasedWhenPostLeavesSite", () => {
+    const { fr, en } = record("T22");
+
+    expect(fr.retention.join(" ")).toContain("effacée avec l'annonce dès qu'elle quitte le site");
+    expect(en.retention.join(" ")).toContain("erased with the post as soon as it leaves the site");
+  });
+
+  it("registerT21_alerts_subPurposeAndRecipientDeclaredFrAndEn", () => {
+    const { fr, en } = record("T21");
+
+    expect(fr.subPurposes.join(" ")).toContain("Comparer chaque nouvelle annonce aux alertes que des comptes ont créées sur la page des annonces (T22)");
+    expect(fr.recipients.join(" ")).toContain("Titulaires d'une alerte (T22)");
+    expect(en.subPurposes.join(" ")).toContain("Comparing each new post with the alerts accounts created on the posts page (T22)");
+    expect(en.recipients.join(" ")).toContain("Holders of an alert (T22)");
+  });
+
+  it("botPrivacyPolicy_getiAlertLink_openedOnReportedPost", () => {
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("un lien vers la page filtrée comme elle, ouverte sur l'annonce signalée, ni pseudo");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("a link to the page filtered like it, opened on the reported post, neither");
+  });
+
+  it("botPrivacyPolicy_siteMessages_listDeadlinesNewMatchProdAndPlanning", () => {
+    const fr = JSON.stringify(PRIVACY_POLICY.fr);
+    const en = JSON.stringify(PRIVACY_POLICY.en);
+
+    expect(fr).toContain("date butoir de planification d'un match, ses rappels et le double forfait prononcé faute d'horaire");
+    expect(fr).toContain("annonce d'un nouveau match aux membres de ses deux équipes");
+    expect(fr).toContain("avis envoyé à la prod d'un match dont la place lui est donnée ou retirée");
+    expect(fr).toContain("avis du planning des casts et arbitres aux arbitres, casters et prods qui le tiennent");
+    expect(fr).toContain("ceux des matchs (horaire, rappel, retrait d'un match, check-in du match, date butoir, nouveau match, place de prod, retrait d'un cast) ne partent qu'aux comptes dont le tag Discord est certifié");
+    expect(en).toContain("a match's scheduling deadline, its reminders and the double forfeit declared for lack of an agreed time");
+    expect(en).toContain("announcement of a new match to the members of its two teams");
+    expect(en).toContain("notice to a match's prod that the place is given to or taken from them");
+    expect(en).toContain("notices of the cast and referee schedule to the referees, casters and prods who staff it");
+    expect(en).toContain("those about matches (time, reminder, removal from a match, match check-in, scheduling deadline, new match, prod place, removal of a cast) only go to accounts with a Discord tag certified");
+  });
+
+  it("botPrivacyPolicy_basis_coversPlanningT20AndGetiAlertsT22", () => {
+    const fr = JSON.stringify(PRIVACY_POLICY.fr);
+    const en = JSON.stringify(PRIVACY_POLICY.en);
+
+    expect(fr).toContain("registre du site T20) pour les avis du planning des casts et arbitres");
+    expect(fr).toContain("exécution du service demandé par le compte (registre du site T22) pour les alertes d'annonces GETI");
+    expect(en).toContain("the website's register T20) for the cast and referee schedule notices");
+    expect(en).toContain("performance of the service the account asked for (the website's register T22) for GETI post alerts");
+  });
+
+  it("botTerms_article01_listsDeadlinesNewMatchProdAndPlanning", () => {
+    const fr = JSON.stringify(TERMS_OF_SERVICE.fr.sections[0]);
+    const en = JSON.stringify(TERMS_OF_SERVICE.en.sections[0]);
+
+    expect(fr).toContain("dates butoirs de planification, annonces d'un nouveau match, avis de prod");
+    expect(fr).toContain("avis du planning des casts et arbitres");
+    expect(en).toContain("scheduling deadlines, announcements of a new match, prod notices");
+    expect(en).toContain("cast and referee schedule notices");
+  });
+
+  it("registerT08_siteMessages_listProdPlanningStaffMessagesAndLogoRestored", () => {
+    const { fr, en } = record("T08");
+    const frText = fr.subPurposes.join(" ");
+    const enText = en.subPurposes.join(" ");
+
+    expect(frText).toContain("avis envoyé à la prod d'un match dont la place lui est donnée ou retirée");
+    expect(frText).toContain("avis du planning des casts et arbitres (T20");
+    expect(frText).toContain("messages du staff d'un tournoi à ses participants");
+    expect(frText).toContain("logo masqué, retiré, supprimé ou rétabli");
+    expect(enText).toContain("the notice sent to a match's prod that the place is given to or taken from them");
+    expect(enText).toContain("notices of the cast and referee schedule (T20");
+    expect(enText).toContain("messages from a tournament's staff to its participants");
+    expect(enText).toContain("logo hidden, removed, deleted or restored");
   });
 });

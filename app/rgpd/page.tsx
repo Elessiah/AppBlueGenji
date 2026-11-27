@@ -347,8 +347,8 @@ function RgpdFr({
             ({GETI_ALERT_MAX_PER_USER} au plus) : le site garde la catégorie et les filtres choisis, un nom facultatif,
             l&apos;état de l&apos;alerte (active ou en pause — une alerte en pause est gardée sans prévenir), sa date de
             création et celle de la dernière notification, et une trace technique des annonces déjà signalées par chaque
-            alerte (l&apos;identifiant du message Discord), pour qu&apos;une alerte ne prévienne jamais deux fois de la même
-            annonce. Quand une nouvelle annonce correspond, le compte est prévenu par notification push sur ses appareils
+            alerte (l&apos;identifiant du message Discord), pour qu&apos;une alerte ne prévienne pas deux fois de la même
+            annonce tant que celle-ci reste sur le site. Quand une nouvelle annonce correspond, le compte est prévenu par notification push sur ses appareils
             abonnés et, si son compte Discord est certifié, par message privé Discord remis par le bot de l&apos;association —
             au plus une fois toutes les {GETI_ALERT_COOLDOWN_MINUTES} minutes par alerte, sans pseudo ni texte de
             l&apos;annonce : le nom de l&apos;alerte et un lien vers la page filtrée comme elle (le lien reprend donc ses
@@ -357,7 +357,8 @@ function RgpdFr({
             de plus). Un compte suspendu garde ses alertes mais n&apos;est plus prévenu. Le sujet « Alertes d&apos;annonces
             GETI » de « Mon profil » coupe les deux. Une alerte est gardée jusqu&apos;à sa suppression par le compte ;
             l&apos;effacement du compte emporte toutes ses alertes. La trace d&apos;une annonce déjà signalée part avec
-            l&apos;annonce (supprimée, retirée sur opposition ou au terme de sa garde), au plus tard au bout de{" "}
+            l&apos;annonce dès qu&apos;elle quitte le site (par exemple supprimée ou vidée de son texte, retirée sur opposition
+            ou au terme de sa garde) — une annonce qui revient ensuite compte comme nouvelle —, au plus tard au bout de{" "}
             {GETI_ALERT_HIT_RETENTION_DAYS} jours. Les alertes et leurs traces figurent dans l&apos;export des données du
             compte. Base : l&apos;exécution du service demandé par le compte. Registre des traitements : fiche T22.
           </p>

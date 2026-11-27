@@ -616,7 +616,8 @@ export async function sendDeadlineNotices(
   for (const side of sides) {
     const ids = leaders.get(side.teamId) ?? [];
     if (ids.length === 0) continue;
-    const recipients = await loadNotificationRecipients(ids, "proven", { matchDm: true });
+    // Message de match : seul un tag Discord certifié le reçoit (`/rgpd#messages-de-match`, T08).
+    const recipients = await loadNotificationRecipients(ids, "certified", { matchDm: true });
     if (recipients.length === 0) continue;
     const report = await notifyUsers(recipients, {
       topic: "SCHEDULE_DEADLINE",

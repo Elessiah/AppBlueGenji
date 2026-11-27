@@ -473,10 +473,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // l'annonce (registre T21 : rien n'est gardé d'une annonce retirée). Sur une
     // base de développement qui a déjà la table sans la clé : les traces sans
     // annonce partent d'abord (sinon la clé est refusée), puis la clé est posée.
-    // Rejoué à chaque démarrage : la clé posée, il n'y a plus d'orphelin (le
-    // `DELETE` ne retire rien) et la clé déjà là est un no-op ; une base neuve l'a
-    // par son `CREATE TABLE`. À retirer une fois jouée partout.
+    // Joué seulement tant que la clé manque (`foreignKeyMissing`) : la clé ne se
+    // lit sur aucun code d'erreur tolérant, et rejouer le `DELETE` balaierait
+    // toutes les traces à chaque démarrage (ou échouerait, table absente). Une
+    // base neuve l'a par son `CREATE TABLE`. À retirer une fois jouée partout.
     {
+      when: foreignKeyMissing("bg_geti_alert_hits", "fk_bg_geti_alert_hits_post"),
       steps: [
         `DELETE h FROM bg_geti_alert_hits h
            LEFT JOIN bg_geti_posts p ON p.message_id = h.message_id
@@ -791,3 +793,11 @@ const columnTypeContains = (table: string, column: string, fragment: string) =>
   `SELECT 1 FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '${table}' AND COLUMN_NAME = '${column}'
       AND COLUMN_TYPE ${fragment}`;
+
+/** Lecture `when` : la table `table` existe et n'a pas (encore) la clé étrangère `constraint`. */
+const foreignKeyMissing = (table: string, constraint: string) =>
+  `SELECT 1 FROM information_schema.TABLES t
+    WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_NAME = '${table}'
+      AND NOT EXISTS (SELECT 1 FROM information_schema.REFERENTIAL_CONSTRAINTS r
+        WHERE r.CONSTRAINT_SCHEMA = DATABASE() AND r.TABLE_NAME = '${table}'
+          AND r.CONSTRAINT_NAME = '${constraint}')`;
