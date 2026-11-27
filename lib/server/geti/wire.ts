@@ -12,6 +12,7 @@ import {
   GETI_DELETE_MAX_IDS,
   GETI_RECONCILE_MAX_IDS,
   GETI_UPSERT_MAX_POSTS,
+  isGetiRelay,
   type GetiSource,
 } from "@/lib/shared/geti/ingest";
 
@@ -104,7 +105,7 @@ function parseEmbeds(value: unknown): GetiRawEmbed[] {
 /**
  * Lit une annonce poussée. `null` : forme inattendue (identifiant, salon hors
  * des six sources, date de publication illisible), message d'un bot autre que
- * GETI Bot, ou message brut trop lourd — elle est comptée « écartée », jamais
+ * GETI Bot ou avis de GETI Bot qui n'est pas un relais, ou message brut trop lourd — elle est comptée « écartée », jamais
  * enregistrée à moitié.
  */
 export function parsePushedPost(value: unknown): GetiPushedPost | null {
@@ -119,6 +120,9 @@ export function parsePushedPost(value: unknown): GetiPushedPost | null {
   const fromBot = author.bot === true;
   // Seul GETI Bot relaie des annonces : le message d'un autre bot (le nôtre compris) n'en est pas une.
   if (fromBot && author.id !== GETI_BOT_USER_ID) return null;
+  const embeds = parseEmbeds(value.embeds);
+  // L'avis « Ton annonce a été publié… » de GETI Bot n'est pas une annonce.
+  if (fromBot && !isGetiRelay(embeds)) return null;
   const raw: GetiRawPost = {
     category,
     channelId,
@@ -129,7 +133,7 @@ export function parsePushedPost(value: unknown): GetiPushedPost | null {
       discriminator: bounded(author.discriminator, 4),
       bot: fromBot,
     },
-    embeds: parseEmbeds(value.embeds),
+    embeds,
     postedAt: postedAt.toISOString(),
     editedAt: editedAt ? editedAt.toISOString() : null,
   };

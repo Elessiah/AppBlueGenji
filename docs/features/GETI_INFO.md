@@ -64,12 +64,18 @@ aucun message réel n'a été lu. Le format du relais GETI a été connu depuis
   encart, `authorTag`.
 
 **Usurpation d'auteur.** Pseudo et identifiant viennent toujours de la même
-source. Notre relais s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête
-GETI : quand l'en-tête et la ligne « Sent from » nomment deux comptes différents,
-personne n'est désigné. Un bot ou un webhook peut écrire n'importe quel en-tête :
-`parseGetiPost(raw, { relayBotIds })` ne lit l'auteur que des bots listés — les
-autres gardent leur texte, sans auteur ni serveur d'origine. **Le lot 2 passe la
-liste** (bot GETI et notre bot) ; sans elle, tout bot est cru.
+source. Un bot ou un webhook peut écrire n'importe quel en-tête, et notre relais
+s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête GETI :
+`parseGetiPost(raw, { getiBotIds, siteBotIds })` ne croit chaque bot que pour
+son propre format. Un bot de `getiBotIds` nomme l'auteur par son en-tête (ou un
+libellé hors citation, `>` et `>>>` compris — un `>>>` ne cite que la fin de son propre morceau : message, titre, description ou champ) ; un bot de `siteBotIds`, par sa
+seule ligne « Sent from » — un en-tête ou un libellé dans son encart est le
+texte du joueur, et une ligne sans « by <@id> » ne nomme personne (le pseudo de
+la ligne d'auteur, écrite par le bot, reste). Un bot listé des deux côtés lit
+les deux ; s'ils nomment deux comptes différents, personne n'est désigné. Un bot
+absent des listes, ou toute annonce de bot **sans liste**, garde son texte, sans
+auteur ni serveur d'origine. **Le lot 2 passe les deux listes** (bot GETI, notre
+bot).
 
 Le jeu `tests/fixtures/geti/posts.json` est **de synthèse** (tournures courantes
 du recrutement Overwatch, en français et en anglais ; pseudos, identifiants,
@@ -130,8 +136,17 @@ texte**, jamais comme du balisage ; un identifiant qui n'est pas un identifiant
 Discord (15 à 22 chiffres) est rendu `null`.
 
 - `teamName` et `originServer` ne gardent aucun caractère de balisage ni de
-  mention (astérisque, tiret bas, tilde, accent grave, barre verticale, chevrons, « @ » et barre oblique inverse retirés, `withoutMarkup`) :
-  « @everyone **Nitro** » devient « everyone Nitro ».
+  mention (`withoutMarkup`) : une mention `<@id>` / `<#id>` est retirée en
+  entier (l'identifiant d'un tiers ne sort pas), un émoji `<:nom:id>` garde son
+  nom, puis astérisque, tiret bas, tilde, accent grave, barre verticale,
+  chevrons, « @ » et barre oblique inverse sont retirés : « @everyone **Nitro** »
+  devient « everyone Nitro ».
+- `authorTag` : mentions, « @ » et chevrons retirés, émoji de serveur réduit à
+  son nom ; le balisage n'est retiré qu'au bord d'un mot, tiret bas gardé (ils
+  font partie de bien des pseudos : « Star*Lord#1234 » reste tel quel) : un
+  en-tête `(**faux_nitro** @everyone)` donne « faux_nitro everyone ».
+- Un en-tête GETI ou une ligne « Sent from » écrits par un autre bot que le
+  leur restent dans `text` : c'est le texte du joueur, affiché tel quel.
 - `text` garde le balisage de l'annonce mais aucune mention active
   (`getiSafeText`) : `<@id>` et `<@&id>` deviennent « @… » (l'identifiant d'un
   tiers ne sort pas), `<#id>` « #… », `@everyone` / `@here` perdent leur « @ ».
@@ -311,10 +326,16 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
 - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
 - **Âge** : publiée depuis `maxAgeHours` au plus ; une annonce sans date, ou
   datée de plus de 5 minutes dans le futur, est écartée.
-- **Filtre enregistré** (JSON relu pour les alertes) : un rôle inconnu
-  (« constructor ») ou une borne de rang qui n'est pas un rang (palier inconnu,
-  division hors de 1–5) est ignoré, jamais une erreur.
-- **Annonces closes** : écartées avec `hideClosed: true`.
+- **Filtre enregistré** (JSON relu pour les alertes) : rien n'y est une
+  erreur. Un filtre `null` ne filtre rien ; une liste qui n'en est pas une
+  (`"regions":"EU"`) est ignorée ; un rôle inconnu (« constructor ») aussi ; une
+  borne de rang qui n'est pas un rang (palier inconnu, division hors de 1–5) est
+  ouverte, et deux bornes invalides valent un critère absent ; une division
+  écrite en texte (`"3"`) est lue comme un nombre ; un `maxAgeHours` écrit en
+  texte (`"24"`) aussi, mais un texte illisible (`"24h"`, `""`) n'est jamais lu
+  comme « sans limite » : rien ne passe ; `includeUnknown: "true"` vaut `true` ;
+  une catégorie inconnue (`"LFP"`) est ignorée.
+- **Annonces closes** : écartées avec `hideClosed: true` (ou `"true"`).
 - **Champ non lu** (rang, rôle, région, plateforme, langue, niveau) : l'annonce est
   écartée, sauf `includeUnknown: true` — le lot 3 décide du réglage par défaut de
   la page.
@@ -325,8 +346,8 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
   de joueurs sont lus ; le lot 2 ajoute des annonces réelles anonymisées et mesure
   le taux de reconnaissance.
 - Accès du bot de production aux six salons (`Voir le salon`, `Lire l'historique`)
-  à vérifier avant le rattrapage de 14 jours.
-- « Top 500 » et la correspondance SR → rang sont des approximations assumées.
+  à vérifier avant le rattrapage (14 jours, 7 pour les scrims).
+- « Top 500 » et l'ancien SR sont des approximations assumées.
 
 ## Réglage sur les annonces réelles (lot 2b)
 
@@ -383,7 +404,12 @@ copie) et le serveur d'origine — dont le nom peut porter des crochets
 le lit (`GETI_HEADER`) et le retire du texte, qui garde ses marques de citation
 (`> …`) ; l'auteur de l'en-tête prime sur toute mention du texte. Le message de **tout autre bot** (le nôtre compris), un message système
 ou un message sans texte n'est pas une annonce : ni poussé par le bot, ni gardé
-par le site. Le réglage de l'analyse sur les textes réels est un lot à part
+par le site. Un message de GETI Bot dont le premier encart ne s'ouvre pas sur l'en-tête d'un
+relais — mention de l'auteur, `(pseudo)`, puis `sur`/`on`/`from` (l'avis « Ton
+annonce a été publié dans … », même s'il mentionne l'auteur) — n'en est pas une non plus
+(`isGetiRelay`, `isGetiRelayMessage` côté bot). L'analyse ne croit l'en-tête
+que des bots listés (`getiTrustedBots` : GETI Bot seul — notre bot n'y est pas,
+ses messages étant refusés avant l'analyse). Le réglage de l'analyse sur les textes réels est un lot à part
 (GETI-TUNE).
 
 ### Durées de garde, par catégorie

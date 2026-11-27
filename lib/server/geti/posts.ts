@@ -25,12 +25,14 @@ import {
   parseGetiPost,
   type GetiCategory,
   type GetiFilter,
+  type GetiParseOptions,
   type GetiParsedPost,
 } from "@/lib/shared/geti";
 import {
   GETI_PAGE_SIZE_DEFAULT,
   GETI_PAGE_SIZE_MAX,
   GETI_RETENTION_MAX_DAYS,
+  GETI_BOT_USER_ID,
   GETI_SOURCES,
   getiRetentionCutoff,
   type GetiPostPage,
@@ -88,6 +90,16 @@ export type GetiUpsertOutcome = {
 };
 
 /**
+ * Bots dont l'analyse croit les relais : GETI Bot seul (son en-tête nomme
+ * l'auteur). Notre bot n'y figure pas : ses messages ne sont pas des annonces
+ * (`parsePushedPost` les refuse avant l'analyse), le croire ne servirait à
+ * rien. Sans cette liste, `parseGetiPost` ne nomme l'auteur d'aucun relais.
+ */
+export function getiTrustedBots(): GetiParseOptions {
+  return { getiBotIds: [GETI_BOT_USER_ID], siteBotIds: [] };
+}
+
+/**
  * Enregistre un lot d'annonces poussées, chacune analysée ici. Une annonce déjà
  * gardée est remplacée (modification), sauf si la version reçue est plus
  * ancienne que la version gardée.
@@ -99,12 +111,13 @@ export async function upsertGetiPosts(
 ): Promise<GetiUpsertOutcome> {
   const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0 };
   const emptied: string[] = [];
+  const trusted = getiTrustedBots();
   for (const post of posts) {
     if (post.postedAt.getTime() < getiRetentionCutoff(post.category, now).getTime()) {
       outcome.expired += 1;
       continue;
     }
-    const parsed = parseGetiPost(post.raw);
+    const parsed = parseGetiPost(post.raw, trusted);
     // Sans texte, ou réponse de service du bot (« Ton annonce a été publié… ») : pas une annonce.
     if (parsed.text.trim() === "" || isGetiBotNotice(post.raw)) {
       outcome.emptied += 1;

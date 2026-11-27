@@ -6,6 +6,7 @@ jest.mock("@/lib/server/periodic-clock", () => ({ startPeriodicClock: jest.fn() 
 import { getDatabase } from "@/lib/server/database";
 import {
   deleteGetiPosts,
+  getiTrustedBots,
   listGetiPosts,
   purgeExpiredGetiPosts,
   reconcileGetiChannel,
@@ -15,7 +16,7 @@ import {
 import { parsePushedPost } from "@/lib/server/geti/wire";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { GETI_CHANNEL_IDS, parseGetiPost, type GetiParsedPost } from "@/lib/shared/geti";
-import { GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS, getiRetentionCutoff, getiRetentionMs } from "@/lib/shared/geti/ingest";
+import { GETI_BOT_USER_ID, GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS, getiRetentionCutoff, getiRetentionMs } from "@/lib/shared/geti/ingest";
 import { parsedGetiPost } from "../../../helpers/geti";
 import {
   GETI_FAKE_MESSAGE_ID,
@@ -87,6 +88,12 @@ describe("durées de garde", () => {
   });
 });
 
+describe("getiTrustedBots", () => {
+  it("getiTrustedBots_always_trustsGetiBotOnly", () => {
+    expect(getiTrustedBots()).toEqual({ getiBotIds: [GETI_BOT_USER_ID], siteBotIds: [] });
+  });
+});
+
 describe("upsertGetiPosts", () => {
   it("upsertGetiPosts_directPost_writesRawAndParsedPost", async () => {
     const execute = executeMock();
@@ -137,16 +144,21 @@ describe("upsertGetiPosts", () => {
 
   it("upsertGetiPosts_botPublicationNotice_isCountedEmptiedAndRemovedNotStored", async () => {
     const execute = executeMock();
-    const notice = getiPushedPost(
-      getiWireRelay("", {
+    // Le fil refuse déjà cet avis (`isGetiRelay`) : l'écriture l'écarte aussi, par défense.
+    const relay = getiPushedPost(getiWireRelay("LFT tank"));
+    const notice = {
+      ...relay,
+      raw: {
+        ...relay.raw,
         embeds: [
           {
             description:
-              "Ton annonce a été publié dans **32 autres channels**.\n[=> Invite FauxBot](https://discord.com/oauth2/authorize?client_id=100000000000000090)",
+              "Ton annonce a été publié dans **32 autres channels**.
+[=> Invite FauxBot](https://discord.com/oauth2/authorize?client_id=100000000000000090)",
           },
         ],
-      }),
-    );
+      },
+    };
 
     const outcome = await upsertGetiPosts(executor(execute), [notice], NOW);
 

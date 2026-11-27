@@ -9,6 +9,7 @@ import {
 } from "@/lib/shared/geti";
 import {
   GETI_FAKE_BOT_ID,
+  GETI_TRUSTED_BOTS,
   getiRange,
   getiRank,
   getiRawPost,
@@ -471,7 +472,7 @@ describe("passages barrés et annonces closes", () => {
   it("une citation de relais barrée est close", () => {
     const header = "<@100000000000000003>*(fauxpseudo)* sur [Faux Serveur](https://discord.gg/fauxcode)";
 
-    expect(parseGetiPost(getiRelayPost(`${header}\n\n> ~~LFS EU PC ADV 20-22 CET~~`, null)).closed).toBe(true);
+    expect(parseGetiPost(getiRelayPost(`${header}\n\n> ~~LFS EU PC ADV 20-22 CET~~`, null), GETI_TRUSTED_BOTS).closed).toBe(true);
   });
 });
 
