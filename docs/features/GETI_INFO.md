@@ -48,13 +48,27 @@ aucun message réel n'a été lu. Le format du relais GETI a été connu depuis
   avant toute mention du texte cité (« > contact <@id> » vise un tiers) et est
   retiré du texte : le nom du serveur n'apporte ni rôle, ni rang, ni région ;
 - **autre relais d'un bot** (`author.bot`) — l'auteur est lu dans l'encart : ligne
-  d'auteur (`pseudo`, `pseudo#1234`, `Nom (@pseudo)`), mention derrière un libellé
-  net (`by`/`par`/`Contact` en tête de ligne, `Auteur :`, `posté par`…) ; une
-  mention sans libellé, dans une phrase (« remplaçant de <@id> ») ou dans une
-  citation (`> …`), ne désigne personne : elle peut viser un tiers ; titre, description et
-  champs de l'encart forment le texte. La dernière ligne des relais de **notre**
-  bot (`*Sent from : [Serveur](invitation)* by <@id>`, `buildServiceMessage`) est
-  retirée du texte et donne `originServer` et `authorId`.
+  d'auteur si elle a la forme d'un pseudo (`pseudo`, `pseudo#1234` ; un nom
+  d'affichage libre comme `Admin (@staff)` n'en donne aucun), mention derrière un
+  libellé net (`by`/`par`/`Contact` en tête de ligne, `Auteur :`, `posté par`…) ;
+  une mention sans libellé, dans une phrase (« remplaçant de <@id> ») ou sur une
+  ligne citée (`> Contact : <@id>`), ne désigne personne : elle peut viser un
+  tiers ; deux libellés qui nomment deux comptes différents non plus (le second
+  peut être écrit par le joueur). L'identifiant lu d'une mention ne s'accompagne
+  d'aucun pseudo : la ligne d'auteur pourrait nommer un autre compte. Titre,
+  description et champs de l'encart forment le texte. La dernière ligne des
+  relais de **notre** bot (`*Sent from : [Serveur](invitation)* by <@id>`,
+  `buildServiceMessage`, en tête de ligne : jamais `> Sent from`) est retirée du
+  texte et donne `originServer`, `authorId` et, par la ligne d'auteur de cet
+  encart, `authorTag`.
+
+**Usurpation d'auteur.** Pseudo et identifiant viennent toujours de la même
+source. Notre relais s'ouvre sur le texte du joueur, qui peut y imiter l'en-tête
+GETI : quand l'en-tête et la ligne « Sent from » nomment deux comptes différents,
+personne n'est désigné. Un bot ou un webhook peut écrire n'importe quel en-tête :
+`parseGetiPost(raw, { relayBotIds })` ne lit l'auteur que des bots listés — les
+autres gardent leur texte, sans auteur ni serveur d'origine. **Le lot 2 passe la
+liste** (bot GETI et notre bot) ; sans elle, tout bot est cru.
 
 Le jeu `tests/fixtures/geti/posts.json` est **de synthèse** (tournures courantes
 du recrutement Overwatch, en français et en anglais ; pseudos, identifiants,
@@ -110,6 +124,15 @@ nettoyés selon `UNTRUSTED_NAMES.md` (contrôles, invisibles et commandes de
 direction retirés ; `visibleText` pour les noms) et bornés. Ils s'affichent **en
 texte**, jamais comme du balisage ; un identifiant qui n'est pas un identifiant
 Discord (15 à 22 chiffres) est rendu `null`.
+
+- `teamName` et `originServer` ne gardent aucun caractère de balisage ni de
+  mention (astérisque, tiret bas, tilde, accent grave, barre verticale, chevrons, « @ » et barre oblique inverse retirés, `withoutMarkup`) :
+  « @everyone **Nitro** » devient « everyone Nitro ».
+- `text` garde le balisage de l'annonce mais aucune mention active
+  (`getiSafeText`) : `<@id>` et `<@&id>` deviennent « @… » (l'identifiant d'un
+  tiers ne sort pas), `<#id>` « #… », `@everyone` / `@here` perdent leur « @ ».
+- Avant tout message Discord, ces textes passent encore par `discordInline` /
+  `discordQuote`.
 
 ### Préparation du texte
 
@@ -220,8 +243,11 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
   comprises. Avec des rôles voulus et un rang par rôle dans l'annonce, seuls les
   rangs de ces rôles comptent ; sinon la fourchette globale.
 - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
-- **Âge** : publiée depuis `maxAgeHours` au plus ; une annonce sans date est
-  écartée.
+- **Âge** : publiée depuis `maxAgeHours` au plus ; une annonce sans date, ou
+  datée de plus de 5 minutes dans le futur, est écartée.
+- **Filtre enregistré** (JSON relu pour les alertes) : un rôle inconnu
+  (« constructor ») ou une borne de rang qui n'est pas un rang (palier inconnu,
+  division hors de 1–5) est ignoré, jamais une erreur.
 - **Champ non lu** (rang, rôle, région, plateforme, langue) : l'annonce est
   écartée, sauf `includeUnknown: true` — le lot 3 décide du réglage par défaut de
   la page.

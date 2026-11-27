@@ -184,8 +184,8 @@ describe("parseGetiPost — relais d'un bot", () => {
     expect(parseGetiPost(getiRelayPost(description)).originServer).toBe("Faux [FR] Serveur");
   });
 
-  it("la ligne d'auteur « Nom (@pseudo) » rend le pseudo", () => {
-    expect(parseGetiPost(getiRelayPost("lft", "Faux Nom (@faux.pseudo)")).authorTag).toBe("faux.pseudo");
+  it("la ligne d'auteur « Nom (@pseudo) » est un nom d'affichage libre : aucun pseudo", () => {
+    expect(parseGetiPost(getiRelayPost("lft", "Faux Nom (@faux.pseudo)")).authorTag).toBeNull();
   });
 
   it("la ligne d'auteur à l'ancien format garde son suffixe", () => {

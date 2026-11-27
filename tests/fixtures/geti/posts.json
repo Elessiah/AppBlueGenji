@@ -252,7 +252,7 @@
     "expected": {
       "category": "lft",
       "relayed": true,
-      "authorTag": "faux.handle",
+      "authorTag": null,
       "authorId": "100000000000000003",
       "originServer": null,
       "teamName": null,
