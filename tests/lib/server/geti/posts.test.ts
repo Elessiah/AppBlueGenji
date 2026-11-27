@@ -5,27 +5,30 @@ jest.mock("@/lib/server/periodic-clock", () => ({ startPeriodicClock: jest.fn() 
 
 import { getDatabase } from "@/lib/server/database";
 import {
-  analyseGetiPost,
   deleteGetiPosts,
-  getiRetentionCutoff,
   listGetiPosts,
   purgeExpiredGetiPosts,
   reconcileGetiChannel,
   startGetiPostsPurgeClock,
   upsertGetiPosts,
 } from "@/lib/server/geti/posts";
-import { startPeriodicClock } from "@/lib/server/periodic-clock";
-import { GETI_CHANNEL_IDS, type GetiParsedPost } from "@/lib/shared/geti";
-import { parsedGetiPost } from "../../../helpers/geti";
-import { GETI_FAKE_MESSAGE_ID, getiPushedPost, getiWireRelay } from "../../../helpers/geti-ingest";
 import { parsePushedPost } from "@/lib/server/geti/wire";
+import { startPeriodicClock } from "@/lib/server/periodic-clock";
+import { GETI_CHANNEL_IDS, parseGetiPost, type GetiParsedPost } from "@/lib/shared/geti";
+import { GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS, getiRetentionCutoff, getiRetentionMs } from "@/lib/shared/geti/ingest";
+import { parsedGetiPost } from "../../../helpers/geti";
+import {
+  GETI_FAKE_MESSAGE_ID,
+  GETI_FAKE_RELAYED_AUTHOR_ID,
+  getiPushedPost,
+  getiWireRelay,
+} from "../../../helpers/geti-ingest";
 import { fakePool, type SqlMock, type SqlQuery } from "../../../helpers/sql-double";
 
-/** Annonces GETI gardées : écriture analysée, suppression, réconciliation, purge, lecture. */
+/** Annonces GETI gardées : écriture analysée, suppression, réconciliation, purge par catégorie, lecture. */
 
 const NOW = Date.parse("2026-11-27T12:00:00.000Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
-const MENTIONED_ID = "100000000000000012";
 
 function executeMock(rows: unknown[] = [], affectedRows = 0): SqlMock {
   return jest.fn<SqlQuery>(async (sql: string) => (sql.trimStart().startsWith("SELECT") ? [rows] : [{ affectedRows }]));
@@ -35,12 +38,11 @@ function executor(execute: SqlMock) {
   return fakePool({ execute });
 }
 
-function relayWithMention(mention: Record<string, unknown>) {
-  const post = parsePushedPost(
-    getiWireRelay("Nom Affiché", `DPS Diamant 1 cherche équipe. Contact : <@${MENTIONED_ID}>`, { mentions: [mention] }),
-  );
-  if (!post) throw new Error("corps de test illisible");
-  return post;
+/** Date gardée en base (heure locale du serveur, sans fuseau), `ageMs` avant {@link NOW}. */
+function storedDate(ageMs: number): string {
+  const date = new Date(NOW - ageMs);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 function row(overrides: Record<string, unknown> = {}, parsed: Partial<GetiParsedPost> = {}) {
@@ -48,10 +50,11 @@ function row(overrides: Record<string, unknown> = {}, parsed: Partial<GetiParsed
     message_id: GETI_FAKE_MESSAGE_ID,
     channel_id: GETI_CHANNEL_IDS.lft,
     category: "lft",
+    source: "direct",
     author_id: "100000000000000001",
     author_tag: "fauxjoueur",
     parsed_json: JSON.stringify(parsedGetiPost({ text: "LFT support", ...parsed })),
-    posted_at: "2026-11-27 10:00:00",
+    posted_at: storedDate(2 * 60 * 60 * 1000),
     edited_at: null,
     ...overrides,
   };
@@ -61,40 +64,31 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-describe("analyseGetiPost", () => {
-  it("analyseGetiPost_userMessage_keepsTheDiscordAuthor", () => {
-    const parsed = analyseGetiPost(getiPushedPost());
-
-    expect(parsed).toMatchObject({ authorTag: "fauxjoueur", authorId: "100000000000000001", category: "lft" });
+describe("durées de garde", () => {
+  it("GETI_RETENTION_DAYS_scrimSearches_liveSevenDays", () => {
+    expect(GETI_RETENTION_DAYS.lfs).toBe(7);
   });
 
-  it("analyseGetiPost_authorMentionResolvedByTheBot_usesItsUsername", () => {
-    const parsed = analyseGetiPost(relayWithMention({ id: MENTIONED_ID, username: "vraipseudo", discriminator: "0" }));
-
-    expect(parsed).toMatchObject({ authorId: MENTIONED_ID, authorTag: "vraipseudo" });
+  it("GETI_RETENTION_DAYS_otherCategories_liveFourteenDays", () => {
+    expect([GETI_RETENTION_DAYS.lfp, GETI_RETENTION_DAYS.lft, GETI_RETENTION_DAYS.lfsub, GETI_RETENTION_DAYS.lfstaff, GETI_RETENTION_DAYS.lfcast]).toEqual([14, 14, 14, 14, 14]);
+    expect(GETI_RETENTION_MAX_DAYS).toBe(14);
   });
 
-  it("analyseGetiPost_mentionWithLegacyDiscriminator_appendsTheSuffix", () => {
-    const parsed = analyseGetiPost(relayWithMention({ id: MENTIONED_ID, username: "vraipseudo", discriminator: "4821" }));
-
-    expect(parsed.authorTag).toBe("vraipseudo#4821");
+  it("getiRetentionCutoff_scrim_isSevenDaysEarlier", () => {
+    expect(getiRetentionCutoff("lfs", NOW)).toEqual(new Date("2026-11-20T12:00:00.000Z"));
   });
 
-  it("analyseGetiPost_resolvedMentionOfAnotherAccount_keepsTheEmbedAuthor", () => {
-    const parsed = analyseGetiPost(relayWithMention({ id: "100000000000000013", username: "autre", discriminator: "0" }));
-
-    expect(parsed.authorTag).toBe("Nom Affiché");
+  it("getiRetentionCutoff_teamSearch_isFourteenDaysEarlier", () => {
+    expect(getiRetentionCutoff("lft", NOW)).toEqual(new Date("2026-11-13T12:00:00.000Z"));
   });
 
-  it("analyseGetiPost_resolvedMentionWithBlankUsername_keepsTheEmbedAuthor", () => {
-    const parsed = analyseGetiPost(relayWithMention({ id: MENTIONED_ID, username: "@@", discriminator: "0" }));
-
-    expect(parsed.authorTag).toBe("Nom Affiché");
+  it("getiRetentionMs_scrim_isSevenDays", () => {
+    expect(getiRetentionMs("lfs")).toBe(7 * DAY_MS);
   });
 });
 
 describe("upsertGetiPosts", () => {
-  it("upsertGetiPosts_freshPost_writesRawAndParsedPost", async () => {
+  it("upsertGetiPosts_directPost_writesRawAndParsedPost", async () => {
     const execute = executeMock();
     const post = getiPushedPost({ postedAt: "2026-11-27T10:00:00.000Z", editedAt: "2026-11-27T11:00:00.000Z" });
 
@@ -108,13 +102,25 @@ describe("upsertGetiPosts", () => {
       GETI_FAKE_MESSAGE_ID,
       GETI_CHANNEL_IDS.lft,
       "lft",
+      "direct",
       "100000000000000001",
       "fauxjoueur",
       JSON.stringify(post.raw),
-      JSON.stringify(analyseGetiPost(post)),
+      JSON.stringify(parseGetiPost(post.raw)),
       new Date("2026-11-27T10:00:00.000Z"),
       new Date("2026-11-27T11:00:00.000Z"),
     ]);
+  });
+
+  it("upsertGetiPosts_relayOfGetiBot_storesTheRelayedAuthorNotTheBot", async () => {
+    const execute = executeMock();
+    const post = parsePushedPost(getiWireRelay("LFP tank Master 3, EU"));
+    if (!post) throw new Error("corps de test illisible");
+
+    await upsertGetiPosts(executor(execute), [post], NOW);
+
+    const params = execute.mock.calls[0][1];
+    expect(params).toEqual(expect.arrayContaining(["relay", GETI_FAKE_RELAYED_AUTHOR_ID, "fauxpseudo"]));
   });
 
   it("upsertGetiPosts_sql_keepsTheStoredVersionWhenTheIncomingOneIsOlder", async () => {
@@ -129,7 +135,7 @@ describe("upsertGetiPosts", () => {
     expect(sql.trimEnd().endsWith(`edited_at = ${guard}, VALUES(edited_at), edited_at)`)).toBe(true);
   });
 
-  it("upsertGetiPosts_postedJustBeforeTheRetentionWindow_isCountedExpiredAndNotWritten", async () => {
+  it("upsertGetiPosts_teamSearchJustOlderThanFourteenDays_isCountedExpiredAndNotWritten", async () => {
     const execute = executeMock();
     const post = getiPushedPost({ postedAt: new Date(NOW - 14 * DAY_MS - 1).toISOString() });
 
@@ -139,9 +145,27 @@ describe("upsertGetiPosts", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it("upsertGetiPosts_postedExactlyAtTheRetentionCutoff_isStored", async () => {
+  it("upsertGetiPosts_teamSearchExactlyFourteenDaysOld_isStored", async () => {
     const execute = executeMock();
     const post = getiPushedPost({ postedAt: new Date(NOW - 14 * DAY_MS).toISOString() });
+
+    const outcome = await upsertGetiPosts(executor(execute), [post], NOW);
+
+    expect(outcome.stored).toBe(1);
+  });
+
+  it("upsertGetiPosts_scrimJustOlderThanSevenDays_isCountedExpired", async () => {
+    const execute = executeMock();
+    const post = getiPushedPost({ channelId: GETI_CHANNEL_IDS.lfs, postedAt: new Date(NOW - 7 * DAY_MS - 1).toISOString() });
+
+    const outcome = await upsertGetiPosts(executor(execute), [post], NOW);
+
+    expect(outcome).toEqual({ stored: 0, emptied: 0, expired: 1 });
+  });
+
+  it("upsertGetiPosts_scrimExactlySevenDaysOld_isStored", async () => {
+    const execute = executeMock();
+    const post = getiPushedPost({ channelId: GETI_CHANNEL_IDS.lfs, postedAt: new Date(NOW - 7 * DAY_MS).toISOString() });
 
     const outcome = await upsertGetiPosts(executor(execute), [post], NOW);
 
@@ -229,29 +253,72 @@ describe("reconcileGetiChannel", () => {
     expect(params).toEqual([GETI_CHANNEL_IDS.lfp, request.since, request.until]);
   });
 
-  it("reconcileGetiChannel_sinceOlderThanTheRetentionWindow_isClampedToTheCutoff", async () => {
+  it("reconcileGetiChannel_sinceOlderThanFourteenDays_isClampedToTheCutoff", async () => {
     const execute = executeMock();
 
     await reconcileGetiChannel(executor(execute), { ...request, since: new Date("2026-01-01T00:00:00.000Z") }, NOW);
 
     expect(execute.mock.calls[0][1]).toEqual([GETI_CHANNEL_IDS.lfp, new Date(NOW - 14 * DAY_MS), request.until]);
   });
-});
 
-describe("purgeExpiredGetiPosts", () => {
-  it("purgeExpiredGetiPosts_called_deletesPostsOlderThanFourteenDays", async () => {
-    const execute = executeMock([], 3);
+  it("reconcileGetiChannel_scrimChannelSinceOlderThanSevenDays_isClampedToSevenDays", async () => {
+    const execute = executeMock();
+    const scrims = { ...request, channelId: GETI_CHANNEL_IDS.lfs, since: new Date(NOW - 10 * DAY_MS) };
 
-    const removed = await purgeExpiredGetiPosts(executor(execute), NOW);
+    await reconcileGetiChannel(executor(execute), scrims, NOW);
 
-    expect(removed).toBe(3);
-    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [new Date(NOW - 14 * DAY_MS)]);
+    expect(execute.mock.calls[0][1]).toEqual([GETI_CHANNEL_IDS.lfs, new Date(NOW - 7 * DAY_MS), request.until]);
+  });
+
+  it("reconcileGetiChannel_channelOutsideTheSixSources_touchesNothing", async () => {
+    const execute = executeMock([{ message_id: "100000000000000902" }], 1);
+
+    const removed = await reconcileGetiChannel(executor(execute), { ...request, channelId: "100000000000000555" }, NOW);
+
+    expect(removed).toBe(0);
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 
-describe("getiRetentionCutoff", () => {
-  it("getiRetentionCutoff_now_isFourteenDaysEarlier", () => {
-    expect(getiRetentionCutoff(NOW)).toEqual(new Date("2026-11-13T12:00:00.000Z"));
+describe("purgeExpiredGetiPosts", () => {
+  it("purgeExpiredGetiPosts_scrims_areDeletedAfterSevenDays", async () => {
+    const execute = executeMock();
+
+    await purgeExpiredGetiPosts(executor(execute), NOW);
+
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ?", [
+      "lfs",
+      new Date(NOW - 7 * DAY_MS),
+    ]);
+  });
+
+  it("purgeExpiredGetiPosts_otherCategories_areDeletedAfterFourteenDays", async () => {
+    const execute = executeMock();
+
+    await purgeExpiredGetiPosts(executor(execute), NOW);
+
+    for (const category of ["lfp", "lft", "lfsub", "lfstaff", "lfcast"]) {
+      expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ?", [
+        category,
+        new Date(NOW - 14 * DAY_MS),
+      ]);
+    }
+  });
+
+  it("purgeExpiredGetiPosts_rowOfAnyCategory_isDeletedAfterTheLongestDuration", async () => {
+    const execute = executeMock();
+
+    await purgeExpiredGetiPosts(executor(execute), NOW);
+
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [new Date(NOW - 14 * DAY_MS)]);
+  });
+
+  it("purgeExpiredGetiPosts_rowsRemoved_returnsTheirTotal", async () => {
+    const execute = executeMock([], 2);
+
+    const removed = await purgeExpiredGetiPosts(executor(execute), NOW);
+
+    expect(removed).toBe(14);
   });
 });
 
@@ -270,12 +337,12 @@ describe("startGetiPostsPurgeClock", () => {
 
     await run();
 
-    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [expect.any(Date)]);
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [expect.any(Date)]);
   });
 });
 
 describe("listGetiPosts", () => {
-  it("listGetiPosts_noFilter_readsTheRetentionWindowNewestFirst", async () => {
+  it("listGetiPosts_noFilter_readsTheLongestRetentionWindowNewestFirst", async () => {
     const execute = executeMock([row()]);
 
     const page = await listGetiPosts({}, {}, executor(execute), NOW);
@@ -288,42 +355,65 @@ describe("listGetiPosts", () => {
   });
 
   it("listGetiPosts_storedRow_isReturnedWithoutTheRawMessage", async () => {
-    const execute = executeMock([row({ edited_at: "2026-11-27 11:00:00" })]);
+    const posted = storedDate(2 * 60 * 60 * 1000);
+    const edited = storedDate(60 * 60 * 1000);
+    const execute = executeMock([row({ source: "relay", posted_at: posted, edited_at: edited })]);
 
     const page = await listGetiPosts({}, {}, executor(execute), NOW);
 
-    const postedAt = new Date("2026-11-27 10:00:00").toISOString();
+    const postedAt = new Date(posted).toISOString();
     expect(page.posts).toEqual([
       {
         messageId: GETI_FAKE_MESSAGE_ID,
         channelId: GETI_CHANNEL_IDS.lft,
         category: "lft",
+        source: "relay",
         authorTag: "fauxjoueur",
         authorId: "100000000000000001",
         parsed: parsedGetiPost({ text: "LFT support", postedAt }),
         postedAt,
-        editedAt: new Date("2026-11-27 11:00:00").toISOString(),
+        editedAt: new Date(edited).toISOString(),
       },
     ]);
   });
 
   it("listGetiPosts_noExecutorGiven_readsFromThePool", async () => {
-    const execute = executeMock([row()]);
+    const execute = executeMock([]);
     jest.mocked(getDatabase).mockResolvedValue(executor(execute));
 
-    const page = await listGetiPosts();
+    await listGetiPosts();
 
-    expect(page.total).toBe(1);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("listGetiPosts_categoryFilter_isAppliedInSql", async () => {
     const execute = executeMock();
 
-    await listGetiPosts({ category: "lfs" }, {}, executor(execute), NOW);
+    await listGetiPosts({ category: "lfp" }, {}, executor(execute), NOW);
 
     const [sql, params] = execute.mock.calls[0];
     expect(sql).toContain("posted_at >= ? AND category = ?");
-    expect(params).toEqual([new Date(NOW - 14 * DAY_MS), "lfs"]);
+    expect(params).toEqual([new Date(NOW - 14 * DAY_MS), "lfp"]);
+  });
+
+  it("listGetiPosts_scrimCategory_readsSevenDaysOnly", async () => {
+    const execute = executeMock();
+
+    await listGetiPosts({ category: "lfs" }, {}, executor(execute), NOW);
+
+    expect(execute.mock.calls[0][1]).toEqual([new Date(NOW - 7 * DAY_MS), "lfs"]);
+  });
+
+  it("listGetiPosts_noCategoryAndScrimOlderThanSevenDays_leavesItOut", async () => {
+    const execute = executeMock([
+      row({ message_id: "100000000000000901", category: "lfs", posted_at: storedDate(8 * DAY_MS) }),
+      row({ message_id: "100000000000000902", category: "lfs", posted_at: storedDate(6 * DAY_MS) }),
+      row({ message_id: "100000000000000903", category: "lft", posted_at: storedDate(8 * DAY_MS) }),
+    ]);
+
+    const page = await listGetiPosts({ includeUnknown: true }, {}, executor(execute), NOW);
+
+    expect(page.posts.map((post) => post.messageId)).toEqual(["100000000000000902", "100000000000000903"]);
   });
 
   it("listGetiPosts_maxAgeHours_narrowsTheSqlWindow", async () => {
@@ -389,6 +479,14 @@ describe("listGetiPosts", () => {
 
   it("listGetiPosts_rowOfAnUnknownCategory_isSkipped", async () => {
     const execute = executeMock([row({ category: "lfg" })]);
+
+    const page = await listGetiPosts({}, {}, executor(execute), NOW);
+
+    expect(page.total).toBe(0);
+  });
+
+  it("listGetiPosts_rowOfAnUnknownSource_isSkipped", async () => {
+    const execute = executeMock([row({ source: "webhook" })]);
 
     const page = await listGetiPosts({}, {}, executor(execute), NOW);
 

@@ -50,6 +50,15 @@ const SENT_FROM = new RegExp(
   String.raw`\n*[*_]*Sent from\s?:\s?${SENT_FROM_LINK}[*_]*${SENT_FROM_AUTHOR}\s*$`,
   "iu",
 );
+/**
+ * En-tête d'un relais de GETI Bot, en tête de la description de son encart :
+ * « <@id>*(pseudo)* sur [Serveur](invitation) », puis l'annonce citée (« > … »).
+ * Le nom du serveur peut lui-même porter des crochets (« [TAG] Nom »).
+ */
+const GETI_RELAY_HEADER =
+  /^\s*<@!?(\d{15,22})>\s*\*\(([^\n]{1,80}?)\)\*\s+sur\s+\[([^\n]{1,200}?)\]\(https?:\/\/[^)\s]*\)[^\S\n]*\n*/u;
+/** Marque de citation Discord en début de ligne (« > »). */
+const QUOTE_MARK = /^[^\S\n]*>[^\S\n]?/gmu;
 /** Pseudo entre parenthèses derrière un nom d'affichage : « Nom (@pseudo) ». */
 const HANDLE_IN_PARENTHESES = /\(@?([\w.]{2,32}(?:#\d{4})?)\)\s*$/u;
 
@@ -137,7 +146,15 @@ function relayContent(raw: GetiRawPost): RelayContent {
   let tag: string | null = null;
   for (const embed of embedsOf(raw)) {
     tag ??= embedAuthorTag(embed.authorName);
-    const description = text(embed.description);
+    let description = text(embed.description);
+    const header = GETI_RELAY_HEADER.exec(description);
+    if (header !== null) {
+      // Relais de GETI Bot : l'auteur, son pseudo et le serveur d'origine sont dans l'en-tête, l'annonce est citée dessous.
+      authorId ??= header[1];
+      tag ??= authorTag(header[2], null);
+      originServer ??= visibleText(header[3]).slice(0, ORIGIN_SERVER_MAX) || null;
+      description = description.slice(header[0].length).replace(QUOTE_MARK, "");
+    }
     const trailer = SENT_FROM.exec(description);
     if (trailer !== null) {
       originServer ??= visibleText(trailer[1].replace(/\\(.)/gu, "$1")).slice(0, ORIGIN_SERVER_MAX) || null;

@@ -8,9 +8,11 @@
  */
 import { getiCategoryOfChannel, type GetiCategory, type GetiRawEmbed, type GetiRawPost } from "@/lib/shared/geti";
 import {
+  GETI_BOT_USER_ID,
   GETI_DELETE_MAX_IDS,
   GETI_RECONCILE_MAX_IDS,
   GETI_UPSERT_MAX_POSTS,
+  type GetiSource,
 } from "@/lib/shared/geti/ingest";
 
 /** Codes de refus des routes GETI. */
@@ -33,15 +35,11 @@ const EMBED_FIELD_NAME_MAX = 256;
 const EMBED_FIELD_VALUE_MAX = 1024;
 const EMBED_FOOTER_MAX = 2048;
 const USERNAME_MAX = 64;
-const MENTIONS_MAX = 5;
 const DATE_MAX_LENGTH = 40;
 /** Octets du message brut gardé (`raw_json`) : au-delà, l'annonce est écartée. */
 export const GETI_RAW_JSON_MAX_BYTES = 60_000;
 
 const SNOWFLAKE = /^\d{15,22}$/u;
-
-/** Pseudo d'un compte mentionné dans un relais, résolu par le bot. */
-export type GetiMention = { id: string; username: string; discriminator: string | null };
 
 /** Une annonce poussée, lue et bornée. */
 export type GetiPushedPost = {
@@ -49,7 +47,7 @@ export type GetiPushedPost = {
   channelId: string;
   category: GetiCategory;
   raw: GetiRawPost;
-  mentions: GetiMention[];
+  source: GetiSource;
   postedAt: Date;
   editedAt: Date | null;
 };
@@ -103,22 +101,11 @@ function parseEmbeds(value: unknown): GetiRawEmbed[] {
   return embeds;
 }
 
-function parseMentions(value: unknown): GetiMention[] {
-  if (!Array.isArray(value)) return [];
-  const mentions: GetiMention[] = [];
-  for (const entry of value.slice(0, MENTIONS_MAX)) {
-    if (!isRecord(entry)) continue;
-    const id = parseSnowflake(entry.id);
-    const username = bounded(entry.username, USERNAME_MAX);
-    if (id && username) mentions.push({ id, username, discriminator: bounded(entry.discriminator, 4) });
-  }
-  return mentions;
-}
-
 /**
  * Lit une annonce poussée. `null` : forme inattendue (identifiant, salon hors
- * des six sources, date de publication illisible) ou message brut trop lourd —
- * elle est comptée « écartée », jamais enregistrée à moitié.
+ * des six sources, date de publication illisible), message d'un bot autre que
+ * GETI Bot, ou message brut trop lourd — elle est comptée « écartée », jamais
+ * enregistrée à moitié.
  */
 export function parsePushedPost(value: unknown): GetiPushedPost | null {
   if (!isRecord(value)) return null;
@@ -129,6 +116,9 @@ export function parsePushedPost(value: unknown): GetiPushedPost | null {
   if (!messageId || !channelId || !category || !postedAt) return null;
   const editedAt = parseDate(value.editedAt);
   const author = isRecord(value.author) ? value.author : {};
+  const fromBot = author.bot === true;
+  // Seul GETI Bot relaie des annonces : le message d'un autre bot (le nôtre compris) n'en est pas une.
+  if (fromBot && author.id !== GETI_BOT_USER_ID) return null;
   const raw: GetiRawPost = {
     category,
     channelId,
@@ -137,14 +127,14 @@ export function parsePushedPost(value: unknown): GetiPushedPost | null {
       id: parseSnowflake(author.id),
       username: bounded(author.username, USERNAME_MAX),
       discriminator: bounded(author.discriminator, 4),
-      bot: author.bot === true,
+      bot: fromBot,
     },
     embeds: parseEmbeds(value.embeds),
     postedAt: postedAt.toISOString(),
     editedAt: editedAt ? editedAt.toISOString() : null,
   };
   if (Buffer.byteLength(JSON.stringify(raw), "utf8") > GETI_RAW_JSON_MAX_BYTES) return null;
-  return { messageId, channelId, category, raw, mentions: parseMentions(value.mentions), postedAt, editedAt };
+  return { messageId, channelId, category, source: fromBot ? "relay" : "direct", raw, postedAt, editedAt };
 }
 
 /** Corps de `POST /api/internal/geti/posts` : les annonces lisibles, et le nombre d'écartées. */

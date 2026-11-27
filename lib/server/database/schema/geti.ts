@@ -7,11 +7,13 @@ import { createTable } from "../declared-tables";
  */
 export async function createGetiTables(db: Pool): Promise<void> {
   try {
-    // Une ligne par message Discord : le message brut tel que le bot l'a
-    // poussé (`raw_json`, borné), son analyse à l'écriture (`parsed_json`,
-    // `parseGetiPost`), le pseudo et l'identifiant Discord de l'auteur. Aucun
-    // lien avec un compte du site. Retirée dès que le message est supprimé sur
-    // Discord, et quatorze jours après sa publication par la purge horaire
+    // Une ligne par message Discord — annonce écrite directement dans le salon
+    // (`source` = `direct`) ou relayée par GETI Bot (`relay`) : le message brut
+    // tel que le bot l'a poussé (`raw_json`, borné), son analyse à l'écriture
+    // (`parsed_json`, `parseGetiPost`), le pseudo et l'identifiant Discord de
+    // l'auteur. Aucun lien avec un compte du site. Retirée dès que le message
+    // est supprimé sur Discord, et au bout de la durée de garde de sa catégorie
+    // (7 jours pour un scrim, 14 sinon) par la purge horaire
     // (`purgeExpiredGetiPosts`).
     await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_geti_posts (
@@ -19,6 +21,7 @@ export async function createGetiTables(db: Pool): Promise<void> {
         message_id VARCHAR(22) NOT NULL,
         channel_id VARCHAR(22) NOT NULL,
         category VARCHAR(8) NOT NULL,
+        source VARCHAR(8) NOT NULL DEFAULT 'relay',
         author_id VARCHAR(22) NULL,
         author_tag VARCHAR(40) NULL,
         raw_json MEDIUMTEXT NOT NULL,

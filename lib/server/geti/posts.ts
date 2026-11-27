@@ -2,11 +2,13 @@
  * Annonces GETI gardées par le site (`bg_geti_posts`) — `docs/features/GETI_INFO.md`
  * § Récupération.
  *
- * Le bot pousse chaque message des six salons sources (création, modification,
- * suppression, rattrapage) ; le site l'analyse **à l'écriture**
+ * Le bot pousse chaque annonce des six salons sources — écrite directement
+ * par un membre, ou relayée par GETI Bot — à sa création, à sa modification, à
+ * sa suppression et au rattrapage ; le site l'analyse **à l'écriture**
  * (`parseGetiPost`) et garde le message brut à côté de son analyse. Une
- * annonce vit au plus {@link GETI_RETENTION_DAYS} jours après sa publication
- * sur Discord, et disparaît dès que le message disparaît de Discord.
+ * annonce vit au plus la durée de garde de sa catégorie
+ * (`GETI_RETENTION_DAYS` : 7 jours pour un scrim, 14 pour les autres) après sa
+ * publication sur Discord, et disparaît dès que le message disparaît de Discord.
  *
  * Module serveur.
  */
@@ -14,9 +16,10 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { toIso } from "@/lib/server/serialization";
-import type { GetiMention, GetiPushedPost, GetiReconcileRequest } from "@/lib/server/geti/wire";
+import type { GetiPushedPost, GetiReconcileRequest } from "@/lib/server/geti/wire";
 import {
   GETI_CATEGORIES,
+  getiCategoryOfChannel,
   matchesGetiFilter,
   parseGetiPost,
   type GetiCategory,
@@ -26,21 +29,22 @@ import {
 import {
   GETI_PAGE_SIZE_DEFAULT,
   GETI_PAGE_SIZE_MAX,
-  GETI_RETENTION_MS,
+  GETI_RETENTION_MAX_DAYS,
+  GETI_SOURCES,
+  getiRetentionCutoff,
   type GetiPostPage,
+  type GetiSource,
   type GetiStoredPost,
 } from "@/lib/shared/geti/ingest";
-import { visibleText } from "@/lib/shared/visible-text";
 
 /** Ce dont le service a besoin d'une base : le pool, ou une connexion. */
 export type GetiExecutor = Pick<Pool, "execute">;
 
-/** Pseudo Discord : 32 caractères, plus l'ancien suffixe « #1234 ». */
-const USERNAME_MAX = 32;
-const AUTHOR_TAG_MAX = USERNAME_MAX + 5;
-const DISCRIMINATOR = /^\d{4}$/u;
+/** Pseudo Discord (32 caractères) et son ancien suffixe « #1234 ». */
+const AUTHOR_TAG_MAX = 37;
 /** Identifiants par `DELETE … IN (…)`. */
 const DELETE_CHUNK = 200;
+const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * Annonces lues d'un coup pour une page : le filtre (rang, rôle, région…) se
  * joue en mémoire sur l'analyse gardée, la table ne portant que deux semaines
@@ -48,33 +52,8 @@ const DELETE_CHUNK = 200;
  */
 export const GETI_LIST_SCAN_MAX = 3000;
 
-/** Début de la fenêtre de garde : une annonce publiée avant n'est ni gardée ni rendue. */
-export function getiRetentionCutoff(now: number = Date.now()): Date {
-  return new Date(now - GETI_RETENTION_MS);
-}
-
 function affected(result: unknown): number {
   return Number((result as { affectedRows?: number }).affectedRows ?? 0);
-}
-
-/** Pseudo copiable d'une mention résolue par le bot, nettoyé comme celui de l'analyse. */
-function mentionTag(mention: GetiMention): string | null {
-  const name = visibleText(mention.username).replace(/^@+/u, "").slice(0, USERNAME_MAX).trim();
-  if (name === "") return null;
-  const suffix = mention.discriminator ?? "";
-  return DISCRIMINATOR.test(suffix) && suffix !== "0000" ? `${name}#${suffix}` : name;
-}
-
-/**
- * Analyse une annonce poussée. Un relais montre parfois un nom d'affichage, pas
- * le pseudo : quand l'auteur est désigné par une mention que le bot a résolue,
- * c'est ce pseudo-là qui se copie.
- */
-export function analyseGetiPost(post: GetiPushedPost): GetiParsedPost {
-  const parsed = parseGetiPost(post.raw);
-  const mention = parsed.authorId === null ? undefined : post.mentions.find((entry) => entry.id === parsed.authorId);
-  const resolved = mention ? mentionTag(mention) : null;
-  return resolved === null ? parsed : { ...parsed, authorTag: resolved };
 }
 
 /**
@@ -88,8 +67,8 @@ const INCOMING_IS_CURRENT = "COALESCE(VALUES(edited_at), VALUES(posted_at)) >= C
 
 const UPSERT_SQL = `
   INSERT INTO bg_geti_posts
-    (message_id, channel_id, category, author_id, author_tag, raw_json, parsed_json, posted_at, edited_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (message_id, channel_id, category, source, author_id, author_tag, raw_json, parsed_json, posted_at, edited_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON DUPLICATE KEY UPDATE
     author_id = IF(${INCOMING_IS_CURRENT}, VALUES(author_id), author_id),
     author_tag = IF(${INCOMING_IS_CURRENT}, VALUES(author_tag), author_tag),
@@ -103,7 +82,7 @@ export type GetiUpsertOutcome = {
   stored: number;
   /** Annonces sans texte (pièce jointe seule, texte vidé par une modification) : retirées si elles étaient gardées. */
   emptied: number;
-  /** Annonces publiées avant la fenêtre de garde : ni gardées ni rendues. */
+  /** Annonces publiées avant la fenêtre de garde de leur catégorie : ni gardées ni rendues. */
   expired: number;
 };
 
@@ -117,15 +96,14 @@ export async function upsertGetiPosts(
   posts: readonly GetiPushedPost[],
   now: number = Date.now(),
 ): Promise<GetiUpsertOutcome> {
-  const cutoff = getiRetentionCutoff(now).getTime();
   const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0 };
   const emptied: string[] = [];
   for (const post of posts) {
-    if (post.postedAt.getTime() < cutoff) {
+    if (post.postedAt.getTime() < getiRetentionCutoff(post.category, now).getTime()) {
       outcome.expired += 1;
       continue;
     }
-    const parsed = analyseGetiPost(post);
+    const parsed = parseGetiPost(post.raw);
     if (parsed.text.trim() === "") {
       outcome.emptied += 1;
       emptied.push(post.messageId);
@@ -135,6 +113,7 @@ export async function upsertGetiPosts(
       post.messageId,
       post.channelId,
       post.category,
+      post.source,
       parsed.authorId,
       parsed.authorTag?.slice(0, AUTHOR_TAG_MAX) ?? null,
       JSON.stringify(post.raw),
@@ -166,15 +145,18 @@ export async function deleteGetiPosts(executor: GetiExecutor, messageIds: readon
  * Réconcilie un salon avec Discord : toute annonce gardée, publiée entre
  * `since` et `until`, dont le message n'est plus dans `ids` a été supprimée
  * pendant que le bot n'écoutait pas — elle est retirée. `since` ne remonte pas
- * au-delà de la fenêtre de garde ; une annonce publiée après `until` (arrivée
- * en direct pendant le rattrapage) n'est pas touchée.
+ * au-delà de la fenêtre de garde de la catégorie du salon ; une annonce
+ * publiée après `until` (arrivée en direct pendant le rattrapage) n'est pas
+ * touchée.
  */
 export async function reconcileGetiChannel(
   executor: GetiExecutor,
   request: GetiReconcileRequest,
   now: number = Date.now(),
 ): Promise<number> {
-  const cutoff = getiRetentionCutoff(now);
+  const category = getiCategoryOfChannel(request.channelId);
+  if (category === null) return 0;
+  const cutoff = getiRetentionCutoff(category, now);
   const since = request.since.getTime() < cutoff.getTime() ? cutoff : request.since;
   const [rows] = await executor.execute<RowDataPacket[]>(
     `SELECT message_id FROM bg_geti_posts WHERE channel_id = ? AND posted_at >= ? AND posted_at <= ?`,
@@ -185,10 +167,24 @@ export async function reconcileGetiChannel(
   return gone.length === 0 ? 0 : deleteGetiPosts(executor, gone);
 }
 
-/** Efface les annonces sorties de la fenêtre de garde ; rend le nombre de lignes effacées. */
+/**
+ * Efface les annonces sorties de la fenêtre de garde de leur catégorie (puis
+ * toute ligne plus vieille que la plus longue des durées, quelle que soit sa
+ * catégorie) ; rend le nombre de lignes effacées.
+ */
 export async function purgeExpiredGetiPosts(executor: GetiExecutor, now: number = Date.now()): Promise<number> {
-  const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE posted_at < ?`, [getiRetentionCutoff(now)]);
-  return affected(result);
+  let removed = 0;
+  for (const category of GETI_CATEGORIES) {
+    const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ?`, [
+      category,
+      getiRetentionCutoff(category, now),
+    ]);
+    removed += affected(result);
+  }
+  const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE posted_at < ?`, [
+    new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS),
+  ]);
+  return removed + affected(result);
 }
 
 const PURGE_CLOCK_KEY = "geti-posts-purge";
@@ -215,6 +211,10 @@ function isCategory(value: unknown): value is GetiCategory {
   return GETI_CATEGORIES.some((category) => category === value);
 }
 
+function isSource(value: unknown): value is GetiSource {
+  return GETI_SOURCES.some((source) => source === value);
+}
+
 function isParsedPost(value: unknown): value is GetiParsedPost {
   return typeof value === "object" && value !== null && typeof (value as { text?: unknown }).text === "string";
 }
@@ -223,6 +223,7 @@ type GetiPostRow = RowDataPacket & {
   message_id: string;
   channel_id: string;
   category: string;
+  source: string;
   author_id: string | null;
   author_tag: string | null;
   parsed_json: string;
@@ -230,9 +231,9 @@ type GetiPostRow = RowDataPacket & {
   edited_at: string | null;
 };
 
-/** Une ligne en annonce rendue ; `null` si son analyse gardée est illisible. */
-function storedPostOf(row: GetiPostRow): GetiStoredPost | null {
-  if (!isCategory(row.category)) return null;
+/** Une ligne en annonce rendue ; `null` si elle est illisible, ou sortie de la fenêtre de garde de sa catégorie. */
+function storedPostOf(row: GetiPostRow, now: number): GetiStoredPost | null {
+  if (!isCategory(row.category) || !isSource(row.source)) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(row.parsed_json);
@@ -241,10 +242,12 @@ function storedPostOf(row: GetiPostRow): GetiStoredPost | null {
   }
   const postedAt = toIso(row.posted_at);
   if (!isParsedPost(parsed) || postedAt === null) return null;
+  if (Date.parse(postedAt) < getiRetentionCutoff(row.category, now).getTime()) return null;
   return {
     messageId: String(row.message_id),
     channelId: String(row.channel_id),
     category: row.category,
+    source: row.source,
     authorTag: row.author_tag,
     authorId: row.author_id,
     // La date gardée fait foi pour le filtre d'âge, pas celle recopiée dans l'analyse.
@@ -262,12 +265,23 @@ function pageNumber(value: number | undefined, fallback: number, max: number): n
   return Math.min(max, Math.max(1, Math.trunc(value)));
 }
 
+/** Plus ancienne date à lire en SQL : la fenêtre de garde (de la catégorie voulue, sinon la plus longue), resserrée par l'âge voulu. */
+function listSince(filter: GetiFilter, now: number): Date {
+  const retention = isCategory(filter.category)
+    ? getiRetentionCutoff(filter.category, now)
+    : new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS);
+  const maxAgeHours = filter.maxAgeHours;
+  if (typeof maxAgeHours !== "number" || !Number.isFinite(maxAgeHours) || maxAgeHours <= 0) return retention;
+  const aged = new Date(now - maxAgeHours * 60 * 60 * 1000);
+  return aged.getTime() > retention.getTime() ? aged : retention;
+}
+
 /**
  * Les annonces gardées qui passent `filter`, de la plus récente à la plus
  * ancienne. La catégorie et l'âge se filtrent en SQL ; le reste (rang, rôle,
  * région, plateforme, langue) par `matchesGetiFilter` sur l'analyse gardée —
  * la même fonction que la page et les alertes. Une annonce sortie de la fenêtre
- * de garde n'est jamais rendue, même avant le passage de la purge.
+ * de garde de sa catégorie n'est jamais rendue, même avant le passage de la purge.
  */
 export async function listGetiPosts(
   filter: GetiFilter = {},
@@ -279,21 +293,15 @@ export async function listGetiPosts(
   const pageSize = pageNumber(page.pageSize, GETI_PAGE_SIZE_DEFAULT, GETI_PAGE_SIZE_MAX);
   const requested = pageNumber(page.page, 1, Number.MAX_SAFE_INTEGER);
 
-  let since = getiRetentionCutoff(now);
-  const maxAgeHours = filter.maxAgeHours;
-  if (typeof maxAgeHours === "number" && Number.isFinite(maxAgeHours) && maxAgeHours > 0) {
-    const aged = new Date(now - maxAgeHours * 60 * 60 * 1000);
-    if (aged.getTime() > since.getTime()) since = aged;
-  }
   const where = ["posted_at >= ?"];
-  const params: (Date | string)[] = [since];
+  const params: (Date | string)[] = [listSince(filter, now)];
   if (isCategory(filter.category)) {
     where.push("category = ?");
     params.push(filter.category);
   }
   // `LIMIT` écrit en dur (constante entière) : `execute` n'accepte pas partout un paramètre lié à cette place.
   const [rows] = await db.execute<GetiPostRow[]>(
-    `SELECT message_id, channel_id, category, author_id, author_tag, parsed_json, posted_at, edited_at
+    `SELECT message_id, channel_id, category, source, author_id, author_tag, parsed_json, posted_at, edited_at
        FROM bg_geti_posts
       WHERE ${where.join(" AND ")}
       ORDER BY posted_at DESC, id DESC
@@ -304,7 +312,7 @@ export async function listGetiPosts(
   const rest: GetiFilter = { ...filter, maxAgeHours: null };
   const matching: GetiStoredPost[] = [];
   for (const row of rows) {
-    const post = storedPostOf(row);
+    const post = storedPostOf(row, now);
     if (post && matchesGetiFilter(post.parsed, rest, now)) matching.push(post);
   }
   const start = (requested - 1) * pageSize;

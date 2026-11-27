@@ -9,7 +9,8 @@ import {
   parseUpsertBody,
 } from "@/lib/server/geti/wire";
 import { GETI_CHANNEL_IDS } from "@/lib/shared/geti";
-import { GETI_FAKE_MESSAGE_ID, getiWirePost } from "../../../helpers/geti-ingest";
+import { GETI_BOT_USER_ID } from "@/lib/shared/geti/ingest";
+import { GETI_FAKE_MESSAGE_ID, getiWirePost, getiWireRelay } from "../../../helpers/geti-ingest";
 
 /** Lecture des corps poussés par le bot : types, bornes, formes inattendues. */
 
@@ -27,6 +28,7 @@ describe("parsePushedPost", () => {
       messageId: GETI_FAKE_MESSAGE_ID,
       channelId: GETI_CHANNEL_IDS.lft,
       category: "lft",
+      source: "direct",
       raw: {
         category: "lft",
         channelId: GETI_CHANNEL_IDS.lft,
@@ -36,7 +38,6 @@ describe("parsePushedPost", () => {
         postedAt: "2026-11-27T10:00:00.000Z",
         editedAt: "2026-11-27T11:00:00.000Z",
       },
-      mentions: [],
       postedAt: new Date("2026-11-27T10:00:00.000Z"),
       editedAt: new Date("2026-11-27T11:00:00.000Z"),
     });
@@ -151,23 +152,20 @@ describe("parsePushedPost", () => {
     expect(post?.raw.author?.id).toBeNull();
   });
 
-  it("parsePushedPost_mentions_keepsOnlyValidEntries", () => {
-    const mentions = [
-      { id: "100000000000000011", username: "pseudo", discriminator: "0" },
-      { id: "pas-un-id", username: "x" },
-      { id: "100000000000000012" },
-      "texte",
-    ];
+  it("parsePushedPost_relayOfGetiBot_isReadAsARelay", () => {
+    const post = parsePushedPost(getiWireRelay("LFP tank Master"));
 
-    expect(parsePushedPost(getiWirePost({ mentions }))?.mentions).toEqual([
-      { id: "100000000000000011", username: "pseudo", discriminator: "0" },
-    ]);
+    expect(post).toMatchObject({ source: "relay", raw: { author: { id: GETI_BOT_USER_ID, bot: true } } });
   });
 
-  it("parsePushedPost_sixMentions_keepsFive", () => {
-    const mentions = ids(6).map((id) => ({ id, username: "pseudo" }));
+  it("parsePushedPost_messageOfAnotherBot_returnsNull", () => {
+    const author = { id: "100000000000000090", username: "AutreBot", discriminator: "0", bot: true };
 
-    expect(parsePushedPost(getiWirePost({ mentions }))?.mentions).toHaveLength(5);
+    expect(parsePushedPost(getiWireRelay("LFP tank Master", { author }))).toBeNull();
+  });
+
+  it("parsePushedPost_botWithoutId_returnsNull", () => {
+    expect(parsePushedPost(getiWirePost({ author: { username: "AutreBot", bot: true } }))).toBeNull();
   });
 
   it("parsePushedPost_rawHeavierThanTheByteCap_returnsNull", () => {
