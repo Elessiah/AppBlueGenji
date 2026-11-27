@@ -61,6 +61,84 @@ export function getiDisplayText(raw: unknown): string {
     .trimEnd();
 }
 
+/**
+ * Motif du code en ligne ou en bloc (`` `…` ``, ```` ```…``` ````), par paires :
+ * Discord l'affiche tel quel, une marque `||` ou `**` y est du texte. Contenu sans
+ * accent grave et sans borne de longueur (Discord n'en met pas) : le contenu
+ * s'arrête au premier accent grave, la recherche reste linéaire.
+ */
+const GETI_CODE_SPAN_SOURCE = "(`{1,3})([^`]+?)\\1";
+
+/**
+ * Expression neuve du code ({@link GETI_CODE_SPAN_SOURCE}) : globale, donc à
+ * état (`lastIndex`) — une par usage, jamais partagée entre deux appels.
+ *
+ * @param flags `gu` (parcours) ou `yu` (code commençant exactement à `lastIndex`).
+ */
+export function getiCodeSpan(flags: "gu" | "yu" = "gu"): RegExp {
+  return new RegExp(GETI_CODE_SPAN_SOURCE, flags);
+}
+
+/** Plages `[début, fin[` du code d'un texte ({@link getiCodeSpan}), dans l'ordre. */
+export function getiCodeRanges(text: string): Array<[number, number]> {
+  if (!text.includes("`")) return [];
+  const ranges: Array<[number, number]> = [];
+  for (const match of text.matchAll(getiCodeSpan())) {
+    const index = match.index ?? 0;
+    ranges.push([index, index + match[0].length]);
+  }
+  return ranges;
+}
+
+/**
+ * Prochaine marque `||` ouvrante hors code à partir de `from` (−1 sinon), lue de
+ * gauche à droite comme Discord : un code qui **commence avant** la marque la
+ * couvre (on reprend après lui) ; une marque qui commence avant le code l'emporte.
+ */
+function nextOpeningMark(text: string, from: number, code: RegExp): number {
+  let mark = text.indexOf("||", from);
+  let tick = text.indexOf("`", from);
+  // Chaque tour avance au-delà d'un accent grave ; `mark` n'est recherchée à nouveau que dépassée : parcours linéaire.
+  while (mark !== -1 && tick !== -1 && tick < mark) {
+    code.lastIndex = tick;
+    const span = code.exec(text);
+    const search = span === null ? tick + 1 : tick + span[0].length;
+    if (search > mark) mark = text.indexOf("||", search);
+    tick = text.indexOf("`", search);
+  }
+  return mark;
+}
+
+/**
+ * Retire les passages masqués (`||…||`) : l'auteur les a cachés derrière un clic
+ * sur Discord, ni la page ni l'analyse ne les lisent (une étiquette tirée d'un
+ * passage masqué le montrerait). Même lecture que Discord, de gauche à droite :
+ * un code ouvert avant une marque la rend littérale (`` `||` ``) ; une marque
+ * ouverte avant un code l'emporte, et le passage se ferme à la **première**
+ * marque `||` qui suit (`\|\|([\s\S]+?)\|\|`), fût-elle dans un accent grave —
+ * au moins un caractère masqué, qui peut être une barre (`||||x||` masque `||x`).
+ * Parcours linéaire, sans borne de longueur ; une marque sans fermante reste du texte.
+ *
+ * @param text Texte d'annonce.
+ * @param replacement Ce qui remplace chaque passage (une espace pour l'analyse, un mot neutre pour la page).
+ * @returns Le texte sans contenu masqué.
+ */
+export function getiWithoutSpoilers(text: string, replacement: string): string {
+  if (!text.includes("||")) return text;
+  const code = getiCodeSpan("yu");
+  let out = "";
+  let from = 0;
+  for (;;) {
+    const open = nextOpeningMark(text, from, code);
+    if (open === -1) break;
+    const close = text.indexOf("||", open + 3);
+    if (close === -1) break;
+    out += text.slice(from, open) + replacement;
+    from = close + 2;
+  }
+  return out + text.slice(from);
+}
+
 const USER_MENTION = /<@[!&]?\d{1,22}>/gu;
 const CHANNEL_MENTION = /<#\d{1,22}>/gu;
 const MASS_MENTION = /@(everyone|here)(?![\p{L}\p{N}])/giu;

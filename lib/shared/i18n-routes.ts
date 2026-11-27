@@ -116,4 +116,7 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // CAST-PLANNING — planning des casts et arbitres (`docs/features/CAST_PLANNING.md`),
   // réservé à la permission `planning`. Espace sécurisé : `noindex`, hors sitemap.
   "/planning",
+  // GETI-PAGE — annonces GETI : une adresse par catégorie (`lib/shared/geti/page.ts`).
+  "/geti-info",
+  "/geti-info/[category]",
 ];

@@ -215,13 +215,24 @@ export type GetiFilter = {
   platforms?: readonly GetiPlatform[] | null;
   languages?: readonly GetiLanguage[] | null;
   levels?: readonly GetiLevel[] | null;
+  /** Sous-rôles voulus (« main tank », « hitscan ») : un seul suffit. */
+  subRoles?: readonly GetiSubRole[] | null;
+  /** Rôles de staff voulus (coach, caster…) : un seul suffit. */
+  staffRoles?: readonly GetiStaffRole[] | null;
+  /** Jours voulus : un seul suffit. */
+  days?: readonly GetiDay[] | null;
+  /**
+   * Créneau voulu, en minutes depuis minuit (0–1440) : un horaire de l'annonce
+   * doit le recouper (une heure seule doit y tomber). Une borne absente est ouverte.
+   */
+  time?: { from?: number | null; to?: number | null } | null;
   /** `true` : une annonce close (texte entièrement barré) est écartée. */
   hideClosed?: boolean;
   /** Âge maximal de l'annonce, en heures. */
   maxAgeHours?: number | null;
   /**
    * `true` : une annonce où le critère n'a pas été lu (rang, rôle, région,
-   * plateforme, langue, niveau) passe quand même. Par défaut elle est écartée.
+   * plateforme, langue, niveau, sous-rôle, rôle de staff, jour, horaire) passe quand même. Par défaut elle est écartée.
    */
   includeUnknown?: boolean;
 };

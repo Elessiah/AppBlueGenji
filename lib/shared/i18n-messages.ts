@@ -54,8 +54,9 @@ import type frAudience from "@/messages/fr/audience.json";
 import type frDevdoc from "@/messages/fr/devdoc.json";
 import type frPlanning from "@/messages/fr/planning.json";
 import type frImpersonate from "@/messages/fr/impersonate.json";
+import type frGeti from "@/messages/fr/geti.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournamentsShared", "tournament", "tournamentServer", "tournamentViews", "tournamentEndurance", "tournamentEnduranceChart", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps", "matchPage", "audience", "devdoc", "planning", "impersonate"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournamentsShared", "tournament", "tournamentServer", "tournamentViews", "tournamentEndurance", "tournamentEnduranceChart", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps", "matchPage", "audience", "devdoc", "planning", "impersonate", "geti"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -184,6 +185,8 @@ export type Messages = {
   planning: typeof frPlanning;
   /** Modale « Incarner un rôle » (admin), chargée à l'ouverture — `components/impersonate-role-text.ts`. Jamais envoyée avec une page. */
   impersonate: typeof frImpersonate;
+  /** Page `/geti-info` (annonces GETI) — `lib/shared/geti/page-text.ts`. */
+  geti: typeof frGeti;
 };
 
 /**

@@ -4,7 +4,7 @@
  *
  * Module pur : importable côté serveur comme côté client.
  */
-import { GETI_RANK_TOP, getiRankValue } from "@/lib/shared/geti/ranks";
+import { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";
 import {
   GETI_CATEGORIES,
   GETI_ROLES,
@@ -49,8 +49,10 @@ function wanted<T>(values: readonly T[] | null | undefined): readonly T[] {
 }
 
 /** Au moins une valeur voulue est dans l'annonce ; champ non lu : selon `includeUnknown`. */
-function matchesAny<T>(found: readonly T[], values: readonly T[], includeUnknown: boolean): boolean {
+function matchesAny<T>(stored: readonly T[] | undefined, values: readonly T[], includeUnknown: boolean): boolean {
   if (values.length === 0) return true;
+  // Analyse gardée incomplète (champ absent) : le critère n'a pas été lu.
+  const found = wanted(stored);
   if (found.length === 0) return includeUnknown;
   return values.some((value) => found.includes(value));
 }
@@ -58,9 +60,10 @@ function matchesAny<T>(found: readonly T[], values: readonly T[], includeUnknown
 function matchesRoles(post: GetiParsedPost, filter: GetiFilter, includeUnknown: boolean): boolean {
   const roles = wanted(filter.roles);
   if (roles.length === 0) return true;
-  if (post.roles.length === 0) return includeUnknown;
+  const found = wanted(post.roles);
+  if (found.length === 0) return includeUnknown;
   // « Flex » dans l'annonce : tous les rôles sont joués (ou acceptés).
-  return post.roles.includes("FLEX") || roles.some((role) => post.roles.includes(role));
+  return found.includes("FLEX") || roles.some((role) => found.includes(role));
 }
 
 /**
@@ -68,12 +71,30 @@ function matchesRoles(post: GetiParsedPost, filter: GetiFilter, includeUnknown: 
  * rang par rôle, sinon sa fourchette globale.
  */
 function rankRangesOf(post: GetiParsedPost, filter: GetiFilter): GetiRankRange[] {
+  const ranks = post.ranks ?? { min: null, max: null, byRole: {} };
+  const byRole = ranks.byRole ?? {};
   const perRole = wanted(filter.roles).flatMap((role) => {
-    const range = isRankedRole(role) && Object.hasOwn(post.ranks.byRole, role) ? post.ranks.byRole[role] : undefined;
-    return range === undefined ? [] : [range];
+    const range = isRankedRole(role) && Object.hasOwn(byRole, role) ? getiStoredRankRange(byRole[role]) : null;
+    return range === null ? [] : [range];
   });
   if (perRole.length > 0) return perRole;
-  return post.ranks.min === null || post.ranks.max === null ? [] : [{ min: post.ranks.min, max: post.ranks.max }];
+  const overall = getiStoredRankRange(ranks);
+  return overall === null ? [] : [overall];
+}
+
+/**
+ * Fourchette de rang d'une analyse gardée, lue seulement si ses deux bornes
+ * sont de vrais rangs (une ligne écrite à la main peut porter `null` ou un
+ * objet abîmé) ; sinon `null` (rang non lu). Les bornes rendues sont de vrais
+ * rangs (division numérique), remises dans l'ordre si la ligne les inverse.
+ */
+export function getiStoredRankRange(range: unknown): GetiRankRange | null {
+  if (typeof range !== "object" || range === null) return null;
+  const { min, max } = range as { min?: GetiRank | null; max?: GetiRank | null };
+  const low = rankValue(min);
+  const high = rankValue(max);
+  if (low === null || high === null) return null;
+  return { min: getiRankFromValue(Math.min(low, high)), max: getiRankFromValue(Math.max(low, high)) };
 }
 
 function matchesRanks(post: GetiParsedPost, filter: GetiFilter, includeUnknown: boolean): boolean {
@@ -89,6 +110,85 @@ function matchesRanks(post: GetiParsedPost, filter: GetiFilter, includeUnknown: 
   const high = max ?? GETI_RANK_TOP;
   // Deux fourchettes se recoupent, bornes comprises.
   return ranges.some((range) => getiRankValue(range.max) >= low && getiRankValue(range.min) <= high);
+}
+
+const DAY_MINUTES = 1440;
+
+/** Borne horaire enregistrée (minutes, 0–1440), sinon `null` (borne ouverte). */
+function minuteBound(value: unknown): number | null {
+  const minutes = storedNumber(value);
+  return Number.isFinite(minutes) && minutes >= 0 && minutes <= DAY_MINUTES ? minutes : null;
+}
+
+/** Une fin à « 0h » après un début dans la journée (« 22h-0h ») est la fin de journée, pas minuit du matin. */
+function untilMidnight(start: number, end: number): number {
+  return end === 0 && start > 0 ? DAY_MINUTES : end;
+}
+
+/**
+ * Horaire d'une analyse gardée, lu seulement s'il est un objet aux bornes
+ * valides (minutes, 0–1440 ; fin absente = heure seule) ; sinon `null`.
+ */
+export function getiStoredTimeSlot(slot: unknown): { from: number; to: number | null } | null {
+  if (typeof slot !== "object" || slot === null) return null;
+  const { from: rawFrom, to: rawTo } = slot as { from?: unknown; to?: unknown };
+  const from = minuteBound(rawFrom);
+  if (from === null) return null;
+  if (rawTo === null || rawTo === undefined) return { from, to: null };
+  const to = minuteBound(rawTo);
+  return to === null ? null : { from, to };
+}
+
+/** Plage `[début, fin]` en minutes ; une plage qui passe minuit (« 22h-2h ») se coupe en deux. */
+function segmentsOf(from: number, to: number): Array<readonly [number, number]> {
+  return from <= to
+    ? [[from, to]]
+    : [
+        [from, DAY_MINUTES],
+        [0, to],
+      ];
+}
+
+/**
+ * Un horaire d'annonce recoupe-t-il le créneau voulu (bornes comprises) ? Une
+ * heure seule doit y tomber. Un horaire ou un créneau qui passe minuit
+ * (« 22h-1h », « entre 22h et 2h ») couvre la fin de soirée **et** le début de
+ * la nuit. Une borne absente est ouverte (début ou fin de journée).
+ *
+ * @param slot Horaire lu dans l'annonce, en minutes depuis minuit.
+ * @param from Début du créneau voulu en minutes, ou `null`.
+ * @param to Fin du créneau voulu en minutes, ou `null`.
+ * @returns `true` si les deux se recoupent.
+ */
+export function getiTimeSlotMatches(
+  slot: { from: number; to: number | null },
+  from: number | null,
+  to: number | null,
+): boolean {
+  const stored = getiStoredTimeSlot(slot);
+  if (stored === null) return false;
+  const start = stored.from;
+  const end = stored.to === null ? start : untilMidnight(start, stored.to);
+  const windowFrom = from ?? 0;
+  const windows = segmentsOf(windowFrom, untilMidnight(windowFrom, to ?? DAY_MINUTES));
+  return segmentsOf(start, end).some(([low, high]) =>
+    windows.some(([windowLow, windowHigh]) => high >= windowLow && low <= windowHigh),
+  );
+}
+
+function matchesTime(post: GetiParsedPost, filter: GetiFilter, includeUnknown: boolean): boolean {
+  const time: unknown = filter.time;
+  const bounds = typeof time === "object" && time !== null ? (time as { from?: unknown; to?: unknown }) : null;
+  const from = minuteBound(bounds?.from);
+  const to = minuteBound(bounds?.to);
+  if (from === null && to === null) return true;
+  // Un horaire abîmé (ligne écrite à la main) vaut un horaire non lu.
+  const times = wanted<unknown>(post.availability?.times).flatMap((slot) => {
+    const stored = getiStoredTimeSlot(slot);
+    return stored === null ? [] : [stored];
+  });
+  if (times.length === 0) return includeUnknown;
+  return times.some((slot) => getiTimeSlotMatches(slot, from, to));
 }
 
 function matchesAge(post: GetiParsedPost, stored: number | null | undefined, now: number): boolean {
@@ -119,7 +219,9 @@ function isOn(value: unknown): boolean {
  * - **Rangs** : la fourchette de l'annonce recoupe celle du filtre ; avec des
  *   rôles voulus et un rang par rôle dans l'annonce, seuls ces rôles comptent.
  * - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
- * - **Région, plateforme, langue, niveau** : une valeur voulue est dans l'annonce.
+ * - **Région, plateforme, langue, niveau, sous-rôle, rôle de staff, jour** : une
+ *   valeur voulue est dans l'annonce.
+ * - **Horaire** : un horaire de l'annonce recoupe le créneau voulu.
  * - **Annonces closes** : écartées avec `hideClosed`.
  * - **Âge** : publiée depuis `maxAgeHours` au plus ; sans date, écartée.
  *
@@ -149,7 +251,11 @@ export function matchesGetiFilter(post: GetiParsedPost, stored: GetiFilter, now:
     matchesAny(post.regions, wanted(filter.regions), includeUnknown) &&
     matchesAny(post.platforms, wanted(filter.platforms), includeUnknown) &&
     matchesAny(post.languages, wanted(filter.languages), includeUnknown) &&
-    matchesAny(post.levels, wanted(filter.levels), includeUnknown)
+    matchesAny(post.levels, wanted(filter.levels), includeUnknown) &&
+    matchesAny(post.subRoles, wanted(filter.subRoles), includeUnknown) &&
+    matchesAny(post.staffRoles, wanted(filter.staffRoles), includeUnknown) &&
+    matchesAny(post.availability?.days, wanted(filter.days), includeUnknown) &&
+    matchesTime(post, filter, includeUnknown)
   );
 }
 

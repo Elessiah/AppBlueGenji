@@ -91,6 +91,8 @@ export function publicSitemapRoutes(botDocSlugs: readonly string[] = []): Sitema
     priority: 0.4,
   }));
 
+  // Annonces GETI (`/geti-info/*`) : absentes à dessein — pages non indexées,
+  // elles portent le pseudo Discord de tiers (`GETI_ROBOTS`, `lib/shared/geti/page.ts`).
   return [...SHOWCASE_ROUTES, ...rules, ...botDocs];
 }
 

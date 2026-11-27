@@ -1,0 +1,242 @@
+{
+  "meta": {
+    "title": "GETI Info — Overwatch listings",
+    "categoryTitle": "{category} — Overwatch listings",
+    "description": "Overwatch recruitment posts from the GETI network, gathered and filterable: players, teams, subs, staff, scrims and casts.",
+    "shareDescription": "Find an Overwatch player, team, scrim or cast among the posts of the GETI network."
+  },
+  "breadcrumb": {
+    "home": "Home",
+    "page": "GETI Info"
+  },
+  "hero": {
+    "eyebrow": "OVERWATCH · LISTINGS",
+    "titleLead": "GETI Info",
+    "titleAccent": "the network's posts.",
+    "lede": "Posts published on the Discord servers of the GETI network, relayed here and sorted for you. Filter, spot what fits, copy the Discord username and contact the author.",
+    "retention": "{days, plural, one {Posts are kept # day} other {Posts are kept # days}} after they are published, then erased. A post edited or deleted on Discord is edited or deleted here too.",
+    "retentionSubject": "How long posts are shown"
+  },
+  "tabs": {
+    "label": "Looking for",
+    "lfp": "Players",
+    "lft": "Teams",
+    "lfsub": "Subs",
+    "lfstaff": "Staff",
+    "lfs": "Scrims",
+    "lfcast": "Casters"
+  },
+  "categories": {
+    "lfp": {
+      "title": "Looking for a player",
+      "lede": "Teams that are recruiting: spot the ones looking for your role and rank."
+    },
+    "lft": {
+      "title": "Looking for a team",
+      "lede": "Players looking for a team: filter by role, rank and availability."
+    },
+    "lfsub": {
+      "title": "Looking for a sub",
+      "lede": "Teams missing someone for a match or a scrim, often for the same evening."
+    },
+    "lfstaff": {
+      "title": "Looking for staff",
+      "lede": "Coaches, managers, analysts: teams looking for them and people offering their help."
+    },
+    "lfs": {
+      "title": "Looking for a scrim",
+      "lede": "Teams looking for a practice match: filter by level, day and time."
+    },
+    "lfcast": {
+      "title": "Looking for a cast",
+      "lede": "Organisers looking for casters, and casters who are available."
+    }
+  },
+  "official": {
+    "eyebrow": "THE NETWORK'S OFFICIAL SERVER",
+    "line": "These posts come from the GETI network. Join its server to publish yours on every subscribed server.",
+    "join": "Join",
+    "joinLabel": "Join the {server} Discord server",
+    "members": "{count, plural, one {# member} other {# members}}",
+    "online": "{count} online",
+    "regionLabel": "GETI official Discord server"
+  },
+  "publish": {
+    "button": "Publish a post",
+    "title": "Publish a post",
+    "intro": "Posts on this page are not written on the site: they come from Discord.",
+    "stepChannel": "Write your post in this category's channel, on our Discord server. It shows up here within moments.",
+    "channelLink": "Open the “{category}” channel",
+    "notMember": "Not on our server yet?",
+    "joinOurs": "Join the BlueGenji Discord",
+    "stepGeti": "To reach the whole network, publish it from the official GETI server too: it is the one relaying posts to subscribed servers.",
+    "rules": "A post edited or deleted on Discord is edited or deleted on this page too.",
+    "close": "Close",
+    "closeLabel": "Close the window",
+    "newTab": "(new tab)"
+  },
+  "filters": {
+    "title": "Filters",
+    "toggle": "Filters",
+    "toggleActive": "{count, plural, one {Filters (# active)} other {Filters (# active)}}",
+    "reset": "Reset",
+    "resetLabel": "Reset all filters",
+    "apply": "{count, plural, =0 {No posts: close the filters} one {Show the post} other {Show all # posts}}",
+    "updating": "Updating…",
+    "any": "Any",
+    "ranks": "Rank",
+    "ranksHintSubject": "Rank filter",
+    "ranksHint": "Keeps posts whose rank range overlaps yours. A legacy SR (“3500”, “4k”) is converted to a rank.",
+    "rankMin": "Minimum rank",
+    "rankMax": "Maximum rank",
+    "roles": "Role",
+    "rolesHintSubject": "Role filter",
+    "rolesHint": "A “Flex” post accepts every role: it stays visible whatever role you pick.",
+    "subRoles": "Sub-role",
+    "staffRoles": "Staff role",
+    "levels": "Team level",
+    "levelsHintSubject": "Team level",
+    "levelsHint": "The FACEIT league divisions, from the most accessible (Open) to the toughest (Expert).",
+    "regions": "Region",
+    "platforms": "Platform",
+    "languages": "Language",
+    "days": "Day",
+    "time": "Time",
+    "timeHintSubject": "Time filter",
+    "timeHint": "Keeps posts with a time inside this slot; “22:00 → 02:00” crosses midnight. Hours are the ones written in the post, most often Paris time.",
+    "hourFrom": "Between (hour)",
+    "hourTo": "and (hour)",
+    "age": "Post age",
+    "ageAll": "All ({days, plural, one {# day} other {# days}})",
+    "ageDays": "{days, plural, one {Less than 24 h} other {Less than # days}}",
+    "options": "Display",
+    "showClosed": "Show closed posts",
+    "showClosedHintSubject": "Closed posts",
+    "showClosedHint": "A post fully struck through by its author is considered closed: the spot is taken.",
+    "includeUnknown": "Include posts that leave a criterion unspecified",
+    "includeUnknownHintSubject": "Incomplete posts",
+    "includeUnknownHint": "Many posts give neither region nor platform. Untick to keep only those stating every criterion you picked."
+  },
+  "results": {
+    "count": "{count, plural, =0 {No posts} one {# post} other {# posts}}",
+    "countFiltered": "{count, plural, =0 {No post matches} one {# post matches} other {# posts match}}",
+    "listLabel": "Posts, newest first",
+    "empty": "No posts in this category for now.",
+    "emptyFiltered": "No post matches these filters.",
+    "beyond": "This page no longer exists: the list has become shorter.",
+    "beyondLink": "Go to page {page}",
+    "emptyReset": "Reset the filters",
+    "unavailable": "Posts are temporarily unavailable.",
+    "none": "Posts not loaded.",
+    "retry": "Try again",
+    "pagination": "Post pages",
+    "previous": "Newer posts",
+    "next": "Older posts",
+    "page": "Page {page} of {pages}"
+  },
+  "post": {
+    "copy": "Copy username",
+    "copyLabel": "Copy username — Discord: {tag}",
+    "copied": "Discord username copied: {tag}",
+    "copyFailed": "Could not copy: select the username by hand.",
+    "noTag": "Unidentified author",
+    "tagLabel": "Discord username",
+    "tagPrefix": "Discord username:",
+    "postedAt": "Published on {date}",
+    "edited": "edited",
+    "editedAt": "Edited on {date}",
+    "closed": "Closed",
+    "sourceRelay": "Relayed by GETI",
+    "sourceDirect": "Published on our Discord",
+    "origin": "from {server}",
+    "more": "Read more",
+    "less": "Collapse",
+    "chipsLabel": "Information read in the post",
+    "matchPrefix": "Matches your search:",
+    "mentionMember": "@member",
+    "mentionRole": "@role",
+    "mentionChannel": "#channel",
+    "spoiler": "[hidden]"
+  },
+  "chips": {
+    "rankRange": "{min} – {max}",
+    "rankForRole": "{role}: {rank}",
+    "rank": "{tier} {division}",
+    "team": "Team: {name}",
+    "minAge": "{age}+ years old",
+    "timeRange": "{from} – {to}",
+    "timeFrom": "from {from}",
+    "timeZone": "{time} ({zone})"
+  },
+  "tiers": {
+    "BRONZE": "Bronze",
+    "SILVER": "Silver",
+    "GOLD": "Gold",
+    "PLATINUM": "Platinum",
+    "EMERALD": "Emerald",
+    "DIAMOND": "Diamond",
+    "MASTER": "Master",
+    "GRANDMASTER": "Grandmaster",
+    "CHAMPION": "Champion"
+  },
+  "roles": {
+    "TANK": "Tank",
+    "DPS": "DPS",
+    "SUPPORT": "Support",
+    "FLEX": "Flex"
+  },
+  "subRoles": {
+    "MAIN_TANK": "Main tank",
+    "OFF_TANK": "Off tank",
+    "HITSCAN": "Hitscan",
+    "FLEX_DPS": "Flex DPS",
+    "MAIN_SUPPORT": "Main support",
+    "FLEX_SUPPORT": "Flex support"
+  },
+  "staffRoles": {
+    "COACH": "Coach",
+    "MANAGER": "Manager",
+    "ANALYST": "Analyst",
+    "CASTER": "Caster",
+    "OBSERVER": "Observer",
+    "GRAPHIC": "Graphic designer",
+    "COMMUNITY": "Community manager"
+  },
+  "levels": {
+    "OPEN": "Open",
+    "INTERMEDIATE": "Intermediate",
+    "ADVANCED": "Advanced",
+    "EXPERT": "Expert"
+  },
+  "regions": {
+    "EU": "Europe",
+    "NA": "North America",
+    "LATAM": "Latin America",
+    "ASIA": "Asia",
+    "OCE": "Oceania"
+  },
+  "platforms": {
+    "PC": "PC",
+    "CONSOLE": "Console"
+  },
+  "languages": {
+    "FR": "French",
+    "EN": "English",
+    "ES": "Spanish",
+    "DE": "German",
+    "IT": "Italian",
+    "PT": "Portuguese",
+    "NL": "Dutch",
+    "PL": "Polish",
+    "AR": "Arabic"
+  },
+  "days": {
+    "MON": "Monday",
+    "TUE": "Tuesday",
+    "WED": "Wednesday",
+    "THU": "Thursday",
+    "FRI": "Friday",
+    "SAT": "Saturday",
+    "SUN": "Sunday"
+  }
+}

@@ -82,6 +82,9 @@ const I18N_MIGRATED_FILES = [
   "app/partenaires/page.tsx",
   "components/recruitment/**",
   "components/recruitment-highlight.tsx",
+  // Annonces GETI (`/geti-info`).
+  "app/geti-info/**",
+  "components/geti/**",
   // Textes légaux du site (lot 7b) : la fenêtre d'acceptation des conditions.
   // Les documents eux-mêmes n'y sont pas — chaque langue est un document
   // rédigé dans sa langue (`I18N.md` § Textes légaux du site).

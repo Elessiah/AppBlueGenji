@@ -138,6 +138,35 @@ export const FICTIONAL_GETI_POSTS: readonly SeedGetiPost[] = [
     author: "test_geti_caster",
     text: "Caster FR/EN dispo pour vos matchs le week-end, PC, EU.",
   },
+  // Page `/geti-info` : une annonce close (entièrement barrée), un niveau de
+  // division, un rang Émeraude, une autre région, une annonce longue (repliée).
+  {
+    category: "lfp",
+    ageHours: 20,
+    author: "test_geti_clos",
+    relayedFrom: "Test Serveur Zénith",
+    text: "~~LFP tank Diamant 3 pour roster Test Zénith, EU, PC, FR.~~",
+  },
+  {
+    category: "lfs",
+    ageHours: 26,
+    author: "test_geti_adv",
+    text: "LFS EU PC adv, Emerald 2 - Diamond 4, mardi 20h-22h CET. Team Test Boréale.",
+  },
+  // Horaire qui passe minuit : le créneau de nuit de la page (« entre 22h et 2h »).
+  {
+    category: "lfs",
+    ageHours: 6,
+    author: "test_geti_nuit",
+    text: "LFS ce soir 23h-1h, Diamant 1 - Master 5, EU, PC, FR. Team Test Nocturne.",
+  },
+  {
+    category: "lft",
+    ageHours: 30,
+    author: "test_geti_na",
+    relayedFrom: "Test Serveur Comète",
+    text: "LFT flex DPS, Platinum 1, NA, console, English only. Available Saturday and Sunday from 7pm.\n\nPlayed in two teams last season, mostly scrims and a few open cups. I can adapt to dive or brawl, I review my own games and I am looking for a calm team with a coach.\n\nI prefer regular scrims over tournaments for now. Voice chat is a must, and I am fine with tryouts over several evenings before any decision is made by the team.",
+  },
 ];
 
 const HOUR_MS = 60 * 60 * 1000;
