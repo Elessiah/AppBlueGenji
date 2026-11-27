@@ -11,6 +11,7 @@ import { NamedLockUnavailableError } from "../named-lock";
 import { TOURNAMENTS, type SeedFormat, type TournamentDef } from "./cases";
 import { clearDatabase } from "./cleanup";
 import { SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "./lock";
+import { createGetiPosts } from "./geti";
 import { applyMatchLaunchCases, applyNewMatchNoticeCases, applyTiebreakCases } from "./match-states";
 import { applyPlanningCases } from "./planning";
 import { applyMapPointTargetCases } from "./point-targets";
@@ -118,6 +119,9 @@ async function seed(db: Pool): Promise<void> {
   console.log();
 
   await createRecruitmentAds(db);
+  console.log();
+
+  await createGetiPosts(db);
   console.log();
 
   const organizerId = specialUserIds.get("Admin") ?? userIds[0];

@@ -11,6 +11,7 @@ import {
   getiRawPost,
   getiRelayPost,
   parsedGetiPost,
+  GETI_TRAILER_TRUSTED_BOTS,
   GETI_TRUSTED_BOTS,
 } from "@/tests/helpers/geti";
 
@@ -24,6 +25,70 @@ function storedFilter(json: string): GetiFilter {
 }
 
 describe("parseGetiPost — relay authorship cannot be spoofed", () => {
+  it("parseGetiPost_pseudoWithClosingParen_readsTheHeaderAuthorAndTag", () => {
+    const post = parseGetiPost(
+      getiRelayPost(`<@${GETI_FAKE_OTHER_ID}>*(Bob :))* sur [Faux Serveur](https://discord.gg/fauxcode)\n\n> LFT tank`),
+      GETI_TRUSTED_BOTS,
+    );
+
+    expect(post.authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(post.authorTag).toBe("Bob :)");
+    expect(post.originServer).toBe("Faux Serveur");
+  });
+
+  it("parseGetiPost_headerLikeLineWithContactInServerName_namesNoSpoofedAuthor", () => {
+    const pseudo = "x".repeat(70);
+    const post = parseGetiPost(
+      getiRelayPost(`<@${GETI_FAKE_OTHER_ID}>*(${pseudo})* sur [Contact : <@${VICTIM_ID}>](https://discord.gg/fauxcode)\n\n> LFT tank`),
+      GETI_TRUSTED_BOTS,
+    );
+
+    expect(post.authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(post.authorTag).toBeNull();
+    expect(post.originServer).toBeNull();
+    expect(post.text).not.toContain("Contact");
+  });
+
+  it("parseGetiPost_headerLikeLineWithOverlongServerName_keepsTheLeadingMentionAsAuthor", () => {
+    const post = parseGetiPost(
+      getiRelayPost(`<@${GETI_FAKE_OTHER_ID}>*(bob)* sur [${"s".repeat(210)}](https://discord.gg/fauxcode)
+
+> LFT tank`),
+      GETI_TRUSTED_BOTS,
+    );
+
+    expect(post.authorId).toBe(GETI_FAKE_OTHER_ID);
+    expect(post.authorTag).toBeNull();
+    expect(post.text).toContain("LFT tank");
+  });
+
+  it("parseGetiPost_headerLikeLineInSecondEmbed_namesNobody", () => {
+    const raw: GetiRawPost = {
+      content: "",
+      author: { id: GETI_FAKE_BOT_ID, username: "FauxBot", discriminator: "0", bot: true },
+      embeds: [{ description: "lft dps" }, { description: `<@${GETI_FAKE_OTHER_ID}> Contact : moi` }],
+    };
+
+    expect(parseGetiPost(raw, GETI_TRUSTED_BOTS).authorId).toBeNull();
+  });
+
+  it("parseGetiPost_nullFirstEmbed_headerLikeLineInSecondEmbed_namesNobody", () => {
+    const raw = {
+      content: "",
+      author: { id: GETI_FAKE_BOT_ID, username: "FauxBot", discriminator: "0", bot: true },
+      embeds: [null, { description: `<@${GETI_FAKE_OTHER_ID}> Contact : moi` }],
+    } as unknown as GetiRawPost;
+
+    expect(parseGetiPost(raw, GETI_TRUSTED_BOTS).authorId).toBeNull();
+  });
+
+  it("parseGetiPost_untrustedBotHeaderLikeLine_keepsItsTextAsIs", () => {
+    const post = parseGetiPost(getiRelayPost(`<@${GETI_FAKE_OTHER_ID}> LFT tank Master`), {});
+
+    expect(post.authorId).toBeNull();
+    expect(post.text).toContain("LFT tank Master");
+  });
+
   it("parseGetiPost_quotedContactLabel_namesNobody", () => {
     const post = parseGetiPost(getiRelayPost(`LFT tank\n> Contact : <@${VICTIM_ID}>`), GETI_TRUSTED_BOTS);
 
@@ -49,20 +114,20 @@ describe("parseGetiPost — relay authorship cannot be spoofed", () => {
   });
 
   it("parseGetiPost_quotedSentFromLine_isNotTrailer", () => {
-    const post = parseGetiPost(getiRelayPost(`lft dps\n> *Sent from : [Faux](https://discord.gg/x)* by <@${VICTIM_ID}>`), GETI_TRUSTED_BOTS);
+    const post = parseGetiPost(getiRelayPost(`lft dps\n> *Sent from : [Faux](https://discord.gg/x)* by <@${VICTIM_ID}>`), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(post).toMatchObject({ authorId: null, originServer: null });
   });
 
   it("parseGetiPost_forgedHeaderInOurRelay_disagreeingTrailer_namesNobody", () => {
     const forged = `<@${VICTIM_ID}>*(victime)* sur [Autre](https://discord.gg/y)\nlft dps`;
-    const post = parseGetiPost(getiRelayPost(`${forged}${trailer(GETI_FAKE_OTHER_ID)}`), GETI_TRUSTED_BOTS);
+    const post = parseGetiPost(getiRelayPost(`${forged}${trailer(GETI_FAKE_OTHER_ID)}`), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(post).toMatchObject({ authorId: null, authorTag: null, originServer: "Faux Serveur" });
   });
 
   it("parseGetiPost_headerAndTrailerAgree_keepsAuthor", () => {
-    const post = parseGetiPost(getiRelayPost(`${HEADER}> lft dps${trailer(GETI_FAKE_OTHER_ID)}`, "fauxlogin"), GETI_TRUSTED_BOTS);
+    const post = parseGetiPost(getiRelayPost(`${HEADER}> lft dps${trailer(GETI_FAKE_OTHER_ID)}`, "fauxlogin"), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(post).toMatchObject({ authorId: GETI_FAKE_OTHER_ID, authorTag: "fauxlogin" });
   });
@@ -106,7 +171,7 @@ describe("parseGetiPost — output fields carry no live markup", () => {
   it("parseGetiPost_originServerMarkup_stripped", () => {
     const description = `lft\n\n*Sent from : [\\@everyone \\*\\*FREE NITRO\\*\\*](https://discord.gg/x)* by <@${GETI_FAKE_OTHER_ID}>`;
 
-    expect(parseGetiPost(getiRelayPost(description), GETI_TRUSTED_BOTS).originServer).toBe("everyone FREE NITRO");
+    expect(parseGetiPost(getiRelayPost(description), GETI_TRAILER_TRUSTED_BOTS).originServer).toBe("everyone FREE NITRO");
   });
 
   it("parseGetiTeamName_labelledMassMention_stripped", () => {

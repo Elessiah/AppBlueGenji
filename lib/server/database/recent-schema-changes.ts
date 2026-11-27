@@ -461,6 +461,14 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // règle d'avant jusqu'à la prochaine connexion Battle.net.
     `ALTER TABLE bg_users ADD COLUMN overwatch_battletag_typed TINYINT(1) NOT NULL DEFAULT 0
        AFTER overwatch_battletag`,
+    // Annonces GETI (`docs/features/GETI_INFO.md`) : la table `bg_geti_posts` est
+    // neuve, son `CREATE TABLE` (`schema/geti.ts`) suffit ; seule la colonne
+    // `source` (annonce directe ou relais de GETI Bot) est venue après une
+    // première création de la table sur les bases de développement.
+    `ALTER TABLE bg_geti_posts ADD COLUMN source VARCHAR(8) NOT NULL DEFAULT 'relay' AFTER category`,
+    // Oppositions GETI (`lib/server/geti/objections.ts`) : retirer et écarter les
+    // annonces d'un auteur lit `author_id` ; déjà là (`ER_DUP_KEYNAME`) : toléré.
+    `ALTER TABLE bg_geti_posts ADD INDEX idx_bg_geti_posts_author (author_id)`,
     // Map de départage d'un tour de play-offs à format défini (`ROUND_MAPS.md`).
     `ALTER TABLE bg_tournament_round_maps ADD COLUMN tiebreak_map VARCHAR(64) NULL AFTER slots_json`,
     // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : option éteinte par

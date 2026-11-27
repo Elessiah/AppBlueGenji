@@ -8,6 +8,7 @@ import {
   getiRawPost,
   getiRelayPost,
   parsedGetiPost,
+  GETI_TRAILER_TRUSTED_BOTS,
   GETI_TRUSTED_BOTS,
 } from "@/tests/helpers/geti";
 
@@ -167,13 +168,13 @@ describe("parseGetiPost — relais d'un bot", () => {
   const OUR_TRAILER = `\n\n*Sent from : [Faux Serveur](https://discord.gg/fauxcode)* by <@${GETI_FAKE_OTHER_ID}>`;
 
   it("l'auteur est lu dans l'encart, pas le bot", () => {
-    const parsed = parseGetiPost(getiRelayPost(`lft dps d3${OUR_TRAILER}`), GETI_TRUSTED_BOTS);
+    const parsed = parseGetiPost(getiRelayPost(`lft dps d3${OUR_TRAILER}`), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(parsed).toMatchObject({ relayed: true, authorTag: "fauxpseudo", authorId: GETI_FAKE_OTHER_ID });
   });
 
   it("la ligne de relais est retirée du texte et donne le serveur d'origine", () => {
-    const parsed = parseGetiPost(getiRelayPost(`lft dps d3${OUR_TRAILER}`), GETI_TRUSTED_BOTS);
+    const parsed = parseGetiPost(getiRelayPost(`lft dps d3${OUR_TRAILER}`), GETI_TRAILER_TRUSTED_BOTS);
 
     expect(parsed.text).toBe("lft dps d3");
     expect(parsed.originServer).toBe("Faux Serveur");
@@ -182,7 +183,7 @@ describe("parseGetiPost — relais d'un bot", () => {
   it("le nom du serveur d'origine perd ses échappements de crochets", () => {
     const description = "lft\n\n*Sent from : [Faux \\[FR\\] Serveur](https://discord.gg/fauxcode)* by <@100000000000000002>";
 
-    expect(parseGetiPost(getiRelayPost(description), GETI_TRUSTED_BOTS).originServer).toBe("Faux [FR] Serveur");
+    expect(parseGetiPost(getiRelayPost(description), GETI_TRAILER_TRUSTED_BOTS).originServer).toBe("Faux [FR] Serveur");
   });
 
   it("la ligne d'auteur « Nom (@pseudo) » est un nom d'affichage libre : aucun pseudo", () => {

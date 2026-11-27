@@ -61,6 +61,12 @@ export async function register(): Promise<void> {
       } catch (error) {
         await logStartupFailure("[staff-message] Purge des compteurs non lancée.", error);
       }
+      try {
+        const { startGetiPostsPurgeClock } = await import("@/lib/server/geti/posts");
+        startGetiPostsPurgeClock();
+      } catch (error) {
+        await logStartupFailure("[geti] Purge des annonces non lancée.", error);
+      }
     }
   }
 }

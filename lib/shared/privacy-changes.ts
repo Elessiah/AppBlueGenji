@@ -45,6 +45,7 @@
  */
 
 import { PLANNING_RETENTION_DAYS } from "@/lib/shared/planning";
+import { GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS } from "@/lib/shared/geti/ingest";
 import { DM_TEST_HOURLY_LIMIT } from "@/lib/shared/discord-dm-test";
 import { PLAYER_VIEW_MAX_HOURS } from "@/lib/shared/player-view";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
@@ -2389,6 +2390,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Qui reçoit quoi : pendant les inscriptions ou le tournoi en cours, les membres actuels des équipes inscrites, selon les catégories choisies par le staff (joueurs, managers, capitaines, propriétaires, tous), et les joueurs d'un tournoi individuel ; une équipe qui a abandonné n'est plus visée. Le message part en message privé Discord (identifiant rattaché ou tag certifié) et en notification push, dans votre langue. Le membre du staff ne voit que des nombres (dont combien n'ont pas de Discord ou ont coupé le sujet), jamais vos noms. Base : l'intérêt légitime de l'association au bon déroulement des tournois ; vous vous y opposez en coupant le sujet, ce qui coupe aussi le message privé.",
       "Ce qui est gardé : rien du texte, ni par le site ni par le bot (il reste dans les messages reçus) ; seul un compteur des envois de chaque membre du staff par tournoi, effacé au plus tard un quart d'heure après la fin de sa fenêtre d'une heure, borne leur nombre. L'envoi est noté au journal du staff sur Discord, gardé un an, sans nommer son auteur ni citer le texte ; les journaux du serveur gardent son auteur et la longueur du texte, selon leur rotation. Depuis Discord, le bot transmet au site l'identifiant Discord de qui lance la commande et son message, sans les garder ; le site garde cet identifiant (ou, depuis sa page, le numéro du compte) en mémoire seulement, onze minutes au plus, pour plafonner les appels.",
+    ],
+  },
+  {
+    // GETI-INGEST — annonces de recrutement Overwatch des salons d'annonces du
+    // serveur Discord recopiées par le site (`docs/features/GETI_INFO.md`) :
+    // registre T21 (et T08), /rgpd (FR et EN), politique du bot. Datée comme
+    // `REGISTER_UPDATED_AT` — tout avancer ensemble si la mise en ligne glisse.
+    id: "2026-11-annonces-de-recrutement-overwatch",
+    publishedAt: "2026-11-28",
+    title: "Annonces de recrutement Overwatch recopiées sur le site",
+    links: [
+      { href: "/rgpd/registre#t21", label: "Lire la fiche T21 du registre" },
+      { href: "/rgpd#annonces-geti", label: "Lire le paragraphe « Annonces de recrutement Overwatch »" },
+    ],
+    summary: `Le site recopie les annonces de recrutement Overwatch publiées dans les salons d'annonces du serveur Discord de l'association — écrites sur place, ou relayées par GETI Bot depuis les serveurs abonnés à son réseau —, pour les réunir sur une page de recherche. Une recherche de scrim y est gardée ${GETI_RETENTION_DAYS.lfs} jours, les autres annonces ${GETI_RETENTION_DAYS.lfp} jours.`,
+    details: [
+      "Ce qui est recopié : le texte de l'annonce, le pseudo et l'identifiant Discord de son auteur, le serveur d'origine d'une annonce relayée, les dates, et les critères lus automatiquement dans le texte (rang, rôle, région, plateforme, langue, disponibilités, âge minimal annoncé, nom d'équipe) pour filtrer les annonces, ainsi que le message tel que le bot l'a transmis, pour refaire cette lecture quand elle s'améliore. Rien n'est rattaché à un compte du site, et le bot de l'association, qui lit ces salons pour le site, n'en enregistre rien (il ne les tient qu'en mémoire : la lecture de l'historique des salons, sa file d'envoi, et le cache de messages de Discord, effacés à son redémarrage). Base : l'intérêt légitime de l'association à aider joueurs et équipes à se trouver, pour des annonces déjà publiques.",
+      `Combien de temps, et comment retirer une annonce : ${GETI_RETENTION_DAYS.lfs} jours après sa publication dans le salon de l'association (pour une annonce relayée, celle de son relais) pour une recherche de scrim, ${GETI_RETENTION_DAYS.lfp} jours pour les autres, puis un effacement automatique. Supprimer l'annonce du salon la retire du site aussitôt, la modifier remplace l'ancienne version — pour une annonce relayée, quand GETI Bot supprime ou modifie son relais, ce que l'association ne maîtrise pas. Une suppression faite pendant un arrêt du bot n'est vue qu'à sa relecture suivante des salons, dans la limite des 5 000 derniers messages de chaque salon, de même qu'un message effacé par le bannissement de son auteur du serveur Discord, dont Discord ne prévient pas le bot ; à défaut, ou si le salon est supprimé ou fermé au bot, l'annonce part au terme de sa garde. Hors les copies de sauvegarde chiffrées (${BACKUP_RETENTION_DAYS} jours au plus) et l'identifiant d'une annonce visée par une opposition, rien n'est gardé d'une annonce retirée ni de son ancienne version. Son auteur, y compris celui d'une annonce relayée depuis un autre serveur, peut aussi s'y opposer et en demander le retrait à l'association (formulaire de signalement, catégorie RGPD) : ses annonces sont alors retirées et ne sont plus recopiées, l'association ne gardant pour cela que son identifiant Discord (ou celui de l'annonce visée), tant que l'opposition tient (${GETI_RETENTION_MAX_DAYS} jours pour une seule annonce). Une sauvegarde restaurée ne connaîtrait pas une opposition enregistrée après elle, qu'il faudrait alors enregistrer de nouveau.`,
     ],
   },
 ];

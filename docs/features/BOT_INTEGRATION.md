@@ -20,3 +20,7 @@ Réponse `VoiceCallOutcome` : `ok`, `gone` (404 : `VOICE_CHANNEL_NOT_TRACKED` au
 sous transaction : seul le balayage de `MATCH_VOICE.md` l'utilise.
 
 **Code d'erreur du bot** (`safeReadError`) : le corps d'une réponse en échec se lit **4 Kio au plus** (`BOT_ERROR_BODY_MAX_BYTES`, au-delà rien n'est analysé) ; seul un code de mots en capitales joints par `_` (ou `UNAUTHORIZED` / `FORBIDDEN`) en sort (`isBotErrorCode`) — tout autre texte, mot seul en capitales compris, devient `BOT_INTERNAL_REQUEST_FAILED`.
+
+## Annonces GETI — second appel bot → site
+
+Le bot pousse au site les annonces de recrutement Overwatch de six salons du serveur Discord (création, modification, suppression, rattrapage et réconciliation) par `POST /api/internal/geti/posts`, `/posts/delete` et `/reconcile` : même porte que `/message-tournoi` (`SITE_INTERNAL_TOKEN`, boucle locale, `rejectWithoutSiteInternalToken`), réponses en nombres seulement. Détail : `GETI_INFO.md` § Récupération.

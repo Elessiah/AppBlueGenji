@@ -551,7 +551,7 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
     // LEGAL-LOT-1 : datée comme le rectificatif du site du 13 novembre 2026.
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["26 novembre 2026", "26 November 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["28 novembre 2026", "28 November 2026"]);
   });
 });
 
@@ -761,6 +761,42 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
         ],
         [
           "it holds in memory at all times, whether or not a tournament has the option on",
+        ],
+      ),
+    ).toEqual([]);
+  });
+
+  it("privacyPolicy_getiPosts_siteIsARecipientFrAndEn", () => {
+    expect(
+      missingInBoth(
+        ["ainsi que les annonces des salons de recrutement Overwatch du serveur de l'association"],
+        ["as well as the posts of the Overwatch recruitment channels of the association's server"],
+      ),
+    ).toEqual([]);
+  });
+
+  it("privacyPolicy_getiPosts_legitimateInterestAndMemoryOnlyFrAndEn", () => {
+    expect(
+      missingInBoth(
+        [
+          "La lecture des annonces de recrutement transmises au site repose elle aussi sur son intérêt légitime",
+          "dans le cache de messages de Discord, qui garde jusqu'à 200 messages de chaque salon (les derniers reçus, ou relus un à un après la modification d'un message qu'il n'avait plus)",
+          "si son exclusion ne peut être vérifiée sur le moment, son annonce passe et le salon est relu toutes les cinq minutes",
+          "à chaque nouvelle session Discord",
+          "après un envoi au site en échec ou une lecture d'un salon en échec passager",
+          "ne déclenche pas à lui seul ces nouvelles lectures",
+          "le temps d'un rattrapage (la lecture de l'historique des salons, qui garde aussi l'identifiant des messages modifiés ou supprimés pendant ce temps et, pour chaque auteur lu, s'il est exclu du relais)",
+          "la file et le cache étant effacés à son redémarrage",
+        ],
+        [
+          "Reading the recruitment posts passed to the website also rests on its legitimate interest",
+          "in Discord's message cache, which keeps up to 200 messages of each channel (the latest received, or fetched again one by one after an edit of a message it no longer held)",
+          "if their exclusion cannot be checked at that moment, their post goes through and the channel is read again every five minutes",
+          "at each new Discord session",
+          "after a failed sending to the website or a temporarily failed read of a channel",
+          "does not by itself trigger those retries",
+          "for the duration of a catch-up (the reading of the channels' history, which also keeps the identifier of the messages edited or deleted meanwhile and, for each author read, whether they are excluded from the relay)",
+          "the queue and the cache being erased when it restarts",
         ],
       ),
     ).toEqual([]);

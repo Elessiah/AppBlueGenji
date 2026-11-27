@@ -173,7 +173,9 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
   conservée hors du serveur, rejeu des **suppressions de compte** à toute
   restauration. Le journal ne porte que celles-là : tout autre effacement
   postérieur à l'archive (tag ou BattleTag retiré, moyen de connexion détaché,
-  réglage modifié, signalement purgé…) reviendrait avec elle, et `/rgpd` le dit.
+  réglage modifié, signalement purgé, opposition à la recopie des annonces GETI
+  (`bg_geti_objections`, à enregistrer de nouveau après une restauration)…)
+  reviendrait avec elle, et `/rgpd` le dit.
 
 ## Ce que dit `/rgpd`
 

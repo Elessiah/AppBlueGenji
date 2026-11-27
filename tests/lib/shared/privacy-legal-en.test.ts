@@ -55,7 +55,7 @@ const TEXT_FIELDS = ["purpose", "legalBasis", "sensitiveData"] as const;
 describe("registre des traitements : l'anglais suit le français, fiche par fiche", () => {
   it("mêmes références, dans le même ordre", () => {
     // Valeur écrite : les deux langues sortent du même `ACTIVITIES`, une égalité entre elles serait vraie par construction.
-    const expected = Array.from({ length: 20 }, (_, index) => `T${String(index + 1).padStart(2, "0")}`);
+    const expected = Array.from({ length: 21 }, (_, index) => `T${String(index + 1).padStart(2, "0")}`);
     expect(PROCESSING_ACTIVITIES.map((a) => a.ref)).toEqual(expected);
     expect(PROCESSING_ACTIVITIES_EN.map((a) => a.ref)).toEqual(expected);
   });
