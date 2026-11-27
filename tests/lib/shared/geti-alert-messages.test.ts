@@ -241,9 +241,25 @@ describe("cycle juridique 2 — « jamais deux fois » borné à l'annonce gard�
     expect(english?.details.join(" ")).toContain("as soon as it leaves the site (for instance deleted or emptied of its text");
   });
 
-  it("getiAlertPrivacyChange_botListsCompleted_nothingChangesInWhatIsSent", () => {
-    expect(entry?.details.join(" ")).toContain("rien ne change dans ce qui est envoyé");
-    expect(english?.details.join(" ")).toContain("nothing changes in what is sent");
+  it("getiAlertPrivacyChange_deadlineDms_certifiedOnlyChangeDeclaredFrAndEn", () => {
+    expect(entry?.details.join(" ")).toContain(
+      "les messages de date butoir de planification ne partent plus qu'aux comptes dont le tag Discord est certifié",
+    );
+    expect(english?.details.join(" ")).toContain(
+      "scheduling deadline messages now go only to accounts with a certified Discord tag",
+    );
+  });
+
+  it("getiAlertPrivacyChange_nothingChangesClaim_absentFrAndEn", () => {
+    expect(entry?.details.join(" ")).not.toContain("rien ne change dans ce qui est envoyé");
+    expect(english?.details.join(" ")).not.toContain("nothing changes in what is sent");
+  });
+
+  it("getiAlertPrivacyChange_t21Change_linkedAndNamedFrAndEn", () => {
+    expect(entry?.links?.map((link) => link.href)).toContain("/rgpd/registre#t21");
+    expect(english?.linkLabels).toContain("Read record T21 of the register");
+    expect(entry?.details.join(" ")).toContain("La fiche T21 du registre cite aussi la comparaison des annonces aux alertes");
+    expect(english?.details.join(" ")).toContain("Record T21 of the register also mentions the comparison of posts with alerts");
   });
 
   it("registerT22_retention_traceErasedWhenPostLeavesSite", () => {

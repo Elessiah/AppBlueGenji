@@ -590,9 +590,11 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // (`columnTypeContains`) ne se lit sur aucun code d'erreur, et la rejouer
     // à l'aveugle copierait la table à chaque démarrage.
     const reads = [...sql.matchAll(/FROM information_schema/gi)];
-    // Quatrième, de même nature que la première : la clé `fk_bg_geti_alert_hits_post`
-    // ne se lit sur aucun code d'erreur tolérant, et son rattrapage commence par
-    // retirer les traces orphelines — un balayage qu'on ne rejoue pas à chaque démarrage.
+    // Quatrième et cinquième (`foreignKeyMissing` lit `TABLES` puis
+    // `REFERENTIAL_CONSTRAINTS`), de même nature que la première : la clé
+    // `fk_bg_geti_alert_hits_post` ne se lit sur aucun code d'erreur tolérant, et
+    // son rattrapage commence par parcourir la table pour retirer les traces
+    // orphelines — un balayage qu'on ne rejoue pas à chaque démarrage.
     expect(reads).toHaveLength(9);
 
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
@@ -607,7 +609,9 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // seule trace durable de ce passage.
     const migrations = sql.slice(0, sql.indexOf("async function warnIfSchemaIsBehind"));
     const outside = [...migrations.matchAll(/FROM\s+information_schema\.(\w+)/gi)].map((m) => m[1]);
-    // Troisième : les conversions d'`ENUM` rattrapées une fois (`columnTypeContains`).
+    // Dans l'ordre : clé des invitations, défaut « sans équipe », clé des traces
+    // d'alertes GETI (`TABLES` + `REFERENTIAL_CONSTRAINTS`), conversions d'`ENUM`
+    // rattrapées une fois (`columnTypeContains`).
     expect(outside).toEqual(["REFERENTIAL_CONSTRAINTS", "COLUMNS", "TABLES", "REFERENTIAL_CONSTRAINTS", "COLUMNS"]);
     expect(migrations).toContain("const foreignKeyMissing = (table: string, constraint: string)");
     expect(migrations).toContain("const columnTypeContains = (table: string, column: string, fragment: string)");

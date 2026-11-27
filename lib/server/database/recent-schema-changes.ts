@@ -474,8 +474,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // base de développement qui a déjà la table sans la clé : les traces sans
     // annonce partent d'abord (sinon la clé est refusée), puis la clé est posée.
     // Joué seulement tant que la clé manque (`foreignKeyMissing`) : la clé ne se
-    // lit sur aucun code d'erreur tolérant, et rejouer le `DELETE` balaierait
-    // toutes les traces à chaque démarrage (ou échouerait, table absente). Une
+    // lit sur aucun code d'erreur tolérant, et rejouer le `DELETE` parcourrait
+    // toute la table à chaque démarrage (sans rien retirer une fois la clé posée),
+    // et l'`ADD CONSTRAINT` rejoué échouerait (contrainte en double, non tolérée). Une
     // base neuve l'a par son `CREATE TABLE`. À retirer une fois jouée partout.
     {
       when: foreignKeyMissing("bg_geti_alert_hits", "fk_bg_geti_alert_hits_post"),
