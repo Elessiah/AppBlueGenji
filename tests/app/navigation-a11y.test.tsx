@@ -20,7 +20,8 @@ import {
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
 import { messagesFor } from "@/lib/server/i18n-messages";
-import { GETI_PAGE_PATH } from "@/lib/shared/geti/page";
+import { GETI_DEFAULT_CATEGORY, GETI_PAGE_PATH, getiCategoryPath } from "@/lib/shared/geti/page";
+import { GETI_DEFAULT_LIST_PATH } from "@/lib/shared/geti/path";
 import { readSource } from "../helpers/read-source";
 
 const siteNav = (activeTeam: { teamId: number; teamName: string } | null = null) =>
@@ -250,7 +251,7 @@ describe("PublicNavPanel — page courante", () => {
 
   it("ouvre sur les annonces GETI, puis les pages hors compétition", () => {
     expect(PUBLIC_NAV_LINKS.map((l) => l.href)).toEqual([
-      "/geti-info",
+      "/geti-info/lfp",
       "/bot",
       "/association",
       "/recrutement",
@@ -258,8 +259,23 @@ describe("PublicNavPanel — page courante", () => {
     ]);
   });
 
-  it("écrit l'adresse des annonces GETI comme la page la déclare", () => {
-    expect(PUBLIC_NAV_LINKS[0].href).toBe(GETI_PAGE_PATH);
+  it("publicNavLinks_getiEntry_pointsToCanonicalList : l'entrée GETI mène à l'adresse canonique, courante sur toute la rubrique", () => {
+    expect(PUBLIC_NAV_LINKS[0].href).toBe(GETI_DEFAULT_LIST_PATH);
+    expect(PUBLIC_NAV_LINKS[0].section).toBe(GETI_PAGE_PATH);
+  });
+
+  it("getiDefaultListPath_comparedToPage_equalsCanonicalCategoryPath : l'adresse écrite en clair suit la page", () => {
+    expect(GETI_DEFAULT_LIST_PATH).toBe(getiCategoryPath(GETI_DEFAULT_CATEGORY));
+  });
+
+  it("publicNavPanel_onNonSectionedPage_usesHref : une entrée sans rubrique est courante sur sa propre adresse", () => {
+    expect(currentLinks(panel("/bot"))).toEqual(["Bot"]);
+  });
+
+  it("publicNavCss_linkActive_hasNonColourMarker : toute page courante se voit autrement que par la couleur", () => {
+    const css = readSource("components/cyber/landing/PublicNavMenu.module.css");
+    const rule = /^\.linkActive\s*\{([^}]*)\}/m.exec(css);
+    expect(rule?.[1]).toMatch(/box-shadow:\s*inset 3px 0 0 var\(--blue-500/);
   });
 
   it("tire l'adresse d'un module sans dépendance, pas de la page (poids de l'en-tête)", () => {
@@ -311,7 +327,7 @@ describe("PublicNavPanel — page courante", () => {
     expect(currentLinks(panel("/equipes"))).toEqual([]);
   });
 
-  it("libelle l'entrée « GETI posts » en anglais, vers /en/geti-info", () => {
+  it("libelle l'entrée « GETI posts » en anglais, vers /en/geti-info/lfp", () => {
     const html = renderToStaticMarkup(
       <AppLocaleProvider locale="en">
         <ShellTextProvider locale="en" messages={messagesFor("en").shell}>
@@ -319,7 +335,7 @@ describe("PublicNavPanel — page courante", () => {
         </ShellTextProvider>
       </AppLocaleProvider>,
     );
-    expect(html).toMatch(/<a [^>]*href="\/en\/geti-info"[^>]*>GETI posts<\/a>/);
+    expect(html).toMatch(/<a [^>]*href="\/en\/geti-info\/lfp"[^>]*>GETI posts<\/a>/);
     expect(html).not.toContain("Annonces GETI");
   });
 

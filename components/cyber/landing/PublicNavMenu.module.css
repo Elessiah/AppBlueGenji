@@ -121,9 +121,13 @@
   background: rgba(90, 200, 255, 0.08);
 }
 
+/* Page courante : teinte, et un trait intérieur à gauche pour qu'elle se voie
+   autrement que par la couleur (WCAG 1.4.1) — `aria-current` la dit aux
+   lecteurs d'écran. */
 .linkActive {
   color: var(--blue-300);
   background: rgba(90, 200, 255, 0.06);
+  box-shadow: inset 3px 0 0 var(--blue-500, #5ac8ff);
 }
 
 /* Entrée mise en avant (annonces GETI) : encadrée et teintée glacier, en tête
@@ -146,7 +150,7 @@
 
 /* Entrée mise en avant ET page courante (`/geti-info…`) : bordure pleine,
    fond plus soutenu et trait intérieur à gauche — la page courante se voit
-   autrement que par la couleur, comme sur les autres entrées. */
+   autrement que par la couleur, avec le même trait que les autres entrées. */
 .linkFeatured.linkActive {
   color: var(--ink);
   background: rgba(90, 200, 255, 0.2);

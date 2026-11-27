@@ -744,16 +744,18 @@ La page est une **fonction principale** du site : on y arrive de deux endroits, 
 chaque page vitrine et dès l'accueil.
 
 - **Menu burger** (`PublicNavMenu`, `PUBLIC_NAVIGATION.md`) : « Annonces GETI » /
-  « GETI posts » ouvre la liste, mise en avant, vers `/geti-info` ; les entrées de la
+  « GETI posts » ouvre la liste, mise en avant, vers l'adresse canonique `/geti-info/lfp`
+  (`GETI_DEFAULT_LIST_PATH`), page courante sur toute la rubrique ; les entrées de la
   partie compétitive (Tournois, Équipes, Classement, Joueurs) en sont sorties. La
   barre des connectés (`SiteNav`) ne change pas.
 - **Accueil** (`components/cyber/landing/GetiSpotlight.tsx`, juste après le bandeau
-  défilant) : une carte avec une phrase d'appel (la marche à suivre — filtrer, puis
-  contacter l'auteur sur Discord — derrière un `<InfoHint>`), le bouton « Voir les
+  défilant) : une carte avec une accroche courte (les types d'annonces ; ce que la page
+  réunit et la marche à suivre — filtrer, puis contacter l'auteur sur Discord —
+  derrière un `<InfoHint>`), le bouton « Voir les
   annonces GETI » et un raccourci par catégorie (« Parcourir : Équipes qui recrutent,
   Joueurs sans équipe, Remplaçants recherchés, Staff, Scrims, Casts » →
   `/geti-info/<catégorie>`). Le bouton vise l'adresse canonique `/geti-info/lfp`
-  (celle que déclare `/geti-info`) : une seule adresse par liste. Les raccourcis
+  (celle que déclare `/geti-info`), comme l'entrée du menu : une seule adresse par liste. Les raccourcis
   nomment **ce que la liste contient**, pas l'intention de l'auteur comme les
   onglets de la page (« Je cherche un joueur » = annonces d'équipes qui recrutent) :
   un capitaine qui cherche un joueur n'y est pas envoyé vers d'autres équipes. Composant

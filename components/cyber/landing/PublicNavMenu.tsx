@@ -2,13 +2,18 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
-import { GETI_PAGE_PATH } from "@/lib/shared/geti/path";
+import { GETI_DEFAULT_LIST_PATH, GETI_PAGE_PATH } from "@/lib/shared/geti/path";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { useShellText } from "@/components/i18n/shell-text";
 import type { ShellKey } from "@/lib/shared/shell-text";
 import styles from "./PublicNavMenu.module.css";
 
-type NavLink = { href: string; labelKey: ShellKey; featured?: boolean };
+/**
+ * `section` : la rubrique que l'entrée désigne comme page courante, quand elle
+ * diffère de `href` (l'entrée des annonces mène à la liste canonique
+ * `/geti-info/lfp` mais reste courante sur toute page `/geti-info…`).
+ */
+type NavLink = { href: string; labelKey: ShellKey; featured?: boolean; section?: string };
 
 /**
  * Une entrée par page, jamais deux vers la même adresse. Les annonces GETI
@@ -18,12 +23,14 @@ type NavLink = { href: string; labelKey: ShellKey; featured?: boolean };
  * une fois connecté et par le pied de page
  * (docs/features/PUBLIC_NAVIGATION.md).
  *
- * L'adresse des annonces vient de `lib/shared/geti/path.ts`, module sans
- * dépendance : importer `lib/shared/geti/page.ts` chargerait les filtres des
+ * L'entrée des annonces mène à l'adresse canonique de la liste par défaut
+ * (`/geti-info/lfp`, comme l'encart de l'accueil : une seule adresse par liste)
+ * et reste la page courante sur toute la rubrique `/geti-info`. Ces adresses
+ * viennent de `lib/shared/geti/path.ts`, module sans dépendance : importer `lib/shared/geti/page.ts` chargerait les filtres des
  * annonces dans l'en-tête de chaque page.
  */
 export const PUBLIC_NAV_LINKS: readonly NavLink[] = [
-  { href: GETI_PAGE_PATH, labelKey: "nav.links.geti", featured: true },
+  { href: GETI_DEFAULT_LIST_PATH, section: GETI_PAGE_PATH, labelKey: "nav.links.geti", featured: true },
   { href: "/bot", labelKey: "nav.links.bot" },
   { href: "/association", labelKey: "nav.links.association" },
   { href: "/recrutement", labelKey: "nav.links.recruitment" },
@@ -82,7 +89,7 @@ export function PublicNavPanel({
   return (
     <nav id={id} className={styles.panel} aria-label={t("nav.mainLabel")}>
       {PUBLIC_NAV_LINKS.map((link) => {
-        const isActive = isNavLinkActive(pathname, link.href);
+        const isActive = isNavLinkActive(pathname, link.section ?? link.href);
         return (
           <LocaleLink
             key={link.href}
