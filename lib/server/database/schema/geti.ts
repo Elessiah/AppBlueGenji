@@ -89,7 +89,10 @@ export async function createGetiTables(db: Pool): Promise<void> {
 
   // Une ligne par couple (alerte, annonce) déjà vu : une alerte ne prévient
   // jamais deux fois pour la même annonce (modification, rattrapage du bot).
-  // Purgée au-delà de la plus longue durée de garde d'une annonce.
+  // Part avec l'annonce (`ON DELETE CASCADE` sur `bg_geti_posts` : supprimée,
+  // retirée sur opposition, échue — rien n'est gardé d'une annonce retirée,
+  // registre T21) ou avec l'alerte ; purgée au-delà de la plus longue durée de
+  // garde d'une annonce en dernier recours.
   try {
     await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_geti_alert_hits (
@@ -99,7 +102,9 @@ export async function createGetiTables(db: Pool): Promise<void> {
         PRIMARY KEY (alert_id, message_id),
         KEY idx_bg_geti_alert_hits_created (created_at),
         CONSTRAINT fk_bg_geti_alert_hits_alert FOREIGN KEY (alert_id)
-          REFERENCES bg_geti_alerts(id) ON DELETE CASCADE
+          REFERENCES bg_geti_alerts(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bg_geti_alert_hits_post FOREIGN KEY (message_id)
+          REFERENCES bg_geti_posts(message_id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
   } catch {

@@ -285,15 +285,21 @@ export function RgpdEn({
           <p id="alertes-geti">
             <strong>Post alerts.</strong> On the posts page, a signed-in account can create alerts (
             {GETI_ALERT_MAX_PER_USER} at most): the site keeps the chosen category and filters, an optional name, the
-            alert&apos;s state (active or paused), its creation date and the date of the last notification, and a technical
-            record of the posts already reported. When a new post matches, the account is notified by push
-            notification on its subscribed devices and, if its Discord account is certified, by Discord direct
-            message — at most once every {GETI_ALERT_COOLDOWN_MINUTES} minutes per alert, with neither a username nor
-            the post&apos;s text (the alert&apos;s name and a link); its own post does not notify it when the post carries its author&apos;s Discord identifier (the Discord identifier
-            linked to the account is compared with it, and nothing more is kept). The “GETI post alerts” topic in “My profile” turns both
-            off. An alert is kept until the account deletes it; erasing the account removes all its alerts, and the
-            record of the posts already reported is erased after {GETI_ALERT_HIT_RETENTION_DAYS} days. Basis:
-            performance of the service the account asked for. Register of processing activities: record T22.
+            alert&apos;s state (active or paused — a paused alert is kept without notifying), its creation date and the
+            date of the last notification, and a technical record of the posts already reported by each alert (the
+            Discord message identifier), so that an alert never notifies twice of the same post. When a new post
+            matches, the account is notified by push notification on its subscribed devices and, if its Discord account
+            is certified, by a Discord direct message delivered by the association&apos;s bot — at most once every{" "}
+            {GETI_ALERT_COOLDOWN_MINUTES} minutes per alert, with neither a username nor the post&apos;s text: the
+            alert&apos;s name and a link to the page filtered like it (the link therefore carries its filters), opened on
+            the reported post. Its own post does not notify it when the post carries its author&apos;s Discord identifier
+            (the Discord identifier linked to the account is compared with it, and nothing more is kept). A suspended
+            account keeps its alerts but is no longer notified. The “GETI post alerts” topic in “My profile” turns both
+            off. An alert is kept until the account deletes it; erasing the account removes all its alerts. The record
+            of a post already reported leaves with the post (deleted, removed on objection or at the end of its
+            retention period), at the latest after {GETI_ALERT_HIT_RETENTION_DAYS} days. The alerts and their records
+            are included in the export of the account&apos;s data. Basis: performance of the service the account asked
+            for. Register of processing activities: record T22.
           </p>
           <p id="age-minimum">
             <strong>Minimum age.</strong> You must be at least {SITE_MINIMUM_AGE} years old to create an account
@@ -1020,7 +1026,8 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
-            tournament&apos;s kickoff, of a message from the staff of a tournament you take part in, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of the scheduling deadline of a match you lead (captain, manager or owner, or player of a solo tournament) — its announcement, its reminders 24 h and 3 h before and the double forfeit that may follow if it passes with no time —, of your match times (set, changed or removed) and their reminders (24 h before; also 10 h before if the tournament has check-in), of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, in a tournament that has check-in, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
+            tournament&apos;s kickoff, of a message from the staff of a tournament you take part in, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of the scheduling deadline of a match you lead (captain, manager or owner, or player of a solo tournament) — its announcement, its reminders 24 h and 3 h before and the double forfeit that may follow if it passes with no time —, of your match times (set, changed or removed) and their reminders (24 h before; also 10 h before if the tournament has check-in), of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, in a tournament that has check-in, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), of a new GETI post that matches one of your{" "}
+            <a href="#alertes-geti">alerts</a>, and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
             opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission; a prod, of their place as a match&apos;s prod given or removed by someone other than themselves, by the staff or automatically, with the reason, as long as they hold the prod permission; a referee, caster or prod, of the schedule (new slots where they can hold a role, their assignments, withdrawals from confirmed assignments on their confirmed slots, and, for a caster, their solo caster status changed by the staff) and, tournament staff, of open slots and lost streams.{" "}
             <strong>Nothing is sent to a device you have not subscribed</strong>: notifications are turned on device by device,

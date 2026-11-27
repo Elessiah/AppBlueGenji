@@ -833,10 +833,18 @@ close ne prévient jamais.
   `category`, `name`, `search`, `paused`, `created_at`, `last_notified_at` ;
   index `(user_id)` et `(category, paused)`.
 - `bg_geti_alert_hits` : clé primaire `(alert_id, message_id)`, `created_at` —
-  une ligne par annonce déjà vue par une alerte.
+  une ligne par annonce déjà vue par une alerte ; deux clés étrangères
+  `ON DELETE CASCADE` : vers l'alerte, et vers l'annonce
+  (`bg_geti_posts.message_id`, `fk_bg_geti_alert_hits_post`) — une annonce
+  retirée (supprimée du salon, vidée, opposition, échue, réanalyse impossible)
+  emporte ses traces dans la même instruction : rien n'en reste (T21).
+  Une trace ne se pose que sur une annonce gardée (`INSERT IGNORE` écarte celle
+  retirée entre-temps).
 
-Tables neuves : leur `CREATE TABLE` (`schema/geti.ts`) suffit, rien dans
-`RECENT_SCHEMA_CHANGES`. Table absente : la page se rend sans alertes, la passe
+Tables neuves : leur `CREATE TABLE` (`schema/geti.ts`) suffit ; seule la clé
+vers l'annonce est dans `RECENT_SCHEMA_CHANGES` (groupe de deux pas, pour les
+bases de développement qui avaient déjà la table : traces orphelines retirées,
+puis la clé ; ensuite des no-op). Table absente : la page se rend sans alertes, la passe
 d'alertes ne fait rien.
 
 ### Routes (`/api/geti/alerts`)
@@ -935,7 +943,8 @@ revoir (index par critère) si ce nombre approche.
 **Croissance des traces** : une trace par couple (alerte, annonce) qui
 correspond, y compris pour une alerte alors dans son délai — la trace **est** ce
 qui empêche une modification tardive de prévenir une seconde fois, elle vit donc
-aussi longtemps que l'annonce (15 jours, purge par lots). Borne : alertes
+aussi longtemps que l'annonce (elle part avec elle ; 15 jours au plus, purge par
+lots). Borne : alertes
 d'une catégorie (≤ 2 000 lues) × annonces récentes de cette catégorie sur 15
 jours ; seules les annonces **récentes** posent des traces (le rattrapage n'en
 pose aucune). À surveiller si le nombre d'alertes « sans filtre » grossit.
@@ -951,9 +960,10 @@ rendu de la page, en parallèle de la liste d'annonces pour la session.
 - Une alerte vit jusqu'à sa suppression par le compte ; la pause la garde sans
   prévenir. Pas d'expiration automatique : elle ne coûte rien tant qu'aucune
   annonce n'y correspond, et son propriétaire la voit dans sa liste.
-- Les traces `bg_geti_alert_hits` sont purgées au bout de 15 jours par
+- Les traces `bg_geti_alert_hits` partent avec l'annonce (clé étrangère) ou
+  avec l'alerte, et sont purgées au plus tard au bout de 15 jours par
   l'horloge `geti-posts-purge` (`purgeGetiAlertHits`, par lots de 5 000 lignes,
-  100 passages au plus par heure), et partent avec l'alerte. Chaque étape du
+  100 passages au plus par heure). Chaque étape du
   passage horaire (`runGetiPostsPurge` : annonces, traces, réanalyse) a sa
   garde : une panne de l'une ne bloque pas les autres, la première erreur est
   signalée par l'horloge.
@@ -964,7 +974,8 @@ rendu de la page, en parallèle de la liste d'annonces pour la session.
 - **Export des données** : `getiAlerts` dans `PersonalDataExport` — tout ce
   que la ligne garde (dont `lastNotifiedAt`) et les annonces déjà signalées
   (`reportedPosts` : identifiant du message, date de la trace).
-- Mentions : registre T22 (et sous-finalité de T12), entrée
+- Mentions : registre T22 (et sous-finalité de T12, message remis cité à T08),
+  politique et conditions du bot (`bot-legal-content.ts`, messages remis), entrée
   `2026-11-alertes-d-annonces-geti` de `PRIVACY_CHANGES` (FR et EN),
   `/rgpd#alertes-geti` (FR et EN).
 

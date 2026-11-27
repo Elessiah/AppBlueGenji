@@ -561,18 +561,18 @@ describe("politique du bot — messages d'équipe (TEAM-INVITE-NOTIFY)", () => {
 
   it("policy_teamNotices_listedAmongDeliveredMessagesFrAndEn", () => {
     expect(fr).toContain("invitation d'une équipe, reprise d'une équipe fantôme que le staff vous propose ou propriété de votre équipe qui vous est transférée, qui ne nomment que l'équipe");
-    expect(fr).toContain("demande d'adhésion, invitation, reprise ou propriété d'équipe, information) en message privé");
+    expect(fr).toContain("demande d'adhésion, invitation, reprise ou propriété d'équipe, alerte d'annonces, information) en message privé");
     expect(en).toContain("a team's invitation, the takeover of a ghost team the staff offers you or the ownership of your team transferred to you, which only name the team");
-    expect(en).toContain("join request, team invitation, takeover or ownership, data-protection notice) by direct message");
+    expect(en).toContain("join request, team invitation, takeover or ownership, post alert, data-protection notice) by direct message");
   });
 
   // Conditions v9 (ERASURE-D2, décision T2 du 2026-11-03) : l'article 01 cite
   // les messages d'équipe remis en privé ; la reprise ne nomme que l'équipe (D4, #595).
   it("terms_article01_listsTeamNoticesUnderTermsV9FrAndEn", () => {
     const article01 = (lang: "fr" | "en") => JSON.stringify(TERMS_OF_SERVICE[lang].sections[0]);
-    expect(article01("fr")).toContain("demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe, jamais personne), messages du staff d'un tournoi à ses participants (signés « le staff du tournoi ») et informations sur les données.");
-    expect(article01("en")).toContain("team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team, never anyone), messages from a tournament's staff to its participants (signed “the tournament staff”) and data-protection notices.");
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["26 novembre 2026", "26 November 2026"]);
+    expect(article01("fr")).toContain("demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe, jamais personne), alertes d'annonces GETI (aux seuls comptes dont le tag Discord est certifié), messages du staff d'un tournoi à ses participants (signés « le staff du tournoi ») et informations sur les données.");
+    expect(article01("en")).toContain("team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team, never anyone), GETI post alerts (only to accounts with a certified Discord tag), messages from a tournament's staff to its participants (signed “the tournament staff”) and data-protection notices.");
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["28 novembre 2026", "28 November 2026"]);
   });
 
   it("terms_article01_neverNamesWhoInvitesOrOffersFrAndEn", () => {

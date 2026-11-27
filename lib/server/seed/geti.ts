@@ -7,7 +7,7 @@
  * vraie base.
  */
 
-import type { Pool } from "mysql2/promise";
+import type { Pool, RowDataPacket } from "mysql2/promise";
 import {
   deleteGetiPosts,
   listGetiPosts,
@@ -250,6 +250,12 @@ export async function createGetiAlerts(db: Pool, userId: number): Promise<void> 
   const kept = await listGetiAlerts(userId, db);
   // Annonces de la passe retirées : la matrice d'annonces reste celle de `createGetiPosts`.
   await deleteGetiPosts(db, [fresh.messageId, lft.messageId]);
+  // Les traces partent avec l'annonce (clé étrangère `ON DELETE CASCADE`) : rien n'en reste (T21).
+  const [leftover] = await db.execute<RowDataPacket[]>(
+    `SELECT COUNT(*) AS n FROM bg_geti_alert_hits WHERE message_id IN (?, ?)`,
+    [fresh.messageId, lft.messageId],
+  );
+  if (Number(leftover[0]?.n ?? 0) !== 0) throw new Error("alertes GETI : traces restées après le retrait de l'annonce");
   if (first.matched !== 1 || first.notified !== 1 || again.matched !== 0 || sent.join() !== String(named.id) || purged !== 0 || kept.length !== 2) {
     throw new Error(
       `alertes GETI : bilan inattendu (${first.matched} touchée(s), ${first.notified} prévenu(s), puis ${again.matched} ; ${purged} trace(s) purgée(s), ${kept.length} alerte(s))`,

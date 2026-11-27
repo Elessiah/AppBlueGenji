@@ -345,16 +345,21 @@ function RgpdFr({
           <p id="alertes-geti">
             <strong>Alertes d&apos;annonces.</strong> Sur la page des annonces, un compte connecté peut créer des alertes
             ({GETI_ALERT_MAX_PER_USER} au plus) : le site garde la catégorie et les filtres choisis, un nom facultatif,
-            l&apos;état de l&apos;alerte (active ou en pause), sa date de création et celle de la dernière notification, et une
-            trace technique des annonces déjà signalées. Quand une nouvelle annonce correspond, le compte est prévenu
-            par notification push sur ses appareils abonnés et, si son compte Discord est certifié, par message privé
-            Discord — au plus une fois toutes les {GETI_ALERT_COOLDOWN_MINUTES} minutes par alerte, sans pseudo ni texte
-            de l&apos;annonce (le nom de l&apos;alerte et un lien) ; sa propre annonce ne le prévient pas quand elle porte l&apos;identifiant Discord de son auteur (l&apos;identifiant
-            Discord lié au compte y est comparé, sans rien garder de plus). Le sujet « Alertes d&apos;annonces GETI » de « Mon profil »
-            coupe les deux. Une alerte est gardée jusqu&apos;à sa suppression par le compte ; l&apos;effacement du compte emporte
-            toutes ses alertes, et la trace des annonces déjà signalées est effacée au bout de{" "}
-            {GETI_ALERT_HIT_RETENTION_DAYS} jours. Base : l&apos;exécution du service demandé par le compte. Registre des
-            traitements : fiche T22.
+            l&apos;état de l&apos;alerte (active ou en pause — une alerte en pause est gardée sans prévenir), sa date de
+            création et celle de la dernière notification, et une trace technique des annonces déjà signalées par chaque
+            alerte (l&apos;identifiant du message Discord), pour qu&apos;une alerte ne prévienne jamais deux fois de la même
+            annonce. Quand une nouvelle annonce correspond, le compte est prévenu par notification push sur ses appareils
+            abonnés et, si son compte Discord est certifié, par message privé Discord remis par le bot de l&apos;association —
+            au plus une fois toutes les {GETI_ALERT_COOLDOWN_MINUTES} minutes par alerte, sans pseudo ni texte de
+            l&apos;annonce : le nom de l&apos;alerte et un lien vers la page filtrée comme elle (le lien reprend donc ses
+            filtres), ouverte sur l&apos;annonce signalée. Sa propre annonce ne le prévient pas quand elle porte
+            l&apos;identifiant Discord de son auteur (l&apos;identifiant Discord lié au compte y est comparé, sans rien garder
+            de plus). Un compte suspendu garde ses alertes mais n&apos;est plus prévenu. Le sujet « Alertes d&apos;annonces
+            GETI » de « Mon profil » coupe les deux. Une alerte est gardée jusqu&apos;à sa suppression par le compte ;
+            l&apos;effacement du compte emporte toutes ses alertes. La trace d&apos;une annonce déjà signalée part avec
+            l&apos;annonce (supprimée, retirée sur opposition ou au terme de sa garde), au plus tard au bout de{" "}
+            {GETI_ALERT_HIT_RETENTION_DAYS} jours. Les alertes et leurs traces figurent dans l&apos;export des données du
+            compte. Base : l&apos;exécution du service demandé par le compte. Registre des traitements : fiche T22.
           </p>
           <p id="age-minimum">
             <strong>Âge minimum.</strong> Il faut avoir au moins {SITE_MINIMUM_AGE} ans pour
@@ -1216,7 +1221,8 @@ function RgpdFr({
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un message du staff d&apos;un tournoi auquel vous participez, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de la date butoir de planification d&apos;un match que vous menez (capitaine, manager ou propriétaire, ou joueur d&apos;un tournoi individuel) — son annonce, ses rappels 24 h et 3 h avant et le double forfait qui peut la suivre si elle passe sans horaire —, de l&apos;horaire de vos matchs (posé,
-            changé ou retiré) et de ses rappels (24 h avant ; aussi 10 h avant si le tournoi a un check-in), du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, dans un tournoi qui a un check-in, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
+            changé ou retiré) et de ses rappels (24 h avant ; aussi 10 h avant si le tournoi a un check-in), du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, dans un tournoi qui a un check-in, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), d&apos;une nouvelle annonce GETI qui correspond à l&apos;une de vos{" "}
+            <a href="#alertes-geti">alertes</a>, et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
             alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage ; une prod, de sa place de prod d&apos;un match donnée ou retirée par un autre qu&apos;elle, par le staff ou d&apos;office, avec le motif, tant qu&apos;elle détient la permission de prod ; un arbitre, caster ou prod, du planning (nouveaux créneaux où il peut tenir un rôle, ses affectations, les désistements d&apos;attributions confirmées sur ses créneaux confirmés, et, caster, son statut de caster autonome changé par le staff) et, staff des tournois, des places à pourvoir et des diffusions perdues. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets. Un
