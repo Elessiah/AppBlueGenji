@@ -6,6 +6,8 @@ jest.mock("@/lib/server/periodic-clock", () => ({ startPeriodicClock: jest.fn() 
 import { getDatabase } from "@/lib/server/database";
 import {
   deleteGetiPosts,
+  forgetGetiListScans,
+  GETI_LIST_SCAN_MAX,
   getiTrustedBots,
   listGetiPosts,
   purgeExpiredGetiPosts,
@@ -62,6 +64,7 @@ function row(overrides: Record<string, unknown> = {}, parsed: Partial<GetiParsed
 }
 
 beforeEach(() => {
+  forgetGetiListScans();
   jest.clearAllMocks();
 });
 
@@ -183,6 +186,40 @@ describe("upsertGetiPosts", () => {
     expect(outcome.stored).toBe(1);
   });
 
+  it("upsertGetiPosts_batchOfPosts_isWrittenByOneMultiRowStatement", async () => {
+    const execute = executeMock();
+    const posts = [
+      getiPushedPost({ id: "100000000000000911" }),
+      getiPushedPost({ id: "100000000000000912" }),
+      getiPushedPost({ id: "100000000000000913" }),
+    ];
+
+    const outcome = await upsertGetiPosts(executor(execute), posts, NOW);
+
+    expect(outcome.stored).toBe(3);
+    expect(execute).toHaveBeenCalledTimes(1);
+    const [sql, params] = execute.mock.calls[0];
+    expect(String(sql).match(/\(\?, \?, \?, \?, \?, \?, \?, \?, \?, \?\)/g)).toHaveLength(3);
+    expect(params).toHaveLength(30);
+    const values: unknown[] = Array.isArray(params) ? params : [];
+    expect([values[0], values[10], values[20]]).toEqual(["100000000000000911", "100000000000000912", "100000000000000913"]);
+  });
+
+  it("upsertGetiPosts_expiredAndEmptiedMixedWithKept_writesOnlyTheKeptOnes", async () => {
+    const execute = executeMock([], 1);
+    const posts = [
+      getiPushedPost({ id: "100000000000000921" }),
+      getiPushedPost({ id: "100000000000000922", content: "  " }),
+      getiPushedPost({ id: "100000000000000923", postedAt: new Date(NOW - 20 * DAY_MS).toISOString() }),
+    ];
+
+    const outcome = await upsertGetiPosts(executor(execute), posts, NOW);
+
+    expect(outcome).toEqual({ stored: 1, emptied: 1, expired: 1 });
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[0][1]).toHaveLength(10);
+  });
+
   it("upsertGetiPosts_postWithoutText_removesTheStoredPost", async () => {
     const execute = executeMock([], 1);
     const post = getiPushedPost({ content: "   " });
@@ -297,7 +334,7 @@ describe("purgeExpiredGetiPosts", () => {
 
     await purgeExpiredGetiPosts(executor(execute), NOW);
 
-    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ?", [
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ? LIMIT 500", [
       "lfs",
       new Date(NOW - 7 * DAY_MS),
     ]);
@@ -309,7 +346,7 @@ describe("purgeExpiredGetiPosts", () => {
     await purgeExpiredGetiPosts(executor(execute), NOW);
 
     for (const category of ["lfp", "lft", "lfsub", "lfstaff", "lfcast"]) {
-      expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ?", [
+      expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ? LIMIT 500", [
         category,
         new Date(NOW - 14 * DAY_MS),
       ]);
@@ -321,7 +358,26 @@ describe("purgeExpiredGetiPosts", () => {
 
     await purgeExpiredGetiPosts(executor(execute), NOW);
 
-    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [new Date(NOW - 14 * DAY_MS)]);
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ? LIMIT 500", [new Date(NOW - 14 * DAY_MS)]);
+  });
+
+  it("purgeExpiredGetiPosts_fullBatch_runsAgainUntilABatchIsShort", async () => {
+    const answers = [500, 500, 20];
+    const execute = jest.fn<SqlQuery>(async () => [{ affectedRows: answers.shift() ?? 0 }]);
+
+    const removed = await purgeExpiredGetiPosts(executor(execute), NOW);
+
+    // Première catégorie : trois passages (500, 500, 20) ; les autres et la condition finale : un passage chacune.
+    expect(execute).toHaveBeenCalledTimes(3 + 6);
+    expect(removed).toBe(1020);
+  });
+
+  it("purgeExpiredGetiPosts_neverShortBatch_stopsAtTheBatchCap", async () => {
+    const execute = jest.fn<SqlQuery>(async () => [{ affectedRows: 500 }]);
+
+    await purgeExpiredGetiPosts(executor(execute), NOW);
+
+    expect(execute).toHaveBeenCalledTimes(100 * 7);
   });
 
   it("purgeExpiredGetiPosts_rowsRemoved_returnsTheirTotal", async () => {
@@ -348,7 +404,7 @@ describe("startGetiPostsPurgeClock", () => {
 
     await run();
 
-    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ?", [expect.any(Date)]);
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_geti_posts WHERE posted_at < ? LIMIT 500", [expect.any(Date)]);
   });
 });
 
@@ -395,6 +451,92 @@ describe("listGetiPosts", () => {
     await listGetiPosts();
 
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPosts_twoReadsOnThePool_shareOneScan", async () => {
+    const execute = executeMock([row()]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+
+    await listGetiPosts();
+    await listGetiPosts();
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPosts_otherCategory_scansAgain", async () => {
+    const execute = executeMock([row()]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+
+    await listGetiPosts({ category: "lfp" });
+    await listGetiPosts({ category: "lft" });
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPosts_storedScanOlderThanTenSeconds_isReadAgain", async () => {
+    const execute = executeMock([row()]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    const clock = jest.spyOn(Date, "now");
+    try {
+      clock.mockReturnValue(NOW);
+      await listGetiPosts();
+      clock.mockReturnValue(NOW + 10_001);
+      await listGetiPosts();
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPosts_afterAWrite_readsAgain", async () => {
+    const execute = executeMock([row()]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    await listGetiPosts();
+
+    await deleteGetiPosts(executor(executeMock([], 1)), [GETI_FAKE_MESSAGE_ID]);
+    await listGetiPosts();
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("listGetiPosts_givenExecutor_neverUsesTheScanKept", async () => {
+    const execute = executeMock([row()]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    await listGetiPosts();
+    const given = executeMock([]);
+
+    await listGetiPosts({}, {}, executor(given), NOW);
+
+    expect(given).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPosts_manyFilters_keepAtMostEightScans", async () => {
+    const execute = executeMock([row()]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    for (let hours = 1; hours <= 10; hours += 1) await listGetiPosts({ maxAgeHours: hours });
+    execute.mockClear();
+
+    await listGetiPosts({ maxAgeHours: 10 });
+    await listGetiPosts({ maxAgeHours: 1 });
+
+    // 10 est gardée ; 1, la plus ancienne, a été oubliée.
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("listGetiPosts_scanAtTheCap_warnsOnce", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const execute = executeMock(Array.from({ length: GETI_LIST_SCAN_MAX }, () => row()));
+      jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+
+      await listGetiPosts();
+      await listGetiPosts();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("listGetiPosts_categoryFilter_isAppliedInSql", async () => {

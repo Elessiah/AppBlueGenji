@@ -365,14 +365,19 @@ lu borné (413), réponses en **nombres** seulement, refus par **code**
 
 Tout champ est tenu pour non fiable (`lib/server/geti/wire.ts`) : typé, borné,
 écarté s'il n'a pas la forme attendue (`rejected`). Un message sans texte après
-analyse (`emptied`) est retiré s'il était gardé.
+analyse (`emptied`) est retiré s'il était gardé. Un lot s'écrit en **une seule
+instruction** multi-lignes (atomique, un aller-retour) ; le plafond d'appels du
+bot (1 200 par minute, 429 avec `Retry-After`, que le bot attend) est loin
+au-dessus du débit d'un rattrapage (environ 400 par minute au pire).
 
 ### Purge
 
 `purgeExpiredGetiPosts`, lancée par `startGetiPostsPurgeClock`
 (`instrumentation.ts`, horloge `geti-posts-purge` : 3 minutes après le
 démarrage, puis toutes les heures) : par catégorie selon sa durée, puis toute
-ligne plus vieille que la plus longue. Suppression définitive — une horloge, pas
+ligne plus vieille que la plus longue, par lots de 500 lignes (`DELETE … LIMIT`,
+100 passages au plus par condition : après une longue panne, le reste attend
+l'heure suivante). Suppression définitive — une horloge, pas
 le trafic ni le bot : un site sans visite ou un bot arrêté ne garde rien au-delà
 de la durée annoncée.
 
@@ -381,7 +386,10 @@ de la durée annoncée.
 `lib/server/geti/posts.ts`, pour la page du lot 3 et les alertes du lot 5 :
 annonces de la plus récente à la plus ancienne, `GetiPostPage`
 (`posts`, `total`, `page`, `pageSize` — 30 par défaut, 100 au plus). La
-catégorie et l'âge se filtrent en SQL, le reste par `matchesGetiFilter` sur
+catégorie et l'âge se filtrent en SQL (3 000 lignes lues au plus — au-delà,
+un avertissement pm2 —, sans le message brut), la lecture sur le pool étant gardée
+10 secondes par catégorie et âge (8 lectures au plus, oubliées à chaque
+écriture, suppression ou purge) ; le reste par `matchesGetiFilter` sur
 l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
 `channelId`, `category`, `source`, `authorTag`, `authorId`, `parsed`,
 `postedAt`, `editedAt` — jamais le message brut.

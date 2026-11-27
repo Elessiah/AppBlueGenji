@@ -47,6 +47,9 @@ const AUTHOR_TAG_MAX = 37;
 /** Identifiants par `DELETE … IN (…)`. */
 const DELETE_CHUNK = 200;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Lignes effacées par instruction de la purge, et passages au plus par condition (le reste attend l'heure suivante). */
+const PURGE_BATCH = 500;
+const PURGE_MAX_BATCHES = 100;
 /**
  * Annonces lues d'un coup pour une page : le filtre (rang, rôle, région…) se
  * joue en mémoire sur l'analyse gardée, la table ne portant que deux semaines
@@ -67,10 +70,13 @@ function affected(result: unknown): number {
  */
 const INCOMING_IS_CURRENT = "COALESCE(VALUES(edited_at), VALUES(posted_at)) >= COALESCE(edited_at, posted_at)";
 
-const UPSERT_SQL = `
+const UPSERT_ROW = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+/** Une seule instruction pour tout un lot : atomique, un aller-retour, un seul commit. */
+const upsertSql = (rows: number): string => `
   INSERT INTO bg_geti_posts
     (message_id, channel_id, category, source, author_id, author_tag, raw_json, parsed_json, posted_at, edited_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES ${Array.from({ length: rows }, () => UPSERT_ROW).join(", ")}
   ON DUPLICATE KEY UPDATE
     author_id = IF(${INCOMING_IS_CURRENT}, VALUES(author_id), author_id),
     author_tag = IF(${INCOMING_IS_CURRENT}, VALUES(author_tag), author_tag),
@@ -110,6 +116,7 @@ export async function upsertGetiPosts(
 ): Promise<GetiUpsertOutcome> {
   const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0 };
   const emptied: string[] = [];
+  const rows: (string | Date | null)[][] = [];
   const trusted = getiTrustedBots();
   for (const post of posts) {
     if (post.postedAt.getTime() < getiRetentionCutoff(post.category, now).getTime()) {
@@ -122,7 +129,7 @@ export async function upsertGetiPosts(
       emptied.push(post.messageId);
       continue;
     }
-    await executor.execute(UPSERT_SQL, [
+    rows.push([
       post.messageId,
       post.channelId,
       post.category,
@@ -136,7 +143,9 @@ export async function upsertGetiPosts(
     ]);
     outcome.stored += 1;
   }
+  if (rows.length > 0) await executor.execute(upsertSql(rows.length), rows.flat());
   if (emptied.length > 0) await deleteGetiPosts(executor, emptied);
+  forgetGetiListScans();
   return outcome;
 }
 
@@ -151,6 +160,7 @@ export async function deleteGetiPosts(executor: GetiExecutor, messageIds: readon
     );
     removed += affected(result);
   }
+  if (removed > 0) forgetGetiListScans();
   return removed;
 }
 
@@ -188,16 +198,27 @@ export async function reconcileGetiChannel(
 export async function purgeExpiredGetiPosts(executor: GetiExecutor, now: number = Date.now()): Promise<number> {
   let removed = 0;
   for (const category of GETI_CATEGORIES) {
-    const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE category = ? AND posted_at < ?`, [
-      category,
-      getiRetentionCutoff(category, now),
-    ]);
-    removed += affected(result);
+    removed += await deleteInBatches(executor, "category = ? AND posted_at < ?", [category, getiRetentionCutoff(category, now)]);
   }
-  const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE posted_at < ?`, [
-    new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS),
-  ]);
-  return removed + affected(result);
+  removed += await deleteInBatches(executor, "posted_at < ?", [new Date(now - GETI_RETENTION_MAX_DAYS * DAY_MS)]);
+  if (removed > 0) forgetGetiListScans();
+  return removed;
+}
+
+/**
+ * Efface les lignes d'une condition par lots : un passage après une longue
+ * panne ne tient ni verrous ni journal binaire sur des milliers de lignes
+ * (deux champs MEDIUMTEXT chacune) en une seule instruction.
+ */
+async function deleteInBatches(executor: GetiExecutor, condition: string, params: (Date | string)[]): Promise<number> {
+  let removed = 0;
+  for (let pass = 0; pass < PURGE_MAX_BATCHES; pass += 1) {
+    const [result] = await executor.execute(`DELETE FROM bg_geti_posts WHERE ${condition} LIMIT ${PURGE_BATCH}`, params);
+    const count = affected(result);
+    removed += count;
+    if (count < PURGE_BATCH) break;
+  }
+  return removed;
 }
 
 const PURGE_CLOCK_KEY = "geti-posts-purge";
@@ -289,6 +310,47 @@ function listSince(filter: GetiFilter, now: number): Date {
   return aged.getTime() > retention.getTime() ? aged : retention;
 }
 
+/** Une lecture de la table, gardée quelques secondes : la page se rafraîchit, la table ne bouge qu'au rythme du bot. */
+const SCAN_TTL_MS = 10_000;
+/** Lectures gardées au plus (une par catégorie et âge voulu) : la clé vient du visiteur, la mémoire ne grandit pas avec. */
+const SCAN_CACHE_MAX = 8;
+const scanCache = new Map<string, { at: number; rows: GetiPostRow[] }>();
+
+/** Oublie les lectures gardées : une écriture, une suppression ou une purge vient de changer la table. */
+export function forgetGetiListScans(): void {
+  scanCache.clear();
+}
+
+async function scanGetiRows(filter: GetiFilter, given: GetiExecutor | undefined, db: GetiExecutor, now: number): Promise<GetiPostRow[]> {
+  const where = ["posted_at >= ?"];
+  const params: (Date | string)[] = [listSince(filter, now)];
+  if (isCategory(filter.category)) {
+    where.push("category = ?");
+    params.push(filter.category);
+  }
+  // Un exécuteur donné (test, transaction) lit toujours la table : seule la lecture sur le pool est gardée.
+  const key = `${isCategory(filter.category) ? filter.category : ""}|${String(filter.maxAgeHours ?? "")}`;
+  const kept = given === undefined ? scanCache.get(key) : undefined;
+  if (kept && Date.now() - kept.at < SCAN_TTL_MS) return kept.rows;
+  // `LIMIT` écrit en dur (constante entière) : `execute` n'accepte pas partout un paramètre lié à cette place.
+  const [rows] = await db.execute<GetiPostRow[]>(
+    `SELECT message_id, channel_id, category, source, author_id, author_tag, parsed_json, posted_at, edited_at
+       FROM bg_geti_posts
+      WHERE ${where.join(" AND ")}
+      ORDER BY posted_at DESC, id DESC
+      LIMIT ${GETI_LIST_SCAN_MAX}`,
+    params,
+  );
+  if (rows.length >= GETI_LIST_SCAN_MAX) {
+    console.warn(`[geti] lecture des annonces tronquée à ${GETI_LIST_SCAN_MAX} lignes : filtres et total incomplets`);
+  }
+  if (given === undefined) {
+    if (scanCache.size >= SCAN_CACHE_MAX) scanCache.delete(String(scanCache.keys().next().value));
+    scanCache.set(key, { at: Date.now(), rows });
+  }
+  return rows;
+}
+
 /**
  * Les annonces gardées qui passent `filter`, de la plus récente à la plus
  * ancienne. La catégorie et l'âge se filtrent en SQL ; le reste (rang, rôle,
@@ -306,21 +368,7 @@ export async function listGetiPosts(
   const pageSize = pageNumber(page.pageSize, GETI_PAGE_SIZE_DEFAULT, GETI_PAGE_SIZE_MAX);
   const requested = pageNumber(page.page, 1, Number.MAX_SAFE_INTEGER);
 
-  const where = ["posted_at >= ?"];
-  const params: (Date | string)[] = [listSince(filter, now)];
-  if (isCategory(filter.category)) {
-    where.push("category = ?");
-    params.push(filter.category);
-  }
-  // `LIMIT` écrit en dur (constante entière) : `execute` n'accepte pas partout un paramètre lié à cette place.
-  const [rows] = await db.execute<GetiPostRow[]>(
-    `SELECT message_id, channel_id, category, source, author_id, author_tag, parsed_json, posted_at, edited_at
-       FROM bg_geti_posts
-      WHERE ${where.join(" AND ")}
-      ORDER BY posted_at DESC, id DESC
-      LIMIT ${GETI_LIST_SCAN_MAX}`,
-    params,
-  );
+  const rows = await scanGetiRows(filter, executor, db, now);
   // L'âge est déjà joué en SQL sur la date gardée : le filtre en mémoire ne le rejoue pas.
   const rest: GetiFilter = { ...filter, maxAgeHours: null };
   const matching: GetiStoredPost[] = [];
