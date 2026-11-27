@@ -23,6 +23,8 @@
  * liste se relise et se teste sans monter un serveur. L'appelant
  * (`app/sitemap.ts`) rend les chemins absolus.
  */
+import { GETI_CATEGORIES } from "./geti/types";
+import { getiCategoryPath } from "./geti/page";
 import { TOURNAMENT_RULE_MODES } from "./tournament-rules";
 import { LOCALES, localeAlternates, type Locale } from "./locales";
 
@@ -91,7 +93,15 @@ export function publicSitemapRoutes(botDocSlugs: readonly string[] = []): Sitema
     priority: 0.4,
   }));
 
-  return [...SHOWCASE_ROUTES, ...rules, ...botDocs];
+  // Annonces GETI : une entrée par catégorie, jamais `/geti-info` tout court
+  // (qui rend la première et la désigne comme adresse canonique).
+  const geti: SitemapRoute[] = GETI_CATEGORIES.map((category) => ({
+    path: getiCategoryPath(category),
+    changeFrequency: "daily",
+    priority: 0.7,
+  }));
+
+  return [...SHOWCASE_ROUTES, ...geti, ...rules, ...botDocs];
 }
 
 /**

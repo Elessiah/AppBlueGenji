@@ -452,3 +452,103 @@ politique de confidentialité du bot. Le seed pose quatorze annonces de synthès
 `tests/app/api/internal/geti/geti-routes.test.ts`,
 `tests/lib/shared/geti/geti-bot-relay.test.ts` (en-tête du relais) ; fabriques
 dans `tests/helpers/geti-ingest.ts`.
+
+## Page publique `/geti-info` (lot 3)
+
+Page **publique** (aucune session), en français et en anglais (`/en/geti-info`),
+rendue côté serveur à chaque demande (`force-dynamic`) : `components/geti/GetiInfoView.tsx`,
+posée par `app/geti-info/page.tsx` et `app/geti-info/[category]/page.tsx`.
+
+### Adresses
+
+- Une adresse par catégorie : `/geti-info/lfp`, `lft`, `lfsub`, `lfstaff`, `lfs`,
+  `lfcast` — le sigle du salon, le même dans les deux langues (`getiCategoryPath`).
+  Toute autre écriture (casse comprise) répond 404.
+- `/geti-info` rend la première catégorie **sans renvoi** ; son adresse canonique
+  est `/geti-info/lfp`. Le sitemap liste les six catégories (FR + EN), jamais
+  `/geti-info` tout court. L'adresse canonique ne porte jamais les filtres.
+- Le texte des annonces porte `data-nosnippet` : la page est indexable, mais un
+  moteur ne reprend pas en extrait une annonce qui disparaîtra sous 7 ou 14 jours.
+
+### Filtres — l'adresse est la seule mémoire
+
+`lib/shared/geti/page.ts` (pur) : `parseGetiPageQuery` lit l'adresse,
+`getiPageSearch` l'écrit, `getiPageFilter` en fait le `GetiFilter` du moteur. Une
+valeur inconnue, hors borne ou non proposée par la catégorie est **ignorée** ;
+des bornes inversées sont remises dans l'ordre.
+
+| Paramètre | Sens | Exemple |
+| --- | --- | --- |
+| `rmin`, `rmax` | fourchette de rangs (`palier-division`) | `rmin=diamond-3` |
+| `role`, `sub`, `staff` | rôles, sous-rôles, rôles de staff | `role=tank,dps` |
+| `lvl`, `reg`, `plat`, `lang`, `day` | niveau d'équipe, région, plateforme, langue, jour | `lvl=advanced` |
+| `hfrom`, `hto` | créneau horaire, heures entières 0–24 | `hfrom=20&hto=23` |
+| `age` | âge maximal en jours, sous la durée de garde (1, 3, et 7 hors scrims) | `age=3` |
+| `closed=1` | montrer aussi les annonces closes (masquées par défaut) | |
+| `strict=1` | écarter les annonces qui ne précisent pas un critère choisi | |
+| `p` | page (30 annonces par page) | `p=2` |
+
+- **Filtres par catégorie** (`GETI_CATEGORY_FILTERS`) : seulement ce que l'analyse
+  lit dans ses annonces — pas de rôle pour un scrim, des rôles de staff pour
+  `lfstaff` et `lfcast`, etc.
+- **Annonces incomplètes** : gardées par défaut (`includeUnknown`), car la plupart
+  des annonces réelles ne donnent ni région ni plateforme ; la case « Inclure les
+  annonces qui ne précisent pas un critère » les écarte (`strict=1`).
+- Le filtre du moteur a reçu quatre critères pour la page : `subRoles`,
+  `staffRoles`, `days`, `time` (créneau en minutes ; un horaire de l'annonce doit
+  le recouper, une heure seule y tomber) — `matchesGetiFilter`.
+- `GetiFilters` (client) : groupes nommés (`role="group"`), cases et listes
+  natives, « i » (`InfoHint`) pour le rang, le rôle, le niveau, l'horaire et les
+  deux réglages d'affichage. Chaque changement réécrit l'adresse
+  (`router.replace`, sans défilement, retour à la page 1) ; le compteur de
+  résultats est une région `aria-live`. Sous 900 px le panneau se replie derrière
+  un bouton (`aria-expanded`).
+
+### Carte d'une annonce (`GetiPostCard`)
+
+- Pseudo Discord (`visibleText`), sélectionnable, et bouton **Copier** : presse-papiers,
+  repli `execCommand`, notification `showSuccess` (ou `showError`).
+- Âge relatif (« il y a 3 h »), date absolue (heure de Paris) en `title` ; marque
+  « modifiée » ; pastille « Close » ; provenance discrète (relais de GETI ou
+  message direct, serveur d'origine).
+- **Étiquettes** des données lues (`getiPostChips`), teintées par nature ; celles
+  qui répondent à un critère actif (`getiChipMatches`) sont mises en avant — plus
+  vives, cochées, et préfixées pour un lecteur d'écran (jamais la couleur seule).
+- **Texte** : toujours un nœud de texte (`getiPostBodyText`) — marques de
+  citation et balisage Discord retirés, mention → mot neutre (jamais un
+  identifiant), émoji de serveur → son nom, lien laissé en texte. Replié au-delà
+  de 420 caractères ou 7 lignes (« Lire la suite »).
+
+### Carte du serveur officiel de GETI, fenêtre « Publier »
+
+- `GetiOfficialCard` en tête de chaque catégorie : **notre** carte (la CSP interdit
+  tout cadre, aucune image n'est chargée de chez Discord), bouton « Rejoindre »
+  vers l'invitation. La fréquentation (`lib/server/geti/community.ts`, invitation
+  publique de Discord, 1,2 s au plus, cache de 30 min, échec compris) est rendue
+  sous `Suspense` : elle ne retient jamais la page et disparaît si Discord se tait.
+- « Publier une annonce » (`GetiPublishButton`, modale portée dans `body`) : on ne
+  publie pas sur le site mais dans le salon Discord de la catégorie
+  (`getiChannelUrl`), avec l'invitation de notre serveur, puis — loyauté envers le
+  réseau — depuis le serveur officiel de GETI, dont la carte est reprise.
+
+### Fraîcheur
+
+Aucun flux : `GetiRefresher` relit la page (`router.refresh()`) au retour sur
+l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement
+(`getiRefreshIntervalMs`, `CLIENT_POWER_MODES.md`) ; un onglet caché ne demande rien.
+
+### Textes, tests, seed
+
+- Messages `messages/<langue>/geti.json` ; les composants clients reçoivent leurs
+  textes en props (aucun dictionnaire de plus dans le paquet). Noms de rangs
+  officiels en français (Maîtrise, Grande maîtrise, Virtuose).
+- Tests : `tests/lib/shared/geti/page.test.ts`, `page-text.test.ts`,
+  `page-filter.test.ts`, `tests/lib/server/geti/community.test.ts`,
+  `e2e/geti-info.spec.ts`.
+- Seed : 17 annonces `Test_` — chaque catégorie, relais et messages directs, une
+  annonce modifiée, une close, un niveau de division, un rang Émeraude, une autre
+  région, un texte long ; un scrim de plus de 7 jours n'est jamais gardé.
+- Données personnelles : rien de plus que ce que décrivent déjà le registre (T21),
+  `/rgpd#annonces-geti` et `PRIVACY_CHANGES` (texte, pseudo, serveur d'origine,
+  dates, critères lus). L'appel à Discord pour la fréquentation part du serveur,
+  sans rien du visiteur.

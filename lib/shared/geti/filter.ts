@@ -53,6 +53,25 @@ function matchesRanks(post: GetiParsedPost, filter: GetiFilter, includeUnknown: 
   return ranges.some((range) => getiRankValue(range.max) >= low && getiRankValue(range.min) <= high);
 }
 
+const DAY_MINUTES = 1440;
+
+/** Un horaire de l'annonce recoupe le créneau voulu (bornes comprises) ; une heure seule doit y tomber. */
+function matchesTime(post: GetiParsedPost, filter: GetiFilter, includeUnknown: boolean): boolean {
+  const from = filter.time?.from ?? null;
+  const to = filter.time?.to ?? null;
+  if (from === null && to === null) return true;
+  const times = post.availability.times;
+  if (times.length === 0) return includeUnknown;
+  const low = from ?? 0;
+  const high = to ?? DAY_MINUTES;
+  return times.some((slot) => {
+    if (slot.to === null) return slot.from >= low && slot.from <= high;
+    // Un horaire qui passe minuit (« 22h-1h ») court jusqu'à la fin de la journée.
+    const end = slot.to < slot.from ? DAY_MINUTES : slot.to;
+    return end >= low && slot.from <= high;
+  });
+}
+
 function matchesAge(post: GetiParsedPost, maxAgeHours: number | null | undefined, now: number): boolean {
   if (maxAgeHours === null || maxAgeHours === undefined || !Number.isFinite(maxAgeHours) || maxAgeHours <= 0) {
     return true;
@@ -71,7 +90,9 @@ function matchesAge(post: GetiParsedPost, maxAgeHours: number | null | undefined
  * - **Rangs** : la fourchette de l'annonce recoupe celle du filtre ; avec des
  *   rôles voulus et un rang par rôle dans l'annonce, seuls ces rôles comptent.
  * - **Rôles** : un rôle voulu est dans l'annonce, ou l'annonce dit « Flex ».
- * - **Région, plateforme, langue, niveau** : une valeur voulue est dans l'annonce.
+ * - **Région, plateforme, langue, niveau, sous-rôle, rôle de staff, jour** : une
+ *   valeur voulue est dans l'annonce.
+ * - **Horaire** : un horaire de l'annonce recoupe le créneau voulu.
  * - **Annonces closes** : écartées avec `hideClosed`.
  * - **Âge** : publiée depuis `maxAgeHours` au plus ; sans date, écartée.
  *
@@ -93,7 +114,11 @@ export function matchesGetiFilter(post: GetiParsedPost, filter: GetiFilter, now:
     matchesAny(post.regions, wanted(filter.regions), includeUnknown) &&
     matchesAny(post.platforms, wanted(filter.platforms), includeUnknown) &&
     matchesAny(post.languages, wanted(filter.languages), includeUnknown) &&
-    matchesAny(post.levels, wanted(filter.levels), includeUnknown)
+    matchesAny(post.levels, wanted(filter.levels), includeUnknown) &&
+    matchesAny(post.subRoles, wanted(filter.subRoles), includeUnknown) &&
+    matchesAny(post.staffRoles, wanted(filter.staffRoles), includeUnknown) &&
+    matchesAny(post.availability.days, wanted(filter.days), includeUnknown) &&
+    matchesTime(post, filter, includeUnknown)
   );
 }
 

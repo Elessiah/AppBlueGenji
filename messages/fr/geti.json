@@ -1,0 +1,235 @@
+{
+  "meta": {
+    "title": "GETI Info — annonces Overwatch",
+    "categoryTitle": "{category} — annonces Overwatch",
+    "description": "Les annonces de recrutement Overwatch du réseau GETI, réunies et filtrables : joueurs, équipes, remplaçants, staff, scrims et casts.",
+    "shareDescription": "Trouve un joueur, une équipe, un scrim ou un cast Overwatch parmi les annonces du réseau GETI."
+  },
+  "breadcrumb": {
+    "home": "Accueil",
+    "page": "GETI Info"
+  },
+  "hero": {
+    "eyebrow": "OVERWATCH · ANNONCES",
+    "titleLead": "GETI Info",
+    "titleAccent": "les annonces du réseau.",
+    "lede": "Les annonces publiées sur les serveurs Discord du réseau GETI, relayées ici et triées pour toi. Filtre, repère ce qui te correspond, copie le pseudo Discord et contacte l'auteur.",
+    "retention": "{days, plural, one {Annonces gardées # jour} other {Annonces gardées # jours}} après leur publication, puis effacées. Une annonce modifiée ou supprimée sur Discord l'est ici aussi.",
+    "retentionSubject": "Durée d'affichage des annonces"
+  },
+  "tabs": {
+    "label": "Je cherche",
+    "lfp": "Un joueur",
+    "lft": "Une équipe",
+    "lfsub": "Un remplaçant",
+    "lfstaff": "Un staff",
+    "lfs": "Un scrim",
+    "lfcast": "Un cast"
+  },
+  "categories": {
+    "lfp": {
+      "title": "Je cherche un joueur",
+      "lede": "Les équipes qui recrutent : repère celles qui cherchent ton rôle et ton rang."
+    },
+    "lft": {
+      "title": "Je cherche une équipe",
+      "lede": "Les joueurs qui cherchent une équipe : filtre par rôle, rang et disponibilités."
+    },
+    "lfsub": {
+      "title": "Je cherche un remplaçant",
+      "lede": "Les équipes à qui il manque quelqu'un pour un match ou un scrim, souvent pour le soir même."
+    },
+    "lfstaff": {
+      "title": "Je cherche un staff",
+      "lede": "Coachs, managers, analystes : les équipes qui en cherchent et les personnes qui se proposent."
+    },
+    "lfs": {
+      "title": "Je cherche un scrim",
+      "lede": "Les équipes qui cherchent un match d'entraînement : filtre par niveau, jour et horaire."
+    },
+    "lfcast": {
+      "title": "Je cherche un cast",
+      "lede": "Les organisateurs qui cherchent des casters, et les casters disponibles."
+    }
+  },
+  "official": {
+    "eyebrow": "SERVEUR OFFICIEL DU RÉSEAU",
+    "line": "Ces annonces viennent du réseau GETI. Rejoins son serveur pour publier la tienne sur tous les serveurs abonnés.",
+    "join": "Rejoindre",
+    "joinLabel": "Rejoindre le serveur Discord {server}",
+    "members": "{count, plural, one {# membre} other {# membres}}",
+    "online": "{count} en ligne",
+    "regionLabel": "Serveur Discord officiel de GETI"
+  },
+  "publish": {
+    "button": "Publier une annonce",
+    "title": "Publier une annonce",
+    "intro": "Les annonces de cette page ne s'écrivent pas sur le site : elles viennent de Discord.",
+    "stepChannel": "Écris ton annonce dans le salon de cette catégorie, sur notre serveur Discord. Elle apparaît ici en quelques instants.",
+    "channelLink": "Ouvrir le salon « {category} »",
+    "notMember": "Pas encore sur notre serveur ?",
+    "joinOurs": "Rejoindre le Discord BlueGenji",
+    "stepGeti": "Pour toucher tout le réseau, publie-la aussi depuis le serveur officiel de GETI : c'est lui qui relaie les annonces vers les serveurs abonnés.",
+    "rules": "Une annonce modifiée ou supprimée sur Discord l'est aussi sur cette page.",
+    "close": "Fermer",
+    "closeLabel": "Fermer la fenêtre",
+    "newTab": "(nouvel onglet)"
+  },
+  "filters": {
+    "title": "Filtres",
+    "toggle": "Filtres",
+    "toggleActive": "{count, plural, one {Filtres (# actif)} other {Filtres (# actifs)}}",
+    "reset": "Réinitialiser",
+    "resetLabel": "Réinitialiser tous les filtres",
+    "apply": "Appliquer les filtres",
+    "any": "Peu importe",
+    "ranks": "Rang",
+    "ranksHintSubject": "Filtre par rang",
+    "ranksHint": "Garde les annonces dont la fourchette de rangs recoupe la tienne. Un ancien SR (« 3500 », « 4k ») est converti en rang.",
+    "rankMin": "Rang minimum",
+    "rankMax": "Rang maximum",
+    "roles": "Rôle",
+    "rolesHintSubject": "Filtre par rôle",
+    "rolesHint": "Une annonce « Flex » accepte tous les rôles : elle reste visible quel que soit le rôle choisi.",
+    "subRoles": "Sous-rôle",
+    "staffRoles": "Rôle de staff",
+    "levels": "Niveau d'équipe",
+    "levelsHintSubject": "Niveau d'équipe",
+    "levelsHint": "Les divisions de la ligue FACEIT, de la plus accessible (Open) à la plus relevée (Expert).",
+    "regions": "Région",
+    "platforms": "Plateforme",
+    "languages": "Langue",
+    "days": "Jour",
+    "time": "Horaire",
+    "timeHintSubject": "Filtre par horaire",
+    "timeHint": "Garde les annonces dont un horaire tombe dans ce créneau. Les heures sont celles écrites dans l'annonce, le plus souvent à l'heure de Paris.",
+    "hourFrom": "Entre (heure)",
+    "hourTo": "et (heure)",
+    "age": "Ancienneté",
+    "ageAll": "Toutes ({days, plural, one {# jour} other {# jours}})",
+    "ageDays": "{days, plural, one {Moins de 24 h} other {Moins de # jours}}",
+    "options": "Affichage",
+    "showClosed": "Montrer les annonces closes",
+    "showClosedHintSubject": "Annonces closes",
+    "showClosedHint": "Une annonce entièrement barrée par son auteur est considérée comme close : la place est prise.",
+    "includeUnknown": "Inclure les annonces qui ne précisent pas un critère",
+    "includeUnknownHintSubject": "Annonces incomplètes",
+    "includeUnknownHint": "Beaucoup d'annonces ne donnent ni région ni plateforme. Décoche pour ne garder que celles qui précisent chaque critère choisi."
+  },
+  "results": {
+    "count": "{count, plural, =0 {Aucune annonce} one {# annonce} other {# annonces}}",
+    "countFiltered": "{count, plural, =0 {Aucune annonce ne correspond} one {# annonce correspond} other {# annonces correspondent}}",
+    "listLabel": "Annonces, de la plus récente à la plus ancienne",
+    "empty": "Aucune annonce dans cette catégorie pour le moment.",
+    "emptyFiltered": "Aucune annonce ne correspond à ces filtres.",
+    "emptyReset": "Réinitialiser les filtres",
+    "unavailable": "Les annonces sont momentanément indisponibles.",
+    "pagination": "Pages d'annonces",
+    "previous": "Annonces plus récentes",
+    "next": "Annonces plus anciennes",
+    "page": "Page {page} sur {pages}"
+  },
+  "post": {
+    "copy": "Copier le pseudo",
+    "copyLabel": "Copier le pseudo Discord {tag}",
+    "copied": "Pseudo Discord copié : {tag}",
+    "copyFailed": "Copie impossible : sélectionne le pseudo à la main.",
+    "noTag": "Auteur non identifié",
+    "tagLabel": "Pseudo Discord",
+    "postedAt": "Publiée le {date}",
+    "edited": "modifiée",
+    "editedAt": "Modifiée le {date}",
+    "closed": "Close",
+    "sourceRelay": "Relayée par GETI",
+    "sourceDirect": "Publiée sur notre Discord",
+    "origin": "depuis {server}",
+    "more": "Lire la suite",
+    "less": "Replier",
+    "chipsLabel": "Informations lues dans l'annonce",
+    "matchPrefix": "Correspond à ta recherche :",
+    "mentionMember": "@membre",
+    "mentionRole": "@rôle",
+    "mentionChannel": "#salon"
+  },
+  "chips": {
+    "rankRange": "{min} – {max}",
+    "rankForRole": "{role} : {rank}",
+    "rank": "{tier} {division}",
+    "team": "Équipe : {name}",
+    "minAge": "{age} ans et +",
+    "timeRange": "{from} – {to}",
+    "timeFrom": "dès {from}",
+    "timeZone": "{time} ({zone})"
+  },
+  "tiers": {
+    "BRONZE": "Bronze",
+    "SILVER": "Argent",
+    "GOLD": "Or",
+    "PLATINUM": "Platine",
+    "EMERALD": "Émeraude",
+    "DIAMOND": "Diamant",
+    "MASTER": "Maîtrise",
+    "GRANDMASTER": "Grande maîtrise",
+    "CHAMPION": "Virtuose"
+  },
+  "roles": {
+    "TANK": "Tank",
+    "DPS": "DPS",
+    "SUPPORT": "Support",
+    "FLEX": "Flex"
+  },
+  "subRoles": {
+    "MAIN_TANK": "Main tank",
+    "OFF_TANK": "Off tank",
+    "HITSCAN": "Hitscan",
+    "FLEX_DPS": "DPS flex",
+    "MAIN_SUPPORT": "Main support",
+    "FLEX_SUPPORT": "Support flex"
+  },
+  "staffRoles": {
+    "COACH": "Coach",
+    "MANAGER": "Manager",
+    "ANALYST": "Analyste",
+    "CASTER": "Caster",
+    "OBSERVER": "Observateur",
+    "GRAPHIC": "Graphiste",
+    "COMMUNITY": "Community manager"
+  },
+  "levels": {
+    "OPEN": "Open",
+    "INTERMEDIATE": "Intermédiaire",
+    "ADVANCED": "Avancé",
+    "EXPERT": "Expert"
+  },
+  "regions": {
+    "EU": "Europe",
+    "NA": "Amérique du Nord",
+    "LATAM": "Amérique latine",
+    "ASIA": "Asie",
+    "OCE": "Océanie"
+  },
+  "platforms": {
+    "PC": "PC",
+    "CONSOLE": "Console"
+  },
+  "languages": {
+    "FR": "Français",
+    "EN": "Anglais",
+    "ES": "Espagnol",
+    "DE": "Allemand",
+    "IT": "Italien",
+    "PT": "Portugais",
+    "NL": "Néerlandais",
+    "PL": "Polonais",
+    "AR": "Arabe"
+  },
+  "days": {
+    "MON": "Lundi",
+    "TUE": "Mardi",
+    "WED": "Mercredi",
+    "THU": "Jeudi",
+    "FRI": "Vendredi",
+    "SAT": "Samedi",
+    "SUN": "Dimanche"
+  }
+}
