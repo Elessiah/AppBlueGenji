@@ -15,10 +15,13 @@ import { readJsonObject } from "@/lib/server/request-body";
 import { GETI_INGEST_ERRORS } from "@/lib/server/geti/wire";
 
 /**
- * Plafond d'appels du bot, toutes routes GETI confondues : un rattrapage de
- * de la durée de garde (14 jours, 7 pour les scrims) sur six salons tient en quelques centaines de lots, loin
- * dessous ; au-delà, c'est une boucle folle, que le site refuse (429) au lieu
- * d'écrire en base à chaque tour.
+ * Plafond d'appels du bot, toutes routes GETI confondues. Le rattrapage est
+ * cadencé par la lecture de l'historique (une page de cent messages toutes les
+ * 750 ms au plus, soit cinq lots de vingt annonces par page au pire : environ
+ * 400 appels par minute, réconciliations comprises) ; l'envoi en direct et les
+ * reprises de la file s'y ajoutent sans l'approcher. Au-delà, c'est une boucle
+ * folle, que le site refuse (429, avec `Retry-After`, que le bot respecte) au
+ * lieu d'écrire en base à chaque tour.
  */
 export const GETI_INGEST_RULE: RateLimitRule = {
   name: "geti-ingest",

@@ -466,6 +466,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // `source` (annonce directe ou relais de GETI Bot) est venue après une
     // première création de la table sur les bases de développement.
     `ALTER TABLE bg_geti_posts ADD COLUMN source VARCHAR(8) NOT NULL DEFAULT 'relay' AFTER category`,
+    // Oppositions GETI (`lib/server/geti/objections.ts`) : retirer et écarter les
+    // annonces d'un auteur lit `author_id` ; déjà là (`ER_DUP_KEYNAME`) : toléré.
+    `ALTER TABLE bg_geti_posts ADD INDEX idx_bg_geti_posts_author (author_id)`,
     // Map de départage d'un tour de play-offs à format défini (`ROUND_MAPS.md`).
     `ALTER TABLE bg_tournament_round_maps ADD COLUMN tiebreak_map VARCHAR(64) NULL AFTER slots_json`,
     // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : option éteinte par
