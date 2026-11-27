@@ -257,3 +257,74 @@ describe("rangs d'une annonce — rang par rôle", () => {
     });
   });
 });
+
+describe("rangs d'une annonce — faux rangs écartés", () => {
+  const NO_RANK = { min: null, max: null };
+
+  it("un montant en milliers n'est pas un SR (« cashprize 1k€ »)", () => {
+    expect(rangeOf("LFT tank, cashprize 1k€ gagné")).toEqual(NO_RANK);
+  });
+
+  it("« 4k » sans libellé ni rôle n'est pas un SR (« écran 4k »)", () => {
+    expect(rangeOf("lft, joue sur écran 4k")).toEqual(NO_RANK);
+  });
+
+  it("« 4k » contre un rôle est un SR", () => {
+    expect(parseGetiText("lft tank 4k").ranks.byRole.TANK).toEqual(getiRange(getiRank("GRANDMASTER", 5)));
+  });
+
+  it("« 4k » suivi de « sr » est un SR", () => {
+    expect(rangeOf("lft 4k sr")).toEqual(getiRange(getiRank("GRANDMASTER", 5)));
+  });
+
+  it("« 4k » derrière « sr : » est un SR", () => {
+    expect(rangeOf("lft, sr : 4k")).toEqual(getiRange(getiRank("GRANDMASTER", 5)));
+  });
+
+  it("un nombre suivi d'une unité n'est pas un SR (« 1500+ heures »)", () => {
+    expect(rangeOf("lft, 1500+ heures de jeu")).toEqual(NO_RANK);
+  });
+
+  it("« s2 » derrière « depuis la » est une saison, pas Silver 2", () => {
+    expect(rangeOf("Je joue depuis la s2, dps d1")).toEqual(getiRange(getiRank("DIAMOND", 1)));
+  });
+
+  it("« G2 » derrière « ex- » est une équipe, pas Gold 2", () => {
+    expect(parseGetiText("lft ex-G2 dps").ranks.byRole).toEqual({});
+  });
+
+  it("« G2 » devant « Esports » est une équipe, pas Gold 2", () => {
+    expect(rangeOf("lft, fan de G2 Esports")).toEqual(NO_RANK);
+  });
+
+  it("« g2 » seul reste Gold 2", () => {
+    expect(rangeOf("lft dps g2")).toEqual(getiRange(getiRank("GOLD", 2)));
+  });
+});
+
+describe("rangs d'une annonce — plusieurs rangs pour un rôle", () => {
+  it("le rang actuel derrière le peak reste au même rôle", () => {
+    expect(parseGetiText("lft tank peak gm, actuellement m1").ranks.byRole.TANK).toEqual(
+      getiRange(getiRank("MASTER", 1), getiRank("GRANDMASTER", 1)),
+    );
+  });
+
+  it("un rang suivi de son propre rôle ne suit pas le rôle d'avant", () => {
+    expect(parseGetiText("lfp tank peak m2, actuellement d1 dps").ranks.byRole).toEqual({
+      TANK: getiRange(getiRank("MASTER", 2)),
+      DPS: getiRange(getiRank("DIAMOND", 1)),
+    });
+  });
+});
+
+describe("rangs d'une annonce — borne ouverte au bout d'une liste", () => {
+  it("« diam ou master+ » monte jusqu'à Champion 1", () => {
+    expect(parseGetiText("lfp dps diam ou master+").ranks.byRole.DPS).toEqual(
+      getiRange(getiRank("DIAMOND", 5), CHAMPION_1),
+    );
+  });
+
+  it("« jusqu'à plat ou diam » descend jusqu'à Bronze 5", () => {
+    expect(rangeOf("lfp jusqu'a plat ou diam")).toEqual(getiRange(BRONZE_5, getiRank("DIAMOND", 1)));
+  });
+});

@@ -50,7 +50,8 @@ function aliasFinder<T extends string>(
 }
 
 const REGION_ALIASES: Readonly<Record<GetiRegion, readonly string[]>> = {
-  EU: ["eu", "euw", "eune", "europe", "european", "europeen", "europeenne", "emea"],
+  // « eu » seul est lu à part : c'est aussi le participe d'« avoir » (« j'ai eu »).
+  EU: ["euw", "eune", "europe", "european", "europeen", "europeenne", "emea"],
   NA: ["na", "nae", "naw", "north america", "amerique du nord"],
   LATAM: ["latam", "south america", "latin america", "amerique du sud", "amerique latine"],
   ASIA: ["asia", "asie", "apac", "korea", "coree", "kr"],
@@ -58,6 +59,27 @@ const REGION_ALIASES: Readonly<Record<GetiRegion, readonly string[]>> = {
 };
 
 const findRegions = aliasFinder(GETI_REGIONS, REGION_ALIASES);
+const EU_WORD = new RegExp(String.raw`${NOT_AFTER_WORD}eu${NOT_BEFORE_WORD}`, "gu");
+/** Mots qui font de « eu » le participe d'« avoir » : « j'ai eu », « on a eu », « jamais eu ». */
+const PARTICIPLE_BEFORE = new Set(
+  [
+    "ai as a avons avez ont avais avait avions aviez avaient aurai auras aura aurons aurez auront",
+    "aurais aurait aurions auriez auraient aie aies ait ayons ayez aient avoir ayant",
+    "pas plus jamais deja bien toujours enfin souvent rien tout beaucoup trop assez presque vraiment",
+  ]
+    .join(" ")
+    .split(" "),
+);
+const WORD_BEFORE = /(\p{L}+)[^\p{L}\p{N}\n]*$/u;
+
+/** « eu » est la région, sauf derrière un auxiliaire ou un adverbe (« j'ai eu une team »). */
+function hasEuWord(lower: string): boolean {
+  for (const match of lower.matchAll(EU_WORD)) {
+    const previous = WORD_BEFORE.exec(lower.slice(Math.max(0, match.index - 20), match.index));
+    if (previous === null || !PARTICIPLE_BEFORE.has(previous[1])) return true;
+  }
+  return false;
+}
 
 /**
  * Régions visées (mêmes mots que le relais du bot, Océanie en plus).
@@ -68,7 +90,8 @@ const findRegions = aliasFinder(GETI_REGIONS, REGION_ALIASES);
  */
 export function parseGetiRegions(lower: string, rawText: string): GetiRegion[] {
   const found = findRegions(lower);
-  return getiFlagCodes(rawText).includes("EU") ? inReferenceOrder(GETI_REGIONS, [...found, "EU"]) : found;
+  const europe = hasEuWord(lower) || getiFlagCodes(rawText).includes("EU");
+  return europe ? inReferenceOrder(GETI_REGIONS, [...found, "EU"]) : found;
 }
 
 const PLATFORM_ALIASES: Readonly<Record<GetiPlatform, readonly string[]>> = {
@@ -218,7 +241,7 @@ const TIME_RANGE = new RegExp(
 );
 const TIME_SINGLE = new RegExp(String.raw`(?<![\p{L}\p{N}:#+])${TIME_ATOM}${NOT_BEFORE_WORD}`, "gu");
 /** Une durée n'est pas une heure : « 2h par jour », « 3h de jeu ». */
-const DURATION_AFTER = /^\s?(?:par|de jeu|de scrim|per|a day|\/\s?(?:jour|day|semaine|week))/u;
+const DURATION_AFTER = /^\s?(?:par|de jeu|de scrim|per|a day|\/\s?(?:jour|soir|day|night|semaine|week))/u;
 
 type TimeParts = {
   hour: number;
@@ -249,7 +272,19 @@ function toMinutes(parts: TimeParts, meridiem: string | undefined): number | nul
   return hour * 60 + parts.minutes;
 }
 
-function parseTimes(lower: string): GetiTimeRange[] {
+/** « 2-3h par soir », « 2h par jour » : une durée, ni lue ni relue heure par heure. */
+function isDuration(lower: string, end: number): boolean {
+  return DURATION_AFTER.test(lower.slice(end, end + 12));
+}
+
+function timeRange(first: TimeParts, second: TimeParts): GetiTimeRange | null {
+  const from = toMinutes(first, first.meridiem ?? second.meridiem);
+  const to = toMinutes(second, second.meridiem);
+  return from === null || to === null ? null : { from, to };
+}
+
+/** Fourchettes horaires, et le texte où elles (et les durées) sont effacées. */
+function parseTimeRanges(lower: string): { times: GetiTimeRange[]; rest: string } {
   const times: GetiTimeRange[] = [];
   let rest = lower;
   for (const match of lower.matchAll(TIME_RANGE)) {
@@ -257,21 +292,29 @@ function parseTimes(lower: string): GetiTimeRange[] {
     const second = timeParts(match, 1 + TIME_ATOM_GROUPS);
     // « 3-5 joueurs » : sans unité sur la seconde heure, ce n'est pas un horaire.
     if (!second.explicit) continue;
-    const from = toMinutes(first, first.meridiem ?? second.meridiem);
-    const to = toMinutes(second, second.meridiem);
-    if (from === null || to === null) continue;
-    times.push({ from, to });
+    const end = match.index + match[0].length;
+    const range = isDuration(lower, end) ? "duration" : timeRange(first, second);
+    if (range === null) continue;
+    if (range !== "duration") times.push(range);
     // La fourchette lue est effacée : ses heures ne se relisent pas une à une.
-    rest = rest.slice(0, match.index) + " ".repeat(match[0].length) + rest.slice(match.index + match[0].length);
+    rest = rest.slice(0, match.index) + " ".repeat(match[0].length) + rest.slice(end);
   }
+  return { times, rest };
+}
+
+function parseTimes(lower: string): GetiTimeRange[] {
+  const { times, rest } = parseTimeRanges(lower);
   for (const match of rest.matchAll(TIME_SINGLE)) {
     const parts = timeParts(match, 1);
     if (!parts.explicit) continue;
-    const end = match.index + match[0].length;
-    if (DURATION_AFTER.test(rest.slice(end, end + 12))) continue;
+    if (isDuration(rest, match.index + match[0].length)) continue;
     const from = toMinutes(parts, parts.meridiem);
     if (from !== null) times.push({ from, to: null });
   }
+  return uniqueSortedTimes(times);
+}
+
+function uniqueSortedTimes(times: readonly GetiTimeRange[]): GetiTimeRange[] {
   const seen = new Set<string>();
   return times
     .filter((time) => {
@@ -345,17 +388,32 @@ export function parseGetiStaffRoles(lower: string): GetiStaffRole[] {
 }
 
 const AGE = String.raw`(1[3-9]|2[0-5])`;
-const MIN_AGE_PATTERNS: readonly RegExp[] = [
-  new RegExp(String.raw`${NOT_AFTER_WORD}${AGE}\s?\+`, "u"),
-  new RegExp(String.raw`(?<![\p{L}\p{N}:])\+\s?${AGE}${NOT_BEFORE_WORD}`, "u"),
-  new RegExp(
-    String.raw`${NOT_AFTER_WORD}${AGE}\s?(?:ans|yo|y/o|years old|years)\s?(?:min|minimum|mini|ou plus|et plus|or older|and older|and up)${NOT_BEFORE_WORD}`,
-    "u",
-  ),
-  new RegExp(
-    String.raw`${NOT_AFTER_WORD}(?:min|minimum|au moins|at least)\s?:?\s?${AGE}\s?(?:ans|yo|y/o|years)${NOT_BEFORE_WORD}`,
-    "u",
-  ),
+/**
+ * Derrière « 18+ » ou « +18 » sans mot d'âge : la fin, une ponctuation ou un mot
+ * d'âge. « +20 joueurs », « 15+ heures » ou « 20+ scrims » sont des nombres.
+ */
+const AGE_FOLLOW = new RegExp(
+  String.raw`^[^\S\n]*(?:$|[^\p{L}\p{N}\s]|\n|(?:ans?|yo|y/o|years?|old|only|seulement|uniquement|obligatoire|requis|required|min|minimum|mini|svp|pls|please)${NOT_BEFORE_WORD})`,
+  "u",
+);
+type AgePattern = { pattern: RegExp; unlabelled: boolean };
+const MIN_AGE_PATTERNS: readonly AgePattern[] = [
+  { pattern: new RegExp(String.raw`${NOT_AFTER_WORD}${AGE}\s?\+`, "gu"), unlabelled: true },
+  { pattern: new RegExp(String.raw`(?<![\p{L}\p{N}:])\+\s?${AGE}${NOT_BEFORE_WORD}`, "gu"), unlabelled: true },
+  {
+    pattern: new RegExp(
+      String.raw`${NOT_AFTER_WORD}${AGE}\s?(?:ans|yo|y/o|years old|years)\s?(?:min|minimum|mini|ou plus|et plus|or older|and older|and up)${NOT_BEFORE_WORD}`,
+      "gu",
+    ),
+    unlabelled: false,
+  },
+  {
+    pattern: new RegExp(
+      String.raw`${NOT_AFTER_WORD}(?:min|minimum|au moins|at least)\s?:?\s?${AGE}\s?(?:ans|yo|y/o|years)${NOT_BEFORE_WORD}`,
+      "gu",
+    ),
+    unlabelled: false,
+  },
 ];
 const ADULT = new RegExp(String.raw`${NOT_AFTER_WORD}(?:majeure?s?|adults? only)${NOT_BEFORE_WORD}`, "u");
 const ADULT_AGE = 18;
@@ -367,9 +425,11 @@ const ADULT_AGE = 18;
  * @returns L'âge, ou `null`.
  */
 export function parseGetiMinAge(lower: string): number | null {
-  for (const pattern of MIN_AGE_PATTERNS) {
-    const match = pattern.exec(lower);
-    if (match !== null) return Number(match[1]);
+  for (const { pattern, unlabelled } of MIN_AGE_PATTERNS) {
+    for (const match of lower.matchAll(pattern)) {
+      const end = match.index + match[0].length;
+      if (!unlabelled || AGE_FOLLOW.test(lower.slice(end, end + 16))) return Number(match[1]);
+    }
   }
   return ADULT.test(lower) ? ADULT_AGE : null;
 }
@@ -400,6 +460,7 @@ const NOT_A_NAME = new Set(
     "cherche recherche recrute looking seeking need needs is are est qui de du des en a au and et for pour",
     "competitive competitif compet chill serieuse serieux tryhard semi francaise francophone",
     "name nom discord role roles rang rank region plateforme platform contact",
+    "je j nous on il elle ils elles vous tu we i you they he she notre nos votre vos mon ma mes my our your",
   ]
     .join(" ")
     .split(" "),
@@ -413,6 +474,9 @@ function nameKey(word: string): string {
     .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
+/** Dans la phrase, un article derrière « team » ouvre une phrase (« team La plus chill »), pas un nom. */
+const LEADING_ARTICLES = new Set(["le", "la", "les", "l", "un", "une", "des", "the", "a", "an", "ce", "cette", "this"]);
+
 function isNameWord(word: string): boolean {
   const key = nameKey(word);
   return key !== "" && !NOT_A_NAME.has(key) && !/^[bsgpdmc][1-5]$/u.test(key);
@@ -424,7 +488,9 @@ function cleanTeamName(candidate: string): string | null {
   const stop = words.findIndex((word) => !isNameWord(word));
   const kept = stop === -1 ? words : words.slice(0, stop);
   const name = visibleText(kept.join(" ")).replace(/[.'-]+$/u, "");
-  return name === "" || name.length > GETI_TEAM_NAME_MAX ? null : name;
+  // Mots en capitale seulement : « 5 joueurs dont 2 tanks » n'est pas un nom.
+  if (!/\p{Lu}/u.test(name)) return null;
+  return name.length > GETI_TEAM_NAME_MAX ? null : name;
 }
 
 /**
@@ -442,6 +508,7 @@ export function parseGetiTeamName(clean: string): string | null {
     if (name !== null) return name;
   }
   for (const match of clean.matchAll(TEAM_INLINE)) {
+    if (LEADING_ARTICLES.has(nameKey(match[1].split(/\s/u)[0]))) continue;
     const name = cleanTeamName(match[1]);
     if (name !== null) return name;
   }

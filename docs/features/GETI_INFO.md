@@ -44,7 +44,9 @@ possibles**, sans en supposer une :
   est le contenu ;
 - **relais d'un bot** (`author.bot`) — l'auteur est lu dans l'encart : ligne
   d'auteur (`pseudo`, `pseudo#1234`, `Nom (@pseudo)`), mention derrière un libellé
-  (`by`, `par`, `Contact :`…) ou unique mention du texte ; titre, description et
+  net (`by`/`par`/`Contact` en tête de ligne, `Auteur :`, `posté par`…) ; une
+  mention sans libellé, ou dans une phrase (« remplaçant de <@id> »), ne désigne
+  personne : elle peut viser un tiers ; titre, description et
   champs de l'encart forment le texte. La dernière ligne des relais de **notre**
   bot (`*Sent from : [Serveur](invitation)* by <@id>`, `buildServiceMessage`) est
   retirée du texte et donne `originServer` et `authorId`.
@@ -122,27 +124,37 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
   (« platinium », « diamand », « grand-maître »).
 - **Initiale + division** collées : « d3 », « m1 » (`b s g p d m c`). Une initiale
   seule n'est jamais un rang. « argent » n'est lu que suivi d'une division ; « or »
-  n'est pas lu (mot trop courant) — « gold » l'est.
+  n'est pas lu (mot trop courant) — « gold » l'est. Derrière « saison », « depuis
+  la », « ex- » (« depuis la s2 », « ex-G2 ») ou devant « esport », ce n'est pas
+  un rang.
 - **Fourchettes** : « diam 3-1 », « d3-m2 », « plat à diam », « d3 to m2 ».
   Plusieurs rangs dispersés : du plus bas au plus haut.
-- **Bornes ouvertes** sur un rang seul : « master+ », « min d2 », « au moins
-  diamant » → jusqu'à Champion 1 ; « max m1 », « jusqu'à master » → depuis
-  Bronze 5.
+- **Bornes ouvertes** : « master+ », « min d2 », « au moins diamant » → jusqu'à
+  Champion 1 ; « max m1 », « jusqu'à master » → depuis Bronze 5. Dans une liste,
+  la borne vaut au bout où elle est écrite (« diam ou master+ » → Champion 1),
+  sauf si l'autre bout est lui-même une borne (« min d3 max m1 »).
 - **Top 500** : Grand Maître 5 → Champion 1.
 - **Ancien SR** : « 3500 sr », « 4400+ », « 3000-3500 », « 4k2 », « 3.9k » —
   500 points par palier, 100 par division, plafonné à Grand Maître 1. Un nombre nu
-  ou deux années (« 2025-2026 ») ne sont pas un SR.
+  ou deux années (« 2025-2026 ») ne sont pas un SR, ni un nombre suivi d'une unité
+  (« 1500+ heures », « 1k€ »). « 4k » seul n'est lu qu'avec « sr »/« elo » ou
+  contre un rôle (« tank 4k ») : sinon c'est un montant (« cashprize 1k », « écran
+  4k »).
 - **Par rôle** : le rôle écrit contre le rang, sur la même ligne, devant
   (« tank m2 / dps d1 ») ou derrière (« M2 tank, D1 dps ») ; une liste de rôles
-  partage la fourchette (« tank/dps : d3-m2 »). « Flex » ne porte pas de rang.
+  partage la fourchette (« tank/dps : d3-m2 »). Un second rang qui suit le
+  premier sans rôle à lui reste au même rôle (« tank peak gm, actuellement m1 » →
+  Tank Master 1 – Grand Maître 1). « Flex » ne porte pas de rang.
 
 ### Autres champs
 
 - **Rôles** : français, anglais, abrégés (« heal », « supp », « mt », « fdps »…).
   « flex dps » / « flex support » sont des sous-rôles, pas le rôle Flex. « ms »
-  derrière un nombre est un ping.
+  derrière un nombre est un ping ; « support » / « soutien » de politesse
+  (« merci pour votre soutien », « thanks for the support ») n'est pas un rôle.
 - **Région** : mêmes mots que le relais du bot, plus l'Océanie et le drapeau
-  européen.
+  européen. « eu » derrière un auxiliaire ou un adverbe (« j'ai eu », « jamais
+  eu ») est le participe d'« avoir », pas l'Europe.
 - **Langues** : mots (« francophone », « english »), drapeaux, sigles **en liste**
   (« FR/EN ») ou derrière « langue : » — seuls, « EN », « ES » ou « DE » sont des
   mots courants.
@@ -150,11 +162,15 @@ Overwatch. Échelle : Bronze 5 = 0 … Champion 1 = 39 (`getiRankValue`,
   fourchettes (« lundi au jeudi »), « week-end », « en semaine », « tous les
   soirs ».
 - **Horaires** : « 21h-23h », « 20h30 », « 20-23h », « 8-11pm », « 20:30 » ; une
-  durée (« 2h par jour ») n'en est pas un. Fuseau : « CET », « CEST », « UTC+1 »,
+  durée (« 2h par jour », « 2-3h par soir ») n'en est pas un. Fuseau : « CET », « CEST », « UTC+1 »,
   « heure française » (= `Europe/Paris`).
 - **Nom d'équipe** : derrière un libellé (« Équipe : … », « Team: … ») ou dans la
   phrase après « team / équipe / structure / roster », mots en capitale seulement,
-  arrêté au premier mot du vocabulaire d'annonce (« Team Blue Phoenix EU »).
+  arrêté au premier mot du vocabulaire d'annonce (« Team Blue Phoenix EU ») ; sans
+  capitale (« Roster : 5 joueurs »), ou derrière « team » un pronom ou un article
+  (« Team Je cherche », « team La plus chill »), pas de nom.
+- **Âge minimal** : « 18+ », « +16 », « 17 ans minimum », « majeur » ; « 18+ » /
+  « +18 » suivis d'un nom (« +20 joueurs », « 15+ heures ») sont des nombres.
 
 ## Filtre — `matchesGetiFilter(post, filter, now?)`
 

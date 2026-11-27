@@ -17,7 +17,7 @@
       "ranks": {
         "min": { "tier": "MASTER", "division": 2 },
         "max": { "tier": "GRANDMASTER", "division": 5 },
-        "byRole": { "DPS": { "min": { "tier": "MASTER", "division": 2 }, "max": { "tier": "MASTER", "division": 2 } } }
+        "byRole": { "DPS": { "min": { "tier": "MASTER", "division": 2 }, "max": { "tier": "GRANDMASTER", "division": 5 } } }
       },
       "regions": ["EU"],
       "platforms": ["PC"],
@@ -323,7 +323,7 @@
       "ranks": {
         "min": { "tier": "MASTER", "division": 1 },
         "max": { "tier": "GRANDMASTER", "division": 3 },
-        "byRole": { "TANK": { "min": { "tier": "GRANDMASTER", "division": 3 }, "max": { "tier": "GRANDMASTER", "division": 3 } } }
+        "byRole": { "TANK": { "min": { "tier": "MASTER", "division": 1 }, "max": { "tier": "GRANDMASTER", "division": 3 } } }
       },
       "regions": ["EU"],
       "languages": ["EN", "DE"]

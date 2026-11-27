@@ -49,6 +49,12 @@ const SUB_ROLE_PARENT: Readonly<Record<GetiSubRole, GetiRole>> = {
 
 /** Abréviations de deux lettres, ambiguës derrière un nombre (« 20 ms » de ping). */
 const SHORT_ABBREVIATIONS = new Set(["mt", "ot", "ms", "fs"]);
+/** « support » et « soutien » sont aussi des mots de politesse (« merci pour votre soutien »). */
+const POLITE_WORDS = new Set(["support", "supports", "soutien"]);
+const POLITE_BEFORE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:votre|vos|ton|tes|your|(?:merci|thanks?|thank you|thx)(?: [\p{L}']+){0,3} (?:le|du|the|this|ce))\s$`,
+  "u",
+);
 
 const ROLE_TABLE = aliasTable(ROLE_ALIASES);
 const ROLE_PATTERN = new RegExp(`${NOT_AFTER_WORD}(${ROLE_TABLE.pattern})${NOT_BEFORE_WORD}`, "gu");
@@ -79,6 +85,7 @@ export function findGetiRoleTokens(lower: string): GetiRoleToken[] {
     if (kind === undefined) continue;
     const start = match.index;
     if (SHORT_ABBREVIATIONS.has(key) && /\d\s?$/u.test(lower.slice(Math.max(0, start - 2), start))) continue;
+    if (POLITE_WORDS.has(key) && POLITE_BEFORE.test(lower.slice(Math.max(0, start - 40), start))) continue;
     tokens.push(
       isSubRole(kind)
         ? { start, end: start + match[0].length, role: SUB_ROLE_PARENT[kind], subRole: kind }
