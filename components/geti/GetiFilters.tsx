@@ -23,6 +23,7 @@ import {
   getiActiveFilterCount,
   getiAllRanks,
   getiClockLabel,
+  getiFilterSync,
   getiPageHref,
   getiPageSearch,
   getiRankSlug,
@@ -36,7 +37,9 @@ import styles from "./geti.module.css";
 type FiltersText = GetiMessages["filters"];
 
 const ALL_RANKS = getiAllRanks();
-const HOURS = Array.from({ length: 25 }, (_, hour) => hour);
+/** Début du créneau : 0h à 23h ; fin : 1h à 24h (fin de journée). Un début après la fin passe minuit. */
+const HOURS_FROM = Array.from({ length: 24 }, (_, hour) => hour);
+const HOURS_TO = Array.from({ length: 24 }, (_, hour) => hour + 1);
 
 /** Clés de l'état qui portent une liste de choix. */
 type ListKey = "roles" | "subRoles" | "staffRoles" | "levels" | "regions" | "platforms" | "languages" | "days";
@@ -103,16 +106,30 @@ export function GetiFilters({
   // L'adresse fait foi : un retour arrière ou un lien partagé remet les contrôles d'accord.
   const serverSearch = getiPageSearch(query);
   const lastServerSearch = useRef(serverSearch);
+  // Dernière adresse demandée par un changement de filtre, tant que son rendu n'est pas arrivé :
+  // le rendu d'un changement plus ancien ne doit pas défaire le dernier geste.
+  const pendingSearch = useRef<string | null>(null);
   useEffect(() => {
     if (lastServerSearch.current === serverSearch) return;
     lastServerSearch.current = serverSearch;
-    setDraft(query);
+    const sync = getiFilterSync(pendingSearch.current, serverSearch);
+    pendingSearch.current = sync.pending;
+    if (sync.adopt) setDraft(query);
   }, [serverSearch, query]);
+  useEffect(() => {
+    // Retour arrière ou avant : l'adresse affichée reprend la main sur les contrôles.
+    const release = () => {
+      pendingSearch.current = null;
+    };
+    window.addEventListener("popstate", release);
+    return () => window.removeEventListener("popstate", release);
+  }, []);
 
   const apply = (next: GetiPageQuery) => {
     // Tout changement de filtre revient à la première page.
     const first = { ...next, page: 1 };
     setDraft(first);
+    pendingSearch.current = getiPageSearch(first);
     router.replace(getiPageHref(category, first), { scroll: false });
   };
 
@@ -175,7 +192,7 @@ export function GetiFilters({
     );
   };
 
-  const hourSelect = (key: "hourFrom" | "hourTo", label: string) => {
+  const hourSelect = (key: "hourFrom" | "hourTo", label: string, hours: readonly number[]) => {
     const id = `${panelId}-${key}`;
     const value = draft[key];
     return (
@@ -189,9 +206,9 @@ export function GetiFilters({
           }
         >
           <option value="">{text.any}</option>
-          {HOURS.map((hour) => (
+          {hours.map((hour) => (
             <option key={hour} value={hour}>
-              {getiClockLabel(hour * 60)}
+              {getiClockLabel(hour * 60, locale)}
             </option>
           ))}
         </select>
@@ -303,8 +320,8 @@ export function GetiFilters({
             }
           >
             <div className={styles.pair}>
-              {hourSelect("hourFrom", text.hourFrom)}
-              {hourSelect("hourTo", text.hourTo)}
+              {hourSelect("hourFrom", text.hourFrom, HOURS_FROM)}
+              {hourSelect("hourTo", text.hourTo, HOURS_TO)}
             </div>
           </Group>
         ) : null}

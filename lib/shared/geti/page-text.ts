@@ -76,11 +76,11 @@ export function getiChipLabel(chip: GetiChip, text: GetiDataText, locale: Locale
     case "day":
       return text.days[chip.value];
     case "time": {
-      const from = getiClockLabel(chip.from);
+      const from = getiClockLabel(chip.from, locale);
       const time =
         chip.to === null
           ? getiText(locale, text.chips.timeFrom, { from })
-          : getiText(locale, text.chips.timeRange, { from, to: getiClockLabel(chip.to) });
+          : getiText(locale, text.chips.timeRange, { from, to: getiClockLabel(chip.to, locale) });
       return chip.timezone ? getiText(locale, text.chips.timeZone, { time, zone: chip.timezone }) : time;
     }
     case "date":

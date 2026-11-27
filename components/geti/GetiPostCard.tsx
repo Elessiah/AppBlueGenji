@@ -92,7 +92,14 @@ export function GetiPostCard({
           {tag ? (
             <GetiCopyTag
               tag={tag}
-              text={{ copy: text.copy, copyLabel: text.copyLabel, copied: text.copied, copyFailed: text.copyFailed, tagLabel: text.tagLabel }}
+              text={{
+                copy: text.copy,
+                copyLabel: text.copyLabel,
+                copied: text.copied,
+                copyFailed: text.copyFailed,
+                tagLabel: text.tagLabel,
+                tagPrefix: text.tagPrefix,
+              }}
             />
           ) : (
             <span className={styles.noTag}>{text.noTag}</span>

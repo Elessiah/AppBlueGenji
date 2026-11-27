@@ -546,26 +546,28 @@ posée par `app/geti-info/page.tsx` et `app/geti-info/[category]/page.tsx`.
 - `/geti-info` rend la première catégorie **sans renvoi** ; son adresse canonique
   est `/geti-info/lfp`. Le sitemap liste les six catégories (FR + EN), jamais
   `/geti-info` tout court. L'adresse canonique ne porte jamais les filtres.
-- Le texte des annonces porte `data-nosnippet` : la page est indexable, mais un
-  moteur ne reprend pas en extrait une annonce qui disparaîtra sous 7 ou 14 jours.
+- Le texte des annonces porte `data-nosnippet` (sur une enveloppe `<div>` : les
+  moteurs ne le lisent que sur `div`, `span` et `section`) : la page est indexable,
+  mais un moteur ne reprend pas en extrait une annonce qui disparaîtra sous 7 ou 14 jours.
 
 ### Filtres — l'adresse est la seule mémoire
 
 `lib/shared/geti/page.ts` (pur) : `parseGetiPageQuery` lit l'adresse,
 `getiPageSearch` l'écrit, `getiPageFilter` en fait le `GetiFilter` du moteur. Une
 valeur inconnue, hors borne ou non proposée par la catégorie est **ignorée** ;
-des bornes inversées sont remises dans l'ordre.
+des rangs inversés sont remis dans l'ordre. Des heures « inversées » ne le sont
+pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
 
 | Paramètre | Sens | Exemple |
 | --- | --- | --- |
 | `rmin`, `rmax` | fourchette de rangs (`palier-division`) | `rmin=diamond-3` |
 | `role`, `sub`, `staff` | rôles, sous-rôles, rôles de staff | `role=tank,dps` |
 | `lvl`, `reg`, `plat`, `lang`, `day` | niveau d'équipe, région, plateforme, langue, jour | `lvl=advanced` |
-| `hfrom`, `hto` | créneau horaire, heures entières 0–24 | `hfrom=20&hto=23` |
+| `hfrom`, `hto` | créneau horaire, heures entières (début 0–23, fin 1–24 ; début après la fin = passe minuit) | `hfrom=22&hto=2` |
 | `age` | âge maximal en jours, sous la durée de garde (1, 3, et 7 hors scrims) | `age=3` |
 | `closed=1` | montrer aussi les annonces closes (masquées par défaut) | |
 | `strict=1` | écarter les annonces qui ne précisent pas un critère choisi | |
-| `p` | page (30 annonces par page) | `p=2` |
+| `p` | page (30 annonces par page ; au-delà de la dernière, un message et un lien vers la dernière) | `p=2` |
 
 - **Filtres par catégorie** (`GETI_CATEGORY_FILTERS`) : seulement ce que l'analyse
   lit dans ses annonces — pas de rôle pour un scrim, des rôles de staff pour
@@ -575,13 +577,20 @@ des bornes inversées sont remises dans l'ordre.
   annonces qui ne précisent pas un critère » les écarte (`strict=1`).
 - Le filtre du moteur a reçu quatre critères pour la page : `subRoles`,
   `staffRoles`, `days`, `time` (créneau en minutes ; un horaire de l'annonce doit
-  le recouper, une heure seule y tomber) — `matchesGetiFilter`.
+  le recouper, une heure seule y tomber ; horaire ou créneau qui passe minuit
+  coupé en deux, `getiTimeSlotMatches`) — `matchesGetiFilter`. Une analyse gardée
+  à laquelle manque un champ est lue comme « critère non lu », jamais une erreur
+  (de même pour `getiPostChips`).
+- Heures écrites selon la langue (`getiClockLabel`) : « 21h », « 20h30 » ; en
+  anglais « 21:00 ». La fin de journée s'écrit « 24h » / « 24:00 ».
 - `GetiFilters` (client) : groupes nommés (`<fieldset>` + légende), cases et listes
   natives, « i » (`InfoHint`) pour le rang, le rôle, le niveau, l'horaire et les
   deux réglages d'affichage. Chaque changement réécrit l'adresse
   (`router.replace`, sans défilement, retour à la page 1) ; le compteur de
   résultats est une région `aria-live`. Sous 900 px le panneau se replie derrière
-  un bouton (`aria-expanded`).
+  un bouton (`aria-expanded`). Tant qu'un changement attend son rendu, le rendu
+  d'un changement plus ancien ne remet pas les contrôles en arrière
+  (`getiFilterSync`) ; un retour arrière lève l'attente.
 
 ### Carte d'une annonce (`GetiPostCard`)
 
@@ -596,7 +605,8 @@ des bornes inversées sont remises dans l'ordre.
 - **Texte** : toujours un nœud de texte (`getiPostBodyText`) — marques de
   citation et balisage Discord retirés, mention → mot neutre (jamais un
   identifiant), émoji de serveur → son nom, lien laissé en texte. Replié au-delà
-  de 420 caractères ou 7 lignes (« Lire la suite »).
+  de 420 caractères ou 7 lignes (« Lire la suite ») ; une fois la page chargée, le
+  bouton ne reste que si le texte replié dépasse réellement.
 
 ### Carte du serveur officiel de GETI, fenêtre « Publier »
 
@@ -624,9 +634,9 @@ l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement
 - Tests : `tests/lib/shared/geti/page.test.ts`, `page-text.test.ts`,
   `page-filter.test.ts`, `tests/lib/server/geti/community.test.ts`,
   `e2e/geti-info.spec.ts`.
-- Seed : 17 annonces `Test_` — chaque catégorie, relais et messages directs, une
+- Seed : 18 annonces `Test_` — chaque catégorie, relais et messages directs, une
   annonce modifiée, une close, un niveau de division, un rang Émeraude, une autre
-  région, un texte long ; un scrim de plus de 7 jours n'est jamais gardé.
+  région, un texte long, un horaire qui passe minuit ; un scrim de plus de 7 jours n'est jamais gardé.
 - Données personnelles : rien de plus que ce que décrivent déjà le registre (T21),
   `/rgpd#annonces-geti` et `PRIVACY_CHANGES` (texte, pseudo, serveur d'origine,
   dates, critères lus). L'appel à Discord pour la fréquentation part du serveur,

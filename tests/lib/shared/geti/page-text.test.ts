@@ -72,7 +72,8 @@ describe("getiChipLabel", () => {
   it("le fuseau écrit dans l'annonce suit l'horaire", () => {
     const chip: GetiChip = { kind: "time", from: 1260, to: 1380, timezone: "CET" };
 
-    expect(getiChipLabel(chip, EN, "en")).toBe("21h – 23h (CET)");
+    expect(getiChipLabel(chip, EN, "en")).toBe("21:00 – 23:00 (CET)");
+    expect(getiChipLabel(chip, FR, "fr")).toBe("21h – 23h (CET)");
   });
 
   it("une date se lit dans la langue de la page", () => {

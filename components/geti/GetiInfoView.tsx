@@ -180,12 +180,23 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, l
     );
   }
   const data = getiDataText(m);
+  const pages = Math.max(1, Math.ceil(listed.total / listed.pageSize));
+  // Page au-delà de la dernière (lien partagé, annonces retirées depuis) : la liste n'est pas vide.
+  const beyond = listed.posts.length === 0 && listed.total > 0;
   return (
     <section className={styles.results} aria-labelledby="geti-category-title">
       <p /* NOSONAR S6819 — compteur de résultats annoncé à chaque filtre, pas une sortie de formulaire */ className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
         {getiText(locale, filtered ? m.results.countFiltered : m.results.count, { count: listed.total })}
       </p>
-      {listed.posts.length === 0 ? (
+      {beyond ? (
+        <div className={styles.empty} data-testid="geti-beyond">
+          <p>{m.results.beyond}</p>
+          <LocaleLink href={getiPageHref(category, { ...query, page: pages })} className={styles.resetLink}>
+            {getiText(locale, m.results.beyondLink, { page: pages })}
+          </LocaleLink>
+        </div>
+      ) : null}
+      {!beyond && listed.posts.length === 0 ? (
         <div className={styles.empty}>
           <p>{filtered ? m.results.emptyFiltered : m.results.empty}</p>
           {filtered ? (
@@ -194,20 +205,24 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, l
             </LocaleLink>
           ) : null}
         </div>
-      ) : (
-        // Le texte des annonces n'est pas repris en extrait par les moteurs (`data-nosnippet`).
-        <ul className={styles.list} aria-label={m.results.listLabel} data-nosnippet="">
-          {listed.posts.map((post) => (
-            <li key={post.messageId}>
-              <GetiPostCard post={post} filter={filter} text={m.post} data={data} locale={locale} now={now} />
-            </li>
-          ))}
-        </ul>
-      )}
+      ) : null}
+      {listed.posts.length > 0 ? (
+        // Le texte des annonces n'est pas repris en extrait par les moteurs : `data-nosnippet`
+        // n'est lu que sur `div`, `span` et `section`, d'où l'enveloppe.
+        <div data-nosnippet="" data-testid="geti-nosnippet">
+          <ul className={styles.list} aria-label={m.results.listLabel}>
+            {listed.posts.map((post) => (
+              <li key={post.messageId}>
+                <GetiPostCard post={post} filter={filter} text={m.post} data={data} locale={locale} now={now} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <GetiPagination
         category={category}
         query={query}
-        pages={Math.max(1, Math.ceil(listed.total / listed.pageSize))}
+        pages={pages}
         text={m.results}
         locale={locale}
       />

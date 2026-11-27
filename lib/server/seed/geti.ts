@@ -152,6 +152,13 @@ export const FICTIONAL_GETI_POSTS: readonly SeedGetiPost[] = [
     author: "test_geti_adv",
     text: "LFS EU PC adv, Emerald 2 - Diamond 4, mardi 20h-22h CET. Team Test Boréale.",
   },
+  // Horaire qui passe minuit : le créneau de nuit de la page (« entre 22h et 2h »).
+  {
+    category: "lfs",
+    ageHours: 6,
+    author: "test_geti_nuit",
+    text: "LFS ce soir 23h-1h, Diamant 1 - Master 5, EU, PC, FR. Team Test Nocturne.",
+  },
   {
     category: "lft",
     ageHours: 30,
