@@ -82,12 +82,16 @@ const AMBIGUOUS_ADVERBS = new Set(["bien", "plus", "tout", "assez"]);
  * sujet : « il a eu », « on a eu », mais « de NA à EU ».
  */
 const A_SUBJECTS = new Set(["il", "elle", "on", "qui", "ca", "cela", "y", "n"]);
-const WORDS_BEFORE = /(?:(?:(\p{L}+)[^\p{L}\p{N}\n]+)?(\p{L}+)[^\p{L}\p{N}\n]+)?(\p{L}+)[^\p{L}\p{N}\n]*$/u;
+/** Les trois derniers mots, sans franchir un chiffre ni une ligne (sans regex à retour arrière). */
+function lastWords(before: string): (string | undefined)[] {
+  const tail = before.split(/[\n\p{N}]/u).at(-1) ?? "";
+  const words = tail.match(/\p{L}+/gu) ?? [];
+  return [words.at(-3), words.at(-2), words.at(-1)];
+}
 
 function isParticiple(before: string): boolean {
-  const words = WORDS_BEFORE.exec(before);
-  if (words === null) return false;
-  const [, third, subject, previous] = words;
+  const [third, subject, previous] = lastWords(before);
+  if (previous === undefined) return false;
   if (previous === "a") return subject !== undefined && A_SUBJECTS.has(subject);
   if (AMBIGUOUS_ADVERBS.has(previous)) {
     // « on a bien eu » : « a » derrière son sujet ; « de NA à tout EU » : la région.
