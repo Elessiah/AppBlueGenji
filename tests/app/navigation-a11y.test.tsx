@@ -262,6 +262,14 @@ describe("PublicNavPanel — page courante", () => {
     expect(PUBLIC_NAV_LINKS[0].href).toBe(GETI_PAGE_PATH);
   });
 
+  it("tire l'adresse d'un module sans dépendance, pas de la page (poids de l'en-tête)", () => {
+    const menu = readSource("components/cyber/landing/PublicNavMenu.tsx");
+    const path = readSource("lib/shared/geti/path.ts");
+    expect(menu).toContain('from "@/lib/shared/geti/path"');
+    expect(menu).not.toContain('lib/shared/geti/page"');
+    expect(path).not.toMatch(/^\s*import\s/m);
+  });
+
   it("ne mène plus à la partie compétitive ni à une section de l'accueil", () => {
     const html = panel("/");
     for (const href of ["/tournois", "/equipes", "/joueurs", "/classement", "/regles", "/signalements"]) {
