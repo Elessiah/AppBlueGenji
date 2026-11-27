@@ -52,7 +52,7 @@ const NO_RANK = { min: null, max: null };
 describe("rangs — SR des annonces de scrim", () => {
   it.each([
     { text: "lfs 3k4-5", expected: getiRange(getiRank("DIAMOND", 1), getiRank("MASTER", 5)) },
-    { text: "lfsub 2k5/7", expected: getiRange(getiRank("EMERALD", 5), getiRank("EMERALD", 3)) },
+    { text: "lfsub 2k5/7", expected: getiRange(getiRank("PLATINUM", 5), getiRank("PLATINUM", 3)) },
     { text: "lfs 3.4-3.5k", expected: getiRange(getiRank("DIAMOND", 1), getiRank("MASTER", 5)) },
     { text: "lfsub 3.5-6k", expected: getiRange(getiRank("MASTER", 5), getiRank("MASTER", 4)) },
     { text: "roster 3.2-3k", expected: getiRange(getiRank("DIAMOND", 5), getiRank("DIAMOND", 3)) },
@@ -60,7 +60,8 @@ describe("rangs — SR des annonces de scrim", () => {
     { text: "lfs sr 3.6-3.7", expected: getiRange(getiRank("MASTER", 4), getiRank("MASTER", 3)) },
     { text: "elo : 3.2", expected: getiRange(getiRank("DIAMOND", 3)) },
     { text: "lfs 3k/3k2", expected: getiRange(getiRank("DIAMOND", 5), getiRank("DIAMOND", 3)) },
-    { text: "lft 5000", expected: getiRange(getiRank("CHAMPION", 1)) },
+    { text: "lft 5000", expected: getiRange(getiRank("GRANDMASTER", 1)) },
+    { text: "elo: gold 2k-2k5", expected: getiRange(getiRank("GOLD", 5), getiRank("PLATINUM", 5)) },
     { text: "lft 4400", expected: getiRange(getiRank("GRANDMASTER", 1)) },
   ])("« $text » est une fourchette de SR", ({ text, expected }) => {
     expect(rangeOf(text)).toEqual(expected);
@@ -86,11 +87,11 @@ describe("rangs — SR des annonces de scrim", () => {
 
   it("un décimal nu est un SR dans une recherche de scrim ou de remplaçant", () => {
     expect(scrimRangeOf("LFS EU PC 3.6 21-23 CET")).toEqual(getiRange(getiRank("MASTER", 4)));
-    expect(scrimRangeOf("LFS | 2.5-3.3 | CEST")).toEqual(getiRange(getiRank("EMERALD", 5), getiRank("DIAMOND", 2)));
+    expect(scrimRangeOf("LFS | 2.5-3.3 | CEST")).toEqual(getiRange(getiRank("PLATINUM", 5), getiRank("DIAMOND", 2)));
   });
 
   it("un décimal nu suivi de « + » ouvre la fourchette vers le haut", () => {
-    expect(scrimRangeOf("LFS EU 20-22 CET adv 4.5+")).toEqual(getiRange(getiRank("CHAMPION", 5), getiRank("CHAMPION", 1)));
+    expect(scrimRangeOf("LFS EU 20-22 CET adv 4.5+")).toEqual(getiRange(getiRank("GRANDMASTER", 1), getiRank("CHAMPION", 1)));
   });
 
   it("un décimal nu n'est pas un SR hors scrim", () => {
@@ -124,11 +125,24 @@ describe("rangs — Émeraude", () => {
     expect(rangeOf("notre 2eme roster recrute")).toEqual(NO_RANK);
   });
 
-  it("le SR place Émeraude entre Platine et Diamant", () => {
-    expect(rangeOf("lft 2400 sr")).toEqual(getiRange(getiRank("PLATINUM", 1)));
-    expect(rangeOf("lft 2500 sr")).toEqual(getiRange(getiRank("EMERALD", 5)));
-    expect(rangeOf("lft 2999 sr")).toEqual(getiRange(getiRank("EMERALD", 1)));
+  it("Émeraude n'a pas de tranche de SR : 2999 est Platine 1, 3000 Diamant 5", () => {
+    expect(rangeOf("lft 2499 sr")).toEqual(getiRange(getiRank("GOLD", 1)));
+    expect(rangeOf("lft 2500 sr")).toEqual(getiRange(getiRank("PLATINUM", 5)));
+    expect(rangeOf("lft 2999 sr")).toEqual(getiRange(getiRank("PLATINUM", 1)));
     expect(rangeOf("lft 3000 sr")).toEqual(getiRange(getiRank("DIAMOND", 5)));
+  });
+
+  it("une fourchette de SR à cheval sur 3000 recouvre Émeraude", () => {
+    const post = parseGetiText("lfp 2900-3100");
+
+    expect(rangeOf("lfp 2900-3100")).toEqual(getiRange(getiRank("PLATINUM", 1), getiRank("DIAMOND", 4)));
+    expect(matchesGetiFilter(post, { ranks: { min: getiRank("EMERALD", 3), max: getiRank("EMERALD", 3) } }, NOW)).toBe(true);
+  });
+
+  it("un SR sous 3000 ne recouvre pas Émeraude", () => {
+    const post = parseGetiText("lfp 2800");
+
+    expect(matchesGetiFilter(post, { ranks: { min: getiRank("EMERALD", 5), max: getiRank("EMERALD", 1) } }, NOW)).toBe(false);
   });
 
   it("le filtre situe une annonce Émeraude entre Platine et Diamant", () => {

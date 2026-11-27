@@ -356,15 +356,26 @@ function tierSpan(tier: GetiTier, first: string | undefined, second: string | un
 }
 
 /**
- * Rang d'un SR : 500 points par palier, 100 par division — 2 500 = Émeraude 5,
- * 3 000 = Diamant 5, 3 500 = Master 5, 4 000 = Grand Maître 5, 4 500 =
- * Champion 5 (l'échelle des annonces de scrim, où « 4.5k+ » se lit couramment),
- * plafonné à Champion 1. Sous 3 000, Émeraude décale d'un palier l'ancienne
- * échelle : 2 000 = Platine 5, 1 000 = Argent 5.
+ * Paliers du SR, par tranche de 500 points depuis 1 000 : la table classique
+ * d'Overwatch, antérieure à Émeraude et à Champion, qui n'y ont **aucune**
+ * tranche — moins de 1 500 Bronze, 1 500 Argent, 2 000 Or, 2 500 Platine,
+ * 3 000 Diamant, 3 500 Master, 4 000 et plus Grand Maître.
+ */
+const SR_TIERS: readonly GetiTier[] = ["BRONZE", "SILVER", "GOLD", "PLATINUM", "DIAMOND", "MASTER", "GRANDMASTER"];
+const SR_BASE = 1000;
+const SR_PER_TIER = 500;
+const SR_PER_DIVISION = 100;
+
+/**
+ * Rang d'un SR : 500 points par palier, 100 par division (5 en bas de la
+ * tranche, 1 en haut), plafonné à Grand Maître 1. Une fourchette à cheval sur
+ * 3 000 (« 2900-3100 ») va de Platine 1 à Diamant 4 et recouvre donc Émeraude.
  */
 function srValue(sr: number): number {
-  const steps = Math.floor((sr - 500) / 100);
-  return Math.min(GETI_RANK_TOP, Math.max(0, steps));
+  const points = Math.max(0, sr - SR_BASE);
+  const band = Math.min(SR_TIERS.length - 1, Math.floor(points / SR_PER_TIER));
+  const division = Math.min(DIVISIONS - 1, Math.floor((points - band * SR_PER_TIER) / SR_PER_DIVISION));
+  return GETI_TIERS.indexOf(SR_TIERS[band]) * DIVISIONS + division;
 }
 
 function srSpan(first: number, second: number): ValueRange {

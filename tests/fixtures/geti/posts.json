@@ -532,8 +532,8 @@
           "division": 3
         },
         "max": {
-          "tier": "CHAMPION",
-          "division": 5
+          "tier": "GRANDMASTER",
+          "division": 1
         },
         "byRole": {}
       },
@@ -589,11 +589,11 @@
     "expected": {
       "ranks": {
         "min": {
-          "tier": "EMERALD",
+          "tier": "PLATINUM",
           "division": 2
         },
         "max": {
-          "tier": "EMERALD",
+          "tier": "PLATINUM",
           "division": 2
         },
         "byRole": {}

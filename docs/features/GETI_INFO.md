@@ -162,10 +162,14 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   (3 500 à 3 600), « 3.2-3k », « 3.3/4k » (3 300 à 4 000) ; derrière son
   libellé sans « k » : « SR 3.6-3.7 », « elo : 3.2 » ; et, dans une recherche de
   scrim ou de remplaçant seulement, le décimal nu (« LFS EU PC 3.6 »,
-  « adv 4.5+ »). 500 points par palier, 100 par division : 2 500 = Émeraude 5,
-  3 000 = Diamant 5, 3 500 = Master 5, 4 000 = Grand Maître 5, 4 500 =
-  Champion 5, plafonné à Champion 1 (sous 3 000, Émeraude décale d'un palier
-  l'ancienne échelle : 1 000 = Argent 5). Un horaire voisin ne fait pas d'un SR
+  « adv 4.5+ »). Table classique d'Overwatch, antérieure à Émeraude et à
+  Champion, qui n'y ont **aucune** tranche : moins de 1 500 Bronze, 1 500
+  Argent, 2 000 Or, 2 500 Platine, 3 000 Diamant, 3 500 Master, 4 000 et plus
+  Grand Maître (« 4k » ≈ Grand Maître ; « 4k5 » plafonne à Grand Maître 1,
+  « 4.5k+ » monte jusqu'à Champion 1) ; 100 points par division, 5 en bas de la
+  tranche, 1 en haut. Une fourchette à cheval sur 3 000 (« 2900-3100 » :
+  Platine 1 à Diamant 4) recouvre donc Émeraude dans un filtre ; « Gold 2k »
+  reste Or. Un horaire voisin ne fait pas d'un SR
   un numéro (« 3500 21-23 », « 4k 20-22 CET »), « loi 1901 » n'est pas un SR,
   et « champion » en titre n'est pas un rang (« S10 Intermediate Champion »,
   « champion de France »). Un nombre est
