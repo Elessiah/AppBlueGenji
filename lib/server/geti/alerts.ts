@@ -18,6 +18,7 @@ import { ignoreMissingTable, isMissingTableError, rowsOrEmptyIfMissingTable } fr
 import { loadNotificationRecipients, notifyUsers, type NotificationRecipient } from "@/lib/server/notify";
 import { toIso } from "@/lib/server/serialization";
 import { siteCanonicalBase } from "@/lib/server/site-url";
+import { userSuspendedSql } from "@/lib/server/suspension-sql";
 import { GETI_CATEGORIES, type GetiCategory, type GetiFilter, type GetiParsedPost } from "@/lib/shared/geti";
 import {
   GETI_ALERT_COOLDOWN_MINUTES,
@@ -28,6 +29,7 @@ import {
   getiAlertName,
   getiAlertSearch,
   isFreshGetiPost,
+  isGetiAlertNameInput,
   matchingGetiAlerts,
   type GetiAlert,
 } from "@/lib/shared/geti/alerts";
@@ -109,6 +111,7 @@ export async function createGetiAlert(userId: number, input: GetiAlertInput): Pr
   const category = input.category;
   const search = getiAlertSearch(category, input.search);
   if (search === null) return GETI_ALERT_ERRORS.invalid;
+  if (!isGetiAlertNameInput(input.name)) return GETI_ALERT_ERRORS.invalid;
   const name = getiAlertName(input.name);
   if (name === undefined) return GETI_ALERT_ERRORS.nameTooLong;
 
@@ -137,6 +140,7 @@ export async function updateGetiAlert(userId: number, alertId: number, patch: Ge
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
   if ("name" in patch) {
+    if (!isGetiAlertNameInput(patch.name)) return GETI_ALERT_ERRORS.invalid;
     const name = getiAlertName(patch.name);
     if (name === undefined) return GETI_ALERT_ERRORS.nameTooLong;
     sets.push("name = ?");
@@ -298,26 +302,69 @@ export type GetiAlertOutcome = {
 };
 
 /**
- * Les alertes actives d'une catégorie, au plus `GETI_ALERT_SCAN_MAX`, dans
- * l'ordre de leur identifiant. Une requête par catégorie : `(category, paused)`
- * porte déjà l'identifiant, la lecture suit l'index sans tri (un `IN` sur
- * plusieurs catégories trierait toutes les alertes actives avant de couper).
+ * Où reprend, par catégorie, la lecture des alertes actives quand la borne a
+ * coupé la précédente : l'identifiant de la dernière alerte lue. Sans ce
+ * curseur, les alertes les plus anciennes prendraient toujours toute la borne
+ * et les plus récentes ne seraient jamais lues ; avec lui, chaque passe lit la
+ * suite, en reprenant au début une fois la fin atteinte.
  */
-async function loadActiveAlertsOf(db: GetiExecutor, category: GetiCategory): Promise<ActiveAlert[]> {
-  // `LIMIT` écrit en dur (constante entière), comme `listGetiPosts`.
+const scanCursors = new Map<GetiCategory, number>();
+
+/** Remet les curseurs de lecture à zéro (tests). */
+export function resetGetiAlertScanCursors(): void {
+  scanCursors.clear();
+}
+
+async function readActiveAlertRows(
+  db: GetiExecutor,
+  category: GetiCategory,
+  range: "after" | "upTo",
+  cursor: number,
+  limit: number,
+): Promise<ActiveAlertRow[]> {
+  // `LIMIT` écrit en dur (entier calculé ici, jamais reçu), comme `listGetiPosts`.
+  // Comptes effacés ou suspendus laissés de côté : ils ne seraient pas prévenus et ne doivent pas prendre la borne.
   const [rows] = await db.execute<ActiveAlertRow[]>(
     `SELECT a.id, a.user_id, a.category, a.name, a.search, a.last_notified_at, u.discord_id
        FROM bg_geti_alerts a
        JOIN bg_users u ON u.id = a.user_id
-      WHERE a.paused = 0 AND a.category = ?
+      WHERE a.paused = 0 AND a.category = ? AND a.id ${range === "after" ? ">" : "<="} ?
+        AND u.is_deleted = 0 AND NOT ${userSuspendedSql("u.id")}
       ORDER BY a.id
-      LIMIT ${GETI_ALERT_SCAN_MAX + 1}`,
-    [category],
+      LIMIT ${Math.max(0, Math.trunc(limit))}`,
+    [category, cursor],
   );
-  // Une ligne de plus que la borne : seule elle dit que des alertes restent non lues — signalé dans pm2 (un nombre seul).
-  if (rows.length > GETI_ALERT_SCAN_MAX) console.warn("[geti] borne des alertes lues atteinte:", GETI_ALERT_SCAN_MAX);
+  return rows;
+}
+
+/**
+ * Les alertes actives d'une catégorie, au plus `GETI_ALERT_SCAN_MAX`, dans
+ * l'ordre de leur identifiant à partir du curseur de la catégorie (puis depuis
+ * le début) : au-delà de la borne, les passes suivantes lisent les alertes
+ * restantes. Une requête par catégorie (deux quand le curseur repart du
+ * début) : `(category, paused)` porte déjà l'identifiant, la lecture suit
+ * l'index sans tri.
+ */
+async function loadActiveAlertsOf(db: GetiExecutor, category: GetiCategory): Promise<ActiveAlert[]> {
+  const cursor = scanCursors.get(category) ?? 0;
+  // Une ligne de plus que la borne : seule elle dit que des alertes restent non lues.
+  let rows = await readActiveAlertRows(db, category, "after", cursor, GETI_ALERT_SCAN_MAX + 1);
+  if (rows.length <= GETI_ALERT_SCAN_MAX && cursor > 0) {
+    rows = rows.concat(
+      await readActiveAlertRows(db, category, "upTo", cursor, GETI_ALERT_SCAN_MAX + 1 - rows.length),
+    );
+  }
+  const overflow = rows.length > GETI_ALERT_SCAN_MAX;
+  rows = rows.slice(0, GETI_ALERT_SCAN_MAX);
+  if (overflow) {
+    // Signalé dans pm2 (un nombre seul) ; la passe suivante reprend après la dernière alerte lue.
+    console.warn("[geti] borne des alertes lues atteinte:", GETI_ALERT_SCAN_MAX);
+    scanCursors.set(category, Number(rows[rows.length - 1]?.id ?? 0));
+  } else {
+    scanCursors.delete(category);
+  }
   const alerts: ActiveAlert[] = [];
-  for (const row of rows.slice(0, GETI_ALERT_SCAN_MAX)) {
+  for (const row of rows) {
     if (!isCategory(row.category)) continue;
     const lastNotifiedAt = toIso(row.last_notified_at);
     alerts.push({
@@ -490,20 +537,42 @@ async function insertNewHits(
   if (unseen.length === 0) return [];
   // À la seconde : la colonne `DATETIME` n'en garde pas moins, et la relecture d'un recouvrement compare cette valeur.
   const at = new Date(Math.floor(now / 1000) * 1000);
-  const [result] = await db.execute(
-    `INSERT IGNORE INTO bg_geti_alert_hits (alert_id, message_id, created_at) VALUES ${unseen.map(() => "(?, ?, ?)").join(", ")}`,
-    unseen.flatMap((alert) => [alert.id, post.messageId, at]),
-  );
-  const inserted = affected(result);
-  if (inserted === 0) return [];
-  if (inserted === unseen.length) return unseen;
-  const [mine] = await db.execute<(RowDataPacket & { alert_id: number })[]>(
-    `SELECT alert_id FROM bg_geti_alert_hits
-      WHERE message_id = ? AND created_at = ? AND alert_id IN (${unseen.map(() => "?").join(", ")})`,
-    [post.messageId, at, ...unseen.map((alert) => alert.id)],
-  );
-  const mineIds = new Set(mine.map((row) => Number(row.alert_id)));
-  return unseen.filter((alert) => mineIds.has(alert.id));
+  const unseenIds = unseen.map((alert) => alert.id);
+  try {
+    const [result] = await db.execute(
+      `INSERT IGNORE INTO bg_geti_alert_hits (alert_id, message_id, created_at) VALUES ${unseen.map(() => "(?, ?, ?)").join(", ")}`,
+      unseen.flatMap((alert) => [alert.id, post.messageId, at]),
+    );
+    const inserted = affected(result);
+    if (inserted === 0) return [];
+    if (inserted === unseen.length) return unseen;
+    const [mine] = await db.execute<(RowDataPacket & { alert_id: number })[]>(
+      `SELECT alert_id FROM bg_geti_alert_hits
+        WHERE message_id = ? AND created_at = ? AND alert_id IN (${unseenIds.map(() => "?").join(", ")})`,
+      [post.messageId, at, ...unseenIds],
+    );
+    const mineIds = new Set(mine.map((row) => Number(row.alert_id)));
+    return unseen.filter((alert) => mineIds.has(alert.id));
+  } catch (error) {
+    // Une écriture ou une relecture en échec ne doit pas laisser des traces
+    // qu'aucun envoi ne suit (l'annonce ne préviendrait plus jamais) : celles
+    // de cette passe sont retirées, l'annonce suivante est jugée quand même.
+    console.error("[geti] traces d'alerte non posées", failureReason(error));
+    await removeHits(db, post.messageId, unseenIds, at);
+    return [];
+  }
+}
+
+/** Retire, au mieux, les traces d'une annonce posées à la date `at` pour ces alertes. */
+async function removeHits(db: GetiExecutor, messageId: string, alertIds: readonly number[], at: Date): Promise<void> {
+  try {
+    await db.execute(
+      `DELETE FROM bg_geti_alert_hits WHERE message_id = ? AND created_at = ? AND alert_id IN (${alertIds.map(() => "?").join(", ")})`,
+      [messageId, at, ...alertIds],
+    );
+  } catch (error) {
+    console.error("[geti] traces d'alerte non retirées", failureReason(error));
+  }
 }
 
 /**
@@ -520,6 +589,20 @@ async function releaseReservation(db: GetiExecutor, hit: AlertHit, reservedAt: D
       hit.alert.id,
       reservedAt,
     ]);
+  } catch (error) {
+    console.error("[geti] délai d'alerte non rendu", failureReason(error));
+  }
+  await releaseHits(db, hit);
+}
+
+/**
+ * Retire les traces que cette passe a posées pour une alerte qui n'a rien
+ * envoyé (compte déjà prévenu par une autre alerte du lot, réservation en
+ * échec) : une modification récente de ces annonces pourra encore la faire
+ * partir.
+ */
+async function releaseHits(db: GetiExecutor, hit: AlertHit): Promise<void> {
+  try {
     for (let start = 0; start < hit.messageIds.length; start += HIT_CHUNK) {
       const chunk = hit.messageIds.slice(start, start + HIT_CHUNK);
       await db.execute(
@@ -528,7 +611,7 @@ async function releaseReservation(db: GetiExecutor, hit: AlertHit, reservedAt: D
       );
     }
   } catch (error) {
-    console.error("[geti] délai d'alerte non rendu", failureReason(error));
+    console.error("[geti] traces d'alerte non rendues", failureReason(error));
   }
 }
 
@@ -556,13 +639,28 @@ async function sendReservedAlerts(
   const notifiedUsers = new Set<number>();
   for (const hit of hits) {
     const { alert, post } = hit;
-    if (notifiedUsers.has(alert.userId) || isCoolingDown(alert, cooledBefore)) continue;
-    const [reserved] = await db.execute(
-      `UPDATE bg_geti_alerts SET last_notified_at = ?
-        WHERE id = ? AND paused = 0 AND (last_notified_at IS NULL OR last_notified_at <= ?)`,
-      [reservedAt, alert.id, cooledBefore],
-    );
-    if (affected(reserved) === 0) continue;
+    // Dans son délai : ses annonces ne partiront pas plus tard (règle du délai), la trace reste.
+    if (isCoolingDown(alert, cooledBefore)) continue;
+    // Compte déjà prévenu par une autre alerte du lot : rien n'est envoyé pour celle-ci, ses traces sont rendues.
+    if (notifiedUsers.has(alert.userId)) {
+      await releaseHits(db, hit);
+      continue;
+    }
+    let reservedCount: number;
+    try {
+      const [reserved] = await db.execute(
+        `UPDATE bg_geti_alerts SET last_notified_at = ?
+          WHERE id = ? AND paused = 0 AND (last_notified_at IS NULL OR last_notified_at <= ?)`,
+        [reservedAt, alert.id, cooledBefore],
+      );
+      reservedCount = affected(reserved);
+    } catch (error) {
+      // Réservation en échec : rien n'est parti, les traces de cette passe sont rendues et les alertes suivantes jugées.
+      console.error("[geti] délai d'alerte non réservé", failureReason(error));
+      await releaseHits(db, hit);
+      continue;
+    }
+    if (reservedCount === 0) continue;
     let delivered = false;
     try {
       delivered = await send(alert, post);
@@ -585,7 +683,7 @@ async function sendReservedAlerts(
  *   ancienne arrivée en retard, ou une annonce retirée entre-temps, ne
  *   prévient pas.
  * - L'auteur d'une annonce n'est pas prévenu par sa propre alerte (même
- *   compte Discord).
+ *   compte Discord, quand l'annonce porte l'identifiant de son auteur).
  * - Une alerte ne voit une annonce qu'**une fois** : la trace
  *   `bg_geti_alert_hits` (clé alerte + message) se pose par `INSERT IGNORE`,
  *   et seule l'insertion qui la crée compte — une modification, un second
@@ -593,12 +691,15 @@ async function sendReservedAlerts(
  * - Au plus une notification par alerte toutes les
  *   `GETI_ALERT_COOLDOWN_MINUTES`, réservée en une instruction
  *   (`UPDATE … WHERE last_notified_at …` + `affectedRows`), et une seule par
- *   compte et par lot ; un envoi qui ne joint personne rend le délai et les
- *   traces posées.
+ *   compte et par lot (les autres alertes du compte rendent leurs traces) ;
+ *   un envoi qui ne joint personne rend le délai et les traces posées.
+ * - Une écriture en échec en cours de passe (traces, réservation) rend les
+ *   traces de cette passe concernées et laisse juger la suite : aucune trace
+ *   ne reste sans envoi.
  *
  * Coût : une relecture des annonces récentes, une lecture des alertes actives
- * des catégories du lot (au plus `GETI_ALERT_SCAN_MAX` lignes, borne signalée
- * dans pm2), deux instructions par annonce touchée pour les traces, puis `annonces récentes × alertes de la
+ * des catégories du lot (au plus `GETI_ALERT_SCAN_MAX` lignes par catégorie,
+ * borne signalée dans pm2, lecture suivante reprise au curseur), deux instructions par annonce touchée pour les traces, puis `annonces récentes × alertes de la
  * catégorie` correspondances en mémoire (lot de vingt annonces au plus), le
  * filtre de chaque alerte n'étant construit qu'une fois.
  *

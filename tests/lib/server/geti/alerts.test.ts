@@ -14,6 +14,7 @@ import {
   listGetiAlerts,
   notifyGetiAlerts,
   purgeGetiAlertHits,
+  resetGetiAlertScanCursors,
   scheduleGetiAlerts,
   GETI_ALERT_QUEUE_MAX,
   updateGetiAlert,
@@ -97,6 +98,7 @@ function sqlOf(execute: SqlMock): string[] {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetGetiAlertScanCursors();
 });
 
 describe("listGetiAlerts", () => {
@@ -153,6 +155,13 @@ describe("createGetiAlert", () => {
     const result = await createGetiAlert(USER_ID, { category: "lfp", search: "", name: "a".repeat(GETI_ALERT_NAME_MAX + 1) });
 
     expect(result).toBe("GETI_ALERT_NAME_TOO_LONG");
+  });
+
+  it("createGetiAlert_nameNotAString_returnsInvalid", async () => {
+    const result = await createGetiAlert(USER_ID, { category: "lfp", search: "", name: 5 });
+
+    expect(result).toBe("GETI_ALERT_INVALID");
+    expect(withConnection).not.toHaveBeenCalled();
   });
 
   it("createGetiAlert_accountAlreadyAtTheLimit_returnsLimitWithoutInsert", async () => {
@@ -227,6 +236,16 @@ describe("updateGetiAlert", () => {
     const result = await updateGetiAlert(USER_ID, 7, { name: "a".repeat(GETI_ALERT_NAME_MAX + 1) });
 
     expect(result).toBe("GETI_ALERT_NAME_TOO_LONG");
+  });
+
+  it("updateGetiAlert_nameNotAString_returnsInvalid", async () => {
+    const execute = executeMock([alertRow()]);
+    useDatabase(execute);
+
+    const result = await updateGetiAlert(USER_ID, 7, { name: { text: "Tank" } });
+
+    expect(result).toBe("GETI_ALERT_INVALID");
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it("updateGetiAlert_alertOfAnotherAccount_returnsNotFound", async () => {
@@ -522,7 +541,7 @@ describe("notifyGetiAlerts", () => {
       expect.stringContaining("WHERE a.paused = 0 AND a.category = ?"),
       expect.stringContaining("WHERE a.paused = 0 AND a.category = ?"),
     ]);
-    expect(reads.map(([, params]) => params)).toEqual([["lfp"], ["lfs"]]);
+    expect(reads.map(([, params]) => params)).toEqual([["lfp", 0], ["lfs", 0]]);
   });
 
   it("notifyGetiAlerts_postAlreadySeenByTheAlert_doesNotNotifyAgain", async () => {
@@ -657,6 +676,58 @@ describe("notifyGetiAlerts", () => {
     warned.mockRestore();
   });
 
+  it("notifyGetiAlerts_activeAlertScan_leavesOutDeletedAndSuspendedOwners", async () => {
+    const execute = alertsDatabase();
+
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    const scan = sqlOf(execute).find((sql) => sql.includes("FROM bg_geti_alerts a"));
+    expect(scan).toContain("u.is_deleted = 0");
+    expect(scan).toContain("AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus WHERE sus.user_id = u.id");
+  });
+
+  it("notifyGetiAlerts_scanCapExceeded_nextPassResumesAfterTheLastReadId", async () => {
+    const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const overCap = Array.from({ length: GETI_ALERT_SCAN_MAX + 1 }, (_, index) => activeAlertRow({ id: index + 1, search: "?role=support" }));
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute: alertsDatabase({ alerts: overCap }) }), send);
+    const execute = alertsDatabase({ alerts: [] });
+
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    const scans = execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_geti_alerts a"));
+    expect(scans[0]).toEqual([expect.stringContaining("a.id > ?"), ["lfp", GETI_ALERT_SCAN_MAX]]);
+    warned.mockRestore();
+  });
+
+  it("notifyGetiAlerts_cursorSetAndFewAlertsAfterIt_wrapsToTheStartForTheRemainder", async () => {
+    const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const overCap = Array.from({ length: GETI_ALERT_SCAN_MAX + 1 }, (_, index) => activeAlertRow({ id: index + 1, search: "?role=support" }));
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute: alertsDatabase({ alerts: overCap }) }), send);
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ id: GETI_ALERT_SCAN_MAX + 1 })] });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    const scans = execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_geti_alerts a"));
+    expect(scans[1]).toEqual([expect.stringContaining("a.id <= ?"), ["lfp", GETI_ALERT_SCAN_MAX]]);
+    expect(scans[1][0]).toContain(`LIMIT ${GETI_ALERT_SCAN_MAX}`);
+    expect(outcome.notified).toBe(1);
+    warned.mockRestore();
+  });
+
+  it("notifyGetiAlerts_passUnderTheCapAfterACursor_resetsTheCursor", async () => {
+    const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const overCap = Array.from({ length: GETI_ALERT_SCAN_MAX + 1 }, (_, index) => activeAlertRow({ id: index + 1, search: "?role=support" }));
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute: alertsDatabase({ alerts: overCap }) }), send);
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute: alertsDatabase({ alerts: [] }) }), send);
+    const execute = alertsDatabase({ alerts: [] });
+
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    const scans = execute.mock.calls.filter(([sql]) => sql.includes("FROM bg_geti_alerts a"));
+    expect(scans).toEqual([[expect.stringContaining("a.id > ?"), ["lfp", 0]]]);
+    warned.mockRestore();
+  });
+
   it("notifyGetiAlerts_storedRowAtAnOlderAnalysisClosedSince_isJudgedOnItsReanalysis", async () => {
     const { closed, ...older } = parsedGetiPost({ category: "lfp", roles: ["TANK"] });
     const raw = getiPushedPost({ content: "~~LFP tank~~" }).raw;
@@ -749,6 +820,83 @@ describe("notifyGetiAlerts", () => {
 
     expect(outcome).toEqual({ matched: 2, notified: 1 });
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyGetiAlerts_secondAlertOfAnAlreadyNotifiedAccount_releasesItsHitsWithoutReserving", async () => {
+    const execute = alertsDatabase({ alerts: [activeAlertRow({ id: 7 }), activeAlertRow({ id: 8, search: "" })] });
+
+    await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_alert_hits WHERE alert_id = ? AND message_id IN (?)", [
+      8,
+      GETI_FAKE_MESSAGE_ID,
+    ]);
+    const reservations = execute.mock.calls.filter(([sql]) => sql.includes("last_notified_at IS NULL OR"));
+    expect(reservations.map(([, params]) => (params as unknown[])[1])).toEqual([7]);
+  });
+
+  it("notifyGetiAlerts_reservationUpdateFails_releasesTheHitsAndTriesTheNextAlert", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const base = alertsDatabase({
+      alerts: [activeAlertRow({ id: 7 }), activeAlertRow({ id: 8, user_id: USER_ID + 1, search: "" })],
+    });
+    const execute = jest.fn<SqlQuery>(async (sql: string, params?: unknown) => {
+      if (sql.includes("last_notified_at IS NULL OR") && (params as unknown[])[1] === 7) throw new Error("lock wait timeout");
+      return base(sql, params);
+    });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(outcome).toEqual({ matched: 2, notified: 1 });
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_geti_alert_hits WHERE alert_id = ? AND message_id IN (?)", [
+      7,
+      GETI_FAKE_MESSAGE_ID,
+    ]);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ id: 8 }), expect.anything());
+    logged.mockRestore();
+  });
+
+  it("notifyGetiAlerts_hitInsertFails_removesThisPassTracesAndStillJudgesTheNextPost", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const second = freshPost({ messageId: "100000000000000902" });
+    const base = alertsDatabase();
+    const execute = jest.fn<SqlQuery>(async (sql: string, params?: unknown) => {
+      if (sql.includes("INSERT IGNORE") && (params as unknown[])[1] === GETI_FAKE_MESSAGE_ID) throw new Error("lock wait timeout");
+      return base(sql, params);
+    });
+
+    const outcome = await notifyGetiAlerts([freshPost(), second], NOW, fakePool({ execute }), send);
+
+    expect(execute).toHaveBeenCalledWith(
+      "DELETE FROM bg_geti_alert_hits WHERE message_id = ? AND created_at = ? AND alert_id IN (?)",
+      [GETI_FAKE_MESSAGE_ID, new Date(NOW), 7],
+    );
+    expect(outcome).toEqual({ matched: 1, notified: 1 });
+    expect(send).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ messageId: "100000000000000902" }));
+    logged.mockRestore();
+  });
+
+  it("notifyGetiAlerts_partialOverlapRereadFails_removesThisPassTraces", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const base = alertsDatabase({
+      alerts: [activeAlertRow({ id: 7 }), activeAlertRow({ id: 8, user_id: USER_ID + 1, search: "" })],
+      inserted: 1,
+    });
+    const execute = jest.fn<SqlQuery>(async (sql: string, params?: unknown) => {
+      if (sql.includes("SELECT alert_id") && sql.includes("created_at = ?")) throw new Error("connection lost");
+      return base(sql, params);
+    });
+
+    const outcome = await notifyGetiAlerts([freshPost()], NOW, fakePool({ execute }), send);
+
+    expect(execute).toHaveBeenCalledWith(
+      "DELETE FROM bg_geti_alert_hits WHERE message_id = ? AND created_at = ? AND alert_id IN (?, ?)",
+      [GETI_FAKE_MESSAGE_ID, new Date(NOW), 7, 8],
+    );
+    expect(outcome).toEqual({ matched: 0, notified: 0 });
+    expect(send).not.toHaveBeenCalled();
+    logged.mockRestore();
   });
 
   it("notifyGetiAlerts_twoMatchingPostsForOneAlert_sendsOneNotificationForTheFirst", async () => {

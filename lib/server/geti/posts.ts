@@ -320,6 +320,31 @@ const PURGE_TICK_MS = 60 * 60 * 1000;
 const FIRST_PURGE_DELAY_MS = 3 * 60 * 1000;
 
 /**
+ * Un passage de la purge horaire : annonces échues, traces d'alerte échues,
+ * réanalyse des annonces anciennes. Chaque étape a sa garde : une panne de
+ * l'une (verrou, délai) n'empêche pas les autres — la garde annoncée des
+ * traces ne dépend pas de celle des annonces. La première erreur est relancée
+ * à la fin, pour que l'horloge la signale.
+ */
+export async function runGetiPostsPurge(db: GetiExecutor, now: number = Date.now()): Promise<number> {
+  let firstError: unknown = null;
+  const guarded = async <T>(step: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await step();
+    } catch (error) {
+      firstError ??= error;
+      return fallback;
+    }
+  };
+  await guarded(() => purgeExpiredGetiPosts(db, now), 0);
+  // Traces « alerte déjà prévenue pour cette annonce » : même horloge, même garde.
+  await guarded(() => purgeGetiAlertHits(db, now), 0);
+  const refreshed = await guarded(() => refreshStaleGetiPosts(db), 0);
+  if (firstError !== null) throw firstError;
+  return refreshed;
+}
+
+/**
  * Lance la purge horaire (une fois par processus ; une alerte par panne). Une
  * horloge, pas le trafic ni le bot : un site sans visite, ou un bot arrêté,
  * garderait sinon des annonces au-delà de la durée annoncée.
@@ -329,13 +354,7 @@ export function startGetiPostsPurgeClock(): void {
     key: PURGE_CLOCK_KEY,
     firstDelayMs: FIRST_PURGE_DELAY_MS,
     tickMs: PURGE_TICK_MS,
-    run: async () => {
-      const db = await getDatabase();
-      await purgeExpiredGetiPosts(db);
-      // Traces « alerte déjà prévenue pour cette annonce » : même horloge, même garde.
-      await purgeGetiAlertHits(db);
-      return refreshStaleGetiPosts(db);
-    },
+    run: async () => runGetiPostsPurge(await getDatabase()),
     failureMessage: "[geti] Purge des annonces impossible.",
   });
 }

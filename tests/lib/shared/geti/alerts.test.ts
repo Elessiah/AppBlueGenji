@@ -7,6 +7,7 @@ import {
   GETI_ALERT_SEARCH_MAX,
   getiAlertFilter,
   getiAlertName,
+  isGetiAlertNameInput,
   getiAlertSearch,
   isFreshGetiPost,
   matchingGetiAlerts,
@@ -76,6 +77,26 @@ describe("getiAlertName", () => {
 
   it("getiAlertName_missingName_returnsNull", () => {
     expect(getiAlertName(undefined)).toBeNull();
+  });
+
+  it("getiAlertName_onlyHangulFillers_returnsNull", () => {
+    expect(getiAlertName("ㅤㅤᅟ")).toBeNull();
+  });
+
+  it("getiAlertName_fullwidthLetters_areNormalizedByNfkc", () => {
+    expect(getiAlertName("Ｔａｎｋ")).toBe("Tank");
+  });
+
+  it("getiAlertName_tagCharacters_areRemoved", () => {
+    expect(getiAlertName("Tank\u{E0041}\u{E0042} EU")).toBe("Tank EU");
+  });
+
+  it("isGetiAlertNameInput_stringNullOrMissing_isAccepted", () => {
+    expect([isGetiAlertNameInput("Tank"), isGetiAlertNameInput(null), isGetiAlertNameInput(undefined)]).toEqual([true, true, true]);
+  });
+
+  it("isGetiAlertNameInput_number_isRefused", () => {
+    expect(isGetiAlertNameInput(5)).toBe(false);
   });
 
   it("getiAlertName_notAString_returnsUndefined", () => {

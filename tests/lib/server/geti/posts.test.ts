@@ -18,6 +18,7 @@ import {
   reconcileGetiChannel,
   refreshStaleGetiPosts,
   resetGetiListFailureLog,
+  runGetiPostsPurge,
   startGetiPostsPurgeClock,
   upsertGetiPosts,
 } from "@/lib/server/geti/posts";
@@ -923,6 +924,42 @@ describe("listGetiPosts", () => {
     const page = await listGetiPosts({}, {}, executor(execute), NOW);
 
     expect(page.total).toBe(0);
+  });
+});
+
+describe("runGetiPostsPurge", () => {
+  const POSTS_PURGE = "DELETE FROM bg_geti_posts WHERE posted_at < ? LIMIT 500";
+  const HITS_PURGE = "DELETE FROM bg_geti_alert_hits WHERE created_at < ? LIMIT 5000";
+
+  it("runGetiPostsPurge_everyStepSucceeds_returnsTheRefreshedCount", async () => {
+    const execute = executeMock([], 1);
+
+    await expect(runGetiPostsPurge(executor(execute), NOW)).resolves.toBe(0);
+    expect(execute).toHaveBeenCalledWith(HITS_PURGE, [expect.any(Date)]);
+  });
+
+  it("runGetiPostsPurge_postsPurgeFails_stillPurgesHitsAndRefreshesThenThrowsIt", async () => {
+    const failure = new Error("lock wait timeout");
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.startsWith("DELETE FROM bg_geti_posts")) throw failure;
+      return sql.trimStart().startsWith("SELECT") ? [[]] : [{ affectedRows: 1 }];
+    });
+
+    await expect(runGetiPostsPurge(executor(execute), NOW)).rejects.toBe(failure);
+    expect(execute).toHaveBeenCalledWith(HITS_PURGE, [expect.any(Date)]);
+    expect(String(execute.mock.calls.at(-1)?.[0])).toContain("NOT parsed_json LIKE");
+  });
+
+  it("runGetiPostsPurge_hitsPurgeFails_stillRefreshesThenThrowsIt", async () => {
+    const failure = new Error("deadlock");
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql === HITS_PURGE) throw failure;
+      return sql.trimStart().startsWith("SELECT") ? [[]] : [{ affectedRows: 1 }];
+    });
+
+    await expect(runGetiPostsPurge(executor(execute), NOW)).rejects.toBe(failure);
+    expect(execute).toHaveBeenCalledWith(POSTS_PURGE, [expect.any(Date)]);
+    expect(String(execute.mock.calls.at(-1)?.[0])).toContain("NOT parsed_json LIKE");
   });
 });
 

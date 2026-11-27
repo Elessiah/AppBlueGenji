@@ -11,6 +11,7 @@
  * Module pur : importable côté serveur comme côté client.
  */
 import { matchesGetiFilter } from "@/lib/shared/geti/filter";
+import { visibleText } from "@/lib/shared/visible-text";
 import {
   getiPageFilter,
   getiPageSearch,
@@ -108,18 +109,22 @@ export function getiAlertFilter(category: GetiCategory, search: string): GetiFil
   return getiPageFilter(category, getiAlertQuery(category, search));
 }
 
-/** Caractères de contrôle, de direction et de largeur nulle : jamais dans un nom gardé. */
-const INVISIBLE = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g;
+/** Un nom d'alerte reçu est-il d'un type admis (texte, ou absent) ? Un autre type est un refus `invalid`, pas « trop long ». */
+export function isGetiAlertNameInput(input: unknown): input is string | null | undefined {
+  return input === null || input === undefined || typeof input === "string";
+}
 
 /**
- * Nom d'alerte nettoyé : espaces repliés, caractères de contrôle et de
- * direction retirés. `null` pour un nom vide, `undefined` s'il est trop long
- * ou n'est pas un texte.
+ * Nom d'alerte nettoyé par `visibleText` (NFKC, contrôles, caractères
+ * invisibles et de direction retirés, espaces repliés —
+ * `docs/features/UNTRUSTED_NAMES.md`). `null` pour un nom vide (ou fait
+ * seulement d'invisibles), `undefined` s'il est trop long ou n'est pas un
+ * texte (`isGetiAlertNameInput` distingue ce second cas).
  */
 export function getiAlertName(input: unknown): string | null | undefined {
   if (input === null || input === undefined) return null;
   if (typeof input !== "string") return undefined;
-  const name = input.replace(INVISIBLE, " ").replace(/\s+/g, " ").trim();
+  const name = visibleText(input);
   if (name === "") return null;
   return name.length > GETI_ALERT_NAME_MAX ? undefined : name;
 }

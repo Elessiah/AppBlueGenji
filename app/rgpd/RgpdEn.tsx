@@ -289,8 +289,8 @@ export function RgpdEn({
             record of the posts already reported. When a new post matches, the account is notified by push
             notification on its subscribed devices and, if its Discord account is certified, by Discord direct
             message — at most once every {GETI_ALERT_COOLDOWN_MINUTES} minutes per alert, with neither a username nor
-            the post&apos;s text (the alert&apos;s name and a link); its own post does not notify it (the Discord identifier
-            linked to the account is compared with the author&apos;s, and nothing more is kept). The “GETI post alerts” topic in “My profile” turns both
+            the post&apos;s text (the alert&apos;s name and a link); its own post does not notify it when the post carries its author&apos;s Discord identifier (the Discord identifier
+            linked to the account is compared with it, and nothing more is kept). The “GETI post alerts” topic in “My profile” turns both
             off. An alert is kept until the account deletes it; erasing the account removes all its alerts, and the
             record of the posts already reported is erased after {GETI_ALERT_HIT_RETENTION_DAYS} days. Basis:
             performance of the service the account asked for. Register of processing activities: record T22.

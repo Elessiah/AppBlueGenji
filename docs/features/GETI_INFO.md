@@ -862,12 +862,18 @@ attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
    ancienne arrivée après une modification (l'enregistrement la laisse de
    côté) est jugée sur la version gardée — fermée, elle ne prévient pas — et
    une annonce retirée entre-temps ne prévient pas.
-2. Une lecture **par catégorie** du lot des alertes actives (`paused = 0`, suit
-   l'index `(category, paused)` sans tri, au plus `GETI_ALERT_SCAN_MAX` par
-   catégorie, lue avec une ligne de plus : seule cette ligne en trop
-   — des alertes restent non lues — déclenche l'avertissement chiffré dans pm2),
-   avec l'identifiant Discord du compte : **sa propre annonce ne prévient pas
-   son auteur**.
+2. Une lecture **par catégorie** du lot des alertes actives (`paused = 0`,
+   comptes ni effacés ni suspendus — ils ne seraient pas prévenus et ne
+   prennent pas la borne —, suit l'index `(category, paused)` sans tri, au plus
+   `GETI_ALERT_SCAN_MAX` par catégorie, lue avec une ligne de plus : seule
+   cette ligne en trop — des alertes restent non lues — déclenche
+   l'avertissement chiffré dans pm2 et pose un **curseur** par catégorie
+   (dernier identifiant lu) : la passe suivante lit la suite, puis repart du
+   début, si bien que les alertes les plus récentes ne sont jamais
+   durablement privées de lecture), avec l'identifiant Discord du compte :
+   **sa propre annonce ne prévient pas son auteur** quand l'annonce porte
+   l'identifiant de son auteur (un relais qui ne donne que le pseudo,
+   `authorId` nul, n'est pas reconnu : textes légaux formulés ainsi).
 3. Correspondance en mémoire par `matchingGetiAlerts` → `matchesGetiFilter`,
    le filtre de chaque alerte construit une seule fois par lot.
 4. **Jamais deux fois pour la même annonce** : par annonce, une lecture des
@@ -882,7 +888,11 @@ attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
    SET last_notified_at = ? WHERE id = ? AND paused = 0 AND (last_notified_at
    IS NULL OR last_notified_at <= ?)` + `affectedRows`. Une annonce arrivée
    pendant le délai garde sa trace et ne sera pas signalée plus tard : elle se
-   lit sur la page. Une seule notification **réussie** par compte et par lot.
+   lit sur la page. Une seule notification **réussie** par compte et par lot :
+   les autres alertes touchées du même compte dans le lot **rendent** leurs
+   traces (une modification récente de ces annonces pourra encore les faire
+   partir). Une réservation en échec (base) rend aussi les traces de l'alerte,
+   et la passe juge les suivantes.
 6. Envoi (`notifyUsers`) au compte, s'il existe encore et n'est pas suspendu :
    les destinataires de tous les comptes à prévenir se lisent ensemble (par
    paquets de 500), pas une requête par alerte, et les envois partent l'un
@@ -892,6 +902,9 @@ attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
    retire les traces que la passe a posées pour cette alerte (toutes ses
    annonces du lot) : une autre alerte du compte peut prévenir, et une
    modification récente de ces annonces aussi.
+   Une écriture de traces en échec (ou sa relecture) retire au mieux les
+   traces posées par la passe pour cette annonce et passe à la suivante :
+   aucune trace ne reste sans envoi derrière elle.
 
 **Passes en file** : `scheduleGetiAlerts` (route d'enregistrement) met la passe
 d'un lot en file, **une à la fois** (au plus `GETI_ALERT_QUEUE_MAX` en attente) :
@@ -905,8 +918,9 @@ touchée pour les traces, puis au plus `annonces récentes × alertes de la cat�
 comparaisons en mémoire (40 000 dans le pire cas, chacune sur une annonce déjà
 analysée) ; les écritures ne portent que sur les couples qui correspondent.
 Hors rattrapage, un lot porte une annonce. Au-delà de 2 000 alertes actives
-sur les catégories d'un lot, les plus récentes ne sont pas lues — à revoir
-(index par critère) si ce nombre approche.
+dans une catégorie, chaque passe en lit 2 000 à partir du curseur (rotation) :
+une alerte peut manquer les annonces d'une passe où elle n'est pas lue — à
+revoir (index par critère) si ce nombre approche.
 
 **Croissance des traces** : une trace par couple (alerte, annonce) qui
 correspond, y compris pour une alerte alors dans son délai — la trace **est** ce
@@ -929,7 +943,10 @@ rendu de la page, en parallèle de la liste d'annonces pour la session.
   annonce n'y correspond, et son propriétaire la voit dans sa liste.
 - Les traces `bg_geti_alert_hits` sont purgées au bout de 15 jours par
   l'horloge `geti-posts-purge` (`purgeGetiAlertHits`, par lots de 5 000 lignes,
-  100 passages au plus par heure), et partent avec l'alerte.
+  100 passages au plus par heure), et partent avec l'alerte. Chaque étape du
+  passage horaire (`runGetiPostsPurge` : annonces, traces, réanalyse) a sa
+  garde : une panne de l'une ne bloque pas les autres, la première erreur est
+  signalée par l'horloge.
 - **Effacement du compte** : l'anonymisation garde la ligne `bg_users`, la
   cascade ne joue donc pas — `anonymizeAccount` appelle
   `deleteGetiAlertsOfUser` (traces puis alertes, chaque instruction avec sa
