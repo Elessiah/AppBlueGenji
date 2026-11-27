@@ -100,9 +100,28 @@ const LETTER_RANK = new RegExp(
   String.raw`${NOT_AFTER_WORD}([bsgpdmc])([1-5])(?:[-–/]([1-5]))?${NOT_BEFORE_WORD}`,
   "gu",
 );
+/** Une initiale + chiffre n'est pas un rang derrière « saison » (« depuis la s2 ») ou « ex- » (« ex-G2 »). */
+const NOT_LETTER_RANK_BEFORE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:saison|season|depuis(?: la)?|since|ex|anciens?|ancienne|former)[\s-]?$`,
+  "u",
+);
+/** … ni devant « esport » (« G2 Esports »). */
+const NOT_LETTER_RANK_AFTER = /^[\s-]?(?:e-?sports?|gaming)(?![\p{L}\p{N}])/u;
 const TOP_500 = new RegExp(String.raw`${NOT_AFTER_WORD}(?:top\s?500|t500)${NOT_BEFORE_WORD}`, "gu");
-/** Ancien SR en milliers : « 4k », « 4.2k », « 3k5 ». */
-const SR_THOUSANDS = new RegExp(String.raw`(?<![\p{L}\p{N}.,#])([1-4])(?:[.,](\d))?k(\d)?${NOT_BEFORE_WORD}`, "gu");
+/**
+ * Ancien SR en milliers : « 4k », « 4.2k », « 3k5 ». « 4k » seul, sans « sr » ni
+ * « elo » autour ni rôle contre lui, est un montant (« cashprize 1k », « écran 4k »).
+ */
+const SR_THOUSANDS = new RegExp(
+  String.raw`(?<![\p{L}\p{N}.,#])([1-4])(?:[.,](\d))?k(\d)?(?:\s?(sr|elo))?${NOT_BEFORE_WORD}`,
+  "gu",
+);
+const SR_LABEL_BEFORE = new RegExp(String.raw`${NOT_AFTER_WORD}(?:sr|elo)\s?:?\s?$`, "u");
+/** Ce qu'un nombre compte quand ce n'est pas un SR : « 1500+ heures », « 2000 abonnés ». */
+const COUNTED_AFTER = new RegExp(
+  String.raw`^\s?(?:h|hrs?|heures?|hours?|€|\$|euros?|abonnes?|followers?|joueurs?|players?|membres?|members?|games?|parties|matchs?|viewers?|vues|views)(?![\p{L}\p{N}])`,
+  "u",
+);
 /** Ancien SR en chiffres : « 3500 sr », « 4400+ », « 3500-4000 ». */
 const SR_NUMBER = new RegExp(
   String.raw`(?<![\p{L}\p{N}.,#])([1-4]\d{3})(?:\s?[-–/]\s?([1-4]\d{3}))?(?:\s?(sr|elo)|(\+))?${NOT_BEFORE_WORD}`,
@@ -137,6 +156,14 @@ const GAP_WORDS = "main|peak|rank|rang|elo|niveau|level|lvl|actuel|actuellement|
 /** Texte admis entre un rôle et son rang (« tank : m2 », « dps peak d1 »). */
 const ROLE_RANK_GAP = new RegExp(`^${GAP_PUNCTUATION}(?:(?:${GAP_WORDS})${GAP_PUNCTUATION}){0,3}$`, "u");
 const ROLE_RANK_GAP_MAX = 30;
+/**
+ * Texte entre deux rangs d'un même rôle (« tank peak gm, actuellement m1 ») : le
+ * second suit le rôle du premier.
+ */
+const SAME_ROLE_GAP = new RegExp(
+  String.raw`^[ ,;:=()[\]>~/-]*(?:(?:${GAP_WORDS}|mais|but|now|maintenant|aujourd'hui|today|avant|before|formerly|anciennement)[ ,;:=()[\]>~/-]*){0,3}$`,
+  "u",
+);
 
 /** Années plausibles : « 2025-2026 » n'est pas une fourchette de SR. */
 const YEAR_MIN = 2015;
@@ -149,6 +176,8 @@ type RankToken = {
   max: number;
   openUp: boolean;
   openDown: boolean;
+  /** Ancien SR en milliers sans libellé : rang seulement contre un rôle. */
+  needsRole: boolean;
 };
 
 type ValueRange = { min: number; max: number };
@@ -172,8 +201,8 @@ function isYear(value: number): boolean {
   return value >= YEAR_MIN && value <= YEAR_MAX;
 }
 
-function tokenOf(match: RegExpExecArray, span: ValueRange, openUp = false): RankToken {
-  return { start: match.index, end: match.index + match[0].length, ...span, openUp, openDown: false };
+function tokenOf(match: RegExpExecArray, span: ValueRange, openUp = false, needsRole = false): RankToken {
+  return { start: match.index, end: match.index + match[0].length, ...span, openUp, openDown: false, needsRole };
 }
 
 /** Paliers nommés, initiales collées à une division et « top 500 ». */
@@ -186,6 +215,9 @@ function tierTokens(lower: string): RankToken[] {
     tokens.push(tokenOf(match, tierSpan(tier, match[2], match[3])));
   }
   for (const match of lower.matchAll(LETTER_RANK)) {
+    const end = match.index + match[0].length;
+    if (NOT_LETTER_RANK_BEFORE.test(lower.slice(Math.max(0, match.index - 12), match.index))) continue;
+    if (NOT_LETTER_RANK_AFTER.test(lower.slice(end, end + 12))) continue;
     tokens.push(tokenOf(match, tierSpan(TIER_LETTERS[match[1]], match[2], match[3])));
   }
   for (const match of lower.matchAll(TOP_500)) {
@@ -205,17 +237,29 @@ function srNumberSpan(match: RegExpExecArray): ValueRange | null {
   return { min: Math.min(...values), max: Math.max(...values) };
 }
 
+function isCounted(lower: string, match: RegExpExecArray): boolean {
+  const end = match.index + match[0].length;
+  return COUNTED_AFTER.test(lower.slice(end, end + 12));
+}
+
 /** Ancien SR, en milliers ou en chiffres. */
 function srTokens(lower: string): RankToken[] {
   const tokens: RankToken[] = [];
   for (const match of lower.matchAll(SR_THOUSANDS)) {
-    if (match[2] !== undefined && match[3] !== undefined) continue;
+    if ((match[2] !== undefined && match[3] !== undefined) || isCounted(lower, match)) continue;
     const value = srValue(Number(match[1]) * 1000 + Number(match[2] ?? match[3] ?? 0) * 100);
-    tokens.push(tokenOf(match, { min: value, max: value }));
+    // « 4k2 », « 3.9k » ne s'écrivent que pour un SR ; « 4k » seul est souvent un montant.
+    const labelled =
+      match[2] !== undefined ||
+      match[3] !== undefined ||
+      match[4] !== undefined ||
+      SR_LABEL_BEFORE.test(lower.slice(Math.max(0, match.index - 6), match.index));
+    tokens.push(tokenOf(match, { min: value, max: value }, false, !labelled));
   }
   for (const match of lower.matchAll(SR_NUMBER)) {
     const span = srNumberSpan(match);
-    if (span !== null) tokens.push(tokenOf(match, span, match[4] !== undefined));
+    const notCounted = match[3] !== undefined || !isCounted(lower, match);
+    if (span !== null && notCounted) tokens.push(tokenOf(match, span, match[4] !== undefined));
   }
   return tokens;
 }
@@ -279,11 +323,14 @@ function rankGroups(lower: string, tokens: readonly RankToken[]): RankGroup[] {
       min: Math.min(...run.map((token) => token.min)),
       max: Math.max(...run.map((token) => token.max)),
     };
-    // Une borne ouverte ne vaut que pour un rang seul : dans « min d3 max m1 »,
-    // chaque marqueur est déjà borné par l'autre rang.
-    if (run.length === 1 && first.openUp) range.max = GETI_RANK_TOP;
-    if (run.length === 1 && first.openDown) range.min = 0;
-    return { ...range, start: first.start, end: run[run.length - 1].end };
+    // Une borne ouverte vaut au bout de la liste où elle est écrite (« diam ou
+    // master+ » monte jusqu'en haut), sauf si l'autre bout est lui-même une
+    // borne : dans « min d3 max m1 », chaque marqueur est borné par l'autre rang.
+    const last = run[run.length - 1];
+    const single = run.length === 1;
+    if (last.openUp && (single || !run.some((token) => token.openDown))) range.max = GETI_RANK_TOP;
+    if (first.openDown && (single || !run.some((token) => token.openUp))) range.min = 0;
+    return { ...range, start: first.start, end: last.end };
   });
 }
 
@@ -308,12 +355,50 @@ function isRoleRankGap(gap: string): boolean {
   return gap.length <= ROLE_RANK_GAP_MAX && ROLE_RANK_GAP.test(gap);
 }
 
+function isSameRoleGap(gap: string): boolean {
+  return gap.length <= ROLE_RANK_GAP_MAX && SAME_ROLE_GAP.test(gap);
+}
+
+/** Un SR en milliers sans libellé n'est un rang que contre un rôle (« tank 4k »). */
+function isBesideRole(lower: string, token: RankToken, runs: readonly RoleRun[]): boolean {
+  const before = runs.findLast((run) => run.end <= token.start);
+  const after = runs.find((run) => run.start >= token.end);
+  return (
+    (before !== undefined && isRoleRankGap(lower.slice(before.end, token.start))) ||
+    (after !== undefined && isRoleRankGap(lower.slice(token.end, after.start)))
+  );
+}
+
 /**
  * Rattache chaque groupe de rangs au rôle écrit juste avant (« tank m2 ») ou,
  * à défaut, juste après (« m2 tank »), sur la même ligne. Une liste de rôles
  * ne sert qu'une fois : dans « m2 tank d1 dps », « tank » va à « m2 » et
  * « d1 » prend donc « dps ».
  */
+type OwnedGroup = { group: RankGroup; owner: RoleRun };
+
+/** Rôle écrit contre un groupe, devant puis derrière, parmi ceux qui n'ont pas encore servi. */
+function adjacentRun(
+  lower: string,
+  group: RankGroup,
+  runs: readonly RoleRun[],
+  used: ReadonlySet<RoleRun>,
+): RoleRun | undefined {
+  const before = runs.findLast((run) => run.end <= group.start);
+  const after = runs.find((run) => run.start >= group.end);
+  const candidates = [
+    before !== undefined && isRoleRankGap(lower.slice(before.end, group.start)) ? before : undefined,
+    after !== undefined && isRoleRankGap(lower.slice(group.end, after.start)) ? after : undefined,
+  ];
+  return candidates.find((run) => run !== undefined && !used.has(run));
+}
+
+function mergeRange(known: ValueRange | undefined, group: ValueRange): ValueRange {
+  return known === undefined
+    ? { min: group.min, max: group.max }
+    : { min: Math.min(known.min, group.min), max: Math.max(known.max, group.max) };
+}
+
 function ranksByRole(
   lower: string,
   groups: readonly RankGroup[],
@@ -321,22 +406,15 @@ function ranksByRole(
 ): Partial<Record<GetiRankedRole, ValueRange>> {
   const byRole: Partial<Record<GetiRankedRole, ValueRange>> = {};
   const used = new Set<RoleRun>();
+  let previous: OwnedGroup | null = null;
   for (const group of groups) {
-    const before = runs.findLast((run) => run.end <= group.start);
-    const after = runs.find((run) => run.start >= group.end);
-    const owner = [
-      before !== undefined && isRoleRankGap(lower.slice(before.end, group.start)) ? before : undefined,
-      after !== undefined && isRoleRankGap(lower.slice(group.end, after.start)) ? after : undefined,
-    ].find((run) => run !== undefined && !used.has(run));
+    const continued: RoleRun | undefined =
+      previous !== null && isSameRoleGap(lower.slice(previous.group.end, group.start)) ? previous.owner : undefined;
+    const owner: RoleRun | undefined = adjacentRun(lower, group, runs, used) ?? continued;
+    previous = owner === undefined ? null : { group, owner };
     if (owner === undefined) continue;
     used.add(owner);
-    for (const role of owner.roles) {
-      const known = byRole[role];
-      byRole[role] =
-        known === undefined
-          ? { min: group.min, max: group.max }
-          : { min: Math.min(known.min, group.min), max: Math.max(known.max, group.max) };
-    }
+    for (const role of owner.roles) byRole[role] = mergeRange(byRole[role], group);
   }
   return byRole;
 }
@@ -354,9 +432,11 @@ function toRankRange(range: ValueRange): GetiRankRange {
  * @returns Les rangs ; `min` et `max` valent `null` quand aucun rang n'est lu.
  */
 export function parseGetiRanks(lower: string, roleTokens: readonly GetiRoleToken[]): GetiRanks {
-  const groups = rankGroups(lower, rankTokens(lower));
+  const runs = roleRuns(lower, roleTokens);
+  const tokens = rankTokens(lower).filter((token) => !token.needsRole || isBesideRole(lower, token, runs));
+  const groups = rankGroups(lower, tokens);
   if (groups.length === 0) return { min: null, max: null, byRole: {} };
-  const byRoleValues = ranksByRole(lower, groups, roleRuns(lower, roleTokens));
+  const byRoleValues = ranksByRole(lower, groups, runs);
   const byRole: GetiRanks["byRole"] = {};
   for (const role of ["TANK", "DPS", "SUPPORT"] as const) {
     const range = byRoleValues[role];

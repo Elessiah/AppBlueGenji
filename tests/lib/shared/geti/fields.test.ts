@@ -415,3 +415,65 @@ describe("catégorie", () => {
     expect(parseGetiText("bonjour").category).toBeNull();
   });
 });
+
+describe("faux positifs du texte courant", () => {
+  it("« eu » participe d'« avoir » n'est pas l'Europe", () => {
+    expect(parseGetiText("J'ai eu une team NA, je cherche team FR").regions).toEqual(["NA"]);
+  });
+
+  it("« jamais eu » n'est pas l'Europe", () => {
+    expect(parseGetiText("lft, jamais eu de team").regions).toEqual([]);
+  });
+
+  it("« team eu » reste l'Europe", () => {
+    expect(parseGetiText("lft dps, cherche team eu").regions).toEqual(["EU"]);
+  });
+
+  it("une durée en fourchette n'est pas un horaire (« 2-3h par soir »)", () => {
+    expect(parseGetiText("Dispo 2-3h par soir, dps diam 2").availability.times).toEqual([]);
+  });
+
+  it("« 1 à 2h par jour » n'est pas un horaire", () => {
+    expect(parseGetiText("lft, 1 à 2h par jour").availability.times).toEqual([]);
+  });
+
+  it("« +20 joueurs » n'est pas un âge", () => {
+    expect(parseGetiText("+20 joueurs dans la structure").minAge).toBeNull();
+  });
+
+  it("« 15+ heures » n'est pas un âge", () => {
+    expect(parseGetiText("lft, 15+ heures de jeu par semaine").minAge).toBeNull();
+  });
+
+  it("un âge plus loin est lu derrière un faux âge (« 20+ scrims, 18+ »)", () => {
+    expect(parseGetiText("lfp, 20+ scrims par mois, 18+").minAge).toBe(18);
+  });
+
+  it("« +18 ans » est un âge", () => {
+    expect(parseGetiText("lfp +18 ans").minAge).toBe(18);
+  });
+
+  it("un libellé suivi d'un texte sans capitale ne donne pas de nom d'équipe", () => {
+    expect(parseGetiText("Roster : 5 joueurs dont 2 tanks").teamName).toBeNull();
+  });
+
+  it("un pronom derrière « team » n'est pas un nom d'équipe", () => {
+    expect(parseGetiText("Team Je cherche un tank").teamName).toBeNull();
+  });
+
+  it("un article derrière « team » n'est pas un nom d'équipe", () => {
+    expect(parseGetiText("cherche une team La plus chill possible").teamName).toBeNull();
+  });
+
+  it("« merci pour votre soutien » n'ajoute pas le Support", () => {
+    expect(parseGetiText("Merci pour votre soutien ! Tank master 2").roles).toEqual(["TANK"]);
+  });
+
+  it("« thanks for the support » n'ajoute pas le Support", () => {
+    expect(parseGetiText("lft tank m2, thanks for the support").roles).toEqual(["TANK"]);
+  });
+
+  it("« soutien » comme rôle reste le Support", () => {
+    expect(parseGetiText("lft soutien m2").roles).toEqual(["SUPPORT"]);
+  });
+});

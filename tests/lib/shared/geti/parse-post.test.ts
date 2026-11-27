@@ -202,8 +202,38 @@ describe("parseGetiPost — relais d'un bot", () => {
     expect(parseGetiPost(getiRelayPost(description)).authorId).toBe(GETI_FAKE_OTHER_ID);
   });
 
-  it("sans libellé, l'unique mention du relais est l'auteur", () => {
-    expect(parseGetiPost(getiRelayPost(`lft dps <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBe(GETI_FAKE_OTHER_ID);
+  it("sans libellé, une mention seule ne désigne personne : elle peut viser un tiers", () => {
+    expect(parseGetiPost(getiRelayPost(`lft dps <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBeNull();
+    expect(parseGetiPost(getiRelayPost(`lft dps, duo avec <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBeNull();
+  });
+
+  it("« by <@id> » en tête de ligne désigne l'auteur", () => {
+    expect(parseGetiPost(getiRelayPost(`lft dps
+by <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBe(GETI_FAKE_OTHER_ID);
+  });
+
+  it("« Auteur : <@id> » dans la ligne désigne l'auteur", () => {
+    expect(parseGetiPost(getiRelayPost(`lft dps — Auteur : <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBe(GETI_FAKE_OTHER_ID);
+  });
+
+  it("« posté par <@id> » désigne l'auteur", () => {
+    expect(parseGetiPost(getiRelayPost(`lft dps, posté par <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBe(GETI_FAKE_OTHER_ID);
+  });
+
+  it("« remplaçant de <@id> » ne désigne pas l'auteur", () => {
+    const description = `Remplaçant de <@${GETI_FAKE_OTHER_ID}> recherché, dps`;
+
+    expect(parseGetiPost(getiRelayPost(description)).authorId).toBeNull();
+  });
+
+  it("« remplacé par <@id> » dans une phrase ne désigne pas l'auteur", () => {
+    const description = `lft dps, notre tank remplacé par <@${GETI_FAKE_OTHER_ID}>`;
+
+    expect(parseGetiPost(getiRelayPost(description)).authorId).toBeNull();
+  });
+
+  it("un libellé collé à un mot ne compte pas (« lobby <@id> »)", () => {
+    expect(parseGetiPost(getiRelayPost(`Je viens du lobby <@${GETI_FAKE_OTHER_ID}>`)).authorId).toBeNull();
   });
 
   it("plusieurs mentions sans libellé ne désignent personne", () => {

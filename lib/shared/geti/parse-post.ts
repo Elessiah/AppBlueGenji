@@ -19,7 +19,7 @@ import {
   parseGetiStaffRoles,
   parseGetiTeamName,
 } from "@/lib/shared/geti/fields";
-import { getiDisplayText, prepareGetiText } from "@/lib/shared/geti/normalize";
+import { NOT_AFTER_WORD, getiDisplayText, prepareGetiText } from "@/lib/shared/geti/normalize";
 import { parseGetiRanks } from "@/lib/shared/geti/ranks";
 import { findGetiRoleTokens, getiRolesOf, getiSubRolesOf } from "@/lib/shared/geti/roles";
 import {
@@ -37,9 +37,21 @@ const USERNAME_MAX = 32;
 const ORIGIN_SERVER_MAX = 100;
 const SNOWFLAKE = /^\d{15,22}$/u;
 const DISCRIMINATOR = /^\d{4}$/u;
-const USER_MENTION = /<@!?(\d{15,22})>/gu;
-/** Mention de l'auteur dans un relais : « by <@id> », « Auteur : <@id> ». */
-const AUTHOR_MENTION = /(?:by|par|from|de|author|auteur|contact)\s*:?\s*<@!?(\d{15,22})>/giu;
+/**
+ * Mention de l'auteur dans un relais, derrière un libellé net : en tête de
+ * ligne (« by <@id> », « Contact : <@id> »), suivi de deux-points
+ * (« Auteur : <@id> ») ou « posté par <@id> ». Dans une phrase, « par », « de »
+ * ou « by » désignent n'importe qui (« remplaçant de <@id> », « remplacé par
+ * <@id> ») : jamais lus.
+ */
+const AUTHOR_MENTION = new RegExp(
+  [
+    String.raw`^[^\p{L}\p{N}<\n]*(?:by|par|from|author|auteur|contact)\s*:?\s*<@!?(\d{15,22})>`,
+    String.raw`${NOT_AFTER_WORD}(?:author|auteur|contact)\s*:\s*<@!?(\d{15,22})>`,
+    String.raw`${NOT_AFTER_WORD}(?:posted|sent|written|post[ée]e?|publi[ée]e?|envoy[ée]e?|[ée]crite?)\s+(?:by|par)\s*:?\s*<@!?(\d{15,22})>`,
+  ].join("|"),
+  "gimu",
+);
 /**
  * Dernière ligne d'un relais de notre bot (`buildServiceMessage`) :
  * « *Sent from : [Serveur](invitation)* by <@id> ».
@@ -120,13 +132,14 @@ function embedFieldLines(embed: GetiRawEmbed): string[] {
   });
 }
 
-/** Auteur d'un relais sans ligne « Sent from » : mention derrière un libellé, sinon l'unique mention. */
+/**
+ * Auteur d'un relais sans ligne « Sent from » : la mention derrière un libellé,
+ * sinon personne. Une mention sans libellé peut viser un tiers (« duo avec
+ * <@id> ») : la deviner enverrait les lecteurs vers quelqu'un qui n'a rien écrit.
+ */
 function mentionedAuthorId(body: string): string | null {
   const labelled = [...body.matchAll(AUTHOR_MENTION)].at(-1);
-  if (labelled !== undefined) return labelled[1];
-  const mentioned = new Set([...body.matchAll(USER_MENTION)].map((mention) => mention[1]));
-  const [only] = mentioned;
-  return mentioned.size === 1 ? only : null;
+  return labelled?.slice(1).find((id) => id !== undefined) ?? null;
 }
 
 /** Texte, auteur et origine d'un relais : tout se lit dans les encarts du bot. */
