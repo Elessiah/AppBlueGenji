@@ -15,6 +15,7 @@ import {
   reconcileGetiChannel,
   upsertGetiPosts,
 } from "../geti/posts";
+import { liftGetiObjection, recordGetiObjection } from "../geti/objections";
 import { parsePushedPost, type GetiPushedPost } from "../geti/wire";
 import { GETI_CATEGORIES, GETI_CHANNEL_IDS, type GetiCategory } from "@/lib/shared/geti";
 import { GETI_BOT_USER_ID, getiRetentionMs } from "@/lib/shared/geti/ingest";
@@ -214,10 +215,15 @@ export async function createGetiPosts(db: Pool): Promise<void> {
     pushed(wirePost({ category: "lft", ageHours: expiredAfter("lft"), author: "test_geti_perime", text: "LFT trop ancien" }, 90, now)),
     pushed(wirePost({ category: "lfs", ageHours: expiredAfter("lfs"), author: "test_geti_perime", text: "LFS trop ancien" }, 91, now)),
   ];
-  const deleted = pushed(wirePost({ category: "lfs", ageHours: 1, author: "test_geti_supprime", text: "LFS annulé" }, 92, now));
+  const deletedBody = wirePost({ category: "lfs", ageHours: 1, author: "test_geti_supprime", text: "LFS annulé" }, 92, now);
+  const deleted = pushed({ ...deletedBody, editedAt: new Date(now - HOUR_MS / 2).toISOString() });
   const outcome = await upsertGetiPosts(db, [...posts, ...expired, deleted], now);
   // Rejouée : la modification d'une annonce déjà gardée passe par `ON DUPLICATE KEY UPDATE`.
   await upsertGetiPosts(db, posts.slice(0, 1), now);
+  // Version vide plus ancienne que la version gardée (envoi retenté après la modification) : l'annonce reste.
+  const stale = await upsertGetiPosts(db, [pushed({ ...deletedBody, content: "", embeds: [] })], now);
+  const [staleRows] = await db.execute(`SELECT COUNT(*) AS total FROM bg_geti_posts WHERE message_id = ?`, [deleted.messageId]);
+  const staleKept = Number((staleRows as { total: number }[])[0]?.total ?? 0) === 1 && stale.emptied === 1;
   const removed = await deleteGetiPosts(db, [deleted.messageId]);
 
   // Réconciliation d'un salon dont rien n'a disparu, puis purge : aucune ligne ne doit partir.
@@ -234,16 +240,37 @@ export async function createGetiPosts(db: Pool): Promise<void> {
   const beforePurge = await mine();
   await purgeExpiredGetiPosts(db, now);
   const afterPurge = await mine();
+
+  // Oppositions sur la vraie base : une sur un message, une sur un auteur — leurs annonces poussées
+  // ensuite ne restent pas ; levées, elles reviennent à la poussée suivante.
+  const objectedMessage = pushed(wirePost({ category: "lft", ageHours: 2, author: "test_geti_oppose", text: "LFT opposé" }, 93, now));
+  const objectedAuthor = pushed(wirePost({ category: "lfp", ageHours: 2, author: "test_geti_oppose", text: "LFP opposé" }, 94, now));
+  const authorObjection = { kind: "author" as const, targetId: fakeId("1000000000000001", 94) };
+  const messageObjection = { kind: "message" as const, targetId: objectedMessage.messageId };
+  await recordGetiObjection(db, messageObjection);
+  await recordGetiObjection(db, authorObjection);
+  const objected = await upsertGetiPosts(db, [objectedMessage, objectedAuthor], now);
+  const lifted = (await liftGetiObjection(db, messageObjection)) && (await liftGetiObjection(db, authorObjection));
+  const restored = await upsertGetiPosts(db, [objectedMessage, objectedAuthor], now);
+  const objectionRemoved = await recordGetiObjection(db, messageObjection);
+  await liftGetiObjection(db, messageObjection);
+  await deleteGetiPosts(db, [objectedAuthor.messageId]);
+  if (objected.withheld !== 2 || objected.stored !== 0 || !lifted || restored.stored !== 2 || objectionRemoved !== 1) {
+    throw new Error(
+      `annonces GETI : oppositions inattendues (${objected.withheld} écartée(s), ${restored.stored} rétablie(s), ${objectionRemoved} retirée(s))`,
+    );
+  }
   if (
     outcome.stored !== posts.length + 1 ||
     outcome.expired !== expired.length ||
     removed !== 1 ||
+    !staleKept ||
     reconciled !== 0 ||
     beforePurge !== posts.length ||
     afterPurge !== posts.length
   ) {
     throw new Error(
-      `annonces GETI : bilan inattendu (${outcome.stored} gardées, ${outcome.expired} périmée(s), ${removed} supprimée(s), ${reconciled} réconciliée(s), ${beforePurge} puis ${afterPurge} après purge)`,
+      `annonces GETI : bilan inattendu (${outcome.stored} gardées, ${outcome.expired} périmée(s), ${removed} supprimée(s), version vide ancienne ${staleKept ? "ignorée" : "appliquée"}, ${reconciled} réconciliée(s), ${beforePurge} puis ${afterPurge} après purge)`,
     );
   }
 

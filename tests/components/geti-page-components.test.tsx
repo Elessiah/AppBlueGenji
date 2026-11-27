@@ -200,16 +200,24 @@ describe("GetiLayout, GetiRetry et finitions UI (cycle ui 1)", () => {
     expect(markup).not.toContain("Indisponible");
   });
 
+  it("GetiRetry_retryStillUnavailable_announcesTheFailureAgain", () => {
+    const source = readSource("components/geti/GetiRetry.tsx");
+
+    expect(source).toContain("useTransition()");
+    expect(source).toMatch(/if \(retrying \|\| !retried\.current\) return;\s*retried\.current = false;\s*showError\(error\);/);
+    expect(source).toContain("startRetry(() => router.refresh())");
+  });
+
   it("GetiInfoView_listUnavailable_logsACodeOnlyAndShowsANeutralLine", () => {
     const source = readSource("components/geti/GetiInfoView.tsx");
 
-    expect(source).toContain('console.warn("[geti] post list unavailable:", getiErrorCode(error))');
+    expect(source).toContain("logGetiListFailure(error);");
     expect(source).toContain("{m.results.none}");
     expect(source).toContain("error={m.results.unavailable}");
   });
 
   it("les messages du repli neutre et du texte masqué existent en français et en anglais", () => {
-    expect([frMessages.results.none, enMessages.results.none]).toEqual(["Aucune annonce à afficher.", "No posts to show."]);
+    expect([frMessages.results.none, enMessages.results.none]).toEqual(["Annonces non chargées.", "Posts not loaded."]);
     expect([frMessages.post.spoiler, enMessages.post.spoiler]).toEqual(["[masqué]", "[hidden]"]);
   });
 

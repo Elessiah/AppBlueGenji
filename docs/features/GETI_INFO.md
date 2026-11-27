@@ -364,17 +364,18 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
   autres channels. », lien d'invitation du bot) n'est pas une annonce ;
   `upsertGetiPosts` l'écarte comme un message vide (compté `emptied`, retiré
   s'il était gardé). Un relais à en-tête GETI n'en est jamais une.
-- **Analyses déjà gardées** : une ligne analysée avant ce lot (sans clé
-  `"closed"` dans `parsed_json`) est réanalysée à la lecture depuis son
+- **Analyses déjà gardées** : chaque analyse est gardée avec sa version en
+  dernière clé (`"analysisVersion":2}` — 2 : passages masqués non lus) ; une ligne
+  d'une version antérieure est réanalysée à la lecture depuis son
   `raw_json` par `listGetiPosts` (seules ces lignes remontent leur message brut) ;
-  message brut illisible : `dates`, `levels` et `closed` vides. Hors requête,
+  message brut illisible : la ligne n'est pas rendue (son analyse ancienne a pu
+  lire un passage masqué). Hors requête,
   l’horloge de purge horaire (`refreshStaleGetiPosts`, 5 000 lignes au plus par
   passage) réécrit ces lignes une fois (une ligne dont le message brut est
-  illisible garde son analyse, champs ajoutés vides ; une ligne sans texte ou
-  avis du bot est retirée) : la lecture ne les réanalyse plus (~0,3 ms chacune,
+  illisible est retirée, comme une ligne sans texte ou un avis du bot) : la lecture ne les réanalyse plus (~0,3 ms chacune,
   jusqu’à 3 000 par page sinon). L’écriture ne touche qu’une ligne encore
-  ancienne. `closed` naît dans ce lot : aucune ligne gardée ne porte d’analyse
-  plus ancienne avec la clé.
+  ancienne. Avancer la version (`ANALYSIS_VERSION`) quand l'analyse change ce
+  qu'elle lit : les lignes gardées sont alors refaites.
 - **Faux positifs écartés** (revue) : une tranche d'âge (« âge : 16-20 ») n'est
   pas un horaire ; « 2/3 joueurs », « 1/12 places » ne sont pas des dates, et
   « 31/12 » lu un 1er janvier l'est (année précédente) ; « recrutement /
@@ -419,7 +420,12 @@ L'en-tête du relais donne l'identifiant de l'auteur, son pseudo (celui qui se
 copie) et le serveur d'origine — dont le nom peut porter des crochets
 (`[TAG] Nom`, la forme la plus courante : `GETI_SERVER_LINK`). `parseGetiPost`
 le lit (`GETI_HEADER`) et le retire du texte, qui garde ses marques de citation
-(`> …`) ; l'auteur de l'en-tête prime sur toute mention du texte. Le message de **tout autre bot** (le nôtre compris), un message système
+(`> …`) ; l'auteur de l'en-tête prime sur toute mention du texte. Le pseudo
+peut porter une parenthèse fermante (`Bob :)`). Une première ligne de GETI Bot
+qui s'ouvre sur une mention sans se lire en entier comme un en-tête est écartée,
+texte et auteur compris (`GETI_HEADER_LIKE_LINE`) : son pseudo et son nom de
+serveur sont choisis par d'autres, qui y écriraient « Contact : <@quelqu'un> »
+pour se faire passer pour un tiers. Le message de **tout autre bot** (le nôtre compris), un message système
 ou un message sans texte n'est pas une annonce : ni poussé par le bot, ni gardé
 par le site. Un message de GETI Bot dont le premier encart ne s'ouvre pas sur l'en-tête d'un
 relais — mention de l'auteur, `(pseudo)`, puis `sur`/`on`/`from` (l'avis « Ton
@@ -466,29 +472,61 @@ lu borné (413), réponses en **nombres** seulement, refus par **code**
 
 | Route | Corps | Effet | Réponse |
 | --- | --- | --- | --- |
-| `POST /api/internal/geti/posts` | `{ posts: [{ id, channelId, content, author{id,username,discriminator,bot}, embeds[{authorName,title,description,fields,footerText}], postedAt, editedAt }] }` — 20 au plus, 512 Kio | crée ou remplace chaque annonce, analysée ici | `{ stored, emptied, expired, rejected }` |
+| `POST /api/internal/geti/posts` | `{ posts: [{ id, channelId, content, author{id,username,discriminator,bot}, embeds[{authorName,title,description,fields,footerText}], postedAt, editedAt }] }` — 20 au plus, 512 Kio | crée ou remplace chaque annonce, analysée ici | `{ stored, emptied, expired, withheld, rejected }` |
 | `POST /api/internal/geti/posts/delete` | `{ ids: [...] }` — 100 au plus | retire ces messages | `{ removed }` |
 | `POST /api/internal/geti/reconcile` | `{ channelId, since, until, ids: [...] }` — 10 000 identifiants au plus | retire toute annonce gardée du salon, publiée entre `since` (ramené à la fenêtre de garde) et `until`, absente de `ids` | `{ removed }` |
 
 Tout champ est tenu pour non fiable (`lib/server/geti/wire.ts`) : typé, borné,
 écarté s'il n'a pas la forme attendue (`rejected`). Un message sans texte après
-analyse (`emptied`) est retiré s'il était gardé.
+analyse (`emptied`) est retiré s'il était gardé. Un lot s'écrit en **une seule
+instruction** multi-lignes (atomique, un aller-retour) ; le plafond d'appels du
+bot (1 200 par minute, 429 avec `Retry-After`, que le bot attend) est loin
+au-dessus du débit d'un rattrapage (environ 400 par minute au pire).
 
 ### Purge
 
 `purgeExpiredGetiPosts`, lancée par `startGetiPostsPurgeClock`
 (`instrumentation.ts`, horloge `geti-posts-purge` : 3 minutes après le
 démarrage, puis toutes les heures) : par catégorie selon sa durée, puis toute
-ligne plus vieille que la plus longue. Suppression définitive — une horloge, pas
+ligne plus vieille que la plus longue, par lots de 500 lignes (`DELETE … LIMIT`,
+100 passages au plus par condition : après une longue panne, le reste attend
+l'heure suivante). Suppression définitive — une horloge, pas
 le trafic ni le bot : un site sans visite ou un bot arrêté ne garde rien au-delà
 de la durée annoncée.
+
+### Opposition (RGPD, art. 21) — `lib/server/geti/objections.ts`
+
+Retirer une ligne de `bg_geti_posts` ne suffit pas : le bot repousse l'annonce
+à chaque rattrapage tant que le message est sur Discord. Une opposition
+s'enregistre dans `bg_geti_objections` (`kind` = `author` + identifiant Discord
+de l'auteur : toutes ses annonces, présentes et à venir ; `message` + identifiant
+du message : une annonce). `POST /api/admin/geti/objections` (`{ authorId }` ou
+`{ messageId }`, l'un des deux exactement ; permission `moderation` ; geste tracé
+dans pm2 avec son auteur) l'enregistre et retire sur-le-champ ce qu'elle couvre
+(`{ removed }`) ; `DELETE` sur la même route, même corps, la lève (`{ lifted }` —
+les annonces encore sur Discord reviennent au prochain rattrapage). À chaque lot
+poussé, `upsertGetiPosts` retire **après** l'écriture les messages couverts
+(`withheld` dans le bilan) : une opposition enregistrée pendant l'écriture
+l'emporte quel que soit l'ordre. Celle d'un auteur tient jusqu'à sa levée ;
+celle d'un message est effacée par la purge horaire 14 jours après son
+enregistrement (le message est alors trop vieux pour revenir). Pas encore
+d'écran : le geste se fait par la route (le lot de la page pourra y brancher un
+bouton). Table absente : l'écriture d'un lot échoue en `503`, le bot réessaie —
+rien n'est recopié sans savoir si son auteur s'y est opposé. Une sauvegarde restaurée
+ne connaît pas une opposition enregistrée après elle : il faut l'enregistrer de
+nouveau (`/rgpd`, T21 et `PRIVACY_CHANGES` le disent ; le journal des
+suppressions ne porte que les suppressions de compte).
 
 ### Lecture — `listGetiPosts(filter, page, executor?, now?)`
 
 `lib/server/geti/posts.ts`, pour la page du lot 3 et les alertes du lot 5 :
 annonces de la plus récente à la plus ancienne, `GetiPostPage`
 (`posts`, `total`, `page`, `pageSize` — 30 par défaut, 100 au plus). La
-catégorie et l'âge se filtrent en SQL, le reste par `matchesGetiFilter` sur
+catégorie et l'âge se filtrent en SQL (3 000 lignes lues au plus — au-delà,
+un avertissement pm2 —, sans le message brut), la lecture sur le pool étant gardée
+10 secondes par catégorie et âge (8 lectures au plus, oubliées à chaque
+écriture, suppression ou purge ; une lecture partie avant un oubli n'est pas
+gardée) ; le reste par `matchesGetiFilter` sur
 l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
 `channelId`, `category`, `source`, `authorTag`, `authorId`, `parsed`,
 `postedAt`, `editedAt` — jamais le message brut.
@@ -498,7 +536,33 @@ l'analyse gardée. Une annonce rendue (`GetiStoredPost`) porte `messageId`,
 - Écoute `messageCreate`, `messageUpdate`, `messageDelete`, `messageDeleteBulk`
   sur les six salons seulement ; partiel `Message` activé (sans lui, la
   modification ou la suppression d'un message hors cache n'est jamais annoncée) ;
-  un message partiel est relu avant d'être poussé.
+  un message partiel est relu avant d'être poussé ; une relecture qui échoue
+  autrement que par « message inconnu » (panne passagère de Discord) fait relire
+  son salon au passage des cinq minutes.
+- Annonces directes d'un utilisateur exclu du relais (table `Ban`, `checkBan`) :
+  ni poussées, ni comptées présentes (la réconciliation les retire du site) ;
+  `/ban` et `/unban` lancent un rattrapage complet (`requestGetiResync`), qui
+  retire du site ses annonces déjà copiées ou les y remet.
+- Bannissement Discord d'un membre : **non écouté** (`guildBanAdd` n'arrive qu'à
+  un bot qui a « Bannir des membres » ou « Voir les logs du serveur », que le
+  relais n'a pas à recevoir). Les messages qu'il efface, que Discord ne signale
+  pas un à un, restent sur le site jusqu'au prochain rattrapage ou à la fin de
+  leur durée de garde.
+- Opposition sur un auteur : un en-tête GETI illisible (pseudo ou serveur hors
+  forme) garde l'auteur par sa mention de tête, écrite par GETI Bot — sans
+  pseudo ni serveur —, pour que l'opposition le couvre. Dans le premier encart
+  du message seulement (position 0, même si un encart illisible la tient) : la
+  mention de tête d'un en-tête illisible dans un encart suivant ne nomme
+  personne. Un en-tête complet et les libellés hors citation (« Contact :
+  <@id> ») se lisent, eux, dans tout encart — le texte du joueur y est cité.
+- Une annonce vidée (pièce jointe seule, texte effacé) n'est retirée que si sa
+  version est au moins aussi récente que la version gardée : un ancien envoi
+  vide, retenté après la modification, ne retire pas l'annonce à jour.
+- `stored` compte les annonces acceptées : une version plus ancienne que la
+  version gardée y figure, sans rien écrire.
+- Un lot qui porte deux versions d'un même message n'en garde que la plus
+  récente (modification, sinon publication), avant l'analyse : une ancienne
+  version vide ne retire pas la version récente du même lot.
 - Rattrapage au démarrage et à chaque nouvelle session Discord : historique de
   chaque salon sur sa fenêtre de garde (pages de 100, pause entre deux pages,
   5 000 messages au plus par salon), puis `reconcile` avec la liste des annonces
@@ -529,7 +593,9 @@ politique de confidentialité du bot. Le seed pose quatorze annonces de synthès
 
 `tests/lib/server/geti/` (`wire`, `posts`, `schema-and-clock`),
 `tests/app/api/internal/geti/geti-routes.test.ts`,
-`tests/lib/shared/geti/geti-bot-relay.test.ts` (en-tête du relais) ; fabriques
+`tests/lib/shared/geti/geti-bot-relay.test.ts` (en-tête du relais),
+`tests/lib/server/geti/objections.test.ts`,
+`tests/app/api/admin/geti-objections.test.ts` (oppositions) ; fabriques
 dans `tests/helpers/geti-ingest.ts`.
 
 ## Page publique `/geti-info` (lot 3)
@@ -620,9 +686,11 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
   qui répondent à un critère actif (`getiChipMatches`) sont mises en avant — plus
   vives, cochées, et préfixées pour un lecteur d'écran (jamais la couleur seule).
 - **Texte** : toujours un nœud de texte (`getiPostBodyText`) — **une** marque de
-  citation suivie d'une espace (celle du relais ; « >4000 » reste), balisage par
-  paires au bord d'un mot (« xX__Sniper__Xx » reste), passage masqué `||…||` →
-  « [masqué] » / « [hidden] » (jamais son contenu), mention → mot neutre (jamais un
+  citation suivie d'une espace ou seule sur sa ligne (celle du relais ; « >4000 » reste), balisage par
+  paires au bord d'un mot (« xX__Sniper__Xx » reste ; `**` / `~~` restés seuls retirés quand ils collent
+  un mot ou finissent le texte, gardés entre deux chiffres « 5**2 », deux espaces ou seuls sur leur ligne),
+  code rendu tel quel (aucune marque retirée dedans, citation et titre compris ; langue d'un bloc ```` ```txt ```` ôtée), passage masqué `||…||` (lu de gauche à droite comme Discord : `||||x||` masque `||x` ; un `||` dans un code ouvert avant lui est du texte ; un passage ouvert avant un code se ferme au premier `||` qui suit, même dans un accent grave ; code sans borne de longueur, motif neuf par usage — `getiCodeSpan()`), quelle que soit sa longueur →
+  « [masqué] » / « [hidden] » (jamais son contenu ; l'analyse ne le lit pas non plus : aucune étiquette n'en vient — `getiWithoutSpoilers`), mention → mot neutre (jamais un
   identifiant), émoji de serveur → son nom, horodatage `<t:…>` → date ou heure à
   l'heure de Paris (`getiTimestampLabel`, `R` écrit comme `f`), lien laissé en texte. Replié au-delà
   de 420 caractères ou 7 lignes (« Lire la suite ») ; une fois la page chargée, le
@@ -666,7 +734,7 @@ l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lec
 
 - `GetiLayout` (client) enveloppe filtres et résultats : pendant un changement de filtre, la grille porte `aria-busy` + `data-pending` (liseré pointillé, jamais d'opacité : contraste 4,5:1) et le panneau annonce « Mise à jour… » (`<output>`).
 - « Réinitialiser » rend le focus au bouton Filtres (mobile) ou au titre du panneau avant de disparaître ; sur mobile, un bouton « Voir les N annonces » referme le panneau.
-- Liste indisponible : filtres masqués, « Aucune annonce à afficher » en ligne, la panne en notification (`showError`) et bouton « Réessayer » (`GetiRetry`, `router.refresh()`) ; pm2 reçoit `[geti] post list unavailable: <code>` (code seul).
+- Liste indisponible : filtres masqués, « Annonces non chargées » / « Posts not loaded » en ligne (jamais un « aucune annonce », qui se lirait comme une recherche vide), la panne en notification (`showError`, redite si « Réessayer » revient encore sans liste) et bouton « Réessayer » (`GetiRetry`, `router.refresh()`) ; pm2 reçoit `[geti] post list unavailable: <code>` (code, à défaut nom de la classe d'erreur ; une ligne par minute au plus, avec le nombre d'échecs tus — `logGetiListFailure`). Une écriture qui échoue en cours de route oublie aussi la lecture partagée.
 - La date exacte de publication / modification est un texte du pied de carte (plus d'infobulle) ; le repli de copie rend le focus au bouton.
 - Onglets anglais au pluriel (Players, Teams, Subs, Staff, Scrims, Casters).
 
