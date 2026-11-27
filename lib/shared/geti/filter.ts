@@ -5,12 +5,47 @@
  * Module pur : importable côté serveur comme côté client.
  */
 import { GETI_RANK_TOP, getiRankValue } from "@/lib/shared/geti/ranks";
-import type { GetiFilter, GetiParsedPost, GetiRankRange } from "@/lib/shared/geti/types";
+import {
+  GETI_CATEGORIES,
+  GETI_ROLES,
+  GETI_TIERS,
+  type GetiFilter,
+  type GetiParsedPost,
+  type GetiRank,
+  type GetiRankRange,
+  type GetiRankedRole,
+} from "@/lib/shared/geti/types";
 
 const HOUR_MS = 3_600_000;
+/** Avance tolérée d'une date de publication sur l'horloge (horloges décalées). */
+const CLOCK_SKEW_MS = 5 * 60_000;
 
+/** Rôle à rang propre : une valeur enregistrée (« constructor ») n'en est pas un. */
+function isRankedRole(role: unknown): role is GetiRankedRole {
+  return role !== "FLEX" && GETI_ROLES.some((known) => known === role);
+}
+
+/** Nombre d'un JSON enregistré : un nombre, ou une chaîne qui en écrit un (« "3" ») ; sinon `NaN`. */
+function storedNumber(value: unknown): number {
+  if (typeof value === "number") return value;
+  return typeof value === "string" && value.trim() !== "" ? Number(value) : Number.NaN;
+}
+
+/** Borne de rang enregistrée, lue seulement si elle est un vrai rang ; sinon `null` (borne ouverte). */
+function rankValue(rank: GetiRank | null | undefined): number | null {
+  if (typeof rank !== "object" || rank === null) return null;
+  const { tier, division: stored } = rank as { tier?: unknown; division?: unknown };
+  const division = storedNumber(stored);
+  const knownTier = GETI_TIERS.find((known) => known === tier);
+  const knownDivision = Number.isInteger(division) && division >= 1 && division <= 5;
+  return knownTier !== undefined && knownDivision
+    ? getiRankValue({ tier: knownTier, division: division as GetiRank["division"] })
+    : null;
+}
+
+/** Liste voulue d'un filtre enregistré : une valeur qui n'est pas une liste ne filtre rien. */
 function wanted<T>(values: readonly T[] | null | undefined): readonly T[] {
-  return values ?? [];
+  return Array.isArray(values) ? values : [];
 }
 
 /** Au moins une valeur voulue est dans l'annonce ; champ non lu : selon `includeUnknown`. */
@@ -34,7 +69,7 @@ function matchesRoles(post: GetiParsedPost, filter: GetiFilter, includeUnknown: 
  */
 function rankRangesOf(post: GetiParsedPost, filter: GetiFilter): GetiRankRange[] {
   const perRole = wanted(filter.roles).flatMap((role) => {
-    const range = role === "FLEX" ? undefined : post.ranks.byRole[role];
+    const range = isRankedRole(role) && Object.hasOwn(post.ranks.byRole, role) ? post.ranks.byRole[role] : undefined;
     return range === undefined ? [] : [range];
   });
   if (perRole.length > 0) return perRole;
@@ -42,25 +77,33 @@ function rankRangesOf(post: GetiParsedPost, filter: GetiFilter): GetiRankRange[]
 }
 
 function matchesRanks(post: GetiParsedPost, filter: GetiFilter, includeUnknown: boolean): boolean {
-  const min = filter.ranks?.min ?? null;
-  const max = filter.ranks?.max ?? null;
+  const ranks: unknown = filter.ranks;
+  const bounds = typeof ranks === "object" && ranks !== null ? (ranks as GetiFilter["ranks"]) : null;
+  // Une borne invalide est ouverte : deux bornes invalides valent un critère absent.
+  const min = rankValue(bounds?.min);
+  const max = rankValue(bounds?.max);
   if (min === null && max === null) return true;
   const ranges = rankRangesOf(post, filter);
   if (ranges.length === 0) return includeUnknown;
-  const low = min === null ? 0 : getiRankValue(min);
-  const high = max === null ? GETI_RANK_TOP : getiRankValue(max);
+  const low = min ?? 0;
+  const high = max ?? GETI_RANK_TOP;
   // Deux fourchettes se recoupent, bornes comprises.
   return ranges.some((range) => getiRankValue(range.max) >= low && getiRankValue(range.min) <= high);
 }
 
-function matchesAge(post: GetiParsedPost, maxAgeHours: number | null | undefined, now: number): boolean {
-  if (maxAgeHours === null || maxAgeHours === undefined || !Number.isFinite(maxAgeHours) || maxAgeHours <= 0) {
-    return true;
-  }
+function matchesAge(post: GetiParsedPost, stored: number | null | undefined, now: number): boolean {
+  if (stored === null || stored === undefined) return true;
+  // Un JSON enregistré peut porter « "24" » : lu comme un nombre. Une limite
+  // illisible (« "24h" », « "" », objet) n'est jamais lue comme « sans limite » :
+  // rien ne passe. Un nombre nul, négatif ou non fini : sans limite.
+  const maxAgeHours = storedNumber(stored);
+  if (typeof stored !== "number" && Number.isNaN(maxAgeHours)) return false;
+  if (!Number.isFinite(maxAgeHours) || maxAgeHours <= 0) return true;
   // Une annonce sans date ne peut pas être dite récente.
   if (post.postedAt === null) return false;
   const posted = Date.parse(post.postedAt);
-  return !Number.isNaN(posted) && now - posted <= maxAgeHours * HOUR_MS;
+  // Une date dans le futur n'est pas récente : elle resterait en tête des années durant.
+  return !Number.isNaN(posted) && posted <= now + CLOCK_SKEW_MS && now - posted <= maxAgeHours * HOUR_MS;
 }
 
 /**
@@ -76,14 +119,22 @@ function matchesAge(post: GetiParsedPost, maxAgeHours: number | null | undefined
  *
  * Une annonce où le critère n'a pas été lu est écartée, sauf `includeUnknown`.
  *
+ * Filtre enregistré (JSON) : une catégorie inconnue, une liste qui n'en est
+ * pas une ou une borne de rang invalide est ignorée ; « "3" » et « "true" »
+ * valent 3 et `true` ; une limite d'âge illisible écarte tout.
+ *
  * @param post Annonce analysée (`parseGetiPost`).
- * @param filter Critères ; absent, `null` ou vide = non filtré.
+ * @param stored Critères ; absent, `null` ou vide = non filtré.
  * @param now Instant de référence en millisecondes (par défaut : maintenant).
  * @returns `true` si l'annonce passe tous les critères.
  */
-export function matchesGetiFilter(post: GetiParsedPost, filter: GetiFilter, now: number = Date.now()): boolean {
-  const includeUnknown = filter.includeUnknown === true;
-  if (filter.category !== null && filter.category !== undefined && post.category !== filter.category) return false;
+export function matchesGetiFilter(post: GetiParsedPost, stored: GetiFilter, now: number = Date.now()): boolean {
+  // Filtre enregistré : `null` ou une valeur qui n'est pas un objet ne filtre rien.
+  const filter: GetiFilter = typeof stored === "object" && stored !== null ? stored : {};
+  const includeUnknown = filter.includeUnknown === true || (filter.includeUnknown as unknown) === "true";
+  // Une catégorie enregistrée inconnue (« "LFP" », 5) ne filtre rien, comme une liste invalide.
+  const category = GETI_CATEGORIES.find((known) => known === filter.category);
+  if (category !== undefined && post.category !== category) return false;
   return (
     matchesAge(post, filter.maxAgeHours, now) &&
     matchesRoles(post, filter, includeUnknown) &&
@@ -92,4 +143,22 @@ export function matchesGetiFilter(post: GetiParsedPost, filter: GetiFilter, now:
     matchesAny(post.platforms, wanted(filter.platforms), includeUnknown) &&
     matchesAny(post.languages, wanted(filter.languages), includeUnknown)
   );
+}
+
+/**
+ * Garde les annonces qui passent un filtre, en lisant l'horloge **une seule
+ * fois** : une annonce au bord de la limite d'âge passerait ou non
+ * selon sa place dans la liste.
+ *
+ * @param posts Annonces analysées.
+ * @param filter Critères (voir {@link matchesGetiFilter}).
+ * @param now Instant de référence en millisecondes (par défaut : maintenant).
+ * @returns Les annonces retenues, dans leur ordre.
+ */
+export function filterGetiPosts<T extends GetiParsedPost>(
+  posts: readonly T[],
+  filter: GetiFilter,
+  now: number = Date.now(),
+): T[] {
+  return posts.filter((post) => matchesGetiFilter(post, filter, now));
 }

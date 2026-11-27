@@ -19,13 +19,23 @@ import {
   parseGetiStaffRoles,
   parseGetiTeamName,
 } from "@/lib/shared/geti/fields";
-import { NOT_AFTER_WORD, getiDisplayText, prepareGetiText } from "@/lib/shared/geti/normalize";
+import {
+  CUSTOM_EMOJI,
+  GETI_TEXT_MAX,
+  MENTION,
+  NOT_AFTER_WORD,
+  getiDisplayText,
+  getiSafeText,
+  prepareGetiText,
+  withoutMarkup,
+} from "@/lib/shared/geti/normalize";
 import { parseGetiRanks } from "@/lib/shared/geti/ranks";
 import { findGetiRoleTokens, getiRolesOf, getiSubRolesOf } from "@/lib/shared/geti/roles";
 import {
   GETI_CATEGORIES,
   GETI_CHANNEL_IDS,
   type GetiCategory,
+  type GetiParseOptions,
   type GetiParsedPost,
   type GetiRawEmbed,
   type GetiRawPost,
@@ -35,6 +45,13 @@ import { visibleText } from "@/lib/shared/visible-text";
 /** Pseudo Discord : 32 caractères, plus l'ancien suffixe « #1234 ». */
 const USERNAME_MAX = 32;
 const ORIGIN_SERVER_MAX = 100;
+/** Longueur lue d'un texte brut (contenu, titre, description, champ) : deux fois la borne affichée. */
+const RAW_TEXT_MAX = GETI_TEXT_MAX * 2;
+/** Discord n'envoie jamais plus de 10 encarts, de 25 champs chacun. */
+const EMBEDS_MAX = 10;
+const EMBED_FIELDS_MAX = 25;
+/** La ligne « Sent from » est la dernière : elle tient dans la fin de la description. */
+const TRAILER_WINDOW = 600;
 const SNOWFLAKE = /^\d{15,22}$/u;
 const DISCRIMINATOR = /^\d{4}$/u;
 /**
@@ -46,9 +63,9 @@ const DISCRIMINATOR = /^\d{4}$/u;
  */
 const AUTHOR_MENTION = new RegExp(
   [
-    String.raw`^[^\p{L}\p{N}<>\n]*(?:by|par|from|author|auteur|contact)\s*:?\s*<@!?(\d{15,22})>`,
+    String.raw`^[^\p{L}\p{N}<>\n]*(?:by|par|from|author|auteur|contact)\s*(?::\s*)?<@!?(\d{15,22})>`,
     String.raw`${NOT_AFTER_WORD}(?:author|auteur|contact)\s*:\s*<@!?(\d{15,22})>`,
-    String.raw`${NOT_AFTER_WORD}(?:posted|sent|written|post[ée]e?|publi[ée]e?|envoy[ée]e?|[ée]crite?)\s+(?:by|par)\s*:?\s*<@!?(\d{15,22})>`,
+    String.raw`${NOT_AFTER_WORD}(?:posted|sent|written|post[ée]e?|publi[ée]e?|envoy[ée]e?|[ée]crite?)\s+(?:by|par)\s*(?::\s*)?<@!?(\d{15,22})>`,
   ].join("|"),
   "gimu",
 );
@@ -59,7 +76,7 @@ const AUTHOR_MENTION = new RegExp(
 const SENT_FROM_LINK = String.raw`\[((?:\\.|[^\]\\])*)\]\([^)\s]*\)`;
 const SENT_FROM_AUTHOR = String.raw`(?:\s*by\s*<@!?(\d{15,22})>)?`;
 const SENT_FROM = new RegExp(
-  String.raw`\n*[*_]*Sent from\s?:\s?${SENT_FROM_LINK}[*_]*${SENT_FROM_AUTHOR}\s*$`,
+  String.raw`(?:^|\n)\n*[*_]*Sent from\s?:\s?${SENT_FROM_LINK}[*_]*${SENT_FROM_AUTHOR}\s*$`,
   "iu",
 );
 /**
@@ -76,11 +93,27 @@ const GETI_HEADER = new RegExp(
   String.raw`^\s*<@!?(\d{15,22})>[^\S\n]*[*_]*\(((?:\\.|[^)\n\\]){1,64})\)[*_]*[^\S\n]*(?:sur|on|from)[^\S\n]*${GETI_SERVER_LINK}[^\S\n]*(?:\n|$)`,
   "iu",
 );
-/** Pseudo entre parenthèses derrière un nom d'affichage : « Nom (@pseudo) ». */
-const HANDLE_IN_PARENTHESES = /\(@?([\w.]{2,32}(?:#\d{4})?)\)\s*$/u;
+/**
+ * Pseudo Discord lisible sur une ligne d'auteur d'encart : nouveau format
+ * (« faux.pseudo ») ou ancien (« Faux Pseudo#4821 »). Un nom d'affichage libre
+ * (« Admin (@staff) ») n'en est pas un : son auteur l'écrit à sa guise.
+ */
+const USERNAME_SHAPE = /^(?:[\w.]{2,32}|[^#@:`()\n]{2,32}#\d{4})$/u;
+/** Ligne citée (« > … ») : le texte relayé d'un joueur, jamais l'en-tête du bot. */
+const QUOTED_LINE = /^\s*>/u;
+/**
+ * Balisage au bord d'un mot (« **Nitro** », « ||x|| ») : retiré. À l'intérieur
+ * d'un ancien pseudo (« Star*Lord#1234 »), il en fait partie et reste.
+ */
+const TAG_EDGE_MARKUP = /(?<=^|\s)[*~`|]+|[*~`|]+(?=\s|$)/gu;
+/** Ni « @ » (aucun pseudo n'en porte) ni chevron (reste d'une mention). */
+const TAG_SYMBOLS = /[<>@]+/gu;
+/** Citation en bloc (« >>> ») : jusqu'à la fin du message. */
+const BLOCK_QUOTE = /^\s*>>>\s/u;
 
+/** Un texte brut, borné : aucun motif ne lit plus que ce qu'une annonce peut porter. */
 function text(value: unknown): string {
-  return typeof value === "string" ? value : "";
+  return typeof value === "string" ? value.slice(0, RAW_TEXT_MAX) : "";
 }
 
 function snowflake(value: unknown): string | null {
@@ -107,21 +140,44 @@ export function getiCategoryOfChannel(channelId: unknown): GetiCategory | null {
   return GETI_CATEGORIES.find((category) => GETI_CHANNEL_IDS[category] === channelId) ?? null;
 }
 
+/**
+ * Pseudo en texte seul : ni mention, ni balisage, ni « @ » (« **Nitro** @everyone »
+ * → « Nitro everyone ») ; un émoji de serveur laisse son nom. Le tiret bas reste :
+ * il fait partie de bien des pseudos.
+ */
+function tagText(value: string): string {
+  return value
+    .replace(CUSTOM_EMOJI, " $1 ")
+    .replace(MENTION, " ")
+    .replace(/\\(.)/gu, "$1")
+    .replace(TAG_SYMBOLS, " ")
+    .replace(TAG_EDGE_MARKUP, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
 /** Pseudo copiable : nettoyé, sans « @ » de tête, avec l'ancien suffixe s'il existe. */
 function authorTag(username: unknown, discriminator: unknown): string | null {
-  const name = visibleText(text(username)).replace(/^@+/u, "").slice(0, USERNAME_MAX).trim();
+  const name = tagText(visibleText(text(username))).slice(0, USERNAME_MAX).trim();
   if (name === "") return null;
   const suffix = text(discriminator);
   return DISCRIMINATOR.test(suffix) && suffix !== "0000" ? `${name}#${suffix}` : name;
 }
 
-/** Pseudo lu dans la ligne d'auteur d'un encart : « pseudo », « pseudo#1234 », « Nom (@pseudo) ». */
-function embedAuthorTag(authorName: unknown): string | null {
-  const shown = visibleText(text(authorName));
-  const handle = HANDLE_IN_PARENTHESES.exec(shown);
-  const [name, suffix] = (handle === null ? shown : handle[1]).split(/#(?=\d{4}$)/u);
+/** Pseudo écrit tel quel (« pseudo », « pseudo#1234 ») : l'ancien suffixe séparé. */
+function splitTag(value: string): string | null {
+  const [name, suffix] = value.split(/#(?=\d{4}$)/u);
   return authorTag(name, suffix);
 }
+
+/** Pseudo lu dans la ligne d'auteur d'un encart, s'il a la forme d'un pseudo Discord. */
+function embedAuthorTag(authorName: unknown): string | null {
+  const shown = visibleText(text(authorName)).replace(/^@+/u, "");
+  return USERNAME_SHAPE.test(shown) ? splitTag(shown) : null;
+}
+
+/** Auteur nommé par une partie du relais que le bot écrit (en-tête, dernière ligne). */
+type RelayAuthor = { id: string | null; tag: string | null; originServer: string | null };
 
 type RelayContent = {
   body: string;
@@ -132,13 +188,15 @@ type RelayContent = {
 
 function embedsOf(raw: GetiRawPost): GetiRawEmbed[] {
   return Array.isArray(raw.embeds)
-    ? raw.embeds.filter((embed): embed is GetiRawEmbed => typeof embed === "object" && embed !== null)
+    ? raw.embeds
+        .slice(0, EMBEDS_MAX)
+        .filter((embed): embed is GetiRawEmbed => typeof embed === "object" && embed !== null)
     : [];
 }
 
 /** Champs d'un encart, une ligne chacun : « Nom : valeur ». */
 function embedFieldLines(embed: GetiRawEmbed): string[] {
-  const fields = Array.isArray(embed.fields) ? embed.fields : [];
+  const fields = Array.isArray(embed.fields) ? embed.fields.slice(0, EMBED_FIELDS_MAX) : [];
   return fields.flatMap((field) => {
     if (typeof field !== "object" || field === null) return [];
     const parts = [text(field.name).trim(), text(field.value).trim()].filter((part) => part !== "");
@@ -147,13 +205,34 @@ function embedFieldLines(embed: GetiRawEmbed): string[] {
 }
 
 /**
- * Auteur d'un relais sans ligne « Sent from » : la mention derrière un libellé,
- * sinon personne. Une mention sans libellé peut viser un tiers (« duo avec
- * <@id> ») : la deviner enverrait les lecteurs vers quelqu'un qui n'a rien écrit.
+ * Auteur d'un relais sans en-tête ni ligne « Sent from » : la mention derrière
+ * un libellé, sinon personne. Une mention sans libellé peut viser un tiers
+ * (« duo avec <@id> »), une ligne citée (« > Contact : <@id> », ou sous un
+ * « >>> ») est le texte du joueur, et deux libellés qui nomment deux comptes
+ * différents se contredisent
+ * (le second peut être écrit par le joueur) : personne n'est désigné.
  */
-function mentionedAuthorId(body: string): string | null {
-  const labelled = [...body.matchAll(AUTHOR_MENTION)].at(-1);
-  return labelled?.slice(1).find((id) => id !== undefined) ?? null;
+function mentionedAuthorId(parts: readonly string[]): string | null {
+  const unquoted = parts.map(unquotedLines).join("\n");
+  let found: string | null = null;
+  for (const match of unquoted.matchAll(AUTHOR_MENTION)) {
+    const id = match.slice(1).find((group) => group !== undefined) ?? null;
+    if (id === null) continue;
+    if (found !== null && found !== id) return null;
+    found = id;
+  }
+  return found;
+}
+
+/**
+ * Lignes non citées d'un morceau (message, titre, description, champ) :
+ * « >>> » cite la ligne et toutes celles qui suivent **dans ce morceau**,
+ * même sans « > » ; Discord ne cite pas au-delà.
+ */
+function unquotedLines(part: string): string {
+  const lines = part.split("\n");
+  const blockStart = lines.findIndex((line) => BLOCK_QUOTE.test(line));
+  return (blockStart === -1 ? lines : lines.slice(0, blockStart)).filter((line) => !QUOTED_LINE.test(line)).join("\n");
 }
 
 /** Retire les échappements Markdown (« \_ », « \] »). */
@@ -161,41 +240,126 @@ function unescapeMarkdown(value: string): string {
   return value.replace(/\\(.)/gu, "$1");
 }
 
+/** Nom du serveur d'origine, en texte seul : ni balisage, ni mention, ni « @everyone ». */
 function serverName(value: string): string | null {
-  return visibleText(unescapeMarkdown(value)).slice(0, ORIGIN_SERVER_MAX) || null;
+  return withoutMarkup(visibleText(unescapeMarkdown(value))).slice(0, ORIGIN_SERVER_MAX).trim() || null;
 }
 
-/** Texte, auteur et origine d'un relais : tout se lit dans les encarts du bot. */
-function relayContent(raw: GetiRawPost): RelayContent {
-  const parts: string[] = [text(raw.content)];
-  let originServer: string | null = null;
-  let authorId: string | null = null;
-  let tag: string | null = null;
-  for (const embed of embedsOf(raw)) {
-    const description = text(embed.description);
-    // L'en-tête GETI nomme l'auteur : il passe avant toute mention du texte cité.
-    const header = GETI_HEADER.exec(description);
-    if (header !== null) {
-      authorId ??= header[1];
-      tag ??= embedAuthorTag(unescapeMarkdown(header[2]));
-      originServer ??= serverName(header[3]);
-    }
-    tag ??= embedAuthorTag(embed.authorName);
-    const trailer = SENT_FROM.exec(description);
-    if (trailer !== null) {
-      originServer ??= serverName(trailer[1]);
-      authorId ??= trailer[2] ?? null;
-    }
-    const start = header === null ? 0 : header[0].length;
-    const end = trailer === null ? undefined : Math.max(start, trailer.index);
-    parts.push(text(embed.title), description.slice(start, end), ...embedFieldLines(embed));
-  }
+/** Ligne « Sent from » qui clôt une description, en tête de ligne seulement (jamais « > Sent from »). */
+function trailerOf(description: string): RegExpExecArray | null {
+  const windowStart = Math.max(0, description.length - TRAILER_WINDOW);
+  const trailer = SENT_FROM.exec(description.slice(windowStart));
+  if (trailer === null) return null;
+  trailer.index += windowStart;
+  const startsLine = trailer[0].startsWith("\n") || trailer.index === 0 || description[trailer.index - 1] === "\n";
+  return startsLine ? trailer : null;
+}
+
+/**
+ * Auteur d'un relais : celui que nomment l'en-tête GETI et la ligne « Sent
+ * from » de notre bot. Deux sources qui nomment deux comptes différents se
+ * contredisent (l'une est écrite par le joueur : notre relais s'ouvre sur son
+ * texte) : personne n'est désigné. Pseudo et identifiant viennent de la même
+ * source.
+ */
+function relayAuthor(header: RelayAuthor | null, trailer: RelayAuthor | null): RelayAuthor | null {
+  const named = [trailer, header].filter((source): source is RelayAuthor => source !== null && source.id !== null);
+  if (named.length === 0) return null;
+  const originServer = trailer?.originServer ?? header?.originServer ?? null;
+  if (named.some((source) => source.id !== named[0].id)) return { id: null, tag: null, originServer };
+  return { id: named[0].id, tag: named[0].tag, originServer };
+}
+
+/** Ce qu'un bot relais est autorisé à dire de l'auteur. */
+type RelayTrust = {
+  /** Bot GETI : son en-tête et ses libellés hors citation. */
+  geti: boolean;
+  /** Notre bot : sa dernière ligne « Sent from ». */
+  site: boolean;
+};
+
+/** Ce qu'un encart dit de son texte, de son auteur et de son origine. */
+type EmbedReading = {
+  parts: string[];
+  header: RelayAuthor | null;
+  trailer: RelayAuthor | null;
+  embedTag: string | null;
+  lineServer: string | null;
+};
+
+/** Lit un encart : en-tête GETI et ligne « Sent from » ne comptent que du bot qui les écrit. */
+function readEmbed(embed: GetiRawEmbed, trust: RelayTrust): EmbedReading {
+  const description = text(embed.description);
+  const headerMatch = GETI_HEADER.exec(description);
+  const header: RelayAuthor | null =
+    headerMatch !== null && trust.geti
+      ? {
+          id: headerMatch[1],
+          tag: splitTag(visibleText(unescapeMarkdown(headerMatch[2]))),
+          originServer: serverName(headerMatch[3]),
+        }
+      : null;
+  const embedTag = embedAuthorTag(embed.authorName);
+  const trailerMatch = trailerOf(description);
+  const trusted = trailerMatch !== null && trust.site ? trailerMatch : null;
+  const trailerId = trusted?.[2] ?? null;
+  // Notre bot écrit le pseudo de l'auteur sur la ligne d'auteur de ce même encart.
+  const trailer: RelayAuthor | null =
+    trusted !== null && trailerId !== null
+      ? { id: trailerId, tag: embedTag, originServer: serverName(trusted[1]) }
+      : null;
+  const lineServer = trusted !== null && trailerId === null ? serverName(trusted[1]) : null;
+  // En-tête ou ligne « Sent from » qui ne vient pas de son bot : le texte du joueur, affiché tel quel.
+  const start = header === null || headerMatch === null ? 0 : headerMatch[0].length;
+  const end = trusted === null ? undefined : Math.max(start, trusted.index);
+  const parts = [text(embed.title), description.slice(start, end), ...embedFieldLines(embed)];
+  return { parts, header, trailer, embedTag, lineServer };
+}
+
+/**
+ * Texte, auteur et origine d'un relais : tout se lit dans les encarts du bot.
+ * L'en-tête GETI n'est cru que d'un bot GETI, la ligne « Sent from » que de
+ * notre bot : notre relais s'ouvre sur le texte du joueur, qui peut y imiter
+ * l'en-tête.
+ */
+function relayContent(raw: GetiRawPost, trust: RelayTrust): RelayContent {
+  const readings = embedsOf(raw).map((embed) => readEmbed(embed, trust));
+  const parts = [text(raw.content), ...readings.flatMap((reading) => reading.parts)];
   const body = parts.filter((part) => part.trim() !== "").join("\n");
-  return { body, authorTag: tag, authorId: authorId ?? mentionedAuthorId(body), originServer };
+  if (!trust.geti && !trust.site) {
+    // Un bot ou un webhook inconnu se fait passer pour qui il veut : son texte se lit, son auteur non.
+    return { body, authorTag: null, authorId: null, originServer: null };
+  }
+  const first = <T>(pick: (reading: EmbedReading) => T | null): T | null =>
+    readings.map(pick).find((value) => value !== null) ?? null;
+  const lineServer = first((reading) => reading.lineServer);
+  const named = relayAuthor(
+    first((reading) => reading.header),
+    first((reading) => reading.trailer),
+  );
+  if (named !== null) {
+    return { body, authorTag: named.tag, authorId: named.id, originServer: named.originServer ?? lineServer };
+  }
+  // Sans source du bot : une mention libellée hors citation, écrite par le bot GETI
+  // (dans notre relais, tout le texte est celui du joueur), dont le pseudo ne se
+  // devine pas (la ligne d'auteur peut nommer un autre compte) ; sinon le seul
+  // pseudo de la ligne d'auteur, qu'écrit le bot.
+  const mentioned = trust.geti ? mentionedAuthorId(parts) : null;
+  const lineTag = first((reading) => reading.embedTag);
+  return { body, authorTag: mentioned === null ? lineTag : null, authorId: mentioned, originServer: lineServer };
 }
 
-function contentOf(raw: GetiRawPost): RelayContent & { relayed: boolean } {
-  if (raw.author?.bot === true) return { ...relayContent(raw), relayed: true };
+/** Le bot est-il dans cette liste d'identifiants (une valeur enregistrée peut ne pas en être une) ? */
+function listed(ids: unknown, botId: string | null): boolean {
+  return botId !== null && Array.isArray(ids) && ids.includes(botId);
+}
+
+function contentOf(raw: GetiRawPost, options: GetiParseOptions): RelayContent & { relayed: boolean } {
+  if (raw.author?.bot === true) {
+    const botId = snowflake(raw.author.id);
+    const trust = { geti: listed(options.getiBotIds, botId), site: listed(options.siteBotIds, botId) };
+    return { ...relayContent(raw, trust), relayed: true };
+  }
   return {
     body: text(raw.content),
     authorTag: authorTag(raw.author?.username, raw.author?.discriminator),
@@ -213,12 +377,17 @@ function contentOf(raw: GetiRawPost): RelayContent & { relayed: boolean } {
  * « je cherche un joueur » sont les rôles **recherchés** ; ceux d'une annonce
  * « je cherche une équipe » sont ceux de l'auteur — même champ, lu pareil.
  *
+ * Un bot (ou un webhook) peut se faire passer pour n'importe qui : seul le
+ * relais d'un bot listé dans `options` nomme un auteur ; sans liste, aucun
+ * relais n'en nomme (son texte se lit).
+ *
  * @param raw Message Discord brut, non fiable.
+ * @param options Bots relais de confiance (lot 2 : bots GETI et notre bot).
  * @returns L'annonce analysée ; un message vide rend des champs vides.
  */
-export function parseGetiPost(raw: GetiRawPost): GetiParsedPost {
+export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}): GetiParsedPost {
   const source: GetiRawPost = typeof raw === "object" && raw !== null ? raw : {};
-  const content = contentOf(source);
+  const content = contentOf(source, options);
   const displayed = getiDisplayText(content.body);
   const prepared = prepareGetiText(displayed);
   const roleTokens = findGetiRoleTokens(prepared.lower);
@@ -230,7 +399,7 @@ export function parseGetiPost(raw: GetiRawPost): GetiParsedPost {
     authorId: content.authorId,
     relayed: content.relayed,
     originServer: content.originServer,
-    text: displayed,
+    text: getiSafeText(displayed),
     ranks: parseGetiRanks(prepared.lower, roleTokens),
     roles: getiRolesOf(roleTokens),
     subRoles: getiSubRolesOf(roleTokens),

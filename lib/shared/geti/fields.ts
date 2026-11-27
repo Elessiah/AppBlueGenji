@@ -12,6 +12,7 @@ import {
   aliasTable,
   getiFlagCodes,
   inReferenceOrder,
+  withoutMarkup,
   type GetiPreparedText,
 } from "@/lib/shared/geti/normalize";
 import {
@@ -61,15 +62,19 @@ const REGION_ALIASES: Readonly<Record<GetiRegion, readonly string[]>> = {
 const findRegions = aliasFinder(GETI_REGIONS, REGION_ALIASES);
 const EU_WORD = new RegExp(String.raw`${NOT_AFTER_WORD}eu${NOT_BEFORE_WORD}`, "gu");
 /** Mots qui font de « eu » le participe d'« avoir » : « j'ai eu », « on a eu », « jamais eu ». */
+const AVOIR_FORMS = [
+  "ai as a avons avez ont avais avait avions aviez avaient aurai auras aura aurons aurez auront",
+  "aurais aurait aurions auriez auraient aie aies ait ayons ayez aient avoir ayant",
+].join(" ");
 const PARTICIPLE_BEFORE = new Set(
-  [
-    "ai as a avons avez ont avais avait avions aviez avaient aurai auras aura aurons aurez auront",
-    "aurais aurait aurions auriez auraient aie aies ait ayons ayez aient avoir ayant",
-    "pas jamais deja toujours enfin souvent rien beaucoup trop presque vraiment",
-  ]
-    .join(" ")
-    .split(" "),
+  [AVOIR_FORMS, "pas jamais deja toujours enfin souvent rien beaucoup trop presque vraiment"].join(" ").split(" "),
 );
+const AVOIR = new Set(AVOIR_FORMS.split(" "));
+/**
+ * Adverbes aussi courants devant la région (« plus EU que NA », « tout EU ») :
+ * « eu » n'est le participe que derrière une forme d'« avoir » (« j'ai bien eu »).
+ */
+const AMBIGUOUS_ADVERBS = new Set(["bien", "plus", "tout", "assez"]);
 /**
  * « a » (accents ôtés, « à » s'y confond) n'est l'auxiliaire que derrière son
  * sujet : « il a eu », « on a eu », mais « de NA à EU ».
@@ -82,6 +87,8 @@ function isParticiple(before: string): boolean {
   if (words === null) return false;
   const [, subject, previous] = words;
   if (previous === "a") return subject !== undefined && A_SUBJECTS.has(subject);
+  // « à tout EU » : derrière « a », l'adverbe reste ambigu et la région l'emporte.
+  if (AMBIGUOUS_ADVERBS.has(previous)) return subject !== undefined && subject !== "a" && AVOIR.has(subject);
   return PARTICIPLE_BEFORE.has(previous);
 }
 
@@ -293,13 +300,12 @@ function isDuration(lower: string, end: number): boolean {
 }
 
 /**
- * Une fourchette devant « par jour » est une durée si sa première borne n'a pas
- * d'unité (« 2-3h ») ou si ses deux bornes sont de petits nombres d'heures
- * (« 1h-2h ») ; « 20h-23h par soir » reste une plage horaire.
+ * Une fourchette devant « par jour » est une durée si ses deux bornes sont de
+ * petits nombres d'heures (« 2-3h », « 1h-2h ») ; « 20h-23h par soir » et
+ * « 20-23h par soir » restent des plages horaires.
  */
 function isDurationRange(lower: string, end: number, first: TimeParts, second: TimeParts): boolean {
   if (!isDuration(lower, end)) return false;
-  if (!first.explicit) return true;
   const plain = (parts: TimeParts) => parts.meridiem === undefined && parts.hour <= DURATION_HOURS_MAX;
   return plain(first) && plain(second);
 }
@@ -416,11 +422,17 @@ export function parseGetiStaffRoles(lower: string): GetiStaffRole[] {
 
 const AGE = String.raw`(1[3-9]|2[0-5])`;
 /**
- * « 18+ » ou « +18 » est un âge, sauf devant ce qu'il compte : « +20 joueurs »,
- * « 15+ heures », « 20+ scrims » sont des nombres ; « 18+ dps », « +18 FR » des âges.
+ * Derrière « 18+ » ou « +18 » sans mot d'âge : la fin, une ponctuation, un mot
+ * d'âge, ou un mot d'annonce (rôle, région, langue, plateforme : « 18+ dps »,
+ * « +18 FR »). « +20 joueurs », « +15 min » ou « 20+ inscrits » sont des nombres.
  */
-const AGE_COUNTED_AFTER = new RegExp(
-  String.raw`^[^\S\n]*(?:de[^\S\n]+)?(?:joueu(?:r|se)s?|players?|membres?|members?|personnes?|people|gens|h|hrs?|heures?|hours?|jours?|days?|mois|months?|semaines?|weeks?|scrims?|games?|parties|matchs?|matches|wins?|victoires?|tournois?|tournaments?|viewers?|vues|views|abonnes?|followers?|subs?|equipes|teams|rosters|places?|slots?|sr|elo|k|€|\$|euros?|%|ms|fps|hz)${NOT_BEFORE_WORD}`,
+const AGE_FOLLOW = new RegExp(
+  String.raw`^[^\S\n]*(?:$|[^\p{L}\p{N}\s]|\n|(?:ans?|yo|y/o|years?|old|only|seulement|uniquement|obligatoire|requis|required|minimum|mini|svp|pls|please|et|and|tank|tanks|dps|supp?|supports?|heal|heals|healers?|flex|fr|eu|na|eng?|euw|francais|francaise|francophones?|english|anglophones?|pc|console|ps5|xbox|team|equipe|lfp|lft|lfs|lfsub|lfstaff|lfcast)${NOT_BEFORE_WORD})`,
+  "u",
+);
+/** … et pas derrière un mot qui en fait un niveau ou un délai : « lvl 20+ », « dans +15 min ». */
+const NOT_AGE_BEFORE = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:lvl|lv|level|niveau|niv|top|rang|rank|dans|in|within)\s?:?\s?$`,
   "u",
 );
 type AgePattern = { pattern: RegExp; unlabelled: boolean };
@@ -454,8 +466,10 @@ const ADULT_AGE = 18;
 export function parseGetiMinAge(lower: string): number | null {
   for (const { pattern, unlabelled } of MIN_AGE_PATTERNS) {
     for (const match of lower.matchAll(pattern)) {
+      if (!unlabelled) return Number(match[1]);
       const end = match.index + match[0].length;
-      if (!unlabelled || !AGE_COUNTED_AFTER.test(lower.slice(end, end + 20))) return Number(match[1]);
+      const before = lower.slice(Math.max(0, match.index - 12), match.index);
+      if (AGE_FOLLOW.test(lower.slice(end, end + 16)) && !NOT_AGE_BEFORE.test(before)) return Number(match[1]);
     }
   }
   return ADULT.test(lower) ? ADULT_AGE : null;
@@ -487,24 +501,34 @@ const NOT_A_NAME = new Set(
     "cherche recherche recrute looking seeking need needs is are est qui de du des en a au and et for pour",
     "competitive competitif compet chill serieuse serieux tryhard semi francaise francophone",
     "name nom discord role roles rang rank region plateforme platform contact",
-    "je j nous on il elle ils elles vous tu notre nos votre vos mon ma mes",
+    "je j nous il elle ils elles vous tu notre nos votre vos mon ma mes",
   ]
     .join(" ")
     .split(" "),
 );
 /**
- * Pronoms anglais : un nom en capitales peut en finir un (« Team Game I »,
- * « Team Ride Or Die » n'en a pas, « Team Not You »), pas en ouvrir un
- * (« team We are looking »). « on » reste français (« team Phoenix On cherche »).
+ * Pronoms : un nom en capitales peut en finir un (« Team Game I », « Team Game
+ * On », « Team Not You ») s'il en est le dernier mot et qu'un verbe de sa langue
+ * ne le suit pas (« Team Phoenix We are looking », « Team Nova I need »,
+ * « team Phoenix On cherche ») ; il n'en ouvre jamais un (« team We are looking »).
  */
 const ENGLISH_PRONOUNS = new Set(["we", "i", "you", "they", "he", "she", "my", "our", "your"]);
+const FRENCH_PRONOUNS = new Set(["on"]);
+const ENGLISH_VERB_AFTER = new RegExp(
+  String.raw`^[^\S\n]+(?:'m|'re|am|are|is|was|were|need|needs|want|wants|have|has|had|look|looking|search|searching|seek|seeking|play|plays|recruit|recruiting|will|can|could|would|do|don't|just|also|still|really)(?![\p{L}\p{N}])`,
+  "u",
+);
+const FRENCH_VERB_AFTER = new RegExp(
+  String.raw`^[^\S\n]+(?:(?:cherche|recherche|recrute|veut|est|a|joue|vise|propose|attend|accepte|prend|organise|monte|lance|ouvre|peut|va|ne|se|y|en)(?![\p{L}\p{N}])|n'|s')`,
+  "u",
+);
+
+const NAME_MARKS = /\p{M}/gu;
+const NAME_SYMBOLS = /[^\p{L}\p{N}]/gu;
+const TIER_LIKE = /^[bsgpdmc][1-5]$/u;
 
 function nameKey(word: string): string {
-  return word
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]/gu, "");
+  return word.normalize("NFD").replace(NAME_MARKS, "").toLowerCase().replace(NAME_SYMBOLS, "");
 }
 
 /**
@@ -521,18 +545,35 @@ function opensSentence(candidate: string): boolean {
   return !(CAPITALISED.test(first) && CAPITALISED.test(second));
 }
 
-function isNameWord(word: string, index: number): boolean {
-  const key = nameKey(word);
-  if (key === "" || NOT_A_NAME.has(key) || /^[bsgpdmc][1-5]$/u.test(key)) return false;
-  return !ENGLISH_PRONOUNS.has(key) || (index > 0 && CAPITALISED.test(word));
+/** Verbe qui, derrière ce pronom, en fait le sujet d'une phrase ; `null` pour un mot qui n'est pas un pronom. */
+function verbAfterPronoun(key: string): RegExp | null {
+  if (ENGLISH_PRONOUNS.has(key)) return ENGLISH_VERB_AFTER;
+  return FRENCH_PRONOUNS.has(key) ? FRENCH_VERB_AFTER : null;
 }
 
-function cleanTeamName(candidate: string): string | null {
+/** Position d'un mot dans le nom candidat, et ce qui suit ce nom dans le texte. */
+type NameWordPlace = { index: number; last: boolean; following: string };
+
+function isNameWord(word: string, place: NameWordPlace): boolean {
+  const key = nameKey(word);
+  if (key === "" || NOT_A_NAME.has(key) || TIER_LIKE.test(key)) return false;
+  const verbAfter = verbAfterPronoun(key);
+  if (verbAfter === null) return true;
+  return place.index > 0 && place.last && CAPITALISED.test(word) && !verbAfter.test(place.following);
+}
+
+/**
+ * @param candidate Mots lus derrière « team » ou le libellé.
+ * @param following Texte qui suit le candidat (vide derrière un libellé).
+ */
+function cleanTeamName(candidate: string, following = ""): string | null {
   const words = candidate.split(/\s+/u).filter((word) => word !== "");
   // Le nom s'arrête au premier mot du vocabulaire d'annonce : « Blue Phoenix EU ».
-  const stop = words.findIndex((word, index) => !isNameWord(word, index));
+  const stop = words.findIndex(
+    (word, index) => !isNameWord(word, { index, last: index === words.length - 1, following }),
+  );
   const kept = stop === -1 ? words : words.slice(0, stop);
-  const name = visibleText(kept.join(" ")).replace(/[.'-]+$/u, "");
+  const name = withoutMarkup(visibleText(kept.join(" "))).replace(/[.'-]+$/u, "");
   // Mots en capitale seulement : « 5 joueurs dont 2 tanks » n'est pas un nom.
   if (!/\p{Lu}/u.test(name)) return null;
   return name.length > GETI_TEAM_NAME_MAX ? null : name;
@@ -554,7 +595,8 @@ export function parseGetiTeamName(clean: string): string | null {
   }
   for (const match of clean.matchAll(TEAM_INLINE)) {
     if (opensSentence(match[1])) continue;
-    const name = cleanTeamName(match[1]);
+    const end = match.index + match[0].length;
+    const name = cleanTeamName(match[1], clean.slice(end, end + 16));
     if (name !== null) return name;
   }
   return null;

@@ -24,12 +24,14 @@ import {
   parseGetiPost,
   type GetiCategory,
   type GetiFilter,
+  type GetiParseOptions,
   type GetiParsedPost,
 } from "@/lib/shared/geti";
 import {
   GETI_PAGE_SIZE_DEFAULT,
   GETI_PAGE_SIZE_MAX,
   GETI_RETENTION_MAX_DAYS,
+  GETI_BOT_USER_ID,
   GETI_SOURCES,
   getiRetentionCutoff,
   type GetiPostPage,
@@ -87,6 +89,17 @@ export type GetiUpsertOutcome = {
 };
 
 /**
+ * Bots dont l'analyse croit les relais : GETI Bot (son en-tête nomme l'auteur)
+ * et notre bot (`DISCORD_BOT_CLIENT_ID`, l'identifiant de l'application est
+ * celui du compte du bot), s'il est configuré. Sans cette liste,
+ * `parseGetiPost` ne nomme l'auteur d'aucun relais.
+ */
+export function getiTrustedBots(env: Readonly<Record<string, string | undefined>> = process.env): GetiParseOptions {
+  const siteBotId = env.DISCORD_BOT_CLIENT_ID?.trim() ?? "";
+  return { getiBotIds: [GETI_BOT_USER_ID], siteBotIds: /^\d{15,22}$/u.test(siteBotId) ? [siteBotId] : [] };
+}
+
+/**
  * Enregistre un lot d'annonces poussées, chacune analysée ici. Une annonce déjà
  * gardée est remplacée (modification), sauf si la version reçue est plus
  * ancienne que la version gardée.
@@ -98,12 +111,13 @@ export async function upsertGetiPosts(
 ): Promise<GetiUpsertOutcome> {
   const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0 };
   const emptied: string[] = [];
+  const trusted = getiTrustedBots();
   for (const post of posts) {
     if (post.postedAt.getTime() < getiRetentionCutoff(post.category, now).getTime()) {
       outcome.expired += 1;
       continue;
     }
-    const parsed = parseGetiPost(post.raw);
+    const parsed = parseGetiPost(post.raw, trusted);
     if (parsed.text.trim() === "") {
       outcome.emptied += 1;
       emptied.push(post.messageId);

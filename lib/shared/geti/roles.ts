@@ -51,13 +51,16 @@ const SUB_ROLE_PARENT: Readonly<Record<GetiSubRole, GetiRole>> = {
 const SHORT_ABBREVIATIONS = new Set(["mt", "ot", "ms", "fs"]);
 /** « support » et « soutien » sont aussi des mots de politesse (« merci pour votre soutien »). */
 const POLITE_WORDS = new Set(["support", "supports", "soutien"]);
+/** Verbes qui font du mot un rôle tenu : « merci de jouer le support ». */
+const ROLE_VERBS = String.raw`(?:jouer|joue|jouez|etre|faire|prendre|devenir|venir|rejoindre|tenir|play|playing|be|become|take|join|main)${NOT_BEFORE_WORD}`;
 /**
- * Un remerciement juste avant : « merci pour votre soutien », « thanks for the
- * support », « merci à tous pour le soutien ». « je serai ton support » ou
- * « merci de jouer le support » restent un rôle.
+ * Un remerciement juste avant, relié par « pour / for / de / du » : « merci pour
+ * votre soutien », « thanks a lot for the support », « thank you very much for
+ * your support », « merci pour tout votre soutien ». « je serai ton support »,
+ * « thx we need a support » ou « merci de jouer le support » restent un rôle.
  */
 const POLITE_BEFORE = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:merci|thanks?|thank you|thx)(?: (?:beaucoup|bcp|encore|infiniment|a|tous|toutes|all|so|much|again|everyone|guys|you|pour|for|de|d'avance))*(?: (?:votre|vos|ton|tes|ta|your|le|du|the|this|ce))?\s$`,
+  String.raw`${NOT_AFTER_WORD}(?:merci|thanks?|thank you|thx)(?: [\p{L}']+){0,3}? (?:pour|for|de|du|d')(?: (?!${ROLE_VERBS})[\p{L}']+){0,2} ?$`,
   "u",
 );
 
@@ -90,7 +93,7 @@ export function findGetiRoleTokens(lower: string): GetiRoleToken[] {
     if (kind === undefined) continue;
     const start = match.index;
     if (SHORT_ABBREVIATIONS.has(key) && /\d\s?$/u.test(lower.slice(Math.max(0, start - 2), start))) continue;
-    if (POLITE_WORDS.has(key) && POLITE_BEFORE.test(lower.slice(Math.max(0, start - 40), start))) continue;
+    if (POLITE_WORDS.has(key) && POLITE_BEFORE.test(lower.slice(Math.max(0, start - 60), start))) continue;
     tokens.push(
       isSubRole(kind)
         ? { start, end: start + match[0].length, role: SUB_ROLE_PARENT[kind], subRole: kind }

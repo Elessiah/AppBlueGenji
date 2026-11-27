@@ -21,8 +21,8 @@ export const NOT_BEFORE_WORD = String.raw`(?![\p{L}\p{N}])`;
 
 const URL_LIKE = /(?:https?:\/\/|discord\.gg\/|www\.)\S+/giu;
 /** Émoji de serveur `<:nom:id>` : son nom porte souvent le rang ou le rôle. */
-const CUSTOM_EMOJI = /<a?:(\w{1,32}):\d{1,22}>/gu;
-const MENTION = /<(?:@[!&]?|#)\d{1,22}>/gu;
+export const CUSTOM_EMOJI = /<a?:(\w{1,32}):\d{1,22}>/gu;
+export const MENTION = /<(?:@[!&]?|#)\d{1,22}>/gu;
 const TIMESTAMP = /<t:\d{1,16}(?::[a-zA-Z])?>/gu;
 const MARKDOWN = /[*_~`|]+|^[ \t]*(?:>{1,3}|#{1,3}|-#)[ \t]+/gmu;
 const REGIONAL_INDICATORS = /[\u{1F1E6}-\u{1F1FF}]/gu;
@@ -53,6 +53,44 @@ export function getiDisplayText(raw: unknown): string {
     .trimEnd();
 }
 
+const USER_MENTION = /<@[!&]?\d{1,22}>/gu;
+const CHANNEL_MENTION = /<#\d{1,22}>/gu;
+const MASS_MENTION = /@(everyone|here)(?![\p{L}\p{N}])/giu;
+/** Caractères de balisage et de mention Discord : un nom n'en garde aucun. */
+const MARKUP_CHARACTERS = /[\\*_~`|<>@]+/gu;
+
+/**
+ * Texte d'annonce à afficher : les mentions d'un compte ou d'un rôle
+ * (« <@id> ») deviennent « @… » — l'identifiant Discord d'un tiers ne sort pas
+ * —, celles d'un salon « #… », et « @everyone » / « @here » perdent leur « @ ».
+ * Le reste du balisage est gardé : il s'affiche en texte, et passe par
+ * `discordQuote` avant tout message Discord (`UNTRUSTED_NAMES.md`).
+ *
+ * @param text Texte déjà passé par {@link getiDisplayText}.
+ * @returns Le texte sans mention active.
+ */
+export function getiSafeText(text: string): string {
+  return text.replace(USER_MENTION, "@…").replace(CHANNEL_MENTION, "#…").replace(MASS_MENTION, "$1");
+}
+
+/**
+ * Nom en texte seul : mentions retirées (l'identifiant Discord d'un tiers ne
+ * sort pas), émoji personnalisé réduit à son nom, balisage Markdown, chevrons,
+ * « @ » et barres obliques inverses retirés, espaces réduites
+ * (« @everyone **Nitro** » → « everyone Nitro »).
+ *
+ * @param name Nom déjà nettoyé de ses invisibles.
+ * @returns Le nom sans caractère de balisage.
+ */
+export function withoutMarkup(name: string): string {
+  return name
+    .replace(CUSTOM_EMOJI, " $1 ")
+    .replace(MENTION, " ")
+    .replace(MARKUP_CHARACTERS, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
 /**
  * Codes des drapeaux d'un texte, dans l'ordre (« FR », « GB »).
  *
@@ -81,8 +119,10 @@ export type GetiPreparedText = {
  * @returns Ses formes d'analyse.
  */
 export function prepareGetiText(text: string): GetiPreparedText {
+  // La forme de compatibilité peut multiplier la longueur (« ﷺ » donne 18 lettres) : on borne à nouveau.
   const clean = text
     .normalize("NFKC")
+    .slice(0, GETI_TEXT_MAX * 2)
     .replace(URL_LIKE, " ")
     .replace(CUSTOM_EMOJI, " $1 ")
     .replace(TIMESTAMP, " ")

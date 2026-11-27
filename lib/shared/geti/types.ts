@@ -139,7 +139,27 @@ export type GetiRawPost = {
   editedAt?: string | null;
 };
 
-/** Annonce analysée : données simples, jamais de balisage. */
+/** Réglages de l'analyse. */
+export type GetiParseOptions = {
+  /**
+   * Bots GETI : leur en-tête (`<@id>*(pseudo)* sur [Serveur](…)`) et leurs
+   * libellés hors citation nomment l'auteur.
+   */
+  getiBotIds?: readonly string[];
+  /**
+   * Nos bots : leur dernière ligne (`*Sent from : [Serveur](…)* by <@id>`)
+   * nomme l'auteur ; le reste de l'encart est le texte du joueur, jamais lu
+   * comme un auteur.
+   */
+  siteBotIds?: readonly string[];
+};
+
+/**
+ * Annonce analysée : énumérations, nombres et textes nettoyés. Les noms
+ * (`authorTag`, `teamName`, `originServer`) n'ont aucun caractère de balisage ;
+ * `text` garde le balisage de l'annonce, sans mention active (voir
+ * `getiSafeText`).
+ */
 export type GetiParsedPost = {
   category: GetiCategory | null;
   /** Pseudo Discord de l'auteur (à copier), `null` s'il est illisible. */
@@ -149,7 +169,7 @@ export type GetiParsedPost = {
   relayed: boolean;
   /** Serveur d'origine d'un relais (« Sent from »), s'il est nommé. */
   originServer: string | null;
-  /** Texte de l'annonce, nettoyé de ses invisibles, sans la ligne de relais. */
+  /** Texte de l'annonce, nettoyé de ses invisibles, sans la ligne de relais ni mention active. */
   text: string;
   ranks: GetiRanks;
   roles: GetiRole[];

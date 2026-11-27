@@ -6,6 +6,7 @@ jest.mock("@/lib/server/periodic-clock", () => ({ startPeriodicClock: jest.fn() 
 import { getDatabase } from "@/lib/server/database";
 import {
   deleteGetiPosts,
+  getiTrustedBots,
   listGetiPosts,
   purgeExpiredGetiPosts,
   reconcileGetiChannel,
@@ -15,7 +16,7 @@ import {
 import { parsePushedPost } from "@/lib/server/geti/wire";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { GETI_CHANNEL_IDS, parseGetiPost, type GetiParsedPost } from "@/lib/shared/geti";
-import { GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS, getiRetentionCutoff, getiRetentionMs } from "@/lib/shared/geti/ingest";
+import { GETI_BOT_USER_ID, GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS, getiRetentionCutoff, getiRetentionMs } from "@/lib/shared/geti/ingest";
 import { parsedGetiPost } from "../../../helpers/geti";
 import {
   GETI_FAKE_MESSAGE_ID,
@@ -84,6 +85,23 @@ describe("durées de garde", () => {
 
   it("getiRetentionMs_scrim_isSevenDays", () => {
     expect(getiRetentionMs("lfs")).toBe(7 * DAY_MS);
+  });
+});
+
+describe("getiTrustedBots", () => {
+  it("getiTrustedBots_botClientIdSet_trustsGetiBotAndOurBot", () => {
+    expect(getiTrustedBots({ DISCORD_BOT_CLIENT_ID: " 100000000000000092 " })).toEqual({
+      getiBotIds: [GETI_BOT_USER_ID],
+      siteBotIds: ["100000000000000092"],
+    });
+  });
+
+  it("getiTrustedBots_botClientIdMissing_trustsGetiBotOnly", () => {
+    expect(getiTrustedBots({})).toEqual({ getiBotIds: [GETI_BOT_USER_ID], siteBotIds: [] });
+  });
+
+  it("getiTrustedBots_botClientIdNotASnowflake_trustsGetiBotOnly", () => {
+    expect(getiTrustedBots({ DISCORD_BOT_CLIENT_ID: "abc" })).toEqual({ getiBotIds: [GETI_BOT_USER_ID], siteBotIds: [] });
   });
 });
 
