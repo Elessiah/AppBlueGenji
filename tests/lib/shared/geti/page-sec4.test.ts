@@ -7,17 +7,16 @@ import { parseGetiText } from "@/tests/helpers/geti";
 
 const LABELS = { member: "@membre", role: "@rôle", channel: "#salon", spoiler: "[masqué]" };
 
+/** Cas `[nom, entrée, attendu]` : un tableau typé, pas `as const`. */
+const SPOILER_CASES: [name: string, input: string, expected: string][] = [
+  ["spoilerOpensBeforeCodeCrossingClose_hiddenUpToFirstBars", "LFT ||team Secret`x|| `y`", "LFT # `y`"],
+  ["spoilerWithBacktickAndNoLaterBars_stillHidden", "||`x|| `", "# `"],
+  ["unpairedBackticksBeforeSpoiler_spoilerHidden", "`a ``b ||s|| fin", "`a ``b # fin"],
+];
+
 describe("getiWithoutSpoilers — passage ouvert avant un code", () => {
-  it("getiWithoutSpoilers_spoilerOpensBeforeCodeCrossingClose_hiddenUpToFirstBars", () => {
-    expect(getiWithoutSpoilers("LFT ||team Secret`x|| `y`", "#")).toBe("LFT # `y`");
-  });
-
-  it("getiWithoutSpoilers_spoilerWithBacktickAndNoLaterBars_stillHidden", () => {
-    expect(getiWithoutSpoilers("||`x|| `", "#")).toBe("# `");
-  });
-
-  it("getiWithoutSpoilers_unpairedBackticksBeforeSpoiler_spoilerHidden", () => {
-    expect(getiWithoutSpoilers("`a ``b ||s|| fin", "#")).toBe("`a ``b # fin");
+  it.each(SPOILER_CASES)("getiWithoutSpoilers_%s", (_name, input, expected) => {
+    expect(getiWithoutSpoilers(input, "#")).toBe(expected);
   });
 
   it("getiWithoutSpoilers_codeLongerThan4096_barsInsideKeptLiteral", () => {

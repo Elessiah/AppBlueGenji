@@ -150,6 +150,8 @@ describe("new date, time, day and struck patterns — bounded cost", () => {
     "unclosed strike marks": "~~a".repeat(1400),
     "strike marks with tildes inside": "~~a~".repeat(1000),
     "emoji names": "<:Grandmaster:1> ".repeat(240),
+    "hyphenated name before a verb": `${"A-".repeat(2000)} recherche`,
+    "hyphenated name before a suffix": `${"A-".repeat(2000)} Esport`,
   };
 
   it.each(Object.keys(hostile))("%s are parsed in bounded time", (name) => {

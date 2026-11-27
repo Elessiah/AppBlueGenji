@@ -683,3 +683,84 @@ describe("revue std 1 — faux positifs et faux négatifs", () => {
     expect(parsed.dates).toEqual(["2026-12-31", "2027-01-01"]);
   });
 });
+
+describe("revue sécurité 1 : tournures courantes qui ne sont pas des critères", () => {
+  it("parseGetiPost_twoAbbreviationsSeparatedByCommaInSentence_noDays", () => {
+    const parsed = parseIn("lfs", "Je cherche une team sur ce jeu, mon rang est diamant");
+
+    expect(parsed.availability.days).toEqual([]);
+    expect(parsed.dates).toEqual([]);
+  });
+
+  it("parseGetiPost_threeAbbreviationsCommaList_readsDays", () => {
+    expect(parseGetiText("dispo lun, mer, ven 21h").availability.days).toEqual(["MON", "WED", "FRI"]);
+  });
+
+  it("parseGetiPost_twoAbbreviationsSlash_readsDays", () => {
+    expect(parseGetiText("dispo lun/mer 21h").availability.days).toEqual(["MON", "WED"]);
+  });
+
+  it("parseGetiPost_fractionOfRoleWord_notADate", () => {
+    const parsed = parseIn("lfs", "Recherche 1/2 tanks", "2026-01-10T12:00:00.000Z");
+
+    expect(parsed.dates).toEqual([]);
+  });
+
+  it("parseGetiLevels_nuancedExp_notALevel", () => {
+    expect(parseGetiText("LFP joueur, low exp accepté").levels).toEqual([]);
+  });
+
+  it("parseGetiLevels_nuancedInt_stillIntermediate", () => {
+    expect(parseGetiText("LFP low int").levels).toEqual(["INTERMEDIATE"]);
+  });
+
+  it("parseGetiLevels_expJoinedToAnotherLevel_stillExpert", () => {
+    expect(parseGetiText("LFT adv/exp").levels).toEqual(["ADVANCED", "EXPERT"]);
+  });
+
+  it("parseGetiLevels_openMinded_notOpen", () => {
+    expect(parseGetiText("LFP joueur open minded").levels).toEqual([]);
+  });
+
+  it("parseGetiLevels_openMindedJoinedToALevel_onlyTheLevel", () => {
+    expect(parseGetiText("LFP low int, open-minded").levels).toEqual(["INTERMEDIATE"]);
+  });
+
+  it("parseGetiLevels_openDEsprit_notOpen", () => {
+    expect(parseGetiText("joueur open d'esprit").levels).toEqual([]);
+  });
+
+  it("parseGetiPost_cetDemonstrativeAfterTime_noTimezone", () => {
+    const { availability } = parseGetiText("Dispo à 15h cet après-midi");
+
+    expect(availability.timezone).toBeNull();
+    expect(availability.times).toEqual([{ from: 900, to: null }]);
+  });
+
+  it("parseGetiPost_unitlessHourBeforeCetEte_notATime", () => {
+    const { availability } = parseGetiText("Dispo 18 cet été");
+
+    expect(availability.times).toEqual([]);
+    expect(availability.timezone).toBeNull();
+  });
+
+  it("parseGetiPost_lowercaseCetAfterRange_stillCET", () => {
+    expect(parseGetiText("dispo 20-22 cet").availability.timezone).toBe("CET");
+  });
+
+  it("parseGetiPost_staffSeekingATeamInLfstaff_noTeamName", () => {
+    expect(parseIn("lfstaff", "Kevin cherche une équipe en tant que coach").teamName).toBeNull();
+  });
+
+  it("parseGetiPost_lftKeywordPostedInLfpChannel_noTeamName", () => {
+    expect(parseIn("lfp", "LFT — Lucas recherche une team").teamName).toBeNull();
+  });
+
+  it("parseGetiPost_structureRecruitsATeam_keepsName", () => {
+    expect(parseIn("lfstaff", "Faux Phoenix Recrute une team en 2k5").teamName).toBe("Faux Phoenix");
+  });
+
+  it("parseGetiPost_scrimTeamSeekingATeam_keepsName", () => {
+    expect(parseIn("lfs", "Verdict Astral recherche une team pour scrim ce soir").teamName).toBe("Verdict Astral");
+  });
+});
