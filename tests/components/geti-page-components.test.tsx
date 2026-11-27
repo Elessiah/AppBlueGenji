@@ -3,6 +3,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/components/ui/toast", () => ({
   useToast: () => ({ showError: jest.fn(), showSuccess: jest.fn(), showInfo: jest.fn() }),
 }));
+jest.mock("next/navigation", () => ({ useRouter: () => ({ refresh: jest.fn() }) }));
 jest.mock("@/components/i18n/locale-navigation", () => ({
   useLocaleRouter: () => ({ push: jest.fn(), replace: jest.fn(), refresh: jest.fn() }),
 }));
@@ -10,6 +11,8 @@ jest.mock("@/components/i18n/locale-navigation", () => ({
 import { renderToStaticMarkup } from "react-dom/server";
 import { GetiCopyTag } from "@/components/geti/GetiCopyTag";
 import { GetiFilters } from "@/components/geti/GetiFilters";
+import { GetiLayout } from "@/components/geti/GetiLayout";
+import { GetiRetry } from "@/components/geti/GetiRetry";
 import { GetiPostText } from "@/components/geti/GetiPostText";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { emptyGetiPageQuery, GETI_CATEGORY_FILTERS } from "@/lib/shared/geti/page";
@@ -46,6 +49,7 @@ function renderFilters(locale: "fr" | "en"): string {
         fields={GETI_CATEGORY_FILTERS.lfp}
         ageOptions={[1, 3]}
         retentionDays={7}
+        total={12}
         text={messages.filters}
         data={getiDataText(messages)}
       />
@@ -168,5 +172,66 @@ describe("GetiInfoView", () => {
     const source = readSource("components/geti/GetiInfoView.tsx");
 
     expect(source).toMatch(/\{query\.page > pages \? null : \(\s*<GetiPagination/);
+  });
+});
+
+describe("GetiLayout, GetiRetry et finitions UI (cycle ui 1)", () => {
+  it("la grille n'est ni occupée ni en attente au rendu initial", () => {
+    const markup = renderToStaticMarkup(<GetiLayout>contenu</GetiLayout>);
+
+    expect(markup).toContain('aria-busy="false"');
+    expect(markup).not.toContain("data-pending");
+    expect(markup).not.toContain("data-single");
+  });
+
+  it("sans liste, la grille passe en colonne unique", () => {
+    expect(renderToStaticMarkup(<GetiLayout single>x</GetiLayout>)).toContain('data-single="true"');
+  });
+
+  it("le bouton Réessayer porte son libellé", () => {
+    expect(renderToStaticMarkup(<GetiRetry label="Réessayer" />)).toContain("Réessayer");
+  });
+
+  it("le panneau rend le bouton « Voir les annonces » avec le total, et une zone de statut", () => {
+    const fr = renderFilters("fr");
+    const en = renderFilters("en");
+
+    expect(fr).toContain("Voir les 12 annonces");
+    expect(en).toContain("Show all 12 posts");
+    expect(fr).toContain("<output");
+  });
+
+  it("la réinitialisation déplace le focus avant que son bouton disparaisse", () => {
+    const source = readSource("components/geti/GetiFilters.tsx");
+
+    expect(source).toContain("const resetAll = () => {");
+    expect(source).toContain("focusStableTarget(toggleRef.current, titleRef.current);");
+    expect(source).not.toContain("onClick={() => apply({ ...emptyGetiPageQuery() })}");
+  });
+
+  it("le repli de copie rend le focus au bouton et évite le zoom iOS", () => {
+    const source = readSource("components/geti/GetiCopyTag.tsx");
+
+    expect(source).toContain("previous?.focus({ preventScroll: true });");
+    expect(source).toContain('area.style.fontSize = "16px"');
+  });
+
+  it("la date exacte est un texte visible, pas une infobulle", () => {
+    const source = readSource("components/geti/GetiPostCard.tsx");
+
+    expect(source).not.toContain("title={getiText(locale, text.postedAt");
+    expect(source).toContain("getiText(locale, text.postedAt, { date: postedAbsolute })");
+  });
+
+  it("le surlignage des étiquettes l'emporte sur la teinte globale", () => {
+    expect(readSource("components/geti/geti.module.css")).toContain(".chips .chipMatch {");
+  });
+
+  it("les nouvelles clés existent en français et en anglais", () => {
+    for (const messages of [frMessages, enMessages]) {
+      expect(messages.filters.updating).not.toBe("");
+      expect(messages.filters.apply).toContain("{count");
+      expect(messages.results.retry).not.toBe("");
+    }
   });
 });

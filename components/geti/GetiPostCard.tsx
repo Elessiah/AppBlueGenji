@@ -107,14 +107,8 @@ export function GetiPostCard({
         </div>
         <div className={styles.meta}>
           {parsed.closed ? <span className="pill pill-neutral">{text.closed}</span> : null}
-          <time dateTime={post.postedAt} title={getiText(locale, text.postedAt, { date: postedAbsolute })}>
-            {relativeDate(post.postedAt, locale, now)}
-          </time>
-          {post.editedAt ? (
-            <span className={styles.edited} title={getiText(locale, text.editedAt, { date: editedAbsolute })}>
-              {text.edited}
-            </span>
-          ) : null}
+          <time dateTime={post.postedAt}>{relativeDate(post.postedAt, locale, now)}</time>
+          {post.editedAt ? <span className={styles.edited}>{text.edited}</span> : null}
         </div>
       </header>
 
@@ -146,6 +140,9 @@ export function GetiPostCard({
       <GetiPostText body={body} long={getiTextIsLong(body)} text={{ more: text.more, less: text.less }} />
 
       <footer className={styles.cardFoot}>
+        {/* La date exacte est lisible sans survol : au toucher et au clavier, une infobulle ne s'ouvre pas. */}
+        <span>{getiText(locale, text.postedAt, { date: postedAbsolute })}</span>
+        {post.editedAt ? <span>{getiText(locale, text.editedAt, { date: editedAbsolute })}</span> : null}
         <span>{post.source === "relay" ? text.sourceRelay : text.sourceDirect}</span>
         {origin ? <span>{getiText(locale, text.origin, { server: origin })}</span> : null}
       </footer>

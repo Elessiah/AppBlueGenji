@@ -27,6 +27,8 @@ import { getiDataText, getiText, type GetiMessages } from "@/lib/shared/geti/pag
 import { localeHref, type Locale } from "@/lib/shared/locales";
 import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
 import { GetiFilters } from "./GetiFilters";
+import { GetiLayout } from "./GetiLayout";
+import { GetiRetry } from "./GetiRetry";
 import { GetiOfficialCard, GetiOfficialCount } from "./GetiOfficialCard";
 import { GetiPostCard } from "./GetiPostCard";
 import { GetiPublishButton } from "./GetiPublishButton";
@@ -128,16 +130,19 @@ export async function GetiInfoView({
           />
         </header>
 
-        <div className={styles.layout}>
-          <GetiFilters
-            category={category}
-            query={query}
-            fields={GETI_CATEGORY_FILTERS[category]}
-            ageOptions={getiAgeOptions(category)}
-            retentionDays={retentionDays}
-            text={m.filters}
-            data={data}
-          />
+        <GetiLayout single={listed === null}>
+          {listed === null ? null : (
+            <GetiFilters
+              category={category}
+              query={query}
+              fields={GETI_CATEGORY_FILTERS[category]}
+              ageOptions={getiAgeOptions(category)}
+              retentionDays={retentionDays}
+              total={listed.total}
+              text={m.filters}
+              data={data}
+            />
+          )}
 
           <GetiResults
             listed={listed}
@@ -149,7 +154,7 @@ export async function GetiInfoView({
             locale={locale}
             now={now}
           />
-        </div>
+        </GetiLayout>
       </div>
       <GetiRefresher />
     </PublicPageShell>
@@ -176,6 +181,7 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, l
         <p /* NOSONAR S6819 — compteur de résultats annoncé à chaque filtre, pas une sortie de formulaire */ className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
           {m.results.unavailable}
         </p>
+        <GetiRetry label={m.results.retry} />
       </section>
     );
   }

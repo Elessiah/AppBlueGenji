@@ -657,3 +657,11 @@ l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement
   `/rgpd#annonces-geti` et `PRIVACY_CHANGES` (texte, pseudo, serveur d'origine,
   dates, critères lus). L'appel à Discord pour la fréquentation part du serveur,
   sans rien du visiteur.
+
+## Retouches UX (cycle ui 1)
+
+- `GetiLayout` (client) enveloppe filtres et résultats : pendant un changement de filtre, la grille porte `aria-busy` + `data-pending` (liste grisée) et le panneau annonce « Mise à jour… » (`<output>`).
+- « Réinitialiser » rend le focus au bouton Filtres (mobile) ou au titre du panneau avant de disparaître ; sur mobile, un bouton « Voir les N annonces » referme le panneau.
+- Liste indisponible : filtres masqués, bouton « Réessayer » (`GetiRetry`, `router.refresh()`).
+- La date exacte de publication / modification est un texte du pied de carte (plus d'infobulle) ; le repli de copie rend le focus au bouton.
+- Onglets anglais au pluriel (Players, Teams, Subs, Staff, Scrims, Casters).

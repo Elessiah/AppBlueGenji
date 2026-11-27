@@ -143,7 +143,7 @@ test.describe("GETI Info — page publique", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.getByRole("heading", { level: 2, name: "Looking for a sub" })).toBeVisible();
     const tabs = page.getByRole("navigation", { name: "Looking for" });
-    await expect(tabs.getByRole("link", { name: "A cast" })).toHaveAttribute("href", "/en/geti-info/lfcast");
+    await expect(tabs.getByRole("link", { name: "Casters" })).toHaveAttribute("href", "/en/geti-info/lfcast");
     await expect(page.getByRole("button", { name: "Publish a post" })).toBeVisible();
   });
 

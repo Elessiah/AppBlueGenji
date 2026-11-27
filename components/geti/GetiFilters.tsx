@@ -34,6 +34,7 @@ import {
   type GetiPageQuery,
 } from "@/lib/shared/geti/page";
 import { getiRankLabel, getiText, type GetiDataText, type GetiMessages } from "@/lib/shared/geti/page-text";
+import { useGetiPending } from "./GetiLayout";
 import styles from "./geti.module.css";
 
 type FiltersText = GetiMessages["filters"];
@@ -75,6 +76,22 @@ function Group({
   );
 }
 
+/** Focus d'une cible qui survit à « Réinitialiser » : le bouton Filtres s'il est affiché (mobile), sinon le titre. */
+function focusStableTarget(toggle: HTMLElement | null, title: HTMLElement | null): void {
+  const visible = toggle !== null && toggle.getClientRects().length > 0;
+  (visible ? toggle : title)?.focus({ preventScroll: true });
+}
+
+/** Bouton « Réinitialiser » : présent seulement tant qu'un filtre est actif. */
+function ResetButton({ active, text, onReset }: Readonly<{ active: number; text: FiltersText; onReset: () => void }>) {
+  if (active === 0) return null;
+  return (
+    <button type="button" className={styles.reset} onClick={onReset} aria-label={text.resetLabel}>
+      {text.reset}
+    </button>
+  );
+}
+
 /**
  * Filtres d'une catégorie d'annonces (`docs/features/GETI_INFO.md` § Page).
  *
@@ -89,6 +106,7 @@ export function GetiFilters({
   fields,
   ageOptions,
   retentionDays,
+  total,
   text,
   data,
 }: Readonly<{
@@ -97,6 +115,8 @@ export function GetiFilters({
   fields: readonly GetiFilterField[];
   ageOptions: readonly number[];
   retentionDays: number;
+  /** Annonces de la liste affichée (bouton « Voir les annonces » sur mobile). */
+  total: number;
   text: FiltersText;
   data: GetiDataText;
 }>) {
@@ -104,6 +124,9 @@ export function GetiFilters({
   const router = useLocaleRouter();
   const panelId = useId();
   const [open, setOpen] = useState(false);
+  const setPending = useGetiPending();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const [draft, setDraft] = useState(query);
   // L'adresse fait foi : un retour arrière ou un lien partagé remet les contrôles d'accord.
   const serverSearch = getiPageSearch(query);
@@ -123,7 +146,8 @@ export function GetiFilters({
   }, [serverSearch, query]);
   useEffect(() => {
     if (!navigating) pendingSearch.current = null;
-  }, [navigating]);
+    setPending(navigating);
+  }, [navigating, setPending]);
   useEffect(() => {
     // Retour arrière ou avant, ou lien suivi (pagination, « Réinitialiser » de la liste) :
     // l'adresse affichée reprend la main sur les contrôles.
@@ -158,6 +182,13 @@ export function GetiFilters({
     setDraft(first);
     pendingSearch.current = getiNormalizedSearch(category, first);
     startNavigation(() => router.replace(getiPageHref(category, first), { scroll: false }));
+  };
+
+  // Les boutons « Réinitialiser » disparaissent avec le dernier filtre : le focus passe à
+  // une cible qui reste (le bouton Filtres sur mobile, le titre du panneau sinon).
+  const resetAll = () => {
+    focusStableTarget(toggleRef.current, titleRef.current);
+    apply({ ...emptyGetiPageQuery() });
   };
 
   const active = getiActiveFilterCount(draft);
@@ -250,6 +281,7 @@ export function GetiFilters({
       <div className={styles.filtersBar}>
         <button
           type="button"
+          ref={toggleRef}
           className={styles.filtersToggle}
           aria-expanded={open}
           aria-controls={panelId}
@@ -258,16 +290,7 @@ export function GetiFilters({
           <SlidersHorizontal size={15} aria-hidden="true" />
           {active > 0 ? getiText(locale, text.toggleActive, { count: active }) : text.toggle}
         </button>
-        {active > 0 ? (
-          <button
-            type="button"
-            className={styles.reset}
-            onClick={() => apply({ ...emptyGetiPageQuery() })}
-            aria-label={text.resetLabel}
-          >
-            {text.reset}
-          </button>
-        ) : null}
+        <ResetButton active={active} text={text} onReset={resetAll} />
       </div>
 
       <form
@@ -278,17 +301,11 @@ export function GetiFilters({
         onSubmit={(event) => event.preventDefault()}
       >
         <div className={styles.panelHead}>
-          <h3 className={styles.panelTitle}>{text.title}</h3>
-          {active > 0 ? (
-            <button
-              type="button"
-              className={styles.reset}
-              onClick={() => apply({ ...emptyGetiPageQuery() })}
-              aria-label={text.resetLabel}
-            >
-              {text.reset}
-            </button>
-          ) : null}
+          <h3 ref={titleRef} tabIndex={-1} className={styles.panelTitle}>
+            {text.title}
+          </h3>
+          <output className={styles.pendingNote}>{navigating ? text.updating : ""}</output>
+          <ResetButton active={active} text={text} onReset={resetAll} />
         </div>
 
         {has("staffRoles") ? checks("staffRoles", text.staffRoles, GETI_STAFF_ROLES, data.staffRoles) : null}
@@ -403,6 +420,18 @@ export function GetiFilters({
             </InfoHint>
           </InfoHintRow>
         </Group>
+        <div className={styles.applyRow}>
+          <button
+            type="button"
+            className={styles.applyButton}
+            onClick={() => {
+              setOpen(false);
+              toggleRef.current?.focus({ preventScroll: true });
+            }}
+          >
+            {getiText(locale, text.apply, { count: total })}
+          </button>
+        </div>
       </form>
     </div>
   );
