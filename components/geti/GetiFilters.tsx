@@ -1,7 +1,7 @@
 "use client";
 
 import { SlidersHorizontal } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -24,6 +24,7 @@ import {
   getiAllRanks,
   getiClockLabel,
   getiFilterSync,
+  getiLinkNavigatesTab,
   getiNormalizedSearch,
   getiPageHref,
   getiPageSearch,
@@ -110,6 +111,9 @@ export function GetiFilters({
   // rendra), tant que son rendu n'est pas arrivé : le rendu d'un changement plus ancien ne
   // doit pas défaire le dernier geste.
   const pendingSearch = useRef<string | null>(null);
+  // Navigations de filtre en cours : une fois toutes rendues, plus rien n'est attendu
+  // (un geste défait vers l'adresse déjà affichée ne produit parfois aucun rendu).
+  const [navigating, startNavigation] = useTransition();
   useEffect(() => {
     // Chaque rendu du serveur (nouvel objet `query`) passe ici, même à adresse égale :
     // un geste défait avant son rendu lève aussi l'attente.
@@ -118,6 +122,9 @@ export function GetiFilters({
     if (sync.adopt) setDraft(query);
   }, [serverSearch, query]);
   useEffect(() => {
+    if (!navigating) pendingSearch.current = null;
+  }, [navigating]);
+  useEffect(() => {
     // Retour arrière ou avant, ou lien suivi (pagination, « Réinitialiser » de la liste) :
     // l'adresse affichée reprend la main sur les contrôles.
     const release = () => {
@@ -125,7 +132,17 @@ export function GetiFilters({
     };
     const releaseOnLink = (event: MouseEvent) => {
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      if (event.target instanceof Element && event.target.closest("a[href]")) release();
+      // Seul un lien qui remplace cette page compte : pas un nouvel onglet, un téléchargement, une ancre.
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (
+        link instanceof HTMLAnchorElement &&
+        getiLinkNavigatesTab(
+          { href: link.href, target: link.target, download: link.hasAttribute("download") },
+          globalThis.location.href,
+        )
+      ) {
+        release();
+      }
     };
     window.addEventListener("popstate", release);
     document.addEventListener("click", releaseOnLink, true);
@@ -140,7 +157,7 @@ export function GetiFilters({
     const first = { ...next, page: 1 };
     setDraft(first);
     pendingSearch.current = getiNormalizedSearch(category, first);
-    router.replace(getiPageHref(category, first), { scroll: false });
+    startNavigation(() => router.replace(getiPageHref(category, first), { scroll: false }));
   };
 
   const active = getiActiveFilterCount(draft);

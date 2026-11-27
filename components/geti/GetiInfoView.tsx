@@ -219,8 +219,8 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, l
           </ul>
         </div>
       ) : null}
-      {/* Au-delà de la dernière page, seul le lien vers la dernière reste : pas de « Page 5 / 3 ». */}
-      {beyond ? null : (
+      {/* Au-delà de la dernière page (liste vide comprise), pas de « Page 5 sur 1 » : seul le lien de retour reste. */}
+      {query.page > pages ? null : (
         <GetiPagination category={category} query={query} pages={pages} text={m.results} locale={locale} />
       )}
     </section>

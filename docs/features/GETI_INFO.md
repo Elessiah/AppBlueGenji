@@ -595,12 +595,18 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
   (`getiFilterSync`) ; l'attente porte l'adresse **normalisée** comme le serveur
   la rendra (`getiNormalizedSearch` : rangs inversés remis dans l'ordre), se lève
   à chaque rendu qui l'atteint — même s'il redonne l'adresse précédente — et
-  sur un retour arrière ou un lien suivi (pagination, réinitialisation).
+  sur un retour arrière, quand toutes les navigations de filtre sont rendues
+  (`useTransition`), ou sur un lien qui remplace cette page (pagination,
+  réinitialisation ; `getiLinkNavigatesTab` écarte nouvel onglet, téléchargement,
+  autre site et ancre de la même page).
 - Étiquette de rang mise en avant comme le filtre la juge : avec des rôles voulus,
-  seul le rang de ces rôles, sauf si la carte n'en donne aucun (le filtre compare
-  alors la fourchette globale et les rangs par rôle de la carte sont jugés).
-- Au-delà de la dernière page, seuls le message et le lien vers la dernière page
-  restent (pas de pagination « Page 5 / 3 »).
+  seul le rang de ces rôles, sauf si la carte n'en donne aucun ou qu'aucun rôle
+  n'est voulu : le filtre compare alors la fourchette globale de l'annonce, que
+  chaque étiquette de rang par rôle porte (`overall`) et sur laquelle elle est jugée.
+  Une fourchette gardée est relue en vrais rangs, bornes remises dans l'ordre
+  (`getiStoredRankRange`).
+- Au-delà de la dernière page (liste vide comprise), pas de pagination
+  (« Page 5 sur 1 ») : seuls le message et son lien restent.
 
 ### Carte d'une annonce (`GetiPostCard`)
 

@@ -4,7 +4,7 @@
  *
  * Module pur : importable côté serveur comme côté client.
  */
-import { GETI_RANK_TOP, getiRankValue } from "@/lib/shared/geti/ranks";
+import { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";
 import {
   GETI_CATEGORIES,
   GETI_ROLES,
@@ -85,12 +85,16 @@ function rankRangesOf(post: GetiParsedPost, filter: GetiFilter): GetiRankRange[]
 /**
  * Fourchette de rang d'une analyse gardée, lue seulement si ses deux bornes
  * sont de vrais rangs (une ligne écrite à la main peut porter `null` ou un
- * objet abîmé) ; sinon `null` (rang non lu).
+ * objet abîmé) ; sinon `null` (rang non lu). Les bornes rendues sont de vrais
+ * rangs (division numérique), remises dans l'ordre si la ligne les inverse.
  */
 export function getiStoredRankRange(range: unknown): GetiRankRange | null {
   if (typeof range !== "object" || range === null) return null;
   const { min, max } = range as { min?: GetiRank | null; max?: GetiRank | null };
-  return min && max && rankValue(min) !== null && rankValue(max) !== null ? { min, max } : null;
+  const low = rankValue(min);
+  const high = rankValue(max);
+  if (low === null || high === null) return null;
+  return { min: getiRankFromValue(Math.min(low, high)), max: getiRankFromValue(Math.max(low, high)) };
 }
 
 function matchesRanks(post: GetiParsedPost, filter: GetiFilter, includeUnknown: boolean): boolean {

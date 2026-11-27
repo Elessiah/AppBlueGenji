@@ -291,8 +291,8 @@ describe("getiPostChips", () => {
     const post = parsedGetiPost({ ranks: { min: D3, max: M2, byRole: { DPS: getiRange(M2), TANK: getiRange(D3) } } });
 
     expect(getiPostChips(post)).toEqual([
-      { kind: "rank", role: "TANK", min: D3, max: D3 },
-      { kind: "rank", role: "DPS", min: M2, max: M2 },
+      { kind: "rank", role: "TANK", min: D3, max: D3, overall: { min: D3, max: M2 } },
+      { kind: "rank", role: "DPS", min: M2, max: M2, overall: { min: D3, max: M2 } },
     ]);
   });
 

@@ -132,6 +132,21 @@ describe("GetiFilters — heures", () => {
     expect(source).toContain('document.addEventListener("click", releaseOnLink, true)');
     expect(source).toContain('closest("a[href]")');
   });
+
+  it("un lien ne lève l'attente que s'il remplace cette page", () => {
+    const source = readSource("components/geti/GetiFilters.tsx");
+
+    expect(source).toContain("getiLinkNavigatesTab(");
+    expect(source).toContain('link.hasAttribute("download")');
+  });
+
+  it("l'attente se lève quand toutes les navigations de filtre sont rendues", () => {
+    const source = readSource("components/geti/GetiFilters.tsx");
+
+    expect(source).toContain("const [navigating, startNavigation] = useTransition();");
+    expect(source).toContain("if (!navigating) pendingSearch.current = null;");
+    expect(source).toContain("startNavigation(() => router.replace(");
+  });
 });
 
 describe("GetiInfoView", () => {
@@ -149,9 +164,9 @@ describe("GetiInfoView", () => {
     expect(enMessages.results.beyondLink).toContain("{page}");
   });
 
-  it("au-delà de la dernière page, la pagination n'est pas rendue", () => {
+  it("au-delà de la dernière page, liste vide comprise, la pagination n'est pas rendue", () => {
     const source = readSource("components/geti/GetiInfoView.tsx");
 
-    expect(source).toMatch(/\{beyond \? null : \(\s*<GetiPagination/);
+    expect(source).toMatch(/\{query\.page > pages \? null : \(\s*<GetiPagination/);
   });
 });

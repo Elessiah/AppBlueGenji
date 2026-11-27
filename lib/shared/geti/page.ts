@@ -378,9 +378,44 @@ export function getiFilterSync(
   return { adopt: true, pending: null };
 }
 
+/**
+ * Le clic sur ce lien remplace-t-il la page de cet onglet ? Seul ce cas rend la
+ * main à l'adresse affichée (`GetiFilters`) : un lien ouvert ailleurs
+ * (`target`), un téléchargement ou une ancre de la même page laisse le dernier
+ * changement de filtre en attente.
+ *
+ * @param link Cible (`href` résolu ou relatif), `target` et présence de `download`.
+ * @param here Adresse complète de la page affichée.
+ */
+export function getiLinkNavigatesTab(
+  link: Readonly<{ href: string; target: string; download: boolean }>,
+  here: string,
+): boolean {
+  if (link.download) return false;
+  if (link.target !== "" && link.target.toLowerCase() !== "_self") return false;
+  let url: URL;
+  let current: URL;
+  try {
+    current = new URL(here);
+    url = new URL(link.href, current);
+  } catch {
+    return false;
+  }
+  if (url.origin !== current.origin) return false;
+  // Ancre de la même page : rien n'est rechargé.
+  return !(url.pathname === current.pathname && url.search === current.search && url.hash !== "");
+}
+
 /** Une donnée lue dans l'annonce, à rendre en étiquette. */
 export type GetiChip =
-  | { kind: "rank"; role: GetiRankedRole | null; min: GetiRank; max: GetiRank }
+  | {
+      kind: "rank";
+      role: GetiRankedRole | null;
+      min: GetiRank;
+      max: GetiRank;
+      /** Rang par rôle : fourchette globale de l'annonce, que le filtre compare quand aucun rôle voulu n'a son rang. */
+      overall?: { min: GetiRank; max: GetiRank } | null;
+    }
   | { kind: "role"; value: GetiRole }
   | { kind: "subRole"; value: GetiSubRole }
   | { kind: "staffRole"; value: GetiStaffRole }
@@ -417,11 +452,11 @@ export function getiPostChips(post: GetiParsedPost): GetiChip[] {
   const chips: GetiChip[] = [];
   if (stored.teamName) chips.push({ kind: "team", name: stored.teamName });
   const byRole = stored.ranks?.byRole ?? {};
+  const overall = getiStoredRankRange(stored.ranks);
   const perRole = RANKED_ROLES.flatMap((role): GetiChip[] => {
     const range = Object.hasOwn(byRole, role) ? getiStoredRankRange(byRole[role]) : null;
-    return range === null ? [] : [{ kind: "rank", role, min: range.min, max: range.max }];
+    return range === null ? [] : [{ kind: "rank", role, min: range.min, max: range.max, overall }];
   });
-  const overall = getiStoredRankRange(stored.ranks);
   if (perRole.length > 0) chips.push(...perRole);
   else if (overall !== null) chips.push({ kind: "rank", role: null, min: overall.min, max: overall.max });
   for (const value of listOf(stored.roles)) chips.push({ kind: "role", value });
@@ -456,7 +491,7 @@ function isRankedRole(role: unknown): role is GetiRankedRole {
 }
 
 function rankChipMatches(
-  chip: { role: GetiRankedRole | null; min: GetiRank; max: GetiRank },
+  chip: Extract<GetiChip, { kind: "rank" }>,
   filter: GetiFilter,
   cardRoles: readonly GetiRankedRole[] | null,
 ): boolean {
@@ -464,14 +499,18 @@ function rankChipMatches(
   const max = filter.ranks?.max ?? null;
   if (min === null && max === null) return false;
   // Comme le filtre : avec des rôles voulus, seul le rang de ces rôles compte —
-  // sauf si la carte n'en porte aucun ; le filtre compare alors la fourchette
-  // globale, que les rangs par rôle de la carte composent.
+  // sauf si la carte n'en porte aucun (ou qu'aucun rôle n'est voulu) ; le filtre
+  // compare alors la fourchette globale de l'annonce, que l'étiquette porte.
   const wantedRoles = (filter.roles ?? []).filter(isRankedRole);
-  const cardHasWanted = cardRoles === null || wantedRoles.some((role) => cardRoles.includes(role));
-  if (chip.role !== null && cardHasWanted && wantedRoles.length > 0 && !wantedRoles.includes(chip.role)) return false;
+  const usesOverall =
+    cardRoles === null ? wantedRoles.length === 0 : !wantedRoles.some((role) => cardRoles.includes(role));
+  if (chip.role !== null && !usesOverall && !wantedRoles.includes(chip.role)) return false;
+  // `overall: null` : l'annonce n'a pas de fourchette globale lisible, le filtre n'a rien à comparer.
+  if (usesOverall && chip.role !== null && chip.overall === null) return false;
+  const range = usesOverall && chip.role !== null && chip.overall ? chip.overall : chip;
   const low = min === null ? 0 : getiRankValue(min);
   const high = max === null ? GETI_RANK_TOP : getiRankValue(max);
-  return getiRankValue(chip.max) >= low && getiRankValue(chip.min) <= high;
+  return getiRankValue(range.max) >= low && getiRankValue(range.min) <= high;
 }
 
 function timeChipMatches(chip: { from: number; to: number | null }, filter: GetiFilter): boolean {
