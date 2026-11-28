@@ -96,7 +96,9 @@ export const CSP_LOG_BUDGET_WINDOW_MS = 60_000;
  * minute depuis une seule adresse (60 requêtes), chacune une ligne de 400
  * caractères dans pm2 — le fichier de log que ce module existe pour éviter.
  * Au-delà du plafond, les causes neuves sont comptées, pas écrites, et la
- * fenêtre suivante en annonce le nombre sur une seule ligne.
+ * fenêtre suivante en annonce le nombre sur une seule ligne (en sus du plafond).
+ * Limite assumée : un envoi soutenu garde la fenêtre pleine, et une vraie cause
+ * neuve arrivée plus tard dans la fenêtre est tue — l'annonce, elle, le dit.
  */
 export const CSP_MAX_LOG_LINES_PER_WINDOW = 30;
 
@@ -109,7 +111,11 @@ const TRUNCATION_DIGEST_LENGTH = 10;
 
 /** Borne un champ brut à {@link CSP_INPUT_MAX_LENGTH} avant de le découper. */
 function bounded(value: string): string {
-  return value.length > CSP_INPUT_MAX_LENGTH ? value.slice(0, CSP_INPUT_MAX_LENGTH) : value;
+  if (value.length <= CSP_INPUT_MAX_LENGTH) return value;
+  const head = value.slice(0, CSP_INPUT_MAX_LENGTH);
+  // Coupure entre les deux moitiés d'une paire : la moitié haute part aussi,
+  // sinon l'analyse d'URL la réécrit en U+FFFD et change la cause.
+  return /[\ud800-\udbff]$/.test(head) ? head.slice(0, -1) : head;
 }
 
 /** Texte avant le premier `:` (ou tout le texte), sans découper le reste. */
@@ -474,7 +480,30 @@ export function admitViolation(tracker: Tracker, cause: string, now: number): nu
 export interface LogBudget {
   windowStart: number;
   written: number;
+  /** Causes neuves distinctes tues dans la fenêtre (une cause retentée compte une fois). */
   dropped: number;
+  /** Causes déjà comptées dans `dropped`, bornée à {@link CSP_MAX_TRACKED_CAUSES}. */
+  droppedCauses?: Set<string>;
+}
+
+/**
+ * Ouvre une nouvelle fenêtre si l'ancienne est close, et rend le nombre de
+ * causes tues pendant elle, à annoncer.
+ */
+function rollWindow(budget: LogBudget, now: number): number {
+  if (now - budget.windowStart < CSP_LOG_BUDGET_WINDOW_MS && now >= budget.windowStart) return 0;
+  const announce = budget.dropped;
+  budget.windowStart = now;
+  budget.written = 0;
+  budget.dropped = 0;
+  budget.droppedCauses?.clear();
+  return announce;
+}
+
+function announceDropped(count: number): void {
+  if (count > 0) {
+    console.warn(`[csp] ${count} cause(s) neuve(s) non journalisée(s) (plafond de ${CSP_MAX_LOG_LINES_PER_WINDOW} lignes par minute)`);
+  }
 }
 
 /**
@@ -482,19 +511,20 @@ export interface LogBudget {
  *
  * @param budget État de la fenêtre, modifié sur place.
  * @param now Horodatage courant.
+ * @param cause Clé de la cause, pour ne compter qu'une fois une cause retentée.
  * @returns `allowed` : la ligne peut s'écrire ; `announce` : nombre de causes
  *   tues pendant la fenêtre qui vient de se clore, à annoncer avant la ligne.
  */
-export function admitLogLine(budget: LogBudget, now: number): { allowed: boolean; announce: number } {
-  let announce = 0;
-  if (now - budget.windowStart >= CSP_LOG_BUDGET_WINDOW_MS || now < budget.windowStart) {
-    announce = budget.dropped;
-    budget.windowStart = now;
-    budget.written = 0;
-    budget.dropped = 0;
-  }
+export function admitLogLine(budget: LogBudget, now: number, cause?: string): { allowed: boolean; announce: number } {
+  const announce = rollWindow(budget, now);
   if (budget.written >= CSP_MAX_LOG_LINES_PER_WINDOW) {
-    budget.dropped += 1;
+    const seen = budget.droppedCauses;
+    if (cause === undefined || !seen) {
+      budget.dropped += 1;
+    } else if (!seen.has(cause)) {
+      budget.dropped += 1;
+      if (seen.size < CSP_MAX_TRACKED_CAUSES) seen.add(cause);
+    }
     return { allowed: false, announce };
   }
   budget.written += 1;
@@ -502,11 +532,21 @@ export function admitLogLine(budget: LogBudget, now: number): { allowed: boolean
 }
 
 const tracker: Tracker = new Map();
-const budget: LogBudget = { windowStart: Number.NEGATIVE_INFINITY, written: 0, dropped: 0 };
+const budget: LogBudget = { windowStart: Number.NEGATIVE_INFINITY, written: 0, dropped: 0, droppedCauses: new Set() };
+
+/** Remet à zéro le suivi et le plafond (tests). */
+export function resetCspLogState(): void {
+  tracker.clear();
+  budget.windowStart = Number.NEGATIVE_INFINITY;
+  budget.written = 0;
+  budget.dropped = 0;
+  budget.droppedCauses?.clear();
+}
 
 /**
  * Journalise les violations d'un rapport, une par cause et par heure, dans la
- * limite de {@link CSP_MAX_LOG_LINES_PER_WINDOW} lignes par fenêtre.
+ * limite de {@link CSP_MAX_LOG_LINES_PER_WINDOW} lignes par fenêtre (plus une
+ * ligne d'annonce des causes tues, une fois la fenêtre close).
  *
  * Les champs sont assainis **ici encore**, bien que {@link parseCspReport} l'ait
  * fait : une {@link CspViolation} se fabrique à la main, et la ligne de journal
@@ -517,22 +557,21 @@ const budget: LogBudget = { windowStart: Number.NEGATIVE_INFINITY, written: 0, d
  * @param now Horodatage courant, injectable pour les tests.
  */
 export function logCspViolations(violations: CspViolation[], now: number = Date.now()): void {
+  // La fenêtre se referme aussi sans cause neuve : l'annonce part au prochain rapport.
+  announceDropped(rollWindow(budget, now));
   for (const violation of violations) {
     const cause = violationCause(violation);
-    const entry = tracker.get(cause);
-    const suppressed = admitViolation(tracker, cause, now);
-    if (suppressed === null) continue;
-    const { allowed, announce } = admitLogLine(budget, now);
-    if (announce > 0) {
-      console.warn(`[csp] ${announce} cause(s) neuve(s) non journalisée(s) (plafond de ${CSP_MAX_LOG_LINES_PER_WINDOW} lignes par minute)`);
-    }
-    if (!allowed) {
-      // Rien n'a été écrit : la cause ne doit pas passer pour vue, sinon une
-      // vraie violation noyée sous un envoi fabriqué se tairait une heure.
-      if (entry) tracker.set(cause, entry);
-      else tracker.delete(cause);
+    const known = tracker.get(cause);
+    if (known && now - known.last < CSP_DEDUPE_WINDOW_MS) {
+      known.suppressed += 1;
       continue;
     }
+    // Le plafond se décide **avant** de toucher au suivi : une cause tue ne
+    // doit ni évincer une cause réelle ni passer pour vue.
+    const { allowed, announce } = admitLogLine(budget, now, cause);
+    announceDropped(announce);
+    if (!allowed) continue;
+    const suppressed = admitViolation(tracker, cause, now) ?? 0;
     const repeated = suppressed > 0 ? ` (+${suppressed} identique(s) depuis)` : "";
     // Le temps du verbe suit le mode : en `Report-Only` le navigateur annonce ce
     // qu'il **aurait** refusé, en application il dit ce qu'il **a** refusé —

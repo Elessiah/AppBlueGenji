@@ -16,6 +16,7 @@ import {
   logCspViolations,
   logSafe,
   parseCspReport,
+  resetCspLogState,
   sourceOriginOf,
   violationCause,
 } from "@/lib/server/csp-reports";
@@ -560,6 +561,7 @@ describe("logCspViolations", () => {
   // une cause qui lui est propre, et l'espion est rendu même sur un échec.
   afterEach(() => {
     jest.restoreAllMocks();
+    resetCspLogState();
   });
 
   it("nomme la source dans la ligne, une fois par cause et par fenêtre", () => {
@@ -635,6 +637,13 @@ describe("admitViolation : récence", () => {
   });
 });
 
+const cause = (i: number, host: string) => ({
+  directive: "img-src",
+  blockedOrigin: `https://${host}${i}.invalid`,
+  documentPath: "/",
+  sourceOrigin: CSP_SOURCE_NONE,
+});
+
 describe("admitLogLine", () => {
   const fresh = () => ({ windowStart: Number.NEGATIVE_INFINITY, written: 0, dropped: 0 });
 
@@ -664,13 +673,7 @@ describe("admitLogLine", () => {
 describe("logCspViolations : plafond global", () => {
   afterEach(() => {
     jest.restoreAllMocks();
-  });
-
-  const cause = (i: number, host: string) => ({
-    directive: "img-src",
-    blockedOrigin: `https://${host}${i}.invalid`,
-    documentPath: "/",
-    sourceOrigin: CSP_SOURCE_NONE,
+    resetCspLogState();
   });
 
   it("n'écrit qu'un nombre borné de lignes face à des causes fabriquées", () => {
@@ -691,5 +694,60 @@ describe("logCspViolations : plafond global", () => {
     expect(warn).toHaveBeenCalledTimes(2);
     expect(warn.mock.calls[0][0]).toContain("1 cause(s) neuve(s) non journalisée(s)");
     expect(warn.mock.calls[1][0]).toContain(`noyee${CSP_MAX_LOG_LINES_PER_WINDOW}`);
+  });
+});
+
+describe("logCspViolations : plafond sans effet de bord sur le suivi", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    resetCspLogState();
+  });
+
+  it("ne fait pas évincer les causes réelles par un envoi tu par le plafond", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const real = cause(0, "reelle");
+    logCspViolations([real], 1_000);
+    // Plafond atteint, puis bien plus de causes que le suivi n'en retient.
+    logCspViolations(Array.from({ length: CSP_MAX_TRACKED_CAUSES * 2 }, (_, i) => cause(i, "flood")), 1_000);
+    warn.mockClear();
+    logCspViolations([real], 2_000);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("ne compte qu'une fois une cause tue puis retentée", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const burst = Array.from({ length: CSP_MAX_LOG_LINES_PER_WINDOW + 2 }, (_, i) => cause(i, "retente"));
+    logCspViolations(burst, 10);
+    logCspViolations(burst, 20);
+    logCspViolations(burst, 30);
+    warn.mockClear();
+    logCspViolations([], 10 + CSP_LOG_BUDGET_WINDOW_MS);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("2 cause(s) neuve(s)");
+  });
+
+  it("annonce les causes tues sans attendre une cause neuve", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    logCspViolations(Array.from({ length: CSP_MAX_LOG_LINES_PER_WINDOW + 4 }, (_, i) => cause(i, "fin")), 5);
+    warn.mockClear();
+    logCspViolations([], 5 + CSP_LOG_BUDGET_WINDOW_MS);
+    logCspViolations([], 6 + CSP_LOG_BUDGET_WINDOW_MS);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("4 cause(s) neuve(s)");
+  });
+
+  it("compte distinctement sans suivi de causes", () => {
+    const budget = { windowStart: 0, written: CSP_MAX_LOG_LINES_PER_WINDOW, dropped: 0 };
+    admitLogLine(budget, 0, "a");
+    admitLogLine(budget, 0, "a");
+    expect(budget.dropped).toBe(2);
+  });
+});
+
+describe("blockedOriginOf : coupure de lecture", () => {
+  it("ne laisse pas une coupure au milieu d'une paire changer l'origine lue", () => {
+    const prefix = "https://exemple.test/" + "a".repeat(CSP_INPUT_MAX_LENGTH - "https://exemple.test/".length - 1);
+    const cut = blockedOriginOf(`${prefix}\u{1F600}suite`);
+    expect(cut).toBe("https://exemple.test");
   });
 });
