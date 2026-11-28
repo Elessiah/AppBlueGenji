@@ -365,16 +365,23 @@ Tout mot relatif se résout depuis l'**écriture du texte gardé** : sa dernièr
 modification si elle suit la publication (« ce soir » écrit en modifiant
 l'annonce le lendemain vise ce lendemain), sinon sa publication (`posted_at`).
 Une modification d'un scrim ou d'un remplaçant qui dit la place prise ou
-l'annonce close (« trouvé », « pourvu », « plus besoin », « complet » — pas
-« équipe complète » —, « c'est bon », « plus dispo », « annulé », « merci à
-tous », « GG », « found », « filled », « done », « booked », « taken »,
-« closed », « cancelled » — ni nié dans
-les trois mots d'avant de la même proposition, « pas encore trouvé », « still
-not found », « haven't found », ni le verbe, « si on trouve », « qui se trouve
-en EU ») garde la publication pour base : « (trouvé merci) » ajouté le
+l'annonce close (« trouvé », « pourvu » — pas « pourvu qu'on… » —, « plus
+besoin », « complet », « c'est complet », « nous sommes complets » — pas
+« équipe complète », « l'équipe est complète », « LF complete team » —,
+« plus dispo », « annulé », « found », « filled », « booked », « closed »,
+« cancelled » — ni nié dans les trois mots d'avant de la même proposition,
+« pas encore trouvé », « still not found », « haven't found », une formule de
+politesse comme « pas de souci » ne niant rien, ni le verbe, « si on trouve »,
+« qui se trouve en EU ») garde la publication pour base. Les mots qui servent
+aussi ailleurs — « c'est bon », « merci à tous », « GG », « done », « taken » —
+ne comptent qu'en fin de phrase (suivis au plus d'un « merci » ou d'un « pour
+nous ») et ne sont niés que par le mot juste avant : « c'est bon niveau »,
+« merci à tous d'avance », « tank taken, need dps », « done by 11pm » ne
+closent rien. « (trouvé merci) » ajouté le
 lendemain ne fait pas du scrim de la veille celui du soir (ni ne le rend à
-la liste, ni n'en prévient les alertes). Une modification à plus de 31 jours
-de la publication (horodatage aberrant) n'est pas prise pour base ; une date
+la liste, ni n'en prévient les alertes). Une modification faite plus de
+`GETI_RETENTION_MAX_DAYS` + 1 jours après la publication (au-delà de toute
+durée de garde : horodatage aberrant) n'est pas prise pour base ; une date
 de publication hors des dates lisibles ne date rien. Jamais
 depuis l'heure de lecture ni celle d'une réanalyse, dans le fuseau écrit
 par l'annonce (Paris sinon). Sans date de publication, aucune date n'est lue.
@@ -443,7 +450,7 @@ est lue à l'heure de Paris (dit dans les `InfoHint` des filtres).
 | « EET », « EEST » | l'heure d'Helsinki (Paris + 1 h) |
 | « EST », « EDT », « heure du Québec » | l'heure de New York |
 | « CST », « CDT » · « PST », « PDT » | l'heure de Chicago · de Los Angeles |
-| « UTC+1 », « GMT+1 » | l'heure de Paris, été comme hiver (l'heure française dans la communauté, comme « CET ») |
+| « UTC+1 », « GMT+1 » | l'heure de Paris, été comme hiver (l'heure française dans la communauté, comme « CET ») ; écrit aux minutes près, « UTC+01:00 » reste un décalage fixe |
 | « UTC », « GMT », « UTC+2 », « GMT-5 », « UTC+5:30 » | un décalage fixe (de −12 à +14 h) |
 
 - Sigles en **capitales** n'importe où pour « CET », « CEST », « UTC », « GMT »

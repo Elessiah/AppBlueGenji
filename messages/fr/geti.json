@@ -160,7 +160,7 @@
     "daysHint": "Un jour désigne une soirée à venir. Une annonce datée (« ce soir », « demain », « 28/11 ») ne répond plus à son jour une fois cette soirée finie.",
     "time": "Horaire",
     "timeHintSubject": "Filtre par horaire",
-    "timeHint": "Garde les annonces dont un horaire tombe dans ce créneau ; « 22h → 2h » passe minuit. Les heures sont à l'heure de Paris : un fuseau écrit dans l'annonce (UTC, EST…) est converti, et sans fuseau l'annonce est lue à l'heure de Paris.",
+    "timeHint": "Garde les annonces dont un horaire tombe dans ce créneau ; « 22h → 2h » passe minuit. Les heures sont à l'heure de Paris : un fuseau écrit dans l'annonce (UTC, EST…) est converti (« UTC+1 » se lit comme l'heure française), et sans fuseau l'annonce est lue à l'heure de Paris.",
     "hourFrom": "Entre (heure)",
     "hourTo": "et (heure)",
     "age": "Ancienneté",

@@ -32,6 +32,7 @@ import {
   prepareGetiText,
   withoutMarkup,
 } from "@/lib/shared/geti/normalize";
+import { GETI_RETENTION_MAX_DAYS } from "@/lib/shared/geti/ingest";
 import { parseGetiRanks } from "@/lib/shared/geti/ranks";
 import { findGetiRoleTokens, getiRolesOf, getiSubRolesOf } from "@/lib/shared/geti/roles";
 import {
@@ -188,18 +189,33 @@ function isoDate(value: unknown): string | null {
 }
 
 /**
- * Place prise ou annonce close : « trouvé », « pourvu », « plus besoin », « complet », « c'est bon »,
- * « plus dispo », « annulé », « merci à tous », « GG », « found », « filled », « done », « booked »,
- * « taken », « closed », « cancelled » (texte sans accents, en minuscules).
+ * Place prise ou annonce close : « trouvé », « pourvu », « plus besoin », « complet », « plus dispo »,
+ * « annulé », « found », « filled », « booked », « closed », « cancelled » (texte sans accents, en
+ * minuscules) ; en fin de phrase seulement, les mots qui servent aussi ailleurs : « c'est bon »,
+ * « merci à tous », « GG », « done », « taken » ({@link CLOSING_TAIL}).
  */
 const FILLED_WORD = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:trouvee?s?|pourvue?s?|plus besoin|(complete?s?)|c'?\s?est bon|plus dispo(?:nibles?)?|annulee?s?|fermee?s?|merci a tous|gg|found|filled|done|booked|taken|closed|cancell?ed)${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}(?:(trouvee?s?)|pourvue?s?(?!\s?qu)|plus besoin|(complete?s?)|(c'?\s?est bon|merci a tous|gg|done|taken)|plus dispo(?:nibles?)?|annulee?s?|fermee?s?|found|filled|booked|closed|cancell?ed)${NOT_BEFORE_WORD}`,
   "gu",
 );
-/** Juste avant « complet » : l'équipe qui cherche, pas la place prise (« équipe complète », « to complete »). */
-const COMPLETE_SUBJECTS = new Set(["equipe", "team", "roster", "lineup", "up", "stack", "groupe", "compo", "to", "we", "i", "est", "sommes", "is", "are"]);
+/**
+ * Après un mot de clôture qui sert aussi ailleurs (« c'est bon niveau », « merci à tous d'avance »,
+ * « tank taken, need dps », « done by 11pm ») : au plus un remerciement ou « pour nous », puis la fin de la phrase.
+ */
+const CLOSING_TAIL = /^\s*(?:(?:pour (?:nous|moi)|merci|thanks|thx|ty)(?![\p{L}\p{N}]))?\s*(?:[).!\]\n]|$)/u;
+/** Juste avant « complet » : l'équipe qui cherche, pas la place prise (« équipe complète », « to complete », « LF complete team »). */
+const COMPLETE_SUBJECTS = new Set([
+  "equipe", "team", "roster", "lineup", "up", "stack", "groupe", "compo", "to", "we", "i",
+  "lf", "lfs", "lft", "lfp", "lfsub", "need", "needs", "looking", "a", "an", "for", "un", "une", "cherche", "recherche", "besoin",
+]);
+/** Verbe être devant « complet » : la place prise (« c'est complet », « nous sommes complets »), sauf l'équipe qui se décrit. */
+const COPULAS = new Set(["est", "sommes", "sont", "etes", "is", "are", "was", "were"]);
+/** L'équipe elle-même : devant le verbe être (« l'équipe est complète ») ou juste après « complete » (« complete team wanted »). */
+const TEAM_NOUNS = new Set(["equipe", "team", "roster", "lineup", "stack", "squad", "groupe", "group", "compo"]);
 /** Mots qui nient la place prise, quelques mots avant : « pas encore trouvé », « toujours rien trouvé », « still not found », « haven't found ». */
 const FILLED_NEGATIONS = new Set(["pas", "rien", "personne", "aucun", "aucune", "jamais", "not", "no", "never", "nobody", "noone", "t"]);
+/** Formules de politesse qui ne nient rien : « pas de souci, c'est bon », « no worries, found ». */
+const COURTESY = /(?:pas de (?:soucis?|problemes?|prob)|no (?:problems?|prob|worries))(?![\p{L}\p{N}])/gu;
 /** Sujet juste avant : le verbe « trouver » au présent (« si on trouve », « je trouve », « qui se trouve en EU »). */
 const FILLED_VERB_SUBJECTS = new Set(["on", "je", "j", "si", "tu", "se", "s", "il", "elle", "ne", "n"]);
 /** Nombre de mots relus avant « trouvé » pour y chercher une négation. */
@@ -207,27 +223,57 @@ const FILLED_LOOKBACK_WORDS = 3;
 /** Fin de proposition : la négation d'avant (« pas de souci. Trouvé ») ne compte plus. */
 const CLAUSE_END = /[.!?;,()\n]/u;
 
+/** Mot qui suit une position du texte (« complete team » → « team »). */
+function nextWord(lower: string, from: number): string | undefined {
+  return /^[^\p{L}\p{N}]*([\p{L}\p{N}]+)/u.exec(lower.slice(from, from + 40))?.[1];
+}
+
+/** « complet » qui dit l'équipe qui cherche (« équipe complète », « l'équipe est complète », « LF complete team »), pas la place prise. */
+function describesTheTeam(before: readonly string[], lower: string, end: number): boolean {
+  const subject = before.at(-1);
+  if (subject !== undefined && COPULAS.has(subject)) return TEAM_NOUNS.has(before.at(-2) ?? "");
+  if (subject !== undefined && COMPLETE_SUBJECTS.has(subject)) return true;
+  return TEAM_NOUNS.has(nextWord(lower, end) ?? "");
+}
+
 /**
  * Place prise, écrite dans une recherche de scrim ou de remplaçant : « trouvé »,
- * « pourvu », « plus besoin », « found », « filled » — ni nié dans les quelques
- * mots d'avant (« pas encore trouvé », « still not found »), ni le verbe
- * (« si on trouve », « qui se trouve en EU »). Texte sans accents, en minuscules.
+ * « pourvu », « plus besoin », « complet », « found », « filled »… — ni nié dans
+ * les quelques mots d'avant (« pas encore trouvé », « still not found »), ni le
+ * verbe (« si on trouve », « qui se trouve en EU »), ni l'équipe qui se décrit
+ * (« équipe complète ») ; un mot qui sert aussi ailleurs (« c'est bon »,
+ * « merci à tous », « done ») ne compte qu'en fin de phrase, et seul le mot juste
+ * avant peut le nier. Texte sans accents, en minuscules.
  */
 function saysFilled(lower: string): boolean {
-  for (const match of lower.matchAll(FILLED_WORD)) {
-    const clause = lower.slice(Math.max(0, match.index - 60), match.index).split(CLAUSE_END).at(-1) ?? "";
-    const before = clause.split(/[^\p{L}\p{N}]+/u).filter((word) => word !== "").slice(-FILLED_LOOKBACK_WORDS);
-    const subject = before.at(-1);
-    if (subject !== undefined && FILLED_VERB_SUBJECTS.has(subject)) continue;
-    if (match[1] !== undefined && subject !== undefined && COMPLETE_SUBJECTS.has(subject)) continue;
-    if (before.some((word) => FILLED_NEGATIONS.has(word))) continue;
-    return true;
-  }
+  for (const match of lower.matchAll(FILLED_WORD)) if (closes(match, lower)) return true;
   return false;
 }
 
-/** Écart le plus grand entre publication et modification pris pour base des dates (au-delà de toute durée de garde). */
-const EDIT_WINDOW_MS = 31 * 24 * 60 * 60 * 1000;
+/** Ce mot de clôture dit-il la place prise, à cet endroit du texte ? */
+function closes(match: RegExpExecArray, lower: string): boolean {
+  const end = match.index + match[0].length;
+  const clause =
+    lower
+      .slice(Math.max(0, match.index - 60), match.index)
+      .replace(COURTESY, ".")
+      .split(CLAUSE_END)
+      .at(-1) ?? "";
+  const before = clause.split(/[^\p{L}\p{N}]+/u).filter((word) => word !== "").slice(-FILLED_LOOKBACK_WORDS);
+  const subject = before.at(-1) ?? "";
+  // Mot qui sert aussi ailleurs : en fin de phrase seulement, nié par le seul mot d'avant.
+  if (match[3] !== undefined) return CLOSING_TAIL.test(lower.slice(end, end + 40)) && !FILLED_NEGATIONS.has(subject);
+  if (match[1] !== undefined && FILLED_VERB_SUBJECTS.has(subject)) return false;
+  if (match[2] !== undefined && describesTheTeam(before, lower, end)) return false;
+  return !before.some((word) => FILLED_NEGATIONS.has(word));
+}
+
+/**
+ * Écart le plus grand entre publication et modification pris pour base des
+ * dates : la plus longue durée de garde (une annonce plus vieille est effacée),
+ * plus un jour.
+ */
+export const GETI_EDIT_WINDOW_MS = (GETI_RETENTION_MAX_DAYS + 1) * 24 * 60 * 60 * 1000;
 
 /**
  * Instant où le texte gardé a été écrit : la modification si elle suit la
@@ -239,8 +285,8 @@ function writtenAt(postedAt: string | null, editedAt: string | null, lower: stri
   if (postedAt === null || editedAt === null) return postedAt;
   if (oneEvening && saysFilled(lower)) return postedAt;
   const [posted, edited] = [Date.parse(postedAt), Date.parse(editedAt)];
-  // Une modification bien après toute durée de garde (horodatage aberrant, « +275760-09-12 ») ne date rien.
-  return edited > posted && edited - posted <= EDIT_WINDOW_MS ? editedAt : postedAt;
+  // Une modification au-delà de toute durée de garde (horodatage aberrant, « +275760-09-12 ») ne date rien.
+  return edited > posted && edited - posted <= GETI_EDIT_WINDOW_MS ? editedAt : postedAt;
 }
 
 /** Scrim ou remplaçant, d'après le salon ou le mot-clé d'une annonce postée ailleurs (« LFSub » dans le salon des joueurs). */

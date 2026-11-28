@@ -158,7 +158,7 @@
     "days": "Day",
     "time": "Time",
     "timeHintSubject": "Time filter",
-    "timeHint": "Keeps posts with a time inside this slot; “22:00 → 02:00” crosses midnight. Hours are in Paris time: a time zone written in the post (UTC, EST…) is converted, and a post with no time zone is read as Paris time.",
+    "timeHint": "Keeps posts with a time inside this slot; “22:00 → 02:00” crosses midnight. Hours are in Paris time: a time zone written in the post (UTC, EST…) is converted (“UTC+1” is read as French time), and a post with no time zone is read as Paris time.",
     "daysHintSubject": "Day filter",
     "daysHint": "A day means an upcoming evening. A dated post (“tonight”, “tomorrow”, “28/11”) no longer matches its day once that evening is over.",
     "hourFrom": "Between (hour)",

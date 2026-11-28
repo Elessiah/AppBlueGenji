@@ -537,7 +537,8 @@ export function getiPostChips(post: GetiParsedPost): GetiChip[] {
     const stated = slot.stated === null ? {} : { stated: slot.stated };
     chips.push({ kind: "time", from: slot.from, to: slot.to, timezone, ...stated });
   }
-  const dates = listOf<unknown>(stored.dates).filter((iso): iso is string => typeof iso === "string");
+  // Un même jour peut revenir à deux écarts d'horaires (changement d'heure) : une seule pastille.
+  const dates = [...new Set(listOf<unknown>(stored.dates).filter((iso): iso is string => typeof iso === "string"))];
   for (const iso of dates.slice(0, MAX_DATE_CHIPS)) chips.push({ kind: "date", iso });
   if (typeof stored.minAge === "number" && Number.isFinite(stored.minAge)) chips.push({ kind: "minAge", age: stored.minAge });
   return chips;

@@ -785,18 +785,19 @@ function getiDateShifts(rule: GetiZoneRule, days: readonly number[], first: numb
 /**
  * Dates triées, sans doublon, avec leur écart d'horaires : deux jours écrits de
  * part et d'autre d'un changement d'heure peuvent tomber le même jour à Paris
- * (« samedi et dimanche 6pm EST » début mars) ; le même jour garde l'écart le
- * plus tardif (celui qui dit quand l'annonce est passée).
+ * (« samedi et dimanche 6pm EST » début mars : dimanche 0 h et dimanche 23 h) ;
+ * ce jour reste alors deux fois, un par écart — chaque soirée garde son heure
+ * (fin de l'annonce, filtre d'horaire). Seul un même jour au même écart se fond.
  */
 function distinctDates(dates: readonly number[], shifts: readonly number[] | null): { dates: number[]; dateShifts: number[] | null } {
-  const latest = new Map<number, number>();
+  const pairs = new Map<string, { date: number; shift: number }>();
   dates.forEach((date, index) => {
     const shift = shifts?.[index] ?? 0;
-    latest.set(date, Math.max(latest.get(date) ?? shift, shift));
+    pairs.set(`${date}:${shift}`, { date, shift });
   });
-  const sorted = [...latest.keys()].sort((a, b) => a - b);
-  const kept = sorted.map((date) => latest.get(date) ?? 0);
-  return { dates: sorted, dateShifts: kept.some((value) => value !== 0) ? kept : null };
+  const sorted = [...pairs.values()].sort((a, b) => a.date - b.date || a.shift - b.shift);
+  const kept = sorted.map((pair) => pair.shift);
+  return { dates: sorted.map((pair) => pair.date), dateShifts: kept.some((value) => value !== 0) ? kept : null };
 }
 
 /** Heure d'après minuit au plus tard pour qu'une heure seule de « ce soir » vise la nuit qui suit (« ce soir 0h30 »). */

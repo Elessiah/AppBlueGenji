@@ -191,7 +191,16 @@ function matchesTime(post: GetiParsedPost, filter: GetiFilter, includeUnknown: b
     return stored === null ? [] : [stored];
   });
   if (times.length === 0) return includeUnknown;
-  return times.some((slot) => getiTimeSlotMatches(slot, from, to));
+  // Une date au décalage à elle (changement d'heure entre deux jours écrits) tient ses horaires à cet écart.
+  const shifts = new Set([0, ...wanted<unknown>(post.availability?.dateShifts).map(storedShift)]);
+  return [...shifts].some((shift) => times.some((slot) => getiTimeSlotMatches(shiftedSlot(slot, shift), from, to)));
+}
+
+/** Un horaire décalé de `shift` minutes, ramené dans la journée. */
+function shiftedSlot(slot: { from: number; to: number | null }, shift: number): { from: number; to: number | null } {
+  if (shift === 0) return slot;
+  const wrap = (minutes: number) => (((minutes + shift) % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
+  return { from: wrap(slot.from), to: slot.to === null ? null : wrap(slot.to) };
 }
 
 /** Durée comptée à une heure seule (« à partir de 21h ») : le créneau est dit fini deux heures après. */

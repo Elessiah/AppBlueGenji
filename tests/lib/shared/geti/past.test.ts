@@ -482,3 +482,30 @@ describe("cycle 3 : écart d'une date de l'autre côté d'un changement d'heure,
     expect(isGetiOneEveningPost(post)).toBe(true);
   });
 });
+
+describe("revue sécurité 2 : un même jour à deux écarts d'horaires", () => {
+  /** « samedi et dimanche 6pm EST » début mars : dimanche 0 h et dimanche 23 h à Paris. */
+  function sameDayTwoShifts(): GetiParsedPost {
+    return parsedGetiPost({
+      category: "lfs",
+      dates: ["2026-03-08", "2026-03-08"],
+      availability: { days: ["SUN"], times: [{ from: 1380, to: null }], timezone: "EST", dateShifts: [-1380, 0] },
+    });
+  }
+
+  const FRIDAY_6_MARCH = Date.parse("2026-03-06T12:00:00.000Z");
+
+  it("matchesGetiFilter_timeAtTheEarlierEveningOfAShiftedDate_keepsThePost", () => {
+    expect(matchesGetiFilter(sameDayTwoShifts(), { time: { from: 0, to: 60 } }, FRIDAY_6_MARCH)).toBe(true);
+  });
+
+  it("matchesGetiFilter_timeOutsideEveryShift_dropsThePost", () => {
+    expect(matchesGetiFilter(sameDayTwoShifts(), { time: { from: 180, to: 240 } }, FRIDAY_6_MARCH)).toBe(false);
+  });
+
+  it("getiPostChips_sameDateTwice_showsOneDateChip", () => {
+    const dateChips = getiPostChips(sameDayTwoShifts()).filter((chip) => chip.kind === "date");
+
+    expect(dateChips).toEqual([{ kind: "date", iso: "2026-03-08" }]);
+  });
+});

@@ -87,7 +87,7 @@ describe("getiZoneRule", () => {
     ["GMT", { offset: 0 }],
     ["UTC+1", { iana: "Europe/Paris" }],
     ["GMT+1", { iana: "Europe/Paris" }],
-    ["UTC+01:00", { iana: "Europe/Paris" }],
+    ["UTC+01:00", { offset: 60 }],
     ["UTC+2", { offset: 120 }],
     ["GMT-5", { offset: -300 }],
     ["UTC+5:30", { offset: 330 }],

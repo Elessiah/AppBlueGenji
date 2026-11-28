@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { getiPostEndsAt, parseGetiPost, type GetiCategory, type GetiParsedPost } from "@/lib/shared/geti";
+import { GETI_RETENTION_MAX_DAYS } from "@/lib/shared/geti/ingest";
+import { GETI_EDIT_WINDOW_MS } from "@/lib/shared/geti/parse-post";
 import { getiRawPost } from "../../../helpers/geti";
 
 /**
@@ -468,12 +470,13 @@ describe("parseGetiPost — revue sécurité 1 : modification qui clôt, horodat
     expect(editedAt("LFS ce soir 21h-23h, pas complet", TUESDAY_MORNING).dates).toEqual(["2026-11-24"]);
   });
 
-  it("parseGetiPost_editExactly31DaysAfter_resolvesFromTheEdit", () => {
-    expect(editedAt("LFS ce soir 21h-23h", "2026-12-24T12:00:00.000Z").dates).toEqual(["2026-12-24"]);
+  it("parseGetiPost_editAtTheEndOfTheWindow_resolvesFromTheEdit", () => {
+    // Fenêtre : la plus longue durée de garde (14 jours) plus un jour, soit 15 jours.
+    expect(editedAt("LFS ce soir 21h-23h", "2026-12-08T12:00:00.000Z").dates).toEqual(["2026-12-08"]);
   });
 
-  it("parseGetiPost_editMoreThan31DaysAfter_keepsThePostDay", () => {
-    expect(editedAt("LFS ce soir 21h-23h", "2026-12-24T12:00:01.000Z").dates).toEqual(["2026-11-23"]);
+  it("parseGetiPost_editJustBeyondTheWindow_keepsThePostDay", () => {
+    expect(editedAt("LFS ce soir 21h-23h", "2026-12-08T12:00:01.000Z").dates).toEqual(["2026-11-23"]);
   });
 
   it("parseGetiPost_editAtTheLastJavaScriptDate_doesNotThrowAndKeepsThePostDay", () => {
@@ -497,11 +500,53 @@ describe("parseGetiPost — revue sécurité 1 : modification qui clôt, horodat
     expect(parsed("LFS ce matin 10h-12h", WEDNESDAY_NOON).dates).toEqual(["2026-11-25"]);
   });
 
-  it("parseGetiPost_twoDaysOnEitherSideOfTheUsChange_keepsOneSortedDate", () => {
+  it("parseGetiPost_twoDaysOnEitherSideOfTheUsChange_keepsBothEveningsSorted", () => {
     // Vendredi 6 mars 2026 : samedi 6pm EST → dimanche 0 h à Paris, dimanche 6pm EDT → dimanche 23 h.
     const post = parsed("LFS samedi et dimanche 6pm EST", "2026-03-06T12:00:00.000Z");
 
-    expect(post.dates).toEqual(["2026-03-08"]);
-    expect(post.availability.dateShifts).toBeUndefined();
+    expect(post.dates).toEqual(["2026-03-08", "2026-03-08"]);
+    expect(post.availability.times).toEqual([{ from: 1380, to: null }]);
+    expect(post.availability.dateShifts).toEqual([-1380, 0]);
+  });
+});
+
+describe("parseGetiPost — revue sécurité 2 : mots de clôture d'une modification du lendemain", () => {
+  const TUESDAY_MORNING = "2026-11-24T08:00:00.000Z";
+
+  function editedAt(content: string): GetiParsedPost {
+    return parseGetiPost(getiRawPost(content, { category: "lfs", postedAt: MONDAY_NOON, editedAt: TUESDAY_MORNING }));
+  }
+
+  it.each([
+    ["LFS ce soir 21h-23h, c'est complet"],
+    ["LFS ce soir 21h-23h, nous sommes complets"],
+    ["LFS tonight 9pm-11pm, we are complete"],
+    ["LFS ce soir 21h-23h c'est bon merci"],
+    ["LFS ce soir 21h-23h, pas de souci c'est bon merci"],
+    ["LFS ce soir 21h-23h pas de souci trouvé"],
+  ])("parseGetiPost_editClosing_%s_keepsThePostDay", (content) => {
+    expect(editedAt(content).dates).toEqual(["2026-11-23"]);
+  });
+
+  it.each([
+    ["L'équipe est complète, LFS ce soir 21h-23h"],
+    ["LFS complete team ce soir 21h"],
+    ["LFS ce soir 21h, complete roster wanted"],
+    ["LFS ce soir 21h-23h, merci à tous d'avance"],
+    ["LFS ce soir 21h-23h c'est bon niveau"],
+    ["LFS tonight 9pm, tank taken, need dps"],
+    ["LFS tonight, done by 11pm"],
+    ["LFS ce soir 21h-23h, pourvu qu'on trouve vite"],
+  ])("parseGetiPost_editStillOpen_%s_resolvesFromTheEdit", (content) => {
+    expect(editedAt(content).dates).toEqual(["2026-11-24"]);
+  });
+
+  it("GETI_EDIT_WINDOW_MS_coversTheLongestRetention", () => {
+    expect(GETI_EDIT_WINDOW_MS).toBeGreaterThanOrEqual(GETI_RETENTION_MAX_DAYS * 24 * 60 * 60 * 1000);
+  });
+
+  it("parseGetiPost_utc0100InSummer_addsOneHour", () => {
+    // Écrit aux minutes près, « UTC+01:00 » est un vrai décalage fixe (pas l'heure française).
+    expect(parsed("LFS tomorrow 20h-22h UTC+01:00", SUMMER_NOON).availability.times).toEqual([{ from: 1260, to: 1380 }]);
   });
 });
