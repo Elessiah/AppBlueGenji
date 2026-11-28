@@ -27,6 +27,8 @@
 import enPush from "@/messages/en/pushMessages.json";
 import frPush from "@/messages/fr/pushMessages.json";
 import enReports from "@/messages/en/reports.json";
+import enGeti from "@/messages/en/geti.json";
+import frGeti from "@/messages/fr/geti.json";
 import frReports from "@/messages/fr/reports.json";
 import {
   CHECK_IN_INVITE_URL,
@@ -49,6 +51,9 @@ import { castReleasedHref, castReleaseReasonKey, type CastReleasedMatch } from "
 import { prodNoticeHref, type ProdNoticeMatch } from "./match-prod";
 import { lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "./lobby-brief";
 import { visibleText, withoutInvisibles } from "./visible-text";
+import { discordQuoted } from "./discord-text";
+import { getiCategoryPath } from "./geti/page";
+import type { GetiCategory } from "./geti/types";
 import { teamInviteNoticePath, type TeamInviteNoticeKind } from "./team-invite-notice";
 import { PLANNING_PATH } from "./planning";
 import type { DeadlineNotice } from "./schedule-deadline-notices";
@@ -1430,4 +1435,58 @@ export function scheduleDeadlinePush(notice: DeadlineNotice, locale: Locale = DE
     url: localeHref(tournamentMatchHref(notice.tournamentId, notice.matchId), locale),
     tag: `${matchTag(notice.matchId)}-deadline`,
   };
+}
+
+/** Une alerte d'annonces GETI touchée par une nouvelle annonce (`GETI_ALERT`, `GETI_INFO.md` § Alertes). */
+export type GetiAlertNotice = {
+  alertId: number;
+  category: GetiCategory;
+  /** Nom donné par le compte ; `null` : la catégorie sert de nom. */
+  name: string | null;
+  /** Filtres gardés (`?role=tank`), repris dans le lien. */
+  search: string;
+  /** Message Discord de l'annonce : l'ancre de sa carte sur la page. */
+  messageId: string;
+};
+
+const GETI_CATEGORY_TITLES: Readonly<Record<Locale, Readonly<Record<GetiCategory, { title: string }>>>> = {
+  fr: frGeti.categories,
+  en: enGeti.categories,
+};
+
+/** Le nom montré d'une alerte : celui du compte, sinon le titre de sa catégorie. */
+function getiAlertLabel(notice: GetiAlertNotice, locale: Locale): string {
+  return notice.name === null ? GETI_CATEGORY_TITLES[locale][notice.category].title : shown(notice.name);
+}
+
+/** Chemin (sans préfixe de langue) de la page filtrée comme l'alerte, sur la carte de l'annonce. */
+export function getiAlertPath(notice: GetiAlertNotice): string {
+  return `${getiCategoryPath(notice.category)}${notice.search}#post-${notice.messageId}`;
+}
+
+/**
+ * Nouvelle annonce qui correspond à une alerte (`GETI_ALERT`). Ni pseudo ni
+ * texte de l'annonce : le nom de l'alerte (écrit par son propriétaire, seul à
+ * le lire) et le lien. Une étiquette par alerte : la plus récente remplace la
+ * précédente sur l'appareil.
+ */
+export function getiAlertPush(notice: GetiAlertNotice, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("getiAlert.title"),
+    body: text.t("getiAlert.body", { alert: getiAlertLabel(notice, locale) }),
+    url: localeHref(getiAlertPath(notice), locale),
+    tag: `geti-alert-${notice.alertId}`,
+  };
+}
+
+/**
+ * Le message privé Discord de la même alerte : une phrase et le lien, sans
+ * pseudo ni extrait de l'annonce. `siteBase` : racine absolue du site.
+ */
+export function getiAlertDm(notice: GetiAlertNotice, siteBase: string, locale: Locale = DEFAULT_LOCALE): string {
+  return TEXT[locale].t("getiAlert.dm", {
+    alert: discordQuoted(getiAlertLabel(notice, locale), locale),
+    link: `${siteBase}${localeHref(getiAlertPath(notice), locale)}`,
+  });
 }

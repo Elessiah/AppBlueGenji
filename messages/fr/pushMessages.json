@@ -285,5 +285,10 @@
     "bodyReminder": "{pairing} ({tournament}) : date butoir le {deadline}, sinon double forfait.",
     "titleForfeit": "Double forfait",
     "bodyForfeit": "{pairing} ({tournament}) : aucun horaire convenu avant la date butoir ({deadline})."
+  },
+  "getiAlert": {
+    "title": "Nouvelle annonce GETI",
+    "body": "Elle correspond à ton alerte « {alert} ».",
+    "dm": "Nouvelle annonce GETI qui correspond à ton alerte {alert} : {link}"
   }
 }

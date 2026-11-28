@@ -14,6 +14,7 @@
  */
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { purgeGetiAlertHits } from "@/lib/server/geti/alerts";
 import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
 import { failureReason } from "@/lib/server/failure-reason";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
@@ -148,12 +149,14 @@ function isNotAnnouncement(parsed: GetiParsedPost, raw: GetiPushedPost["raw"]): 
 /**
  * Enregistre un lot d'annonces poussées, chacune analysée ici. Une annonce déjà
  * gardée est remplacée (modification), sauf si la version reçue est plus
- * ancienne que la version gardée.
+ * ancienne que la version gardée. `onStored` reçoit chaque annonce
+ * enregistrée avec son analyse (les alertes, `lib/server/geti/alerts.ts`).
  */
 export async function upsertGetiPosts(
   executor: GetiExecutor,
   posts: readonly GetiPushedPost[],
   now: number = Date.now(),
+  onStored?: (post: GetiPushedPost, parsed: GetiParsedPost) => void,
 ): Promise<GetiUpsertOutcome> {
   const outcome: GetiUpsertOutcome = { stored: 0, emptied: 0, expired: 0, withheld: 0 };
   const emptied: { messageId: string; version: Date }[] = [];
@@ -186,6 +189,7 @@ export async function upsertGetiPosts(
         post.editedAt,
       ]);
       outcome.stored += 1;
+      onStored?.(post, parsed);
     }
     if (rows.length > 0) {
       await executor.execute(upsertSql(rows.length), rows.flat());
@@ -316,6 +320,31 @@ const PURGE_TICK_MS = 60 * 60 * 1000;
 const FIRST_PURGE_DELAY_MS = 3 * 60 * 1000;
 
 /**
+ * Un passage de la purge horaire : annonces échues, traces d'alerte échues,
+ * réanalyse des annonces anciennes. Chaque étape a sa garde : une panne de
+ * l'une (verrou, délai) n'empêche pas les autres — la garde annoncée des
+ * traces ne dépend pas de celle des annonces. La première erreur est relancée
+ * à la fin, pour que l'horloge la signale.
+ */
+export async function runGetiPostsPurge(db: GetiExecutor, now: number = Date.now()): Promise<number> {
+  let firstError: unknown = null;
+  const guarded = async <T>(step: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await step();
+    } catch (error) {
+      firstError ??= error;
+      return fallback;
+    }
+  };
+  await guarded(() => purgeExpiredGetiPosts(db, now), 0);
+  // Traces « alerte déjà prévenue pour cette annonce » : même horloge, même garde.
+  await guarded(() => purgeGetiAlertHits(db, now), 0);
+  const refreshed = await guarded(() => refreshStaleGetiPosts(db), 0);
+  if (firstError !== null) throw firstError;
+  return refreshed;
+}
+
+/**
  * Lance la purge horaire (une fois par processus ; une alerte par panne). Une
  * horloge, pas le trafic ni le bot : un site sans visite, ou un bot arrêté,
  * garderait sinon des annonces au-delà de la durée annoncée.
@@ -325,11 +354,7 @@ export function startGetiPostsPurgeClock(): void {
     key: PURGE_CLOCK_KEY,
     firstDelayMs: FIRST_PURGE_DELAY_MS,
     tickMs: PURGE_TICK_MS,
-    run: async () => {
-      const db = await getDatabase();
-      await purgeExpiredGetiPosts(db);
-      return refreshStaleGetiPosts(db);
-    },
+    run: async () => runGetiPostsPurge(await getDatabase()),
     failureMessage: "[geti] Purge des annonces impossible.",
   });
 }
@@ -659,6 +684,40 @@ async function scanGetiPosts(
   for (const row of rows) {
     const post = storedPostOf(row, now);
     if (post) posts.push(post);
+  }
+  return posts;
+}
+
+/** Identifiants lus par requête `IN (…)` (`readStoredGetiPosts`). */
+const STORED_READ_CHUNK = 100;
+
+/**
+ * La version **gardée** des annonces demandées, lue comme la page la lit : une
+ * analyse gardée à une version antérieure est réanalysée depuis le message
+ * brut, une ligne illisible ou sortie de la garde de sa catégorie n'est pas
+ * rendue, une annonce retirée n'est plus là (les alertes,
+ * `lib/server/geti/alerts.ts`).
+ */
+export async function readStoredGetiPosts(
+  executor: GetiExecutor,
+  messageIds: readonly string[],
+  now: number = Date.now(),
+): Promise<GetiStoredPost[]> {
+  const ids = [...new Set(messageIds)];
+  const posts: GetiStoredPost[] = [];
+  for (let start = 0; start < ids.length; start += STORED_READ_CHUNK) {
+    const chunk = ids.slice(start, start + STORED_READ_CHUNK);
+    const [rows] = await executor.execute<GetiPostRow[]>(
+      `SELECT message_id, channel_id, category, source, author_id, author_tag, parsed_json, ${STALE_RAW_JSON},
+              posted_at, edited_at
+         FROM bg_geti_posts
+        WHERE message_id IN (${chunk.map(() => "?").join(", ")})`,
+      [...chunk],
+    );
+    for (const row of rows) {
+      const post = storedPostOf(row, now);
+      if (post) posts.push(post);
+    }
   }
   return posts;
 }

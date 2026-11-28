@@ -24,7 +24,7 @@ describe("createGetiTables", () => {
     expect(ddl).toContain("UNIQUE KEY uniq_bg_geti_posts_message (message_id)");
     expect(ddl).toContain("KEY idx_bg_geti_posts_category (category, posted_at)");
     expect(ddl).toContain("KEY idx_bg_geti_posts_posted (posted_at)");
-    expect(DECLARED_TABLES).toHaveLength(2);
+    expect(DECLARED_TABLES).toHaveLength(4);
   });
 
   it("createGetiTables_called_declaresTheObjectionsTableUniquePerTarget", async () => {
@@ -35,6 +35,19 @@ describe("createGetiTables", () => {
     const ddl = String(execute.mock.calls[1][0]);
     expect(ddl).toContain("CREATE TABLE IF NOT EXISTS bg_geti_objections");
     expect(ddl).toContain("UNIQUE KEY uniq_bg_geti_objections_target (kind, target_id)");
+  });
+
+  it("createGetiTables_called_cascadesAlertTracesWithTheirAlertAndTheirPost", async () => {
+    const execute = jest.fn<SqlQuery>(async () => [{}]);
+
+    await createGetiTables(fakePool({ execute }));
+
+    const ddl = String(execute.mock.calls[3][0]);
+    expect(ddl).toContain("CREATE TABLE IF NOT EXISTS bg_geti_alert_hits");
+    expect(ddl).toContain("REFERENCES bg_geti_alerts(id) ON DELETE CASCADE");
+    // Une annonce retirée emporte ses traces (registre T21 : rien n'en reste).
+    expect(ddl).toContain("CONSTRAINT fk_bg_geti_alert_hits_post FOREIGN KEY (message_id)");
+    expect(ddl).toContain("REFERENCES bg_geti_posts(message_id) ON DELETE CASCADE");
   });
 
   it("createGetiTables_creationRefused_doesNotThrow", async () => {

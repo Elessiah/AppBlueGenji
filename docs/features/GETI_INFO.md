@@ -10,9 +10,9 @@ cinq lots ; ce document grandit avec eux.
 | 1. GETI-PARSER | Analyse d'une annonce et filtre (`lib/shared/geti/`), jeu d'annonces anonymisées | **fait** |
 | 2. GETI-INGEST | Bot → site : création, modification, suppression, rattrapage ; table, purge, mentions légales (§ Récupération) | **fait** |
 | 2b. GETI-TUNE | Réglage de l'analyse sur les annonces réelles : Émeraude, SR de scrim, dates, niveaux, annonces closes (§ Réglage) | **fait** |
-| 3. GETI-PAGE | Page, six catégories, filtres, copie du pseudo, carte d'invitation, « Publier » | à venir |
-| 4. GETI-NAV | Menu et mention sur l'accueil | à venir |
-| 5. GETI-ALERTS | Alertes sur un filtre enregistré | à venir |
+| 3. GETI-PAGE | Page, six catégories, filtres, copie du pseudo, carte d'invitation, « Publier » (§ Page publique) | **fait** |
+| 4. GETI-NAV | Menu et mention sur l'accueil (§ Navigation) | **fait** |
+| 5. GETI-ALERTS | Alertes sur une recherche gardée : push et message privé Discord (§ Alertes) | **fait** |
 
 Le lot 1 ne stocke ni n'affiche rien : aucune donnée personnelle n'est encore
 traitée par le site (rien à déclarer au registre avant le lot 2).
@@ -776,3 +776,234 @@ chaque page vitrine et dès l'accueil.
   colonne ; à 375 px les raccourcis passent à la ligne, sans défilement horizontal.
 - Tests : `tests/app/navigation-a11y.test.tsx`, `tests/app/geti-spotlight.test.tsx`,
   `e2e/landing.spec.ts`.
+
+## Alertes sur une recherche (lot 5)
+
+Sur `/geti-info`, « Créer une alerte » garde **la catégorie affichée et ses
+filtres**. Quand le bot pousse une nouvelle annonce qui y correspond, le
+propriétaire de l'alerte est prévenu.
+
+### Décisions
+
+- **Compte requis.** Les notifications push du site sont rattachées à un compte
+  de bout en bout (`bg_push_subscriptions.user_id`, sujets coupés, langue,
+  export, effacement). Un abonnement anonyme, tenu par la seule adresse de
+  l'appareil, ouvrirait une écriture sans session (adresses d'abonnement
+  arbitraires, plafonds par IP seulement) et une seconde gestion des droits
+  (lister, supprimer, exporter sans compte) : écarté pour ce lot. Sans session,
+  la fenêtre mène à `/connexion`.
+- **Aucun changement côté bot.** L'envoi passe par `notifyUsers`
+  (`lib/server/notify.ts`) : push sur les appareils abonnés du compte, message
+  privé Discord au compte Discord **certifié** (`certified`), par l'appel
+  app → bot existant — bot injoignable, le push part seul. Sujet
+  `GETI_ALERT` de `PUSH_TOPICS` ; coupé dans « Mon profil », il coupe aussi le
+  message privé (`dmFollowsTopic`).
+- **Ce que dit le message.** Push : « Nouvelle annonce GETI » / « Elle
+  correspond à ton alerte « nom ». » ; message privé : « Nouvelle annonce GETI
+  qui correspond à ton alerte « nom » : lien ». Ni pseudo, ni texte de
+  l'annonce ; le nom est celui que le compte a donné (rendu sûr par
+  `discordQuoted`), sinon le titre de la catégorie. Langue du compte
+  (`getiAlertPush`, `getiAlertDm` dans `lib/shared/push-messages.ts`). Le lien
+  ouvre la page filtrée comme l'alerte, sur la carte de l'annonce
+  (`#post-<id du message>`).
+
+### Ce qu'une alerte garde
+
+`lib/shared/geti/alerts.ts` (module pur). La recherche est gardée sous la
+**forme canonique de l'adresse** (`getiPageSearch`), relue par
+`parseGetiPageQuery` : une alerte ne peut pas porter un filtre que la page ne
+sait pas écrire, et deux recherches égales s'écrivent pareil (refus du
+doublon). La page, l'âge et « montrer les annonces closes » ne sont pas
+gardés : une alerte ne regarde que ce qui vient d'arriver, et une annonce
+close ne prévient jamais.
+
+| Constante | Valeur | Rôle |
+| --- | --- | --- |
+| `GETI_ALERT_MAX_PER_USER` | 10 | Alertes par compte |
+| `GETI_ALERT_NAME_MAX` | 60 | Nom facultatif (contrôles et caractères de direction retirés) |
+| `GETI_ALERT_COOLDOWN_MINUTES` | 10 | Au plus une notification par alerte sur cette durée |
+| `GETI_ALERT_FRESH_MINUTES` | 30 | Âge maximal (publication ou modification) d'une annonce qui prévient |
+| `GETI_ALERT_SCAN_MAX` | 2000 | Alertes actives lues par catégorie et par lot reçu |
+| `GETI_ALERT_QUEUE_MAX` | 100 | Passes d'alertes en attente de leur tour (au-delà : lot abandonné, avertissement pm2) |
+| `GETI_ALERT_HIT_RETENTION_DAYS` | 15 | Garde des traces « déjà signalée » |
+
+### Tables
+
+- `bg_geti_alerts` : `user_id` (clé étrangère, `ON DELETE CASCADE`),
+  `category`, `name`, `search`, `paused`, `created_at`, `last_notified_at` ;
+  index `(user_id)` et `(category, paused)`.
+- `bg_geti_alert_hits` : clé primaire `(alert_id, message_id)`, `created_at` —
+  une ligne par annonce déjà vue par une alerte ; deux clés étrangères
+  `ON DELETE CASCADE` : vers l'alerte, et vers l'annonce
+  (`bg_geti_posts.message_id`, `fk_bg_geti_alert_hits_post`) — une annonce
+  retirée (supprimée du salon, vidée, opposition, échue, réanalyse impossible)
+  emporte ses traces dans la même instruction : rien n'en reste (T21). Une
+  annonce qui revient ensuite (texte rétabli après avoir été vidé) compte comme
+  nouvelle et peut prévenir encore si elle est récente (publiée ou modifiée
+  depuis moins de 30 min, `isFreshGetiPost` — y compris quand c'est le
+  rattrapage du bot qui la pousse ; son arriéré plus ancien ne prévient
+  personne et ne pose aucune trace) : la promesse « jamais deux
+  fois » vaut tant que l'annonce reste sur le site (textes légaux).
+  Une trace ne se pose que sur une annonce gardée (`INSERT IGNORE` écarte celle
+  retirée entre-temps).
+
+Tables neuves : leur `CREATE TABLE` (`schema/geti.ts`) suffit ; seule la clé
+vers l'annonce est dans `RECENT_SCHEMA_CHANGES` (groupe de deux pas, pour les
+bases de développement qui avaient déjà la table : traces orphelines retirées,
+puis la clé), joué seulement tant que `information_schema` ne montre pas la clé
+(table présente, `fk_bg_geti_alert_hits_post` absente) : ni balayage des traces
+à chaque démarrage, ni erreur quand la table manque. Table absente : la page se rend sans alertes, la passe
+d'alertes ne fait rien.
+
+### Routes (`/api/geti/alerts`)
+
+Session requise (401 `UNAUTHORIZED`), écritures plafonnées par compte
+(`GETI_ALERT_WRITE_RULE`, 40 par 10 minutes), réponses d'erreur à code seul.
+
+| Route | Effet | Refus |
+| --- | --- | --- |
+| `GET /api/geti/alerts` | `{ alerts, max }` du compte | 503 `GETI_ALERT_UNAVAILABLE` |
+| `POST /api/geti/alerts` `{ category, search, name? }` | 201 `{ alert }` | 400 `GETI_ALERT_INVALID`, 400 `GETI_ALERT_NAME_TOO_LONG`, 409 `GETI_ALERT_LIMIT`, 409 `GETI_ALERT_DUPLICATE` |
+| `PATCH /api/geti/alerts/[id]` `{ name?, paused? }` | `{ alert }` | 404 `GETI_ALERT_NOT_FOUND` (alerte d'un autre compte comprise), 400 |
+| `DELETE /api/geti/alerts/[id]` | `{ deleted: true }` | 404 `GETI_ALERT_NOT_FOUND` |
+
+Le plafond et le doublon se jouent dans une transaction dont la **première
+instruction** verrouille la ligne du compte (`SELECT id FROM bg_users WHERE
+id = ? FOR UPDATE`, une table, sans jointure — MariaDB) : deux créations
+simultanées ne dépassent pas dix alertes.
+
+### Passe d'alertes — `notifyGetiAlerts(posts, now?, executor?, send?)`
+
+Appelée par `POST /api/internal/geti/posts` après l'enregistrement, **sans être
+attendue** (le bot n'attend ni push ni message privé) ; elle ne lève jamais.
+
+1. Ne restent que les annonces **ouvertes** et **récentes** (`isFreshGetiPost`,
+   30 minutes) : le rattrapage du bot, qui repousse deux semaines d'annonces à
+   chaque démarrage, ne prévient personne. Une annonce ancienne **modifiée**
+   à l'instant compte comme récente : si elle correspond désormais à une
+   alerte qui ne l'avait jamais vue, elle prévient une fois. Ce tri se refait
+   sur la **version gardée**, relue dans `bg_geti_posts` comme la page la lit
+   (`readStoredGetiPosts` : une analyse d'une version antérieure est
+   réanalysée depuis le message brut) : une version plus
+   ancienne arrivée après une modification (l'enregistrement la laisse de
+   côté) est jugée sur la version gardée — fermée, elle ne prévient pas — et
+   une annonce retirée entre-temps ne prévient pas.
+2. Une lecture **par catégorie** du lot des alertes actives (`paused = 0`,
+   comptes ni effacés ni suspendus — ils ne seraient pas prévenus et ne
+   prennent pas la borne —, suit l'index `(category, paused)` sans tri, au plus
+   `GETI_ALERT_SCAN_MAX` par catégorie, lue avec une ligne de plus : seule
+   cette ligne en trop — des alertes restent non lues — déclenche
+   l'avertissement chiffré dans pm2 et pose un **curseur** par catégorie
+   (dernier identifiant lu) : la passe suivante lit la suite, puis repart du
+   début, si bien que les alertes les plus récentes ne sont jamais
+   durablement privées de lecture), avec l'identifiant Discord du compte :
+   **sa propre annonce ne prévient pas son auteur** quand l'annonce porte
+   l'identifiant de son auteur (un relais qui ne donne que le pseudo,
+   `authorId` nul, n'est pas reconnu : textes légaux formulés ainsi).
+3. Correspondance en mémoire par `matchingGetiAlerts` → `matchesGetiFilter`,
+   le filtre de chaque alerte construit une seule fois par lot.
+4. **Jamais deux fois pour la même annonce** (tant qu'elle est gardée) : par annonce, une lecture des
+   traces déjà là puis un seul `INSERT IGNORE INTO bg_geti_alert_hits` à
+   plusieurs lignes pour les autres (par paquets de 500) ; une insertion qui
+   ne pose rien (passe simultanée) ne prévient pas (modification, second
+   rattrapage, envoi en double : rien) ; une insertion qui en pose une partie
+   seulement relit les traces datées de cette passe (date à la seconde) et ne
+   compte que celles-là.
+5. **Délai par alerte** : une alerte déjà dans son délai à la lecture est
+   écartée en mémoire (aucune écriture) ; sinon il se réserve en une instruction : `UPDATE bg_geti_alerts
+   SET last_notified_at = ? WHERE id = ? AND paused = 0 AND (last_notified_at
+   IS NULL OR last_notified_at <= ?)` + `affectedRows`. Une annonce arrivée
+   pendant le délai garde sa trace et ne sera pas signalée plus tard : elle se
+   lit sur la page. Une seule notification **réussie** par compte et par lot :
+   les autres alertes touchées du même compte dans le lot **rendent** leurs
+   traces (une modification récente de ces annonces pourra encore les faire
+   partir). Une réservation en échec (base) rend aussi les traces de l'alerte,
+   et la passe juge les suivantes.
+6. Envoi (`notifyUsers`) au compte, s'il existe encore et n'est pas suspendu :
+   les destinataires de tous les comptes à prévenir se lisent ensemble (par
+   paquets de 500), pas une requête par alerte, et les envois partent l'un
+   après l'autre.
+   Un envoi qui ne joint personne (compte suspendu ou effacé) ou qui échoue
+   **rend** le délai (date précédente remise, si personne ne l'a reprise) et
+   retire les traces que la passe a posées pour cette alerte (toutes ses
+   annonces du lot) : une autre alerte du compte peut prévenir, et une
+   modification récente de ces annonces aussi.
+   Une écriture de traces en échec (ou sa relecture) retire au mieux les
+   traces posées par la passe pour cette annonce et passe à la suivante :
+   aucune trace ne reste sans envoi derrière elle.
+
+**Passes en file** : `scheduleGetiAlerts` (route d'enregistrement) met la passe
+d'un lot en file, **une à la fois** (au plus `GETI_ALERT_QUEUE_MAX` en attente) :
+sans cela deux lots rapprochés enverraient en même temps des appels au bot qui
+s'additionnent (coupe-circuit). Seules les annonces encore récentes entrent en
+file ; le rattrapage n'en met aucune.
+
+**Borne du coût** : par lot (20 annonces au plus), une relecture des annonces
+récentes, une lecture d'au plus 2 000 alertes, deux instructions par annonce
+touchée pour les traces, puis au plus `annonces récentes × alertes de la catégorie`
+comparaisons en mémoire (40 000 dans le pire cas, chacune sur une annonce déjà
+analysée) ; les écritures ne portent que sur les couples qui correspondent.
+Hors rattrapage, un lot porte une annonce. Au-delà de 2 000 alertes actives
+dans une catégorie, chaque passe en lit 2 000 à partir du curseur (rotation) :
+une alerte peut manquer les annonces d'une passe où elle n'est pas lue — à
+revoir (index par critère) si ce nombre approche.
+
+**Croissance des traces** : une trace par couple (alerte, annonce) qui
+correspond, y compris pour une alerte alors dans son délai — la trace **est** ce
+qui empêche une modification tardive de prévenir une seconde fois, elle vit donc
+aussi longtemps que l'annonce gardée (elle part avec elle ; 15 jours au plus, purge par
+lots). Borne : alertes
+d'une catégorie (≤ 2 000 lues) × annonces récentes de cette catégorie sur 15
+jours ; seules les annonces **récentes** posent des traces (le rattrapage n'en
+pose aucune). À surveiller si le nombre d'alertes « sans filtre » grossit.
+
+**Fenêtre côté client** : `GetiAlerts` ne rend que le bouton ; la fenêtre
+(`GetiAlertsDialog`, formulaire, liste, confirmation) est un morceau chargé au
+premier clic, au survol ou au focus du bouton (`onceLoader`, un échec se retente
+et se dit par un toast). La liste des alertes du compte est lue côté serveur au
+rendu de la page, en parallèle de la liste d'annonces pour la session.
+
+### Durée de garde, effacement, export
+
+- Une alerte vit jusqu'à sa suppression par le compte ; la pause la garde sans
+  prévenir. Pas d'expiration automatique : elle ne coûte rien tant qu'aucune
+  annonce n'y correspond, et son propriétaire la voit dans sa liste.
+- Les traces `bg_geti_alert_hits` partent avec l'annonce (clé étrangère) ou
+  avec l'alerte, et sont purgées au plus tard au bout de 15 jours par
+  l'horloge `geti-posts-purge` (`purgeGetiAlertHits`, par lots de 5 000 lignes,
+  100 passages au plus par heure). Chaque étape du
+  passage horaire (`runGetiPostsPurge` : annonces, traces, réanalyse) a sa
+  garde : une panne de l'une ne bloque pas les autres, la première erreur est
+  signalée par l'horloge.
+- **Effacement du compte** : l'anonymisation garde la ligne `bg_users`, la
+  cascade ne joue donc pas — `anonymizeAccount` appelle
+  `deleteGetiAlertsOfUser` (traces puis alertes, chaque instruction avec sa
+  garde de table absente).
+- **Export des données** : `getiAlerts` dans `PersonalDataExport` — tout ce
+  que la ligne garde (dont `lastNotifiedAt`) et les annonces déjà signalées
+  (`reportedPosts` : identifiant du message, date de la trace).
+- Mentions : registre T22 (et sous-finalité de T12, message remis cité à T08),
+  politique et conditions du bot (`bot-legal-content.ts`, messages remis), entrée
+  `2026-11-alertes-d-annonces-geti` de `PRIVACY_CHANGES` (FR et EN),
+  `/rgpd#alertes-geti` (FR et EN).
+
+### Interface (`components/geti/GetiAlerts.tsx`, fenêtre `GetiAlertsDialog.tsx`)
+
+Bouton « Créer une alerte » dans l'en-tête de la catégorie, avec son
+`InfoHint`. Sa fenêtre (portée dans `body`, `useDialogBehavior`) montre, pour un
+compte connecté : ce que l'alerte gardera (catégorie et nombre de filtres), un
+nom facultatif, puis « Mes alertes (n/10) » — état, lien vers la recherche,
+« Mettre en pause » / « Relancer », « Renommer », « Supprimer »
+(`ConfirmActionDialog`). Les alertes du compte sont lues par le serveur au rendu
+de la page. Succès et refus en notification (`useToast`) ; un nom refusé est
+aussi rattaché à son champ (`useFieldErrors`). Boutons d'envoi en
+`BusyButton`. Textes : `alerts` de `messages/<langue>/geti.json`.
+
+### Tests (lot 5)
+
+`tests/lib/shared/geti/alerts.test.ts`, `tests/lib/server/geti/alerts.test.ts`,
+`tests/app/api/geti/alerts-routes.test.ts`,
+`tests/lib/shared/geti-alert-messages.test.ts`, `tests/app/geti-alerts.test.tsx`,
+`tests/lib/server/account-erasure-geti-alerts.test.ts`, `e2e/geti-info.spec.ts` ;
+le seed (`createGetiAlerts`) joue la création, le doublon, la pause et la passe
+d'alertes sur la vraie base, sans rien envoyer.

@@ -9,6 +9,7 @@ import { listOwnMapEntries } from "@/lib/server/match-map-entries";
 import { listTermsAcceptances } from "@/lib/server/terms-acceptance";
 import { listReportsByAuthor } from "@/lib/server/content-reports";
 import { exportPushData } from "@/lib/server/push-subscriptions";
+import { exportGetiAlerts } from "@/lib/server/geti/alerts";
 import { listOwnSuspensions } from "@/lib/server/account-suspensions";
 import type { PersonalDataExport } from "@/lib/shared/types";
 import { getFullProfile } from "./full-profile";
@@ -207,6 +208,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     termsAcceptances: await listTermsAcceptances(userId),
     reports: await listReportsByAuthor(userId),
     pushNotifications: await exportPushData(userId),
+    getiAlerts: await exportGetiAlerts(userId),
     connectionLogs: await listOwnConnectionLogs(userId),
     mapEntries: await listOwnMapEntries(userId),
     liveAnnouncements: await listOwnLiveAnnouncements(userId),

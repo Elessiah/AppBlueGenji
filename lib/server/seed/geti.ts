@@ -7,7 +7,7 @@
  * vraie base.
  */
 
-import type { Pool } from "mysql2/promise";
+import type { Pool, RowDataPacket } from "mysql2/promise";
 import {
   deleteGetiPosts,
   listGetiPosts,
@@ -17,7 +17,15 @@ import {
 } from "../geti/posts";
 import { liftGetiObjection, recordGetiObjection } from "../geti/objections";
 import { parsePushedPost, type GetiPushedPost } from "../geti/wire";
-import { GETI_CATEGORIES, GETI_CHANNEL_IDS, type GetiCategory } from "@/lib/shared/geti";
+import {
+  createGetiAlert,
+  listGetiAlerts,
+  notifyGetiAlerts,
+  purgeGetiAlertHits,
+  updateGetiAlert,
+} from "../geti/alerts";
+import { GETI_ALERT_ERRORS } from "@/lib/shared/geti/alerts";
+import { GETI_CATEGORIES, GETI_CHANNEL_IDS, parseGetiPost, type GetiCategory } from "@/lib/shared/geti";
 import { GETI_BOT_USER_ID, getiRetentionMs } from "@/lib/shared/geti/ingest";
 
 /** Identifiants de message factices : `1000000000000009NN`, hors de toute plage réelle des six salons (effacés par `cleanup.ts`). */
@@ -200,6 +208,60 @@ function pushed(body: Record<string, unknown>): GetiPushedPost {
   const post = parsePushedPost(body);
   if (!post) throw new Error("annonce GETI du seed illisible");
   return post;
+}
+
+/**
+ * Deux alertes du compte donné, et la passe d'alertes jouée sur la vraie base
+ * (trace `INSERT IGNORE`, réservation du délai) — sans rien envoyer : l'envoi
+ * est remplacé, ni push ni message privé ne partent du seed.
+ */
+export async function createGetiAlerts(db: Pool, userId: number): Promise<void> {
+  console.log("🔔 Création des alertes GETI...");
+  const now = Date.now();
+  const named = await createGetiAlert(userId, { category: "lfp", search: "?role=tank&reg=eu", name: "Test - Tank EU" });
+  const unnamed = await createGetiAlert(userId, { category: "lft", search: "", name: null });
+  const duplicate = await createGetiAlert(userId, { category: "lfp", search: "?reg=eu&role=tank", name: "Test - doublon" });
+  if (typeof named === "string" || typeof unnamed === "string" || duplicate !== GETI_ALERT_ERRORS.duplicate) {
+    throw new Error(`alertes GETI : création inattendue (${String(named)}, ${String(unnamed)}, ${String(duplicate)})`);
+  }
+  const paused = await updateGetiAlert(userId, unnamed.id, { paused: true });
+  if (typeof paused === "string" || !paused.paused) throw new Error("alertes GETI : mise en pause refusée");
+
+  // Une annonce récente qui correspond à l'alerte nommée : vue une fois, pas deux ; l'alerte en pause ne voit rien.
+  const fresh = pushed(wirePost({ category: "lfp", ageHours: 0, author: "test_geti_alerte", text: "LFP — équipe Test Alerte cherche un main tank Diamant, EU." }, 93, now));
+  const lft = pushed(wirePost({ category: "lft", ageHours: 0, author: "test_geti_alerte", text: "LFT — support Master cherche une équipe, EU." }, 94, now));
+  // Enregistrées d'abord, comme par la route : la passe juge la version gardée en base.
+  await upsertGetiPosts(db, [fresh, lft], now);
+  const posts = [fresh, lft].map((post) => ({
+    messageId: post.messageId,
+    category: post.category,
+    parsed: parseGetiPost(post.raw),
+    postedAt: post.postedAt,
+    editedAt: post.editedAt,
+  }));
+  const sent: number[] = [];
+  const send = async (alert: { id: number }) => {
+    sent.push(alert.id);
+    return true;
+  };
+  const first = await notifyGetiAlerts(posts, now, db, send);
+  const again = await notifyGetiAlerts(posts, now, db, send);
+  const purged = await purgeGetiAlertHits(db, now);
+  const kept = await listGetiAlerts(userId, db);
+  // Annonces de la passe retirées : la matrice d'annonces reste celle de `createGetiPosts`.
+  await deleteGetiPosts(db, [fresh.messageId, lft.messageId]);
+  // Les traces partent avec l'annonce (clé étrangère `ON DELETE CASCADE`) : rien n'en reste (T21).
+  const [leftover] = await db.execute<RowDataPacket[]>(
+    `SELECT COUNT(*) AS n FROM bg_geti_alert_hits WHERE message_id IN (?, ?)`,
+    [fresh.messageId, lft.messageId],
+  );
+  if (Number(leftover[0]?.n ?? 0) !== 0) throw new Error("alertes GETI : traces restées après le retrait de l'annonce");
+  if (first.matched !== 1 || first.notified !== 1 || again.matched !== 0 || sent.join() !== String(named.id) || purged !== 0 || kept.length !== 2) {
+    throw new Error(
+      `alertes GETI : bilan inattendu (${first.matched} touchée(s), ${first.notified} prévenu(s), puis ${again.matched} ; ${purged} trace(s) purgée(s), ${kept.length} alerte(s))`,
+    );
+  }
+  console.log(`  ✓ ${kept.length} alertes créées (1 active, 1 en pause), 1 annonce signalée une seule fois`);
 }
 
 export async function createGetiPosts(db: Pool): Promise<void> {

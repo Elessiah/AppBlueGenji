@@ -285,5 +285,10 @@
     "bodyReminder": "{pairing} ({tournament}): deadline {deadline}, otherwise double forfeit.",
     "titleForfeit": "Double forfeit",
     "bodyForfeit": "{pairing} ({tournament}): no time agreed before the deadline ({deadline})."
+  },
+  "getiAlert": {
+    "title": "New GETI post",
+    "body": "It matches your alert “{alert}”.",
+    "dm": "New GETI post matching your alert {alert}: {link}"
   }
 }

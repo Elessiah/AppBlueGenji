@@ -469,6 +469,26 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Oppositions GETI (`lib/server/geti/objections.ts`) : retirer et écarter les
     // annonces d'un auteur lit `author_id` ; déjà là (`ER_DUP_KEYNAME`) : toléré.
     `ALTER TABLE bg_geti_posts ADD INDEX idx_bg_geti_posts_author (author_id)`,
+    // Traces d'alertes GETI (`lib/server/geti/alerts.ts`) : elles partent avec
+    // l'annonce (registre T21 : rien n'est gardé d'une annonce retirée). Sur une
+    // base de développement qui a déjà la table sans la clé : les traces sans
+    // annonce partent d'abord (sinon la clé est refusée), puis la clé est posée.
+    // Joué seulement tant que la clé manque (`foreignKeyMissing`) : rejouer le
+    // `DELETE` parcourrait toute la table à chaque démarrage (sans rien retirer
+    // une fois la clé posée) — l'`ADD CONSTRAINT` rejoué, lui, serait toléré
+    // (clé en double, `isSchemaNoOpError`). Une base neuve l'a par son
+    // `CREATE TABLE`. À retirer une fois jouée partout.
+    {
+      when: foreignKeyMissing("bg_geti_alert_hits", "fk_bg_geti_alert_hits_post"),
+      steps: [
+        `DELETE h FROM bg_geti_alert_hits h
+           LEFT JOIN bg_geti_posts p ON p.message_id = h.message_id
+          WHERE p.id IS NULL`,
+        `ALTER TABLE bg_geti_alert_hits
+           ADD CONSTRAINT fk_bg_geti_alert_hits_post FOREIGN KEY (message_id)
+             REFERENCES bg_geti_posts(message_id) ON DELETE CASCADE`,
+      ],
+    },
     // Map de départage d'un tour de play-offs à format défini (`ROUND_MAPS.md`).
     `ALTER TABLE bg_tournament_round_maps ADD COLUMN tiebreak_map VARCHAR(64) NULL AFTER slots_json`,
     // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : option éteinte par
@@ -774,3 +794,11 @@ const columnTypeContains = (table: string, column: string, fragment: string) =>
   `SELECT 1 FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '${table}' AND COLUMN_NAME = '${column}'
       AND COLUMN_TYPE ${fragment}`;
+
+/** Lecture `when` : la table `table` existe et n'a pas (encore) la clé étrangère `constraint`. */
+const foreignKeyMissing = (table: string, constraint: string) =>
+  `SELECT 1 FROM information_schema.TABLES t
+    WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_NAME = '${table}'
+      AND NOT EXISTS (SELECT 1 FROM information_schema.REFERENTIAL_CONSTRAINTS r
+        WHERE r.CONSTRAINT_SCHEMA = DATABASE() AND r.TABLE_NAME = '${table}'
+          AND r.CONSTRAINT_NAME = '${constraint}')`;

@@ -63,6 +63,37 @@ test.describe("GETI Info — page publique", () => {
     await expect(trigger).toBeFocused();
   });
 
+  test("« Créer une alerte » sans session mène à la connexion, refermée par Échap", async ({ page }) => {
+    await page.goto("/geti-info/lfp?role=tank");
+    const trigger = page.getByRole("button", { name: "Créer une alerte" });
+    const dialog = page.getByRole("dialog", { name: "Alertes d'annonces" });
+    // Un clic parti avant l'hydratation est perdu : on le rejoue jusqu'à l'ouverture.
+    await expect(async () => {
+      await trigger.click();
+      await expect(dialog).toBeVisible({ timeout: 2_000 });
+    }).toPass();
+    const login = dialog.getByRole("link", { name: "Se connecter" });
+    // Sous le bypass DEV_AUTH, un compte est connecté : la fenêtre montre le formulaire.
+    test.skip((await login.count()) === 0, "Session active (bypass DEV_AUTH) : le parcours sans session ne joue pas."); // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
+    await expect(login).toHaveAttribute("href", "/connexion?redirect=%2Fgeti-info%2Flfp%3Frole%3Dtank");
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
+  test("« Create an alert » en anglais", async ({ page }) => {
+    await page.goto("/en/geti-info/lft");
+    const dialog = page.getByRole("dialog", { name: "Post alerts" });
+    // L'annonce de recrutement, en anglais, se referme par « Later » (le traitement commun ne connaît que « Plus tard »).
+    const later = page.getByRole("button", { name: "Later", exact: true });
+    await expect(async () => {
+      if (await later.isVisible()) await later.click({ timeout: 1_000 });
+      await page.getByRole("button", { name: "Create an alert" }).click({ timeout: 2_000 });
+      await expect(dialog).toBeVisible({ timeout: 2_000 });
+    }).toPass();
+  });
+
   test("un filtre coché au clavier s'écrit dans l'adresse, et se réinitialise", async ({ page }) => {
     await page.goto("/geti-info/lfp");
     await skipWithoutList(page);

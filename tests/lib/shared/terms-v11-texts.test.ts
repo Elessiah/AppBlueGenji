@@ -241,8 +241,8 @@ describe("entrée PRIVACY_CHANGES de la version 11", () => {
   it("privacyChange_termsV11_isLastDatedWithTermsForAllAccounts", () => {
     // Suivie, le même jour, du rectificatif de la reprise d'équipe (#595), des avis d'équipe (TEAMS-LOT) et de leur réglage (TEAM-DM-OPTOUT).
     // Puis l'avis d'exclusion du bot (même jour), le rectificatif de la marque de session (EF-63, plus tard) puis les trois entrées d'EF-65 (2026-11-18), puis la mesure détaillée (STATS-PAGE) et l'empreinte perceptuelle (EF-72).
-    expect(PRIVACY_CHANGES.at(-25)?.id).toBe(V11_ID);
-    expect(PRIVACY_CHANGES.at(-21)?.publishedAt).toBe(TERMS_UPDATED_AT);
+    expect(PRIVACY_CHANGES.at(-26)?.id).toBe(V11_ID);
+    expect(PRIVACY_CHANGES.at(-22)?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr?.audience).toBeUndefined();
   });
@@ -268,15 +268,15 @@ describe("entrée PRIVACY_CHANGES de la version 11", () => {
 });
 
 describe("documents du bot — D47 et reprise d'équipe", () => {
-  it("botDocs_bothDocuments_bothDated26November2026FrAndEn", () => {
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["26 novembre 2026", "26 November 2026"]);
+  it("botDocs_bothDocuments_bothDated28November2026FrAndEn", () => {
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["28 novembre 2026", "28 November 2026"]);
     expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["28 novembre 2026", "28 November 2026"]);
   });
 
   // D4 (#595) : la reprise ne cite plus « un admin » — la politique du bot ne le dit plus.
   it("botPrivacyPolicy_teamTakeover_namesTheTeamOnlyFrAndEn", () => {
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("qui ne nomment que l'équipe, jamais personne ; information sur les données");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("which only name the team, never anyone; data-protection notice");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("qui ne nomment que l'équipe, jamais personne ; alerte d'annonces GETI");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("which only name the team, never anyone; GETI post alert");
     expect(JSON.stringify(PRIVACY_POLICY.fr)).not.toContain("un admin");
     expect(JSON.stringify(PRIVACY_POLICY.en)).not.toContain("an admin");
   });
@@ -413,8 +413,8 @@ describe("revue juridique v11 — textes alignés", () => {
 
   // D4 (#595) : la reprise ne cite plus « un admin ».
   it("rgpdPages_pushParagraph_takeoverNamesTheTeamOnlyFrAndEn", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain("(le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui");
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("(the team&apos;s name only, never who invites, offers or transfers), and of what");
+    expect(readSource("app/rgpd/page.tsx")).toContain("(le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), d&apos;une nouvelle annonce GETI");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("(the team&apos;s name only, never who invites, offers or transfers), of a new GETI post");
     expect(readSource("app/rgpd/page.tsx")).not.toContain("« un admin »");
     expect(readSource("app/rgpd/RgpdEn.tsx")).not.toContain("“an admin”");
   });

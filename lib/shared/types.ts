@@ -1281,6 +1281,21 @@ export type PersonalDataExport = {
     createdAt: string;
   }[];
   /**
+   * Alertes d'annonces GETI : catégorie, filtres gardés (forme de l'adresse),
+   * nom, pause, dates de création et de dernière notification, et les annonces
+   * déjà signalées (traces gardées 15 jours).
+   */
+  getiAlerts: {
+    category: string;
+    name: string | null;
+    search: string;
+    paused: boolean;
+    createdAt: string;
+    lastNotifiedAt: string | null;
+    /** Annonces déjà signalées par l'alerte : identifiant du message Discord, date de la trace. */
+    reportedPosts: { messageId: string; createdAt: string }[];
+  }[];
+  /**
    * Notifications push (`lib/shared/push-notifications.ts`) : les appareils
    * abonnés — **tout** ce que la ligne garde, clés comprises — et les sujets
    * coupés par le compte.

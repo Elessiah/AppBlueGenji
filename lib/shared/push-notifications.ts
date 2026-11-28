@@ -80,6 +80,11 @@ export const PUSH_TOPICS = {
     description: "Un match que tu mènes (capitaine, manager, propriétaire, ou joueur d'un tournoi individuel) a reçu du staff une date butoir pour convenir d'un horaire : l'annonce, des rappels 24 h et 3 h avant s'il n'a toujours pas d'horaire, puis le double forfait qui peut suivre. Coupe aussi le message privé Discord.",
     audience: null,
   },
+  GETI_ALERT: {
+    label: "Alertes d'annonces GETI",
+    description: "Une nouvelle annonce GETI correspond à l'une de tes alertes (page « Annonces GETI »). Coupe aussi le message privé Discord.",
+    audience: null,
+  },
   TEAM_JOIN_REQUEST: {
     label: "Demandes d'adhésion",
     description: "Un joueur demande à rejoindre une équipe que tu gères.",
