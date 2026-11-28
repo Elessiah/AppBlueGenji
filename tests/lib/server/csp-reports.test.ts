@@ -52,7 +52,7 @@ describe("blockedOriginOf", () => {
   });
 
   it("borne la longueur d'une origine fabriquée", () => {
-    const origin = blockedOriginOf(`https://${"a".repeat(30_000)}.invalid/x`);
+    const origin = blockedOriginOf(`https://${"ab.".repeat(10_000)}invalid/x`);
     expect(origin).toHaveLength(CSP_FIELD_MAX_LENGTH);
   });
 
@@ -471,7 +471,7 @@ describe("sourceOriginOf", () => {
   });
 
   it("borne la longueur d'une origine fabriquée", () => {
-    const origin = sourceOriginOf(`https://${"a".repeat(30_000)}.invalid/x.js`);
+    const origin = sourceOriginOf(`https://${"ab.".repeat(10_000)}invalid/x.js`);
     expect(origin).toHaveLength(CSP_FIELD_MAX_LENGTH);
   });
 
@@ -661,14 +661,14 @@ describe("admitLogLine", () => {
   it("annonce les causes tues à l'ouverture de la fenêtre suivante", () => {
     const budget = fresh();
     for (let i = 0; i < CSP_MAX_LOG_LINES_PER_WINDOW + 3; i++) admitLogLine(budget, 10);
-    expect(admitLogLine(budget, 10 + CSP_LOG_BUDGET_WINDOW_MS)).toEqual({ allowed: true, announce: 3 });
+    expect(admitLogLine(budget, 10 + CSP_LOG_BUDGET_WINDOW_MS)).toEqual({ allowed: true, announce: 3, announceAtLeast: false });
     expect(budget.written).toBe(1);
   });
 
   it("ne réannonce rien dans une fenêtre sans perte", () => {
     const budget = fresh();
     admitLogLine(budget, 0);
-    expect(admitLogLine(budget, CSP_LOG_BUDGET_WINDOW_MS)).toEqual({ allowed: true, announce: 0 });
+    expect(admitLogLine(budget, CSP_LOG_BUDGET_WINDOW_MS)).toEqual({ allowed: true, announce: 0, announceAtLeast: false });
   });
 });
 
@@ -780,19 +780,19 @@ describe("documentPathOf : texte de l'appelant", () => {
 
 describe("origines en adresse IP ou locales", () => {
   it("tait une adresse IPv4", () => {
-    expect(blockedOriginOf("http://192.168.1.4:8080/x.js")).toBe(CSP_ORIGIN_IP);
+    expect(blockedOriginOf("http://192.168.1.4:8080/x.js")).toBe(`${CSP_ORIGIN_IP}:8080`);
   });
 
   it("tait une adresse IPv6", () => {
-    expect(blockedOriginOf("http://[::1]:52130/x.js")).toBe(CSP_ORIGIN_IP);
+    expect(blockedOriginOf("http://[::1]:52130/x.js")).toBe(`${CSP_ORIGIN_IP}:52130`);
   });
 
   it("tait l'adresse de bouclage d'un script injecté", () => {
-    expect(sourceOriginOf("http://127.0.0.1:52130/inject.js")).toBe(CSP_ORIGIN_IP);
+    expect(sourceOriginOf("http://127.0.0.1:52130/inject.js")).toBe(`${CSP_ORIGIN_IP}:52130`);
   });
 
   it("réduit localhost et un hôte .local au mot-clé local", () => {
-    expect(blockedOriginOf("http://localhost:3000/a")).toBe(CSP_ORIGIN_LOCAL);
+    expect(blockedOriginOf("http://localhost:3000/a")).toBe(`${CSP_ORIGIN_LOCAL}:3000`);
     expect(sourceOriginOf("https://imprimante.local/a.js")).toBe(CSP_ORIGIN_LOCAL);
   });
 });
@@ -840,5 +840,91 @@ describe("compte des causes tues : suivi plein", () => {
     logCspViolations([], 7 + CSP_LOG_BUDGET_WINDOW_MS);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain(`au moins ${CSP_MAX_TRACKED_CAUSES} cause(s) non journalisée(s)`);
+  });
+});
+
+describe("origines masquées : formes détournées", () => {
+  it("lit l'hôte d'une adresse blob: sur l'origine qu'elle enveloppe", () => {
+    expect(blockedOriginOf("blob:http://192.168.1.5:8080/uuid")).toBe(`${CSP_ORIGIN_IP}:8080`);
+  });
+
+  it("masque l'hôte local d'une adresse blob:", () => {
+    expect(sourceOriginOf("blob:http://johns-macbook.local/x")).toBe(CSP_ORIGIN_LOCAL);
+  });
+
+  it("masque un hôte local écrit avec un point final", () => {
+    expect(sourceOriginOf("http://johns-macbook.local./inject.js")).toBe(CSP_ORIGIN_LOCAL);
+    expect(blockedOriginOf("http://localhost./a")).toBe(CSP_ORIGIN_LOCAL);
+  });
+
+  it("masque un nom de machine sans point en gardant le port", () => {
+    expect(sourceOriginOf("http://desktop-kerya:8080/x.js")).toBe(`${CSP_ORIGIN_LOCAL}:8080`);
+  });
+
+  it("masque les suffixes de réseau privé", () => {
+    expect(sourceOriginOf("http://nas.lan/a.js")).toBe(CSP_ORIGIN_LOCAL);
+    expect(sourceOriginOf("https://proxy.corp.internal/a.js")).toBe(CSP_ORIGIN_LOCAL);
+    expect(sourceOriginOf("http://box.home.arpa/a.js")).toBe(CSP_ORIGIN_LOCAL);
+  });
+
+  it("garde deux services locaux sur deux ports distincts", () => {
+    expect(blockedOriginOf("http://localhost:3000/a")).toBe(`${CSP_ORIGIN_LOCAL}:3000`);
+    expect(blockedOriginOf("http://localhost:8888/a")).toBe(`${CSP_ORIGIN_LOCAL}:8888`);
+  });
+
+  it("garde l'origine d'un hôte public écrit avec un point final", () => {
+    expect(blockedOriginOf("https://exemple.fr./a")).toBe("https://exemple.fr");
+  });
+});
+
+describe("logSafe : classes Unicode", () => {
+  it("remplace les caractères de mise en forme et ignorables qu'une liste oubliait", () => {
+    expect(logSafe("a⁥b⁪c￰d\u{1BCA0}e\u{1D173}f\u{E0080}g")).toBe("a?b?c?d?e?f?g");
+  });
+
+  it("garde les lettres accentuées et un émoji visible", () => {
+    expect(logSafe("/équipe-é\u{1F600}")).toBe("/équipe-é\u{1F600}");
+  });
+});
+
+describe("dédoublonnage : petit recul de l'horloge", () => {
+  it("tait encore une cause après un recul de quelques millisecondes", () => {
+    const tracker = new Map<string, { last: number; suppressed: number }>();
+    admitViolation(tracker, "c", 10 * CSP_DEDUPE_WINDOW_MS);
+    expect(admitViolation(tracker, "c", 10 * CSP_DEDUPE_WINDOW_MS - 3)).toBeNull();
+  });
+});
+
+describe("compte des causes tues : exact ou minimum", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    resetCspLogState();
+  });
+
+  it("annonce un compte exact sans suivi des causes, même au-delà de la borne", () => {
+    const budget = { windowStart: 0, written: CSP_MAX_LOG_LINES_PER_WINDOW, dropped: CSP_MAX_TRACKED_CAUSES + 50 };
+    expect(admitLogLine(budget, CSP_LOG_BUDGET_WINDOW_MS)).toEqual({
+      allowed: true,
+      announce: CSP_MAX_TRACKED_CAUSES + 50,
+      announceAtLeast: false,
+    });
+  });
+
+  it("annonce un minimum quand une cause inconnue tombe sur un suivi plein, puis repart exact", () => {
+    const droppedCauses = new Set(Array.from({ length: CSP_MAX_TRACKED_CAUSES }, (_, i) => `vue${i}`));
+    const budget = { windowStart: 0, written: CSP_MAX_LOG_LINES_PER_WINDOW, dropped: CSP_MAX_TRACKED_CAUSES, droppedCauses };
+    admitLogLine(budget, 0, "inconnue");
+    expect(admitLogLine(budget, CSP_LOG_BUDGET_WINDOW_MS).announceAtLeast).toBe(true);
+    expect(admitLogLine(budget, 2 * CSP_LOG_BUDGET_WINDOW_MS).announceAtLeast).toBe(false);
+  });
+
+  it("annonce un compte exact quand le suivi se remplit sans cause de plus", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const burst = Array.from({ length: CSP_MAX_LOG_LINES_PER_WINDOW + CSP_MAX_TRACKED_CAUSES }, (_, i) => cause(i, "juste"));
+    logCspViolations(burst, 9);
+    warn.mockClear();
+    logCspViolations([], 9 + CSP_LOG_BUDGET_WINDOW_MS);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain(`] ${CSP_MAX_TRACKED_CAUSES} cause(s) non journalisée(s)`);
   });
 });

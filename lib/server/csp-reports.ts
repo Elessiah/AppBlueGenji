@@ -132,19 +132,19 @@ const DIRECTIVE = /^[a-z][a-z-]{0,39}$/;
 
 /**
  * Caractères qu'une ligne de journal ne doit jamais porter tels quels :
- * contrôles C0 et C1 (dont le saut de ligne, qui fabriquerait une fausse
- * ligne `[auth] …` dans pm2), séparateurs de ligne Unicode, marques
- * bidirectionnelles (dont U+061C), caractères invisibles ou de largeur nulle
- * (U+00AD, U+034F, U+115F, U+1160, U+17B4, U+17B5, U+180E, U+200B–U+200F,
- * U+2060–U+2064, U+3164, U+FEFF, U+FFA0, U+FFF9–U+FFFB, les sélecteurs de
- * variante (U+FE00–U+FE0F et suivants, propriété Unicode) et les
- * étiquettes U+E0000–U+E007F), qui maquillent le texte, et
- * moitiés de paire UTF-16 orphelines, qui rendraient la ligne invalide en
- * UTF-8. Le drapeau `u` lit une paire complète comme un seul caractère : seule
- * une moitié orpheline tombe dans la plage des demi-codets.
+ * contrôles C0 et C1 (`Cc`, dont le saut de ligne, qui fabriquerait une
+ * fausse ligne `[auth] …` dans pm2), séparateurs de ligne et de paragraphe
+ * Unicode (`Zl`, `Zp`), caractères de mise en forme (`Cf` : marques
+ * bidirectionnelles, largeur nulle, trait d'union conditionnel, étiquettes
+ * U+E0000–U+E007F…) et tout caractère ignorable par défaut
+ * (`Default_Ignorable_Code_Point` : remplissages hangul, sélecteurs de
+ * variante, plages réservées…), qui maquillent le texte, et moitiés de paire
+ * UTF-16 orphelines, qui rendraient la ligne invalide en UTF-8. Des classes
+ * Unicode plutôt qu'une liste tenue à la main : une liste en oublie toujours.
+ * Le drapeau `u` lit une paire complète comme un seul caractère : seule une
+ * moitié orpheline tombe dans la plage des demi-codets.
  */
-const UNSAFE_LOG_CHARS =
-  /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u115f\u1160\u180e\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff\uffa0\ufff9-\ufffb\u{e0000}-\u{e007f}\ud800-\udfff]|\u034f|\u17b4|\u17b5|\p{Variation_Selector}/gu;
+const UNSAFE_LOG_CHARS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}\ud800-\udfff]/gu;
 
 /**
  * Rend un champ sûr pour une ligne de journal : caractères dangereux remplacés
@@ -157,7 +157,8 @@ const UNSAFE_LOG_CHARS =
  * @returns Le texte, sur une seule ligne et borné.
  */
 export function logSafe(value: string): string {
-  // Le remplacement est d'un codet pour un codet : la longueur ne change pas.
+  // Le remplacement n'allonge jamais le texte (un caractère, d'un ou deux
+  // codets, devient un `?`).
   // Seule la tête gardée est donc balayée, pas les 32 Ko d'un champ fabriqué ;
   // l'empreinte, elle, porte sur la valeur entière.
   if (value.length <= CSP_FIELD_MAX_LENGTH) return value.replace(UNSAFE_LOG_CHARS, "?");
@@ -168,23 +169,39 @@ export function logSafe(value: string): string {
   return `${head.replace(UNSAFE_LOG_CHARS, "?")}\u2026#${digest}`;
 }
 
-/** Origine rendue pour un hôte écrit en adresse IP (v4 ou v6). */
+/** Origine rendue pour un hôte écrit en adresse IP (v4 ou v6), suivie de `:<port>` s'il est écrit. */
 export const CSP_ORIGIN_IP = "adresse-ip";
 
-/** Origine rendue pour un hôte local (`localhost`, `*.localhost`, `*.local`). */
+/**
+ * Origine rendue pour un hôte local ou de réseau privé (`localhost`, nom sans
+ * point, suffixes de {@link LOCAL_HOST_SUFFIXES}), suivie de `:<port>` s'il est écrit.
+ */
 export const CSP_ORIGIN_LOCAL = "local";
+
+/** Suffixes d'hôtes de réseau local ou privé, qui portent souvent le nom d'une machine. */
+const LOCAL_HOST_SUFFIXES = [".localhost", ".local", ".lan", ".home", ".internal", ".intranet", ".corp", ".home.arpa"];
 
 /**
  * Origine d'une URL déjà analysée, sauf pour un hôte en adresse IP ou local :
  * un antivirus ou un proxy qui injecte son script le sert souvent de
- * `127.0.0.1:<port>` ou de l'adresse du réseau du visiteur, et la ligne
- * porterait alors une adresse IP. Le mot-clé suffit au tri.
+ * `127.0.0.1:<port>`, de l'adresse du réseau du visiteur ou du nom de sa
+ * machine, que la ligne porterait alors. Le mot-clé suffit au tri ; le port
+ * reste, pour que deux services locaux (le site en dev sur `:3000`, un
+ * injecteur sur un autre port) restent deux causes.
+ *
+ * L'hôte se lit sur l'**origine** : celle d'une adresse `blob:` est celle de
+ * l'adresse qu'elle enveloppe, alors que son `hostname` est vide.
  */
 function safeOrigin(url: URL): string {
-  const host = url.hostname.toLowerCase();
-  if (host.startsWith("[") || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return CSP_ORIGIN_IP;
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return CSP_ORIGIN_LOCAL;
-  return logSafe(url.origin);
+  const origin = new URL(url.origin);
+  // Le point final d'un nom absolu (`machine.local.`) ne change pas l'hôte.
+  const host = origin.hostname.toLowerCase().replace(/\.+$/, "");
+  const port = origin.port ? `:${origin.port}` : "";
+  if (host.startsWith("[") || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return `${CSP_ORIGIN_IP}${port}`;
+  if (host === "localhost" || !host.includes(".") || LOCAL_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))) {
+    return `${CSP_ORIGIN_LOCAL}${port}`;
+  }
+  return logSafe(`${origin.protocol}//${host}${port}`);
 }
 
 /**
@@ -477,6 +494,16 @@ export function violationCause(violation: CspViolation): string {
 type Tracker = Map<string, { last: number; suppressed: number }>;
 
 /**
+ * La dernière ligne de la cause est-elle assez proche pour taire celle-ci ?
+ * L'écart se prend en valeur absolue : une horloge qui recule de quelques
+ * millisecondes (correction NTP) ne relâche pas toutes les causes, et un
+ * grand recul ne prolonge pas le silence au-delà d'une fenêtre.
+ */
+function isWithinDedupeWindow(last: number, now: number): boolean {
+  return Math.abs(now - last) < CSP_DEDUPE_WINDOW_MS;
+}
+
+/**
  * Décide si une violation mérite une ligne, et compte celles qu'on tait.
  *
  * Extrait de la journalisation pour être testable sans console ni horloge
@@ -489,8 +516,7 @@ type Tracker = Map<string, { last: number; suppressed: number }>;
  */
 export function admitViolation(tracker: Tracker, cause: string, now: number): number | null {
   const entry = tracker.get(cause);
-  // Une horloge qui recule (correction NTP) ne prolonge pas le silence.
-  if (entry && now >= entry.last && now - entry.last < CSP_DEDUPE_WINDOW_MS) {
+  if (entry && isWithinDedupeWindow(entry.last, now)) {
     entry.suppressed += 1;
     return null;
   }
@@ -524,25 +550,37 @@ export interface LogBudget {
   dropped: number;
   /** Causes déjà comptées dans `dropped`, bornée à {@link CSP_MAX_TRACKED_CAUSES}. */
   droppedCauses?: Set<string>;
+  /** Une cause inconnue a été tue, ensemble plein : `dropped` n'est qu'un minimum. */
+  droppedSaturated?: boolean;
+}
+
+/** Causes tues pendant une fenêtre close, à annoncer. */
+interface DroppedAnnounce {
+  count: number;
+  /** Le compte n'est qu'un minimum (ensemble des causes tues plein). */
+  atLeast: boolean;
 }
 
 /**
  * Ouvre une nouvelle fenêtre si l'ancienne est close, et rend le nombre de
  * causes tues pendant elle, à annoncer.
  */
-function rollWindow(budget: LogBudget, now: number): number {
-  if (now - budget.windowStart < CSP_LOG_BUDGET_WINDOW_MS && now >= budget.windowStart) return 0;
-  const announce = budget.dropped;
+function rollWindow(budget: LogBudget, now: number): DroppedAnnounce {
+  if (now - budget.windowStart < CSP_LOG_BUDGET_WINDOW_MS && now >= budget.windowStart) {
+    return { count: 0, atLeast: false };
+  }
+  const announce = { count: budget.dropped, atLeast: budget.droppedSaturated === true };
   budget.windowStart = now;
   budget.written = 0;
   budget.dropped = 0;
+  budget.droppedSaturated = false;
   budget.droppedCauses?.clear();
   return announce;
 }
 
-function announceDropped(count: number): void {
+function announceDropped({ count, atLeast }: DroppedAnnounce): void {
   if (count > 0) {
-    const amount = count >= CSP_MAX_TRACKED_CAUSES ? `au moins ${count}` : `${count}`;
+    const amount = atLeast ? `au moins ${count}` : `${count}`;
     console.warn(`[csp] ${amount} cause(s) non journalisée(s) (plafond de ${CSP_MAX_LOG_LINES_PER_WINDOW} lignes par minute)`);
   }
 }
@@ -554,24 +592,35 @@ function announceDropped(count: number): void {
  * @param now Horodatage courant.
  * @param cause Clé de la cause, pour ne compter qu'une fois une cause retentée.
  * @returns `allowed` : la ligne peut s'écrire ; `announce` : nombre de causes
- *   tues pendant la fenêtre qui vient de se clore, à annoncer avant la ligne.
+ *   tues pendant la fenêtre qui vient de se clore, à annoncer avant la ligne ;
+ *   `announceAtLeast` : ce nombre n'est qu'un minimum.
  */
-export function admitLogLine(budget: LogBudget, now: number, cause?: string): { allowed: boolean; announce: number } {
-  const announce = rollWindow(budget, now);
+export function admitLogLine(
+  budget: LogBudget,
+  now: number,
+  cause?: string,
+): { allowed: boolean; announce: number; announceAtLeast: boolean } {
+  const rolled = rollWindow(budget, now);
+  const announce = rolled.count;
+  const announceAtLeast = rolled.atLeast;
   if (budget.written >= CSP_MAX_LOG_LINES_PER_WINDOW) {
     const seen = budget.droppedCauses;
     if (cause === undefined || !seen) {
       budget.dropped += 1;
-    } else if (!seen.has(cause) && seen.size < CSP_MAX_TRACKED_CAUSES) {
-      // Ensemble plein : une cause inconnue peut être une cause déjà tue,
-      // retentée ; le compte s'arrête là et l'annonce dit « au moins ».
-      budget.dropped += 1;
-      seen.add(cause);
+    } else if (!seen.has(cause)) {
+      if (seen.size < CSP_MAX_TRACKED_CAUSES) {
+        budget.dropped += 1;
+        seen.add(cause);
+      } else {
+        // Ensemble plein : une cause inconnue peut être une cause déjà tue,
+        // retentée ; le compte s'arrête là et l'annonce dit « au moins ».
+        budget.droppedSaturated = true;
+      }
     }
-    return { allowed: false, announce };
+    return { allowed: false, announce, announceAtLeast };
   }
   budget.written += 1;
-  return { allowed: true, announce };
+  return { allowed: true, announce, announceAtLeast };
 }
 
 const tracker: Tracker = new Map();
@@ -583,6 +632,7 @@ export function resetCspLogState(): void {
   budget.windowStart = Number.NEGATIVE_INFINITY;
   budget.written = 0;
   budget.dropped = 0;
+  budget.droppedSaturated = false;
   budget.droppedCauses?.clear();
 }
 
@@ -605,14 +655,14 @@ export function logCspViolations(violations: CspViolation[], now: number = Date.
   for (const violation of violations) {
     const cause = violationCause(violation);
     const known = tracker.get(cause);
-    if (known && now >= known.last && now - known.last < CSP_DEDUPE_WINDOW_MS) {
+    if (known && isWithinDedupeWindow(known.last, now)) {
       known.suppressed += 1;
       continue;
     }
     // Le plafond se décide **avant** de toucher au suivi : une cause tue ne
     // doit ni évincer une cause réelle ni passer pour vue.
-    const { allowed, announce } = admitLogLine(budget, now, cause);
-    announceDropped(announce);
+    const { allowed, announce, announceAtLeast } = admitLogLine(budget, now, cause);
+    announceDropped({ count: announce, atLeast: announceAtLeast });
     if (!allowed) continue;
     const suppressed = admitViolation(tracker, cause, now) ?? 0;
     const repeated = suppressed > 0 ? ` (+${suppressed} identique(s) depuis)` : "";
