@@ -158,6 +158,29 @@ describe("parseCspReport", () => {
     ]);
   });
 
+  it("passe un effective-directive vide pour lire le violated-directive", () => {
+    // Le premier champ non nul ne suffit pas : vide, il taisait une vraie violation.
+    const violations = parseCspReport({
+      "csp-report": {
+        "effective-directive": "",
+        "violated-directive": "img-src 'self'",
+        "blocked-uri": "https://x.invalid/a.png",
+      },
+    });
+    expect(violations.map((v) => v.directive)).toEqual(["img-src"]);
+  });
+
+  it("passe un effectiveDirective mal typé pour lire le violatedDirective", () => {
+    const violations = parseCspReport([
+      { type: "csp-violation", body: { effectiveDirective: 42, violatedDirective: "connect-src", blockedURL: "data" } },
+    ]);
+    expect(violations.map((v) => v.directive)).toEqual(["connect-src"]);
+  });
+
+  it("écarte un rapport dont toutes les directives sont vides", () => {
+    expect(parseCspReport({ "csp-report": { "effective-directive": "  ", "violated-directive": "" } })).toEqual([]);
+  });
+
   it("écarte les rapports d'un autre type que csp-violation", () => {
     expect(parseCspReport([{ type: "deprecation", body: { effectiveDirective: "x" } }])).toEqual([]);
   });
@@ -407,6 +430,11 @@ describe("sourceOriginOf", () => {
     expect(sourceOriginOf("moz-extension://0d8e-uuid/inject.js")).toBe("moz-extension");
     expect(sourceOriginOf("safari-web-extension://ID/script.js")).toBe("safari-web-extension");
     expect(sourceOriginOf("Chrome-Extension://abc/x.js")).toBe("chrome-extension");
+  });
+
+  it("ramène l'adresse masquée par Safari d'un script d'extension à son schéma", () => {
+    expect(sourceOriginOf("webkit-masked-url://hidden/")).toBe("webkit-masked-url");
+    expect(sourceOriginOf("webkit-masked-url")).toBe("webkit-masked-url");
   });
 
   it("reconnaît le schéma seul, forme que Chrome envoie pour une extension", () => {

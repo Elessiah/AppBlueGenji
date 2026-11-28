@@ -166,9 +166,16 @@ const EXTENSION_SCHEMES = new Set([
   "safari-extension",
   "safari-web-extension",
   "ms-browser-extension",
+  // Safari masque l'adresse d'un script d'extension (`webkit-masked-url://hidden/`).
+  "webkit-masked-url",
 ]);
 
-/** Source rendue quand le rapport ne nomme aucun script. */
+/**
+ * Source rendue quand le rapport ne nomme aucun script : code évalué ou
+ * injecté, mais aussi chargement qu'aucun script n'a lancé (police ou image
+ * d'une feuille de style, préchargement, navigation). Seule, elle n'accuse
+ * donc ni le site ni un tiers : la directive et la ressource tranchent.
+ */
 export const CSP_SOURCE_NONE = "aucune";
 
 /**
@@ -213,9 +220,9 @@ function isScriptOnlyViolation(directive: string, blockedOrigin: string): boolea
  * application : `connect-src a refusé data sur /tournois/20` a ainsi fait
  * chercher un `fetch("data:…")` que le site ne contient pas. Un appel parti
  * d'un morceau du site nomme ce morceau, donc l'origine du site ; une
- * extension nomme son schéma ; un code évalué ou injecté en ligne n'en nomme
- * **aucun** (`"aucune"`), ce qui, sur une page sans script en ligne de notre
- * main, désigne un code étranger.
+ * extension nomme son schéma ; un rapport qui ne nomme **aucun** script
+ * (`"aucune"`) vient d'un code évalué ou injecté, ou d'un chargement qu'aucun
+ * script n'a lancé (voir {@link CSP_SOURCE_NONE}).
  *
  * Un code **de la page** (adresse d'un document du site, pas d'un fichier de
  * script) n'est pas réduit ici mais par l'appelant, en {@link CSP_SOURCE_PAGE},
@@ -351,12 +358,15 @@ function reportBodies(payload: unknown): Record<string, unknown>[] {
 function violationOf(body: Record<string, unknown>): CspViolation | null {
   // Les deux formats nomment les mêmes champs différemment : tirets pour
   // l'historique, camelCase pour le Reporting API.
-  const directive =
-    body["effective-directive"] ??
-    body.effectiveDirective ??
-    body["violated-directive"] ??
-    body.violatedDirective;
-  if (typeof directive !== "string") return null;
+  // Premier candidat non vide : un `effective-directive` vide ou mal typé ne
+  // doit pas écarter le `violated-directive` lisible qui le suit.
+  const directive = [
+    body["effective-directive"],
+    body.effectiveDirective,
+    body["violated-directive"],
+    body.violatedDirective,
+  ].find((candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0);
+  if (directive === undefined) return null;
   // L'ancien `violated-directive` porte la directive entière
   // (`script-src 'self'`) : seul son nom compte. Un nom qui n'en est pas un
   // (saut de ligne, texte libre) écarte le rapport — un navigateur n'en envoie pas.
