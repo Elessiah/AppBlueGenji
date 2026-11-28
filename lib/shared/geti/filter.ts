@@ -203,23 +203,31 @@ export const GETI_SINGLE_TIME_MINUTES = 120;
  * plage, deux heures après une heure seule, la fin de la journée sans horaire.
  * Les horaires sont lus dans l'ordre gardé : croissant, sauf quand un horaire
  * converti d'un autre fuseau passe au lendemain (« 3pm and 9pm EST » : 21 h puis
- * 3 h) — un début plus petit que le précédent est alors celui du lendemain.
+ * 3 h) — un début plus petit que le précédent est alors celui du lendemain,
+ * mais seulement pour un horaire converti : écrits dans le désordre (« 21h-23h
+ * ou 19h-20h »), les créneaux restent du même jour.
  *
  * @param times Horaires gardés (`availability.times`) ; un horaire abîmé est ignoré.
+ * @param converted `true` quand les horaires viennent d'un autre fuseau (`statedTimes`, `dateShifts`).
  */
-export function getiSlotEndMinutes(times: readonly unknown[] | null | undefined): number {
+export function getiSlotEndMinutes(times: readonly unknown[] | null | undefined, converted = false): number {
   let end = 0;
   let offset = 0;
   let previous = -1;
   for (const slot of wanted<unknown>(times)) {
     const stored = getiStoredTimeSlot(slot);
     if (stored === null) continue;
-    if (stored.from < previous) offset += DAY_MINUTES;
+    if (converted && stored.from < previous) offset += DAY_MINUTES;
     previous = stored.from;
     const stop = stored.to === null ? stored.from + GETI_SINGLE_TIME_MINUTES : stored.to;
     end = Math.max(end, offset + (stop <= stored.from ? stop + DAY_MINUTES : stop));
   }
   return end === 0 ? DAY_MINUTES : end;
+}
+
+/** Les horaires gardés viennent-ils d'un autre fuseau ? (`statedTimes` ou `dateShifts` posés à l'analyse) */
+function isConverted(post: GetiParsedPost): boolean {
+  return post.availability?.statedTimes != null || post.availability?.dateShifts != null;
 }
 
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/u;
@@ -249,6 +257,13 @@ function dateEndsAt(date: StoredDate, end: number): number {
 }
 
 /**
+ * Fin déjà calculée d'une annonce : la carte, le filtre de la page et chaque
+ * alerte la relisent pour la même annonce ; valable tant que ses dates et
+ * disponibilités sont les mêmes objets.
+ */
+const endsAtCache = new WeakMap<object, { dates: unknown; availability: unknown; ends: number | null }>();
+
+/**
  * Instant où la dernière soirée visée par l'annonce est finie (heure de
  * Paris) : sa dernière date, à la fin de son dernier horaire
  * ({@link getiSlotEndMinutes}). `null` pour une annonce sans date : elle ne
@@ -258,10 +273,15 @@ function dateEndsAt(date: StoredDate, end: number): number {
  * @returns L'instant en millisecondes, ou `null`.
  */
 export function getiPostEndsAt(post: GetiParsedPost): number | null {
+  const known = endsAtCache.get(post);
+  if (known?.dates === post.dates && known.availability === post.availability) return known.ends;
   const dates = storedDates(post);
-  if (dates.length === 0) return null;
-  const end = getiSlotEndMinutes(post.availability?.times);
-  return Math.max(...dates.map((date) => dateEndsAt(date, end)));
+  const ends =
+    dates.length === 0
+      ? null
+      : Math.max(...dates.map((date) => dateEndsAt(date, getiSlotEndMinutes(post.availability?.times, isConverted(post)))));
+  endsAtCache.set(post, { dates: post.dates, availability: post.availability, ends });
+  return ends;
 }
 
 /**
@@ -298,7 +318,7 @@ function matchesDays(post: GetiParsedPost, days: readonly GetiDay[], includeUnkn
   if (dated.length === 0) return days.some((day) => found.includes(day));
   const datedWeekdays = new Set(dated.map((date) => weekdayOf(date.day)));
   if (found.filter((day) => !datedWeekdays.has(day)).length >= HABIT_DAYS_MIN) return days.some((day) => found.includes(day));
-  const end = getiSlotEndMinutes(post.availability?.times);
+  const end = getiSlotEndMinutes(post.availability?.times, isConverted(post));
   const upcoming = new Set<GetiDay>();
   const over = new Set<GetiDay>();
   for (const date of dated) (now >= dateEndsAt(date, end) ? over : upcoming).add(weekdayOf(date.day));

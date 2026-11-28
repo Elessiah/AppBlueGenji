@@ -64,20 +64,19 @@ function relativeDate(iso: string, locale: Locale, now: number): string {
  * sinon : « Passé » pour un scrim ou un remplaçant, qui ne vaut plus ; « Date
  * passée » ailleurs — un recrutement qui citait un essai reste d'actualité.
  */
-function pastLabelOf(post: GetiStoredPost, text: GetiMessages["post"], now: number): string | null {
-  if (post.parsed.closed || !isGetiPostPast(post.parsed, now)) return null;
+function pastLabelOf(post: GetiStoredPost, text: GetiMessages["post"], past: boolean): string | null {
+  if (!past) return null;
   return isGetiOneEveningPost(post.parsed) ? text.past : text.datePast;
 }
 
-/** Carte estompée : annonce close, ou soirée finie d'un scrim ou d'un remplaçant. */
-function isFaded(post: GetiStoredPost, now: number): boolean {
-  return post.parsed.closed || (isGetiPostPast(post.parsed, now) && isGetiOneEveningPost(post.parsed));
-}
-
-/** Style de la carte : close (pointillés), passée (estompée, trait plein) ou courante. */
-function cardClassOf(post: GetiStoredPost, now: number): string {
+/**
+ * Style de la carte : close (pointillés), passée (estompée, trait plein : soirée
+ * finie d'un scrim ou d'un remplaçant) ou courante. `past` est calculé une fois
+ * par carte (`isGetiPostPast`).
+ */
+function cardClassOf(post: GetiStoredPost, past: boolean): string {
   if (post.parsed.closed) return `${styles.card} ${styles.cardClosed}`;
-  return isFaded(post, now) ? `${styles.card} ${styles.cardPast}` : styles.card;
+  return past && isGetiOneEveningPost(post.parsed) ? `${styles.card} ${styles.cardPast}` : styles.card;
 }
 
 /**
@@ -149,14 +148,15 @@ export function GetiPostCard({
     spoiler: text.spoiler,
   }, locale);
   const chips = getiPostChips(parsed);
-  const pastLabel = pastLabelOf(post, text, now);
+  const past = !post.parsed.closed && isGetiPostPast(post.parsed, now);
+  const pastLabel = pastLabelOf(post, text, past);
   const postedAbsolute = absoluteDate(post.postedAt, locale);
   const editedAbsolute = post.editedAt ? absoluteDate(post.editedAt, locale) : "";
 
   return (
     <article
       id={`post-${post.messageId}`}
-      className={cardClassOf(post, now)}
+      className={cardClassOf(post, past)}
       data-testid="geti-post"
       data-past={pastLabel === null ? undefined : "true"}
     >

@@ -335,7 +335,41 @@ describe("étiquette d'un horaire converti", () => {
 describe("cycle 1 : horaire converti au lendemain, jours habituels, catégories d'une soirée", () => {
   it("getiSlotEndMinutes_convertedSlotWrappingToTheNextDay_endsTheNextDay", () => {
     // 21 h puis 3 h (gardés dans l'ordre écrit) : le second est le lendemain, + 2 h.
-    expect(getiSlotEndMinutes([{ from: 1260, to: null }, { from: 180, to: null }])).toBe(1740);
+    expect(getiSlotEndMinutes([{ from: 1260, to: null }, { from: 180, to: null }], true)).toBe(1740);
+  });
+
+  it("getiSlotEndMinutes_slotsWrittenOutOfOrder_stayOnTheSameDay", () => {
+    // « 21h-23h ou 19h-20h » : pas une conversion, la fin est 23 h.
+    expect(getiSlotEndMinutes([{ from: 1260, to: 1380 }, { from: 1140, to: 1200 }])).toBe(1380);
+  });
+
+  it("isGetiPostPast_unconvertedSlotsOutOfOrder_endsAtTheLatestSlotTheSameDay", () => {
+    const post = parseGetiPost(getiRawPost("scrim 21h-23h ou 19h-20h", { category: "lfs", postedAt: "2026-11-27T10:00:00Z" }));
+
+    expect(isGetiPostPast(post, Date.parse("2026-11-27T22:30:00Z"))).toBe(true);
+  });
+
+  it("isGetiOneEveningPost_storedFlag_isReadWithoutTheText", () => {
+    expect(isGetiOneEveningPost({ category: "lft", text: "LFSub ce soir", oneEvening: false })).toBe(false);
+    expect(isGetiOneEveningPost({ category: "lft", text: "dispo", oneEvening: true })).toBe(true);
+  });
+
+  it("parseGetiPost_keywordOutsideTheChannel_storesOneEvening", () => {
+    const post = parseGetiPost(getiRawPost("LFSub ce soir 21h", { category: "lft", postedAt: FRIDAY_NOON_ISO }));
+
+    expect(post.oneEvening).toBe(true);
+  });
+
+  it("getiPostEndsAt_samePostTwice_isTheSameInstant", () => {
+    const post = fridayScrim();
+
+    expect(getiPostEndsAt(post)).toBe(getiPostEndsAt(post));
+  });
+
+  it("matchingGetiAlerts_alertableKnownFalse_returnsNothingWithoutTheCheck", () => {
+    const alert = { id: 1, category: "lfs" as const, search: "" };
+
+    expect(matchingGetiAlerts(fridayScrim(), "lfs", [alert], new Map(), FRIDAY_MORNING, false)).toEqual([]);
   });
 
   it("matchesGetiFilter_recurringNamedDaysWithAPastDate_stillMatchesThatDay", () => {

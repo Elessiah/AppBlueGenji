@@ -245,8 +245,9 @@ const oneEveningCache = new WeakMap<object, boolean>();
  * à l'analyse. Passée, elle ne vaut plus ; ailleurs, une date passée n'éteint
  * pas l'annonce (un recrutement qui citait un essai reste d'actualité).
  */
-export function isGetiOneEveningPost(post: Pick<GetiParsedPost, "category" | "text">): boolean {
+export function isGetiOneEveningPost(post: Pick<GetiParsedPost, "category" | "text" | "oneEvening">): boolean {
   if (isOneEveningKind([post.category])) return true;
+  if (typeof post.oneEvening === "boolean") return post.oneEvening;
   const known = oneEveningCache.get(post);
   if (known !== undefined) return known;
   // Le texte lu comme à l'analyse : sans passage masqué ni passage barré (« ~~LFSub ce soir~~ dispo »).
@@ -563,6 +564,7 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
     dates: schedule.dates,
     levels: parseGetiLevels(prepared.lower),
     closed,
+    oneEvening,
     teamName: parseGetiTeamName(prepared.clean, kinds.includes("lft"), kinds.includes("lfs")),
     staffRoles: parseGetiStaffRoles(prepared.lower),
     minAge: parseGetiMinAge(prepared.lower),

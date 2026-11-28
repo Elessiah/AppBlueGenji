@@ -213,6 +213,12 @@ export type GetiParsedPost = {
   levels: GetiLevel[];
   /** `true` quand tout le texte est barré (`~~…~~`) : l'annonce est close. */
   closed: boolean;
+  /**
+   * `true` pour une recherche qui ne vaut que pour sa soirée (scrim, remplaçant,
+   * d'après le salon ou le mot-clé du texte), calculé une fois à l'analyse ;
+   * absent d'une analyse plus ancienne, relu alors depuis le texte.
+   */
+  oneEvening?: boolean;
   teamName: string | null;
   staffRoles: GetiStaffRole[];
   /** Âge minimal demandé ou annoncé (« 18+ », « majeur »). */

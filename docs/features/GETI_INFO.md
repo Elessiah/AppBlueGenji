@@ -398,7 +398,13 @@ Paris : à la fin de son dernier horaire (`getiSlotEndMinutes` — la fin d'une
 plage, le lendemain pour « 22h-1h » ; **deux heures** après une heure seule,
 « dès 21h » ; minuit sans horaire). Une annonce sans date ne l'est jamais. Le
 calcul se fait à la lecture, depuis `dates` et `availability.times` : rien de
-plus n'est gardé.
+plus n'est gardé. Les horaires écrits dans le désordre (« 21h-23h ou 19h-20h »)
+restent du même jour ; seul un horaire **converti** d'un autre fuseau
+(`statedTimes` ou `dateShifts` présents) passe au lendemain quand son début
+recule. La fin d'une annonce est mémorisée par objet (`WeakMap`, tant que ses
+dates et disponibilités sont les mêmes) : la carte, le filtre et chaque alerte
+la relisent sans recalcul ; la carte ne l'évalue qu'une fois, et
+`matchingGetiAlerts` reçoit la réponse d'`isGetiPostAlertable` déjà connue.
 
 - **Scrims** (`GETI_PAST_HIDDEN_CATEGORIES` : `lfs`) : masqués par défaut
   (`hidePast`). Le lien « Afficher / Masquer les scrims passés » sous le
@@ -414,7 +420,7 @@ plus n'est gardé.
   en plus, sans rendre le vendredi passé.
 - **Alertes** : un scrim ou un remplaçant (`isGetiOneEveningPost` : d'après le
   salon, ou le mot-clé du texte hors passages barrés — « LFSub » dans le salon
-  des joueurs, comme à l'analyse ; la carte le lit pareil, une fois par annonce) déjà passé à
+  des joueurs, comme à l'analyse ; calculé à l'analyse et gardé dans `oneEvening` — relu depuis le texte, une fois par objet, pour une analyse plus ancienne ; la carte le lit pareil) déjà passé à
   sa réception ne prévient personne (`isGetiPostAlertable` — un « tonight » de
   la veille reçu au rattrapage) ; ailleurs, une date passée n'éteint pas
   l'annonce, qui prévient. Une alerte ne garde pas `past=1`.

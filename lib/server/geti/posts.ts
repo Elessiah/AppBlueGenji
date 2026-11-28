@@ -397,7 +397,7 @@ const ADDED_FIELDS: Partial<GetiParsedPost> = { dates: [], levels: [], closed: f
 const ANALYSIS_VERSION = 3;
 /**
  * Une analyse gardée à la version courante : `JSON.stringify` écrit la clé en
- * dernier, `…,"analysisVersion":2}` ; dans le texte d'une annonce, un guillemet
+ * dernier, `…,"analysisVersion":3}` ; dans le texte d'une annonce, un guillemet
  * est échappé (`\"`), un texte ne peut pas la contrefaire.
  */
 const CURRENT_ANALYSIS = `parsed_json LIKE '%"analysisVersion":${ANALYSIS_VERSION}}'`;
@@ -484,6 +484,8 @@ async function rewriteChunk(executor: GetiExecutor, rows: RowDataPacket[], trust
   const failures: unknown[] = [];
   let removed = 0;
   try {
+    // Toutes les écritures du lot partent ensemble (pas un aller-retour par ligne) ; l'ordre des lignes est gardé.
+    const writes: Promise<void>[] = [];
     for (const row of rows) {
       const messageId = String(row.message_id);
       const next = reanalysed(row, trusted);
@@ -491,12 +493,21 @@ async function rewriteChunk(executor: GetiExecutor, rows: RowDataPacket[], trust
         gone.push(messageId);
         continue;
       }
-      const [result] = await executor.execute(
-        `UPDATE bg_geti_posts SET parsed_json = ?, author_id = ?, author_tag = ? WHERE message_id = ? AND ${STILL_STALE}`,
-        [next.parsedJson, next.authorId, next.authorTag, messageId],
+      writes.push(
+        executor
+          .execute(
+            `UPDATE bg_geti_posts SET parsed_json = ?, author_id = ?, author_tag = ? WHERE message_id = ? AND ${STILL_STALE}`,
+            [next.parsedJson, next.authorId, next.authorTag, messageId],
+          )
+          .then(([result]) => {
+            if (affected(result) > 0) rewritten.push(messageId);
+          }),
       );
-      if (affected(result) > 0) rewritten.push(messageId);
     }
+    // Une écriture qui échoue ne laisse pas les autres sans suite : toutes sont attendues, la première erreur remonte.
+    const settled = await Promise.allSettled(writes);
+    const failed = settled.find((write) => write.status === "rejected");
+    if (failed !== undefined) throw failed.reason;
     removed = await deleteStaleGetiPosts(executor, gone);
   } catch (error) {
     failures.push(error);

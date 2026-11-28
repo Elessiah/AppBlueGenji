@@ -305,14 +305,14 @@ by <@${GETI_FAKE_OTHER_ID}>`), GETI_TRUSTED_BOTS).authorId).toBe(GETI_FAKE_OTHER
 
 describe("parseGetiPost — entrées douteuses", () => {
   it("une valeur qui n'est pas un objet rend une annonce vide", () => {
-    const expected = parsedGetiPost({ category: null, authorTag: null, authorId: null });
+    const expected = parsedGetiPost({ category: null, authorTag: null, authorId: null, oneEvening: false });
 
     expect(parseGetiPost(untyped("null"))).toEqual(expected);
   });
 
   it("des champs du mauvais type sont ignorés sans erreur", () => {
     const raw = untyped('{"content":42,"author":"x","embeds":"y","postedAt":7,"channelId":[]}');
-    const expected = parsedGetiPost({ category: null, authorTag: null, authorId: null });
+    const expected = parsedGetiPost({ category: null, authorTag: null, authorId: null, oneEvening: false });
 
     expect(parseGetiPost(raw)).toEqual(expected);
   });

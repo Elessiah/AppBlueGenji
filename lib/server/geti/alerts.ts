@@ -495,7 +495,7 @@ async function recordAlertHits(
   const filters = new Map<number, GetiFilter>();
   const firstHit = new Map<number, AlertHit>();
   for (const post of posts) {
-    const matched = matchingGetiAlerts(post.parsed, post.category, alerts, filters, now).filter(
+    const matched = matchingGetiAlerts(post.parsed, post.category, alerts, filters, now, true).filter(
       (alert) => !isOwnPost(alert, post),
     );
     for (let start = 0; start < matched.length; start += HIT_CHUNK) {

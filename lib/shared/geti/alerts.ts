@@ -154,6 +154,7 @@ export function isGetiPostAlertable(post: GetiParsedPost, now: number): boolean 
  * Les alertes que touche une annonce : même catégorie, annonce ouverte et à venir, et la
  * correspondance de la page (`matchesGetiFilter`). Le filtre de chaque alerte
  * est construit une fois (`filters`, à partager entre les annonces d'un lot).
+ * `alertable` : réponse déjà connue de `isGetiPostAlertable` (même `now`), sinon calculée.
  */
 export function matchingGetiAlerts<T extends GetiAlertCriteria>(
   post: GetiParsedPost,
@@ -161,8 +162,11 @@ export function matchingGetiAlerts<T extends GetiAlertCriteria>(
   alerts: readonly T[],
   filters: Map<number, GetiFilter>,
   now: number,
+  alertable: boolean = isGetiPostAlertable(post, now),
 ): T[] {
-  if (!isGetiPostAlertable(post, now)) return [];
+  if (!alertable) return [];
+  // Un seul objet pour toutes les alertes : la fin de l'annonce, calculée une fois, est relue (`getiPostEndsAt`).
+  const categorised = post.category === category ? post : { ...post, category };
   return alerts.filter((alert) => {
     if (alert.category !== category) return false;
     let filter = filters.get(alert.id);
@@ -170,6 +174,6 @@ export function matchingGetiAlerts<T extends GetiAlertCriteria>(
       filter = getiAlertFilter(alert.category, alert.search);
       filters.set(alert.id, filter);
     }
-    return matchesGetiFilter({ ...post, category }, filter, now);
+    return matchesGetiFilter(categorised, filter, now);
   });
 }
