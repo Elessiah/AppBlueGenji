@@ -12,6 +12,7 @@
 import { createElement, type ComponentType, type ReactElement } from "react";
 import {
   Accessibility,
+  ArrowLeftRight,
   Bot,
   BookOpen,
   ClipboardList,
@@ -21,6 +22,7 @@ import {
   HeartHandshake,
   Lock,
   LogIn,
+  Mic,
   Network,
   Scale,
   ScrollText,
@@ -41,6 +43,7 @@ export const SHARE_ACCENT_COLORS: Readonly<Record<ShareAccent, string>> = {
   cyan: SHARE_CARD_COLORS.cyan,
   blue: SHARE_CARD_COLORS.blueSoft,
   violet: SHARE_CARD_COLORS.violetSoft,
+  violetDeep: SHARE_CARD_COLORS.violet,
   pink: SHARE_CARD_COLORS.pink,
   teal: SHARE_CARD_COLORS.teal,
 };
@@ -67,6 +70,8 @@ const MOTIF_ICONS: Readonly<Record<ShareMotif, ComponentType>> = {
   teamShield: Shield,
   gamepad: Gamepad2,
   user: UserRound,
+  mic: Mic,
+  swap: ArrowLeftRight,
 };
 
 export type MotifShape = readonly (readonly [string, Readonly<Record<string, string>>])[];

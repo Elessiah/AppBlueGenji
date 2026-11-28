@@ -125,7 +125,11 @@
     "alt": "BlueGenji team ranking",
     "points": "pts",
     "teamFallback": "Team #{id}",
-    "places": ["1st", "2nd", "3rd"]
+    "places": [
+      "1st",
+      "2nd",
+      "3rd"
+    ]
   },
   "embed": {
     "tournamentFallback": "Tournament",
@@ -165,5 +169,34 @@
     "provisionalScore": "{state}: {score}",
     "tournamentAlt": "Preview of the tournament {name}",
     "matchAlt": "Preview of the match {team1} vs {team2}"
+  },
+  "geti": {
+    "eyebrow": "GETI posts · Overwatch",
+    "categories": {
+      "lfp": {
+        "title": "Looking for a player",
+        "subtitle": "Teams that are recruiting: spot the ones looking for your role and rank."
+      },
+      "lft": {
+        "title": "Looking for a team",
+        "subtitle": "Players looking for a team: filter by role, rank and availability."
+      },
+      "lfsub": {
+        "title": "Looking for a sub",
+        "subtitle": "Teams missing someone for a match or a scrim, often for the same evening."
+      },
+      "lfstaff": {
+        "title": "Looking for staff",
+        "subtitle": "Coaches, managers, analysts: teams looking for them and people offering their help."
+      },
+      "lfs": {
+        "title": "Looking for a scrim",
+        "subtitle": "Teams looking for a practice match: filter by level, day and time."
+      },
+      "lfcast": {
+        "title": "Looking for a cast",
+        "subtitle": "Organisers looking for casters, and casters who are available."
+      }
+    }
   }
 }

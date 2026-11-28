@@ -5,7 +5,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { getCurrentUser } from "@/lib/server/auth";
 import { listGetiAlerts } from "@/lib/server/geti/alerts";
-import { listGetiPostsShared, logGetiListFailure } from "@/lib/server/geti/posts";
+import { countGetiPostsForNav, listGetiPostsShared, logGetiListFailure } from "@/lib/server/geti/posts";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -32,6 +32,7 @@ import { getiDataText, getiFilterDataText, getiText, type GetiDataText, type Get
 import { localeHref, type Locale } from "@/lib/shared/locales";
 import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
 import { GetiAlerts } from "./GetiAlerts";
+import { GetiCategoryNav } from "./GetiCategoryNav";
 import { GetiFilters } from "./GetiFilters";
 import { GetiLayout } from "./GetiLayout";
 import { GetiRetry } from "./GetiRetry";
@@ -100,24 +101,19 @@ export async function GetiInfoView({
       </section>
 
       <div className={styles.section}>
-        <nav className={styles.tabs} aria-label={m.tabs.label}>
-          <span className={styles.tabsLabel} aria-hidden="true">
-            {m.tabs.label}
-          </span>
-          <ul className={styles.tabList} data-tap-zone="">
-            {GETI_CATEGORIES.map((entry) => (
-              <li key={entry}>
-                <LocaleLink
-                  href={getiCategoryPath(entry)}
-                  className={entry === category ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-                  aria-current={entry === category ? "page" : undefined}
-                >
-                  {m.tabs[entry]}
-                </LocaleLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        {/* Nombre d'annonces par catégorie : rendu à part (`Suspense`), la page n'attend jamais ses six lectures. */}
+        <Suspense
+          fallback={<GetiCategoryNav text={m.tabs} locale={locale} current={category} counts={null} filtered={activeFilters > 0} pending />}
+        >
+          <GetiCategoryNavCounted
+            text={m.tabs}
+            locale={locale}
+            current={category}
+            filtered={activeFilters > 0}
+            currentTotal={listed !== null && activeFilters === 0 ? listed.total : null}
+            now={now}
+          />
+        </Suspense>
 
         <GetiOfficialCard
           text={m.official}
@@ -161,6 +157,11 @@ export async function GetiInfoView({
               channelUrl={getiChannelUrl(category)}
               ourInviteUrl={DISCORD_INVITE_URL}
               official={m.official}
+              count={
+                <Suspense fallback={null}>
+                  <GetiOfficialCount text={m.official} locale={locale} />
+                </Suspense>
+              }
             />
           </div>
         </header>
@@ -195,6 +196,31 @@ export async function GetiInfoView({
       <GetiRefresher />
     </PublicPageShell>
   );
+}
+
+/**
+ * Le sélecteur avec ses nombres (`countGetiPostsForNav`, mutualisé) : sans
+ * eux, il se rend sans nombre. La case courante, sans filtre, reprend le total
+ * de la liste affichée (`currentTotal`) : ses deux nombres ne se contredisent jamais.
+ */
+async function GetiCategoryNavCounted({
+  text,
+  locale,
+  current,
+  filtered,
+  currentTotal,
+  now,
+}: Readonly<{
+  text: GetiMessages["tabs"];
+  locale: Locale;
+  current: GetiCategory;
+  filtered: boolean;
+  currentTotal: number | null;
+  now: number;
+}>) {
+  const counts = await countGetiPostsForNav(now);
+  const shown = counts && currentTotal !== null ? { ...counts, [current]: currentTotal } : counts;
+  return <GetiCategoryNav text={text} locale={locale} current={current} counts={shown} filtered={filtered} />;
 }
 
 type ResultsProps = Readonly<{

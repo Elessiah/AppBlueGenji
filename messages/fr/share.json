@@ -125,7 +125,11 @@
     "alt": "Classement des équipes BlueGenji",
     "points": "pts",
     "teamFallback": "Équipe #{id}",
-    "places": ["1re", "2e", "3e"]
+    "places": [
+      "1re",
+      "2e",
+      "3e"
+    ]
   },
   "embed": {
     "tournamentFallback": "Tournoi",
@@ -165,5 +169,34 @@
     "provisionalScore": "{state} : {score}",
     "tournamentAlt": "Aperçu du tournoi {name}",
     "matchAlt": "Aperçu du match {team1} contre {team2}"
+  },
+  "geti": {
+    "eyebrow": "Annonces GETI · Overwatch",
+    "categories": {
+      "lfp": {
+        "title": "Je cherche un joueur",
+        "subtitle": "Les équipes qui recrutent : repère celles qui cherchent ton rôle et ton rang."
+      },
+      "lft": {
+        "title": "Je cherche une équipe",
+        "subtitle": "Les joueurs qui cherchent une équipe : filtre par rôle, rang et disponibilités."
+      },
+      "lfsub": {
+        "title": "Je cherche un remplaçant",
+        "subtitle": "Les équipes à qui il manque quelqu'un pour un match ou un scrim, souvent pour le soir même."
+      },
+      "lfstaff": {
+        "title": "Je cherche un staff",
+        "subtitle": "Coachs, managers, analystes : les équipes qui en cherchent et les personnes qui se proposent."
+      },
+      "lfs": {
+        "title": "Je cherche un scrim",
+        "subtitle": "Les équipes qui cherchent un match d'entraînement : filtre par niveau, jour et horaire."
+      },
+      "lfcast": {
+        "title": "Je cherche un cast",
+        "subtitle": "Les organisateurs qui cherchent des casters, et les casters disponibles."
+      }
+    }
   }
 }

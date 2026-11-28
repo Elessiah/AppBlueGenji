@@ -46,7 +46,17 @@ import {
 export { GETI_PAGE_PATH };
 
 /** Catégorie rendue par `/geti-info` tout court. */
-export const GETI_DEFAULT_CATEGORY: GetiCategory = "lfp";
+export const GETI_DEFAULT_CATEGORY: GetiCategory = "lfs";
+
+/**
+ * Ordre d'**affichage** des catégories (sélecteur de la page, raccourcis de
+ * l'accueil) : la catégorie par défaut d'abord, puis l'ordre des salons.
+ * `GETI_CATEGORIES` reste l'ordre de référence des données.
+ */
+export const GETI_CATEGORY_ORDER: readonly GetiCategory[] = [
+  GETI_DEFAULT_CATEGORY,
+  ...GETI_CATEGORIES.filter((category) => category !== GETI_DEFAULT_CATEGORY),
+];
 
 /** Nom du serveur officiel de GETI. */
 export const GETI_OFFICIAL_SERVER_NAME = "GETI \u2014 Geeking Time";

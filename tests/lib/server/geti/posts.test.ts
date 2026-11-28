@@ -8,6 +8,11 @@ import { getDatabase } from "@/lib/server/database";
 import {
   deleteGetiPosts,
   forgetGetiListScans,
+  countGetiPostsForNav,
+  countGetiPostsShared,
+  GETI_COUNT_CACHE_TTL_MS,
+  GETI_COUNT_FAILURE_TTL_MS,
+  GETI_SCAN_CACHE_TTL_MS,
   GETI_LIST_SCAN_MAX,
   getiTrustedBots,
   listGetiPosts,
@@ -1155,6 +1160,160 @@ describe("refreshStaleGetiPosts", () => {
 
     expect(done).toBe(0);
     expect(execute.mock.calls.filter(([sql]) => String(sql).startsWith("SELECT"))).toHaveLength(1);
+  });
+});
+
+describe("countGetiPostsShared", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+
+  /** Base simulée : chaque lecture rend les lignes de la catégorie demandée (2e paramètre de la requête). */
+  function categoryRows(rowsByCategory: Record<string, unknown[]>) {
+    const execute = jest.fn<SqlQuery>(async (_sql: string, params?: unknown) => [
+      rowsByCategory[Array.isArray(params) ? String(params[1]) : ""] ?? [],
+    ]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    return execute;
+  }
+
+  it("countGetiPostsShared_sixCategories_returnsTotalPerCategory", async () => {
+    categoryRows({
+      lft: [row(), row({ message_id: "100000000000000902" })],
+      lfs: [row({ category: "lfs", channel_id: GETI_CHANNEL_IDS.lfs }, { category: "lfs" })],
+    });
+
+    const counts = await countGetiPostsShared(NOW);
+
+    expect(counts).toEqual({ lfp: 0, lft: 2, lfsub: 0, lfstaff: 0, lfs: 1, lfcast: 0 });
+  });
+
+  it("countGetiPostsShared_closedPost_isNotCounted", async () => {
+    categoryRows({ lft: [row(), row({ message_id: "100000000000000902" }, { closed: true })] });
+
+    const counts = await countGetiPostsShared(NOW);
+
+    expect(counts.lft).toBe(1);
+  });
+
+  it("countGetiPostsShared_calledTwice_readsEachCategoryOnce", async () => {
+    const execute = categoryRows({ lft: [row()] });
+
+    await countGetiPostsShared(NOW);
+    await countGetiPostsShared(NOW + 30_000);
+
+    expect(execute).toHaveBeenCalledTimes(6);
+  });
+
+  it("countGetiPostsShared_afterDelete_countsAgain", async () => {
+    const execute = categoryRows({ lft: [row()] });
+    await countGetiPostsShared(NOW);
+
+    await deleteGetiPosts(executor(executeMock([], 1)), [GETI_FAKE_MESSAGE_ID]);
+    await countGetiPostsShared(NOW);
+
+    expect(execute).toHaveBeenCalledTimes(12);
+  });
+
+  it("countGetiPostsShared_readFails_rejectsAndIsNotCached", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(new Error("down")).mockResolvedValue([[]]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+
+    await expect(countGetiPostsShared(NOW)).rejects.toThrow();
+    const counts = await countGetiPostsShared(NOW);
+
+    expect(counts.lft).toBe(0);
+  });
+});
+
+describe("countGetiPostsForNav", () => {
+  beforeEach(() => {
+    clearCache();
+    resetGetiListFailureLog();
+    jest.restoreAllMocks();
+  });
+
+  it("countGetiPostsForNav_readSucceeds_returnsCountsPerCategory", async () => {
+    jest.mocked(getDatabase).mockResolvedValue(executor(executeMock([row()])));
+
+    const counts = await countGetiPostsForNav(NOW);
+
+    expect(counts).toEqual({ lfp: 0, lft: 1, lfsub: 0, lfstaff: 0, lfs: 0, lfcast: 0 });
+  });
+
+  it("countGetiPostsForNav_readFails_returnsNullAndLogsCodeOnly", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const failure = Object.assign(new Error("SELECT secret FROM bg_geti_posts"), { code: "ECONNREFUSED" });
+    jest.mocked(getDatabase).mockResolvedValue(executor(jest.fn<SqlQuery>().mockRejectedValue(failure)));
+
+    const counts = await countGetiPostsForNav(NOW);
+
+    expect(counts).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toBe("[geti] post list unavailable:");
+    expect(JSON.stringify(warn.mock.calls[0])).not.toContain("secret");
+  });
+
+  it("countGetiPostsForNav_withinFailureAbstention_returnsNullWithoutReading", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("down"));
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    await countGetiPostsForNav(NOW);
+    const readsAfterFailure = execute.mock.calls.length;
+
+    const counts = await countGetiPostsForNav(NOW);
+
+    expect(counts).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(readsAfterFailure);
+  });
+
+  it("countGetiPostsForNav_afterAbstention_readsAgain", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const clock = jest.spyOn(Date, "now").mockReturnValue(NOW);
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("down"));
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    await countGetiPostsForNav(NOW);
+    execute.mockResolvedValue([[]]);
+    clock.mockReturnValue(NOW + GETI_COUNT_FAILURE_TTL_MS + 1);
+
+    const counts = await countGetiPostsForNav(NOW);
+
+    expect(counts).toEqual({ lfp: 0, lft: 0, lfsub: 0, lfstaff: 0, lfs: 0, lfcast: 0 });
+  });
+
+  it("countCacheTtl_isHalfTheScanTtl_soTheNumberLagsTheListByAtMost15s", () => {
+    expect(GETI_COUNT_CACHE_TTL_MS).toBe(GETI_SCAN_CACHE_TTL_MS / 2);
+  });
+
+  it("countGetiPostsShared_coldCache_readsOneCategoryAtATime", async () => {
+    let running = 0;
+    let peak = 0;
+    const execute = jest.fn<SqlQuery>(async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await Promise.resolve();
+      running -= 1;
+      return [[]];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+
+    await countGetiPostsForNav(NOW);
+
+    expect(execute).toHaveBeenCalledTimes(6);
+    expect(peak).toBe(1);
+  });
+
+  it("countGetiPostsForNav_afterAWrite_liftsTheAbstentionAtOnce", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("down"));
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    await countGetiPostsForNav(NOW);
+    execute.mockResolvedValue([[]]);
+
+    forgetGetiListScans();
+    const counts = await countGetiPostsForNav(NOW);
+
+    expect(counts).toEqual({ lfp: 0, lft: 0, lfsub: 0, lfstaff: 0, lfs: 0, lfcast: 0 });
   });
 });
 

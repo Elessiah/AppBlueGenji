@@ -11,7 +11,7 @@ import styles from "./PublicNavMenu.module.css";
 /**
  * `section` : la rubrique que l'entrée désigne comme page courante, quand elle
  * diffère de `href` (l'entrée des annonces mène à la liste canonique
- * `/geti-info/lfp` mais reste courante sur toute page `/geti-info…`).
+ * `/geti-info/lfs` mais reste courante sur toute page `/geti-info…`).
  */
 type NavLink = { href: string; labelKey: ShellKey; featured?: boolean; section?: string };
 
@@ -24,7 +24,7 @@ type NavLink = { href: string; labelKey: ShellKey; featured?: boolean; section?:
  * (docs/features/PUBLIC_NAVIGATION.md).
  *
  * L'entrée des annonces mène à l'adresse canonique de la liste par défaut
- * (`/geti-info/lfp`, comme l'encart de l'accueil : une seule adresse par liste)
+ * (`/geti-info/lfs`, comme l'encart de l'accueil : une seule adresse par liste)
  * et reste la page courante sur toute la rubrique `/geti-info`. Ces adresses
  * viennent de `lib/shared/geti/path.ts`, module sans dépendance : importer `lib/shared/geti/page.ts` chargerait les filtres des
  * annonces dans l'en-tête de chaque page.

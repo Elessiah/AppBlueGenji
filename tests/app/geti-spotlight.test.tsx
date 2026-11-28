@@ -31,17 +31,17 @@ const links = (html: string) =>
   [...html.matchAll(/<a [^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map((m) => ({ href: m[1], label: m[2] }));
 
 describe("GetiSpotlight — encart de l'accueil", () => {
-  it("getiSpotlight_french_ctaTargetsCanonicalCategory : le bouton vise l'adresse canonique de la première catégorie", () => {
-    expect(links(french())[0]).toEqual({ href: "/geti-info/lfp", label: "Voir les annonces GETI" });
+  it("getiSpotlight_french_ctaTargetsCanonicalCategory : le bouton vise l'adresse canonique de la catégorie par défaut", () => {
+    expect(links(french())[0]).toEqual({ href: "/geti-info/lfs", label: "Voir les annonces GETI" });
   });
 
   it("getiSpotlight_french_chipsNameListContent : les raccourcis disent ce que chaque liste contient", () => {
     expect(links(french()).slice(1)).toEqual([
+      { href: "/geti-info/lfs", label: "Scrims" },
       { href: "/geti-info/lfp", label: "Équipes qui recrutent" },
       { href: "/geti-info/lft", label: "Joueurs sans équipe" },
       { href: "/geti-info/lfsub", label: "Remplaçants recherchés" },
       { href: "/geti-info/lfstaff", label: "Staff" },
-      { href: "/geti-info/lfs", label: "Scrims" },
       { href: "/geti-info/lfcast", label: "Casts" },
     ]);
     expect(french()).toMatch(/<p id="geti-spotlight-categories"[^>]*>Parcourir<\/p>/);
@@ -49,12 +49,12 @@ describe("GetiSpotlight — encart de l'accueil", () => {
 
   it("getiSpotlight_english_chipsAndCtaUnderEn : adresses /en et libellés anglais", () => {
     expect(links(english())).toEqual([
-      { href: "/en/geti-info/lfp", label: "Browse GETI posts" },
+      { href: "/en/geti-info/lfs", label: "Browse GETI posts" },
+      { href: "/en/geti-info/lfs", label: "Scrims" },
       { href: "/en/geti-info/lfp", label: "Teams recruiting" },
       { href: "/en/geti-info/lft", label: "Free agents" },
       { href: "/en/geti-info/lfsub", label: "Subs wanted" },
       { href: "/en/geti-info/lfstaff", label: "Staff" },
-      { href: "/en/geti-info/lfs", label: "Scrims" },
       { href: "/en/geti-info/lfcast", label: "Casts" },
     ]);
   });

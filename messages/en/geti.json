@@ -1,9 +1,8 @@
 {
   "meta": {
     "title": "GETI Info — Overwatch listings",
-    "categoryTitle": "{category} — Overwatch listings",
-    "description": "Overwatch recruitment posts from the GETI network, gathered and filterable: players, teams, subs, staff, scrims and casts.",
-    "shareDescription": "Find an Overwatch player, team, scrim or cast among the posts of the GETI network."
+    "categoryTitle": "GETI posts — {category}",
+    "description": "Overwatch recruitment posts from the GETI network, gathered and filterable: players, teams, subs, staff, scrims and casts."
   },
   "breadcrumb": {
     "home": "Home",
@@ -19,12 +18,15 @@
   },
   "tabs": {
     "label": "Looking for",
+    "heading": "Looking for:",
     "lfp": "Players",
     "lft": "Teams",
     "lfsub": "Subs",
     "lfstaff": "Staff",
     "lfs": "Scrims",
-    "lfcast": "Casters"
+    "lfcast": "Casters",
+    "count": "{count, plural, one {# post} other {# posts}}",
+    "countUnfiltered": "{count, plural, one {# post without filters} other {# posts without filters}}"
   },
   "categories": {
     "lfp": {
@@ -65,12 +67,16 @@
     "button": "Publish a post",
     "title": "Publish a post",
     "intro": "Posts on this page are not written on the site: they come from Discord.",
-    "stepChannel": "Write your post in this category's channel, on our Discord server. It shows up here within moments.",
+    "oursEyebrow": "BLUEGENJI SERVER",
+    "oursTitle": "Post on our server",
+    "stepChannel": "Write your post in this category's channel: it shows up here within moments.",
     "channelLink": "Open the “{category}” channel",
     "notMember": "Not on our server yet?",
     "joinOurs": "Join the BlueGenji Discord",
-    "stepGeti": "To reach the whole network, publish it from the official GETI server too: it is the one relaying posts to subscribed servers.",
+    "getiTitle": "Post via GETI Bot",
+    "stepGeti": "Publish it from the official GETI server: its bot relays it to every subscribed server of the network.",
     "rules": "A post edited or deleted on Discord is edited or deleted on this page too.",
+    "rulesSubject": "edited or deleted posts",
     "close": "Close",
     "closeLabel": "Close the window",
     "newTab": "(new tab)"

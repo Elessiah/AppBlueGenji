@@ -27,17 +27,16 @@
   line-height: 1.6;
 }
 
-/* Onglets de catégorie : des liens, une adresse par catégorie. */
+/* Sélecteur de catégorie : des liens (une adresse par catégorie), en cases
+   égales — six de front, puis 3 × 2, puis 2 × 3 au téléphone : les six restent
+   visibles d'un coup, sans défilement caché. */
 .tabs {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-  padding: 14px 0 18px;
+  padding: 16px 0 20px;
   border-top: 1px solid var(--line-soft);
 }
 
 .tabsLabel {
+  margin: 0 0 10px;
   font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.16em;
@@ -46,32 +45,87 @@
 }
 
 .tabList {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.tabList > li {
+  display: flex;
+  min-width: 0;
+}
+
 .tab {
-  display: inline-flex;
+  flex: 1;
+  display: flex;
   align-items: center;
-  min-height: 40px;
-  padding: 8px 16px;
+  gap: 8px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 10px 8px;
   border: 1px solid var(--line-strong-cy);
-  border-radius: 999px;
+  border-radius: var(--r-cy-md);
   background: rgba(var(--blue-500-rgb), 0.04);
   color: var(--ink-soft);
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.25;
   text-decoration: none;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tabIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(var(--blue-500-rgb), 0.12);
+  color: var(--blue-300);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tabName {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.tabCount {
+  flex: none;
+  min-width: 26px;
+  padding: 2px 7px;
+  border: 1px solid rgba(var(--blue-500-rgb), 0.35);
+  border-radius: 999px;
+  color: var(--blue-300);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+/* Case sans nombre encore (fallback du Suspense) : même emprise que la pastille, pour que rien ne bouge à son arrivée. */
+.tabCountPending {
+  border-color: transparent;
 }
 
 .tab:hover {
   border-color: rgba(var(--blue-500-rgb), 0.5);
   color: var(--ink);
+}
+
+.tab:hover .tabIcon {
+  background: rgba(var(--blue-500-rgb), 0.22);
+}
+
+.tab:hover .tabCount {
+  border-color: rgba(var(--blue-500-rgb), 0.6);
 }
 
 .tab:focus-visible,
@@ -88,10 +142,42 @@
   outline-offset: 2px;
 }
 
+/* Catégorie courante : pas la seule couleur — bordure pleine, barre basse,
+   icône sur fond plein, graisse. */
 .tabActive {
   border-color: var(--blue-500);
   background: rgba(var(--blue-500-rgb), 0.16);
+  box-shadow: inset 0 -3px 0 var(--blue-500);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.tabActive .tabIcon {
+  background: var(--blue-500);
+  color: var(--cyber-bg);
+}
+
+.tabActive .tabCount {
+  border-color: var(--blue-500);
+  background: rgba(var(--blue-500-rgb), 0.2);
   color: var(--blue-100);
+}
+
+/* Contraste forcé : couleurs et ombres sont ignorées — la case courante garde une bordure épaisse et son icône un cadre. */
+@media (forced-colors: active) {
+  /* Cadre épais dessiné par l'ombre (hors flux) : la case courante garde sa taille, rien ne bouge d'une catégorie à l'autre. */
+  .tabActive {
+    box-shadow: inset 0 0 0 2px Highlight;
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .tabActive .tabIcon {
+    background: Highlight;
+    color: HighlightText;
+  }
 }
 
 /* Carte du serveur officiel de GETI. */
@@ -639,6 +725,11 @@
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.75);
 }
 
+/* Fenêtre « Publier » : deux cadres côte à côte. */
+.modalWide {
+  width: min(820px, 100%);
+}
+
 .modal:focus {
   outline: none;
 }
@@ -666,8 +757,8 @@
 
 .modalClose {
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--line-strong-cy);
   border-radius: var(--r-cy-md);
   background: transparent;
@@ -695,25 +786,137 @@
   font-weight: 600;
 }
 
-.steps {
+/* Fenêtre « Publier » : écarts réguliers entre phrase, cadres et note (les
+   marges nulles de `.modalText` / `.modalNote` annulaient celui de `.modalScroll`). */
+.publishScroll {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  margin: 0;
-  padding-left: 22px;
-  color: var(--blue-300);
+  gap: 14px;
 }
 
-.steps li {
-  padding-left: 4px;
+.publishScroll > * + * {
+  margin-top: 0;
 }
 
-.steps li > * + * {
-  margin-top: 10px;
+.publishClose {
+  justify-content: center;
+  min-height: 44px;
 }
 
-.steps li::marker {
+/* Les deux options de publication : deux cadres de même poids, côte à côte. */
+.options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Quatre rangées partagées (en-tête, phrase, bouton, pied) : les boutons des
+     deux cadres restent à la même hauteur quel que soit le texte. */
+  grid-template-rows: repeat(4, auto);
+  gap: 0 14px;
+}
+
+.option {
+  --option-rgb: var(--blue-500-rgb);
+  --option-tone: var(--blue-300);
+  display: grid;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  row-gap: 14px;
+  align-content: start;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid rgba(var(--option-rgb), 0.38);
+  border-radius: var(--r-cy-lg);
+  background: linear-gradient(160deg, rgba(var(--option-rgb), 0.1), rgba(var(--blue-500-rgb), 0.03));
+}
+
+/* Le violet reste celui du réseau GETI (carte de la page). */
+.optionGeti {
+  --option-rgb: var(--violet-400-rgb);
+  --option-tone: var(--violet-300);
+}
+
+.optionHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.optionHeadText {
+  min-width: 0;
+}
+
+.optionLogo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(var(--option-rgb), 0.55);
+  border-radius: 13px;
+  background: rgba(var(--option-rgb), 0.16);
+  color: var(--blue-100);
+  font-family: var(--font-mono);
+  font-size: 20px;
   font-weight: 700;
+}
+
+.optionEyebrow {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--option-tone);
+}
+
+.optionTitle {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.optionText {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.optionAction {
+  align-self: end;
+  justify-content: center;
+  min-height: 44px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.optionFoot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 44px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Le lien d'invitation garde une cible de 44 px sans gonfler la ligne. */
+.optionFoot .modalLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.optionFoot .officialCount {
+  margin: 2px 0 0;
+}
+
+.optionServer {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .modalActions {
@@ -725,11 +928,23 @@
 .headActions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
 }
 
-.alertOpen {
+/* Le bouton est le premier enfant d'une rangée `InfoHintRow inline`, qui met
+   son premier enfant « en ligne » (prévu pour une phrase) : le bouton y perdait
+   sa boîte flexible — plus d'écart, cloche posée sur la ligne de base au lieu
+   d'être centrée sur le libellé. Il la reprend ici. */
+.headActions button.alertOpen {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
+  vertical-align: middle;
+}
+
+.alertOpen svg {
+  flex: none;
 }
 
 .alertBody {
@@ -893,6 +1108,39 @@
   }
 }
 
+@media (max-width: 1100px) {
+  .tabList {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Fenêtre « Publier » étroite, ou navigateur sans sous-grille : les deux cadres s'empilent. */
+@supports not (grid-template-rows: subgrid) {
+  .options {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    gap: 14px;
+  }
+
+  .option {
+    grid-row: auto;
+    grid-template-rows: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .options {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    gap: 14px;
+  }
+
+  .option {
+    grid-row: auto;
+    grid-template-rows: none;
+  }
+}
+
 @media (max-width: 560px) {
   .hero {
     padding: 40px 0 20px;
@@ -906,7 +1154,18 @@
     width: 100%;
   }
 
+  .tabList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .tab {
-    padding: 8px 13px;
+    gap: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .tabIcon {
+    width: 28px;
+    height: 28px;
   }
 }

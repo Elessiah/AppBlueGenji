@@ -768,8 +768,12 @@ posée par `app/geti-info/page.tsx` et `app/geti-info/[category]/page.tsx`.
 - Une adresse par catégorie : `/geti-info/lfp`, `lft`, `lfsub`, `lfstaff`, `lfs`,
   `lfcast` — le sigle du salon, le même dans les deux langues (`getiCategoryPath`).
   Toute autre écriture (casse comprise) répond 404.
-- `/geti-info` rend la première catégorie **sans renvoi** ; son adresse canonique
-  est `/geti-info/lfp`. L'adresse canonique ne porte jamais les filtres.
+- `/geti-info` rend la catégorie **par défaut — les scrims (`lfs`,
+  `GETI_DEFAULT_CATEGORY`)** — **sans renvoi** ; son adresse canonique
+  est `/geti-info/lfs` (`GETI_DEFAULT_LIST_PATH`, que visent aussi le menu et
+  l'encart de l'accueil). `/geti-info/lfp` et les autres adresses de catégorie
+  restent valides (le défaut est passé de `lfp` à `lfs`, sans renvoi : seul le nu
+  `/geti-info` change de liste). L'adresse canonique ne porte jamais les filtres.
 - **Non indexée** (`GETI_ROBOTS` : `noindex, follow`, `lib/shared/geti/page.ts`) et
   absente du sitemap : les annonces portent le pseudo Discord de tiers (relais GETI
   compris), et `data-nosnippet` ne cache que l'extrait — une recherche sur un pseudo
@@ -863,15 +867,79 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
   vers l'invitation. La fréquentation (`lib/server/geti/community.ts`, invitation
   publique de Discord, 0,8 s au plus, succès gardé 30 min, échec une minute seulement et journalisé par code) est rendue
   sous `Suspense` : elle ne retient jamais la page et disparaît si Discord se tait.
-- « Publier une annonce » (`GetiPublishButton`, modale portée dans `body`) : on ne
-  publie pas sur le site mais dans le salon Discord de la catégorie
-  (`getiChannelUrl`), avec l'invitation de notre serveur, puis — loyauté envers le
-  réseau — depuis le serveur officiel de GETI, dont la carte est reprise.
+- « Publier une annonce » (`GetiPublishButton`, fenêtre `GetiPublishDialog` portée
+  dans `body`, `useDialogBehavior`, `useBackdropDismiss`) : on ne publie pas sur le
+  site mais sur Discord, par l'une de **deux options présentées dans deux cadres de
+  même poids** (`<section>` nommée par son `<h3>`, même gabarit : emblème, surtitre,
+  titre, une phrase, un bouton principal, un pied) :
+  1. **« Publier sur notre serveur » / « Post on our server »** (teinte glacier) :
+     bouton vers le salon de la catégorie (`getiChannelUrl`), et en pied
+     l'invitation de notre serveur pour qui n'en est pas membre.
+  2. **« Publier via GETI Bot » / « Post via GETI Bot »** (violet du réseau,
+     loyauté envers lui) : le serveur officiel de GETI fait **partie du cadre** —
+     plus de carte posée au milieu de la fenêtre —, bouton « Rejoindre » (nom
+     accessible « Rejoindre le serveur Discord GETI… ») et en pied le nom du
+     serveur et sa fréquentation quand Discord la donne (`count`, le
+     `GetiOfficialCount` rendu par le serveur sous `Suspense` : même cache que la
+     carte de la page, aucun appel de plus).
+  L'introduction tient en une phrase ; la règle « une annonce modifiée ou supprimée
+  sur Discord l'est aussi ici » est derrière son `InfoHint`.
+  Côte à côte (rangées partagées par `subgrid` : les deux boutons restent à la même
+  hauteur), empilés sous 700 px ; cibles de 44 px (boutons, fermeture, lien
+  d'invitation). La fenêtre ne charge rien de chez Discord.
+
+### Sélecteur de catégorie (`GetiCategoryNav`)
+
+« Je cherche : » puis **six cases égales** — icône (la même que la carte d'aperçu de
+la catégorie), libellé (« Un scrim », « Un joueur »…), nombre d'annonces. Des
+**liens** (une adresse par catégorie, `aria-current="page"` sur la courante), pas un
+`tablist` : chaque case recharge la page. La catégorie par défaut vient en premier
+(`GETI_CATEGORY_ORDER`, aussi l'ordre des raccourcis de l'accueil). Six de front,
+3 × 2 sous 1100 px, **2 × 3 au téléphone** plutôt qu'une bande défilante : les six
+restent visibles d'un coup. La courante se voit autrement que par la couleur
+(bordure pleine, barre basse, icône sur fond plein, graisse) ; cases de 56 px.
+
+Le nombre est celui des annonces **affichées par défaut** (sans filtre, closes
+cachées) : `countGetiPostsShared` le compte sur les lectures partagées de la liste
+(mêmes règles : fenêtre de garde, oppositions), gardé 5 s (`GETI_COUNT_CACHE_TTL_MS`, bâti sur
+des lectures de 10 s : une annonce sortie de la garde quitte le nombre au plus 15 s
+après, la case courante sans filtre prenant le total de la liste) sous le préfixe
+`geti:scan:`, **une lecture après l'autre** (pas six ensemble sur le pool), oublié
+à toute écriture comme la liste ; la case courante sans filtre reprend le total de la
+liste affichée. Rendu **à part**, sous `Suspense` (`GetiCategoryNavCounted`) : la page
+n'attend jamais ces six lectures, le sélecteur s'affiche d'abord sans nombre. Lu à voix
+haute en entier (« Un scrim, 4 annonces » ; filtres actifs, la case courante dit « 14
+annonces sans filtre »). Illisible (`countGetiPostsForNav`) : aucun nombre, l'échec
+consigné par code comme celui de la liste (`logGetiListFailure`), et 10 s d'abstention
+avant de relire (levée aussi par toute écriture réussie : la base est revenue). Finitions : pastille vide de même emprise pendant l'attente des nombres
+(`pending`, aucun décalage à leur arrivée), libellé coupé aux mots (`overflow-wrap:
+break-word`, `hyphens: auto`), survol de l'icône et de la pastille, barre basse animée,
+repli `forced-colors` (bordure de 3 px, icône `Highlight`) ; dans la fenêtre « Publier »,
+repli sans sous-grille (`@supports not`) : les deux cadres s'empilent, et le lien
+« Rejoindre » garde son texte visible avec un suffixe lu seulement (serveur, nouvel onglet).
+
+### Aperçu d'un lien collé (Discord)
+
+La page est `noindex, follow`, ce qui n'empêche pas l'aperçu : `getiCategoryMetadata`
+passe par `pageMetadata` (`SHARE_METADATA.md`) et écrit, par catégorie et par langue,
+`og:title` « Annonces GETI — Je cherche un scrim · BlueGenji Esport » (« GETI posts —
+… »), `og:description` = la phrase de la catégorie, `og:site_name`, `og:url`
+canonique (celle de la catégorie, `/geti-info` compris), `og:locale` (`fr_FR` /
+`en_US`, la valeur du site pour l'anglais), la carte Twitter large et `og:image`
+= **une carte par catégorie**, `/og/<langue>/geti-<catégorie>.png` (1200 × 630,
+rendue par le site, texte de `messages/*/share.json` § `geti`, motif et teinte de
+`GETI_SHARE_CARD_STYLES`). `theme-color` vient de la mise en page racine. Aucune
+annonce ni pseudo dans l'aperçu : titre, phrase et carte sont fixes.
+
+Le bouton « Créer une alerte » est le premier enfant d'une rangée `InfoHintRow
+inline`, qui met son premier enfant « en ligne » : il y perdait sa boîte flexible
+(cloche sur la ligne de base, sans écart). `.headActions button.alertOpen` la lui
+rend, et `.headActions` centre ses boutons.
 
 ### Fraîcheur
 
 Aucun flux : `GetiRefresher` relit la page (`router.refresh()`) au retour sur
-l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lecture SQL des annonces est mutualisée 10 s par catégorie et âge — `listGetiPostsShared`, `cached` à vol unique, oubliée après toute écriture : enregistrement, suppression, réconciliation, purge, réanalyse ; une annonce supprimée sur Discord disparaît donc aussitôt, comme le dit `/rgpd` —, le filtre et la page restent par demande ; un geste de filtre attend 300 ms de calme avant de naviguer, « Réinitialiser » part tout de suite ; la fenêtre « Publier » rend sa carte elle-même à l'ouverture)
+l'onglet (étranglé) et toutes les 5 minutes en régime plein seulement (la lecture SQL des annonces est mutualisée 10 s par catégorie et âge — `listGetiPostsShared`, `cached` à vol unique, oubliée après toute écriture : enregistrement, suppression, réconciliation, purge, réanalyse ; une annonce supprimée sur Discord disparaît donc aussitôt, comme le dit `/rgpd` —, le filtre et la page restent par demande ; un geste de filtre attend 300 ms de calme avant de naviguer, « Réinitialiser » part tout de suite ; la fenêtre « Publier » rend ses deux cadres elle-même à l'ouverture)
 (`getiRefreshIntervalMs`, `CLIENT_POWER_MODES.md`) ; un onglet caché ne demande rien.
 
 ### Textes, tests, seed
@@ -904,7 +972,7 @@ La page est une **fonction principale** du site : on y arrive de deux endroits, 
 chaque page vitrine et dès l'accueil.
 
 - **Menu burger** (`PublicNavMenu`, `PUBLIC_NAVIGATION.md`) : « Annonces GETI » /
-  « GETI posts » ouvre la liste, mise en avant, vers l'adresse canonique `/geti-info/lfp`
+  « GETI posts » ouvre la liste, mise en avant, vers l'adresse canonique `/geti-info/lfs`
   (`GETI_DEFAULT_LIST_PATH`), page courante sur toute la rubrique ; les entrées de la
   partie compétitive (Tournois, Équipes, Classement, Joueurs) en sont sorties. La
   barre des connectés (`SiteNav`) ne change pas.
@@ -912,9 +980,9 @@ chaque page vitrine et dès l'accueil.
   défilant) : une carte avec une accroche courte (les types d'annonces ; ce que la page
   réunit et la marche à suivre — filtrer, puis contacter l'auteur sur Discord —
   derrière un `<InfoHint>`), le bouton « Voir les
-  annonces GETI » et un raccourci par catégorie (« Parcourir : Équipes qui recrutent,
-  Joueurs sans équipe, Remplaçants recherchés, Staff, Scrims, Casts » →
-  `/geti-info/<catégorie>`). Le bouton vise l'adresse canonique `/geti-info/lfp`
+  annonces GETI » et un raccourci par catégorie (« Parcourir : Scrims, Équipes qui recrutent,
+  Joueurs sans équipe, Remplaçants recherchés, Staff, Casts » →
+  `/geti-info/<catégorie>`, scrims d'abord). Le bouton vise l'adresse canonique `/geti-info/lfs`
   (celle que déclare `/geti-info`), comme l'entrée du menu : une seule adresse par liste. Les raccourcis
   nomment **ce que la liste contient**, pas l'intention de l'auteur comme les
   onglets de la page (« Je cherche un joueur » = annonces d'équipes qui recrutent) :
