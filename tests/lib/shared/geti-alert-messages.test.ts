@@ -101,6 +101,10 @@ describe("privacy change « alertes d'annonces GETI »", () => {
 });
 
 /** Textes d'une fiche du registre, en français et en anglais. */
+/** Politique du bot et article 01 de ses conditions, en texte : [fr, en]. */
+const BOT_POLICY = [JSON.stringify(PRIVACY_POLICY.fr), JSON.stringify(PRIVACY_POLICY.en)];
+const BOT_TERMS_01 = [JSON.stringify(TERMS_OF_SERVICE.fr.sections[0]), JSON.stringify(TERMS_OF_SERVICE.en.sections[0])];
+
 function record(ref: string) {
   const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === ref);
   const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === ref);
@@ -160,8 +164,7 @@ describe("registre — T08 et documents du bot", () => {
   });
 
   it("botPrivacyPolicy_siteMessages_listGetiPostAlertCertifiedOnlyAndTopicOptOut", () => {
-    const fr = JSON.stringify(PRIVACY_POLICY.fr);
-    const en = JSON.stringify(PRIVACY_POLICY.en);
+    const [fr, en] = BOT_POLICY;
 
     expect(fr).toContain("alerte d'annonces GETI — une nouvelle annonce de recrutement correspond à une recherche que vous avez gardée sur le site");
     expect(fr).toContain("les alertes d'annonces GETI ne partent, elles aussi, qu'aux tags certifiés, et se coupent par leur sujet de notifications dans « Mon profil »");
@@ -170,8 +173,8 @@ describe("registre — T08 et documents du bot", () => {
   });
 
   it("botTerms_article01_listsGetiPostAlerts", () => {
-    expect(JSON.stringify(TERMS_OF_SERVICE.fr.sections[0])).toContain("alertes d'annonces GETI (aux seuls comptes dont le tag Discord est certifié)");
-    expect(JSON.stringify(TERMS_OF_SERVICE.en.sections[0])).toContain("GETI post alerts (only to accounts with a certified Discord tag)");
+    expect(BOT_TERMS_01[0]).toContain("alertes d'annonces GETI (aux seuls comptes dont le tag Discord est certifié)");
+    expect(BOT_TERMS_01[1]).toContain("GETI post alerts (only to accounts with a certified Discord tag)");
   });
 });
 
@@ -279,13 +282,12 @@ describe("cycle juridique 2 — « jamais deux fois » borné à l'annonce gard�
   });
 
   it("botPrivacyPolicy_getiAlertLink_openedOnReportedPost", () => {
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("un lien vers la page filtrée comme elle, ouverte sur l'annonce signalée, ni pseudo");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("a link to the page filtered like it, opened on the reported post, neither");
+    expect(BOT_POLICY[0]).toContain("un lien vers la page filtrée comme elle, ouverte sur l'annonce signalée, ni pseudo");
+    expect(BOT_POLICY[1]).toContain("a link to the page filtered like it, opened on the reported post, neither");
   });
 
   it("botPrivacyPolicy_siteMessages_listDeadlinesNewMatchProdAndPlanning", () => {
-    const fr = JSON.stringify(PRIVACY_POLICY.fr);
-    const en = JSON.stringify(PRIVACY_POLICY.en);
+    const [fr, en] = BOT_POLICY;
 
     expect(fr).toContain("date butoir de planification d'un match, ses rappels et le double forfait prononcé faute d'horaire");
     expect(fr).toContain("annonce d'un nouveau match aux membres de ses deux équipes");
@@ -300,8 +302,7 @@ describe("cycle juridique 2 — « jamais deux fois » borné à l'annonce gard�
   });
 
   it("botPrivacyPolicy_basis_coversPlanningT20AndGetiAlertsT22", () => {
-    const fr = JSON.stringify(PRIVACY_POLICY.fr);
-    const en = JSON.stringify(PRIVACY_POLICY.en);
+    const [fr, en] = BOT_POLICY;
 
     expect(fr).toContain("registre du site T20) pour les avis du planning des casts et arbitres");
     expect(fr).toContain("exécution du service demandé par le compte (registre du site T22) pour les alertes d'annonces GETI");
@@ -310,8 +311,7 @@ describe("cycle juridique 2 — « jamais deux fois » borné à l'annonce gard�
   });
 
   it("botTerms_article01_listsDeadlinesNewMatchProdAndPlanning", () => {
-    const fr = JSON.stringify(TERMS_OF_SERVICE.fr.sections[0]);
-    const en = JSON.stringify(TERMS_OF_SERVICE.en.sections[0]);
+    const [fr, en] = BOT_TERMS_01;
 
     expect(fr).toContain("dates butoirs de planification, annonces d'un nouveau match, avis de prod");
     expect(fr).toContain("avis du planning des casts et arbitres");

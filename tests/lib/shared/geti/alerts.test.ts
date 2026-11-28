@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import type { GetiFilter } from "@/lib/shared/geti";
+import type { GetiCategory, GetiFilter } from "@/lib/shared/geti";
 import {
   GETI_ALERT_FRESH_MINUTES,
   GETI_ALERT_NAME_MAX,
@@ -20,29 +20,14 @@ const NOW = Date.parse("2026-11-27T12:00:00.000Z");
 const MINUTE_MS = 60_000;
 
 describe("getiAlertSearch", () => {
-  it("getiAlertSearch_pageSearchWithAgePageAndClosed_keepsFiltersOnly", () => {
-    const search = getiAlertSearch("lfp", "?role=tank&age=3&p=2&closed=1");
-
-    expect(search).toBe("?role=tank");
-  });
-
-  it("getiAlertSearch_unorderedAndUnknownParams_returnsCanonicalForm", () => {
-    const search = getiAlertSearch("lfp", "?reg=eu&inconnu=1&role=tank");
-
-    expect(search).toBe("?role=tank&reg=eu");
-  });
-
-  it("getiAlertSearch_noFilter_returnsEmptySearch", () => {
-    const search = getiAlertSearch("lft", "");
-
-    expect(search).toBe("");
-  });
-
-  it("getiAlertSearch_filterNotOfferedByCategory_dropsIt", () => {
-    // Les recherches de scrim n'ont pas de filtre de rôle.
-    const search = getiAlertSearch("lfs", "?role=tank");
-
-    expect(search).toBe("");
+  // Une recherche de scrim (`lfs`) n'a pas de filtre de rôle.
+  it.each<[string, GetiCategory, string, string]>([
+    ["pageSearchWithAgePageAndClosed_keepsFiltersOnly", "lfp", "?role=tank&age=3&p=2&closed=1", "?role=tank"],
+    ["unorderedAndUnknownParams_returnsCanonicalForm", "lfp", "?reg=eu&inconnu=1&role=tank", "?role=tank&reg=eu"],
+    ["noFilter_returnsEmptySearch", "lft", "", ""],
+    ["filterNotOfferedByCategory_dropsIt", "lfs", "?role=tank", ""],
+  ])("getiAlertSearch_%s", (_case, category, input, expected) => {
+    expect(getiAlertSearch(category, input)).toBe(expected);
   });
 
   it("getiAlertSearch_oversizedInput_returnsNull", () => {
@@ -104,7 +89,7 @@ describe("getiAlertName", () => {
   });
 
   it("getiAlertName_controlAndDirectionCharacters_areReplacedBySingleSpaces", () => {
-    expect(getiAlertName("  Tank‮\n​EU  ")).toBe("Tank EU");
+    expect(getiAlertName("  Tank\u202E\n\u200BEU  ")).toBe("Tank EU");
   });
 });
 
