@@ -269,14 +269,15 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   (« lundi au jeudi » — deux puces « - Mardi », « - Dimanche » sont deux
   jours), « week-end », « en semaine », « tous les soirs », « 7/7j ». Le jour de
   semaine de chaque date lue s'y ajoute.
-- **Dates** (`dates`, `parseGetiDates`) : « 26/11 », « 22/11/26 », « Thursday
-  26 » (le quantième doit tomber sur le jour nommé), « ce soir », « today »,
-  « demain », résolues depuis la date de publication, à l'heure de Paris, dans
-  une fenêtre de −1 à +60 jours (« 4/5 jours », « 9/10 » ne sont pas des
-  dates). Une recherche de **scrim ou de remplaçant** (salon, ou mot-clé
-  `lfs` / `lfsub` du texte) vise des soirées : un jour nommé sans date donne sa
-  prochaine occurrence (six jours au plus), un horaire sans jour ou un « now »
-  le jour même de la publication.
+- **Dates** (`dates`, `parseGetiSchedule`) : « 26/11 », « 22/11/26 », « Thursday
+  26 » (le quantième doit tomber sur le jour nommé), « ce soir », « demain »,
+  « après-demain », « ce week-end », « lundi prochain », résolues **depuis la
+  date de publication**, dans une fenêtre de −1 à +60 jours (« 4/5 jours »,
+  « 9/10 » ne sont pas des dates) — détail au § Dates relatives, annonces
+  passées et fuseaux. Une recherche de **scrim ou de remplaçant** (salon, ou
+  mot-clé `lfs` / `lfsub` du texte) vise des soirées : un jour nommé sans date
+  donne sa prochaine occurrence (six jours au plus), un horaire sans jour ou un
+  « now » le jour même de la publication.
 - **Niveaux** (`levels`, `parseGetiLevels`) : divisions de la ligue FACEIT —
   « open », « inter(mediate) », « adv(anced) », « expert », nuancés ou non
   (« high open », « HighOpen », « low-mid advanced »). « int » n'est lu que
@@ -293,9 +294,8 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
   « 20-22 CET », « 21/23 CET », « 21.15-23 CET », « h21-23 », « 20 CET » ; sans
   fuseau derrière, seulement en soirée (« 20-22 » dès 13 h au tiret, « 21/23 »
   dès 19 h à la barre) — « 3-5 joueurs », « 18-25 ans », « 22/11 », « 15/20 »
-  n'en sont pas. Fuseau : « CET », « CEST », « BST », « EET », « UTC+1 »,
-  « heure française » (= `Europe/Paris`), et « cet » / « cest » en minuscules
-  derrière une heure — pas le démonstratif (« 15h cet après-midi », « 18 cet été »).
+  n'en sont pas. Fuseau écrit : voir § Dates relatives, annonces passées et
+  fuseaux — les horaires gardés sont **à l'heure de Paris**.
 - **Nom d'équipe** : derrière un libellé (« Équipe : … », « Team: … ») ou dans la
   phrase après « team / équipe / structure / roster », mots en capitale seulement,
   arrêté au premier mot du vocabulaire d'annonce (« Team Blue Phoenix EU ») ; sans
@@ -320,8 +320,8 @@ Master, Grand Maître, Champion. Échelle : Bronze 5 = 0 … Champion 1 = 44
 ## Filtre — `matchesGetiFilter(post, filter, now?)`
 
 Critères de `GetiFilter` : `category`, `ranks` (`min`, `max`), `roles`,
-`regions`, `platforms`, `languages`, `levels`, `hideClosed`, `maxAgeHours`,
-`includeUnknown`. Un critère
+`regions`, `platforms`, `languages`, `levels`, `days`, `time`, `hideClosed`,
+`hidePast`, `maxAgeHours`, `includeUnknown`. Un critère
 absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passer
 (ET) ; dans un critère à plusieurs valeurs, une seule suffit (OU).
 
@@ -341,9 +341,128 @@ absent, nul ou vide ne filtre rien. Tous les critères renseignés doivent passe
   comme « sans limite » : rien ne passe ; `includeUnknown: "true"` vaut `true` ;
   une catégorie inconnue (`"LFP"`) est ignorée.
 - **Annonces closes** : écartées avec `hideClosed: true` (ou `"true"`).
+- **Annonces passées** : écartées avec `hidePast: true` (ou `"true"`) — toutes
+  les dates visées sont finies à `now` (`isGetiPostPast`). Une annonce sans date
+  n'est jamais passée.
+- **Jour** : un jour voulu désigne une soirée **à venir**. Le jour d'une date
+  déjà finie ne compte plus (sauf si une date à venir tombe le même jour) : un
+  « tonight » publié vendredi ne répond plus à « vendredi » le samedi, même
+  avec `includeUnknown`.
 - **Champ non lu** (rang, rôle, région, plateforme, langue, niveau) : l'annonce est
   écartée, sauf `includeUnknown: true` — le lot 3 décide du réglage par défaut de
   la page.
+
+## Dates relatives, annonces passées et fuseaux
+
+Signalement (2026-11-28) : un scrim « TONIGHT » publié la veille restait dans la
+liste et répondait au filtre « vendredi ». La date était bien résolue depuis la
+publication — mais rien ne disait qu'elle était **finie**, et le filtre par jour
+ne regardait que le jour de la semaine.
+
+### Dates relatives (`parseGetiSchedule`, `lib/shared/geti/fields.ts`)
+
+Tout mot relatif se résout depuis la **date de publication** (`posted_at`),
+jamais depuis l'heure de lecture ni celle d'une réanalyse, dans le fuseau écrit
+par l'annonce (Paris sinon). Sans date de publication, aucune date n'est lue.
+
+| Écrit | Date |
+| --- | --- |
+| « ce soir », « tonight », « cette nuit », « cet après-midi », « this evening » | le jour de la publication |
+| « aujourd'hui », « today », « ajd » | le jour de la publication — **scrim ou remplaçant seulement** (« aujourd'hui, on recrute » ne date pas un recrutement) |
+| « demain », « tomorrow », « tmrw » | le lendemain |
+| « après-demain », « day after tomorrow » | le surlendemain (lu avant « demain », qu'il contient) |
+| « ce week-end », « this weekend », « ce we » | le samedi et le dimanche qui viennent ; publié un dimanche : ce dimanche (« le week-end » seul reste une habitude) |
+| « lundi prochain », « next friday » | la prochaine occurrence **après** le jour de la publication |
+| « ce vendredi », « this friday » | la prochaine occurrence, jour de la publication compris |
+
+Publié jeudi à 23 h 30, « tonight » vise jeudi ; publié vendredi à 0 h 30,
+vendredi. Un créneau sans jour d'un scrim (« LFS 3k5 21-23 ») vise le soir
+même — le **lendemain** s'il était déjà fini à la publication (écrit à 23 h 30).
+
+Pour un scrim ou un remplaçant daté, `availability.days` ne porte **que** les
+jours de ses dates (au plus six jours nommés ; au-delà, « tous les soirs »
+reste une habitude sans date).
+
+### Annonces passées (`getiPostEndsAt`, `isGetiPostPast`, `lib/shared/geti/filter.ts`)
+
+Une annonce est **passée** quand sa dernière date visée est finie, à l'heure de
+Paris : à la fin de son dernier horaire (`getiSlotEndMinutes` — la fin d'une
+plage, le lendemain pour « 22h-1h » ; **deux heures** après une heure seule,
+« dès 21h » ; minuit sans horaire). Une annonce sans date ne l'est jamais. Le
+calcul se fait à la lecture, depuis `dates` et `availability.times` : rien de
+plus n'est gardé.
+
+- **Scrims** (`GETI_PAST_HIDDEN_CATEGORIES` : `lfs`) : masqués par défaut
+  (`hidePast`). Le lien « Afficher / Masquer les scrims passés » sous le
+  compteur et la case du même nom dans les filtres (`past=1`, `InfoHint`) les
+  montrent, avec la pastille « Passé » et la carte en pointillés.
+- **Autres catégories** : jamais masquées. Pastille « Passé » pour un
+  remplaçant, « Date passée » ailleurs (un recrutement qui citait un essai
+  « ce soir » reste d'actualité).
+- **Filtre par jour** : ne compte que les dates à venir (§ Filtre).
+- **Alertes** : une annonce déjà passée à sa réception ne prévient personne
+  (`isGetiPostAlertable` — un « tonight » de la veille reçu au rattrapage, une
+  modification tardive) ; une alerte ne garde pas `past=1`.
+
+### Fuseaux (`lib/shared/geti/zones.ts`)
+
+Horaires et dates sont gardés **à l'heure de Paris**. Une annonce sans fuseau
+est lue à l'heure de Paris (dit dans les `InfoHint` des filtres).
+
+| Écrit | Lu comme |
+| --- | --- |
+| « CET », « CEST », « heure française », « heure FR », « 21h FR », « Paris time » | l'heure de Paris, été comme hiver (« CET » écrit en juillet est l'heure de Paris, pas UTC+1) |
+| « BST », « WET », « WEST » | l'heure de Londres (Paris − 1 h) |
+| « EET », « EEST » | l'heure d'Helsinki (Paris + 1 h) |
+| « EST », « EDT », « heure du Québec » | l'heure de New York |
+| « CST », « CDT » · « PST », « PDT » | l'heure de Chicago · de Los Angeles |
+| « UTC », « GMT », « UTC+1 », « GMT-5 », « UTC+5:30 » | un décalage fixe (de −12 à +14 h) |
+
+- Sigles en **capitales** seulement (« est », « cet », « west » sont des mots),
+  ou en minuscules derrière une heure : « 20-22 cet », « 21h cest », « 20-22
+  utc+1 » ; les sigles américains en minuscules seulement derrière une heure en
+  am/pm (« 9pm est » ; « 21h est bien » reste du français).
+- **« cet » démonstratif** n'est pas un fuseau, en minuscules comme en
+  capitales : « 15h cet après-midi », « RDV CET APRÈS-MIDI », « cet été »,
+  « cet horaire », « cet effectif »… (`CET_DEMONSTRATIVE`).
+- **Conversion** : le décalage est celui de l'instant visé (première date, sinon
+  jour de la publication ; premier horaire) — heure d'été des deux côtés
+  comprise (les semaines où New York et Paris ne changent pas d'heure ensemble
+  donnent 5 h d'écart au lieu de 6). Une date suit son premier horaire :
+  « Friday 9pm EST » tombe le **samedi** à 3 h à Paris, et le jour gardé est
+  samedi. « ce soir » se compte dans le fuseau écrit.
+- **Affichage** : l'étiquette dit l'heure de Paris (« 21h – 23h (heure de
+  Paris) ») ; l'heure écrite (`availability.statedTimes`, gardée seulement quand
+  la conversion décale) se lit au survol et par un lecteur d'écran (« Dans
+  l'annonce : 20h – 22h (UTC) », `getiChipTitle`). Un fuseau qui ne décale rien
+  reste écrit tel quel (« 21h – 23h (CET) »).
+- **Heure de Paris sans `Intl`** (`getiParisOffsetMinutes`) : règle européenne
+  (dernier dimanche de mars → dernier dimanche d'octobre, bascule à 1 h UTC),
+  car le filtre la calcule pour chaque annonce listée ; les autres fuseaux
+  nommés passent par `Intl`, à l'analyse seulement.
+
+### Réanalyse
+
+`ANALYSIS_VERSION` passe à **3** : les lignes gardées sont réécrites par la
+purge horaire (`refreshStaleGetiPosts`), et réanalysées à la lecture d'ici là.
+La réanalyse date le message brut de **`posted_at`** (`datedRaw`), la date
+gardée de la publication — jamais de l'heure où elle tourne.
+
+### Mesure sur l'échantillon réel
+
+695 annonces réelles (lecture seule, jamais dans le dépôt), « maintenant » fixé
+au 27/11/2026 12 h (Paris) : 99 % des recherches de scrim ont une date résolue
+(inchangé), 71 % sont passées et sortent de la liste par défaut ; les 7
+recherches de remplaçant sont toutes passées. Fuseaux écrits : CET (188),
+CEST (53), « heure FR » (1) — aucun fuseau hors de Paris dans l'échantillon, la
+conversion vaut pour la suite.
+
+### Tests
+
+`tests/lib/shared/geti/zones.test.ts` (fuseaux, heure d'été),
+`schedule.test.ts` (mots relatifs, conversion), `past.test.ts` (annonce passée,
+filtre par jour, alertes), `tests/components/geti-past.test.tsx` (pastille,
+lien, case), `e2e/geti-info.spec.ts` (base seedée).
 
 ## Questions ouvertes pour les lots suivants
 
@@ -367,7 +486,7 @@ identifiants, serveurs, équipes) rejoignent `tests/fixtures/geti/posts.json`.
   `upsertGetiPosts` l'écarte comme un message vide (compté `emptied`, retiré
   s'il était gardé). Un relais à en-tête GETI n'en est jamais une.
 - **Analyses déjà gardées** : chaque analyse est gardée avec sa version en
-  dernière clé (`"analysisVersion":2}` — 2 : passages masqués non lus) ; une ligne
+  dernière clé (`"analysisVersion":3}` — 2 : passages masqués non lus ; 3 : dates relatives et fuseaux) ; une ligne
   d'une version antérieure est réanalysée à la lecture depuis son
   `raw_json` par `listGetiPosts` (seules ces lignes remontent leur message brut) ;
   message brut illisible : la ligne n'est pas rendue (son analyse ancienne a pu
@@ -643,6 +762,7 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
 | `hfrom`, `hto` | créneau horaire, heures entières (début 0–23, fin 1–24 ; début après la fin = passe minuit) | `hfrom=22&hto=2` |
 | `age` | âge maximal en jours, sous la durée de garde (1, 3, et 7 hors scrims) | `age=3` |
 | `closed=1` | montrer aussi les annonces closes (masquées par défaut) | |
+| `past=1` | montrer aussi les scrims passés (masqués par défaut ; `lfs` seulement) | |
 | `strict=1` | écarter les annonces qui ne précisent pas un critère choisi | |
 | `p` | page (30 annonces par page ; au-delà de la dernière, un message et un lien vers la dernière) | `p=2` |
 
@@ -690,7 +810,7 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
 - Pseudo Discord (`visibleText`), sélectionnable, et bouton **Copier** : presse-papiers,
   repli `execCommand`, notification `showSuccess` (ou `showError`).
 - Âge relatif (« il y a 3 h »), date absolue (heure de Paris) en `title` ; marque
-  « modifiée » ; pastille « Close » ; provenance discrète (relais de GETI ou
+  « modifiée » ; pastille « Close », pastille « Passé » / « Date passée » (§ Dates relatives, annonces passées et fuseaux) ; provenance discrète (relais de GETI ou
   message direct, serveur d'origine).
 - **Étiquettes** des données lues (`getiPostChips`), teintées par nature ; celles
   qui répondent à un critère actif (`getiChipMatches`) sont mises en avant — plus

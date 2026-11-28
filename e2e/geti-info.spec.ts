@@ -139,7 +139,8 @@ test.describe("GETI Info — page publique", () => {
   });
 
   test("base seedée : le créneau de nuit garde l'annonce de 23h à 1h", async ({ page }) => {
-    await page.goto("/geti-info/lfs?hfrom=22&hto=2");
+    // Scrims passés compris : « ce soir » d'une base seedée la veille est déjà passé.
+    await page.goto("/geti-info/lfs?hfrom=22&hto=2&past=1");
     const posts = page.getByTestId("geti-post");
     test.skip((await posts.count()) === 0, "Aucune annonce : base absente ou non seedée."); // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     await expect(posts.filter({ hasText: "Team Test Nocturne" })).toHaveCount(1);
@@ -210,6 +211,34 @@ test.describe("GETI Info — page publique", () => {
     await first.getByRole("button", { name: /Copier le pseudo/ }).click();
     await expect(page.getByText(`Pseudo Discord copié : ${tag}`, { exact: true })).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(tag);
+  });
+
+  test("base seedée : un scrim passé est masqué, puis montré avec sa pastille", async ({ page }) => {
+    await page.goto("/geti-info/lfs");
+    const posts = page.getByTestId("geti-post");
+    test.skip((await posts.count()) === 0, "Aucune annonce : base absente ou non seedée."); // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
+    // « tonight » publié l'avant-veille : passé, donc masqué ; « demain » reste à venir.
+    await expect(posts.filter({ hasText: "Team Test Veille" })).toHaveCount(0);
+    await expect(posts.filter({ hasText: "Team Test Demain" })).toHaveCount(1);
+    await expect(posts.getByTestId("geti-past")).toHaveCount(0);
+
+    await page.getByTestId("geti-past-toggle").click();
+    await expect(page).toHaveURL(/\/geti-info\/lfs\?past=1$/);
+    const past = posts.filter({ hasText: "Team Test Veille" });
+    await expect(past).toHaveCount(1);
+    await expect(past.getByTestId("geti-past")).toHaveText("Passé");
+    await expect(page.getByRole("form", { name: "Filtres" }).getByRole("checkbox", { name: "Afficher les scrims passés" })).toBeChecked();
+  });
+
+  test("base seedée : un horaire écrit en UTC s'affiche à l'heure de Paris", async ({ page }) => {
+    await page.goto("/geti-info/lfs");
+    const post = page.getByTestId("geti-post").filter({ hasText: "Team Test Meridian" });
+    test.skip((await post.count()) === 0, "Aucune annonce : base absente ou non seedée."); // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
+    // 20 h – 22 h UTC : 21 h – 23 h à Paris en hiver, 22 h – 24 h en été ; l'heure écrite reste lisible.
+    const chip = post.locator(`li[title^="Dans l'annonce"]`);
+    await expect(chip).toHaveCount(1);
+    await expect(chip).toContainText("heure de Paris");
+    await expect(chip).toHaveAttribute("title", "Dans l'annonce : 20h – 22h (UTC)");
   });
 
   test("base seedée : une annonce close n'apparaît que sur demande", async ({ page }) => {

@@ -93,16 +93,26 @@ export const GETI_STAFF_ROLES = [
 export type GetiStaffRole = (typeof GETI_STAFF_ROLES)[number];
 
 /**
- * Horaire lu dans l'annonce, en minutes depuis minuit (0–1440) dans le fuseau
- * de l'annonce ; `to` vaut `null` pour une heure seule (« à partir de 21h »).
+ * Horaire lu dans l'annonce, en minutes depuis minuit (0–1440) ;
+ * `to` vaut `null` pour une heure seule (« à partir de 21h »).
  */
 export type GetiTimeRange = { from: number; to: number | null };
 
 export type GetiAvailability = {
+  /** Jours visés, à l'heure de Paris ; ceux des dates pour un scrim ou un remplaçant daté. */
   days: GetiDay[];
+  /** Horaires à l'heure de Paris (convertis quand l'annonce écrit un autre fuseau). */
   times: GetiTimeRange[];
-  /** « Europe/Paris », ou le sigle écrit (« CET », « UTC+1 ») ; `null` si absent. */
+  /**
+   * Fuseau écrit : « Europe/Paris » (en mots), ou le sigle (« CET », « UTC+1 »,
+   * « EST ») ; `null` si absent — l'annonce est alors lue à l'heure de Paris.
+   */
   timezone: string | null;
+  /**
+   * Horaires tels qu'écrits, dans le fuseau de l'annonce, dans l'ordre de
+   * `times` ; présents seulement quand la conversion les a décalés.
+   */
+  statedTimes?: GetiTimeRange[];
 };
 
 /** Rangs lus dans l'annonce : fourchette globale, puis par rôle quand il est donné. */
@@ -188,8 +198,9 @@ export type GetiParsedPost = {
   languages: GetiLanguage[];
   availability: GetiAvailability;
   /**
-   * Dates visées (« 26/11 », « Thursday 26 », « ce soir »), « AAAA-MM-JJ » à
-   * l'heure de Paris, triées ; vide sans date de publication.
+   * Dates visées (« 26/11 », « Thursday 26 », « ce soir », « demain »),
+   * « AAAA-MM-JJ » à l'heure de Paris, triées ; résolues depuis la date de
+   * publication (jamais depuis l'heure de lecture), vides sans elle.
    */
   dates: string[];
   /** Niveaux de division cités (« adv », « high open »). */
@@ -219,7 +230,7 @@ export type GetiFilter = {
   subRoles?: readonly GetiSubRole[] | null;
   /** Rôles de staff voulus (coach, caster…) : un seul suffit. */
   staffRoles?: readonly GetiStaffRole[] | null;
-  /** Jours voulus : un seul suffit. */
+  /** Jours voulus : un seul suffit ; le jour d'une date déjà finie ne compte plus. */
   days?: readonly GetiDay[] | null;
   /**
    * Créneau voulu, en minutes depuis minuit (0–1440) : un horaire de l'annonce
@@ -228,6 +239,8 @@ export type GetiFilter = {
   time?: { from?: number | null; to?: number | null } | null;
   /** `true` : une annonce close (texte entièrement barré) est écartée. */
   hideClosed?: boolean;
+  /** `true` : une annonce passée (toutes ses dates visées sont finies) est écartée. */
+  hidePast?: boolean;
   /** Âge maximal de l'annonce, en heures. */
   maxAgeHours?: number | null;
   /**

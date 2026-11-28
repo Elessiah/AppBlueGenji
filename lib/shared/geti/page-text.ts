@@ -64,6 +64,24 @@ function dateLabel(iso: string, locale: Locale): string {
   }).format(date);
 }
 
+/** « 21h – 23h », « dès 21h ». */
+function timeLabel(slot: { from: number; to: number | null }, text: GetiDataText, locale: Locale): string {
+  const from = getiClockLabel(slot.from, locale);
+  return slot.to === null
+    ? getiText(locale, text.chips.timeFrom, { from })
+    : getiText(locale, text.chips.timeRange, { from, to: getiClockLabel(slot.to, locale) });
+}
+
+/**
+ * Précision d'une étiquette, lue au survol et par un lecteur d'écran : l'horaire
+ * tel que l'annonce l'écrit (« 21h – 23h UTC ») quand l'étiquette le montre
+ * converti à l'heure de Paris. `null` quand l'étiquette dit déjà tout.
+ */
+export function getiChipTitle(chip: GetiChip, text: GetiDataText, locale: Locale): string | null {
+  if (chip.kind !== "time" || !chip.stated || chip.timezone === null) return null;
+  return getiText(locale, text.chips.timeStated, { time: timeLabel(chip.stated, text, locale), zone: chip.timezone });
+}
+
 /** Le texte d'une étiquette d'annonce. */
 export function getiChipLabel(chip: GetiChip, text: GetiDataText, locale: Locale): string {
   switch (chip.kind) {
@@ -88,11 +106,9 @@ export function getiChipLabel(chip: GetiChip, text: GetiDataText, locale: Locale
     case "day":
       return text.days[chip.value];
     case "time": {
-      const from = getiClockLabel(chip.from, locale);
-      const time =
-        chip.to === null
-          ? getiText(locale, text.chips.timeFrom, { from })
-          : getiText(locale, text.chips.timeRange, { from, to: getiClockLabel(chip.to, locale) });
+      const time = timeLabel(chip, text, locale);
+      // Horaire converti : l'étiquette dit l'heure de Paris, le fuseau écrit reste dans l'infobulle.
+      if (chip.stated) return getiText(locale, text.chips.timeParis, { time });
       return chip.timezone ? getiText(locale, text.chips.timeZone, { time, zone: chip.timezone }) : time;
     }
     case "date":

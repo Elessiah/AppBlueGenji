@@ -10,7 +10,7 @@
  *
  * Module pur : importable côté serveur comme côté client.
  */
-import { matchesGetiFilter } from "@/lib/shared/geti/filter";
+import { isGetiPostPast, matchesGetiFilter } from "@/lib/shared/geti/filter";
 import { visibleText } from "@/lib/shared/visible-text";
 import {
   getiPageFilter,
@@ -83,10 +83,10 @@ function searchParamsOf(search: string): GetiSearchParams {
 /**
  * Ce qu'une alerte garde d'un état de filtres : ni la page, ni l'âge (une
  * alerte ne regarde que ce qui vient d'arriver), ni « montrer les annonces
- * closes » (une annonce close ne prévient jamais).
+ * closes » ou « passées » (une annonce close ou passée ne prévient jamais).
  */
 function alertQuery(query: GetiPageQuery): GetiPageQuery {
-  return { ...query, page: 1, ageDays: null, showClosed: false };
+  return { ...query, page: 1, ageDays: null, showClosed: false, showPast: false };
 }
 
 /** L'état de filtres d'une alerte gardée (ou d'une recherche écrite par la page). */
@@ -140,7 +140,16 @@ export function isFreshGetiPost(postedAt: number, editedAt: number | null, now: 
 export type GetiAlertCriteria = { id: number; category: GetiCategory; search: string };
 
 /**
- * Les alertes que touche une annonce : même catégorie, annonce ouverte, et la
+ * Une annonce peut-elle prévenir ? Ni close, ni passée : une annonce dont
+ * toutes les dates visées sont finies à `now` (un scrim de la veille reçu au
+ * rattrapage, une modification tardive) ne réveille personne.
+ */
+export function isGetiPostAlertable(post: GetiParsedPost, now: number): boolean {
+  return !post.closed && !isGetiPostPast(post, now);
+}
+
+/**
+ * Les alertes que touche une annonce : même catégorie, annonce ouverte et à venir, et la
  * correspondance de la page (`matchesGetiFilter`). Le filtre de chaque alerte
  * est construit une fois (`filters`, à partager entre les annonces d'un lot).
  */
@@ -151,7 +160,7 @@ export function matchingGetiAlerts<T extends GetiAlertCriteria>(
   filters: Map<number, GetiFilter>,
   now: number,
 ): T[] {
-  if (post.closed) return [];
+  if (!isGetiPostAlertable(post, now)) return [];
   return alerts.filter((alert) => {
     if (alert.category !== category) return false;
     let filter = filters.get(alert.id);

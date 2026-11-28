@@ -95,6 +95,18 @@ export const GETI_CATEGORY_FILTERS: Readonly<Record<GetiCategory, readonly GetiF
   lfcast: ["staffRoles", "languages", "days", "time"],
 });
 
+/**
+ * Catégories où une annonce passée (toutes ses dates visées sont finies) est
+ * masquée par défaut : la recherche de scrim, qui ne vaut que pour sa soirée.
+ * Ailleurs, elle reste affichée, avec sa pastille.
+ */
+export const GETI_PAST_HIDDEN_CATEGORIES: readonly GetiCategory[] = ["lfs"];
+
+/** La catégorie masque-t-elle par défaut ses annonces passées ? */
+export function getiHidesPast(category: GetiCategory): boolean {
+  return GETI_PAST_HIDDEN_CATEGORIES.includes(category);
+}
+
 /** Âges proposés (en jours), toujours sous la durée de garde de la catégorie ; « tout » = aucune valeur. */
 export function getiAgeOptions(category: GetiCategory): number[] {
   return [1, 3, 7].filter((days) => days < GETI_RETENTION_DAYS[category]);
@@ -122,6 +134,8 @@ export type GetiPageQuery = {
   ageDays: number | null;
   /** `true` : les annonces closes (texte barré) sont montrées aussi. */
   showClosed: boolean;
+  /** `true` : les annonces passées sont montrées aussi (catégories de `GETI_PAST_HIDDEN_CATEGORIES`). */
+  showPast: boolean;
   /** `true` : une annonce qui ne précise pas un critère demandé est écartée. */
   strict: boolean;
   /** Page demandée, à partir de 1. */
@@ -145,6 +159,7 @@ export function emptyGetiPageQuery(): GetiPageQuery {
     hourTo: null,
     ageDays: null,
     showClosed: false,
+    showPast: false,
     strict: false,
     page: 1,
   };
@@ -169,6 +184,7 @@ export const GETI_PARAMS = {
   hourTo: "hto",
   ageDays: "age",
   showClosed: "closed",
+  showPast: "past",
   strict: "strict",
   page: "p",
 } as const;
@@ -257,6 +273,7 @@ export function parseGetiPageQuery(category: GetiCategory, params: GetiSearchPar
     hourTo,
     ageDays: ageDays !== null && getiAgeOptions(category).includes(ageDays) ? ageDays : null,
     showClosed: flagParam(params, GETI_PARAMS.showClosed),
+    showPast: getiHidesPast(category) && flagParam(params, GETI_PARAMS.showPast),
     strict: flagParam(params, GETI_PARAMS.strict),
     page: intParam(params, GETI_PARAMS.page, 1, MAX_PAGE) ?? 1,
   };
@@ -287,6 +304,7 @@ export function getiPageSearch(query: GetiPageQuery): string {
   if (query.hourTo !== null) search.set(GETI_PARAMS.hourTo, String(query.hourTo));
   if (query.ageDays !== null) search.set(GETI_PARAMS.ageDays, String(query.ageDays));
   if (query.showClosed) search.set(GETI_PARAMS.showClosed, "1");
+  if (query.showPast) search.set(GETI_PARAMS.showPast, "1");
   if (query.strict) search.set(GETI_PARAMS.strict, "1");
   if (query.page > 1) search.set(GETI_PARAMS.page, String(query.page));
   // Les virgules restent lisibles dans une adresse partagée.
@@ -327,6 +345,7 @@ export function getiActiveFilterCount(query: GetiPageQuery): number {
     query.hourFrom !== null || query.hourTo !== null,
     query.ageDays !== null,
     query.showClosed,
+    query.showPast,
     query.strict,
   ];
   return lists.filter((values) => values.length > 0).length + flags.filter(Boolean).length;
@@ -353,6 +372,7 @@ export function getiPageFilter(category: GetiCategory, query: GetiPageQuery): Ge
         }
       : null,
     hideClosed: !query.showClosed,
+    hidePast: getiHidesPast(category) && !query.showPast,
     maxAgeHours: query.ageDays === null ? null : query.ageDays * 24,
     // Par défaut une annonce qui ne précise pas un critère reste visible : la
     // plupart ne donnent ni région ni plateforme, les écarter viderait la liste.
@@ -427,7 +447,16 @@ export type GetiChip =
   | { kind: "platform"; value: GetiPlatform }
   | { kind: "language"; value: GetiLanguage }
   | { kind: "day"; value: GetiDay }
-  | { kind: "time"; from: number; to: number | null; timezone: string | null }
+  | {
+      kind: "time";
+      /** Horaire à l'heure de Paris. */
+      from: number;
+      to: number | null;
+      /** Fuseau écrit dans l'annonce, `null` s'il n'y en a pas. */
+      timezone: string | null;
+      /** Horaire tel qu'écrit dans ce fuseau, quand la conversion l'a décalé ; absent ou `null` sinon. */
+      stated?: { from: number; to: number | null } | null;
+    }
   | { kind: "date"; iso: string }
   | { kind: "team"; name: string }
   | { kind: "minAge"; age: number };
@@ -488,12 +517,15 @@ export function getiPostChips(post: GetiParsedPost): GetiChip[] {
   chips.push(...listedChips(stored));
   const availability = stored.availability;
   const timezone = typeof availability?.timezone === "string" ? availability.timezone : null;
-  const slots = listOf<unknown>(availability?.times).flatMap((slot) => {
+  // Les horaires écrits suivent l'ordre des horaires convertis : même rang, même créneau.
+  const statedTimes = timezone === null ? [] : listOf<unknown>(availability?.statedTimes);
+  const slots = listOf<unknown>(availability?.times).flatMap((slot, index) => {
     const valid = getiStoredTimeSlot(slot);
-    return valid === null ? [] : [valid];
+    return valid === null ? [] : [{ ...valid, stated: getiStoredTimeSlot(statedTimes[index]) }];
   });
   for (const slot of slots.slice(0, MAX_TIME_CHIPS)) {
-    chips.push({ kind: "time", from: slot.from, to: slot.to, timezone });
+    const stated = slot.stated === null ? {} : { stated: slot.stated };
+    chips.push({ kind: "time", from: slot.from, to: slot.to, timezone, ...stated });
   }
   const dates = listOf<unknown>(stored.dates).filter((iso): iso is string => typeof iso === "string");
   for (const iso of dates.slice(0, MAX_DATE_CHIPS)) chips.push({ kind: "date", iso });

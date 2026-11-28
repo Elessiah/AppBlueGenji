@@ -15,6 +15,19 @@ import {
   withoutMarkup,
   type GetiPreparedText,
 } from "@/lib/shared/geti/normalize";
+import { getiSlotEndMinutes } from "@/lib/shared/geti/filter";
+import {
+  CET_DEMONSTRATIVE,
+  GETI_DAY_MS,
+  GETI_PARIS_ZONE,
+  getiCivilDay,
+  getiParisShiftMinutes,
+  getiWallInstant,
+  getiWrapMinutes,
+  getiZoneRule,
+  parseGetiTimezone,
+  type GetiZoneRule,
+} from "@/lib/shared/geti/zones";
 import {
   GETI_CATEGORIES,
   GETI_DAYS,
@@ -374,8 +387,6 @@ const UNITLESS_RANGE = new RegExp(
 /** Sans fuseau, la barre oblique ne se lit qu'en fin de soirée : « 21/23 », pas « 15/20 ». */
 const SLASH_FROM_HOUR = 19;
 const SLASH_SPAN_MAX_HOURS = 4;
-/** « cet » démonstratif, pas un fuseau : « 15h cet après-midi », « 18 cet été ». */
-const CET_DEMONSTRATIVE = String.raw`\s(?:ete|apres|aprem|apm|hiver|automne|instant|horaire|evenement|event|endroit)${NOT_BEFORE_WORD}`;
 /** Heure seule sans unité, devant son fuseau : « 20 CET ». */
 const UNITLESS_SINGLE = new RegExp(
   String.raw`(?<![\p{L}\p{N}:#+.,/–-])(\d{1,2})(?:[.:](\d{2}))?(?= ?\(?(?:cest|cet)${NOT_BEFORE_WORD}(?!${CET_DEMONSTRATIVE}))`,
@@ -539,52 +550,18 @@ function uniqueSortedTimes(times: readonly GetiTimeRange[]): GetiTimeRange[] {
     .sort((a, b) => a.from - b.from || (a.to ?? -1) - (b.to ?? -1));
 }
 
-/** Sigles de fuseau lus en capitales seulement (« est » est un mot français). */
-const UTC_OFFSET = String.raw`(?:UTC|GMT)(?:\s?[+-]\s?\d{1,2})?`;
-const TIMEZONE_CODE = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(CEST|CET|BST|EET|${UTC_OFFSET})${NOT_BEFORE_WORD}`,
-  "u",
-);
-/** … ou en minuscules derrière une heure : « 20-22 cet », « 21h cest » (« cet été » n'en est pas un). */
-const TIMEZONE_AFTER_TIME = new RegExp(String.raw`\d ?h? ?\(?(cest|cet)(?![\p{L}\p{N}]|${CET_DEMONSTRATIVE})`, "u");
-const PARIS_TIME = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:heure francaise|heure de paris|heure de france|french time|paris time)${NOT_BEFORE_WORD}`,
-  "u",
-);
-
-function parseTimezone(prepared: GetiPreparedText): string | null {
-  if (PARIS_TIME.test(prepared.lower)) return "Europe/Paris";
-  const code = TIMEZONE_CODE.exec(prepared.plain);
-  if (code !== null) return code[1].replace(/\s/gu, "");
-  const afterTime = TIMEZONE_AFTER_TIME.exec(prepared.lower);
-  return afterTime === null ? null : afterTime[1].toUpperCase();
-}
-
-const DAY_MS = 86_400_000;
+const DAY_MS = GETI_DAY_MS;
 /** Une date lue reste proche de la publication : au-delà, c'est autre chose (« 9/10 », une note). */
 const DATE_WINDOW_DAYS = 60;
 const DATE_MAX = 14;
-const PARIS_DATE = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Europe/Paris",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
-/** Jour civil à Paris d'un instant, en millisecondes UTC à minuit de ce jour. */
-function parisDay(instant: number): number {
-  const parts = PARIS_DATE.formatToParts(new Date(instant));
-  const part = (type: string) => Number(parts.find((entry) => entry.type === type)?.value ?? 0);
-  return Date.UTC(part("year"), part("month") - 1, part("day"));
-}
 
 function isoDay(day: number): string {
   return new Date(day).toISOString().slice(0, 10);
 }
 
-/** Jour de la semaine d'une date « AAAA-MM-JJ ». */
-function weekdayOf(date: string): GetiDay {
-  return GETI_DAYS[(new Date(`${date}T00:00:00.000Z`).getUTCDay() + 6) % 7];
+/** Jour de la semaine d'un jour civil (millisecondes UTC à minuit). */
+function weekdayOf(day: number): GetiDay {
+  return GETI_DAYS[(new Date(day).getUTCDay() + 6) % 7];
 }
 
 /** Jour civil valide (le 31/02 n'existe pas), en millisecondes UTC, ou `null`. */
@@ -606,11 +583,44 @@ const NAMED_DAY_NUMBER = new RegExp(
   String.raw`${NOT_AFTER_WORD}(${DAY_TABLE.pattern})\s(\d{1,2})(?!\p{N}|(?!${MONTH_START})\p{L}|\s?[/h:.k]|\s?[–-]\s?\d)`,
   "gu",
 );
+/** Le jour même de la publication : « ce soir », « tonight », « cet après-midi ». */
 const TODAY = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:ce soir|tonight|today|aujourd'?\s?hui)${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}(?:ce soir|cette nuit|ce midi|ce matin|cet(?:te)? apres[\s-]?midi|cet(?:te)? aprem|cet apm|tonight|tonite|this evening|this afternoon|this morning)${NOT_BEFORE_WORD}`,
   "u",
 );
-const TOMORROW = new RegExp(String.raw`${NOT_AFTER_WORD}(?:demain|tomorrow|tmrw|tmr)${NOT_BEFORE_WORD}`, "u");
+/**
+ * « aujourd'hui », « today », « ajd » : une date dans une recherche de scrim ou
+ * de remplaçant seulement — ailleurs c'est souvent une tournure (« aujourd'hui,
+ * on recrute »), qui daterait à tort un recrutement.
+ */
+const TODAY_WORD = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:today|aujourd'?\s?hui|aujd|auj|ajd)${NOT_BEFORE_WORD}`,
+  "u",
+);
+/** Le surlendemain ; lu avant « demain », qu'il contient. */
+const DAY_AFTER_TOMORROW = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:apres[\s-]?demain|the day after tomorrow|day after tomorrow)${NOT_BEFORE_WORD}`,
+  "gu",
+);
+const TOMORROW = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:demain|tomorrow|tomorow|tommorow|tommorrow|tmrw|tmr)${NOT_BEFORE_WORD}`,
+  "u",
+);
+/** « ce week-end », « this weekend », « ce we » : le samedi et le dimanche qui viennent (« le week-end » reste une habitude). */
+const THIS_WEEKEND = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:(?:ce|this|du)\sweek[\s-]?end|ce\s(?:we|wk))${NOT_BEFORE_WORD}`,
+  "u",
+);
+/** « lundi prochain », « next friday » : la prochaine occurrence après le jour de la publication. */
+const NEXT_NAMED_DAY = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:(${DAY_TABLE.pattern})\s(?:prochaine?|pro)|next\s(${DAY_TABLE.pattern}))${NOT_BEFORE_WORD}`,
+  "gu",
+);
+/** « ce vendredi », « this friday » : la prochaine occurrence, jour de la publication compris. */
+const THIS_NAMED_DAY = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:ce|this)\s(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}`,
+  "gu",
+);
 
 /** Jour gardé s'il reste proche de la publication (`today`), `null` sinon. */
 function nearDay(day: number | null, today: number): number | null {
@@ -649,8 +659,43 @@ function namedDayDates(lower: string, today: number): number[] {
     const next = month === 12 ? civilDay(year + 1, 1, day) : civilDay(year, month + 1, day);
     const date = [civilDay(year, month, day), next]
       .map((candidate) => nearDay(candidate, today))
-      .find((near) => near !== null && weekdayOf(isoDay(near)) === named);
+      .find((near) => near !== null && weekdayOf(near) === named);
     if (date !== undefined && date !== null) found.push(date);
+  }
+  return found;
+}
+
+/** Jours d'ici la prochaine occurrence d'un jour nommé (0 : le jour même). */
+function daysUntil(day: GetiDay, today: number): number {
+  return (GETI_DAYS.indexOf(day) - GETI_DAYS.indexOf(weekdayOf(today)) + 7) % 7;
+}
+
+/**
+ * Jours dits par rapport à la publication : « ce soir », « demain »,
+ * « après-demain », « ce week-end », « lundi prochain », « this friday » ;
+ * « aujourd'hui » pour une recherche de scrim ou de remplaçant (`sameDay`).
+ */
+function relativeDays(lower: string, today: number, sameDay: boolean): number[] {
+  const found: number[] = [];
+  if (TODAY.test(lower) || (sameDay && TODAY_WORD.test(lower))) found.push(today);
+  const withoutDayAfter = lower.replace(DAY_AFTER_TOMORROW, (matched) => {
+    found.push(today + 2 * DAY_MS);
+    return " ".repeat(matched.length);
+  });
+  if (TOMORROW.test(withoutDayAfter)) found.push(today + DAY_MS);
+  if (THIS_WEEKEND.test(lower)) {
+    // Publiée un dimanche : il ne reste que ce dimanche-là.
+    const saturday = today + daysUntil("SAT", today) * DAY_MS;
+    found.push(...(weekdayOf(today) === "SUN" ? [today] : [saturday, saturday + DAY_MS]));
+  }
+  const dayOf = (text: string | undefined) => (text === undefined ? undefined : DAY_TABLE.lookup.get(aliasKey(text)));
+  for (const match of lower.matchAll(NEXT_NAMED_DAY)) {
+    const day = dayOf(match[1] ?? match[2]);
+    if (day !== undefined) found.push(today + (daysUntil(day, today) || 7) * DAY_MS);
+  }
+  for (const match of lower.matchAll(THIS_NAMED_DAY)) {
+    const day = dayOf(match[1]);
+    if (day !== undefined) found.push(today + daysUntil(day, today) * DAY_MS);
   }
   return found;
 }
@@ -664,56 +709,90 @@ const RIGHT_NOW = new RegExp(String.raw`${NOT_AFTER_WORD}(?:now|asap|maintenant|
  * Soirées d'une recherche de scrim ou de remplaçant qui ne donne pas de date :
  * un jour nommé (« Mardi 21h-23h ») vise sa prochaine occurrence, et un
  * horaire sans jour (« LFS 3k5 20-22 CET ») ou un « now » le jour même de la
- * publication.
+ * publication (`implicit` : ce jour-là n'est écrit nulle part, seul l'horaire le donne).
  */
-function eveningDays(lower: string, today: number, found: readonly number[]): number[] {
-  const dated = new Set(found.map((day) => weekdayOf(isoDay(day))));
-  const named = parseDays(lower).filter((day) => !dated.has(day));
-  if (named.length > EVENING_DAYS_MAX) return [];
-  if (named.length === 0) {
-    return found.length === 0 && (parseTimes(lower).length > 0 || RIGHT_NOW.test(lower)) ? [today] : [];
+function eveningDays(
+  lower: string,
+  today: number,
+  found: readonly number[],
+  named: readonly GetiDay[],
+  timed: boolean,
+): { days: number[]; implicit: boolean } {
+  const dated = new Set(found.map(weekdayOf));
+  const undated = named.filter((day) => !dated.has(day));
+  if (undated.length > EVENING_DAYS_MAX) return { days: [], implicit: false };
+  if (undated.length === 0) {
+    if (found.length > 0) return { days: [], implicit: false };
+    if (RIGHT_NOW.test(lower)) return { days: [today], implicit: false };
+    return timed ? { days: [today], implicit: true } : { days: [], implicit: false };
   }
-  const todayIndex = GETI_DAYS.indexOf(weekdayOf(isoDay(today)));
-  return named.map((day) => today + ((GETI_DAYS.indexOf(day) - todayIndex + 7) % 7) * DAY_MS);
+  return { days: undated.map((day) => today + daysUntil(day, today) * DAY_MS), implicit: false };
 }
 
+const PARIS_RULE: GetiZoneRule = { iana: GETI_PARIS_ZONE };
+
+/** Horaires écrits ramenés à l'heure de Paris (`shift` minutes à ajouter). */
+function shiftedTimes(times: readonly GetiTimeRange[], shift: number): GetiTimeRange[] {
+  return times.map((time) => ({
+    from: getiWrapMinutes(time.from + shift),
+    to: time.to === null ? null : getiWrapMinutes(time.to + shift, true),
+  }));
+}
+
+/** Dates et disponibilités d'une annonce, à l'heure de Paris. */
+export type GetiSchedule = { dates: string[]; availability: GetiAvailability };
+
 /**
- * Dates visées par l'annonce (« 26/11 », « Thursday 26 », « ce soir »,
- * « tomorrow »), résolues depuis la date de publication, à l'heure de Paris.
- * Sans date de publication, rien n'est lu : une date sans année ne se situe pas.
+ * Dates visées (« 26/11 », « Thursday 26 », « ce soir », « demain »,
+ * « après-demain », « ce week-end », « lundi prochain ») et disponibilités
+ * (jours, horaires, fuseau) d'une annonce.
  *
- * @param lower Texte sans accents, en minuscules.
- * @param postedAt Date ISO de publication, ou `null`.
- * @param sameDay `true` pour une recherche de scrim ou de remplaçant : un jour
- *   nommé vise sa prochaine occurrence, un horaire sans jour le soir même.
- * @returns Les dates « AAAA-MM-JJ », triées, sans doublon.
- */
-export function parseGetiDates(lower: string, postedAt: string | null, sameDay = false): string[] {
-  const posted = postedAt === null ? Number.NaN : Date.parse(postedAt);
-  if (Number.isNaN(posted)) return [];
-  const today = parisDay(posted);
-  const found: number[] = [...numericDates(lower, today), ...namedDayDates(lower, today)];
-  if (TODAY.test(lower)) found.push(today);
-  if (TOMORROW.test(lower)) found.push(today + DAY_MS);
-  if (sameDay) found.push(...eveningDays(lower, today, found));
-  return [...new Set(found)]
-    .sort((a, b) => a - b)
-    .slice(0, DATE_MAX)
-    .map(isoDay);
-}
-
-/**
- * Disponibilités : jours cités, horaires (minutes depuis minuit) et fuseau.
+ * - Tout mot relatif se résout depuis la **date de publication**, jamais depuis
+ *   l'heure de lecture, dans le fuseau écrit par l'annonce (Paris sinon). Sans
+ *   date de publication, aucune date n'est lue ni aucun horaire converti.
+ * - Un fuseau écrit (« 21h UTC », « 9pm EST ») convertit horaires et dates à
+ *   l'heure de Paris, heure d'été comprise ; les horaires tels qu'écrits restent
+ *   dans `statedTimes`. Une date suit son premier horaire (« Friday 9pm EST »
+ *   tombe le samedi à Paris).
+ * - `sameDay` (recherche de scrim ou de remplaçant) : un jour nommé vise sa
+ *   prochaine occurrence, un horaire sans jour le soir même — le lendemain si
+ *   ce créneau était déjà fini à la publication. Les jours rendus sont alors
+ *   ceux des dates.
  *
  * @param prepared Formes d'analyse du texte.
- * @param dates Dates déjà lues (`parseGetiDates`) : leur jour de semaine s'ajoute aux jours cités.
- * @returns Les disponibilités, listes vides quand rien n'est lu.
+ * @param postedAt Date ISO de publication, ou `null`.
+ * @param sameDay `true` pour une recherche de scrim ou de remplaçant.
+ * @returns Les dates « AAAA-MM-JJ » (Paris), triées, sans doublon, et les disponibilités.
  */
-export function parseGetiAvailability(prepared: GetiPreparedText, dates: readonly string[] = []): GetiAvailability {
+export function parseGetiSchedule(prepared: GetiPreparedText, postedAt: string | null, sameDay = false): GetiSchedule {
+  const lower = prepared.lower;
+  const timezone = parseGetiTimezone(prepared);
+  const stated = parseTimes(lower);
+  const named = parseDays(lower);
+  const posted = postedAt === null ? Number.NaN : Date.parse(postedAt);
+  if (Number.isNaN(posted)) return { dates: [], availability: { days: named, times: stated, timezone } };
+  const rule = getiZoneRule(timezone) ?? PARIS_RULE;
+  const today = getiCivilDay(posted, rule);
+  const found = [...numericDates(lower, today), ...namedDayDates(lower, today), ...relativeDays(lower, today, sameDay)];
+  const evening = sameDay ? eveningDays(lower, today, found, named, stated.length > 0) : { days: [], implicit: false };
+  // Un créneau sans jour, déjà fini quand l'annonce est publiée (« 21-23 » écrit à 23 h 30), vise le lendemain.
+  const over = evening.implicit && posted >= getiWallInstant(today, getiSlotEndMinutes(stated), rule);
+  const days = [...new Set([...found, ...(over ? [today + DAY_MS] : evening.days)])].sort((a, b) => a - b).slice(0, DATE_MAX);
+  const first = stated[0]?.from;
+  const shift = first === undefined ? 0 : getiParisShiftMinutes(rule, days[0] ?? today, first);
+  const dayShift = first === undefined ? 0 : Math.floor((first + shift) / 1440);
+  const dates = days.map((day) => day + dayShift * DAY_MS);
+  const shiftDay = (day: GetiDay) => GETI_DAYS[(GETI_DAYS.indexOf(day) + dayShift + 7) % 7];
+  // Scrim ou remplaçant aux soirées datées : les jours sont ceux des dates, rien d'autre.
+  const datedOnly = sameDay && dates.length > 0 && named.length <= EVENING_DAYS_MAX;
   return {
-    days: inReferenceOrder(GETI_DAYS, [...parseDays(prepared.lower), ...dates.map(weekdayOf)]),
-    times: parseTimes(prepared.lower),
-    timezone: parseTimezone(prepared),
+    dates: dates.map(isoDay),
+    availability: {
+      days: inReferenceOrder(GETI_DAYS, [...(datedOnly ? [] : named.map(shiftDay)), ...dates.map(weekdayOf)]),
+      times: shift === 0 ? stated : shiftedTimes(stated, shift),
+      timezone,
+      ...(shift === 0 ? {} : { statedTimes: stated }),
+    },
   };
 }
 

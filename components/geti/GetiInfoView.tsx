@@ -20,6 +20,7 @@ import {
   getiAgeOptions,
   getiCategoryPath,
   getiChannelUrl,
+  getiHidesPast,
   getiPageFilter,
   getiPageHref,
   getiPageSearch,
@@ -229,6 +230,16 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, d
       <p /* NOSONAR S6819 — compteur de résultats annoncé à chaque filtre, pas une sortie de formulaire */ className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
         {getiText(locale, filtered ? m.results.countFiltered : m.results.count, { count: listed.total })}
       </p>
+      {getiHidesPast(category) ? (
+        <LocaleLink
+          href={getiPageHref(category, { ...query, showPast: !query.showPast, page: 1 })}
+          className={`${styles.resetLink} ${styles.pastToggle}`}
+          scroll={false}
+          data-testid="geti-past-toggle"
+        >
+          {query.showPast ? m.results.hidePast : m.results.showPast}
+        </LocaleLink>
+      ) : null}
       {beyond ? (
         <div className={styles.empty} data-testid="geti-beyond">
           <p>{m.results.beyond}</p>

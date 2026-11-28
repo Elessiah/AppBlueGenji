@@ -20,6 +20,7 @@ import {
 } from "@/lib/shared/geti";
 import {
   emptyGetiPageQuery,
+  getiHidesPast,
   getiActiveFilterCount,
   getiAllRanks,
   getiClockLabel,
@@ -371,7 +372,17 @@ export function GetiFilters({
         {has("regions") ? checks("regions", text.regions, GETI_REGIONS, data.regions) : null}
         {has("platforms") ? checks("platforms", text.platforms, GETI_PLATFORMS, data.platforms) : null}
         {has("languages") ? checks("languages", text.languages, GETI_LANGUAGES, data.languages) : null}
-        {has("days") ? checks("days", text.days, GETI_DAYS, data.days) : null}
+        {has("days")
+          ? checks(
+              "days",
+              text.days,
+              GETI_DAYS,
+              data.days,
+              <InfoHint id={`${panelId}-days-hint`} subject={text.daysHintSubject}>
+                {text.daysHint}
+              </InfoHint>,
+            )
+          : null}
 
         {has("time") ? (
           <Group
@@ -412,6 +423,21 @@ export function GetiFilters({
         </div>
 
         <Group label={text.options}>
+          {getiHidesPast(category) ? (
+            <InfoHintRow separated>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={draft.showPast}
+                  onChange={(event) => apply({ ...draft, showPast: event.target.checked })}
+                />
+                <span>{text.showPast}</span>
+              </label>
+              <InfoHint id={`${panelId}-past-hint`} subject={text.showPastHintSubject}>
+                {text.showPastHint}
+              </InfoHint>
+            </InfoHintRow>
+          ) : null}
           <InfoHintRow separated>
             <label className={styles.check}>
               <input

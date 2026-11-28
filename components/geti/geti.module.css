@@ -454,6 +454,12 @@
   font-weight: 600;
 }
 
+/* Lien « Afficher / Masquer les scrims passés », sous le compteur. */
+.pastToggle {
+  align-self: flex-start;
+  padding-block: 6px;
+}
+
 .card {
   display: flex;
   flex-direction: column;

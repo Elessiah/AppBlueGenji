@@ -4,6 +4,12 @@
  * Module pur : importable côté serveur comme côté client.
  */
 export * from "@/lib/shared/geti/types";
-export { filterGetiPosts, getiTimeSlotMatches, matchesGetiFilter } from "@/lib/shared/geti/filter";
+export {
+  filterGetiPosts,
+  getiPostEndsAt,
+  getiTimeSlotMatches,
+  isGetiPostPast,
+  matchesGetiFilter,
+} from "@/lib/shared/geti/filter";
 export { getiCategoryOfChannel, isGetiBotNotice, parseGetiPost } from "@/lib/shared/geti/parse-post";
 export { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";

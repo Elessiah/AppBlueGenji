@@ -5,10 +5,13 @@
  * Module pur : importable côté serveur comme côté client.
  */
 import { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";
+import { getiWallInstant } from "@/lib/shared/geti/zones";
 import {
   GETI_CATEGORIES,
+  GETI_DAYS,
   GETI_ROLES,
   GETI_TIERS,
+  type GetiDay,
   type GetiFilter,
   type GetiParsedPost,
   type GetiRank,
@@ -191,6 +194,86 @@ function matchesTime(post: GetiParsedPost, filter: GetiFilter, includeUnknown: b
   return times.some((slot) => getiTimeSlotMatches(slot, from, to));
 }
 
+/** Durée comptée à une heure seule (« à partir de 21h ») : le créneau est dit fini deux heures après. */
+export const GETI_SINGLE_TIME_MINUTES = 120;
+
+/**
+ * Fin du dernier horaire d'une annonce, en minutes depuis minuit du jour visé
+ * (au-delà de 1440 : le lendemain, « 22h-1h » finit à 1500) : la fin d'une
+ * plage, deux heures après une heure seule, la fin de la journée sans horaire.
+ *
+ * @param times Horaires gardés (`availability.times`) ; un horaire abîmé est ignoré.
+ */
+export function getiSlotEndMinutes(times: readonly unknown[] | null | undefined): number {
+  let end = 0;
+  for (const slot of wanted<unknown>(times)) {
+    const stored = getiStoredTimeSlot(slot);
+    if (stored === null) continue;
+    const stop = stored.to === null ? stored.from + GETI_SINGLE_TIME_MINUTES : stored.to;
+    end = Math.max(end, stop <= stored.from ? stop + DAY_MINUTES : stop);
+  }
+  return end === 0 ? DAY_MINUTES : end;
+}
+
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/u;
+
+/** Dates visées d'une analyse gardée (« AAAA-MM-JJ »), en millisecondes UTC à minuit ; une date abîmée est ignorée. */
+function storedDays(post: GetiParsedPost): number[] {
+  return wanted<unknown>(post.dates).flatMap((iso) => {
+    const match = typeof iso === "string" ? ISO_DAY.exec(iso) : null;
+    if (match === null) return [];
+    const day = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return Number.isNaN(day) ? [] : [day];
+  });
+}
+
+/**
+ * Instant où la dernière soirée visée par l'annonce est finie (heure de
+ * Paris) : sa dernière date, à la fin de son dernier horaire
+ * ({@link getiSlotEndMinutes}). `null` pour une annonce sans date : elle ne
+ * passe jamais.
+ *
+ * @param post Annonce analysée (dates et horaires à l'heure de Paris).
+ * @returns L'instant en millisecondes, ou `null`.
+ */
+export function getiPostEndsAt(post: GetiParsedPost): number | null {
+  const days = storedDays(post);
+  if (days.length === 0) return null;
+  return getiWallInstant(Math.max(...days), getiSlotEndMinutes(post.availability?.times));
+}
+
+/**
+ * L'annonce est-elle passée ? Toutes ses dates visées sont finies à `now`
+ * ({@link getiPostEndsAt}). Une annonce sans date ne l'est jamais.
+ */
+export function isGetiPostPast(post: GetiParsedPost, now: number): boolean {
+  const ends = getiPostEndsAt(post);
+  return ends !== null && now >= ends;
+}
+
+function weekdayOf(day: number): GetiDay {
+  return GETI_DAYS[(new Date(day).getUTCDay() + 6) % 7];
+}
+
+/**
+ * Jours d'une annonce pour le filtre : un jour voulu désigne une soirée **à
+ * venir**. Le jour d'une date déjà finie ne compte plus (sauf si une date à
+ * venir tombe le même jour) ; une annonce dont tous les jours sont passés ne
+ * répond à aucun jour, même avec `includeUnknown`.
+ */
+function matchesDays(post: GetiParsedPost, days: readonly GetiDay[], includeUnknown: boolean, now: number): boolean {
+  if (days.length === 0) return true;
+  const found = wanted(post.availability?.days);
+  if (found.length === 0) return includeUnknown;
+  const dated = storedDays(post);
+  if (dated.length === 0) return days.some((day) => found.includes(day));
+  const end = getiSlotEndMinutes(post.availability?.times);
+  const upcoming = new Set<GetiDay>();
+  const over = new Set<GetiDay>();
+  for (const day of dated) (now >= getiWallInstant(day, end) ? over : upcoming).add(weekdayOf(day));
+  return days.some((day) => found.includes(day) && (upcoming.has(day) || !over.has(day)));
+}
+
 function matchesAge(post: GetiParsedPost, stored: number | null | undefined, now: number): boolean {
   if (stored === null || stored === undefined) return true;
   // Un JSON enregistré peut porter « "24" » : lu comme un nombre. Une limite
@@ -222,7 +305,9 @@ function isOn(value: unknown): boolean {
  * - **Région, plateforme, langue, niveau, sous-rôle, rôle de staff, jour** : une
  *   valeur voulue est dans l'annonce.
  * - **Horaire** : un horaire de l'annonce recoupe le créneau voulu.
+ * - **Jour** : une date déjà finie ne compte plus, un jour voulu désigne une soirée à venir.
  * - **Annonces closes** : écartées avec `hideClosed`.
+ * - **Annonces passées** (toutes les dates visées sont finies) : écartées avec `hidePast`.
  * - **Âge** : publiée depuis `maxAgeHours` au plus ; sans date, écartée.
  *
  * Une annonce où le critère n'a pas été lu est écartée, sauf `includeUnknown`.
@@ -244,6 +329,7 @@ export function matchesGetiFilter(post: GetiParsedPost, stored: GetiFilter, now:
   const category = GETI_CATEGORIES.find((known) => known === filter.category);
   if (category !== undefined && post.category !== category) return false;
   if (isOn(filter.hideClosed) && post.closed) return false;
+  if (isOn(filter.hidePast) && isGetiPostPast(post, now)) return false;
   return (
     matchesAge(post, filter.maxAgeHours, now) &&
     matchesRoles(post, filter, includeUnknown) &&
@@ -254,7 +340,7 @@ export function matchesGetiFilter(post: GetiParsedPost, stored: GetiFilter, now:
     matchesAny(post.levels, wanted(filter.levels), includeUnknown) &&
     matchesAny(post.subRoles, wanted(filter.subRoles), includeUnknown) &&
     matchesAny(post.staffRoles, wanted(filter.staffRoles), includeUnknown) &&
-    matchesAny(post.availability?.days, wanted(filter.days), includeUnknown) &&
+    matchesDays(post, wanted(filter.days), includeUnknown, now) &&
     matchesTime(post, filter, includeUnknown)
   );
 }

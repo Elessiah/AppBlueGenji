@@ -11,8 +11,7 @@
  */
 import {
   detectGetiCategory,
-  parseGetiAvailability,
-  parseGetiDates,
+  parseGetiSchedule,
   parseGetiLanguages,
   parseGetiLevels,
   parseGetiMinAge,
@@ -474,7 +473,7 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
   // ailleurs (« LFSub » dans le salon des joueurs) : une soirée précise, à un SR donné.
   const kinds = [category, detectGetiCategory(prepared.lower)];
   const oneEvening = kinds.some((kind) => kind === "lfs" || kind === "lfsub");
-  const dates = parseGetiDates(prepared.lower, postedAt, oneEvening);
+  const schedule = parseGetiSchedule(prepared, postedAt, oneEvening);
   return {
     category,
     authorTag: content.authorTag,
@@ -488,8 +487,8 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
     regions: parseGetiRegions(prepared.lower, analysed),
     platforms: parseGetiPlatforms(prepared.lower, category === "lfs"),
     languages: parseGetiLanguages(prepared, analysed),
-    availability: parseGetiAvailability(prepared, dates),
-    dates,
+    availability: schedule.availability,
+    dates: schedule.dates,
     levels: parseGetiLevels(prepared.lower),
     closed,
     teamName: parseGetiTeamName(prepared.clean, kinds.includes("lft"), kinds.includes("lfs")),

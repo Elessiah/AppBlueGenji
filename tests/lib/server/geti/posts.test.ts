@@ -132,7 +132,7 @@ describe("upsertGetiPosts", () => {
       "100000000000000001",
       "fauxjoueur",
       JSON.stringify(post.raw),
-      JSON.stringify({ ...parseGetiPost(post.raw), analysisVersion: 2 }),
+      JSON.stringify({ ...parseGetiPost(post.raw), analysisVersion: 3 }),
       new Date("2026-11-27T10:00:00.000Z"),
       new Date("2026-11-27T11:00:00.000Z"),
     ]);
@@ -631,7 +631,7 @@ describe("startGetiPostsPurgeClock", () => {
 
     await run();
 
-    expect(String(execute.mock.calls.at(-1)?.[0])).toContain(`NOT parsed_json LIKE '%"analysisVersion":2}'`);
+    expect(String(execute.mock.calls.at(-1)?.[0])).toContain(`NOT parsed_json LIKE '%"analysisVersion":3}'`);
   });
 });
 
@@ -707,7 +707,7 @@ describe("listGetiPosts", () => {
 
     await listGetiPosts({}, {}, executor(execute), NOW);
 
-    expect(String(execute.mock.calls[0][0])).toContain(`IF(parsed_json LIKE '%"analysisVersion":2}', NULL, raw_json) AS stale_raw_json`);
+    expect(String(execute.mock.calls[0][0])).toContain(`IF(parsed_json LIKE '%"analysisVersion":3}', NULL, raw_json) AS stale_raw_json`);
   });
 
   it("listGetiPosts_noExecutorGiven_readsFromThePool", async () => {
@@ -964,7 +964,7 @@ describe("runGetiPostsPurge", () => {
 });
 
 describe("refreshStaleGetiPosts", () => {
-  const STALE_SELECT = `NOT parsed_json LIKE '%"analysisVersion":2}'`;
+  const STALE_SELECT = `NOT parsed_json LIKE '%"analysisVersion":3}'`;
 
   function updateOf(execute: SqlMock): { sql: string; params: unknown[] } {
     const call = execute.mock.calls.find(([sql]) => String(sql).startsWith("UPDATE"));
@@ -993,6 +993,29 @@ describe("refreshStaleGetiPosts", () => {
 
     expect(done).toBe(0);
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshStaleGetiPosts_rawMessageWithoutDate_resolvesTonightFromThePostedAtColumn", async () => {
+    // Message brut sans date : « ce soir » se compte depuis `posted_at` (vendredi 20/11), jamais depuis l'heure de la réanalyse.
+    const raw = { category: "lfs", content: "LFS ce soir 21h-23h", author: { id: GETI_FAKE_AUTHOR_ID, username: "fauxjoueur" } };
+    const row = { ...stale(JSON.stringify(raw), "LFS ce soir 21h-23h"), posted_at: new Date("2026-11-20T12:00:00.000Z") };
+    const execute = once([row]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(JSON.parse(String(updateOf(execute).params[0]))).toMatchObject({
+      dates: ["2026-11-20"],
+      postedAt: "2026-11-20T12:00:00.000Z",
+      analysisVersion: 3,
+    });
+  });
+
+  it("refreshStaleGetiPosts_staleSelect_readsThePostedAtColumn", async () => {
+    const execute = executeMock([]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(String(execute.mock.calls[0][0])).toContain("SELECT message_id, raw_json, parsed_json, posted_at FROM bg_geti_posts");
   });
 
   it("refreshStaleGetiPosts_oldRow_isRewrittenFromItsRawMessageWithTheNewFields", async () => {
@@ -1378,7 +1401,7 @@ describe("version de l'analyse gardée", () => {
 
     await refreshStaleGetiPosts(executor(execute));
 
-    expect(JSON.parse(String(updateParams(execute)[0]))).toMatchObject({ minAge: null, teamName: null, analysisVersion: 2 });
+    expect(JSON.parse(String(updateParams(execute)[0]))).toMatchObject({ minAge: null, teamName: null, analysisVersion: 3 });
   });
 
   it("refreshStaleGetiPosts_unreadableRawWithSpoilerDerivedTeam_neverStampedCurrent", async () => {
@@ -1413,7 +1436,7 @@ describe("version de l'analyse gardée", () => {
   });
 
   it("listGetiPosts_currentVersionRow_postHasNoAnalysisVersionKey", async () => {
-    const parsed = { ...parsedGetiPost({ text: "LFT support" }), analysisVersion: 2 };
+    const parsed = { ...parsedGetiPost({ text: "LFT support" }), analysisVersion: 3 };
     const execute = executeMock([row({ parsed_json: JSON.stringify(parsed) })]);
 
     const page = await listGetiPosts({}, {}, executor(execute), NOW);

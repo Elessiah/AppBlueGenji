@@ -390,9 +390,11 @@ const ADDED_FIELDS: Partial<GetiParsedPost> = { dates: [], levels: [], closed: f
 /**
  * Version de l'analyse gardée, écrite en **dernière** clé (`storedAnalysis`) :
  * avancée quand l'analyse change ce qu'elle lit — 2 : un passage masqué
- * (`||…||`) n'est plus lu, une analyse plus ancienne en a tiré des étiquettes.
+ * (`||…||`) n'est plus lu, une analyse plus ancienne en a tiré des étiquettes ;
+ * 3 : dates relatives (« après-demain », « ce week-end », « lundi prochain »),
+ * horaires et dates convertis à l'heure de Paris depuis le fuseau écrit.
  */
-const ANALYSIS_VERSION = 2;
+const ANALYSIS_VERSION = 3;
 /**
  * Une analyse gardée à la version courante : `JSON.stringify` écrit la clé en
  * dernier, `…,"analysisVersion":2}` ; dans le texte d'une annonce, un guillemet
@@ -414,6 +416,16 @@ function storedAnalysis(parsed: object): string {
 const STALE_RAW_JSON = `IF(${CURRENT_ANALYSIS}, NULL, raw_json) AS stale_raw_json`;
 
 /**
+ * Message brut d'une ligne, daté de **sa publication gardée** (`posted_at`) :
+ * une réanalyse résout « ce soir » ou « demain » depuis cette date-là, jamais
+ * depuis l'heure où elle tourne, même si le message brut ne porte pas de date.
+ */
+function datedRaw(raw: GetiPushedPost["raw"], postedAt: Date | string | null): GetiPushedPost["raw"] {
+  const posted = toIso(postedAt);
+  return posted === null ? raw : { ...raw, postedAt: posted };
+}
+
+/**
  * Analyse d'une ligne : celle gardée à la version courante, ou celle de son message
  * brut. Une analyse plus ancienne dont le message brut est illisible n'est pas
  * rendue (`null`) : ses étiquettes ont pu être lues dans un passage masqué.
@@ -421,7 +433,7 @@ const STALE_RAW_JSON = `IF(${CURRENT_ANALYSIS}, NULL, raw_json) AS stale_raw_jso
 function analysisOf(row: GetiPostRow): unknown {
   if (row.stale_raw_json !== null && row.stale_raw_json !== undefined) {
     try {
-      return parseGetiPost(JSON.parse(row.stale_raw_json), getiTrustedBots());
+      return parseGetiPost(datedRaw(JSON.parse(row.stale_raw_json), row.posted_at), getiTrustedBots());
     } catch {
       return null;
     }
@@ -444,7 +456,7 @@ type GetiRefreshedRow = { parsedJson: string; authorId: string | null; authorTag
  */
 function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): GetiRefreshedRow | null {
   try {
-    const raw: GetiPushedPost["raw"] = JSON.parse(String(row.raw_json));
+    const raw = datedRaw(JSON.parse(String(row.raw_json)), row.posted_at);
     const parsed = parseGetiPost(raw, trusted);
     if (isNotAnnouncement(parsed, raw)) return null;
     return { parsedJson: storedAnalysis(parsed), authorId: parsed.authorId, authorTag: parsed.authorTag?.slice(0, AUTHOR_TAG_MAX) ?? null };
@@ -516,7 +528,7 @@ export async function refreshStaleGetiPosts(executor: GetiExecutor): Promise<num
   let done = 0;
   for (let chunk = 0; chunk < REFRESH_CHUNKS_MAX; chunk += 1) {
     const [rows] = await executor.execute<RowDataPacket[]>(
-      `SELECT message_id, raw_json, parsed_json FROM bg_geti_posts
+      `SELECT message_id, raw_json, parsed_json, posted_at FROM bg_geti_posts
         WHERE ${STILL_STALE} ORDER BY id LIMIT ${REFRESH_CHUNK}`,
     );
     if (rows.length === 0) break;
