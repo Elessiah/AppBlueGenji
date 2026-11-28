@@ -468,6 +468,9 @@ function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): GetiRefreshe
   }
 }
 
+/** Écritures d'une réécriture lancées ensemble : une part du pool de 25 connexions, les lectures de page passent. */
+const REWRITE_CONCURRENCY = 8;
+
 /** Une ligne encore ancienne : une modification enregistrée entre la lecture et l'écriture l'a rendue courante. */
 const STILL_STALE = `NOT ${CURRENT_ANALYSIS}`;
 
@@ -484,8 +487,8 @@ async function rewriteChunk(executor: GetiExecutor, rows: RowDataPacket[], trust
   const failures: unknown[] = [];
   let removed = 0;
   try {
-    // Toutes les écritures du lot partent ensemble (pas un aller-retour par ligne) ; l'ordre des lignes est gardé.
-    const writes: Promise<void>[] = [];
+    // Les écritures partent par petits groupes (pas un aller-retour par ligne, sans prendre tout le pool partagé).
+    const writes: (() => Promise<void>)[] = [];
     for (const row of rows) {
       const messageId = String(row.message_id);
       const next = reanalysed(row, trusted);
@@ -493,7 +496,7 @@ async function rewriteChunk(executor: GetiExecutor, rows: RowDataPacket[], trust
         gone.push(messageId);
         continue;
       }
-      writes.push(
+      writes.push(() =>
         executor
           .execute(
             `UPDATE bg_geti_posts SET parsed_json = ?, author_id = ?, author_tag = ? WHERE message_id = ? AND ${STILL_STALE}`,
@@ -505,8 +508,11 @@ async function rewriteChunk(executor: GetiExecutor, rows: RowDataPacket[], trust
       );
     }
     // Une écriture qui échoue ne laisse pas les autres sans suite : toutes sont attendues, la première erreur remonte.
-    const settled = await Promise.allSettled(writes);
-    const failed = settled.find((write) => write.status === "rejected");
+    let failed: PromiseRejectedResult | undefined;
+    for (let start = 0; start < writes.length; start += REWRITE_CONCURRENCY) {
+      const settled = await Promise.allSettled(writes.slice(start, start + REWRITE_CONCURRENCY).map((write) => write()));
+      failed ??= settled.find((write): write is PromiseRejectedResult => write.status === "rejected");
+    }
     if (failed !== undefined) throw failed.reason;
     removed = await deleteStaleGetiPosts(executor, gone);
   } catch (error) {

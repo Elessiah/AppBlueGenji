@@ -1103,6 +1103,47 @@ describe("refreshStaleGetiPosts", () => {
     expect(execute).toHaveBeenCalledWith(expect.stringContaining("bg_geti_objections"), [GETI_FAKE_MESSAGE_ID]);
   });
 
+  it("refreshStaleGetiPosts_twentyRows_neverMoreThanEightUpdatesAtOnce", async () => {
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support" }).raw);
+    const rows = Array.from({ length: 20 }, (_, index) => ({ ...stale(raw), message_id: `1000000000000009${String(index).padStart(2, "0")}` }));
+    let selects = 0;
+    let inFlight = 0;
+    let most = 0;
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.trimStart().startsWith("SELECT")) {
+        selects += 1;
+        return [selects === 1 ? rows : []];
+      }
+      if (!sql.startsWith("UPDATE")) return [{ affectedRows: 0 }];
+      inFlight += 1;
+      most = Math.max(most, inFlight);
+      await new Promise((resolve) => setImmediate(resolve));
+      inFlight -= 1;
+      return [{ affectedRows: 1 }];
+    });
+
+    const done = await refreshStaleGetiPosts(executor(execute));
+
+    expect(done).toBe(20);
+    expect(most).toBe(8);
+  });
+
+  it("refreshStaleGetiPosts_updateFailsInTheFirstGroup_laterGroupsStillWrittenThenRethrows", async () => {
+    const raw = JSON.stringify(getiPushedPost({ content: "LFT support" }).raw);
+    const rows = Array.from({ length: 10 }, (_, index) => ({ ...stale(raw), message_id: `1000000000000009${String(index).padStart(2, "0")}` }));
+    const execute = jest.fn<SqlQuery>(async (sql: string, params?: unknown) => {
+      if (sql.trimStart().startsWith("SELECT")) return [rows];
+      if (sql.startsWith("UPDATE") && Array.isArray(params) && params[3] === "100000000000000900") throw new Error("deadlock");
+      return [{ affectedRows: 1 }];
+    });
+
+    await expect(refreshStaleGetiPosts(executor(execute))).rejects.toThrow("deadlock");
+
+    const updated = execute.mock.calls.filter(([sql]) => String(sql).startsWith("UPDATE")).map(([, params]) => (Array.isArray(params) ? params[3] : null));
+    expect(updated).toContain("100000000000000909");
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining("bg_geti_objections"), expect.arrayContaining(["100000000000000909"]));
+  });
+
   it("refreshStaleGetiPosts_withholdFails_rethrowsTheWithholdFailure", async () => {
     const raw = JSON.stringify(getiPushedPost({ content: "LFT support" }).raw);
     const execute = jest.fn<SqlQuery>(async (sql: string) => {

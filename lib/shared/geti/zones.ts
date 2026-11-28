@@ -62,6 +62,8 @@ const FIXED_OFFSET = /^(?:UTC|GMT)(?:([+-])(\d{1,2})(?::(\d{2}))?)?$/u;
 /** Décalages fixes admis : de UTC−12 à UTC+14. */
 const OFFSET_MIN = -12 * 60;
 const OFFSET_MAX = 14 * 60;
+/** Décalage fixe écrit pour dire l'heure française (« UTC+1 », « GMT+1 »), lu à l'heure de Paris. */
+const FRENCH_WRITTEN_OFFSET = 60;
 
 /**
  * La règle d'un fuseau gardé (`availability.timezone` : « Europe/Paris »,
@@ -77,7 +79,9 @@ export function getiZoneRule(label: string | null | undefined): GetiZoneRule | n
   const extra = Number(fixed[3] ?? 0);
   const minutes = Number(fixed[2] ?? 0) * 60 + extra;
   const offset = fixed[1] === "-" ? -minutes : minutes;
-  return extra < 60 && offset >= OFFSET_MIN && offset <= OFFSET_MAX ? { offset } : null;
+  if (extra >= 60 || offset < OFFSET_MIN || offset > OFFSET_MAX) return null;
+  // « UTC+1 », « GMT+1 » : l'heure française dans la communauté, été comme hiver (comme « CET »).
+  return offset === FRENCH_WRITTEN_OFFSET ? { iana: GETI_PARIS_ZONE } : { offset };
 }
 
 const formatters = new Map<string, Intl.DateTimeFormat>();

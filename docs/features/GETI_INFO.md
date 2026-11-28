@@ -364,19 +364,25 @@ ne regardait que le jour de la semaine.
 Tout mot relatif se résout depuis l'**écriture du texte gardé** : sa dernière
 modification si elle suit la publication (« ce soir » écrit en modifiant
 l'annonce le lendemain vise ce lendemain), sinon sa publication (`posted_at`).
-Une modification d'un scrim ou d'un remplaçant qui dit la place prise
-(« trouvé », « pourvu », « plus besoin », « found », « filled » — ni nié dans
+Une modification d'un scrim ou d'un remplaçant qui dit la place prise ou
+l'annonce close (« trouvé », « pourvu », « plus besoin », « complet » — pas
+« équipe complète » —, « c'est bon », « plus dispo », « annulé », « merci à
+tous », « GG », « found », « filled », « done », « booked », « taken »,
+« closed », « cancelled » — ni nié dans
 les trois mots d'avant de la même proposition, « pas encore trouvé », « still
 not found », « haven't found », ni le verbe, « si on trouve », « qui se trouve
 en EU ») garde la publication pour base : « (trouvé merci) » ajouté le
-lendemain ne fait pas du scrim de la veille celui du soir. Jamais
+lendemain ne fait pas du scrim de la veille celui du soir (ni ne le rend à
+la liste, ni n'en prévient les alertes). Une modification à plus de 31 jours
+de la publication (horodatage aberrant) n'est pas prise pour base ; une date
+de publication hors des dates lisibles ne date rien. Jamais
 depuis l'heure de lecture ni celle d'une réanalyse, dans le fuseau écrit
 par l'annonce (Paris sinon). Sans date de publication, aucune date n'est lue.
 
 | Écrit | Date |
 | --- | --- |
-| « ce soir », « tonight », « cette nuit », « cet après-midi », « this evening » | le jour de la publication ; « ce soir » / « cette nuit » dont tous les horaires sont d'après minuit (avant 6 h), écrit à 6 h ou plus tard : le lendemain (« cette nuit 1h-3h » écrit à 22 h) ; écrit avant 6 h : la nuit en cours tant que son créneau n'est pas fini (« cette nuit 1h-3h » écrit à 1 h 30), la suivante sinon (écrit à 4 h) |
-| « aujourd'hui », « today », « ajd » | le jour de la publication — **scrim ou remplaçant seulement** (« aujourd'hui, on recrute » ne date pas un recrutement) |
+| « ce soir », « tonight », « cette nuit », « this evening » | le jour de la publication ; « ce soir » / « cette nuit » dont tous les horaires sont d'après minuit (avant 6 h), écrit à 6 h ou plus tard : le lendemain (« cette nuit 1h-3h » écrit à 22 h) ; écrit avant 6 h : la nuit en cours tant que son créneau n'est pas fini (« cette nuit 1h-3h » écrit à 1 h 30), la suivante sinon (écrit à 4 h) |
+| « aujourd'hui », « today », « ajd », « ce matin », « ce midi », « cet après-midi », « this morning », « this afternoon » | le jour de la publication — **scrim ou remplaçant seulement** (« aujourd'hui, on recrute », « ce matin j'ai quitté ma team » ne datent pas une annonce de joueur) |
 | « demain », « tomorrow », « tmrw » | le lendemain |
 | « après-demain », « day after tomorrow » | le surlendemain (lu avant « demain », qu'il contient) |
 | « ce week-end », « this weekend », « ce we » | le samedi et le dimanche qui viennent ; publié un dimanche : ce dimanche (« le week-end », « du week-end » restent une habitude) |
@@ -437,7 +443,8 @@ est lue à l'heure de Paris (dit dans les `InfoHint` des filtres).
 | « EET », « EEST » | l'heure d'Helsinki (Paris + 1 h) |
 | « EST », « EDT », « heure du Québec » | l'heure de New York |
 | « CST », « CDT » · « PST », « PDT » | l'heure de Chicago · de Los Angeles |
-| « UTC », « GMT », « UTC+1 », « GMT-5 », « UTC+5:30 » | un décalage fixe (de −12 à +14 h) |
+| « UTC+1 », « GMT+1 » | l'heure de Paris, été comme hiver (l'heure française dans la communauté, comme « CET ») |
+| « UTC », « GMT », « UTC+2 », « GMT-5 », « UTC+5:30 » | un décalage fixe (de −12 à +14 h) |
 
 - Sigles en **capitales** n'importe où pour « CET », « CEST », « UTC », « GMT »
   seulement ; les autres, qui sont aussi des mots en capitales (« NOTRE ÉQUIPE
@@ -466,7 +473,9 @@ est lue à l'heure de Paris (dit dans les `InfoHint` des filtres).
   l'ordre des dates : `[1380, 0]`, le 29/10 à 23 h) : le filtre par jour et la
   fin d'annonce lisent chaque date à son heure à elle — heure d'été des deux côtés
   comprise (les semaines où New York et Paris ne changent pas d'heure ensemble
-  donnent 5 h d'écart au lieu de 6). Une date suit son premier horaire :
+  donnent 5 h d'écart au lieu de 6). Deux jours écrits qui tombent le même jour
+  à Paris (« samedi et dimanche 6pm EST » début mars) n'en font qu'une date,
+  à l'écart le plus tardif ; les dates restent triées. Une date suit son premier horaire :
   « Friday 9pm EST » tombe le **samedi** à 3 h à Paris, et le jour gardé est
   samedi. « ce soir » se compte dans le fuseau écrit. Les horaires convertis
   restent dans l'ordre écrit : « Friday 3pm and 9pm EST » garde 21 h puis 3 h,
@@ -485,7 +494,8 @@ est lue à l'heure de Paris (dit dans les `InfoHint` des filtres).
 ### Réanalyse
 
 `ANALYSIS_VERSION` passe à **3** : les lignes gardées sont réécrites par la
-purge horaire (`refreshStaleGetiPosts`), et réanalysées à la lecture d'ici là.
+purge horaire (`refreshStaleGetiPosts`, écritures par groupes de 8 pour
+laisser le pool aux lectures de page), et réanalysées à la lecture d'ici là.
 La réanalyse date le message brut de **sa publication** (`datedRaw`) :
 l'instant exact écrit dans le message brut à la réception, sinon `posted_at`
 (une date locale, ambiguë dans l'heure du passage à l'heure d'hiver) — jamais

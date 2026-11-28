@@ -179,8 +179,9 @@ describe("parseGetiPost — fuseau écrit, converti à l'heure de Paris", () => 
     expect(post.availability.statedTimes).toEqual([{ from: 1200, to: 1320 }]);
   });
 
-  it("parseGetiPost_utcPlus1InSummer_addsOneHour", () => {
-    expect(parsed("LFS tomorrow 20h-22h UTC+1", SUMMER_NOON).availability.times).toEqual([{ from: 1260, to: 1380 }]);
+  it("parseGetiPost_utcPlus1InSummer_staysParisTime", () => {
+    // « UTC+1 » dit l'heure française dans la communauté, été comme hiver (comme « CET »).
+    expect(parsed("LFS tomorrow 20h-22h UTC+1", SUMMER_NOON).availability.times).toEqual([{ from: 1200, to: 1320 }]);
   });
 
   it("parseGetiPost_cetInSummer_staysParisTime", () => {
@@ -433,5 +434,74 @@ describe("parseGetiPost — cycle 3 : place prise niée, nuit finie, changement 
 
   it("parseGetiPost_samediProHyphenLeague_isThatSaturday", () => {
     expect(parsed("LFS samedi pro-league 21h", SATURDAY_NOON).dates).toEqual(["2026-11-28"]);
+  });
+});
+
+describe("parseGetiPost — revue sécurité 1 : modification qui clôt, horodatages aberrants, récit du matin, dates confondues", () => {
+  const TUESDAY_MORNING = "2026-11-24T08:00:00.000Z";
+
+  function editedAt(content: string, editedAt: string): GetiParsedPost {
+    return parseGetiPost(getiRawPost(content, { category: "lfs", postedAt: MONDAY_NOON, editedAt }));
+  }
+
+  it.each([
+    ["LFS ce soir 21h-23h complet merci"],
+    ["LFS ce soir 21h-23h, c'est bon pour nous"],
+    ["LFS ce soir 21h-23h (plus dispo)"],
+    ["LFS ce soir 21h-23h annulé"],
+    ["LFS ce soir 21h-23h merci à tous"],
+    ["LFS ce soir 21h-23h GG"],
+    ["LFS tonight 9pm-11pm booked"],
+    ["LFS tonight 9pm-11pm done"],
+    ["LFS tonight 9pm-11pm taken"],
+    ["LFS tonight 9pm-11pm closed"],
+    ["LFS tonight 9pm-11pm cancelled"],
+  ])("parseGetiPost_editClosing_%s_keepsThePostDay", (content) => {
+    expect(editedAt(content, TUESDAY_MORNING).dates).toEqual(["2026-11-23"]);
+  });
+
+  it("parseGetiPost_editWithEquipeComplete_resolvesFromTheEdit", () => {
+    expect(editedAt("Équipe complète cherche scrim ce soir 21h-23h", TUESDAY_MORNING).dates).toEqual(["2026-11-24"]);
+  });
+
+  it("parseGetiPost_editWithPasComplet_resolvesFromTheEdit", () => {
+    expect(editedAt("LFS ce soir 21h-23h, pas complet", TUESDAY_MORNING).dates).toEqual(["2026-11-24"]);
+  });
+
+  it("parseGetiPost_editExactly31DaysAfter_resolvesFromTheEdit", () => {
+    expect(editedAt("LFS ce soir 21h-23h", "2026-12-24T12:00:00.000Z").dates).toEqual(["2026-12-24"]);
+  });
+
+  it("parseGetiPost_editMoreThan31DaysAfter_keepsThePostDay", () => {
+    expect(editedAt("LFS ce soir 21h-23h", "2026-12-24T12:00:01.000Z").dates).toEqual(["2026-11-23"]);
+  });
+
+  it("parseGetiPost_editAtTheLastJavaScriptDate_doesNotThrowAndKeepsThePostDay", () => {
+    expect(editedAt("LFS demain 21h-23h", "+275760-09-13T00:00:00.000Z").dates).toEqual(["2026-11-24"]);
+  });
+
+  it("parseGetiPost_postedAtTheLastJavaScriptDate_readsNoDate", () => {
+    const post = parsed("LFS demain 21h-23h", "+275760-09-13T00:00:00.000Z");
+
+    expect(post.dates).toEqual([]);
+  });
+
+  it("parseGetiPost_lftStoryCeMatin_readsNoDate", () => {
+    const post = parsed("LFT Ce matin j'ai quitté ma team, dispo lundi soir", WEDNESDAY_NOON, "lft");
+
+    expect(post.dates).toEqual([]);
+    expect(post.availability.days).toEqual(["MON"]);
+  });
+
+  it("parseGetiPost_lfsCeMatin_isThePostingDay", () => {
+    expect(parsed("LFS ce matin 10h-12h", WEDNESDAY_NOON).dates).toEqual(["2026-11-25"]);
+  });
+
+  it("parseGetiPost_twoDaysOnEitherSideOfTheUsChange_keepsOneSortedDate", () => {
+    // Vendredi 6 mars 2026 : samedi 6pm EST → dimanche 0 h à Paris, dimanche 6pm EDT → dimanche 23 h.
+    const post = parsed("LFS samedi et dimanche 6pm EST", "2026-03-06T12:00:00.000Z");
+
+    expect(post.dates).toEqual(["2026-03-08"]);
+    expect(post.availability.dateShifts).toBeUndefined();
   });
 });

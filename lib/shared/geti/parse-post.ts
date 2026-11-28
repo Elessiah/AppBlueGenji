@@ -187,11 +187,17 @@ function isoDate(value: unknown): string | null {
   return Number.isNaN(time) ? null : new Date(time).toISOString();
 }
 
-/** « trouvé », « pourvu », « plus besoin », « found », « filled » (texte sans accents, en minuscules). */
+/**
+ * Place prise ou annonce close : « trouvé », « pourvu », « plus besoin », « complet », « c'est bon »,
+ * « plus dispo », « annulé », « merci à tous », « GG », « found », « filled », « done », « booked »,
+ * « taken », « closed », « cancelled » (texte sans accents, en minuscules).
+ */
 const FILLED_WORD = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:trouvee?s?|pourvue?s?|plus besoin|found|filled)${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}(?:trouvee?s?|pourvue?s?|plus besoin|(complete?s?)|c'?\s?est bon|plus dispo(?:nibles?)?|annulee?s?|fermee?s?|merci a tous|gg|found|filled|done|booked|taken|closed|cancell?ed)${NOT_BEFORE_WORD}`,
   "gu",
 );
+/** Juste avant « complet » : l'équipe qui cherche, pas la place prise (« équipe complète », « to complete »). */
+const COMPLETE_SUBJECTS = new Set(["equipe", "team", "roster", "lineup", "up", "stack", "groupe", "compo", "to", "we", "i", "est", "sommes", "is", "are"]);
 /** Mots qui nient la place prise, quelques mots avant : « pas encore trouvé », « toujours rien trouvé », « still not found », « haven't found ». */
 const FILLED_NEGATIONS = new Set(["pas", "rien", "personne", "aucun", "aucune", "jamais", "not", "no", "never", "nobody", "noone", "t"]);
 /** Sujet juste avant : le verbe « trouver » au présent (« si on trouve », « je trouve », « qui se trouve en EU »). */
@@ -213,11 +219,15 @@ function saysFilled(lower: string): boolean {
     const before = clause.split(/[^\p{L}\p{N}]+/u).filter((word) => word !== "").slice(-FILLED_LOOKBACK_WORDS);
     const subject = before.at(-1);
     if (subject !== undefined && FILLED_VERB_SUBJECTS.has(subject)) continue;
+    if (match[1] !== undefined && subject !== undefined && COMPLETE_SUBJECTS.has(subject)) continue;
     if (before.some((word) => FILLED_NEGATIONS.has(word))) continue;
     return true;
   }
   return false;
 }
+
+/** Écart le plus grand entre publication et modification pris pour base des dates (au-delà de toute durée de garde). */
+const EDIT_WINDOW_MS = 31 * 24 * 60 * 60 * 1000;
 
 /**
  * Instant où le texte gardé a été écrit : la modification si elle suit la
@@ -228,7 +238,9 @@ function saysFilled(lower: string): boolean {
 function writtenAt(postedAt: string | null, editedAt: string | null, lower: string, oneEvening: boolean): string | null {
   if (postedAt === null || editedAt === null) return postedAt;
   if (oneEvening && saysFilled(lower)) return postedAt;
-  return Date.parse(editedAt) > Date.parse(postedAt) ? editedAt : postedAt;
+  const [posted, edited] = [Date.parse(postedAt), Date.parse(editedAt)];
+  // Une modification bien après toute durée de garde (horodatage aberrant, « +275760-09-12 ») ne date rien.
+  return edited > posted && edited - posted <= EDIT_WINDOW_MS ? editedAt : postedAt;
 }
 
 /** Scrim ou remplaçant, d'après le salon ou le mot-clé d'une annonce postée ailleurs (« LFSub » dans le salon des joueurs). */

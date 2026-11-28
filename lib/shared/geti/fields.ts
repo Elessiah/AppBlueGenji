@@ -554,6 +554,8 @@ const DAY_MS = GETI_DAY_MS;
 /** Une date lue reste proche de la publication : au-delà, c'est autre chose (« 9/10 », une note). */
 const DATE_WINDOW_DAYS = 60;
 const DATE_MAX = 14;
+/** Publication la plus lointaine lue : la limite des dates JavaScript, moins de quoi y ajouter la fenêtre des dates. */
+const POSTED_MAX_MS = 8.64e15 - (DATE_WINDOW_DAYS + 2) * DAY_MS;
 
 function isoDay(day: number): string {
   return new Date(day).toISOString().slice(0, 10);
@@ -695,7 +697,9 @@ function daysUntil(day: GetiDay, today: number): number {
 function relativeDays(lower: string, today: number, sameDay: boolean, tonight: number): number[] {
   const found: number[] = [];
   if (TONIGHT.test(lower)) found.push(tonight);
-  if (TODAY.test(lower.replace(TONIGHT_ALL, " ")) || (sameDay && TODAY_WORD.test(lower))) found.push(today);
+  // « ce matin », « cet après-midi », « aujourd'hui » : une date dans une recherche de scrim ou de remplaçant
+  // seulement — ailleurs, souvent un récit (« ce matin j'ai quitté ma team ») qui daterait à tort l'annonce.
+  if (sameDay && (TODAY.test(lower.replace(TONIGHT_ALL, " ")) || TODAY_WORD.test(lower))) found.push(today);
   const withoutDayAfter = lower.replace(DAY_AFTER_TOMORROW, (matched) => {
     found.push(today + 2 * DAY_MS);
     return " ".repeat(matched.length);
@@ -778,6 +782,23 @@ function getiDateShifts(rule: GetiZoneRule, days: readonly number[], first: numb
   return shifts.some((value) => value !== 0) ? shifts : null;
 }
 
+/**
+ * Dates triées, sans doublon, avec leur écart d'horaires : deux jours écrits de
+ * part et d'autre d'un changement d'heure peuvent tomber le même jour à Paris
+ * (« samedi et dimanche 6pm EST » début mars) ; le même jour garde l'écart le
+ * plus tardif (celui qui dit quand l'annonce est passée).
+ */
+function distinctDates(dates: readonly number[], shifts: readonly number[] | null): { dates: number[]; dateShifts: number[] | null } {
+  const latest = new Map<number, number>();
+  dates.forEach((date, index) => {
+    const shift = shifts?.[index] ?? 0;
+    latest.set(date, Math.max(latest.get(date) ?? shift, shift));
+  });
+  const sorted = [...latest.keys()].sort((a, b) => a - b);
+  const kept = sorted.map((date) => latest.get(date) ?? 0);
+  return { dates: sorted, dateShifts: kept.some((value) => value !== 0) ? kept : null };
+}
+
 /** Heure d'après minuit au plus tard pour qu'une heure seule de « ce soir » vise la nuit qui suit (« ce soir 0h30 »). */
 const AFTER_MIDNIGHT_HOURS = 6;
 
@@ -833,7 +854,8 @@ export function parseGetiSchedule(prepared: GetiPreparedText, postedAt: string |
   const stated = parseTimes(lower);
   const named = parseDays(lower);
   const posted = postedAt === null ? Number.NaN : Date.parse(postedAt);
-  if (Number.isNaN(posted)) return { dates: [], availability: { days: named, times: stated, timezone } };
+  // Une date de publication hors des dates lisibles (« +275760-09-12 ») : aucune date n'est lue (le lendemain n'existerait pas).
+  if (Number.isNaN(posted) || Math.abs(posted) > POSTED_MAX_MS) return { dates: [], availability: { days: named, times: stated, timezone } };
   const rule = getiZoneRule(timezone) ?? PARIS_RULE;
   const today = getiCivilDay(posted, rule);
   const found = [
@@ -855,8 +877,10 @@ export function parseGetiSchedule(prepared: GetiPreparedText, postedAt: string |
   // Les jours nommés suivent les horaires gardés : le décalage de la dernière date.
   const dayShift = dayShiftAt(last);
   // Chaque date suit le décalage de son jour à elle (heure d'été d'un côté, d'hiver de l'autre).
-  const dates = days.map((day) => day + dayShiftAt(day) * DAY_MS);
-  const dateShifts = getiDateShifts(rule, days, first, shifts[0] ?? 0);
+  const { dates, dateShifts } = distinctDates(
+    days.map((day) => day + dayShiftAt(day) * DAY_MS),
+    getiDateShifts(rule, days, first, shifts[0] ?? 0),
+  );
   const shiftDay = (day: GetiDay) => GETI_DAYS[(GETI_DAYS.indexOf(day) + dayShift + 7) % 7];
   const converted = shifts.some((value) => value !== 0);
   // Scrim ou remplaçant aux soirées datées : les jours sont ceux des dates, rien d'autre.
