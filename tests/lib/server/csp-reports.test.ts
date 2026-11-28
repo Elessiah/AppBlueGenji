@@ -7,6 +7,8 @@ import {
   CSP_MAX_LOG_LINES_PER_WINDOW,
   CSP_MAX_TRACKED_CAUSES,
   CSP_MAX_VIOLATIONS_PER_REPORT,
+  CSP_ORIGIN_IP,
+  CSP_ORIGIN_LOCAL,
   CSP_SOURCE_NONE,
   CSP_SOURCE_PAGE,
   admitLogLine,
@@ -121,7 +123,7 @@ describe("documentPathOf", () => {
   });
 
   it("neutralise un saut de ligne dans un chemin relatif", () => {
-    expect(documentPathOf("/a\n[auth] connexion admin")).toBe("/a?[auth] connexion admin");
+    expect(documentPathOf("/a\n[auth] connexion admin")).toBe("/a[auth]%20connexion%20admin");
   });
 });
 
@@ -692,7 +694,7 @@ describe("logCspViolations : plafond global", () => {
     const later = now + CSP_LOG_BUDGET_WINDOW_MS;
     logCspViolations([cause(CSP_MAX_LOG_LINES_PER_WINDOW, "noyee")], later);
     expect(warn).toHaveBeenCalledTimes(2);
-    expect(warn.mock.calls[0][0]).toContain("1 cause(s) neuve(s) non journalisée(s)");
+    expect(warn.mock.calls[0][0]).toContain("1 cause(s) non journalisée(s)");
     expect(warn.mock.calls[1][0]).toContain(`noyee${CSP_MAX_LOG_LINES_PER_WINDOW}`);
   });
 });
@@ -723,7 +725,7 @@ describe("logCspViolations : plafond sans effet de bord sur le suivi", () => {
     warn.mockClear();
     logCspViolations([], 10 + CSP_LOG_BUDGET_WINDOW_MS);
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toContain("2 cause(s) neuve(s)");
+    expect(warn.mock.calls[0][0]).toContain("2 cause(s) non journalisée(s)");
   });
 
   it("annonce les causes tues sans attendre une cause neuve", () => {
@@ -733,7 +735,7 @@ describe("logCspViolations : plafond sans effet de bord sur le suivi", () => {
     logCspViolations([], 5 + CSP_LOG_BUDGET_WINDOW_MS);
     logCspViolations([], 6 + CSP_LOG_BUDGET_WINDOW_MS);
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toContain("4 cause(s) neuve(s)");
+    expect(warn.mock.calls[0][0]).toContain("4 cause(s) non journalisée(s)");
   });
 
   it("compte distinctement sans suivi de causes", () => {
@@ -749,5 +751,94 @@ describe("blockedOriginOf : coupure de lecture", () => {
     const prefix = "https://exemple.test/" + "a".repeat(CSP_INPUT_MAX_LENGTH - "https://exemple.test/".length - 1);
     const cut = blockedOriginOf(`${prefix}\u{1F600}suite`);
     expect(cut).toBe("https://exemple.test");
+  });
+});
+
+describe("logSafe : caractères invisibles supplémentaires", () => {
+  it("remplace le trait d'union conditionnel et un caractère d'étiquette", () => {
+    expect(logSafe("/a\u{E0041}\u00adb")).toBe("/a??b");
+  });
+
+  it("remplace le remplissage hangul, le sélecteur de variante et les ancres d'annotation", () => {
+    expect(logSafe("x\u3164\ufe0f\uffa0\ufffbx")).toBe("x????x");
+  });
+});
+
+describe("documentPathOf : texte de l'appelant", () => {
+  it("encode un faux segment de source dans un chemin relatif", () => {
+    expect(documentPathOf("/a b (source : page)")).toBe("/a%20b%20(source%20:%20page)");
+  });
+
+  it("encode un caractère d'étiquette dans un chemin relatif", () => {
+    expect(documentPathOf("/a\u{E0041}")).toBe("/a%F3%A0%81%81");
+  });
+
+  it("ramène le chemin opaque d'un document data: à la racine", () => {
+    expect(documentPathOf("data:text/html,x (source : page)")).toBe("/");
+  });
+});
+
+describe("origines en adresse IP ou locales", () => {
+  it("tait une adresse IPv4", () => {
+    expect(blockedOriginOf("http://192.168.1.4:8080/x.js")).toBe(CSP_ORIGIN_IP);
+  });
+
+  it("tait une adresse IPv6", () => {
+    expect(blockedOriginOf("http://[::1]:52130/x.js")).toBe(CSP_ORIGIN_IP);
+  });
+
+  it("tait l'adresse de bouclage d'un script injecté", () => {
+    expect(sourceOriginOf("http://127.0.0.1:52130/inject.js")).toBe(CSP_ORIGIN_IP);
+  });
+
+  it("réduit localhost et un hôte .local au mot-clé local", () => {
+    expect(blockedOriginOf("http://localhost:3000/a")).toBe(CSP_ORIGIN_LOCAL);
+    expect(sourceOriginOf("https://imprimante.local/a.js")).toBe(CSP_ORIGIN_LOCAL);
+  });
+});
+
+describe("dédoublonnage : horloge qui recule", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    resetCspLogState();
+  });
+
+  it("réadmet une cause quand l'horloge recule", () => {
+    const tracker = new Map<string, { last: number; suppressed: number }>();
+    admitViolation(tracker, "c", 10 * CSP_DEDUPE_WINDOW_MS);
+    expect(admitViolation(tracker, "c", 8 * CSP_DEDUPE_WINDOW_MS)).toBe(0);
+  });
+
+  it("journalise de nouveau une cause après un recul de l'horloge", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    logCspViolations([cause(0, "recul")], 10 * CSP_DEDUPE_WINDOW_MS);
+    warn.mockClear();
+    logCspViolations([cause(0, "recul")], 8 * CSP_DEDUPE_WINDOW_MS);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("recul0");
+  });
+});
+
+describe("compte des causes tues : suivi plein", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    resetCspLogState();
+  });
+
+  it("ne compte plus une cause inconnue une fois le suivi plein", () => {
+    const droppedCauses = new Set(Array.from({ length: CSP_MAX_TRACKED_CAUSES }, (_, i) => `vue${i}`));
+    const budget = { windowStart: 0, written: CSP_MAX_LOG_LINES_PER_WINDOW, dropped: CSP_MAX_TRACKED_CAUSES, droppedCauses };
+    admitLogLine(budget, 0, "inconnue");
+    expect(budget.dropped).toBe(CSP_MAX_TRACKED_CAUSES);
+  });
+
+  it("annonce « au moins » quand le compte atteint la borne du suivi", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const burst = Array.from({ length: CSP_MAX_LOG_LINES_PER_WINDOW + CSP_MAX_TRACKED_CAUSES + 50 }, (_, i) => cause(i, "plein"));
+    logCspViolations(burst, 7);
+    warn.mockClear();
+    logCspViolations([], 7 + CSP_LOG_BUDGET_WINDOW_MS);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain(`au moins ${CSP_MAX_TRACKED_CAUSES} cause(s) non journalisée(s)`);
   });
 });

@@ -135,13 +135,16 @@ const DIRECTIVE = /^[a-z][a-z-]{0,39}$/;
  * contrôles C0 et C1 (dont le saut de ligne, qui fabriquerait une fausse
  * ligne `[auth] …` dans pm2), séparateurs de ligne Unicode, marques
  * bidirectionnelles (dont U+061C), caractères invisibles ou de largeur nulle
- * (U+180E, U+200B–U+200F, U+2060–U+2064, U+FEFF), qui maquillent le texte, et
+ * (U+00AD, U+034F, U+115F, U+1160, U+17B4, U+17B5, U+180E, U+200B–U+200F,
+ * U+2060–U+2064, U+3164, U+FEFF, U+FFA0, U+FFF9–U+FFFB, les sélecteurs de
+ * variante (U+FE00–U+FE0F et suivants, propriété Unicode) et les
+ * étiquettes U+E0000–U+E007F), qui maquillent le texte, et
  * moitiés de paire UTF-16 orphelines, qui rendraient la ligne invalide en
  * UTF-8. Le drapeau `u` lit une paire complète comme un seul caractère : seule
  * une moitié orpheline tombe dans la plage des demi-codets.
  */
 const UNSAFE_LOG_CHARS =
-  /[\u0000-\u001f\u007f-\u009f\u061c\u180e\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\ud800-\udfff]/gu;
+  /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u115f\u1160\u180e\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff\uffa0\ufff9-\ufffb\u{e0000}-\u{e007f}\ud800-\udfff]|\u034f|\u17b4|\u17b5|\p{Variation_Selector}/gu;
 
 /**
  * Rend un champ sûr pour une ligne de journal : caractères dangereux remplacés
@@ -165,6 +168,25 @@ export function logSafe(value: string): string {
   return `${head.replace(UNSAFE_LOG_CHARS, "?")}\u2026#${digest}`;
 }
 
+/** Origine rendue pour un hôte écrit en adresse IP (v4 ou v6). */
+export const CSP_ORIGIN_IP = "adresse-ip";
+
+/** Origine rendue pour un hôte local (`localhost`, `*.localhost`, `*.local`). */
+export const CSP_ORIGIN_LOCAL = "local";
+
+/**
+ * Origine d'une URL déjà analysée, sauf pour un hôte en adresse IP ou local :
+ * un antivirus ou un proxy qui injecte son script le sert souvent de
+ * `127.0.0.1:<port>` ou de l'adresse du réseau du visiteur, et la ligne
+ * porterait alors une adresse IP. Le mot-clé suffit au tri.
+ */
+function safeOrigin(url: URL): string {
+  const host = url.hostname.toLowerCase();
+  if (host.startsWith("[") || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return CSP_ORIGIN_IP;
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return CSP_ORIGIN_LOCAL;
+  return logSafe(url.origin);
+}
+
 /**
  * Réduit une URL à son origine, ou au mot-clé que le navigateur a employé.
  *
@@ -174,7 +196,9 @@ export function logSafe(value: string): string {
  * la politique, le reste ne fait que grossir la ligne.
  *
  * @param value Valeur de `blocked-uri`.
- * @returns L'origine, le mot-clé, ou `"inconnu"` si la valeur est inexploitable.
+ * @returns L'origine ({@link CSP_ORIGIN_IP} / {@link CSP_ORIGIN_LOCAL} pour un
+ *   hôte en adresse IP ou local), le mot-clé, ou `"inconnu"` si la valeur est
+ *   inexploitable.
  */
 export function blockedOriginOf(value: unknown): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -188,8 +212,8 @@ export function blockedOriginOf(value: unknown): string {
     return KEYWORD.test(keyword) ? keyword.toLowerCase() : "inconnu";
   }
   try {
-    const origin = new URL(trimmed).origin;
-    if (origin !== "null") return logSafe(origin);
+    const url = new URL(trimmed);
+    if (url.origin !== "null") return safeOrigin(url);
     // Un schéma non standard n'a pas d'origine : son nom suffit.
     const scheme = beforeColon(trimmed);
     return KEYWORD.test(scheme) ? scheme.toLowerCase() : "inconnu";
@@ -276,7 +300,8 @@ function isScriptOnlyViolation(directive: string, blockedOrigin: string): boolea
  * rien au correctif et singularise le visiteur.
  *
  * @param value Valeur de `source-file` ou `sourceFile`.
- * @returns L'origine, le schéma d'extension, le mot-clé du navigateur
+ * @returns L'origine (`adresse-ip` / `local` pour un hôte en adresse IP ou
+ *   local), le schéma d'extension, le mot-clé du navigateur
  *   (`inline`, `eval`…), {@link CSP_SOURCE_NONE} sans script nommé, ou
  *   `"inconnu"` sur une valeur illisible.
  */
@@ -296,9 +321,9 @@ export function sourceOriginOf(value: unknown): string {
     return keyword ?? "inconnu";
   }
   try {
-    const origin = new URL(trimmed).origin;
+    const url = new URL(trimmed);
     // Un schéma non standard n'a pas d'origine (`"null"`) : son nom suffit.
-    return origin === "null" ? (keyword ?? "inconnu") : logSafe(origin);
+    return url.origin === "null" ? (keyword ?? "inconnu") : safeOrigin(url);
   } catch {
     return "inconnu";
   }
@@ -341,11 +366,22 @@ export function documentPathOf(value: unknown): string {
   }
   const trimmed = bounded(value).trim();
   try {
-    return logSafe(new URL(trimmed).pathname || "/");
+    // Un chemin opaque (`data:text/html,…`, `about:blank`) ne commence pas par
+    // `/` : c'est du texte libre, pas un chemin du site.
+    const path = new URL(trimmed).pathname;
+    return path.startsWith("/") ? logSafe(path) : "/";
   } catch {
-    // Une valeur relative reste exploitable : on coupe à la requête ou au fragment.
+    // Une valeur relative reste exploitable : on coupe à la requête ou au
+    // fragment, puis l'analyse d'URL encode le chemin comme pour une adresse
+    // complète (espaces et caractères non ASCII en `%XX`) — sans quoi le texte
+    // de l'appelant passerait tel quel, faux segment `(source : …)` compris.
     const cut = trimmed.split(/[?#]/)[0];
-    return cut.startsWith("/") ? logSafe(cut) : "/";
+    if (!cut.startsWith("/")) return "/";
+    try {
+      return logSafe(new URL(cut, "http://chemin.invalid").pathname);
+    } catch {
+      return "/";
+    }
   }
 }
 
@@ -453,7 +489,8 @@ type Tracker = Map<string, { last: number; suppressed: number }>;
  */
 export function admitViolation(tracker: Tracker, cause: string, now: number): number | null {
   const entry = tracker.get(cause);
-  if (entry && now - entry.last < CSP_DEDUPE_WINDOW_MS) {
+  // Une horloge qui recule (correction NTP) ne prolonge pas le silence.
+  if (entry && now >= entry.last && now - entry.last < CSP_DEDUPE_WINDOW_MS) {
     entry.suppressed += 1;
     return null;
   }
@@ -480,7 +517,10 @@ export function admitViolation(tracker: Tracker, cause: string, now: number): nu
 export interface LogBudget {
   windowStart: number;
   written: number;
-  /** Causes neuves distinctes tues dans la fenêtre (une cause retentée compte une fois). */
+  /**
+   * Causes distinctes tues dans la fenêtre (une cause retentée compte une
+   * fois), bornée à {@link CSP_MAX_TRACKED_CAUSES} quand `droppedCauses` est suivi.
+   */
   dropped: number;
   /** Causes déjà comptées dans `dropped`, bornée à {@link CSP_MAX_TRACKED_CAUSES}. */
   droppedCauses?: Set<string>;
@@ -502,7 +542,8 @@ function rollWindow(budget: LogBudget, now: number): number {
 
 function announceDropped(count: number): void {
   if (count > 0) {
-    console.warn(`[csp] ${count} cause(s) neuve(s) non journalisée(s) (plafond de ${CSP_MAX_LOG_LINES_PER_WINDOW} lignes par minute)`);
+    const amount = count >= CSP_MAX_TRACKED_CAUSES ? `au moins ${count}` : `${count}`;
+    console.warn(`[csp] ${amount} cause(s) non journalisée(s) (plafond de ${CSP_MAX_LOG_LINES_PER_WINDOW} lignes par minute)`);
   }
 }
 
@@ -521,9 +562,11 @@ export function admitLogLine(budget: LogBudget, now: number, cause?: string): { 
     const seen = budget.droppedCauses;
     if (cause === undefined || !seen) {
       budget.dropped += 1;
-    } else if (!seen.has(cause)) {
+    } else if (!seen.has(cause) && seen.size < CSP_MAX_TRACKED_CAUSES) {
+      // Ensemble plein : une cause inconnue peut être une cause déjà tue,
+      // retentée ; le compte s'arrête là et l'annonce dit « au moins ».
       budget.dropped += 1;
-      if (seen.size < CSP_MAX_TRACKED_CAUSES) seen.add(cause);
+      seen.add(cause);
     }
     return { allowed: false, announce };
   }
@@ -562,7 +605,7 @@ export function logCspViolations(violations: CspViolation[], now: number = Date.
   for (const violation of violations) {
     const cause = violationCause(violation);
     const known = tracker.get(cause);
-    if (known && now - known.last < CSP_DEDUPE_WINDOW_MS) {
+    if (known && now >= known.last && now - known.last < CSP_DEDUPE_WINDOW_MS) {
       known.suppressed += 1;
       continue;
     }
