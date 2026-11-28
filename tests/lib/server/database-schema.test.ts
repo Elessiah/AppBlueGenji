@@ -591,10 +591,10 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // à l'aveugle copierait la table à chaque démarrage.
     const reads = [...sql.matchAll(/FROM information_schema/gi)];
     // Quatrième et cinquième (`foreignKeyMissing` lit `TABLES` puis
-    // `REFERENTIAL_CONSTRAINTS`), de même nature que la première : la clé
-    // `fk_bg_geti_alert_hits_post` ne se lit sur aucun code d'erreur tolérant, et
-    // son rattrapage commence par parcourir la table pour retirer les traces
-    // orphelines — un balayage qu'on ne rejoue pas à chaque démarrage.
+    // `REFERENTIAL_CONSTRAINTS`), de même nature que la seconde : le rattrapage
+    // de la clé `fk_bg_geti_alert_hits_post` commence par parcourir la table pour
+    // retirer les traces orphelines — un balayage qu'on ne rejoue pas à chaque
+    // démarrage (l'`ADD CONSTRAINT` rejoué, lui, serait toléré).
     expect(reads).toHaveLength(9);
 
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
@@ -609,9 +609,9 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // seule trace durable de ce passage.
     const migrations = sql.slice(0, sql.indexOf("async function warnIfSchemaIsBehind"));
     const outside = [...migrations.matchAll(/FROM\s+information_schema\.(\w+)/gi)].map((m) => m[1]);
-    // Dans l'ordre : clé des invitations, défaut « sans équipe », clé des traces
-    // d'alertes GETI (`TABLES` + `REFERENTIAL_CONSTRAINTS`), conversions d'`ENUM`
-    // rattrapées une fois (`columnTypeContains`).
+    // Dans l'ordre : clé des invitations, conversions d'`ENUM` rattrapées une
+    // fois (`columnTypeContains`), clé des traces d'alertes GETI (`TABLES` +
+    // `REFERENTIAL_CONSTRAINTS`), défaut « sans équipe ».
     expect(outside).toEqual(["REFERENTIAL_CONSTRAINTS", "COLUMNS", "TABLES", "REFERENTIAL_CONSTRAINTS", "COLUMNS"]);
     expect(migrations).toContain("const foreignKeyMissing = (table: string, constraint: string)");
     expect(migrations).toContain("const columnTypeContains = (table: string, column: string, fragment: string)");

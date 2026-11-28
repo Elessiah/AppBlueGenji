@@ -839,8 +839,10 @@ close ne prévient jamais.
   retirée (supprimée du salon, vidée, opposition, échue, réanalyse impossible)
   emporte ses traces dans la même instruction : rien n'en reste (T21). Une
   annonce qui revient ensuite (texte rétabli après avoir été vidé) compte comme
-  nouvelle et peut prévenir encore si elle est récente (moins de 30 min : le
-  rattrapage, lui, ne pose aucune trace et ne prévient pas) : la promesse « jamais deux
+  nouvelle et peut prévenir encore si elle est récente (publiée ou modifiée
+  depuis moins de 30 min, `isFreshGetiPost` — y compris quand c'est le
+  rattrapage du bot qui la pousse ; son arriéré plus ancien ne prévient
+  personne et ne pose aucune trace) : la promesse « jamais deux
   fois » vaut tant que l'annonce reste sur le site (textes légaux).
   Une trace ne se pose que sur une annonce gardée (`INSERT IGNORE` écarte celle
   retirée entre-temps).

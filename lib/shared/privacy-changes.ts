@@ -2414,7 +2414,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   },
   {
     // GETI-ALERTS — alertes sur une recherche d'annonces
-    // (`docs/features/GETI_INFO.md` § Alertes) : registre T22 (et T12),
+    // (`docs/features/GETI_INFO.md` § Alertes) : registre T22, T21, T12 et T08,
     // /rgpd (FR et EN). Datée comme `REGISTER_UPDATED_AT` — tout avancer
     // ensemble si la mise en ligne glisse.
     id: "2026-11-alertes-d-annonces-geti",
@@ -2424,13 +2424,14 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd/registre#t22", label: "Lire la fiche T22 du registre" },
       { href: "/rgpd#alertes-geti", label: "Lire le paragraphe « Alertes d'annonces »" },
       { href: "/rgpd/registre#t21", label: "Lire la fiche T21 du registre" },
+      { href: "/rgpd/registre#t12", label: "Lire la fiche T12 du registre" },
     ],
     summary: "Sur la page des annonces de recrutement Overwatch, un compte connecté peut créer des alertes : le site garde la catégorie et les filtres choisis, et le prévient quand une nouvelle annonce y correspond.",
     details: [
       "Ce qui est gardé : pour chaque alerte, la catégorie et les filtres choisis, un nom facultatif, son état (active ou en pause), sa date de création et celle de la dernière notification, ainsi qu'une trace technique des annonces déjà signalées par chaque alerte (l'identifiant du message Discord), pour qu'une alerte ne prévienne pas deux fois de la même annonce tant que celle-ci reste sur le site. Dix alertes au plus par compte. Rien n'est créé sans ton geste : l'alerte est un service que tu demandes.",
       "Comment tu es prévenu : par notification push sur les appareils où tu l'as activée, et par message privé Discord, remis par le bot de l'association, si ton compte Discord est certifié — au plus une fois toutes les 10 minutes par alerte. Le message ne porte que le nom de ton alerte et un lien vers la page filtrée comme elle (le lien reprend donc ses filtres), ouverte sur l'annonce signalée — ni pseudo ni texte de l'annonce. Un compte suspendu garde ses alertes mais n'est plus prévenu. Ta propre annonce ne te prévient pas quand elle porte l'identifiant Discord de son auteur : l'identifiant Discord lié à ton compte y est comparé, sans rien garder de plus. Le sujet « Alertes d'annonces GETI » de « Mon profil » coupe les deux.",
-      "Combien de temps : jusqu'à ce que tu supprimes l'alerte (ou la mettes en pause, ce qui la garde sans te prévenir) ; l'effacement de ton compte emporte toutes tes alertes. La trace d'une annonce déjà signalée part avec l'annonce dès qu'elle quitte le site (par exemple supprimée ou vidée de son texte, retirée sur opposition ou au terme de sa garde) — une annonce qui revient ensuite compte comme nouvelle —, et au plus tard au bout de 15 jours. Tes alertes et leurs traces figurent dans l'export de tes données.",
-      "Au passage, la politique de confidentialité du bot, ses conditions d'utilisation et la fiche T08 du registre citent aussi des messages privés que le site faisait déjà remettre par le bot (dates butoirs de planification, nouveau match, avis de prod, avis du planning des casts et arbitres, messages du staff d'un tournoi). Une seule chose change dans ce qui est envoyé : les messages de date butoir de planification ne partent plus qu'aux comptes dont le tag Discord est certifié, comme les autres messages de match et comme le disait déjà le paragraphe « Messages privés Discord de match ». La fiche T21 du registre cite aussi la comparaison des annonces aux alertes, et les titulaires d'une alerte parmi ses destinataires.",
+      "Combien de temps : jusqu'à ce que tu supprimes l'alerte (ou la mettes en pause, ce qui la garde sans te prévenir) ; l'effacement de ton compte emporte toutes tes alertes. La trace d'une annonce déjà signalée part avec l'annonce dès qu'elle quitte le site (par exemple supprimée ou vidée de son texte, retirée sur opposition ou au terme de sa garde) — une annonce qui revient ensuite compte comme nouvelle, et peut donc prévenir de nouveau —, et au plus tard au bout de 15 jours. Tes alertes et leurs traces figurent dans l'export de tes données.",
+      "Au passage, la politique de confidentialité du bot, ses conditions d'utilisation et la fiche T08 du registre citent aussi des messages privés que le site faisait déjà remettre par le bot (dates butoirs de planification, nouveau match, avis de prod, avis du planning des casts et arbitres, messages du staff d'un tournoi, avis de logo rétabli). Pour ces messages déjà remis, une seule chose change dans ce qui est envoyé : les messages de date butoir de planification ne partent plus qu'aux comptes dont le tag Discord est certifié, comme les autres messages de match et comme le disait déjà le paragraphe « Messages privés Discord de match ». La fiche T21 du registre cite aussi la comparaison des annonces aux alertes, et les titulaires d'une alerte parmi ses destinataires ; la fiche T12 (notifications push) compte le sujet « Alertes d'annonces de recrutement » parmi ses finalités.",
     ],
   },
 ];

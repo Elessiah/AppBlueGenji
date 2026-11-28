@@ -358,7 +358,7 @@ function RgpdFr({
             GETI » de « Mon profil » coupe les deux. Une alerte est gardée jusqu&apos;à sa suppression par le compte ;
             l&apos;effacement du compte emporte toutes ses alertes. La trace d&apos;une annonce déjà signalée part avec
             l&apos;annonce dès qu&apos;elle quitte le site (par exemple supprimée ou vidée de son texte, retirée sur opposition
-            ou au terme de sa garde) — une annonce qui revient ensuite compte comme nouvelle —, au plus tard au bout de{" "}
+            ou au terme de sa garde) — une annonce qui revient ensuite compte comme nouvelle, et peut donc prévenir de nouveau —, au plus tard au bout de{" "}
             {GETI_ALERT_HIT_RETENTION_DAYS} jours. Les alertes et leurs traces figurent dans l&apos;export des données du
             compte. Base : l&apos;exécution du service demandé par le compte. Registre des traitements : fiche T22.
           </p>

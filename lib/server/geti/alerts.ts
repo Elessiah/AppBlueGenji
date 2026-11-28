@@ -678,7 +678,8 @@ async function sendReservedAlerts(
  * propriétaires.
  *
  * - Seules les annonces **récentes** et **ouvertes** comptent
- *   (`isFreshGetiPost`) : le rattrapage du bot ne prévient personne. La
+ *   (`isFreshGetiPost`) : le rattrapage du bot ne prévient que pour les
+ *   annonces publiées ou modifiées depuis moins de 30 min. La
  *   version jugée est celle **gardée** en base, relue : une version plus
  *   ancienne arrivée en retard, ou une annonce retirée entre-temps, ne
  *   prévient pas.
@@ -744,7 +745,7 @@ let queued = 0;
  * deux passes qui lisent les mêmes alertes et envoient en même temps — des
  * appels au bot qui s'ajoutent d'un coup (coupe-circuit) pour des comptes que
  * la première passe est déjà en train de prévenir. Seules les annonces encore
- * récentes entrent en file (le rattrapage du bot n'en met aucune) ; une passe
+ * récentes entrent en file (l'arriéré du rattrapage du bot n'en met aucune) ; une passe
  * jugée à son tour, pas à l'arrivée du lot. Ne lève jamais.
  */
 export function scheduleGetiAlerts(posts: readonly GetiAlertPost[], now: number = Date.now()): void {

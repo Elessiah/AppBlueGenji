@@ -298,7 +298,7 @@ export function RgpdEn({
             off. An alert is kept until the account deletes it; erasing the account removes all its alerts. The record
             of a post already reported leaves with the post as soon as it leaves the site (for instance deleted or emptied of
             its text, removed on objection or at the end of its retention period) — a post that comes back afterwards
-            counts as new —, at the latest after {GETI_ALERT_HIT_RETENTION_DAYS} days. The alerts and their records
+            counts as new, and may therefore notify again —, at the latest after {GETI_ALERT_HIT_RETENTION_DAYS} days. The alerts and their records
             are included in the export of the account&apos;s data. Basis: performance of the service the account asked
             for. Register of processing activities: record T22.
           </p>

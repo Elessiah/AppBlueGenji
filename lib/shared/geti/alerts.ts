@@ -36,7 +36,8 @@ export const GETI_ALERT_COOLDOWN_MINUTES = 10;
 /**
  * Une annonce ne prévient que si elle a été publiée (ou modifiée) depuis moins
  * de cette durée : le rattrapage du bot, qui repousse deux semaines
- * d'annonces à chaque démarrage, ne réveille personne.
+ * d'annonces à chaque démarrage, ne réveille personne pour cet arriéré (seules
+ * ses annonces récentes peuvent prévenir).
  */
 export const GETI_ALERT_FRESH_MINUTES = 30;
 

@@ -334,3 +334,39 @@ describe("cycle juridique 2 — « jamais deux fois » borné à l'annonce gard�
     expect(enText).toContain("logo hidden, removed, deleted or restored");
   });
 });
+
+describe("cycle juridique 4 — liste des changements bornée, T12 nommée, annonce revenue", () => {
+  const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-11-alertes-d-annonces-geti");
+  const english = PRIVACY_CHANGES_EN["2026-11-alertes-d-annonces-geti"];
+
+  it("getiAlertPrivacyChange_onlyOneThingChanges_scopedToAlreadyDeliveredMessagesFrAndEn", () => {
+    expect(entry?.details.join(" ")).toContain("Pour ces messages déjà remis, une seule chose change");
+    expect(english?.details.join(" ")).toContain("For these messages already delivered, only one thing changes");
+  });
+
+  it("getiAlertPrivacyChange_logoRestoredNotice_listedFrAndEn", () => {
+    expect(entry?.details.join(" ")).toContain("avis de logo rétabli");
+    expect(english?.details.join(" ")).toContain("logo restored notices");
+  });
+
+  it("getiAlertPrivacyChange_t12Change_linkedAndNamedFrAndEn", () => {
+    expect(entry?.links?.map((link) => link.href)).toContain("/rgpd/registre#t12");
+    expect(english?.linkLabels).toContain("Read record T12 of the register");
+    expect(english?.linkLabels).toHaveLength(entry?.links?.length ?? -1);
+    expect(entry?.details.join(" ")).toContain("la fiche T12 (notifications push)");
+    expect(english?.details.join(" ")).toContain("record T12 (push notifications)");
+  });
+
+  it("getiAlertTexts_returningPost_mayNotifyAgainFrAndEn", () => {
+    const rgpdFr = readSource("app/rgpd/page.tsx").replace(/\s+/g, " ");
+    const rgpdEn = readSource("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ");
+    const { fr, en } = record("T22");
+
+    expect(entry?.details.join(" ")).toContain("compte comme nouvelle, et peut donc prévenir de nouveau");
+    expect(english?.details.join(" ")).toContain("counts as new, and may therefore notify again");
+    expect(rgpdFr).toContain("compte comme nouvelle, et peut donc prévenir de nouveau");
+    expect(rgpdEn).toContain("counts as new, and may therefore notify again");
+    expect(fr.subPurposes.join(" ")).toContain("compte comme nouvelle (et peut donc prévenir de nouveau)");
+    expect(en.subPurposes.join(" ")).toContain("counts as new (and may therefore notify again)");
+  });
+});
