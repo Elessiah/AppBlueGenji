@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { getiPostEndsAt, parseGetiPost, type GetiCategory, type GetiParsedPost } from "@/lib/shared/geti";
 import { GETI_RETENTION_MAX_DAYS } from "@/lib/shared/geti/ingest";
 import { GETI_EDIT_WINDOW_MS } from "@/lib/shared/geti/parse-post";
+import { GETI_CATEGORIES, type GetiRawPost } from "@/lib/shared/geti/types";
 import { getiRawPost } from "../../../helpers/geti";
 
 /**
@@ -21,6 +22,29 @@ const SUMMER_NOON = "2026-07-15T12:00:00.000Z";
 
 function parsed(content: string, postedAt: string | null, category: GetiCategory = "lfs"): GetiParsedPost {
   return parseGetiPost(getiRawPost(content, { category, postedAt }));
+}
+
+
+/**
+ * Table de cas « une annonce → ses dates », une ligne par cas :
+ * `nom ¦ texte ¦ publication ¦ modification ¦ catégorie ¦ dates` (« - » : absent ou
+ * aucune ; dates séparées par des virgules). Une ligne « // … » est un commentaire.
+ */
+function dateCases(table: string): Array<[string, GetiRawPost, string[]]> {
+  return table
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("//"))
+    .map((line) => {
+      const [name, content, postedAt, editedAt, category, dates] = line.split(" ¦ ");
+      const known = GETI_CATEGORIES.find((value) => value === category);
+      const raw = getiRawPost(content, {
+        ...(postedAt === "-" ? { postedAt: null } : { postedAt }),
+        ...(editedAt === "-" ? {} : { editedAt }),
+        ...(known === undefined ? {} : { category: known }),
+      });
+      return [name, raw, dates === "-" ? [] : dates.split(",")];
+    });
 }
 
 describe("parseGetiPost — mots relatifs, depuis la date de publication", () => {
@@ -67,32 +91,18 @@ describe("parseGetiPost — mots relatifs, depuis la date de publication", () =>
     expect(post.availability.days).toEqual(["SAT", "SUN"]);
   });
 
-  it("parseGetiPost_thisWeekendPostedSaturday_isSaturdayAndSunday", () => {
-    expect(parsed("LFS this weekend 9pm", SATURDAY_NOON).dates).toEqual(["2026-11-28", "2026-11-29"]);
-  });
-
-  it("parseGetiPost_thisWeekendPostedSunday_isThatSunday", () => {
-    expect(parsed("LFS ce we 21h", SUNDAY_NOON).dates).toEqual(["2026-11-29"]);
-  });
-
-  it("parseGetiPost_nextMondayPostedMonday_isAWeekLater", () => {
-    expect(parsed("LFS lundi prochain 21h", MONDAY_NOON).dates).toEqual(["2026-11-30"]);
-  });
-
-  it("parseGetiPost_nextMondayPostedThursday_isTheComingMonday", () => {
-    expect(parsed("LFS lundi prochain 21h", THURSDAY_NOON).dates).toEqual(["2026-11-30"]);
-  });
-
-  it("parseGetiPost_nextFridayPostedThursday_isTheNextDay", () => {
-    expect(parsed("LFS next friday 9pm", THURSDAY_NOON).dates).toEqual(["2026-11-27"]);
-  });
-
-  it("parseGetiPost_thisFridayPostedFriday_isThatDay", () => {
-    expect(parsed("LFS ce vendredi 21h", FRIDAY_NOON).dates).toEqual(["2026-11-27"]);
-  });
-
-  it("parseGetiPost_thisFridayPostedThursday_isTheNextDay", () => {
-    expect(parsed("LFS this friday 9pm", THURSDAY_NOON).dates).toEqual(["2026-11-27"]);
+  it.each(
+    dateCases(`
+      parseGetiPost_thisWeekendPostedSaturday_isSaturdayAndSunday ¦ LFS this weekend 9pm ¦ 2026-11-28T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-28,2026-11-29
+      parseGetiPost_thisWeekendPostedSunday_isThatSunday ¦ LFS ce we 21h ¦ 2026-11-29T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-29
+      parseGetiPost_nextMondayPostedMonday_isAWeekLater ¦ LFS lundi prochain 21h ¦ 2026-11-23T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-30
+      parseGetiPost_nextMondayPostedThursday_isTheComingMonday ¦ LFS lundi prochain 21h ¦ 2026-11-26T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-30
+      parseGetiPost_nextFridayPostedThursday_isTheNextDay ¦ LFS next friday 9pm ¦ 2026-11-26T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-27
+      parseGetiPost_thisFridayPostedFriday_isThatDay ¦ LFS ce vendredi 21h ¦ 2026-11-27T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-27
+      parseGetiPost_thisFridayPostedThursday_isTheNextDay ¦ LFS this friday 9pm ¦ 2026-11-26T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-27
+    `),
+  )("%s", (_name, raw, dates) => {
+    expect(parseGetiPost(raw).dates).toEqual(dates);
   });
 
   it("parseGetiPost_weekendHabitInRecruitment_hasNoDate", () => {
@@ -102,16 +112,14 @@ describe("parseGetiPost — mots relatifs, depuis la date de publication", () =>
     expect(post.availability.days).toEqual(["SAT", "SUN"]);
   });
 
-  it("parseGetiPost_todayAsATurnOfPhraseInRecruitment_hasNoDate", () => {
-    expect(parsed("Aujourd'hui, on recrute un tank Master", THURSDAY_NOON, "lfp").dates).toEqual([]);
-  });
-
-  it("parseGetiPost_todayInAScrimSearch_isThePostingDay", () => {
-    expect(parsed("LFS aujourd'hui 21h", THURSDAY_NOON).dates).toEqual(["2026-11-26"]);
-  });
-
-  it("parseGetiPost_tonightInRecruitment_isThePostingDay", () => {
-    expect(parsed("Tryouts ce soir 21h pour un tank", THURSDAY_NOON, "lfp").dates).toEqual(["2026-11-26"]);
+  it.each(
+    dateCases(`
+      parseGetiPost_todayAsATurnOfPhraseInRecruitment_hasNoDate ¦ Aujourd'hui, on recrute un tank Master ¦ 2026-11-26T12:00:00.000Z ¦ - ¦ lfp ¦ -
+      parseGetiPost_todayInAScrimSearch_isThePostingDay ¦ LFS aujourd'hui 21h ¦ 2026-11-26T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-26
+      parseGetiPost_tonightInRecruitment_isThePostingDay ¦ Tryouts ce soir 21h pour un tank ¦ 2026-11-26T12:00:00.000Z ¦ - ¦ lfp ¦ 2026-11-26
+    `),
+  )("%s", (_name, raw, dates) => {
+    expect(parseGetiPost(raw).dates).toEqual(dates);
   });
 
   it("parseGetiPost_withoutPostingDate_readsNoDate", () => {
@@ -123,21 +131,16 @@ describe("parseGetiPost — mots relatifs, depuis la date de publication", () =>
 });
 
 describe("parseGetiPost — soirées d'un scrim", () => {
-  it("parseGetiPost_timeOnlyPostedBeforeTheSlot_isTheSameDay", () => {
-    expect(parsed("LFS 3k5 21-23", THURSDAY_NOON).dates).toEqual(["2026-11-26"]);
-  });
-
-  it("parseGetiPost_timeOnlyPostedDuringTheSlot_isTheSameDay", () => {
-    expect(parsed("LFS 3k5 21-23", "2026-11-26T21:59:00.000Z").dates).toEqual(["2026-11-26"]);
-  });
-
-  it("parseGetiPost_timeOnlyPostedOnceTheSlotIsOver_isTheNextDay", () => {
-    // 23 h à Paris : le créneau « 21-23 » vient de finir.
-    expect(parsed("LFS 3k5 21-23", "2026-11-26T22:00:00.000Z").dates).toEqual(["2026-11-27"]);
-  });
-
-  it("parseGetiPost_nowPostedAfterTheSlot_staysTheSameDay", () => {
-    expect(parsed("LFS now 3k5 21-23", "2026-11-26T22:30:00.000Z").dates).toEqual(["2026-11-26"]);
+  it.each(
+    dateCases(`
+      parseGetiPost_timeOnlyPostedBeforeTheSlot_isTheSameDay ¦ LFS 3k5 21-23 ¦ 2026-11-26T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-26
+      parseGetiPost_timeOnlyPostedDuringTheSlot_isTheSameDay ¦ LFS 3k5 21-23 ¦ 2026-11-26T21:59:00.000Z ¦ - ¦ lfs ¦ 2026-11-26
+      // 23 h à Paris : le créneau « 21-23 » vient de finir.
+      parseGetiPost_timeOnlyPostedOnceTheSlotIsOver_isTheNextDay ¦ LFS 3k5 21-23 ¦ 2026-11-26T22:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-27
+      parseGetiPost_nowPostedAfterTheSlot_staysTheSameDay ¦ LFS now 3k5 21-23 ¦ 2026-11-26T22:30:00.000Z ¦ - ¦ lfs ¦ 2026-11-26
+    `),
+  )("%s", (_name, raw, dates) => {
+    expect(parseGetiPost(raw).dates).toEqual(dates);
   });
 
   it("parseGetiPost_namedDays_daysAreThoseOfTheDates", () => {
@@ -246,22 +249,17 @@ describe("parseGetiPost — fuseau écrit, converti à l'heure de Paris", () => 
 });
 
 describe("parseGetiPost — cycle 1 : nuit, fuseaux par horaire, tournures habituelles, modification", () => {
-  it("parseGetiPost_tonightAfterMidnightPostedInTheEvening_isTheNextDay", () => {
-    // Vendredi 27, 22 h à Paris : « cette nuit 1h-3h » est la nuit de vendredi à samedi.
-    expect(parsed("LFS cette nuit 1h-3h", "2026-11-27T21:00:00.000Z").dates).toEqual(["2026-11-28"]);
-  });
-
-  it("parseGetiPost_tonightAfterMidnightPostedAfterMidnight_isTheSameDay", () => {
-    // Samedi 28, 0 h 30 à Paris : 1 h n'est pas encore passée.
-    expect(parsed("LFS cette nuit 1h-3h", "2026-11-27T23:30:00.000Z").dates).toEqual(["2026-11-28"]);
-  });
-
-  it("parseGetiPost_tonightSingleTimeAfterMidnight_isTheNextDay", () => {
-    expect(parsed("LFS ce soir 0h30", "2026-11-27T21:00:00.000Z").dates).toEqual(["2026-11-28"]);
-  });
-
-  it("parseGetiPost_tonightEveningSlotAcrossMidnight_staysTheSameDay", () => {
-    expect(parsed("LFS ce soir 22h-1h", "2026-11-27T20:00:00.000Z").dates).toEqual(["2026-11-27"]);
+  it.each(
+    dateCases(`
+      // Vendredi 27, 22 h à Paris : « cette nuit 1h-3h » est la nuit de vendredi à samedi.
+      parseGetiPost_tonightAfterMidnightPostedInTheEvening_isTheNextDay ¦ LFS cette nuit 1h-3h ¦ 2026-11-27T21:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-28
+      // Samedi 28, 0 h 30 à Paris : 1 h n'est pas encore passée.
+      parseGetiPost_tonightAfterMidnightPostedAfterMidnight_isTheSameDay ¦ LFS cette nuit 1h-3h ¦ 2026-11-27T23:30:00.000Z ¦ - ¦ lfs ¦ 2026-11-28
+      parseGetiPost_tonightSingleTimeAfterMidnight_isTheNextDay ¦ LFS ce soir 0h30 ¦ 2026-11-27T21:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-28
+      parseGetiPost_tonightEveningSlotAcrossMidnight_staysTheSameDay ¦ LFS ce soir 22h-1h ¦ 2026-11-27T20:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-27
+    `),
+  )("%s", (_name, raw, dates) => {
+    expect(parseGetiPost(raw).dates).toEqual(dates);
   });
 
   it("parseGetiPost_twoSlotsEst_secondSlotWrapsAfterTheFirst", () => {
@@ -281,38 +279,19 @@ describe("parseGetiPost — cycle 1 : nuit, fuseaux par horaire, tournures habit
     expect(getiPostEndsAt(post)).toBe(Date.parse("2026-11-28T04:00:00.000Z"));
   });
 
-  it("parseGetiPost_datesAcrossTheUsDstChange_eachDateFollowsItsOwnShift", () => {
-    // 6pm EDT le 29/10 = 23 h à Paris ; 6pm EST le 02/11 = minuit à Paris, le 03/11.
-    expect(parsed("LFS 29/10 et 02/11 6pm EST", "2026-10-28T12:00:00.000Z").dates).toEqual(["2026-10-29", "2026-11-03"]);
-  });
-
-  it("parseGetiPost_duWeekEnd_isAHabitNotADate", () => {
-    expect(parsed("LFT dispo en soirée et du week-end", MONDAY_NOON, "lft").dates).toEqual([]);
-  });
-
-  it("parseGetiPost_samediProLeague_isNotNextSaturday", () => {
-    expect(parsed("LFT on vise la samedi pro league", MONDAY_NOON, "lft").dates).toEqual([]);
-  });
-
-  it("parseGetiPost_ceSamediProchain_isOnlyNextWeeksSaturday", () => {
-    // Publiée le lundi 23 : le samedi d'après est le 28.
-    expect(parsed("LFS ce samedi prochain 21h", MONDAY_NOON).dates).toEqual(["2026-11-28"]);
-  });
-
-  it("parseGetiPost_editedTheNextDay_resolvesTonightFromTheEdit", () => {
-    const post = parseGetiPost(
-      getiRawPost("LFS ce soir 21h-23h", { category: "lfs", postedAt: MONDAY_NOON, editedAt: "2026-11-24T17:00:00.000Z" }),
-    );
-
-    expect(post.dates).toEqual(["2026-11-24"]);
-  });
-
-  it("parseGetiPost_editDateBeforeThePostDate_usesThePostDate", () => {
-    const post = parseGetiPost(
-      getiRawPost("LFS ce soir 21h-23h", { category: "lfs", postedAt: MONDAY_NOON, editedAt: "2026-11-20T17:00:00.000Z" }),
-    );
-
-    expect(post.dates).toEqual(["2026-11-23"]);
+  it.each(
+    dateCases(`
+      // 6pm EDT le 29/10 = 23 h à Paris ; 6pm EST le 02/11 = minuit à Paris, le 03/11.
+      parseGetiPost_datesAcrossTheUsDstChange_eachDateFollowsItsOwnShift ¦ LFS 29/10 et 02/11 6pm EST ¦ 2026-10-28T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-10-29,2026-11-03
+      parseGetiPost_duWeekEnd_isAHabitNotADate ¦ LFT dispo en soirée et du week-end ¦ 2026-11-23T12:00:00.000Z ¦ - ¦ lft ¦ -
+      parseGetiPost_samediProLeague_isNotNextSaturday ¦ LFT on vise la samedi pro league ¦ 2026-11-23T12:00:00.000Z ¦ - ¦ lft ¦ -
+      // Publiée le lundi 23 : le samedi d'après est le 28.
+      parseGetiPost_ceSamediProchain_isOnlyNextWeeksSaturday ¦ LFS ce samedi prochain 21h ¦ 2026-11-23T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-28
+      parseGetiPost_editedTheNextDay_resolvesTonightFromTheEdit ¦ LFS ce soir 21h-23h ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T17:00:00.000Z ¦ lfs ¦ 2026-11-24
+      parseGetiPost_editDateBeforeThePostDate_usesThePostDate ¦ LFS ce soir 21h-23h ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-20T17:00:00.000Z ¦ lfs ¦ 2026-11-23
+    `),
+  )("%s", (_name, raw, dates) => {
+    expect(parseGetiPost(raw).dates).toEqual(dates);
   });
 });
 
@@ -326,46 +305,20 @@ describe("parseGetiPost — cycle 2 : changement d'heure, nuit en cours, place p
     expect(getiPostEndsAt(post)).toBe(Date.parse("2026-11-03T01:00:00.000Z"));
   });
 
-  it("parseGetiPost_tonightAfterMidnightPostedDuringThatNight_isTheSameDay", () => {
-    // Samedi 28, 1 h 30 à Paris : la nuit en cours.
-    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T00:30:00.000Z").dates).toEqual(["2026-11-28"]);
-  });
-
-  it("parseGetiPost_tonightAfterMidnightPostedAtSixSharp_isTheNextDay", () => {
-    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T05:00:00.000Z").dates).toEqual(["2026-11-29"]);
-  });
-
-  it("parseGetiPost_tonightAfterMidnightPostedJustBeforeSixAfterTheSlot_isTheNextNight", () => {
-    // 5 h 59 à Paris : le créneau 1 h – 3 h de cette nuit-là est fini, l'annonce vise la nuit suivante.
-    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T04:59:00.000Z").dates).toEqual(["2026-11-29"]);
-  });
-
-  it("parseGetiPost_editMarkingTheSpotFound_keepsThePostDay", () => {
-    const post = parseGetiPost(
-      getiRawPost("LFS ce soir 21h-23h (trouvé merci)", { category: "lfs", postedAt: MONDAY_NOON, editedAt: "2026-11-24T08:00:00.000Z" }),
-    );
-
-    expect(post.dates).toEqual(["2026-11-23"]);
-  });
-
-  it("parseGetiPost_editSayingNotFoundYet_resolvesFromTheEdit", () => {
-    const post = parseGetiPost(
-      getiRawPost("LFS ce soir 21h-23h, toujours pas trouvé", { category: "lfs", postedAt: MONDAY_NOON, editedAt: "2026-11-24T08:00:00.000Z" }),
-    );
-
-    expect(post.dates).toEqual(["2026-11-24"]);
-  });
-
-  it("parseGetiPost_lftEditWithFound_resolvesFromTheEdit", () => {
-    const post = parseGetiPost(
-      getiRawPost("LFT dispo ce soir, found nothing yet", { category: "lft", postedAt: MONDAY_NOON, editedAt: "2026-11-24T08:00:00.000Z" }),
-    );
-
-    expect(post.dates).toEqual(["2026-11-24"]);
-  });
-
-  it("parseGetiPost_samediProPostedThatSaturday_isNextWeek", () => {
-    expect(parsed("LFS samedi pro 21h", SATURDAY_NOON).dates).toEqual(["2026-12-05"]);
+  it.each(
+    dateCases(`
+      // Samedi 28, 1 h 30 à Paris : la nuit en cours.
+      parseGetiPost_tonightAfterMidnightPostedDuringThatNight_isTheSameDay ¦ LFS cette nuit 1h-3h ¦ 2026-11-28T00:30:00.000Z ¦ - ¦ lfs ¦ 2026-11-28
+      parseGetiPost_tonightAfterMidnightPostedAtSixSharp_isTheNextDay ¦ LFS cette nuit 1h-3h ¦ 2026-11-28T05:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-29
+      // 5 h 59 à Paris : le créneau 1 h – 3 h de cette nuit-là est fini, l'annonce vise la nuit suivante.
+      parseGetiPost_tonightAfterMidnightPostedJustBeforeSixAfterTheSlot_isTheNextNight ¦ LFS cette nuit 1h-3h ¦ 2026-11-28T04:59:00.000Z ¦ - ¦ lfs ¦ 2026-11-29
+      parseGetiPost_editMarkingTheSpotFound_keepsThePostDay ¦ LFS ce soir 21h-23h (trouvé merci) ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-23
+      parseGetiPost_editSayingNotFoundYet_resolvesFromTheEdit ¦ LFS ce soir 21h-23h, toujours pas trouvé ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-24
+      parseGetiPost_lftEditWithFound_resolvesFromTheEdit ¦ LFT dispo ce soir, found nothing yet ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lft ¦ 2026-11-24
+      parseGetiPost_samediProPostedThatSaturday_isNextWeek ¦ LFS samedi pro 21h ¦ 2026-11-28T12:00:00.000Z ¦ - ¦ lfs ¦ 2026-12-05
+    `),
+  )("%s", (_name, raw, dates) => {
+    expect(parseGetiPost(raw).dates).toEqual(dates);
   });
 });
 
@@ -376,43 +329,23 @@ describe("parseGetiPost — cycle 3 : place prise niée, nuit finie, changement 
     return parseGetiPost(getiRawPost(content, { category: "lfs", postedAt: MONDAY_NOON, editedAt: TUESDAY_MORNING }));
   }
 
-  it("parseGetiPost_editSayingPasEncoreTrouve_resolvesFromTheEdit", () => {
-    expect(edited("LFS ce soir 21h-23h, pas encore trouvé").dates).toEqual(["2026-11-24"]);
-  });
-
-  it("parseGetiPost_editSayingStillNotFound_resolvesFromTheEdit", () => {
-    expect(edited("LFS tonight 9pm-11pm, still not found").dates).toEqual(["2026-11-24"]);
-  });
-
-  it("parseGetiPost_editSayingHaventFound_resolvesFromTheEdit", () => {
-    expect(edited("LFS tonight 9pm-11pm, haven't found anyone").dates).toEqual(["2026-11-24"]);
-  });
-
-  it("parseGetiPost_editWithQuiSeTrouve_resolvesFromTheEdit", () => {
-    expect(edited("LFS ce soir 21h-23h, équipe qui se trouve en EU").dates).toEqual(["2026-11-24"]);
-  });
-
-  it("parseGetiPost_negationInAnEarlierClause_keepsThePostDay", () => {
-    expect(edited("LFS ce soir 21h-23h, pas de souci. Trouvé").dates).toEqual(["2026-11-23"]);
-  });
-
-  it("parseGetiPost_editSayingOnATrouve_keepsThePostDay", () => {
-    expect(edited("LFS ce soir 21h-23h (on a trouvé)").dates).toEqual(["2026-11-23"]);
-  });
-
-  it("parseGetiPost_tonightAfterMidnightPostedAfterTheSlotEnded_isTheNextNight", () => {
-    // Samedi 28, 4 h à Paris : le créneau 1 h – 3 h est fini.
-    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T03:00:00.000Z").dates).toEqual(["2026-11-29"]);
-  });
-
-  it("parseGetiPost_tonightAfterMidnightPostedDuringTheSlot_isTheSameNight", () => {
-    // Samedi 28, 2 h à Paris : en plein créneau.
-    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T01:00:00.000Z").dates).toEqual(["2026-11-28"]);
-  });
-
-  it("parseGetiPost_ceSoir0h30PostedAt0530_isTheNextNight", () => {
-    // 0 h 30 seule finit à 2 h 30 : écrite à 5 h 30, l'annonce vise la nuit suivante.
-    expect(parsed("LFS ce soir 0h30", "2026-11-28T04:30:00.000Z").dates).toEqual(["2026-11-29"]);
+  it.each(
+    dateCases(`
+      parseGetiPost_editSayingPasEncoreTrouve_resolvesFromTheEdit ¦ LFS ce soir 21h-23h, pas encore trouvé ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-24
+      parseGetiPost_editSayingStillNotFound_resolvesFromTheEdit ¦ LFS tonight 9pm-11pm, still not found ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-24
+      parseGetiPost_editSayingHaventFound_resolvesFromTheEdit ¦ LFS tonight 9pm-11pm, haven't found anyone ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-24
+      parseGetiPost_editWithQuiSeTrouve_resolvesFromTheEdit ¦ LFS ce soir 21h-23h, équipe qui se trouve en EU ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-24
+      parseGetiPost_negationInAnEarlierClause_keepsThePostDay ¦ LFS ce soir 21h-23h, pas de souci. Trouvé ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-23
+      parseGetiPost_editSayingOnATrouve_keepsThePostDay ¦ LFS ce soir 21h-23h (on a trouvé) ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-23
+      // Samedi 28, 4 h à Paris : le créneau 1 h – 3 h est fini.
+      parseGetiPost_tonightAfterMidnightPostedAfterTheSlotEnded_isTheNextNight ¦ LFS cette nuit 1h-3h ¦ 2026-11-28T03:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-29
+      // Samedi 28, 2 h à Paris : en plein créneau.
+      parseGetiPost_tonightAfterMidnightPostedDuringTheSlot_isTheSameNight ¦ LFS cette nuit 1h-3h ¦ 2026-11-28T01:00:00.000Z ¦ - ¦ lfs ¦ 2026-11-28
+      // 0 h 30 seule finit à 2 h 30 : écrite à 5 h 30, l'annonce vise la nuit suivante.
+      parseGetiPost_ceSoir0h30PostedAt0530_isTheNextNight ¦ LFS ce soir 0h30 ¦ 2026-11-28T04:30:00.000Z ¦ - ¦ lfs ¦ 2026-11-29
+    `),
+  )("%s", (_name, raw, dates) => {
+    expect(parseGetiPost(raw).dates).toEqual(dates);
   });
 
   it("parseGetiPost_datesAcrossTheUsDstChange_storesTheEarlierDatesShift", () => {
@@ -462,31 +395,18 @@ describe("parseGetiPost — revue sécurité 1 : modification qui clôt, horodat
     expect(editedAt(content, TUESDAY_MORNING).dates).toEqual(["2026-11-23"]);
   });
 
-  it("parseGetiPost_editWithEquipeComplete_resolvesFromTheEdit", () => {
-    expect(editedAt("Équipe complète cherche scrim ce soir 21h-23h", TUESDAY_MORNING).dates).toEqual(["2026-11-24"]);
-  });
-
-  it("parseGetiPost_editWithPasComplet_resolvesFromTheEdit", () => {
-    expect(editedAt("LFS ce soir 21h-23h, pas complet", TUESDAY_MORNING).dates).toEqual(["2026-11-24"]);
-  });
-
-  it("parseGetiPost_editAtTheEndOfTheWindow_resolvesFromTheEdit", () => {
-    // Fenêtre : la plus longue durée de garde (14 jours) plus un jour, soit 15 jours.
-    expect(editedAt("LFS ce soir 21h-23h", "2026-12-08T12:00:00.000Z").dates).toEqual(["2026-12-08"]);
-  });
-
-  it("parseGetiPost_editJustBeyondTheWindow_keepsThePostDay", () => {
-    expect(editedAt("LFS ce soir 21h-23h", "2026-12-08T12:00:01.000Z").dates).toEqual(["2026-11-23"]);
-  });
-
-  it("parseGetiPost_editAtTheLastJavaScriptDate_doesNotThrowAndKeepsThePostDay", () => {
-    expect(editedAt("LFS demain 21h-23h", "+275760-09-13T00:00:00.000Z").dates).toEqual(["2026-11-24"]);
-  });
-
-  it("parseGetiPost_postedAtTheLastJavaScriptDate_readsNoDate", () => {
-    const post = parsed("LFS demain 21h-23h", "+275760-09-13T00:00:00.000Z");
-
-    expect(post.dates).toEqual([]);
+  it.each(
+    dateCases(`
+      parseGetiPost_editWithEquipeComplete_resolvesFromTheEdit ¦ Équipe complète cherche scrim ce soir 21h-23h ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-24
+      parseGetiPost_editWithPasComplet_resolvesFromTheEdit ¦ LFS ce soir 21h-23h, pas complet ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-24
+      // Fenêtre : la plus longue durée de garde (14 jours) plus un jour, soit 15 jours.
+      parseGetiPost_editAtTheEndOfTheWindow_resolvesFromTheEdit ¦ LFS ce soir 21h-23h ¦ 2026-11-23T12:00:00.000Z ¦ 2026-12-08T12:00:00.000Z ¦ lfs ¦ 2026-12-08
+      parseGetiPost_editJustBeyondTheWindow_keepsThePostDay ¦ LFS ce soir 21h-23h ¦ 2026-11-23T12:00:00.000Z ¦ 2026-12-08T12:00:01.000Z ¦ lfs ¦ 2026-11-23
+      parseGetiPost_editAtTheLastJavaScriptDate_doesNotThrowAndKeepsThePostDay ¦ LFS demain 21h-23h ¦ 2026-11-23T12:00:00.000Z ¦ +275760-09-13T00:00:00.000Z ¦ lfs ¦ 2026-11-24
+      parseGetiPost_postedAtTheLastJavaScriptDate_readsNoDate ¦ LFS demain 21h-23h ¦ +275760-09-13T00:00:00.000Z ¦ - ¦ lfs ¦ -
+    `),
+  )("%s", (_name, raw, dates) => {
+    expect(parseGetiPost(raw).dates).toEqual(dates);
   });
 
   it("parseGetiPost_lftStoryCeMatin_readsNoDate", () => {

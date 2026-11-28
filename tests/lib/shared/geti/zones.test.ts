@@ -246,106 +246,71 @@ describe("getiWrapMinutes", () => {
   });
 });
 
+/** Fuseaux lus : sigles, capitales, mots (« heure FR »), décalages. */
+const ZONE_CASES: Array<[string, string]> = [
+  ["LFS 3k5 20-22 CET", "CET"],
+  ["LFS 21h-23h CEST", "CEST"],
+  ["lfs 20-22 cet eu pc", "CET"],
+  ["lfs 21h cest", "CEST"],
+  ["LFS 20h UTC+1", "UTC+1"],
+  ["LFS 20h UTC +2", "UTC+2"],
+  ["LFS 8pm GMT-5", "GMT-5"],
+  ["lfs 20-22 utc", "UTC"],
+  ["LFS 8pm BST", "BST"],
+  ["LFS 9pm EST", "EST"],
+  ["lfs 9pm est", "EST"],
+  ["LFS 6pm PST", "PST"],
+  ["LFS 22h EET", "EET"],
+  ["Scrim 21h heure française", "Europe/Paris"],
+  ["Scrim 21h (heure FR)", "Europe/Paris"],
+  ["LF Sub 3k3 PC tank 21h FR", "Europe/Paris"],
+  ["Scrim 9pm Paris time", "Europe/Paris"],
+  ["Scrim 20h heure du Québec", "EST"],
+  ["LFS 9PM EST", "EST"],
+  ["LFS 21:00 EST", "EST"],
+  ["LFS 21H BST", "BST"],
+  ["LFS 8PM WEST", "WEST"],
+  ["LFT dps, available 8pm-11pm. Timezone: EST", "EST"],
+  ["LFS TZ PST", "PST"],
+  ["LFS fuseau : CST", "CST"],
+  ["LFT playing in EST", "EST"],
+  ["LFS tonight (EDT)", "EDT"],
+  ["LFS EST 9PM", "EST"],
+  ["LFS 8-10 EST", "EST"],
+  ["LFS 20-22 BST", "BST"],
+  ["LFS EU WEST 21h CET", "CET"],
+];
+
+/** Aucun fuseau : mots français (« cet », « est »), régions, rangs, scores, décalage hors borne. */
+const NO_ZONE_CASES: Array<[string]> = [
+  ["LFS 3k5 21h-23h ce soir"],
+  ["Dispo 15h cet après-midi"],
+  ["RDV 15H CET APRÈS-MIDI"],
+  ["On joue 18 cet été"],
+  ["Dispo à 20h cet horaire me va"],
+  ["Le scrim de 21h est bien passé"],
+  ["Notre support est dispo, west coast"],
+  ["LFS 20h UTC+15"],
+  ["LFS CE SOIR 21H-23H, NOTRE ÉQUIPE EST PRÊTE"],
+  ["LFS 21H EST BON POUR NOUS"],
+  ["LFS EU WEST CE SOIR"],
+  ["LFS 3K5 WEST 21h-23h"],
+  ["LFT DPS 4500 WEST EU dispo 21h"],
+  ["LFS C'EST 9PM"],
+  ["LFT playing in WEST EU"],
+  ["LFT Diamond 1-3 WEST EU"],
+  ["LFS Master 1-2 EST"],
+  ["LFS on a gagné 2-1 EST"],
+  ["LFS EU (WEST)"],
+  ["LFS QUI EST 8PM"],
+];
+
 describe("parseGetiTimezone", () => {
-  it.each([
-    ["LFS 3k5 20-22 CET", "CET"],
-    ["LFS 21h-23h CEST", "CEST"],
-    ["lfs 20-22 cet eu pc", "CET"],
-    ["lfs 21h cest", "CEST"],
-    ["LFS 20h UTC+1", "UTC+1"],
-    ["LFS 20h UTC +2", "UTC+2"],
-    ["LFS 8pm GMT-5", "GMT-5"],
-    ["lfs 20-22 utc", "UTC"],
-    ["LFS 8pm BST", "BST"],
-    ["LFS 9pm EST", "EST"],
-    ["lfs 9pm est", "EST"],
-    ["LFS 6pm PST", "PST"],
-    ["LFS 22h EET", "EET"],
-    ["Scrim 21h heure française", "Europe/Paris"],
-    ["Scrim 21h (heure FR)", "Europe/Paris"],
-    ["LF Sub 3k3 PC tank 21h FR", "Europe/Paris"],
-    ["Scrim 9pm Paris time", "Europe/Paris"],
-    ["Scrim 20h heure du Québec", "EST"],
-  ])("parseGetiTimezone_%s_returnsItsLabel", (text, zone) => {
+  it.each(ZONE_CASES)("parseGetiTimezone_%s_returnsItsLabel", (text, zone) => {
     expect(zoneOf(text)).toBe(zone);
   });
 
-  it.each([
-    ["LFS 3k5 21h-23h ce soir"],
-    ["Dispo 15h cet après-midi"],
-    ["RDV 15H CET APRÈS-MIDI"],
-    ["On joue 18 cet été"],
-    ["Dispo à 20h cet horaire me va"],
-    ["Le scrim de 21h est bien passé"],
-    ["Notre support est dispo, west coast"],
-    ["LFS 20h UTC+15"],
-    ["LFS CE SOIR 21H-23H, NOTRE ÉQUIPE EST PRÊTE"],
-    ["LFS 21H EST BON POUR NOUS"],
-    ["LFS EU WEST CE SOIR"],
-  ])("parseGetiTimezone_%s_returnsNull", (text) => {
+  it.each(NO_ZONE_CASES)("parseGetiTimezone_%s_returnsNull", (text) => {
     expect(zoneOf(text)).toBeNull();
-  });
-
-  it("parseGetiTimezone_euWestThenCet_returnsCet", () => {
-    expect(zoneOf("LFS EU WEST 21h CET")).toBe("CET");
-  });
-
-  it.each([
-    ["LFS 9PM EST", "EST"],
-    ["LFS 21:00 EST", "EST"],
-    ["LFS 21H BST", "BST"],
-    ["LFS 8PM WEST", "WEST"],
-  ])("parseGetiTimezone_capitalCodeAfterATime_%s_returnsIt", (text, zone) => {
-    expect(zoneOf(text)).toBe(zone);
-  });
-});
-
-describe("parseGetiTimezone — cycle 2 : sigles-mots en capitales", () => {
-  it.each([
-    ["LFT dps, available 8pm-11pm. Timezone: EST", "EST"],
-    ["LFS TZ PST", "PST"],
-    ["LFS fuseau : CST", "CST"],
-    ["LFT playing in EST", "EST"],
-    ["LFS tonight (EDT)", "EDT"],
-    ["LFS EST 9PM", "EST"],
-    ["LFS 8-10 EST", "EST"],
-    ["LFS 20-22 BST", "BST"],
-  ])("parseGetiTimezone_%s_returnsIt", (text, zone) => {
-    expect(zoneOf(text)).toBe(zone);
-  });
-
-  it.each([
-    ["LFS 3K5 WEST 21h-23h"],
-    ["LFT DPS 4500 WEST EU dispo 21h"],
-    ["LFS C'EST 9PM"],
-    ["LFT playing in WEST EU"],
-  ])("parseGetiTimezone_%s_returnsNull", (text) => {
-    expect(zoneOf(text)).toBeNull();
-  });
-});
-
-describe("parseGetiTimezone — cycle 3 : paliers de rang, régions, « EST » français", () => {
-  it("parseGetiTimezone_rankTierBeforeWest_isNull", () => {
-    expect(zoneOf("LFT Diamond 1-3 WEST EU")).toBeNull();
-  });
-
-  it("parseGetiTimezone_rankTierBeforeEst_isNull", () => {
-    expect(zoneOf("LFS Master 1-2 EST")).toBeNull();
-  });
-
-  it("parseGetiTimezone_scoreBeforeEst_isNull", () => {
-    expect(zoneOf("LFS on a gagné 2-1 EST")).toBeNull();
-  });
-
-  it("parseGetiTimezone_bareHourRangeBeforeEst_isEst", () => {
-    expect(zoneOf("LFS 8-10 EST")).toBe("EST");
-  });
-
-  it("parseGetiTimezone_euWestInParentheses_isNull", () => {
-    expect(zoneOf("LFS EU (WEST)")).toBeNull();
-  });
-
-  it("parseGetiTimezone_quiEstBefore8pm_isNull", () => {
-    expect(zoneOf("LFS QUI EST 8PM")).toBeNull();
   });
 });
