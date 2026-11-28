@@ -1,13 +1,16 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   CSP_DEDUPE_WINDOW_MS,
+  CSP_FIELD_MAX_LENGTH,
   CSP_MAX_TRACKED_CAUSES,
   CSP_MAX_VIOLATIONS_PER_REPORT,
   CSP_SOURCE_NONE,
+  CSP_SOURCE_PAGE,
   admitViolation,
   blockedOriginOf,
   documentPathOf,
   logCspViolations,
+  logSafe,
   parseCspReport,
   sourceOriginOf,
   violationCause,
@@ -35,6 +38,37 @@ describe("blockedOriginOf", () => {
     expect(blockedOriginOf(42)).toBe("inconnu");
     expect(blockedOriginOf("://pas-une-url")).toBe("inconnu");
   });
+
+  it("rejette un mot-clé qui porte un saut de ligne", () => {
+    // Sans quoi `inline\n[auth] …` écrirait une fausse ligne dans pm2.
+    expect(blockedOriginOf("inline\n[auth] connexion admin")).toBe("inconnu");
+  });
+
+  it("borne la longueur d'une origine fabriquée", () => {
+    const origin = blockedOriginOf(`https://${"a".repeat(30_000)}.invalid/x`);
+    expect(origin).toHaveLength(CSP_FIELD_MAX_LENGTH);
+  });
+
+  it("garde le schéma d'une adresse non standard, qui n'a pas d'origine", () => {
+    expect(blockedOriginOf("webkit-masked-url://hidden/")).toBe("webkit-masked-url");
+  });
+});
+
+describe("logSafe", () => {
+  it("remplace sauts de ligne, marques bidirectionnelles et largeur nulle", () => {
+    expect(logSafe("a\nb\u202ec\u200bd\u2028e")).toBe("a?b?c?d?e");
+  });
+
+  it("garde entier un texte à la longueur maximale", () => {
+    const text = "x".repeat(CSP_FIELD_MAX_LENGTH);
+    expect(logSafe(text)).toBe(text);
+  });
+
+  it("coupe un texte trop long et le marque", () => {
+    const result = logSafe("x".repeat(CSP_FIELD_MAX_LENGTH + 1));
+    expect(result).toHaveLength(CSP_FIELD_MAX_LENGTH);
+    expect(result.endsWith("\u2026")).toBe(true);
+  });
 });
 
 describe("documentPathOf", () => {
@@ -55,6 +89,10 @@ describe("documentPathOf", () => {
     expect(documentPathOf(undefined)).toBe("/");
     expect(documentPathOf("")).toBe("/");
     expect(documentPathOf("pas-un-chemin")).toBe("/");
+  });
+
+  it("neutralise un saut de ligne dans un chemin relatif", () => {
+    expect(documentPathOf("/a\n[auth] connexion admin")).toBe("/a?[auth] connexion admin");
   });
 });
 
@@ -165,6 +203,55 @@ describe("parseCspReport", () => {
     ]);
     expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
   });
+
+  it("nomme « page » un script fautif qui est la page elle-même", () => {
+    // Chrome nomme le document pour un script en ligne : sur notre site, ceux
+    // de Next portent le nonce, donc ce code a été posé là par un tiers.
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/tournois/20?onglet=matchs",
+        "effective-directive": "connect-src",
+        "blocked-uri": "data",
+        "source-file": "https://bluegenji-esport.fr/tournois/20",
+      },
+    });
+    expect(violation.sourceOrigin).toBe(CSP_SOURCE_PAGE);
+  });
+
+  it("garde l'origine du site pour un script d'une autre page du site", () => {
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/tournois/20",
+        "effective-directive": "connect-src",
+        "blocked-uri": "data",
+        "source-file": "https://bluegenji-esport.fr/_next/static/chunks/a.js",
+      },
+    });
+    expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
+  });
+
+  it("ne garde que le nom d'une directive historique complète", () => {
+    const [violation] = parseCspReport({
+      "csp-report": { "violated-directive": "script-src 'self' 'nonce-abc'", "blocked-uri": "inline" },
+    });
+    expect(violation.directive).toBe("script-src");
+  });
+
+  it("ne garde rien de ce qui suit un saut de ligne dans la directive", () => {
+    const [violation] = parseCspReport({
+      "csp-report": { "effective-directive": "img-src\n[auth] connexion admin", "blocked-uri": "inline" },
+    });
+    expect(violation.directive).toBe("img-src");
+  });
+
+  it("écarte une directive qui n'est pas un nom de directive", () => {
+    expect(parseCspReport({ "csp-report": { "effective-directive": "img_src;[auth]" } })).toEqual([]);
+  });
+
+  it("met le nom de la directive en minuscules", () => {
+    const [violation] = parseCspReport({ "csp-report": { "effective-directive": "IMG-SRC" } });
+    expect(violation.directive).toBe("img-src");
+  });
 });
 
 describe("sourceOriginOf", () => {
@@ -183,6 +270,11 @@ describe("sourceOriginOf", () => {
     expect(sourceOriginOf("Chrome-Extension://abc/x.js")).toBe("chrome-extension");
   });
 
+  it("reconnaît le schéma seul, forme que Chrome envoie pour une extension", () => {
+    expect(sourceOriginOf("chrome-extension")).toBe("chrome-extension");
+    expect(sourceOriginOf("moz-extension")).toBe("moz-extension");
+  });
+
   it("dit « aucune » quand le navigateur ne nomme aucun script", () => {
     // Code évalué ou injecté en ligne : Chrome envoie une chaîne vide.
     expect(sourceOriginOf(undefined)).toBe(CSP_SOURCE_NONE);
@@ -191,9 +283,22 @@ describe("sourceOriginOf", () => {
     expect(sourceOriginOf(42)).toBe(CSP_SOURCE_NONE);
   });
 
-  it("garde le schéma d'une valeur sans hôte, et un repli sans schéma", () => {
+  it("garde le schéma d'une valeur sans hôte", () => {
     expect(sourceOriginOf("data:text/javascript,x")).toBe("data");
-    expect(sourceOriginOf("inline")).toBe("inconnu");
+  });
+
+  it("garde les mots-clés du navigateur pour un code sans fichier", () => {
+    expect(sourceOriginOf("inline")).toBe("inline");
+    expect(sourceOriginOf("eval")).toBe("eval");
+  });
+
+  it("rejette une valeur qui n'est ni adresse ni mot-clé", () => {
+    expect(sourceOriginOf("inline\n[auth] connexion admin")).toBe("inconnu");
+  });
+
+  it("borne la longueur d'une origine fabriquée", () => {
+    const origin = sourceOriginOf(`https://${"a".repeat(30_000)}.invalid/x.js`);
+    expect(origin).toHaveLength(CSP_FIELD_MAX_LENGTH);
   });
 
   it("garde le schéma d'une adresse non standard, qui n'a pas d'origine", () => {
@@ -280,6 +385,12 @@ describe("violationCause", () => {
 });
 
 describe("logCspViolations", () => {
+  // Le suivi de dédoublonnage vit au niveau du module : chaque test emploie
+  // une cause qui lui est propre, et l'espion est rendu même sur un échec.
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it("nomme la source dans la ligne, une fois par cause et par fenêtre", () => {
     const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
     const violation = {
@@ -292,6 +403,21 @@ describe("logCspViolations", () => {
     logCspViolations([violation], 2_000);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith("[csp] connect-src a refusé data sur /tournois/20 (source : moz-extension)");
-    warn.mockRestore();
+  });
+
+  it("n'écrit qu'une ligne, même sur des champs fabriqués", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    logCspViolations(
+      [
+        {
+          directive: "font-src\n[auth] a",
+          blockedOrigin: "b\nc",
+          documentPath: "/d\re",
+          sourceOrigin: "f\u2028g",
+        },
+      ],
+      1_000,
+    );
+    expect(warn).toHaveBeenCalledWith("[csp] font-src?[auth] a a refusé b?c sur /d?e (source : f?g)");
   });
 });

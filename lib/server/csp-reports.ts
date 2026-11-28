@@ -65,6 +65,40 @@ export const CSP_MAX_TRACKED_CAUSES = 200;
 export const CSP_MAX_VIOLATIONS_PER_REPORT = 25;
 
 /**
+ * Longueur maximale d'un champ de la ligne de journal (et donc de la clé de
+ * dédoublonnage). Le corps est choisi par l'appelant : une origine de 30 Ko
+ * (l'analyse d'URL ne borne pas la longueur d'un hôte) ferait une ligne de
+ * 30 Ko et une clé de 30 Ko gardée en mémoire, deux cents fois.
+ */
+export const CSP_FIELD_MAX_LENGTH = 200;
+
+/** Mot-clé ou schéma (`inline`, `eval`, `wasm-eval`, `data`, `chrome-extension`…). */
+const KEYWORD = /^[a-z][a-z0-9+.-]{0,39}$/i;
+
+/** Nom de directive (`script-src-elem`, `connect-src`…). */
+const DIRECTIVE = /^[a-z][a-z-]{0,39}$/;
+
+/**
+ * Caractères qu'une ligne de journal ne doit jamais porter tels quels :
+ * contrôles C0 et C1 (dont le saut de ligne, qui fabriquerait une fausse
+ * ligne `[auth] …` dans pm2), séparateurs de ligne Unicode, marques
+ * bidirectionnelles et caractères de largeur nulle (qui maquillent le texte).
+ */
+const UNSAFE_LOG_CHARS = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
+
+/**
+ * Rend un champ sûr pour une ligne de journal : caractères dangereux remplacés
+ * par `?`, longueur bornée à {@link CSP_FIELD_MAX_LENGTH} (coupure marquée `…`).
+ *
+ * @param value Texte venu du rapport, donc de l'appelant.
+ * @returns Le texte, sur une seule ligne et borné.
+ */
+export function logSafe(value: string): string {
+  const clean = value.replace(UNSAFE_LOG_CHARS, "?");
+  return clean.length > CSP_FIELD_MAX_LENGTH ? `${clean.slice(0, CSP_FIELD_MAX_LENGTH - 1)}\u2026` : clean;
+}
+
+/**
  * Réduit une URL à son origine, ou au mot-clé que le navigateur a employé.
  *
  * Les navigateurs ne renvoient pas toujours une URL : `inline`, `eval` et
@@ -81,11 +115,17 @@ export function blockedOriginOf(value: unknown): string {
   }
   const trimmed = value.trim();
   // Mots-clés et schémas sans hôte : `data:`, `blob:`, `inline`, `eval`…
+  // Seul un vrai mot-clé passe : le reste (sauts de ligne compris) est rejeté.
   if (!trimmed.includes("://")) {
-    return trimmed.split(":")[0] || "inconnu";
+    const keyword = trimmed.split(":")[0];
+    return KEYWORD.test(keyword) ? keyword : "inconnu";
   }
   try {
-    return new URL(trimmed).origin;
+    const origin = new URL(trimmed).origin;
+    if (origin !== "null") return logSafe(origin);
+    // Un schéma non standard n'a pas d'origine : son nom suffit.
+    const scheme = trimmed.split(":")[0];
+    return KEYWORD.test(scheme) ? scheme.toLowerCase() : "inconnu";
   } catch {
     return "inconnu";
   }
@@ -108,6 +148,14 @@ const EXTENSION_SCHEMES = new Set([
 export const CSP_SOURCE_NONE = "aucune";
 
 /**
+ * Source rendue quand le script fautif est **la page elle-même** : Chrome
+ * nomme l'URL du document pour un script en ligne ou un attribut d'évènement.
+ * Les scripts en ligne de Next portent le nonce et ne sont jamais refusés :
+ * un refus « page » vient d'un code posé dans la page par un tiers.
+ */
+export const CSP_SOURCE_PAGE = "page";
+
+/**
  * Réduit le script fautif (`source-file` / `sourceFile`) à ce qui sert au tri.
  *
  * Sans ce champ, une ligne du journal ne distinguait pas un défaut du site
@@ -118,6 +166,10 @@ export const CSP_SOURCE_NONE = "aucune";
  * extension nomme son schéma ; un code évalué ou injecté en ligne n'en nomme
  * **aucun** (`"aucune"`), ce qui, sur une page sans script en ligne de notre
  * main, désigne un code étranger.
+ *
+ * Un script **de la page** (même URL que le document) n'est pas réduit ici
+ * mais par l'appelant, en {@link CSP_SOURCE_PAGE} : une origine du site ne
+ * désigne donc qu'un morceau servi par le site.
  *
  * Comme pour la ressource refusée, seule l'origine est gardée : le chemin
  * d'un script d'extension porte l'identifiant de l'extension, qui n'apprend
@@ -131,17 +183,40 @@ export function sourceOriginOf(value: unknown): string {
     return CSP_SOURCE_NONE;
   }
   const trimmed = value.trim();
-  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(trimmed)?.[1]?.toLowerCase();
-  if (scheme && EXTENSION_SCHEMES.has(scheme)) return scheme;
+  // Tête avant le premier `:` : schéma d'une adresse, ou mot-clé entier.
+  // Chrome ramène souvent le script d'une extension à son seul schéma
+  // (`"chrome-extension"`, sans `:`) ; Firefox et Safari écrivent `inline`
+  // ou `eval` pour du code sans fichier.
+  const head = trimmed.split(":")[0].toLowerCase();
+  const keyword = KEYWORD.test(head) ? head : null;
+  if (keyword && EXTENSION_SCHEMES.has(keyword)) return keyword;
   if (!trimmed.includes("://")) {
-    return scheme ?? "inconnu";
+    return keyword ?? "inconnu";
   }
   try {
     const origin = new URL(trimmed).origin;
     // Un schéma non standard n'a pas d'origine (`"null"`) : son nom suffit.
-    return origin === "null" ? (scheme ?? "inconnu") : origin;
+    return origin === "null" ? (keyword ?? "inconnu") : logSafe(origin);
   } catch {
     return "inconnu";
+  }
+}
+
+/**
+ * Le script fautif est-il la page elle-même (même origine, même chemin) ?
+ *
+ * @param source Valeur de `source-file` / `sourceFile`.
+ * @param document Valeur de `document-uri` / `documentURL`.
+ * @returns `true` si les deux adresses désignent le même document.
+ */
+function isDocumentItself(source: unknown, document: unknown): boolean {
+  if (typeof source !== "string" || typeof document !== "string") return false;
+  try {
+    const a = new URL(source.trim());
+    const b = new URL(document.trim());
+    return a.origin !== "null" && a.origin === b.origin && a.pathname === b.pathname;
+  } catch {
+    return false;
   }
 }
 
@@ -157,11 +232,11 @@ export function documentPathOf(value: unknown): string {
   }
   const trimmed = value.trim();
   try {
-    return new URL(trimmed).pathname || "/";
+    return logSafe(new URL(trimmed).pathname || "/");
   } catch {
     // Une valeur relative reste exploitable : on coupe à la requête ou au fragment.
     const cut = trimmed.split(/[?#]/)[0];
-    return cut.startsWith("/") ? cut : "/";
+    return cut.startsWith("/") ? logSafe(cut) : "/";
   }
 }
 
@@ -222,13 +297,20 @@ function violationOf(body: Record<string, unknown>): CspViolation | null {
     body.effectiveDirective ??
     body["violated-directive"] ??
     body.violatedDirective;
-  if (typeof directive !== "string" || directive.trim().length === 0) return null;
+  if (typeof directive !== "string") return null;
+  // L'ancien `violated-directive` porte la directive entière
+  // (`script-src 'self'`) : seul son nom compte. Un nom qui n'en est pas un
+  // (saut de ligne, texte libre) écarte le rapport — un navigateur n'en envoie pas.
+  const name = directive.trim().split(/\s+/)[0].toLowerCase();
+  if (!DIRECTIVE.test(name)) return null;
 
+  const documentUrl = body["document-uri"] ?? body.documentURL;
+  const sourceFile = body["source-file"] ?? body.sourceFile;
   return {
-    directive: directive.trim(),
+    directive: name,
     blockedOrigin: blockedOriginOf(body["blocked-uri"] ?? body.blockedURL),
-    documentPath: documentPathOf(body["document-uri"] ?? body.documentURL),
-    sourceOrigin: sourceOriginOf(body["source-file"] ?? body.sourceFile),
+    documentPath: documentPathOf(documentUrl),
+    sourceOrigin: isDocumentItself(sourceFile, documentUrl) ? CSP_SOURCE_PAGE : sourceOriginOf(sourceFile),
   };
 }
 
@@ -295,7 +377,7 @@ export function logCspViolations(violations: CspViolation[], now: number = Date.
     // « refuserait » sur une page en panne enverrait chercher au mauvais endroit.
     const verbe = CSP_MODE === "enforce" ? "a refusé" : "refuserait";
     console.warn(
-      `[csp] ${violation.directive} ${verbe} ${violation.blockedOrigin} sur ${violation.documentPath} (source : ${violation.sourceOrigin})${repeated}`,
+      `[csp] ${logSafe(violation.directive)} ${verbe} ${logSafe(violation.blockedOrigin)} sur ${logSafe(violation.documentPath)} (source : ${logSafe(violation.sourceOrigin)})${repeated}`,
     );
   }
 }
