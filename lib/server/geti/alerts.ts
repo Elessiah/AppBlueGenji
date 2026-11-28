@@ -29,6 +29,7 @@ import {
   getiAlertName,
   getiAlertSearch,
   isFreshGetiPost,
+  isGetiPostAlertable,
   isGetiAlertNameInput,
   matchingGetiAlerts,
   type GetiAlert,
@@ -414,7 +415,7 @@ async function loadStoredVersions(
 
 /** Une annonce ouverte, publiée ou modifiée récemment : la seule qui prévient. */
 function isAlertable(post: GetiAlertPost, now: number): boolean {
-  return !post.parsed.closed && isFreshGetiPost(post.postedAt.getTime(), post.editedAt?.getTime() ?? null, now);
+  return isGetiPostAlertable(post.parsed, now) && isFreshGetiPost(post.postedAt.getTime(), post.editedAt?.getTime() ?? null, now);
 }
 
 /** L'auteur de l'annonce est le propriétaire de l'alerte (même compte Discord) : il n'est pas prévenu. */
@@ -494,7 +495,7 @@ async function recordAlertHits(
   const filters = new Map<number, GetiFilter>();
   const firstHit = new Map<number, AlertHit>();
   for (const post of posts) {
-    const matched = matchingGetiAlerts(post.parsed, post.category, alerts, filters, now).filter(
+    const matched = matchingGetiAlerts(post.parsed, post.category, alerts, filters, now, true).filter(
       (alert) => !isOwnPost(alert, post),
     );
     for (let start = 0; start < matched.length; start += HIT_CHUNK) {

@@ -20,6 +20,7 @@ import {
   getiAgeOptions,
   getiCategoryPath,
   getiChannelUrl,
+  getiHidesPast,
   getiPageFilter,
   getiPageHref,
   getiPageSearch,
@@ -250,11 +251,24 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, d
   const pages = Math.max(1, Math.ceil(listed.total / listed.pageSize));
   // Page au-delà de la dernière (lien partagé, annonces retirées depuis) : la liste n'est pas vide.
   const beyond = listed.posts.length === 0 && listed.total > 0;
+  // Liste vide alors que les scrims passés sont masqués : dire qu'ils le sont, pas « rien du tout ».
+  const pastHidden = getiHidesPast(category) && !query.showPast;
+  const emptyText = emptyTextOf(m.results, pastHidden, filtered);
   return (
     <section className={styles.results} aria-labelledby="geti-category-title">
       <p /* NOSONAR S6819 — compteur de résultats annoncé à chaque filtre, pas une sortie de formulaire */ className={styles.count} role="status" aria-live="polite" aria-atomic="true" data-testid="geti-count">
         {getiText(locale, filtered ? m.results.countFiltered : m.results.count, { count: listed.total })}
       </p>
+      {getiHidesPast(category) ? (
+        <LocaleLink
+          href={getiPageHref(category, { ...query, showPast: !query.showPast, page: 1 })}
+          className={`${styles.resetLink} ${styles.pastToggle}`}
+          scroll={false}
+          data-testid="geti-past-toggle"
+        >
+          {query.showPast ? m.results.hidePast : m.results.showPast}
+        </LocaleLink>
+      ) : null}
       {beyond ? (
         <div className={styles.empty} data-testid="geti-beyond">
           <p>{m.results.beyond}</p>
@@ -265,7 +279,7 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, d
       ) : null}
       {!beyond && listed.posts.length === 0 ? (
         <div className={styles.empty}>
-          <p>{filtered ? m.results.emptyFiltered : m.results.empty}</p>
+          <p>{emptyText}</p>
           {filtered ? (
             <LocaleLink href={getiPageHref(category)} className={styles.resetLink} scroll={false}>
               {m.results.emptyReset}
@@ -292,6 +306,12 @@ function GetiResults({ listed, category, query, filter, filtered, messages: m, d
       )}
     </section>
   );
+}
+
+/** Texte d'une liste vide : les scrims passés masqués priment sur « aucun résultat ». */
+function emptyTextOf(text: GetiMessages["results"], pastHidden: boolean, filtered: boolean): string {
+  if (pastHidden) return text.emptyPast;
+  return filtered ? text.emptyFiltered : text.empty;
 }
 
 function GetiPagination({

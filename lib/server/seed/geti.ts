@@ -168,6 +168,28 @@ export const FICTIONAL_GETI_POSTS: readonly SeedGetiPost[] = [
     author: "test_geti_nuit",
     text: "LFS ce soir 23h-1h, Diamant 1 - Master 5, EU, PC, FR. Team Test Nocturne.",
   },
+  // Dates relatives, scrims passés et fuseaux : « demain » reste à venir quelle que soit l'heure du
+  // seed, « tonight » publié l'avant-veille est toujours passé (masqué par défaut), et un horaire
+  // écrit en UTC s'affiche converti à l'heure de Paris (l'heure écrite au survol).
+  {
+    category: "lfs",
+    ageHours: 1,
+    author: "test_geti_demain",
+    text: "LFS demain 21h-23h, Platine 1 - Diamant 3, EU, PC, FR. Team Test Demain.",
+  },
+  {
+    category: "lfs",
+    ageHours: 2,
+    author: "test_geti_utc",
+    relayedFrom: "Test Serveur Comète",
+    text: "LFS tomorrow 8pm-10pm UTC, Master 5 - Master 1, EU, PC, EN. Team Test Meridian.",
+  },
+  {
+    category: "lfs",
+    ageHours: 2 * DAY,
+    author: "test_geti_veille",
+    text: "LFS tonight 20-22 CET, Diamant 4 - Diamant 1, EU, PC. Team Test Veille.",
+  },
   {
     category: "lft",
     ageHours: 30,

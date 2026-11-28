@@ -390,12 +390,14 @@ const ADDED_FIELDS: Partial<GetiParsedPost> = { dates: [], levels: [], closed: f
 /**
  * Version de l'analyse gardée, écrite en **dernière** clé (`storedAnalysis`) :
  * avancée quand l'analyse change ce qu'elle lit — 2 : un passage masqué
- * (`||…||`) n'est plus lu, une analyse plus ancienne en a tiré des étiquettes.
+ * (`||…||`) n'est plus lu, une analyse plus ancienne en a tiré des étiquettes ;
+ * 3 : dates relatives (« après-demain », « ce week-end », « lundi prochain »),
+ * horaires et dates convertis à l'heure de Paris depuis le fuseau écrit.
  */
-const ANALYSIS_VERSION = 2;
+const ANALYSIS_VERSION = 3;
 /**
  * Une analyse gardée à la version courante : `JSON.stringify` écrit la clé en
- * dernier, `…,"analysisVersion":2}` ; dans le texte d'une annonce, un guillemet
+ * dernier, `…,"analysisVersion":3}` ; dans le texte d'une annonce, un guillemet
  * est échappé (`\"`), un texte ne peut pas la contrefaire.
  */
 const CURRENT_ANALYSIS = `parsed_json LIKE '%"analysisVersion":${ANALYSIS_VERSION}}'`;
@@ -414,6 +416,19 @@ function storedAnalysis(parsed: object): string {
 const STALE_RAW_JSON = `IF(${CURRENT_ANALYSIS}, NULL, raw_json) AS stale_raw_json`;
 
 /**
+ * Message brut d'une ligne, daté de **sa publication** : celle du message
+ * brut (instant exact écrit à la réception), sinon celle gardée (`posted_at`).
+ * Une réanalyse résout « ce soir » ou « demain » depuis cette date-là, jamais
+ * depuis l'heure où elle tourne, même si le message brut ne porte pas de date.
+ */
+function datedRaw(raw: GetiPushedPost["raw"], postedAt: Date | string | null): GetiPushedPost["raw"] {
+  const own: unknown = typeof raw === "object" && raw !== null ? raw.postedAt : undefined;
+  if (typeof own === "string" && !Number.isNaN(Date.parse(own))) return raw;
+  const posted = toIso(postedAt);
+  return posted === null ? raw : { ...raw, postedAt: posted };
+}
+
+/**
  * Analyse d'une ligne : celle gardée à la version courante, ou celle de son message
  * brut. Une analyse plus ancienne dont le message brut est illisible n'est pas
  * rendue (`null`) : ses étiquettes ont pu être lues dans un passage masqué.
@@ -421,7 +436,7 @@ const STALE_RAW_JSON = `IF(${CURRENT_ANALYSIS}, NULL, raw_json) AS stale_raw_jso
 function analysisOf(row: GetiPostRow): unknown {
   if (row.stale_raw_json !== null && row.stale_raw_json !== undefined) {
     try {
-      return parseGetiPost(JSON.parse(row.stale_raw_json), getiTrustedBots());
+      return parseGetiPost(datedRaw(JSON.parse(row.stale_raw_json), row.posted_at), getiTrustedBots());
     } catch {
       return null;
     }
@@ -444,7 +459,7 @@ type GetiRefreshedRow = { parsedJson: string; authorId: string | null; authorTag
  */
 function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): GetiRefreshedRow | null {
   try {
-    const raw: GetiPushedPost["raw"] = JSON.parse(String(row.raw_json));
+    const raw = datedRaw(JSON.parse(String(row.raw_json)), row.posted_at);
     const parsed = parseGetiPost(raw, trusted);
     if (isNotAnnouncement(parsed, raw)) return null;
     return { parsedJson: storedAnalysis(parsed), authorId: parsed.authorId, authorTag: parsed.authorTag?.slice(0, AUTHOR_TAG_MAX) ?? null };
@@ -452,6 +467,9 @@ function reanalysed(row: RowDataPacket, trusted: GetiParseOptions): GetiRefreshe
     return null;
   }
 }
+
+/** Écritures d'une réécriture lancées ensemble : une part du pool de 25 connexions, les lectures de page passent. */
+const REWRITE_CONCURRENCY = 8;
 
 /** Une ligne encore ancienne : une modification enregistrée entre la lecture et l'écriture l'a rendue courante. */
 const STILL_STALE = `NOT ${CURRENT_ANALYSIS}`;
@@ -469,6 +487,8 @@ async function rewriteChunk(executor: GetiExecutor, rows: RowDataPacket[], trust
   const failures: unknown[] = [];
   let removed = 0;
   try {
+    // Les écritures partent par petits groupes (pas un aller-retour par ligne, sans prendre tout le pool partagé).
+    const writes: (() => Promise<void>)[] = [];
     for (const row of rows) {
       const messageId = String(row.message_id);
       const next = reanalysed(row, trusted);
@@ -476,12 +496,24 @@ async function rewriteChunk(executor: GetiExecutor, rows: RowDataPacket[], trust
         gone.push(messageId);
         continue;
       }
-      const [result] = await executor.execute(
-        `UPDATE bg_geti_posts SET parsed_json = ?, author_id = ?, author_tag = ? WHERE message_id = ? AND ${STILL_STALE}`,
-        [next.parsedJson, next.authorId, next.authorTag, messageId],
+      writes.push(() =>
+        executor
+          .execute(
+            `UPDATE bg_geti_posts SET parsed_json = ?, author_id = ?, author_tag = ? WHERE message_id = ? AND ${STILL_STALE}`,
+            [next.parsedJson, next.authorId, next.authorTag, messageId],
+          )
+          .then(([result]) => {
+            if (affected(result) > 0) rewritten.push(messageId);
+          }),
       );
-      if (affected(result) > 0) rewritten.push(messageId);
     }
+    // Une écriture qui échoue ne laisse pas les autres sans suite : toutes sont attendues, la première erreur remonte.
+    let failed: PromiseRejectedResult | undefined;
+    for (let start = 0; start < writes.length; start += REWRITE_CONCURRENCY) {
+      const settled = await Promise.allSettled(writes.slice(start, start + REWRITE_CONCURRENCY).map((write) => write()));
+      failed ??= settled.find((write): write is PromiseRejectedResult => write.status === "rejected");
+    }
+    if (failed !== undefined) throw failed.reason;
     removed = await deleteStaleGetiPosts(executor, gone);
   } catch (error) {
     failures.push(error);
@@ -516,7 +548,7 @@ export async function refreshStaleGetiPosts(executor: GetiExecutor): Promise<num
   let done = 0;
   for (let chunk = 0; chunk < REFRESH_CHUNKS_MAX; chunk += 1) {
     const [rows] = await executor.execute<RowDataPacket[]>(
-      `SELECT message_id, raw_json, parsed_json FROM bg_geti_posts
+      `SELECT message_id, raw_json, parsed_json, posted_at FROM bg_geti_posts
         WHERE ${STILL_STALE} ORDER BY id LIMIT ${REFRESH_CHUNK}`,
     );
     if (rows.length === 0) break;
