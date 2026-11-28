@@ -4,8 +4,8 @@ import { GETI_DEFAULT_CATEGORY, type GetiSearchParams } from "@/lib/shared/geti/
 import { getiCategoryMetadata } from "./metadata";
 
 /**
- * `/geti-info` (et `/en/geti-info`) : la première catégorie, sans renvoi.
- * Son adresse canonique est celle de la catégorie (`/geti-info/lfp`) — une
+ * `/geti-info` (et `/en/geti-info`) : la catégorie par défaut (les scrims), sans renvoi.
+ * Son adresse canonique est celle de la catégorie (`/geti-info/lfs`) — une
  * seule adresse pour un même contenu (la page n'est pas indexée).
  */
 export function generateMetadata(): Promise<Metadata> {

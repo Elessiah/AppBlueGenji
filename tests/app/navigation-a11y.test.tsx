@@ -251,7 +251,7 @@ describe("PublicNavPanel — page courante", () => {
 
   it("ouvre sur les annonces GETI, puis les pages hors compétition", () => {
     expect(PUBLIC_NAV_LINKS.map((l) => l.href)).toEqual([
-      "/geti-info/lfp",
+      "/geti-info/lfs",
       "/bot",
       "/association",
       "/recrutement",
@@ -327,7 +327,7 @@ describe("PublicNavPanel — page courante", () => {
     expect(currentLinks(panel("/equipes"))).toEqual([]);
   });
 
-  it("libelle l'entrée « GETI posts » en anglais, vers /en/geti-info/lfp", () => {
+  it("libelle l'entrée « GETI posts » en anglais, vers /en/geti-info/lfs", () => {
     const html = renderToStaticMarkup(
       <AppLocaleProvider locale="en">
         <ShellTextProvider locale="en" messages={messagesFor("en").shell}>
@@ -335,7 +335,7 @@ describe("PublicNavPanel — page courante", () => {
         </ShellTextProvider>
       </AppLocaleProvider>,
     );
-    expect(html).toMatch(/<a [^>]*href="\/en\/geti-info\/lfp"[^>]*>GETI posts<\/a>/);
+    expect(html).toMatch(/<a [^>]*href="\/en\/geti-info\/lfs"[^>]*>GETI posts<\/a>/);
     expect(html).not.toContain("Annonces GETI");
   });
 

@@ -1,9 +1,8 @@
 {
   "meta": {
     "title": "GETI Info — annonces Overwatch",
-    "categoryTitle": "{category} — annonces Overwatch",
-    "description": "Les annonces de recrutement Overwatch du réseau GETI, réunies et filtrables : joueurs, équipes, remplaçants, staff, scrims et casts.",
-    "shareDescription": "Trouve un joueur, une équipe, un scrim ou un cast Overwatch parmi les annonces du réseau GETI."
+    "categoryTitle": "Annonces GETI — {category}",
+    "description": "Les annonces de recrutement Overwatch du réseau GETI, réunies et filtrables : joueurs, équipes, remplaçants, staff, scrims et casts."
   },
   "breadcrumb": {
     "home": "Accueil",
@@ -19,12 +18,15 @@
   },
   "tabs": {
     "label": "Je cherche",
+    "heading": "Je cherche :",
     "lfp": "Un joueur",
     "lft": "Une équipe",
     "lfsub": "Un remplaçant",
     "lfstaff": "Un staff",
     "lfs": "Un scrim",
-    "lfcast": "Un cast"
+    "lfcast": "Un cast",
+    "count": "{count, plural, one {# annonce} other {# annonces}}",
+    "countUnfiltered": "{count, plural, one {# annonce sans filtre} other {# annonces sans filtre}}"
   },
   "categories": {
     "lfp": {
@@ -65,12 +67,16 @@
     "button": "Publier une annonce",
     "title": "Publier une annonce",
     "intro": "Les annonces de cette page ne s'écrivent pas sur le site : elles viennent de Discord.",
-    "stepChannel": "Écris ton annonce dans le salon de cette catégorie, sur notre serveur Discord. Elle apparaît ici en quelques instants.",
+    "oursEyebrow": "SERVEUR BLUEGENJI",
+    "oursTitle": "Publier sur notre serveur",
+    "stepChannel": "Écris ton annonce dans le salon de cette catégorie : elle apparaît ici en quelques instants.",
     "channelLink": "Ouvrir le salon « {category} »",
     "notMember": "Pas encore sur notre serveur ?",
     "joinOurs": "Rejoindre le Discord BlueGenji",
-    "stepGeti": "Pour toucher tout le réseau, publie-la aussi depuis le serveur officiel de GETI : c'est lui qui relaie les annonces vers les serveurs abonnés.",
+    "getiTitle": "Publier via GETI Bot",
+    "stepGeti": "Publie-la depuis le serveur officiel de GETI : son bot la relaie vers tous les serveurs abonnés du réseau.",
     "rules": "Une annonce modifiée ou supprimée sur Discord l'est aussi sur cette page.",
+    "rulesSubject": "les annonces modifiées ou supprimées",
     "close": "Fermer",
     "closeLabel": "Fermer la fenêtre",
     "newTab": "(nouvel onglet)"

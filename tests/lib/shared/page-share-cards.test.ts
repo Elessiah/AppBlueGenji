@@ -13,6 +13,8 @@ import {
   RULE_MODE_SUBTITLE_MAX_LENGTH,
   shareTagline,
   allShareCardKeys,
+  GETI_SHARE_CARD_STYLES,
+  getiShareCardKey,
   pageShareImagePath,
   parseShareImageSegments,
   podiumShareEntries,
@@ -24,11 +26,14 @@ import {
   teamShareCardKey,
   type ShareMessages,
 } from "@/lib/shared/page-share-cards";
+import { SHARE_ACCENT_COLORS } from "@/components/og/share-motifs";
 import { SITE_SHARE_CARD } from "@/lib/shared/share-metadata";
 import enRules from "@/messages/en/rules.json";
 import enShare from "@/messages/en/share.json";
 import frRules from "@/messages/fr/rules.json";
 import frShare from "@/messages/fr/share.json";
+import enGeti from "@/messages/en/geti.json";
+import frGeti from "@/messages/fr/geti.json";
 
 const LOCALES: [string, ShareMessages, typeof frRules][] = [
   ["fr", frShare, frRules],
@@ -39,11 +44,81 @@ function modeTexts(rules: typeof frRules) {
   return new Map(localizedRuleModes(rules).map((mode) => [mode.slug, mode]));
 }
 
+describe("cartes des annonces GETI", () => {
+  it("resolvePageShareCard_getiScrimsFrench_usesCategoryTextAndStyle", () => {
+    const card = resolvePageShareCard("geti-lfs", frShare, modeTexts(frRules));
+
+    expect(card).toEqual({
+      eyebrow: "Annonces GETI · Overwatch",
+      title: "Je cherche un scrim",
+      subtitle: frShare.geti.categories.lfs.subtitle,
+      footer: frShare.footer,
+      motif: "swords",
+      accent: "cyan",
+    });
+  });
+
+  it("resolvePageShareCard_getiCastEnglish_usesEnglishText", () => {
+    const card = resolvePageShareCard("geti-lfcast", enShare, modeTexts(enRules));
+
+    expect(card?.eyebrow).toBe("GETI posts · Overwatch");
+    expect(card?.title).toBe("Looking for a cast");
+    expect(card?.motif).toBe("mic");
+  });
+
+  it("getiShareCardStyles_sixCategories_haveDistinctAccents", () => {
+    const accents = Object.values(GETI_SHARE_CARD_STYLES).map((style) => style.accent);
+
+    expect(new Set(accents).size).toBe(6);
+    expect(GETI_SHARE_CARD_STYLES.lfcast.accent).toBe("violetDeep");
+  });
+
+  it("getiShareCardStyles_sixCategories_haveDistinctColours", () => {
+    const colours = Object.values(GETI_SHARE_CARD_STYLES).map((style) => SHARE_ACCENT_COLORS[style.accent]);
+
+    expect(new Set(colours).size).toBe(6);
+  });
+
+  it("getiShareCardStyles_blueFamily_onlyCyanAndOneBlue", () => {
+    const blues = new Set(["#3ee6ff", "#5ac8ff", "#8fd5ff", "#2aa8e6"]);
+    const colours = Object.values(GETI_SHARE_CARD_STYLES).map((style) => SHARE_ACCENT_COLORS[style.accent]);
+
+    expect(colours.filter((colour) => blues.has(colour))).toHaveLength(2);
+  });
+
+  it("shareAccentColors_violetDeep_isViolet400", () => {
+    expect(SHARE_ACCENT_COLORS.violetDeep).toBe("#a78bfa");
+  });
+
+  it("resolvePageShareCard_unknownGetiCategory_returnsNull", () => {
+    expect(resolvePageShareCard("geti-nope", frShare, modeTexts(frRules))).toBeNull();
+  });
+
+  it("parseShareImageSegments_getiCard_isServedInBothLanguages", () => {
+    expect(parseShareImageSegments("fr", "geti-lfs.png")).toEqual({ locale: "fr", key: "geti-lfs" });
+    expect(parseShareImageSegments("en", "geti-lfsub.png")).toEqual({ locale: "en", key: "geti-lfsub" });
+  });
+
+  it("parseShareImageSegments_unknownGetiCategory_isRefused", () => {
+    expect(parseShareImageSegments("fr", "geti-nope.png")).toBeNull();
+  });
+
+  it("getiShareCardKey_category_prefixesTheSlug", () => {
+    expect(getiShareCardKey("lfstaff")).toBe("geti-lfstaff");
+  });
+});
+
 describe("registre des cartes", () => {
-  it("compte une carte fixe par page, puis une par mode de règles", () => {
+  it("compte une carte fixe par page, une par mode de règles, une par catégorie d'annonces GETI", () => {
     expect(allShareCardKeys()).toEqual([
       ...PAGE_SHARE_CARD_KEYS,
       ...RULE_MODE_DEFINITIONS.map((mode) => `rules-${mode.slug}`),
+      "geti-lfp",
+      "geti-lft",
+      "geti-lfsub",
+      "geti-lfstaff",
+      "geti-lfs",
+      "geti-lfcast",
     ]);
     expect(new Set(allShareCardKeys()).size).toBe(allShareCardKeys().length);
   });
@@ -148,6 +223,23 @@ describe("langues", () => {
   it("ne laisse aucune carte anglaise identique à la française (hors noms propres)", () => {
     const same = PAGE_SHARE_CARD_KEYS.filter((key) => frShare.pages[key].subtitle === enShare.pages[key].subtitle);
     expect(same).toEqual([]);
+  });
+});
+
+describe("textes des cartes GETI", () => {
+  function expectSubtitlesAreLedes(share: typeof frShare, geti: typeof frGeti): void {
+    for (const category of Object.keys(share.geti.categories) as (keyof typeof share.geti.categories)[]) {
+      expect(share.geti.categories[category].subtitle).toBe(geti.categories[category].lede);
+      expect(share.geti.categories[category].subtitle.length).toBeLessThanOrEqual(RULE_MODE_SUBTITLE_MAX_LENGTH);
+    }
+  }
+
+  it("fr : le sous-titre de la carte est la phrase de l'aperçu de la catégorie", () => {
+    expectSubtitlesAreLedes(frShare, frGeti);
+  });
+
+  it("en : le sous-titre de la carte est la phrase de l'aperçu de la catégorie", () => {
+    expectSubtitlesAreLedes(enShare, enGeti);
   });
 });
 

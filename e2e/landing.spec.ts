@@ -65,7 +65,7 @@ test.describe("Header landing", () => {
     }).toPass();
 
     await expect(nav.getByRole("link").first()).toHaveText("Annonces GETI");
-    await expect(nav.getByRole("link", { name: "Annonces GETI" })).toHaveAttribute("href", "/geti-info/lfp");
+    await expect(nav.getByRole("link", { name: "Annonces GETI" })).toHaveAttribute("href", "/geti-info/lfs");
     for (const name of ["Tournois", "Équipes", "Classement", "Joueurs"]) {
       await expect(nav.getByRole("link", { name, exact: true })).toHaveCount(0);
     }
@@ -74,7 +74,7 @@ test.describe("Header landing", () => {
   test("l'accueil annonce les annonces GETI et ses six catégories", async ({ page }) => {
     await page.goto("/");
     const spotlight = page.locator("section", { has: page.locator("#geti-spotlight-title") });
-    await expect(spotlight.getByRole("link", { name: "Voir les annonces GETI" })).toHaveAttribute("href", "/geti-info/lfp");
+    await expect(spotlight.getByRole("link", { name: "Voir les annonces GETI" })).toHaveAttribute("href", "/geti-info/lfs");
     await expect(spotlight.getByRole("list", { name: "Parcourir" }).getByRole("link")).toHaveCount(6);
     await expect(spotlight.getByRole("link", { name: "Scrims" })).toHaveAttribute("href", "/geti-info/lfs");
   });
@@ -82,7 +82,7 @@ test.describe("Header landing", () => {
   test("l'accueil anglais annonce les annonces GETI en anglais", async ({ page }) => {
     await page.goto("/en");
     const spotlight = page.locator("section", { has: page.locator("#geti-spotlight-title") });
-    await expect(spotlight.getByRole("link", { name: "Browse GETI posts" })).toHaveAttribute("href", "/en/geti-info/lfp");
+    await expect(spotlight.getByRole("link", { name: "Browse GETI posts" })).toHaveAttribute("href", "/en/geti-info/lfs");
     await expect(spotlight.getByRole("link", { name: "Scrims" })).toHaveAttribute("href", "/en/geti-info/lfs");
   });
 });
