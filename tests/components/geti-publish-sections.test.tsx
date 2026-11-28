@@ -124,7 +124,7 @@ describe("GetiPublishDialog — deux options dans deux cadres", () => {
     expect(geti).toContain('<p data-count="">3 512 membres</p>');
     expect(geti).toMatch(
       new RegExp(
-        `<a [^>]*href="${GETI_OFFICIAL_INVITE_URL}"[^>]*aria-label="Rejoindre le serveur Discord GETI — Geeking Time \\(nouvel onglet\\)"[^>]*>Rejoindre</a>`,
+        `<a [^>]*href="${GETI_OFFICIAL_INVITE_URL}"[^>]*>Rejoindre<span class="sr-only"> — GETI — Geeking Time \\(nouvel onglet\\)</span></a>`,
       ),
     );
     expect(geti).not.toContain(CHANNEL_URL);
@@ -144,7 +144,8 @@ describe("GetiPublishDialog — deux options dans deux cadres", () => {
     expect(ours).toContain("Post on our server");
     expect(ours).toContain("Open the “Looking for a scrim” channel");
     expect(geti).toContain("Post via GETI Bot");
-    expect(geti).toContain('aria-label="Join the GETI — Geeking Time Discord server (new tab)"');
+    expect(geti).toContain('Join<span class="sr-only"> — GETI — Geeking Time (new tab)</span>');
+    expect(geti).not.toContain("aria-label=");
     expect(html).not.toContain("Publier");
   });
 
@@ -262,7 +263,30 @@ describe("GetiCategoryNav — sélecteur de catégorie", () => {
 
     expect(source).not.toContain("countGetiPostsShared");
     expect(source).toContain("const counts = await countGetiPostsForNav(now);");
-    expect(source).toMatch(/<Suspense\s+fallback=\{<GetiCategoryNav [^>]*counts=\{null\}/);
+    expect(source).toMatch(/<Suspense\s+fallback=\{<GetiCategoryNav [\s\S]*?counts=\{null\}[\s\S]*?pending \/>\}/);
+  });
+
+  it("categoryNav_pending_reservesAnEmptyHiddenPillPerTab", () => {
+    const html = renderToStaticMarkup(
+      <GetiCategoryNav text={frGeti.tabs} locale="fr" current="lfs" counts={null} pending />,
+    );
+
+    expect(html.match(/class="tabCount tabCountPending" aria-hidden="true"/g)).toHaveLength(6);
+  });
+
+  it("categoryNav_noCountsNotPending_rendersNoPill", () => {
+    const html = renderToStaticMarkup(<GetiCategoryNav text={frGeti.tabs} locale="fr" current="lfs" counts={null} />);
+
+    expect(html).not.toContain("tabCount");
+  });
+
+  it("geti_css_hasForcedColorsFallbackAndSubgridFallback", () => {
+    const css = readSource("components/geti/geti.module.css");
+
+    expect(css).toMatch(/@media \(forced-colors: active\)\s*\{\s*\.tabActive\s*\{[^}]*border-width: 3px/);
+    expect(css).toMatch(/@supports not \(grid-template-rows: subgrid\)\s*\{\s*\.options/);
+    expect(css).toContain("box-shadow 0.15s ease");
+    expect(css).toContain("overflow-wrap: break-word");
   });
 
   it("getiInfoView_currentUnfiltered_overridesWithListedTotal", () => {

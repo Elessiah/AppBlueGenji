@@ -757,7 +757,12 @@ n'attend jamais ces six lectures, le sélecteur s'affiche d'abord sans nombre. L
 haute en entier (« Un scrim, 4 annonces » ; filtres actifs, la case courante dit « 14
 annonces sans filtre »). Illisible (`countGetiPostsForNav`) : aucun nombre, l'échec
 consigné par code comme celui de la liste (`logGetiListFailure`), et 10 s d'abstention
-avant de relire.
+avant de relire. Finitions : pastille vide de même emprise pendant l'attente des nombres
+(`pending`, aucun décalage à leur arrivée), libellé coupé aux mots (`overflow-wrap:
+break-word`, `hyphens: auto`), survol de l'icône et de la pastille, barre basse animée,
+repli `forced-colors` (bordure de 3 px, icône `Highlight`) ; dans la fenêtre « Publier »,
+repli sans sous-grille (`@supports not`) : les deux cadres s'empilent, et le lien
+« Rejoindre » garde son texte visible avec un suffixe lu seulement (serveur, nouvel onglet).
 
 ### Aperçu d'un lien collé (Discord)
 

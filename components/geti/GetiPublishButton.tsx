@@ -119,9 +119,12 @@ export function GetiPublishDialog({
                   href={GETI_OFFICIAL_INVITE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={`${getiText(locale, official.joinLabel, { server: GETI_OFFICIAL_SERVER_NAME })} ${text.newTab}`}
                 >
                   {official.join}
+                  <span className="sr-only">
+                    {" "}
+                    — {GETI_OFFICIAL_SERVER_NAME} {text.newTab}
+                  </span>
                 </a>
               </CyberButton>
               <div className={styles.optionFoot}>

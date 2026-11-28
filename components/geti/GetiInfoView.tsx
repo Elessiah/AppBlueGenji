@@ -102,7 +102,7 @@ export async function GetiInfoView({
       <div className={styles.section}>
         {/* Nombre d'annonces par catégorie : rendu à part (`Suspense`), la page n'attend jamais ses six lectures. */}
         <Suspense
-          fallback={<GetiCategoryNav text={m.tabs} locale={locale} current={category} counts={null} filtered={activeFilters > 0} />}
+          fallback={<GetiCategoryNav text={m.tabs} locale={locale} current={category} counts={null} filtered={activeFilters > 0} pending />}
         >
           <GetiCategoryNavCounted
             text={m.tabs}

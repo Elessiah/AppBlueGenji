@@ -33,6 +33,7 @@ export function GetiCategoryNav({
   current,
   counts,
   filtered = false,
+  pending = false,
 }: Readonly<{
   text: GetiMessages["tabs"];
   locale: Locale;
@@ -41,6 +42,8 @@ export function GetiCategoryNav({
   counts: Readonly<Record<GetiCategory, number>> | null;
   /** Des filtres sont actifs : le nombre de la case courante (sans filtre) le dit à la lecture vocale. */
   filtered?: boolean;
+  /** Les nombres arrivent (repli du `Suspense`) : une pastille vide réserve leur place, rien ne bouge à leur arrivée. */
+  pending?: boolean;
 }>) {
   return (
     <nav className={styles.tabs} aria-label={text.label}>
@@ -51,6 +54,7 @@ export function GetiCategoryNav({
         {GETI_CATEGORY_ORDER.map((entry) => {
           const Icon = GETI_CATEGORY_ICONS[entry];
           const active = entry === current;
+          const countPill = renderCount(counts, entry, { text, locale, active, filtered, pending });
           return (
             <li key={entry}>
               <LocaleLink
@@ -62,19 +66,42 @@ export function GetiCategoryNav({
                   <Icon size={18} />
                 </span>
                 <span className={styles.tabName}>{text[entry]}</span>
-                {counts ? (
-                  <span className={styles.tabCount}>
-                    <span aria-hidden="true">{formatLocalNumber(counts[entry], locale)}</span>
-                    <span className="sr-only">
-                      , {getiText(locale, active && filtered ? text.countUnfiltered : text.count, { count: counts[entry] })}
-                    </span>
-                  </span>
-                ) : null}
+                {countPill}
               </LocaleLink>
             </li>
           );
         })}
       </ul>
     </nav>
+  );
+}
+
+/** Pastille de nombre d'une case : le nombre, une place vide (en attente) ou rien. */
+function renderCount(
+  counts: Readonly<Record<GetiCategory, number>> | null,
+  entry: GetiCategory,
+  { text, locale, active, filtered, pending }: Readonly<{
+    text: GetiMessages["tabs"];
+    locale: Locale;
+    active: boolean;
+    filtered: boolean;
+    pending: boolean;
+  }>,
+) {
+  if (counts) {
+    return (
+      <span className={styles.tabCount}>
+        <span aria-hidden="true">{formatLocalNumber(counts[entry], locale)}</span>
+        <span className="sr-only">
+          , {getiText(locale, active && filtered ? text.countUnfiltered : text.count, { count: counts[entry] })}
+        </span>
+      </span>
+    );
+  }
+  if (!pending) return null;
+  return (
+    <span className={`${styles.tabCount} ${styles.tabCountPending}`} aria-hidden="true">
+      &nbsp;
+    </span>
   );
 }

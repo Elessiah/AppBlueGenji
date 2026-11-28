@@ -65,8 +65,8 @@ test.describe("GETI Info — page publique", () => {
       "https://discord.com/channels/676570513023172637/679323814106103819",
     );
     await expect(ours.getByRole("link", { name: /Rejoindre le Discord BlueGenji/ })).toBeVisible();
-    await expect(geti.getByText("GETI — Geeking Time")).toBeVisible();
-    await expect(geti.getByRole("link", { name: /Rejoindre le serveur Discord GETI/ })).toHaveAttribute("href", GETI_INVITE);
+    await expect(geti.getByText("GETI — Geeking Time", { exact: true })).toBeVisible();
+    await expect(geti.getByRole("link", { name: /Rejoindre.*GETI — Geeking Time/ })).toHaveAttribute("href", GETI_INVITE);
     await expect(dialog.getByRole("link")).toHaveCount(3);
     await expect(dialog.locator("iframe")).toHaveCount(0);
 

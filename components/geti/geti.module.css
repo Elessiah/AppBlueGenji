@@ -74,7 +74,7 @@
   font-weight: 600;
   line-height: 1.25;
   text-decoration: none;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .tabIcon {
@@ -86,12 +86,14 @@
   border-radius: 9px;
   background: rgba(var(--blue-500-rgb), 0.12);
   color: var(--blue-300);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .tabName {
   flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .tabCount {
@@ -105,11 +107,25 @@
   font-size: 12px;
   font-weight: 600;
   text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+/* Case sans nombre encore (fallback du Suspense) : même emprise que la pastille, pour que rien ne bouge à son arrivée. */
+.tabCountPending {
+  border-color: transparent;
 }
 
 .tab:hover {
   border-color: rgba(var(--blue-500-rgb), 0.5);
   color: var(--ink);
+}
+
+.tab:hover .tabIcon {
+  background: rgba(var(--blue-500-rgb), 0.22);
+}
+
+.tab:hover .tabCount {
+  border-color: rgba(var(--blue-500-rgb), 0.6);
 }
 
 .tab:focus-visible,
@@ -145,6 +161,22 @@
   border-color: var(--blue-500);
   background: rgba(var(--blue-500-rgb), 0.2);
   color: var(--blue-100);
+}
+
+/* Contraste forcé : couleurs et ombres sont ignorées — la case courante garde une bordure épaisse et son icône un cadre. */
+@media (forced-colors: active) {
+  .tabActive {
+    border-width: 3px;
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .tabActive .tabIcon {
+    background: Highlight;
+    color: HighlightText;
+  }
 }
 
 /* Carte du serveur officiel de GETI. */
@@ -1075,7 +1107,20 @@
   }
 }
 
-/* Fenêtre « Publier » étroite : les deux cadres s'empilent. */
+/* Fenêtre « Publier » étroite, ou navigateur sans sous-grille : les deux cadres s'empilent. */
+@supports not (grid-template-rows: subgrid) {
+  .options {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    gap: 14px;
+  }
+
+  .option {
+    grid-row: auto;
+    grid-template-rows: none;
+  }
+}
+
 @media (max-width: 700px) {
   .options {
     grid-template-columns: minmax(0, 1fr);
