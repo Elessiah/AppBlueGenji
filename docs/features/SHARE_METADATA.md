@@ -306,7 +306,7 @@ la carte générique de `/tournois` (mise en page parente) y descendrait.
 
 **Registre** (`lib/shared/page-share-cards.ts`, pur) : `PAGE_SHARE_CARD_KEYS`, le
 style de chaque carte (`PAGE_SHARE_CARD_STYLES` : motif Lucide + teinte parmi les
-tons `.pill-*` — cyan, glacier, violet, rose, turquoise, plus le bleu de marque `--blue-500` (`brand`) ; **jamais** l'ambre ni le
+tons `.pill-*` — cyan, glacier, violet, rose, turquoise, plus le violet profond `--violet-400` (`violetDeep`, cast GETI : un seul bleu à côté du cyan parmi les six catégories) ; **jamais** l'ambre ni le
 rouge), puis une carte par mode de règles (`rules-<slug>` : nom et accroche du
 mode dans la langue, accroche bornée à 120 caractères — phrases entières de préférence (`shareTagline`), sinon coupée sur un mot). Textes dans
 l'espace de messages **`share`** (`messages/fr|en/share.json`) : toute carte

@@ -70,11 +70,24 @@ describe("cartes des annonces GETI", () => {
     const accents = Object.values(GETI_SHARE_CARD_STYLES).map((style) => style.accent);
 
     expect(new Set(accents).size).toBe(6);
-    expect(GETI_SHARE_CARD_STYLES.lfcast.accent).toBe("brand");
+    expect(GETI_SHARE_CARD_STYLES.lfcast.accent).toBe("violetDeep");
   });
 
-  it("shareAccentColors_brand_isTheBrandBlue", () => {
-    expect(SHARE_ACCENT_COLORS.brand).toBe("#5ac8ff");
+  it("getiShareCardStyles_sixCategories_haveDistinctColours", () => {
+    const colours = Object.values(GETI_SHARE_CARD_STYLES).map((style) => SHARE_ACCENT_COLORS[style.accent]);
+
+    expect(new Set(colours).size).toBe(6);
+  });
+
+  it("getiShareCardStyles_blueFamily_onlyCyanAndOneBlue", () => {
+    const blues = new Set(["#3ee6ff", "#5ac8ff", "#8fd5ff", "#2aa8e6"]);
+    const colours = Object.values(GETI_SHARE_CARD_STYLES).map((style) => SHARE_ACCENT_COLORS[style.accent]);
+
+    expect(colours.filter((colour) => blues.has(colour))).toHaveLength(2);
+  });
+
+  it("shareAccentColors_violetDeep_isViolet400", () => {
+    expect(SHARE_ACCENT_COLORS.violetDeep).toBe("#a78bfa");
   });
 
   it("resolvePageShareCard_unknownGetiCategory_returnsNull", () => {
@@ -214,14 +227,19 @@ describe("langues", () => {
 });
 
 describe("textes des cartes GETI", () => {
-  it.each([
-    ["fr", frShare, frGeti],
-    ["en", enShare, enGeti],
-  ] as const)("%s : le sous-titre de la carte est la phrase de l'aperçu de la catégorie", (_locale, share, geti) => {
+  function expectSubtitlesAreLedes(share: typeof frShare, geti: typeof frGeti): void {
     for (const category of Object.keys(share.geti.categories) as (keyof typeof share.geti.categories)[]) {
       expect(share.geti.categories[category].subtitle).toBe(geti.categories[category].lede);
       expect(share.geti.categories[category].subtitle.length).toBeLessThanOrEqual(RULE_MODE_SUBTITLE_MAX_LENGTH);
     }
+  }
+
+  it("fr : le sous-titre de la carte est la phrase de l'aperçu de la catégorie", () => {
+    expectSubtitlesAreLedes(frShare, frGeti);
+  });
+
+  it("en : le sous-titre de la carte est la phrase de l'aperçu de la catégorie", () => {
+    expectSubtitlesAreLedes(enShare, enGeti);
   });
 });
 
