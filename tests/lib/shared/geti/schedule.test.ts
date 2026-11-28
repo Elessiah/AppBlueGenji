@@ -14,9 +14,7 @@ import { getiRawPost } from "../../../helpers/geti";
 
 const WEDNESDAY_NOON = "2026-11-25T12:00:00.000Z";
 const THURSDAY_NOON = "2026-11-26T12:00:00.000Z";
-const FRIDAY_NOON = "2026-11-27T12:00:00.000Z";
 const SATURDAY_NOON = "2026-11-28T12:00:00.000Z";
-const SUNDAY_NOON = "2026-11-29T12:00:00.000Z";
 const MONDAY_NOON = "2026-11-23T12:00:00.000Z";
 const SUMMER_NOON = "2026-07-15T12:00:00.000Z";
 
@@ -323,12 +321,6 @@ describe("parseGetiPost — cycle 2 : changement d'heure, nuit en cours, place p
 });
 
 describe("parseGetiPost — cycle 3 : place prise niée, nuit finie, changement d'heure par date, « pro-league »", () => {
-  const TUESDAY_MORNING = "2026-11-24T08:00:00.000Z";
-
-  function edited(content: string): GetiParsedPost {
-    return parseGetiPost(getiRawPost(content, { category: "lfs", postedAt: MONDAY_NOON, editedAt: TUESDAY_MORNING }));
-  }
-
   it.each(
     dateCases(`
       parseGetiPost_editSayingPasEncoreTrouve_resolvesFromTheEdit ¦ LFS ce soir 21h-23h, pas encore trouvé ¦ 2026-11-23T12:00:00.000Z ¦ 2026-11-24T08:00:00.000Z ¦ lfs ¦ 2026-11-24
