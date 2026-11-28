@@ -28,6 +28,8 @@
  * Une table grandirait, et ce que l'on cherche ici tient en quelques lignes.
  */
 
+import { createHash } from "node:crypto";
+
 import { CSP_MODE } from "@/lib/shared/csp";
 
 /** Ce qu'un rapport de violation apprend, une fois débarrassé du reste. */
@@ -39,9 +41,11 @@ export interface CspViolation {
   /** Chemin de la page, sans la chaîne de requête. */
   documentPath: string;
   /**
-   * D'où part l'appel refusé : origine du script fautif, schéma d'une
-   * extension (`chrome-extension`…), ou `"aucune"` quand le navigateur n'en
-   * nomme pas — voir {@link sourceOriginOf}.
+   * D'où part l'appel refusé : origine du script fautif, `"page"` pour un code
+   * écrit dans la page même, schéma d'une extension (`chrome-extension`…),
+   * mot-clé du navigateur (`inline`, `eval`), `"aucune"` quand le navigateur ne
+   * nomme pas de script, `"inconnu"` sur une valeur illisible — voir
+   * {@link sourceOriginOf} et {@link CSP_SOURCE_PAGE}.
    */
   sourceOrigin: string;
 }
@@ -72,6 +76,13 @@ export const CSP_MAX_VIOLATIONS_PER_REPORT = 25;
  */
 export const CSP_FIELD_MAX_LENGTH = 200;
 
+/**
+ * Longueur de l'empreinte ajoutée à un champ coupé : deux valeurs qui ne
+ * diffèrent qu'après la coupure restent deux causes, et une valeur fabriquée
+ * ne peut pas taire une vraie violation qui partagerait son début.
+ */
+const TRUNCATION_DIGEST_LENGTH = 10;
+
 /** Mot-clé ou schéma (`inline`, `eval`, `wasm-eval`, `data`, `chrome-extension`…). */
 const KEYWORD = /^[a-z][a-z0-9+.-]{0,39}$/i;
 
@@ -82,20 +93,33 @@ const DIRECTIVE = /^[a-z][a-z-]{0,39}$/;
  * Caractères qu'une ligne de journal ne doit jamais porter tels quels :
  * contrôles C0 et C1 (dont le saut de ligne, qui fabriquerait une fausse
  * ligne `[auth] …` dans pm2), séparateurs de ligne Unicode, marques
- * bidirectionnelles et caractères de largeur nulle (qui maquillent le texte).
+ * bidirectionnelles (dont U+061C), caractères invisibles ou de largeur nulle
+ * (U+180E, U+200B–U+200F, U+2060–U+2064, U+FEFF), qui maquillent le texte, et
+ * moitiés de paire UTF-16 orphelines, qui rendraient la ligne invalide en
+ * UTF-8. Le drapeau `u` lit une paire complète comme un seul caractère : seule
+ * une moitié orpheline tombe dans la plage des demi-codets.
  */
-const UNSAFE_LOG_CHARS = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
+const UNSAFE_LOG_CHARS =
+  /[\u0000-\u001f\u007f-\u009f\u061c\u180e\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\ud800-\udfff]/gu;
 
 /**
  * Rend un champ sûr pour une ligne de journal : caractères dangereux remplacés
- * par `?`, longueur bornée à {@link CSP_FIELD_MAX_LENGTH} (coupure marquée `…`).
+ * par `?`, longueur bornée à {@link CSP_FIELD_MAX_LENGTH}. Une coupure est
+ * marquée `…#<empreinte>` (empreinte de la valeur entière, pour que la clé de
+ * dédoublonnage ne confonde pas deux valeurs au même début), sans jamais
+ * séparer les deux moitiés d'une paire UTF-16.
  *
  * @param value Texte venu du rapport, donc de l'appelant.
  * @returns Le texte, sur une seule ligne et borné.
  */
 export function logSafe(value: string): string {
   const clean = value.replace(UNSAFE_LOG_CHARS, "?");
-  return clean.length > CSP_FIELD_MAX_LENGTH ? `${clean.slice(0, CSP_FIELD_MAX_LENGTH - 1)}\u2026` : clean;
+  if (clean.length <= CSP_FIELD_MAX_LENGTH) return clean;
+  const digest = createHash("sha256").update(value).digest("hex").slice(0, TRUNCATION_DIGEST_LENGTH);
+  let head = clean.slice(0, CSP_FIELD_MAX_LENGTH - TRUNCATION_DIGEST_LENGTH - 2);
+  // Coupure entre les deux moitiés d'une paire : la moitié haute part aussi.
+  if (/[\ud800-\udbff]$/.test(head)) head = head.slice(0, -1);
+  return `${head}\u2026#${digest}`;
 }
 
 /**
@@ -118,7 +142,7 @@ export function blockedOriginOf(value: unknown): string {
   // Seul un vrai mot-clé passe : le reste (sauts de ligne compris) est rejeté.
   if (!trimmed.includes("://")) {
     const keyword = trimmed.split(":")[0];
-    return KEYWORD.test(keyword) ? keyword : "inconnu";
+    return KEYWORD.test(keyword) ? keyword.toLowerCase() : "inconnu";
   }
   try {
     const origin = new URL(trimmed).origin;
@@ -148,12 +172,38 @@ const EXTENSION_SCHEMES = new Set([
 export const CSP_SOURCE_NONE = "aucune";
 
 /**
- * Source rendue quand le script fautif est **la page elle-même** : Chrome
- * nomme l'URL du document pour un script en ligne ou un attribut d'évènement.
- * Les scripts en ligne de Next portent le nonce et ne sont jamais refusés :
- * un refus « page » vient d'un code posé dans la page par un tiers.
+ * Source rendue quand l'appel refusé part d'un code **écrit dans la page
+ * même** : Chrome nomme alors l'adresse d'un document (pas d'un fichier de
+ * script) pour un script en ligne ou un attribut d'évènement. Les scripts en
+ * ligne de Next portent le nonce : hors oubli d'un nonce de notre part, un
+ * refus « page » vient d'un code posé dans la page par un tiers.
+ *
+ * Réservée aux refus qu'**un script seul** peut causer (voir
+ * {@link isScriptOnlyViolation}) : une image ou une feuille écrite dans le HTML
+ * nomme elle aussi le document, et c'est alors bien le site qui la sert.
  */
 export const CSP_SOURCE_PAGE = "page";
+
+/** Mots-clés de `blocked-uri` qui désignent du code sans fichier. */
+const CODE_KEYWORDS = new Set(["inline", "eval", "wasm-eval", "trusted-types-sink"]);
+
+/**
+ * Le refus ne peut-il venir que d'un script en train de s'exécuter ?
+ *
+ * `connect-src` (fetch, XHR, EventSource, WebSocket, sendBeacon) et
+ * `worker-src` ne sont sollicités que par du code ; un script en ligne ou
+ * évalué (`script-src*` refusant `inline` / `eval`) l'est par définition. Le
+ * reste (`img-src`, `style-src`, `font-src`, `frame-src`, un `<script src>`…)
+ * peut venir du HTML que le site a lui-même rendu.
+ *
+ * @param directive Nom de la directive, déjà réduit.
+ * @param blockedOrigin Ressource refusée, déjà réduite.
+ * @returns `true` si seul un script en cours d'exécution cause ce refus.
+ */
+function isScriptOnlyViolation(directive: string, blockedOrigin: string): boolean {
+  if (directive === "connect-src" || directive === "worker-src") return true;
+  return directive.startsWith("script-src") && CODE_KEYWORDS.has(blockedOrigin);
+}
 
 /**
  * Réduit le script fautif (`source-file` / `sourceFile`) à ce qui sert au tri.
@@ -167,16 +217,18 @@ export const CSP_SOURCE_PAGE = "page";
  * **aucun** (`"aucune"`), ce qui, sur une page sans script en ligne de notre
  * main, désigne un code étranger.
  *
- * Un script **de la page** (même URL que le document) n'est pas réduit ici
- * mais par l'appelant, en {@link CSP_SOURCE_PAGE} : une origine du site ne
- * désigne donc qu'un morceau servi par le site.
+ * Un code **de la page** (adresse d'un document du site, pas d'un fichier de
+ * script) n'est pas réduit ici mais par l'appelant, en {@link CSP_SOURCE_PAGE},
+ * quand seul un script peut causer le refus.
  *
  * Comme pour la ressource refusée, seule l'origine est gardée : le chemin
  * d'un script d'extension porte l'identifiant de l'extension, qui n'apprend
  * rien au correctif et singularise le visiteur.
  *
  * @param value Valeur de `source-file` ou `sourceFile`.
- * @returns L'origine, le schéma d'extension, ou {@link CSP_SOURCE_NONE}.
+ * @returns L'origine, le schéma d'extension, le mot-clé du navigateur
+ *   (`inline`, `eval`…), {@link CSP_SOURCE_NONE} sans script nommé, ou
+ *   `"inconnu"` sur une valeur illisible.
  */
 export function sourceOriginOf(value: unknown): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -203,18 +255,25 @@ export function sourceOriginOf(value: unknown): string {
 }
 
 /**
- * Le script fautif est-il la page elle-même (même origine, même chemin) ?
+ * Le script fautif est-il un **document** du site plutôt qu'un fichier de
+ * script ?
+ *
+ * Le chemin n'a pas à être celui du document : une navigation côté client
+ * (App Router) change `document-uri`, mais un code en ligne garde l'adresse
+ * de la page où il a été posé. Un morceau servi par le site vit sous
+ * `/_next/` ou finit en `.js` (`/push-sw.js`) : il garde l'origine du site.
  *
  * @param source Valeur de `source-file` / `sourceFile`.
  * @param document Valeur de `document-uri` / `documentURL`.
- * @returns `true` si les deux adresses désignent le même document.
+ * @returns `true` si la source est une page de la même origine que le document.
  */
-function isDocumentItself(source: unknown, document: unknown): boolean {
+function isSitePage(source: unknown, document: unknown): boolean {
   if (typeof source !== "string" || typeof document !== "string") return false;
   try {
     const a = new URL(source.trim());
     const b = new URL(document.trim());
-    return a.origin !== "null" && a.origin === b.origin && a.pathname === b.pathname;
+    if (a.origin === "null" || a.origin !== b.origin) return false;
+    return !a.pathname.startsWith("/_next/") && !/\.m?js$/i.test(a.pathname);
   } catch {
     return false;
   }
@@ -306,11 +365,13 @@ function violationOf(body: Record<string, unknown>): CspViolation | null {
 
   const documentUrl = body["document-uri"] ?? body.documentURL;
   const sourceFile = body["source-file"] ?? body.sourceFile;
+  const blockedOrigin = blockedOriginOf(body["blocked-uri"] ?? body.blockedURL);
+  const fromPage = isScriptOnlyViolation(name, blockedOrigin) && isSitePage(sourceFile, documentUrl);
   return {
     directive: name,
-    blockedOrigin: blockedOriginOf(body["blocked-uri"] ?? body.blockedURL),
+    blockedOrigin,
     documentPath: documentPathOf(documentUrl),
-    sourceOrigin: isDocumentItself(sourceFile, documentUrl) ? CSP_SOURCE_PAGE : sourceOriginOf(sourceFile),
+    sourceOrigin: fromPage ? CSP_SOURCE_PAGE : sourceOriginOf(sourceFile),
   };
 }
 

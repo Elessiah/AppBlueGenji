@@ -52,6 +52,11 @@ describe("blockedOriginOf", () => {
   it("garde le schéma d'une adresse non standard, qui n'a pas d'origine", () => {
     expect(blockedOriginOf("webkit-masked-url://hidden/")).toBe("webkit-masked-url");
   });
+
+  it("met un mot-clé en minuscules, pour qu'une casse ne dédouble pas la cause", () => {
+    expect(blockedOriginOf("Data:text/plain,x")).toBe("data");
+    expect(blockedOriginOf("INLINE")).toBe("inline");
+  });
 });
 
 describe("logSafe", () => {
@@ -64,10 +69,29 @@ describe("logSafe", () => {
     expect(logSafe(text)).toBe(text);
   });
 
-  it("coupe un texte trop long et le marque", () => {
+  it("coupe un texte trop long et le marque d'une empreinte", () => {
     const result = logSafe("x".repeat(CSP_FIELD_MAX_LENGTH + 1));
     expect(result).toHaveLength(CSP_FIELD_MAX_LENGTH);
-    expect(result.endsWith("\u2026")).toBe(true);
+    expect(result).toMatch(/^x+\u2026#[0-9a-f]{10}$/);
+  });
+
+  it("remplace aussi les autres caractères invisibles ou bidirectionnels", () => {
+    expect(logSafe("a\u061cb\u180ec\u2060d\u2064e\ufefff")).toBe("a?b?c?d?e?f");
+  });
+
+  it("remplace une moitié de paire orpheline et garde une paire entière", () => {
+    expect(logSafe("a\ud83db\ude00c\ud83d\ude00")).toBe("a?b?c\ud83d\ude00");
+  });
+
+  it("distingue deux textes trop longs au même début", () => {
+    const start = "x".repeat(CSP_FIELD_MAX_LENGTH);
+    expect(logSafe(`${start}b`)).not.toBe(logSafe(`${start}c`));
+  });
+
+  it("ne coupe jamais entre les deux moitiés d'une paire", () => {
+    // La coupure tombe sur le 188e codet : l'émoji qui l'enjambe part entier.
+    const result = logSafe(`${"x".repeat(187)}\ud83d\ude00${"y".repeat(50)}`);
+    expect(result).toMatch(/^x{187}\u2026#[0-9a-f]{10}$/);
   });
 });
 
@@ -228,6 +252,121 @@ describe("parseCspReport", () => {
       },
     });
     expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
+  });
+
+  it("nomme « page » un code posé sur une page quittée par une navigation côté client", () => {
+    // L'App Router change document-uri ; le code en ligne garde l'adresse
+    // de la page où il a été posé.
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/tournois/20",
+        "effective-directive": "connect-src",
+        "blocked-uri": "data",
+        "source-file": "https://bluegenji-esport.fr/tournois",
+      },
+    });
+    expect(violation.sourceOrigin).toBe(CSP_SOURCE_PAGE);
+  });
+
+  it("nomme « page » une source qui porte une requête ou une barre finale", () => {
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/tournois/20",
+        "effective-directive": "connect-src",
+        "blocked-uri": "data",
+        "source-file": "https://bluegenji-esport.fr/tournois/20/?onglet=matchs",
+      },
+    });
+    expect(violation.sourceOrigin).toBe(CSP_SOURCE_PAGE);
+  });
+
+  it("nomme « page » au format Reporting API (documentURL, sourceFile)", () => {
+    const [violation] = parseCspReport([
+      {
+        type: "csp-violation",
+        body: {
+          documentURL: "https://bluegenji-esport.fr/tournois/20",
+          effectiveDirective: "connect-src",
+          blockedURL: "data",
+          sourceFile: "https://bluegenji-esport.fr/tournois/20",
+        },
+      },
+    ]);
+    expect(violation.sourceOrigin).toBe(CSP_SOURCE_PAGE);
+  });
+
+  it("nomme « page » un script en ligne refusé", () => {
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/equipes",
+        "effective-directive": "script-src-elem",
+        "blocked-uri": "inline",
+        "source-file": "https://bluegenji-esport.fr/equipes",
+      },
+    });
+    expect(violation.sourceOrigin).toBe(CSP_SOURCE_PAGE);
+  });
+
+  it("garde l'origine du site pour une image écrite dans le HTML de la page", () => {
+    // Une image tierce réintroduite dans le rendu serveur est un défaut du
+    // site : Chrome nomme le document, la ligne ne doit pas accuser un tiers.
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/joueurs/x",
+        "effective-directive": "img-src",
+        "blocked-uri": "https://lh3.googleusercontent.com/a/photo",
+        "source-file": "https://bluegenji-esport.fr/joueurs/x",
+      },
+    });
+    expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
+  });
+
+  it("garde l'origine du site pour un script externe écrit dans la page", () => {
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/",
+        "effective-directive": "script-src-elem",
+        "blocked-uri": "https://cdn.example.com/x.js",
+        "source-file": "https://bluegenji-esport.fr/",
+      },
+    });
+    expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
+  });
+
+  it("garde l'origine du site pour un script servi à la racine (.js)", () => {
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/tournois/20",
+        "effective-directive": "connect-src",
+        "blocked-uri": "data",
+        "source-file": "https://bluegenji-esport.fr/push-sw.js",
+      },
+    });
+    expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
+  });
+
+  it("garde le schéma d'une extension qui agit sur une page", () => {
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/tournois/20",
+        "effective-directive": "connect-src",
+        "blocked-uri": "data",
+        "source-file": "chrome-extension://abcdefghijklmnop/content.js",
+      },
+    });
+    expect(violation.sourceOrigin).toBe("chrome-extension");
+  });
+
+  it("garde l'origine d'une page d'un autre site", () => {
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/tournois/20",
+        "effective-directive": "connect-src",
+        "blocked-uri": "data",
+        "source-file": "https://autre.example/page",
+      },
+    });
+    expect(violation.sourceOrigin).toBe("https://autre.example");
   });
 
   it("ne garde que le nom d'une directive historique complète", () => {
