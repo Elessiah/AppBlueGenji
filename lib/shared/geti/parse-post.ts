@@ -187,15 +187,37 @@ function isoDate(value: unknown): string | null {
   return Number.isNaN(time) ? null : new Date(time).toISOString();
 }
 
+/** « trouvé », « pourvu », « plus besoin », « found », « filled » (texte sans accents, en minuscules). */
+const FILLED_WORD = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:trouvee?s?|pourvue?s?|plus besoin|found|filled)${NOT_BEFORE_WORD}`,
+  "gu",
+);
+/** Mots qui nient la place prise, quelques mots avant : « pas encore trouvé », « toujours rien trouvé », « still not found », « haven't found ». */
+const FILLED_NEGATIONS = new Set(["pas", "rien", "personne", "aucun", "aucune", "jamais", "not", "no", "never", "nobody", "noone", "t"]);
+/** Sujet juste avant : le verbe « trouver » au présent (« si on trouve », « je trouve », « qui se trouve en EU »). */
+const FILLED_VERB_SUBJECTS = new Set(["on", "je", "j", "si", "tu", "se", "s", "il", "elle", "ne", "n"]);
+/** Nombre de mots relus avant « trouvé » pour y chercher une négation. */
+const FILLED_LOOKBACK_WORDS = 3;
+/** Fin de proposition : la négation d'avant (« pas de souci. Trouvé ») ne compte plus. */
+const CLAUSE_END = /[.!?;,()\n]/u;
+
 /**
  * Place prise, écrite dans une recherche de scrim ou de remplaçant : « trouvé »,
- * « pourvu », « plus besoin », « found », « filled » (« pas trouvé », « si on
- * trouve » n'en sont pas). Texte sans accents, en minuscules.
+ * « pourvu », « plus besoin », « found », « filled » — ni nié dans les quelques
+ * mots d'avant (« pas encore trouvé », « still not found »), ni le verbe
+ * (« si on trouve », « qui se trouve en EU »). Texte sans accents, en minuscules.
  */
-const FILLED = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?<!(?:pas|on|je|si|tu) )(?:trouvee?s?|pourvue?s?|plus besoin|found|filled)${NOT_BEFORE_WORD}`,
-  "u",
-);
+function saysFilled(lower: string): boolean {
+  for (const match of lower.matchAll(FILLED_WORD)) {
+    const clause = lower.slice(Math.max(0, match.index - 60), match.index).split(CLAUSE_END).at(-1) ?? "";
+    const before = clause.split(/[^\p{L}\p{N}]+/u).filter((word) => word !== "").slice(-FILLED_LOOKBACK_WORDS);
+    const subject = before.at(-1);
+    if (subject !== undefined && FILLED_VERB_SUBJECTS.has(subject)) continue;
+    if (before.some((word) => FILLED_NEGATIONS.has(word))) continue;
+    return true;
+  }
+  return false;
+}
 
 /**
  * Instant où le texte gardé a été écrit : la modification si elle suit la
@@ -205,14 +227,17 @@ const FILLED = new RegExp(
  */
 function writtenAt(postedAt: string | null, editedAt: string | null, lower: string, oneEvening: boolean): string | null {
   if (postedAt === null || editedAt === null) return postedAt;
-  if (oneEvening && FILLED.test(lower)) return postedAt;
+  if (oneEvening && saysFilled(lower)) return postedAt;
   return Date.parse(editedAt) > Date.parse(postedAt) ? editedAt : postedAt;
 }
 
 /** Scrim ou remplaçant, d'après le salon ou le mot-clé d'une annonce postée ailleurs (« LFSub » dans le salon des joueurs). */
-function isOneEveningKind(category: GetiCategory | null, lower: string): boolean {
-  return [category, detectGetiCategory(lower)].some((kind) => kind === "lfs" || kind === "lfsub");
+function isOneEveningKind(kinds: readonly (GetiCategory | null)[]): boolean {
+  return kinds.some((kind) => kind === "lfs" || kind === "lfsub");
 }
+
+/** Réponse déjà calculée pour une annonce (la carte la relit à chaque rendu). */
+const oneEveningCache = new WeakMap<object, boolean>();
 
 /**
  * Recherche qui ne vaut que pour sa soirée : un scrim, un remplaçant — d'après
@@ -221,8 +246,14 @@ function isOneEveningKind(category: GetiCategory | null, lower: string): boolean
  * pas l'annonce (un recrutement qui citait un essai reste d'actualité).
  */
 export function isGetiOneEveningPost(post: Pick<GetiParsedPost, "category" | "text">): boolean {
-  if (post.category === "lfs" || post.category === "lfsub") return true;
-  return isOneEveningKind(post.category, prepareGetiText(getiWithoutSpoilers(post.text, " ")).lower);
+  if (isOneEveningKind([post.category])) return true;
+  const known = oneEveningCache.get(post);
+  if (known !== undefined) return known;
+  // Le texte lu comme à l'analyse : sans passage masqué ni passage barré (« ~~LFSub ce soir~~ dispo »).
+  const { analysed } = withoutStruck(getiWithoutSpoilers(post.text, " "));
+  const answer = isOneEveningKind([detectGetiCategory(prepareGetiText(analysed).lower)]);
+  oneEveningCache.set(post, answer);
+  return answer;
 }
 
 function isCategory(value: unknown): value is GetiCategory {
@@ -511,7 +542,7 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
   // Scrim ou remplaçant — d'après le salon, ou le mot-clé d'une annonce postée
   // ailleurs (« LFSub » dans le salon des joueurs) : une soirée précise, à un SR donné.
   const kinds = [category, detectGetiCategory(prepared.lower)];
-  const oneEvening = isOneEveningKind(category, prepared.lower);
+  const oneEvening = isOneEveningKind(kinds);
   // « ce soir » ou « demain » se lit depuis l'écriture du texte gardé : sa dernière modification, sinon sa publication.
   const written = writtenAt(postedAt, isoDate(source.editedAt), prepared.lower, oneEvening);
   const schedule = parseGetiSchedule(prepared, written, oneEvening);

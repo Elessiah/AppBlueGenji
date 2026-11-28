@@ -174,8 +174,17 @@ const US_CODES = "EST|EDT|CST|CDT|PST|PDT";
 const HOUR_UNIT = String.raw`\d ?[hH](?:\d{2})?`;
 /** Heure en am/pm ou en « 21:00 ». */
 const MERIDIEM_OR_CLOCK = String.raw`(?:\d ?[aApP][mM]|\d:\d{2})`;
-/** Plage sans unité : « 8-10 », « 20 - 22 ». */
-const BARE_RANGE = String.raw`(?<!\d)\d{1,2} ?- ?\d{1,2}`;
+/** Heure d'une plage sans unité qui ne peut pas être un palier de rang ni un score : de 6 à 24. */
+const HOUR_LIKE = String.raw`(?:[6-9]|1\d|2[0-4])`;
+/**
+ * Plage sans unité : « 8-10 », « 20 - 22 » — une de ses bornes au moins vaut
+ * 6 ou plus (« Diamond 1-3 WEST », « Master 1-2 EST », un score « 2-1 » n'en sont pas).
+ */
+const BARE_RANGE = String.raw`(?<!\d)(?:${HOUR_LIKE} ?- ?\d{1,2}|\d{1,2} ?- ?${HOUR_LIKE})(?!\d)`;
+/** Sigles que la parenthèse ne suffit pas à lire : « EU (WEST) » est une région de serveur. */
+const PAREN_CODES = "BST|WET|EEST|EET|" + US_CODES;
+/** Sujet français juste avant : « QUI EST 8PM » est du français (« est »), pas un fuseau. */
+const FRENCH_SUBJECT_BEFORE = String.raw`(?<!(?:^|[^\p{L}])(?:[Qq][Uu][Ii]|[Ii][Ll]|[Ee][Ll][Ll][Ee]|[Cc][Ee]|[ÇçCc][Aa]|[Oo][Nn]|[Qq][Uu][Ee]|[Tt][Oo][Uu][Tt]|[Rr][Ii][Ee][Nn]) )`;
 /** Début d'un sigle : ni collé à un mot, ni derrière une apostrophe (« C'EST »). */
 const CODE_START = String.raw`${NOT_AFTER_WORD}(?<!['\u2019])`;
 /**
@@ -185,8 +194,9 @@ const CODE_START = String.raw`${NOT_AFTER_WORD}(?<!['\u2019])`;
  *   « 21:00 » ou une plage « 20-22 » (jamais un rang, « 3K5 WEST », « 4500 WEST ») ;
  *   américains derrière les mêmes, sauf « 21H » (« 21H EST BON » reste du français) ;
  * - derrière une étiquette (« Timezone: EST », « TZ EST », « fuseau : PST »,
- *   « in EST » pour un sigle américain), entre parenthèses (« (EST) ») ;
- * - devant une heure en am/pm (« EST 9PM »).
+ *   « in EST » pour un sigle américain), entre parenthèses (« (EST) » ; jamais
+ *   « (WEST) », la région « EU (WEST) ») ;
+ * - devant une heure en am/pm (« EST 9PM » ; « QUI EST 8PM » reste du français).
  */
 const ZONE_CODE_AFTER_TIME = new RegExp(
   [
@@ -194,8 +204,8 @@ const ZONE_CODE_AFTER_TIME = new RegExp(
     String.raw`(?:${MERIDIEM_OR_CLOCK}|${BARE_RANGE}) ?\(?(${US_CODES})${NOT_BEFORE_WORD}`,
     String.raw`${NOT_AFTER_WORD}(?:[Tt][Ii][Mm][Ee] ?[Zz][Oo][Nn][Ee]|[Tt][Zz]|[Ff][Uu][Ss][Ee][Aa][Uu])\s?:?\s?\(?(${EU_WORD_CODES}|${US_CODES})${NOT_BEFORE_WORD}`,
     String.raw`${NOT_AFTER_WORD}[Ii][Nn]\s(${US_CODES})${NOT_BEFORE_WORD}`,
-    String.raw`\((${EU_WORD_CODES}|${US_CODES})\)`,
-    String.raw`${CODE_START}(${EU_WORD_CODES}|${US_CODES}) ?\d{1,2}(?::\d{2})? ?[aApP][mM]${NOT_BEFORE_WORD}`,
+    String.raw`\((${PAREN_CODES})\)`,
+    String.raw`${CODE_START}${FRENCH_SUBJECT_BEFORE}(${EU_WORD_CODES}|${US_CODES}) ?\d{1,2}(?::\d{2})? ?[aApP][mM]${NOT_BEFORE_WORD}`,
   ].join("|"),
   "u",
 );

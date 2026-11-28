@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { getiPostEndsAt, isGetiOneEveningPost, isGetiPostPast, matchesGetiFilter, type GetiParsedPost } from "@/lib/shared/geti";
 import { getiAlertSearch, isGetiPostAlertable, matchingGetiAlerts } from "@/lib/shared/geti/alerts";
 import { getiSlotEndMinutes } from "@/lib/shared/geti/filter";
+import { parseGetiPost } from "@/lib/shared/geti/parse-post";
 import {
   emptyGetiPageQuery,
   getiActiveFilterCount,
@@ -14,7 +15,7 @@ import {
 import { getiChipLabel, getiChipTitle, getiDataText } from "@/lib/shared/geti/page-text";
 import enMessages from "@/messages/en/geti.json";
 import frMessages from "@/messages/fr/geti.json";
-import { parsedGetiPost } from "../../../helpers/geti";
+import { getiRawPost, parsedGetiPost } from "../../../helpers/geti";
 
 /**
  * Annonces passées : fin de la dernière soirée visée (heure de Paris), filtre
@@ -32,6 +33,7 @@ function fridayScrim(overrides: Partial<GetiParsedPost> = {}): GetiParsedPost {
   });
 }
 
+const FRIDAY_NOON_ISO = "2026-11-27T11:00:00.000Z";
 const FRIDAY_END = Date.parse("2026-11-27T22:00:00.000Z");
 const FRIDAY_MORNING = Date.parse("2026-11-27T09:00:00.000Z");
 const SATURDAY_MORNING = Date.parse("2026-11-28T09:00:00.000Z");
@@ -389,5 +391,60 @@ describe("cycle 2 : recherche d'une soirée postée ailleurs, jour cité hors da
     const post = parsedGetiPost({ category: "lft", dates: ["2026-11-27"], availability: { days: ["MON", "FRI"], times: [], timezone: null } });
 
     expect(matchesGetiFilter(post, { days: ["MON"] }, SATURDAY_MORNING)).toBe(true);
+  });
+});
+
+describe("cycle 3 : écart d'une date de l'autre côté d'un changement d'heure, mot-clé barré", () => {
+  /** « 6pm EST » le jeudi 29/10 (23 h à Paris) puis le 02/11 (0 h le 03/11) : horaires gardés à 0 h. */
+  function acrossDst(dateShifts?: number[]): GetiParsedPost {
+    return parsedGetiPost({
+      category: "lft",
+      dates: ["2026-10-29", "2026-11-03"],
+      availability: {
+        days: ["THU", "TUE"],
+        times: [{ from: 0, to: null }],
+        timezone: "EST",
+        ...(dateShifts === undefined ? {} : { dateShifts }),
+      },
+    });
+  }
+
+  const THURSDAY_29_MORNING = Date.parse("2026-10-29T09:00:00.000Z");
+
+  it("matchesGetiFilter_earlierDateAcrossDstOnItsMorning_stillMatchesItsDay", () => {
+    expect(matchesGetiFilter(acrossDst([1380, 0]), { days: ["THU"] }, THURSDAY_29_MORNING)).toBe(true);
+  });
+
+  it("matchesGetiFilter_earlierDateAcrossDstWithoutShifts_isOverThatMorning", () => {
+    expect(matchesGetiFilter(acrossDst(), { days: ["THU"] }, THURSDAY_29_MORNING)).toBe(false);
+  });
+
+  it("getiPostEndsAt_withDateShifts_isTheLatestDatesEnd", () => {
+    // Le 03/11 à 2 h à Paris (CET) : 01:00Z.
+    expect(getiPostEndsAt(acrossDst([1380, 0]))).toBe(Date.parse("2026-11-03T01:00:00.000Z"));
+  });
+
+  it("getiPostEndsAt_badStoredShifts_areIgnored", () => {
+    // Un JSON gardé abîmé : hors bornes, non fini.
+    expect(getiPostEndsAt(acrossDst([99999, Number.NaN]))).toBe(getiPostEndsAt(acrossDst()));
+  });
+
+  it("isGetiOneEveningPost_struckKeywordInAnLftPost_isFalse", () => {
+    const post = parseGetiPost(getiRawPost("~~LFSub ce soir~~ dispo tank", { category: "lft", postedAt: FRIDAY_NOON_ISO }));
+
+    expect(isGetiOneEveningPost(post)).toBe(false);
+  });
+
+  it("isGetiOneEveningPost_keywordOutsideTheStrike_isTrue", () => {
+    const post = parseGetiPost(getiRawPost("LFSub ce soir ~~21h~~ 22h", { category: "lft", postedAt: FRIDAY_NOON_ISO }));
+
+    expect(isGetiOneEveningPost(post)).toBe(true);
+  });
+
+  it("isGetiOneEveningPost_samePostReadTwice_givesTheSameAnswer", () => {
+    const post = parseGetiPost(getiRawPost("LFSub ce soir 21h", { category: "lft", postedAt: FRIDAY_NOON_ISO }));
+
+    expect(isGetiOneEveningPost(post)).toBe(true);
+    expect(isGetiOneEveningPost(post)).toBe(true);
   });
 });

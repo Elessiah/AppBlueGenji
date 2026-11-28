@@ -622,10 +622,10 @@ const THIS_WEEKEND = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:(?:ce|this)\sweek[\s-]?end|ce\s(?:we|wk))${NOT_BEFORE_WORD}`,
   "u",
 );
-/** Mots qui suivent « pro » sans en faire « prochain » : « samedi pro league », « pro am ». */
+/** Mots qui suivent « pro » sans en faire « prochain » : « samedi pro league », « pro-league », « pro am ». */
 const PRO_FOLLOWERS = "league|ligue|leagues|am|player|players|team|teams|tour|series|scene|circuit|division|div";
 /** « prochain », « prochaine », ou l'abrégé « pro » (« samedi pro ») — pas celui de « samedi pro league ». */
-const NEXT_SUFFIX = String.raw`\s(?:prochaine?|pro${NOT_BEFORE_WORD}(?!\s(?:${PRO_FOLLOWERS})${NOT_BEFORE_WORD}))`;
+const NEXT_SUFFIX = String.raw`\s(?:prochaine?|pro${NOT_BEFORE_WORD}(?![\s/-](?:${PRO_FOLLOWERS})${NOT_BEFORE_WORD}))`;
 /** « lundi prochain », « samedi pro », « next friday » : la prochaine occurrence après le jour de la publication (« samedi pro league » n'en est pas une). */
 const NEXT_NAMED_DAY = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:(${DAY_TABLE.pattern})${NEXT_SUFFIX}|next\s(${DAY_TABLE.pattern}))${NOT_BEFORE_WORD}`,
@@ -765,6 +765,19 @@ function shiftedTimes(times: readonly GetiTimeRange[], shifts: readonly number[]
   });
 }
 
+/**
+ * Écart, en minutes, entre les horaires gardés (au décalage de la dernière
+ * date) et ceux de chaque date (au sien) : non nul seulement pour une date
+ * d'avant un changement d'heure du fuseau écrit (« 6pm EST » le 29/10, 23 h à
+ * Paris, puis le 02/11, 0 h le 03/11). `null` quand toutes valent 0.
+ */
+function getiDateShifts(rule: GetiZoneRule, days: readonly number[], first: number | undefined, lastShift: number): number[] | null {
+  if (first === undefined) return null;
+  const kept = getiWrapMinutes(first + lastShift);
+  const shifts = days.map((day) => getiWrapMinutes(first + getiParisShiftMinutes(rule, day, first)) - kept);
+  return shifts.some((value) => value !== 0) ? shifts : null;
+}
+
 /** Heure d'après minuit au plus tard pour qu'une heure seule de « ce soir » vise la nuit qui suit (« ce soir 0h30 »). */
 const AFTER_MIDNIGHT_HOURS = 6;
 
@@ -772,14 +785,18 @@ const AFTER_MIDNIGHT_HOURS = 6;
  * Jour de « ce soir », « cette nuit » : le lendemain quand tous les horaires
  * commencent après minuit (avant 6 h) et que l'annonce est écrite dans la
  * journée ou la soirée d'avant (« cette nuit 1h-3h » écrit à 22 h vise 1 h le
- * lendemain) ; écrite elle-même avant 6 h (à 0 h 30, à 1 h 30), elle parle de
- * la nuit en cours : le jour même.
+ * lendemain) ; écrite elle-même avant 6 h, elle parle de la nuit en cours tant
+ * que ce créneau n'est pas fini (« cette nuit 1h-3h » écrit à 1 h 30 : le jour
+ * même ; écrit à 4 h : la nuit suivante).
  */
 function tonightDay(stated: readonly GetiTimeRange[], today: number, posted: number, rule: GetiZoneRule): number {
   if (stated.length === 0) return today;
   const latest = Math.max(...stated.map((time) => time.from));
   if (latest >= AFTER_MIDNIGHT_HOURS * 60) return today;
-  return posted >= getiWallInstant(today, AFTER_MIDNIGHT_HOURS * 60, rule) ? today + DAY_MS : today;
+  if (posted < getiWallInstant(today, AFTER_MIDNIGHT_HOURS * 60, rule)) {
+    return posted < getiWallInstant(today, getiSlotEndMinutes(stated), rule) ? today : today + DAY_MS;
+  }
+  return today + DAY_MS;
 }
 
 /** Dates et disponibilités d'une annonce, à l'heure de Paris. */
@@ -797,7 +814,9 @@ export type GetiSchedule = { dates: string[]; availability: GetiAvailability };
  *   l'heure de Paris, heure d'été comprise ; les horaires tels qu'écrits restent
  *   dans `statedTimes`. Une date suit son premier horaire (« Friday 9pm EST »
  *   tombe le samedi à Paris), au décalage de son jour à elle ; les horaires
- *   gardés suivent celui de la dernière date (la fin d'annonce reste exacte).
+ *   gardés (et les jours nommés) suivent celui de la dernière date (la fin
+ *   d'annonce reste exacte). Une date d'avant un changement d'heure porte
+ *   l'écart de ses horaires à elle dans `dateShifts`.
  * - `sameDay` (recherche de scrim ou de remplaçant) : un jour nommé vise sa
  *   prochaine occurrence, un horaire sans jour le soir même — le lendemain si
  *   ce créneau était déjà fini à la publication. Les jours rendus sont alors
@@ -827,16 +846,17 @@ export function parseGetiSchedule(prepared: GetiPreparedText, postedAt: string |
   const over = evening.implicit && posted >= getiWallInstant(today, getiSlotEndMinutes(stated), rule);
   const days = [...new Set([...found, ...(over ? [today + DAY_MS] : evening.days)])].sort((a, b) => a - b).slice(0, DATE_MAX);
   const first = stated[0]?.from;
-  const reference = days[0] ?? today;
   // Les horaires gardés valent pour toutes les dates : ils suivent le décalage de la dernière, celle qui dit
   // quand l'annonce est passée (deux dates de part et d'autre d'un changement d'heure) ; chacun le sien.
   const last = days.at(-1) ?? today;
   const shifts = stated.map((time) => getiParisShiftMinutes(rule, last, time.from));
   const dayShiftAt = (day: number) =>
     first === undefined ? 0 : Math.floor((first + getiParisShiftMinutes(rule, day, first)) / 1440);
-  const dayShift = dayShiftAt(reference);
+  // Les jours nommés suivent les horaires gardés : le décalage de la dernière date.
+  const dayShift = dayShiftAt(last);
   // Chaque date suit le décalage de son jour à elle (heure d'été d'un côté, d'hiver de l'autre).
   const dates = days.map((day) => day + dayShiftAt(day) * DAY_MS);
+  const dateShifts = getiDateShifts(rule, days, first, shifts[0] ?? 0);
   const shiftDay = (day: GetiDay) => GETI_DAYS[(GETI_DAYS.indexOf(day) + dayShift + 7) % 7];
   const converted = shifts.some((value) => value !== 0);
   // Scrim ou remplaçant aux soirées datées : les jours sont ceux des dates, rien d'autre.
@@ -848,6 +868,7 @@ export function parseGetiSchedule(prepared: GetiPreparedText, postedAt: string |
       times: converted ? shiftedTimes(stated, shifts) : stated,
       timezone,
       ...(converted ? { statedTimes: stated } : {}),
+      ...(dateShifts === null ? {} : { dateShifts }),
     },
   };
 }

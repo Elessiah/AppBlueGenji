@@ -332,8 +332,9 @@ describe("parseGetiPost — cycle 2 : changement d'heure, nuit en cours, place p
     expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T05:00:00.000Z").dates).toEqual(["2026-11-29"]);
   });
 
-  it("parseGetiPost_tonightAfterMidnightPostedJustBeforeSix_isTheSameDay", () => {
-    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T04:59:00.000Z").dates).toEqual(["2026-11-28"]);
+  it("parseGetiPost_tonightAfterMidnightPostedJustBeforeSixAfterTheSlot_isTheNextNight", () => {
+    // 5 h 59 à Paris : le créneau 1 h – 3 h de cette nuit-là est fini, l'annonce vise la nuit suivante.
+    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T04:59:00.000Z").dates).toEqual(["2026-11-29"]);
   });
 
   it("parseGetiPost_editMarkingTheSpotFound_keepsThePostDay", () => {
@@ -362,5 +363,75 @@ describe("parseGetiPost — cycle 2 : changement d'heure, nuit en cours, place p
 
   it("parseGetiPost_samediProPostedThatSaturday_isNextWeek", () => {
     expect(parsed("LFS samedi pro 21h", SATURDAY_NOON).dates).toEqual(["2026-12-05"]);
+  });
+});
+
+describe("parseGetiPost — cycle 3 : place prise niée, nuit finie, changement d'heure par date, « pro-league »", () => {
+  const TUESDAY_MORNING = "2026-11-24T08:00:00.000Z";
+
+  function edited(content: string): GetiParsedPost {
+    return parseGetiPost(getiRawPost(content, { category: "lfs", postedAt: MONDAY_NOON, editedAt: TUESDAY_MORNING }));
+  }
+
+  it("parseGetiPost_editSayingPasEncoreTrouve_resolvesFromTheEdit", () => {
+    expect(edited("LFS ce soir 21h-23h, pas encore trouvé").dates).toEqual(["2026-11-24"]);
+  });
+
+  it("parseGetiPost_editSayingStillNotFound_resolvesFromTheEdit", () => {
+    expect(edited("LFS tonight 9pm-11pm, still not found").dates).toEqual(["2026-11-24"]);
+  });
+
+  it("parseGetiPost_editSayingHaventFound_resolvesFromTheEdit", () => {
+    expect(edited("LFS tonight 9pm-11pm, haven't found anyone").dates).toEqual(["2026-11-24"]);
+  });
+
+  it("parseGetiPost_editWithQuiSeTrouve_resolvesFromTheEdit", () => {
+    expect(edited("LFS ce soir 21h-23h, équipe qui se trouve en EU").dates).toEqual(["2026-11-24"]);
+  });
+
+  it("parseGetiPost_negationInAnEarlierClause_keepsThePostDay", () => {
+    expect(edited("LFS ce soir 21h-23h, pas de souci. Trouvé").dates).toEqual(["2026-11-23"]);
+  });
+
+  it("parseGetiPost_editSayingOnATrouve_keepsThePostDay", () => {
+    expect(edited("LFS ce soir 21h-23h (on a trouvé)").dates).toEqual(["2026-11-23"]);
+  });
+
+  it("parseGetiPost_tonightAfterMidnightPostedAfterTheSlotEnded_isTheNextNight", () => {
+    // Samedi 28, 4 h à Paris : le créneau 1 h – 3 h est fini.
+    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T03:00:00.000Z").dates).toEqual(["2026-11-29"]);
+  });
+
+  it("parseGetiPost_tonightAfterMidnightPostedDuringTheSlot_isTheSameNight", () => {
+    // Samedi 28, 2 h à Paris : en plein créneau.
+    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T01:00:00.000Z").dates).toEqual(["2026-11-28"]);
+  });
+
+  it("parseGetiPost_ceSoir0h30PostedAt0530_isTheNextNight", () => {
+    // 0 h 30 seule finit à 2 h 30 : écrite à 5 h 30, l'annonce vise la nuit suivante.
+    expect(parsed("LFS ce soir 0h30", "2026-11-28T04:30:00.000Z").dates).toEqual(["2026-11-29"]);
+  });
+
+  it("parseGetiPost_datesAcrossTheUsDstChange_storesTheEarlierDatesShift", () => {
+    const post = parsed("LFS 29/10 et 02/11 6pm EST", "2026-10-28T12:00:00.000Z");
+
+    // 29/10 : 6pm EDT = 23 h à Paris, 1 380 minutes après le minuit gardé (0 h, celui du 03/11).
+    expect(post.availability.dateShifts).toEqual([1380, 0]);
+  });
+
+  it("parseGetiPost_parisPost_hasNoDateShifts", () => {
+    expect(parsed("LFS 29/10 et 02/11 21h", "2026-10-28T12:00:00.000Z").availability.dateShifts).toBeUndefined();
+  });
+
+  it("parseGetiPost_namedDayAcrossTheUsDstChange_followsTheLastDatesShift", () => {
+    const post = parsed("LFT dispo lundi 6pm EST, essais 29/10 et 02/11", "2026-10-28T12:00:00.000Z", "lft");
+
+    // Les horaires gardés sont à 0 h (décalage du 02/11) : lundi 6pm EST tombe le mardi à Paris.
+    expect(post.availability.days).toContain("TUE");
+    expect(post.availability.days).not.toContain("MON");
+  });
+
+  it("parseGetiPost_samediProHyphenLeague_isThatSaturday", () => {
+    expect(parsed("LFS samedi pro-league 21h", SATURDAY_NOON).dates).toEqual(["2026-11-28"]);
   });
 });

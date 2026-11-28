@@ -224,14 +224,28 @@ export function getiSlotEndMinutes(times: readonly unknown[] | null | undefined)
 
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/u;
 
+/** Date visée d'une analyse gardée, et l'écart de ses horaires à elle (`dateShifts`), en minutes. */
+type StoredDate = { day: number; shift: number };
+
+/** Écart gardé d'une date : un nombre fini de moins d'un jour, 0 sinon (JSON abîmé). */
+function storedShift(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && Math.abs(value) < DAY_MINUTES ? value : 0;
+}
+
 /** Dates visées d'une analyse gardée (« AAAA-MM-JJ »), en millisecondes UTC à minuit ; une date abîmée est ignorée. */
-function storedDays(post: GetiParsedPost): number[] {
-  return wanted<unknown>(post.dates).flatMap((iso) => {
+function storedDates(post: GetiParsedPost): StoredDate[] {
+  const shifts = wanted<unknown>(post.availability?.dateShifts);
+  return wanted<unknown>(post.dates).flatMap((iso, index) => {
     const match = typeof iso === "string" ? ISO_DAY.exec(iso) : null;
     if (match === null) return [];
     const day = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    return Number.isNaN(day) ? [] : [day];
+    return Number.isNaN(day) ? [] : [{ day, shift: storedShift(shifts[index]) }];
   });
+}
+
+/** Instant où la soirée d'une date est finie : la fin de son dernier horaire, à l'écart de cette date. */
+function dateEndsAt(date: StoredDate, end: number): number {
+  return getiWallInstant(date.day, end + date.shift);
 }
 
 /**
@@ -244,9 +258,10 @@ function storedDays(post: GetiParsedPost): number[] {
  * @returns L'instant en millisecondes, ou `null`.
  */
 export function getiPostEndsAt(post: GetiParsedPost): number | null {
-  const days = storedDays(post);
-  if (days.length === 0) return null;
-  return getiWallInstant(Math.max(...days), getiSlotEndMinutes(post.availability?.times));
+  const dates = storedDates(post);
+  if (dates.length === 0) return null;
+  const end = getiSlotEndMinutes(post.availability?.times);
+  return Math.max(...dates.map((date) => dateEndsAt(date, end)));
 }
 
 /**
@@ -262,6 +277,9 @@ function weekdayOf(day: number): GetiDay {
   return GETI_DAYS[(new Date(day).getUTCDay() + 6) % 7];
 }
 
+/** Jours cités hors des dates à partir desquels une annonce parle d'une disponibilité habituelle. */
+const HABIT_DAYS_MIN = 2;
+
 /**
  * Jours d'une annonce pour le filtre : un jour voulu désigne une soirée **à
  * venir**. Le jour d'une date déjà finie ne compte plus (sauf si une date à
@@ -272,21 +290,18 @@ function weekdayOf(day: number): GetiDay {
  * Un seul (« essai vendredi 27/11, dispo aussi lundi ») ne rend pas le
  * vendredi passé : seul ce jour-là, hors date, compte en plus.
  */
-/** Jours cités hors des dates à partir desquels une annonce parle d'une disponibilité habituelle. */
-const HABIT_DAYS_MIN = 2;
-
 function matchesDays(post: GetiParsedPost, days: readonly GetiDay[], includeUnknown: boolean, now: number): boolean {
   if (days.length === 0) return true;
   const found = wanted(post.availability?.days);
   if (found.length === 0) return includeUnknown;
-  const dated = storedDays(post);
+  const dated = storedDates(post);
   if (dated.length === 0) return days.some((day) => found.includes(day));
-  const datedWeekdays = new Set(dated.map(weekdayOf));
+  const datedWeekdays = new Set(dated.map((date) => weekdayOf(date.day)));
   if (found.filter((day) => !datedWeekdays.has(day)).length >= HABIT_DAYS_MIN) return days.some((day) => found.includes(day));
   const end = getiSlotEndMinutes(post.availability?.times);
   const upcoming = new Set<GetiDay>();
   const over = new Set<GetiDay>();
-  for (const day of dated) (now >= getiWallInstant(day, end) ? over : upcoming).add(weekdayOf(day));
+  for (const date of dated) (now >= dateEndsAt(date, end) ? over : upcoming).add(weekdayOf(date.day));
   return days.some((day) => found.includes(day) && (upcoming.has(day) || !over.has(day)));
 }
 

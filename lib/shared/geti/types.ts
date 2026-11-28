@@ -113,6 +113,12 @@ export type GetiAvailability = {
    * `times` ; présents seulement quand la conversion les a décalés.
    */
   statedTimes?: GetiTimeRange[];
+  /**
+   * Minutes à ajouter à `times` pour chaque date, dans l'ordre de `dates` :
+   * présentes seulement quand une date tombe de l'autre côté d'un changement
+   * d'heure du fuseau écrit (ses horaires à elle diffèrent de ceux gardés).
+   */
+  dateShifts?: number[];
 };
 
 /** Rangs lus dans l'annonce : fourchette globale, puis par rôle quand il est donné. */

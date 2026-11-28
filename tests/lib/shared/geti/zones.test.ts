@@ -320,3 +320,29 @@ describe("parseGetiTimezone — cycle 2 : sigles-mots en capitales", () => {
     expect(zoneOf(text)).toBeNull();
   });
 });
+
+describe("parseGetiTimezone — cycle 3 : paliers de rang, régions, « EST » français", () => {
+  it("parseGetiTimezone_rankTierBeforeWest_isNull", () => {
+    expect(zoneOf("LFT Diamond 1-3 WEST EU")).toBeNull();
+  });
+
+  it("parseGetiTimezone_rankTierBeforeEst_isNull", () => {
+    expect(zoneOf("LFS Master 1-2 EST")).toBeNull();
+  });
+
+  it("parseGetiTimezone_scoreBeforeEst_isNull", () => {
+    expect(zoneOf("LFS on a gagné 2-1 EST")).toBeNull();
+  });
+
+  it("parseGetiTimezone_bareHourRangeBeforeEst_isEst", () => {
+    expect(zoneOf("LFS 8-10 EST")).toBe("EST");
+  });
+
+  it("parseGetiTimezone_euWestInParentheses_isNull", () => {
+    expect(zoneOf("LFS EU (WEST)")).toBeNull();
+  });
+
+  it("parseGetiTimezone_quiEstBefore8pm_isNull", () => {
+    expect(zoneOf("LFS QUI EST 8PM")).toBeNull();
+  });
+});
