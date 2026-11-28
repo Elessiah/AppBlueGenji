@@ -38,6 +38,12 @@ export interface CspViolation {
   blockedOrigin: string;
   /** Chemin de la page, sans la chaîne de requête. */
   documentPath: string;
+  /**
+   * D'où part l'appel refusé : origine du script fautif, schéma d'une
+   * extension (`chrome-extension`…), ou `"aucune"` quand le navigateur n'en
+   * nomme pas — voir {@link sourceOriginOf}.
+   */
+  sourceOrigin: string;
 }
 
 /** Fenêtre de dédoublonnage : une cause distincte ne se journalise qu'une fois par heure. */
@@ -80,6 +86,60 @@ export function blockedOriginOf(value: unknown): string {
   }
   try {
     return new URL(trimmed).origin;
+  } catch {
+    return "inconnu";
+  }
+}
+
+/**
+ * Schémas des scripts d'extension de navigateur. Un refus qui en part ne se
+ * corrige pas dans le site : il le dit, plutôt que d'envoyer chercher un appel
+ * qui n'existe pas dans le code.
+ */
+const EXTENSION_SCHEMES = new Set([
+  "chrome-extension",
+  "moz-extension",
+  "safari-extension",
+  "safari-web-extension",
+  "ms-browser-extension",
+]);
+
+/** Source rendue quand le rapport ne nomme aucun script. */
+export const CSP_SOURCE_NONE = "aucune";
+
+/**
+ * Réduit le script fautif (`source-file` / `sourceFile`) à ce qui sert au tri.
+ *
+ * Sans ce champ, une ligne du journal ne distinguait pas un défaut du site
+ * d'un code **injecté** dans la page — extension, navigateur intégré d'une
+ * application : `connect-src a refusé data sur /tournois/20` a ainsi fait
+ * chercher un `fetch("data:…")` que le site ne contient pas. Un appel parti
+ * d'un morceau du site nomme ce morceau, donc l'origine du site ; une
+ * extension nomme son schéma ; un code évalué ou injecté en ligne n'en nomme
+ * **aucun** (`"aucune"`), ce qui, sur une page sans script en ligne de notre
+ * main, désigne un code étranger.
+ *
+ * Comme pour la ressource refusée, seule l'origine est gardée : le chemin
+ * d'un script d'extension porte l'identifiant de l'extension, qui n'apprend
+ * rien au correctif et singularise le visiteur.
+ *
+ * @param value Valeur de `source-file` ou `sourceFile`.
+ * @returns L'origine, le schéma d'extension, ou {@link CSP_SOURCE_NONE}.
+ */
+export function sourceOriginOf(value: unknown): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return CSP_SOURCE_NONE;
+  }
+  const trimmed = value.trim();
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(trimmed)?.[1]?.toLowerCase();
+  if (scheme && EXTENSION_SCHEMES.has(scheme)) return scheme;
+  if (!trimmed.includes("://")) {
+    return scheme ?? "inconnu";
+  }
+  try {
+    const origin = new URL(trimmed).origin;
+    // Un schéma non standard n'a pas d'origine (`"null"`) : son nom suffit.
+    return origin === "null" ? (scheme ?? "inconnu") : origin;
   } catch {
     return "inconnu";
   }
@@ -168,12 +228,18 @@ function violationOf(body: Record<string, unknown>): CspViolation | null {
     directive: directive.trim(),
     blockedOrigin: blockedOriginOf(body["blocked-uri"] ?? body.blockedURL),
     documentPath: documentPathOf(body["document-uri"] ?? body.documentURL),
+    sourceOrigin: sourceOriginOf(body["source-file"] ?? body.sourceFile),
   };
 }
 
-/** Clé de dédoublonnage : ce qui distingue deux causes à corriger. */
+/**
+ * Clé de dédoublonnage : ce qui distingue deux causes à corriger.
+ *
+ * La source en fait partie : un même refus venu du site et d'une extension
+ * sont deux causes, et la seconde ne doit pas taire la première.
+ */
 export function violationCause(violation: CspViolation): string {
-  return `${violation.directive}|${violation.blockedOrigin}`;
+  return `${violation.directive}|${violation.blockedOrigin}|${violation.sourceOrigin}`;
 }
 
 type Tracker = Map<string, { last: number; suppressed: number }>;
@@ -229,7 +295,7 @@ export function logCspViolations(violations: CspViolation[], now: number = Date.
     // « refuserait » sur une page en panne enverrait chercher au mauvais endroit.
     const verbe = CSP_MODE === "enforce" ? "a refusé" : "refuserait";
     console.warn(
-      `[csp] ${violation.directive} ${verbe} ${violation.blockedOrigin} sur ${violation.documentPath}${repeated}`,
+      `[csp] ${violation.directive} ${verbe} ${violation.blockedOrigin} sur ${violation.documentPath} (source : ${violation.sourceOrigin})${repeated}`,
     );
   }
 }

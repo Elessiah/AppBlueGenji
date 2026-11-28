@@ -1,12 +1,15 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import {
   CSP_DEDUPE_WINDOW_MS,
   CSP_MAX_TRACKED_CAUSES,
   CSP_MAX_VIOLATIONS_PER_REPORT,
+  CSP_SOURCE_NONE,
   admitViolation,
   blockedOriginOf,
   documentPathOf,
+  logCspViolations,
   parseCspReport,
+  sourceOriginOf,
   violationCause,
 } from "@/lib/server/csp-reports";
 
@@ -70,6 +73,7 @@ describe("parseCspReport", () => {
         directive: "img-src",
         blockedOrigin: "https://lh3.googleusercontent.com",
         documentPath: "/profil",
+        sourceOrigin: CSP_SOURCE_NONE,
       },
     ]);
   });
@@ -88,7 +92,7 @@ describe("parseCspReport", () => {
       },
     ]);
     expect(violations).toEqual([
-      { directive: "script-src-elem", blockedOrigin: "inline", documentPath: "/" },
+      { directive: "script-src-elem", blockedOrigin: "inline", documentPath: "/", sourceOrigin: CSP_SOURCE_NONE },
     ]);
   });
 
@@ -132,6 +136,72 @@ describe("parseCspReport", () => {
     });
     expect(JSON.stringify(violation)).not.toContain("alert");
     expect(JSON.stringify(violation)).not.toContain("redirect");
+    expect(JSON.stringify(violation)).not.toContain("secret.js");
+  });
+
+  it("lit le script fautif au format historique (source-file)", () => {
+    const [violation] = parseCspReport({
+      "csp-report": {
+        "document-uri": "https://bluegenji-esport.fr/tournois/20",
+        "effective-directive": "connect-src",
+        "blocked-uri": "data",
+        "source-file": "chrome-extension://abcdefghijklmnop/content.js",
+      },
+    });
+    expect(violation.sourceOrigin).toBe("chrome-extension");
+  });
+
+  it("lit le script fautif au format Reporting API (sourceFile)", () => {
+    const [violation] = parseCspReport([
+      {
+        type: "csp-violation",
+        body: {
+          documentURL: "https://bluegenji-esport.fr/tournois/20",
+          effectiveDirective: "connect-src",
+          blockedURL: "data",
+          sourceFile: "https://bluegenji-esport.fr/_next/static/chunks/page.js",
+        },
+      },
+    ]);
+    expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
+  });
+});
+
+describe("sourceOriginOf", () => {
+  it("réduit un script du site à son origine", () => {
+    expect(sourceOriginOf("https://bluegenji-esport.fr/_next/static/chunks/a.js?v=1")).toBe(
+      "https://bluegenji-esport.fr",
+    );
+  });
+
+  it("ramène un script d'extension à son schéma, sans l'identifiant de l'extension", () => {
+    // `connect-src a refusé data` sans source a fait chercher dans le site un
+    // appel que seule une extension faisait : le schéma suffit à trancher.
+    expect(sourceOriginOf("chrome-extension://abcdefghijklmnop/content.js")).toBe("chrome-extension");
+    expect(sourceOriginOf("moz-extension://0d8e-uuid/inject.js")).toBe("moz-extension");
+    expect(sourceOriginOf("safari-web-extension://ID/script.js")).toBe("safari-web-extension");
+    expect(sourceOriginOf("Chrome-Extension://abc/x.js")).toBe("chrome-extension");
+  });
+
+  it("dit « aucune » quand le navigateur ne nomme aucun script", () => {
+    // Code évalué ou injecté en ligne : Chrome envoie une chaîne vide.
+    expect(sourceOriginOf(undefined)).toBe(CSP_SOURCE_NONE);
+    expect(sourceOriginOf("")).toBe(CSP_SOURCE_NONE);
+    expect(sourceOriginOf("   ")).toBe(CSP_SOURCE_NONE);
+    expect(sourceOriginOf(42)).toBe(CSP_SOURCE_NONE);
+  });
+
+  it("garde le schéma d'une valeur sans hôte, et un repli sans schéma", () => {
+    expect(sourceOriginOf("data:text/javascript,x")).toBe("data");
+    expect(sourceOriginOf("inline")).toBe("inconnu");
+  });
+
+  it("garde le schéma d'une adresse non standard, qui n'a pas d'origine", () => {
+    expect(sourceOriginOf("webkit-masked-url://hidden/")).toBe("webkit-masked-url");
+  });
+
+  it("rend un repli lisible sur une adresse illisible", () => {
+    expect(sourceOriginOf("https://")).toBe("inconnu");
   });
 });
 
@@ -180,12 +250,48 @@ describe("violationCause", () => {
       directive: "img-src",
       blockedOrigin: "https://exemple.invalid",
       documentPath: "/",
+      sourceOrigin: CSP_SOURCE_NONE,
     });
     const surTournoi = violationCause({
       directive: "img-src",
       blockedOrigin: "https://exemple.invalid",
       documentPath: "/tournois/42",
+      sourceOrigin: CSP_SOURCE_NONE,
     });
     expect(surAccueil).toBe(surTournoi);
+  });
+
+  it("distingue un même refus venu du site et d'une extension", () => {
+    // Sinon l'extension, plus bavarde, tairait le vrai défaut du site.
+    const duSite = violationCause({
+      directive: "connect-src",
+      blockedOrigin: "data",
+      documentPath: "/tournois/20",
+      sourceOrigin: "https://bluegenji-esport.fr",
+    });
+    const dExtension = violationCause({
+      directive: "connect-src",
+      blockedOrigin: "data",
+      documentPath: "/tournois/20",
+      sourceOrigin: "chrome-extension",
+    });
+    expect(duSite).not.toBe(dExtension);
+  });
+});
+
+describe("logCspViolations", () => {
+  it("nomme la source dans la ligne, une fois par cause et par fenêtre", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const violation = {
+      directive: "connect-src",
+      blockedOrigin: "data",
+      documentPath: "/tournois/20",
+      sourceOrigin: "moz-extension",
+    };
+    logCspViolations([violation], 1_000);
+    logCspViolations([violation], 2_000);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith("[csp] connect-src a refusé data sur /tournois/20 (source : moz-extension)");
+    warn.mockRestore();
   });
 });
