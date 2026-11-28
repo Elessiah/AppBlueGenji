@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { isGetiPostPast, type GetiFilter } from "@/lib/shared/geti";
+import { isGetiOneEveningPost, isGetiPostPast, type GetiFilter } from "@/lib/shared/geti";
 import type { GetiStoredPost } from "@/lib/shared/geti/ingest";
 import {
   getiChipMatches,
@@ -59,11 +59,6 @@ function relativeDate(iso: string, locale: Locale, now: number): string {
   );
 }
 
-/** Recherche qui ne vaut que pour sa soirée : un scrim, un remplaçant. */
-function isOneEvening(post: GetiStoredPost): boolean {
-  return post.category === "lfs" || post.category === "lfsub";
-}
-
 /**
  * Pastille d'une annonce passée (toutes ses dates visées sont finies), `null`
  * sinon : « Passé » pour un scrim ou un remplaçant, qui ne vaut plus ; « Date
@@ -71,12 +66,12 @@ function isOneEvening(post: GetiStoredPost): boolean {
  */
 function pastLabelOf(post: GetiStoredPost, text: GetiMessages["post"], now: number): string | null {
   if (!isGetiPostPast(post.parsed, now)) return null;
-  return isOneEvening(post) ? text.past : text.datePast;
+  return isGetiOneEveningPost(post) ? text.past : text.datePast;
 }
 
 /** Carte estompée : annonce close, ou soirée finie d'un scrim ou d'un remplaçant. */
 function isFaded(post: GetiStoredPost, now: number): boolean {
-  return post.parsed.closed || (isOneEvening(post) && isGetiPostPast(post.parsed, now));
+  return post.parsed.closed || (isGetiOneEveningPost(post) && isGetiPostPast(post.parsed, now));
 }
 
 /**

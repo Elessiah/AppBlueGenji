@@ -588,6 +588,12 @@ const TODAY = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:ce soir|cette nuit|ce midi|ce matin|cet(?:te)? apres[\s-]?midi|cet(?:te)? aprem|cet apm|tonight|tonite|this evening|this afternoon|this morning)${NOT_BEFORE_WORD}`,
   "u",
 );
+/** Les mots du soir même, dont une heure d'après minuit (« cette nuit 1h-3h ») vise la nuit qui suit. */
+const TONIGHT = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?:ce soir|cette nuit|tonight|tonite|this evening)${NOT_BEFORE_WORD}`,
+  "u",
+);
+
 /**
  * « aujourd'hui », « today », « ajd » : une date dans une recherche de scrim ou
  * de remplaçant seulement — ailleurs c'est souvent une tournure (« aujourd'hui,
@@ -606,19 +612,22 @@ const TOMORROW = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:demain|tomorrow|tomorow|tommorow|tommorrow|tmrw|tmr)${NOT_BEFORE_WORD}`,
   "u",
 );
-/** « ce week-end », « this weekend », « ce we » : le samedi et le dimanche qui viennent (« le week-end » reste une habitude). */
+/**
+ * « ce week-end », « this weekend », « ce we » : le samedi et le dimanche qui
+ * viennent (« le week-end », « du week-end » restent une habitude).
+ */
 const THIS_WEEKEND = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:(?:ce|this|du)\sweek[\s-]?end|ce\s(?:we|wk))${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}(?:(?:ce|this)\sweek[\s-]?end|ce\s(?:we|wk))${NOT_BEFORE_WORD}`,
   "u",
 );
-/** « lundi prochain », « next friday » : la prochaine occurrence après le jour de la publication. */
+/** « lundi prochain », « next friday » : la prochaine occurrence après le jour de la publication (« samedi pro league » n'en est pas une). */
 const NEXT_NAMED_DAY = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:(${DAY_TABLE.pattern})\s(?:prochaine?|pro)|next\s(${DAY_TABLE.pattern}))${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}(?:(${DAY_TABLE.pattern})\sprochaine?|next\s(${DAY_TABLE.pattern}))${NOT_BEFORE_WORD}`,
   "gu",
 );
-/** « ce vendredi », « this friday » : la prochaine occurrence, jour de la publication compris. */
+/** « ce vendredi », « this friday » : la prochaine occurrence, jour de la publication compris (« ce samedi prochain » : celui d'après seulement). */
 const THIS_NAMED_DAY = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:ce|this)\s(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}(?:ce|this)\s(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}(?!\sprochaine?${NOT_BEFORE_WORD})`,
   "gu",
 );
 
@@ -674,10 +683,13 @@ function daysUntil(day: GetiDay, today: number): number {
  * Jours dits par rapport à la publication : « ce soir », « demain »,
  * « après-demain », « ce week-end », « lundi prochain », « this friday » ;
  * « aujourd'hui » pour une recherche de scrim ou de remplaçant (`sameDay`).
+ * « ce soir », « cette nuit », « tonight » visent `tonight` : le jour même, ou
+ * le lendemain quand l'annonce parle d'heures d'après minuit déjà passées.
  */
-function relativeDays(lower: string, today: number, sameDay: boolean): number[] {
+function relativeDays(lower: string, today: number, sameDay: boolean, tonight: number): number[] {
   const found: number[] = [];
-  if (TODAY.test(lower) || (sameDay && TODAY_WORD.test(lower))) found.push(today);
+  if (TONIGHT.test(lower)) found.push(tonight);
+  if (TODAY.test(lower.replace(new RegExp(TONIGHT.source, "gu"), " ")) || (sameDay && TODAY_WORD.test(lower))) found.push(today);
   const withoutDayAfter = lower.replace(DAY_AFTER_TOMORROW, (matched) => {
     found.push(today + 2 * DAY_MS);
     return " ".repeat(matched.length);
@@ -731,12 +743,37 @@ function eveningDays(
 
 const PARIS_RULE: GetiZoneRule = { iana: GETI_PARIS_ZONE };
 
-/** Horaires écrits ramenés à l'heure de Paris (`shift` minutes à ajouter). */
-function shiftedTimes(times: readonly GetiTimeRange[], shift: number): GetiTimeRange[] {
-  return times.map((time) => ({
-    from: getiWrapMinutes(time.from + shift),
-    to: time.to === null ? null : getiWrapMinutes(time.to + shift, true),
-  }));
+/**
+ * Horaires écrits ramenés à l'heure de Paris (`shifts[i]` minutes à ajouter au
+ * i-ème), dans l'ordre écrit : un horaire qui passe au lendemain (« 3pm and
+ * 9pm EST » : 21 h puis 3 h) suit donc un `from` plus grand — c'est ainsi que
+ * la fin d'annonce le lit (`getiSlotEndMinutes`).
+ */
+function shiftedTimes(times: readonly GetiTimeRange[], shifts: readonly number[]): GetiTimeRange[] {
+  return times.map((time, index) => {
+    const shift = shifts[index] ?? 0;
+    return {
+      from: getiWrapMinutes(time.from + shift),
+      to: time.to === null ? null : getiWrapMinutes(time.to + shift, true),
+    };
+  });
+}
+
+/** Heure d'après minuit au plus tard pour qu'une heure seule de « ce soir » vise la nuit qui suit (« ce soir 0h30 »). */
+const AFTER_MIDNIGHT_HOURS = 6;
+
+/**
+ * Jour de « ce soir », « cette nuit » : le lendemain quand tous les horaires
+ * commencent après minuit (avant 6 h) et que cette heure-là est déjà passée à
+ * la publication (« cette nuit 1h-3h » écrit à 22 h vise 1 h le lendemain ;
+ * écrit à 0 h 30, la nuit même), le jour même sinon.
+ */
+function tonightDay(stated: readonly GetiTimeRange[], today: number, posted: number, rule: GetiZoneRule): number {
+  if (stated.length === 0) return today;
+  const latest = Math.max(...stated.map((time) => time.from));
+  if (latest >= AFTER_MIDNIGHT_HOURS * 60) return today;
+  const earliest = Math.min(...stated.map((time) => time.from));
+  return posted >= getiWallInstant(today, earliest, rule) ? today + DAY_MS : today;
 }
 
 /** Dates et disponibilités d'une annonce, à l'heure de Paris. */
@@ -773,25 +810,35 @@ export function parseGetiSchedule(prepared: GetiPreparedText, postedAt: string |
   if (Number.isNaN(posted)) return { dates: [], availability: { days: named, times: stated, timezone } };
   const rule = getiZoneRule(timezone) ?? PARIS_RULE;
   const today = getiCivilDay(posted, rule);
-  const found = [...numericDates(lower, today), ...namedDayDates(lower, today), ...relativeDays(lower, today, sameDay)];
+  const found = [
+    ...numericDates(lower, today),
+    ...namedDayDates(lower, today),
+    ...relativeDays(lower, today, sameDay, tonightDay(stated, today, posted, rule)),
+  ];
   const evening = sameDay ? eveningDays(lower, today, found, named, stated.length > 0) : { days: [], implicit: false };
   // Un créneau sans jour, déjà fini quand l'annonce est publiée (« 21-23 » écrit à 23 h 30), vise le lendemain.
   const over = evening.implicit && posted >= getiWallInstant(today, getiSlotEndMinutes(stated), rule);
   const days = [...new Set([...found, ...(over ? [today + DAY_MS] : evening.days)])].sort((a, b) => a - b).slice(0, DATE_MAX);
   const first = stated[0]?.from;
-  const shift = first === undefined ? 0 : getiParisShiftMinutes(rule, days[0] ?? today, first);
-  const dayShift = first === undefined ? 0 : Math.floor((first + shift) / 1440);
-  const dates = days.map((day) => day + dayShift * DAY_MS);
+  const reference = days[0] ?? today;
+  // Chaque horaire suit le décalage de son heure à lui (deux heures écrites de part et d'autre d'un changement d'heure).
+  const shifts = stated.map((time) => getiParisShiftMinutes(rule, reference, time.from));
+  const dayShiftAt = (day: number) =>
+    first === undefined ? 0 : Math.floor((first + getiParisShiftMinutes(rule, day, first)) / 1440);
+  const dayShift = dayShiftAt(reference);
+  // Chaque date suit le décalage de son jour à elle (heure d'été d'un côté, d'hiver de l'autre).
+  const dates = days.map((day) => day + dayShiftAt(day) * DAY_MS);
   const shiftDay = (day: GetiDay) => GETI_DAYS[(GETI_DAYS.indexOf(day) + dayShift + 7) % 7];
+  const converted = shifts.some((value) => value !== 0);
   // Scrim ou remplaçant aux soirées datées : les jours sont ceux des dates, rien d'autre.
   const datedOnly = sameDay && dates.length > 0 && named.length <= EVENING_DAYS_MAX;
   return {
     dates: dates.map(isoDay),
     availability: {
       days: inReferenceOrder(GETI_DAYS, [...(datedOnly ? [] : named.map(shiftDay)), ...dates.map(weekdayOf)]),
-      times: shift === 0 ? stated : shiftedTimes(stated, shift),
+      times: converted ? shiftedTimes(stated, shifts) : stated,
       timezone,
-      ...(shift === 0 ? {} : { statedTimes: stated }),
+      ...(converted ? { statedTimes: stated } : {}),
     },
   };
 }

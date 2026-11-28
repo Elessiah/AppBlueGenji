@@ -8,6 +8,7 @@ export {
   filterGetiPosts,
   getiPostEndsAt,
   getiTimeSlotMatches,
+  isGetiOneEveningPost,
   isGetiPostPast,
   matchesGetiFilter,
 } from "@/lib/shared/geti/filter";

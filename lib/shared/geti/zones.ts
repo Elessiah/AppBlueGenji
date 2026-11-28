@@ -158,9 +158,22 @@ const CET_DEMONSTRATIVE_ANY_CASE = String.raw`\s(?:${CET_FOLLOWERS}|${CET_FOLLOW
 
 /** Décalage écrit derrière UTC ou GMT : « +1 », « -5 », « +5:30 ». */
 const OFFSET_SUFFIX = String.raw`(?:\s?[+-]\s?\d{1,2}(?::\d{2})?)?`;
-/** Sigles lus en capitales seulement (« est », « cet », « west » sont aussi des mots). */
+/**
+ * Sigles lus en capitales n'importe où : ceux qui ne sont pas des mots
+ * (« CET APRÈS-MIDI » mis à part).
+ */
 const ZONE_CODE = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(CEST|CET(?!${CET_DEMONSTRATIVE_ANY_CASE})|BST|WEST|WET|EEST|EET|EST|EDT|CST|CDT|PST|PDT|(?:UTC|GMT)${OFFSET_SUFFIX})${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}(CEST|CET(?!${CET_DEMONSTRATIVE_ANY_CASE})|(?:UTC|GMT)${OFFSET_SUFFIX})${NOT_BEFORE_WORD}`,
+  "u",
+);
+/**
+ * Sigles qui sont aussi des mots en capitales (« NOTRE ÉQUIPE EST PRÊTE »,
+ * « EU WEST ») : lus derrière une heure seulement — européens derrière toute
+ * heure (« 21H BST », « 8PM BST »), américains derrière une heure en am/pm ou en « 21:00 »
+ * (« 9PM EST » ; « 21H EST BON » reste du français).
+ */
+const ZONE_CODE_AFTER_TIME = new RegExp(
+  String.raw`\d ?(?:[hH](?:\d{2})?|[aApP][mM])? ?\(?(BST|WEST|WET|EEST|EET)${NOT_BEFORE_WORD}|(?:\d ?[aApP][mM]|\d:\d{2}) ?\(?(EST|EDT|CST|CDT|PST|PDT)${NOT_BEFORE_WORD}`,
   "u",
 );
 /** … ou en minuscules derrière une heure : « 20-22 cet », « 21h cest », « 20-22 utc+1 » (« cet été » n'en est pas un). */
@@ -181,6 +194,11 @@ const QUEBEC_TIME = new RegExp(
   "u",
 );
 
+function codeAfterTime(plain: string): string | undefined {
+  const match = ZONE_CODE_AFTER_TIME.exec(plain);
+  return match === null ? undefined : (match[1] ?? match[2]);
+}
+
 /**
  * Fuseau écrit dans l'annonce : « Europe/Paris » pour l'heure de Paris écrite
  * en mots, sinon le sigle tel qu'écrit, en capitales et sans espace (« CET »,
@@ -192,6 +210,7 @@ export function parseGetiTimezone(prepared: GetiPreparedText): string | null {
   if (QUEBEC_TIME.test(prepared.lower)) return "EST";
   const found =
     ZONE_CODE.exec(prepared.plain)?.[1] ??
+    codeAfterTime(prepared.plain) ??
     ZONE_AFTER_TIME.exec(prepared.lower)?.[1] ??
     ZONE_AFTER_MERIDIEM.exec(prepared.lower)?.[1];
   if (found === undefined) return null;

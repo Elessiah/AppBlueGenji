@@ -166,7 +166,7 @@
     "showClosedHint": "A post fully struck through by its author is considered closed: the spot is taken.",
     "showPast": "Show past scrims",
     "showPastHintSubject": "Past scrims",
-    "showPastHint": "A scrim is past once its last date and time slot are over, in Paris time (“tonight” and “tomorrow” count from the day it was posted). A post with no time zone is read as Paris time; one with no date is never hidden.",
+    "showPastHint": "A scrim is past once its last date and time slot are over, in Paris time (“tonight” and “tomorrow” count from when it was posted, or last edited). A post with no time zone is read as Paris time; one with no date is never hidden.",
     "includeUnknown": "Include posts that leave a criterion unspecified",
     "includeUnknownHintSubject": "Incomplete posts",
     "includeUnknownHint": "Many posts give neither region nor platform. Untick to keep only those stating every criterion you picked."

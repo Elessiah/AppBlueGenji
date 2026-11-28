@@ -361,19 +361,21 @@ ne regardait que le jour de la semaine.
 
 ### Dates relatives (`parseGetiSchedule`, `lib/shared/geti/fields.ts`)
 
-Tout mot relatif se résout depuis la **date de publication** (`posted_at`),
+Tout mot relatif se résout depuis l'**écriture du texte gardé** : sa dernière
+modification si elle suit la publication (« ce soir » écrit en modifiant
+l'annonce le lendemain vise ce lendemain), sinon sa publication (`posted_at`) —
 jamais depuis l'heure de lecture ni celle d'une réanalyse, dans le fuseau écrit
 par l'annonce (Paris sinon). Sans date de publication, aucune date n'est lue.
 
 | Écrit | Date |
 | --- | --- |
-| « ce soir », « tonight », « cette nuit », « cet après-midi », « this evening » | le jour de la publication |
+| « ce soir », « tonight », « cette nuit », « cet après-midi », « this evening » | le jour de la publication ; « ce soir » / « cette nuit » dont tous les horaires sont d'après minuit (avant 6 h) et déjà passés à la publication : le lendemain (« cette nuit 1h-3h » écrit à 22 h) |
 | « aujourd'hui », « today », « ajd » | le jour de la publication — **scrim ou remplaçant seulement** (« aujourd'hui, on recrute » ne date pas un recrutement) |
 | « demain », « tomorrow », « tmrw » | le lendemain |
 | « après-demain », « day after tomorrow » | le surlendemain (lu avant « demain », qu'il contient) |
-| « ce week-end », « this weekend », « ce we » | le samedi et le dimanche qui viennent ; publié un dimanche : ce dimanche (« le week-end » seul reste une habitude) |
-| « lundi prochain », « next friday » | la prochaine occurrence **après** le jour de la publication |
-| « ce vendredi », « this friday » | la prochaine occurrence, jour de la publication compris |
+| « ce week-end », « this weekend », « ce we » | le samedi et le dimanche qui viennent ; publié un dimanche : ce dimanche (« le week-end », « du week-end » restent une habitude) |
+| « lundi prochain », « next friday » | la prochaine occurrence **après** le jour de la publication (« samedi pro league » n'en est pas une) |
+| « ce vendredi », « this friday » | la prochaine occurrence, jour de la publication compris (« ce samedi prochain » : celui d'après seulement) |
 
 Publié jeudi à 23 h 30, « tonight » vise jeudi ; publié vendredi à 0 h 30,
 vendredi. Un créneau sans jour d'un scrim (« LFS 3k5 21-23 ») vise le soir
@@ -399,10 +401,14 @@ plus n'est gardé.
 - **Autres catégories** : jamais masquées. Pastille « Passé » pour un
   remplaçant, « Date passée » ailleurs (un recrutement qui citait un essai
   « ce soir » reste d'actualité).
-- **Filtre par jour** : ne compte que les dates à venir (§ Filtre).
-- **Alertes** : une annonce déjà passée à sa réception ne prévient personne
-  (`isGetiPostAlertable` — un « tonight » de la veille reçu au rattrapage, une
-  modification tardive) ; une alerte ne garde pas `past=1`.
+- **Filtre par jour** : ne compte que les dates à venir (§ Filtre) — sauf pour
+  une annonce qui cite aussi des jours hors de ses dates (« dispo lundi,
+  mercredi, vendredi, dès ce soir ») : disponibilité habituelle, tous ses jours
+  comptent.
+- **Alertes** : un scrim ou un remplaçant (`isGetiOneEveningPost`) déjà passé à
+  sa réception ne prévient personne (`isGetiPostAlertable` — un « tonight » de
+  la veille reçu au rattrapage) ; ailleurs, une date passée n'éteint pas
+  l'annonce, qui prévient. Une alerte ne garde pas `past=1`.
 
 ### Fuseaux (`lib/shared/geti/zones.ts`)
 
@@ -418,19 +424,26 @@ est lue à l'heure de Paris (dit dans les `InfoHint` des filtres).
 | « CST », « CDT » · « PST », « PDT » | l'heure de Chicago · de Los Angeles |
 | « UTC », « GMT », « UTC+1 », « GMT-5 », « UTC+5:30 » | un décalage fixe (de −12 à +14 h) |
 
-- Sigles en **capitales** seulement (« est », « cet », « west » sont des mots),
-  ou en minuscules derrière une heure : « 20-22 cet », « 21h cest », « 20-22
-  utc+1 » ; les sigles américains en minuscules seulement derrière une heure en
-  am/pm (« 9pm est » ; « 21h est bien » reste du français).
+- Sigles en **capitales** n'importe où pour « CET », « CEST », « UTC », « GMT »
+  seulement ; les autres, qui sont aussi des mots en capitales (« NOTRE ÉQUIPE
+  EST PRÊTE », « EU WEST »), derrière une heure : européens derrière toute heure
+  (« 21H BST »), américains derrière une heure en am/pm ou « 21:00 » (« 9PM
+  EST » ; « 21H EST BON » reste du français). En minuscules, derrière une heure :
+  « 20-22 cet », « 21h cest », « 20-22 utc+1 » ; les sigles américains seulement
+  derrière une heure en am/pm (« 9pm est » ; « 21h est bien » reste du français).
 - **« cet » démonstratif** n'est pas un fuseau, en minuscules comme en
   capitales : « 15h cet après-midi », « RDV CET APRÈS-MIDI », « cet été »,
   « cet horaire », « cet effectif »… (`CET_DEMONSTRATIVE`).
-- **Conversion** : le décalage est celui de l'instant visé (première date, sinon
-  jour de la publication ; premier horaire) — heure d'été des deux côtés
+- **Conversion** : chaque horaire suit le décalage de son heure (à la première
+  date, sinon au jour de la publication), chaque date celui de son jour (deux
+  dates de part et d'autre d'un changement d'heure) — heure d'été des deux côtés
   comprise (les semaines où New York et Paris ne changent pas d'heure ensemble
   donnent 5 h d'écart au lieu de 6). Une date suit son premier horaire :
   « Friday 9pm EST » tombe le **samedi** à 3 h à Paris, et le jour gardé est
-  samedi. « ce soir » se compte dans le fuseau écrit.
+  samedi. « ce soir » se compte dans le fuseau écrit. Les horaires convertis
+  restent dans l'ordre écrit : « Friday 3pm and 9pm EST » garde 21 h puis 3 h,
+  et un début plus petit que le précédent est lu le lendemain (la fin de
+  l'annonce est samedi 5 h, `getiSlotEndMinutes`).
 - **Affichage** : l'étiquette dit l'heure de Paris (« 21h – 23h (heure de
   Paris) ») ; l'heure écrite (`availability.statedTimes`, gardée seulement quand
   la conversion décale) se lit au survol et par un lecteur d'écran (« Dans
@@ -445,8 +458,10 @@ est lue à l'heure de Paris (dit dans les `InfoHint` des filtres).
 
 `ANALYSIS_VERSION` passe à **3** : les lignes gardées sont réécrites par la
 purge horaire (`refreshStaleGetiPosts`), et réanalysées à la lecture d'ici là.
-La réanalyse date le message brut de **`posted_at`** (`datedRaw`), la date
-gardée de la publication — jamais de l'heure où elle tourne.
+La réanalyse date le message brut de **sa publication** (`datedRaw`) :
+l'instant exact écrit dans le message brut à la réception, sinon `posted_at`
+(une date locale, ambiguë dans l'heure du passage à l'heure d'hiver) — jamais
+de l'heure où elle tourne.
 
 ### Mesure sur l'échantillon réel
 

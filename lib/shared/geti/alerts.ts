@@ -10,7 +10,7 @@
  *
  * Module pur : importable côté serveur comme côté client.
  */
-import { isGetiPostPast, matchesGetiFilter } from "@/lib/shared/geti/filter";
+import { isGetiOneEveningPost, isGetiPostPast, matchesGetiFilter } from "@/lib/shared/geti/filter";
 import { visibleText } from "@/lib/shared/visible-text";
 import {
   getiPageFilter,
@@ -140,12 +140,13 @@ export function isFreshGetiPost(postedAt: number, editedAt: number | null, now: 
 export type GetiAlertCriteria = { id: number; category: GetiCategory; search: string };
 
 /**
- * Une annonce peut-elle prévenir ? Ni close, ni passée : une annonce dont
- * toutes les dates visées sont finies à `now` (un scrim de la veille reçu au
- * rattrapage, une modification tardive) ne réveille personne.
+ * Une annonce peut-elle prévenir ? Ni close, ni — pour un scrim ou un
+ * remplaçant (`isGetiOneEveningPost`) — passée : une soirée déjà finie à `now`
+ * (un scrim de la veille reçu au rattrapage) ne réveille personne. Ailleurs,
+ * une date passée n'éteint pas l'annonce, qui reste listée et prévient.
  */
 export function isGetiPostAlertable(post: GetiParsedPost, now: number): boolean {
-  return !post.closed && !isGetiPostPast(post, now);
+  return !post.closed && !(isGetiOneEveningPost(post) && isGetiPostPast(post, now));
 }
 
 /**

@@ -416,11 +416,14 @@ function storedAnalysis(parsed: object): string {
 const STALE_RAW_JSON = `IF(${CURRENT_ANALYSIS}, NULL, raw_json) AS stale_raw_json`;
 
 /**
- * Message brut d'une ligne, daté de **sa publication gardée** (`posted_at`) :
- * une réanalyse résout « ce soir » ou « demain » depuis cette date-là, jamais
+ * Message brut d'une ligne, daté de **sa publication** : celle du message
+ * brut (instant exact écrit à la réception), sinon celle gardée (`posted_at`).
+ * Une réanalyse résout « ce soir » ou « demain » depuis cette date-là, jamais
  * depuis l'heure où elle tourne, même si le message brut ne porte pas de date.
  */
 function datedRaw(raw: GetiPushedPost["raw"], postedAt: Date | string | null): GetiPushedPost["raw"] {
+  const own: unknown = typeof raw === "object" && raw !== null ? raw.postedAt : undefined;
+  if (typeof own === "string" && !Number.isNaN(Date.parse(own))) return raw;
   const posted = toIso(postedAt);
   return posted === null ? raw : { ...raw, postedAt: posted };
 }

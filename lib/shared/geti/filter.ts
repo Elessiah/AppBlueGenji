@@ -201,16 +201,23 @@ export const GETI_SINGLE_TIME_MINUTES = 120;
  * Fin du dernier horaire d'une annonce, en minutes depuis minuit du jour visé
  * (au-delà de 1440 : le lendemain, « 22h-1h » finit à 1500) : la fin d'une
  * plage, deux heures après une heure seule, la fin de la journée sans horaire.
+ * Les horaires sont lus dans l'ordre gardé : croissant, sauf quand un horaire
+ * converti d'un autre fuseau passe au lendemain (« 3pm and 9pm EST » : 21 h puis
+ * 3 h) — un début plus petit que le précédent est alors celui du lendemain.
  *
  * @param times Horaires gardés (`availability.times`) ; un horaire abîmé est ignoré.
  */
 export function getiSlotEndMinutes(times: readonly unknown[] | null | undefined): number {
   let end = 0;
+  let offset = 0;
+  let previous = -1;
   for (const slot of wanted<unknown>(times)) {
     const stored = getiStoredTimeSlot(slot);
     if (stored === null) continue;
+    if (stored.from < previous) offset += DAY_MINUTES;
+    previous = stored.from;
     const stop = stored.to === null ? stored.from + GETI_SINGLE_TIME_MINUTES : stored.to;
-    end = Math.max(end, stop <= stored.from ? stop + DAY_MINUTES : stop);
+    end = Math.max(end, offset + (stop <= stored.from ? stop + DAY_MINUTES : stop));
   }
   return end === 0 ? DAY_MINUTES : end;
 }
@@ -243,6 +250,15 @@ export function getiPostEndsAt(post: GetiParsedPost): number | null {
 }
 
 /**
+ * Recherche qui ne vaut que pour sa soirée : un scrim (`lfs`), un remplaçant
+ * (`lfsub`). Passée, elle ne vaut plus ; ailleurs, une date passée n'éteint
+ * pas l'annonce (un recrutement qui citait un essai reste d'actualité).
+ */
+export function isGetiOneEveningPost(post: Pick<GetiParsedPost, "category">): boolean {
+  return post.category === "lfs" || post.category === "lfsub";
+}
+
+/**
  * L'annonce est-elle passée ? Toutes ses dates visées sont finies à `now`
  * ({@link getiPostEndsAt}). Une annonce sans date ne l'est jamais.
  */
@@ -259,7 +275,9 @@ function weekdayOf(day: number): GetiDay {
  * Jours d'une annonce pour le filtre : un jour voulu désigne une soirée **à
  * venir**. Le jour d'une date déjà finie ne compte plus (sauf si une date à
  * venir tombe le même jour) ; une annonce dont tous les jours sont passés ne
- * répond à aucun jour, même avec `includeUnknown`.
+ * répond à aucun jour, même avec `includeUnknown`. Une annonce qui cite aussi
+ * des jours hors de ses dates (« dispo lundi, mercredi, vendredi, dès ce
+ * soir ») parle d'une disponibilité habituelle : ses jours comptent tous.
  */
 function matchesDays(post: GetiParsedPost, days: readonly GetiDay[], includeUnknown: boolean, now: number): boolean {
   if (days.length === 0) return true;
@@ -267,6 +285,8 @@ function matchesDays(post: GetiParsedPost, days: readonly GetiDay[], includeUnkn
   if (found.length === 0) return includeUnknown;
   const dated = storedDays(post);
   if (dated.length === 0) return days.some((day) => found.includes(day));
+  const datedWeekdays = new Set(dated.map(weekdayOf));
+  if (found.some((day) => !datedWeekdays.has(day))) return days.some((day) => found.includes(day));
   const end = getiSlotEndMinutes(post.availability?.times);
   const upcoming = new Set<GetiDay>();
   const over = new Set<GetiDay>();

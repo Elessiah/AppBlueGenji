@@ -166,7 +166,7 @@
     "showClosedHint": "Une annonce entièrement barrée par son auteur est considérée comme close : la place est prise.",
     "showPast": "Afficher les scrims passés",
     "showPastHintSubject": "Scrims passés",
-    "showPastHint": "Un scrim est passé quand sa dernière date et son créneau sont finis, à l'heure de Paris (« ce soir » et « demain » se comptent depuis la publication). Sans fuseau écrit, l'annonce est lue à l'heure de Paris ; sans date, elle n'est jamais masquée.",
+    "showPastHint": "Un scrim est passé quand sa dernière date et son créneau sont finis, à l'heure de Paris (« ce soir » et « demain » se comptent depuis la publication, ou la dernière modification). Sans fuseau écrit, l'annonce est lue à l'heure de Paris ; sans date, elle n'est jamais masquée.",
     "includeUnknown": "Inclure les annonces qui ne précisent pas un critère",
     "includeUnknownHintSubject": "Annonces incomplètes",
     "includeUnknownHint": "Beaucoup d'annonces ne donnent ni région ni plateforme. Décoche pour ne garder que celles qui précisent chaque critère choisi."

@@ -1010,6 +1010,22 @@ describe("refreshStaleGetiPosts", () => {
     });
   });
 
+  it("refreshStaleGetiPosts_rawMessageWithItsDate_keepsTheExactRawInstant", async () => {
+    // Le message brut porte l'instant exact : la colonne (heure locale, ambiguë à l'automne) ne le remplace pas.
+    const raw = {
+      category: "lfs",
+      content: "LFS ce soir 21h-23h",
+      postedAt: "2026-11-20T22:30:00.000Z",
+      author: { id: GETI_FAKE_AUTHOR_ID, username: "fauxjoueur" },
+    };
+    const row = { ...stale(JSON.stringify(raw), "LFS ce soir 21h-23h"), posted_at: new Date("2026-11-21T12:00:00.000Z") };
+    const execute = once([row]);
+
+    await refreshStaleGetiPosts(executor(execute));
+
+    expect(JSON.parse(String(updateOf(execute).params[0]))).toMatchObject({ dates: ["2026-11-20"], postedAt: "2026-11-20T22:30:00.000Z" });
+  });
+
   it("refreshStaleGetiPosts_staleSelect_readsThePostedAtColumn", async () => {
     const execute = executeMock([]);
 

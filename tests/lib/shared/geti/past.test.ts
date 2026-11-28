@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { getiPostEndsAt, isGetiPostPast, matchesGetiFilter, type GetiParsedPost } from "@/lib/shared/geti";
+import { getiPostEndsAt, isGetiOneEveningPost, isGetiPostPast, matchesGetiFilter, type GetiParsedPost } from "@/lib/shared/geti";
 import { getiAlertSearch, isGetiPostAlertable, matchingGetiAlerts } from "@/lib/shared/geti/alerts";
 import { getiSlotEndMinutes } from "@/lib/shared/geti/filter";
 import {
@@ -327,5 +327,40 @@ describe("étiquette d'un horaire converti", () => {
 
   it("getiChipTitle_anotherKindOfChip_isNull", () => {
     expect(getiChipTitle({ kind: "day", value: "FRI" }, fr, "fr")).toBeNull();
+  });
+});
+
+describe("cycle 1 : horaire converti au lendemain, jours habituels, catégories d'une soirée", () => {
+  it("getiSlotEndMinutes_convertedSlotWrappingToTheNextDay_endsTheNextDay", () => {
+    // 21 h puis 3 h (gardés dans l'ordre écrit) : le second est le lendemain, + 2 h.
+    expect(getiSlotEndMinutes([{ from: 1260, to: null }, { from: 180, to: null }])).toBe(1740);
+  });
+
+  it("matchesGetiFilter_recurringNamedDaysWithAPastDate_stillMatchesThatDay", () => {
+    // LFT du lundi 23 : « dispo lundi, mercredi, vendredi, dès ce soir », lu le mardi.
+    const post = parsedGetiPost({
+      category: "lft",
+      dates: ["2026-11-23"],
+      availability: { days: ["MON", "WED", "FRI"], times: [], timezone: null },
+    });
+
+    expect(matchesGetiFilter(post, { days: ["MON"] }, Date.parse("2026-11-24T12:00:00.000Z"))).toBe(true);
+  });
+
+  it.each([
+    ["lfs", true],
+    ["lfsub", true],
+    ["lft", false],
+    ["lfp", false],
+  ])("isGetiOneEveningPost_%s_returns%s", (category, expected) => {
+    expect(isGetiOneEveningPost(parsedGetiPost({ category: category as GetiParsedPost["category"] }))).toBe(expected);
+  });
+
+  it("isGetiPostAlertable_pastLftPost_isTrue", () => {
+    expect(isGetiPostAlertable(fridayScrim({ category: "lft" }), SATURDAY_MORNING)).toBe(true);
+  });
+
+  it("isGetiPostAlertable_pastLfsubPost_isFalse", () => {
+    expect(isGetiPostAlertable(fridayScrim({ category: "lfsub" }), SATURDAY_MORNING)).toBe(false);
   });
 });

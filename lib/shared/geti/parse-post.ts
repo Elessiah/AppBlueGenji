@@ -186,6 +186,12 @@ function isoDate(value: unknown): string | null {
   return Number.isNaN(time) ? null : new Date(time).toISOString();
 }
 
+/** Instant où le texte gardé a été écrit : la modification si elle suit la publication, sinon la publication. */
+function writtenAt(postedAt: string | null, editedAt: string | null): string | null {
+  if (postedAt === null || editedAt === null) return postedAt;
+  return Date.parse(editedAt) > Date.parse(postedAt) ? editedAt : postedAt;
+}
+
 function isCategory(value: unknown): value is GetiCategory {
   return GETI_CATEGORIES.some((category) => category === value);
 }
@@ -473,7 +479,8 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
   // ailleurs (« LFSub » dans le salon des joueurs) : une soirée précise, à un SR donné.
   const kinds = [category, detectGetiCategory(prepared.lower)];
   const oneEvening = kinds.some((kind) => kind === "lfs" || kind === "lfsub");
-  const schedule = parseGetiSchedule(prepared, postedAt, oneEvening);
+  // « ce soir » ou « demain » se lit depuis l'écriture du texte gardé : sa dernière modification, sinon sa publication.
+  const schedule = parseGetiSchedule(prepared, writtenAt(postedAt, isoDate(source.editedAt)), oneEvening);
   return {
     category,
     authorTag: content.authorTag,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { parseGetiPost, type GetiCategory, type GetiParsedPost } from "@/lib/shared/geti";
+import { getiPostEndsAt, parseGetiPost, type GetiCategory, type GetiParsedPost } from "@/lib/shared/geti";
 import { getiRawPost } from "../../../helpers/geti";
 
 /**
@@ -239,5 +239,76 @@ describe("parseGetiPost — fuseau écrit, converti à l'heure de Paris", () => 
 
     expect(post.dates).toEqual([]);
     expect(post.availability.days).toEqual(["SAT"]);
+  });
+});
+
+describe("parseGetiPost — cycle 1 : nuit, fuseaux par horaire, tournures habituelles, modification", () => {
+  it("parseGetiPost_tonightAfterMidnightPostedInTheEvening_isTheNextDay", () => {
+    // Vendredi 27, 22 h à Paris : « cette nuit 1h-3h » est la nuit de vendredi à samedi.
+    expect(parsed("LFS cette nuit 1h-3h", "2026-11-27T21:00:00.000Z").dates).toEqual(["2026-11-28"]);
+  });
+
+  it("parseGetiPost_tonightAfterMidnightPostedAfterMidnight_isTheSameDay", () => {
+    // Samedi 28, 0 h 30 à Paris : 1 h n'est pas encore passée.
+    expect(parsed("LFS cette nuit 1h-3h", "2026-11-27T23:30:00.000Z").dates).toEqual(["2026-11-28"]);
+  });
+
+  it("parseGetiPost_tonightSingleTimeAfterMidnight_isTheNextDay", () => {
+    expect(parsed("LFS ce soir 0h30", "2026-11-27T21:00:00.000Z").dates).toEqual(["2026-11-28"]);
+  });
+
+  it("parseGetiPost_tonightEveningSlotAcrossMidnight_staysTheSameDay", () => {
+    expect(parsed("LFS ce soir 22h-1h", "2026-11-27T20:00:00.000Z").dates).toEqual(["2026-11-27"]);
+  });
+
+  it("parseGetiPost_twoSlotsEst_secondSlotWrapsAfterTheFirst", () => {
+    const post = parsed("LFS Friday 3pm and 9pm EST", THURSDAY_NOON);
+
+    expect(post.dates).toEqual(["2026-11-27"]);
+    expect(post.availability.times).toEqual([
+      { from: 1260, to: null },
+      { from: 180, to: null },
+    ]);
+  });
+
+  it("parseGetiPost_twoSlotsEst_endsAfterTheSecondSlotNextDay", () => {
+    const post = parsed("LFS Friday 3pm and 9pm EST", THURSDAY_NOON);
+
+    // 9pm EST = 3 h à Paris le samedi, + 2 h pour une heure seule : samedi 5 h Paris = 04:00Z.
+    expect(getiPostEndsAt(post)).toBe(Date.parse("2026-11-28T04:00:00.000Z"));
+  });
+
+  it("parseGetiPost_datesAcrossTheUsDstChange_eachDateFollowsItsOwnShift", () => {
+    // 6pm EDT le 29/10 = 23 h à Paris ; 6pm EST le 02/11 = minuit à Paris, le 03/11.
+    expect(parsed("LFS 29/10 et 02/11 6pm EST", "2026-10-28T12:00:00.000Z").dates).toEqual(["2026-10-29", "2026-11-03"]);
+  });
+
+  it("parseGetiPost_duWeekEnd_isAHabitNotADate", () => {
+    expect(parsed("LFT dispo en soirée et du week-end", MONDAY_NOON, "lft").dates).toEqual([]);
+  });
+
+  it("parseGetiPost_samediProLeague_isNotNextSaturday", () => {
+    expect(parsed("LFT on vise la samedi pro league", MONDAY_NOON, "lft").dates).toEqual([]);
+  });
+
+  it("parseGetiPost_ceSamediProchain_isOnlyNextWeeksSaturday", () => {
+    // Publiée le lundi 23 : le samedi d'après est le 28.
+    expect(parsed("LFS ce samedi prochain 21h", MONDAY_NOON).dates).toEqual(["2026-11-28"]);
+  });
+
+  it("parseGetiPost_editedTheNextDay_resolvesTonightFromTheEdit", () => {
+    const post = parseGetiPost(
+      getiRawPost("LFS ce soir 21h-23h", { category: "lfs", postedAt: MONDAY_NOON, editedAt: "2026-11-24T17:00:00.000Z" }),
+    );
+
+    expect(post.dates).toEqual(["2026-11-24"]);
+  });
+
+  it("parseGetiPost_editDateBeforeThePostDate_usesThePostDate", () => {
+    const post = parseGetiPost(
+      getiRawPost("LFS ce soir 21h-23h", { category: "lfs", postedAt: MONDAY_NOON, editedAt: "2026-11-20T17:00:00.000Z" }),
+    );
+
+    expect(post.dates).toEqual(["2026-11-23"]);
   });
 });

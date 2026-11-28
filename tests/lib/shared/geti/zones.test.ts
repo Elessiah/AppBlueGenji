@@ -276,7 +276,23 @@ describe("parseGetiTimezone", () => {
     ["Le scrim de 21h est bien passé"],
     ["Notre support est dispo, west coast"],
     ["LFS 20h UTC+15"],
+    ["LFS CE SOIR 21H-23H, NOTRE ÉQUIPE EST PRÊTE"],
+    ["LFS 21H EST BON POUR NOUS"],
+    ["LFS EU WEST CE SOIR"],
   ])("parseGetiTimezone_%s_returnsNull", (text) => {
     expect(zoneOf(text)).toBeNull();
+  });
+
+  it("parseGetiTimezone_euWestThenCet_returnsCet", () => {
+    expect(zoneOf("LFS EU WEST 21h CET")).toBe("CET");
+  });
+
+  it.each([
+    ["LFS 9PM EST", "EST"],
+    ["LFS 21:00 EST", "EST"],
+    ["LFS 21H BST", "BST"],
+    ["LFS 8PM WEST", "WEST"],
+  ])("parseGetiTimezone_capitalCodeAfterATime_%s_returnsIt", (text, zone) => {
+    expect(zoneOf(text)).toBe(zone);
   });
 });
