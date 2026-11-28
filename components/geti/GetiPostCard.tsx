@@ -66,12 +66,12 @@ function relativeDate(iso: string, locale: Locale, now: number): string {
  */
 function pastLabelOf(post: GetiStoredPost, text: GetiMessages["post"], now: number): string | null {
   if (!isGetiPostPast(post.parsed, now)) return null;
-  return isGetiOneEveningPost(post) ? text.past : text.datePast;
+  return isGetiOneEveningPost(post.parsed) ? text.past : text.datePast;
 }
 
 /** Carte estompée : annonce close, ou soirée finie d'un scrim ou d'un remplaçant. */
 function isFaded(post: GetiStoredPost, now: number): boolean {
-  return post.parsed.closed || (isGetiOneEveningPost(post) && isGetiPostPast(post.parsed, now));
+  return post.parsed.closed || (isGetiPostPast(post.parsed, now) && isGetiOneEveningPost(post.parsed));
 }
 
 /**

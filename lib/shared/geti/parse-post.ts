@@ -25,6 +25,7 @@ import {
   GETI_TEXT_MAX,
   MENTION,
   NOT_AFTER_WORD,
+  NOT_BEFORE_WORD,
   getiDisplayText,
   getiSafeText,
   getiWithoutSpoilers,
@@ -186,10 +187,42 @@ function isoDate(value: unknown): string | null {
   return Number.isNaN(time) ? null : new Date(time).toISOString();
 }
 
-/** Instant où le texte gardé a été écrit : la modification si elle suit la publication, sinon la publication. */
-function writtenAt(postedAt: string | null, editedAt: string | null): string | null {
+/**
+ * Place prise, écrite dans une recherche de scrim ou de remplaçant : « trouvé »,
+ * « pourvu », « plus besoin », « found », « filled » (« pas trouvé », « si on
+ * trouve » n'en sont pas). Texte sans accents, en minuscules.
+ */
+const FILLED = new RegExp(
+  String.raw`${NOT_AFTER_WORD}(?<!(?:pas|on|je|si|tu) )(?:trouvee?s?|pourvue?s?|plus besoin|found|filled)${NOT_BEFORE_WORD}`,
+  "u",
+);
+
+/**
+ * Instant où le texte gardé a été écrit : la modification si elle suit la
+ * publication, sinon la publication. Une modification qui dit la place prise
+ * (« (trouvé merci) ») ne change pas la soirée visée : la publication reste la
+ * base de « ce soir », « demain ».
+ */
+function writtenAt(postedAt: string | null, editedAt: string | null, lower: string, oneEvening: boolean): string | null {
   if (postedAt === null || editedAt === null) return postedAt;
+  if (oneEvening && FILLED.test(lower)) return postedAt;
   return Date.parse(editedAt) > Date.parse(postedAt) ? editedAt : postedAt;
+}
+
+/** Scrim ou remplaçant, d'après le salon ou le mot-clé d'une annonce postée ailleurs (« LFSub » dans le salon des joueurs). */
+function isOneEveningKind(category: GetiCategory | null, lower: string): boolean {
+  return [category, detectGetiCategory(lower)].some((kind) => kind === "lfs" || kind === "lfsub");
+}
+
+/**
+ * Recherche qui ne vaut que pour sa soirée : un scrim, un remplaçant — d'après
+ * le salon, ou le mot-clé du texte (« LFSub » dans le salon des joueurs), comme
+ * à l'analyse. Passée, elle ne vaut plus ; ailleurs, une date passée n'éteint
+ * pas l'annonce (un recrutement qui citait un essai reste d'actualité).
+ */
+export function isGetiOneEveningPost(post: Pick<GetiParsedPost, "category" | "text">): boolean {
+  if (post.category === "lfs" || post.category === "lfsub") return true;
+  return isOneEveningKind(post.category, prepareGetiText(getiWithoutSpoilers(post.text, " ")).lower);
 }
 
 function isCategory(value: unknown): value is GetiCategory {
@@ -478,9 +511,10 @@ export function parseGetiPost(raw: GetiRawPost, options: GetiParseOptions = {}):
   // Scrim ou remplaçant — d'après le salon, ou le mot-clé d'une annonce postée
   // ailleurs (« LFSub » dans le salon des joueurs) : une soirée précise, à un SR donné.
   const kinds = [category, detectGetiCategory(prepared.lower)];
-  const oneEvening = kinds.some((kind) => kind === "lfs" || kind === "lfsub");
+  const oneEvening = isOneEveningKind(category, prepared.lower);
   // « ce soir » ou « demain » se lit depuis l'écriture du texte gardé : sa dernière modification, sinon sa publication.
-  const schedule = parseGetiSchedule(prepared, writtenAt(postedAt, isoDate(source.editedAt)), oneEvening);
+  const written = writtenAt(postedAt, isoDate(source.editedAt), prepared.lower, oneEvening);
+  const schedule = parseGetiSchedule(prepared, written, oneEvening);
   return {
     category,
     authorTag: content.authorTag,

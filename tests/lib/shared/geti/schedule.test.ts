@@ -312,3 +312,55 @@ describe("parseGetiPost — cycle 1 : nuit, fuseaux par horaire, tournures habit
     expect(post.dates).toEqual(["2026-11-23"]);
   });
 });
+
+describe("parseGetiPost — cycle 2 : changement d'heure, nuit en cours, place prise, « samedi pro »", () => {
+  it("parseGetiPost_datesAcrossTheUsDstChange_endsAtTheLastDatesRealEnd", () => {
+    const post = parsed("LFS 29/10 et 02/11 6pm EST", "2026-10-28T12:00:00.000Z");
+
+    expect(post.dates).toEqual(["2026-10-29", "2026-11-03"]);
+    expect(post.availability.times).toEqual([{ from: 0, to: null }]);
+    // 6pm EST le 02/11 = minuit à Paris le 03/11, + 2 h pour une heure seule : 02 h Paris = 01:00Z.
+    expect(getiPostEndsAt(post)).toBe(Date.parse("2026-11-03T01:00:00.000Z"));
+  });
+
+  it("parseGetiPost_tonightAfterMidnightPostedDuringThatNight_isTheSameDay", () => {
+    // Samedi 28, 1 h 30 à Paris : la nuit en cours.
+    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T00:30:00.000Z").dates).toEqual(["2026-11-28"]);
+  });
+
+  it("parseGetiPost_tonightAfterMidnightPostedAtSixSharp_isTheNextDay", () => {
+    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T05:00:00.000Z").dates).toEqual(["2026-11-29"]);
+  });
+
+  it("parseGetiPost_tonightAfterMidnightPostedJustBeforeSix_isTheSameDay", () => {
+    expect(parsed("LFS cette nuit 1h-3h", "2026-11-28T04:59:00.000Z").dates).toEqual(["2026-11-28"]);
+  });
+
+  it("parseGetiPost_editMarkingTheSpotFound_keepsThePostDay", () => {
+    const post = parseGetiPost(
+      getiRawPost("LFS ce soir 21h-23h (trouvé merci)", { category: "lfs", postedAt: MONDAY_NOON, editedAt: "2026-11-24T08:00:00.000Z" }),
+    );
+
+    expect(post.dates).toEqual(["2026-11-23"]);
+  });
+
+  it("parseGetiPost_editSayingNotFoundYet_resolvesFromTheEdit", () => {
+    const post = parseGetiPost(
+      getiRawPost("LFS ce soir 21h-23h, toujours pas trouvé", { category: "lfs", postedAt: MONDAY_NOON, editedAt: "2026-11-24T08:00:00.000Z" }),
+    );
+
+    expect(post.dates).toEqual(["2026-11-24"]);
+  });
+
+  it("parseGetiPost_lftEditWithFound_resolvesFromTheEdit", () => {
+    const post = parseGetiPost(
+      getiRawPost("LFT dispo ce soir, found nothing yet", { category: "lft", postedAt: MONDAY_NOON, editedAt: "2026-11-24T08:00:00.000Z" }),
+    );
+
+    expect(post.dates).toEqual(["2026-11-24"]);
+  });
+
+  it("parseGetiPost_samediProPostedThatSaturday_isNextWeek", () => {
+    expect(parsed("LFS samedi pro 21h", SATURDAY_NOON).dates).toEqual(["2026-12-05"]);
+  });
+});

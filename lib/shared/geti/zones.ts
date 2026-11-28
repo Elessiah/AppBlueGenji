@@ -166,14 +166,37 @@ const ZONE_CODE = new RegExp(
   String.raw`${NOT_AFTER_WORD}(CEST|CET(?!${CET_DEMONSTRATIVE_ANY_CASE})|(?:UTC|GMT)${OFFSET_SUFFIX})${NOT_BEFORE_WORD}`,
   "u",
 );
+/** Sigles européens qui sont aussi des mots en capitales (« EU WEST »). */
+const EU_WORD_CODES = "BST|WEST|WET|EEST|EET";
+/** Sigles américains qui sont aussi des mots en capitales (« NOTRE ÉQUIPE EST PRÊTE »). */
+const US_CODES = "EST|EDT|CST|CDT|PST|PDT";
+/** Heure en « 21h », « 21H30 ». */
+const HOUR_UNIT = String.raw`\d ?[hH](?:\d{2})?`;
+/** Heure en am/pm ou en « 21:00 ». */
+const MERIDIEM_OR_CLOCK = String.raw`(?:\d ?[aApP][mM]|\d:\d{2})`;
+/** Plage sans unité : « 8-10 », « 20 - 22 ». */
+const BARE_RANGE = String.raw`(?<!\d)\d{1,2} ?- ?\d{1,2}`;
+/** Début d'un sigle : ni collé à un mot, ni derrière une apostrophe (« C'EST »). */
+const CODE_START = String.raw`${NOT_AFTER_WORD}(?<!['\u2019])`;
 /**
- * Sigles qui sont aussi des mots en capitales (« NOTRE ÉQUIPE EST PRÊTE »,
- * « EU WEST ») : lus derrière une heure seulement — européens derrière toute
- * heure (« 21H BST », « 8PM BST »), américains derrière une heure en am/pm ou en « 21:00 »
- * (« 9PM EST » ; « 21H EST BON » reste du français).
+ * Sigles qui sont aussi des mots en capitales, lus seulement là où ils ne
+ * peuvent être qu'un fuseau :
+ * - derrière une heure — européens derrière « 21H », une heure en am/pm, en
+ *   « 21:00 » ou une plage « 20-22 » (jamais un rang, « 3K5 WEST », « 4500 WEST ») ;
+ *   américains derrière les mêmes, sauf « 21H » (« 21H EST BON » reste du français) ;
+ * - derrière une étiquette (« Timezone: EST », « TZ EST », « fuseau : PST »,
+ *   « in EST » pour un sigle américain), entre parenthèses (« (EST) ») ;
+ * - devant une heure en am/pm (« EST 9PM »).
  */
 const ZONE_CODE_AFTER_TIME = new RegExp(
-  String.raw`\d ?(?:[hH](?:\d{2})?|[aApP][mM])? ?\(?(BST|WEST|WET|EEST|EET)${NOT_BEFORE_WORD}|(?:\d ?[aApP][mM]|\d:\d{2}) ?\(?(EST|EDT|CST|CDT|PST|PDT)${NOT_BEFORE_WORD}`,
+  [
+    String.raw`(?:${HOUR_UNIT}|${MERIDIEM_OR_CLOCK}|${BARE_RANGE}) ?\(?(${EU_WORD_CODES})${NOT_BEFORE_WORD}`,
+    String.raw`(?:${MERIDIEM_OR_CLOCK}|${BARE_RANGE}) ?\(?(${US_CODES})${NOT_BEFORE_WORD}`,
+    String.raw`${NOT_AFTER_WORD}(?:[Tt][Ii][Mm][Ee] ?[Zz][Oo][Nn][Ee]|[Tt][Zz]|[Ff][Uu][Ss][Ee][Aa][Uu])\s?:?\s?\(?(${EU_WORD_CODES}|${US_CODES})${NOT_BEFORE_WORD}`,
+    String.raw`${NOT_AFTER_WORD}[Ii][Nn]\s(${US_CODES})${NOT_BEFORE_WORD}`,
+    String.raw`\((${EU_WORD_CODES}|${US_CODES})\)`,
+    String.raw`${CODE_START}(${EU_WORD_CODES}|${US_CODES}) ?\d{1,2}(?::\d{2})? ?[aApP][mM]${NOT_BEFORE_WORD}`,
+  ].join("|"),
   "u",
 );
 /** … ou en minuscules derrière une heure : « 20-22 cet », « 21h cest », « 20-22 utc+1 » (« cet été » n'en est pas un). */
@@ -196,7 +219,7 @@ const QUEBEC_TIME = new RegExp(
 
 function codeAfterTime(plain: string): string | undefined {
   const match = ZONE_CODE_AFTER_TIME.exec(plain);
-  return match === null ? undefined : (match[1] ?? match[2]);
+  return match?.slice(1).find((code) => code !== undefined);
 }
 
 /**

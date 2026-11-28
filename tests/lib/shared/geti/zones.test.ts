@@ -296,3 +296,27 @@ describe("parseGetiTimezone", () => {
     expect(zoneOf(text)).toBe(zone);
   });
 });
+
+describe("parseGetiTimezone — cycle 2 : sigles-mots en capitales", () => {
+  it.each([
+    ["LFT dps, available 8pm-11pm. Timezone: EST", "EST"],
+    ["LFS TZ PST", "PST"],
+    ["LFS fuseau : CST", "CST"],
+    ["LFT playing in EST", "EST"],
+    ["LFS tonight (EDT)", "EDT"],
+    ["LFS EST 9PM", "EST"],
+    ["LFS 8-10 EST", "EST"],
+    ["LFS 20-22 BST", "BST"],
+  ])("parseGetiTimezone_%s_returnsIt", (text, zone) => {
+    expect(zoneOf(text)).toBe(zone);
+  });
+
+  it.each([
+    ["LFS 3K5 WEST 21h-23h"],
+    ["LFT DPS 4500 WEST EU dispo 21h"],
+    ["LFS C'EST 9PM"],
+    ["LFT playing in WEST EU"],
+  ])("parseGetiTimezone_%s_returnsNull", (text) => {
+    expect(zoneOf(text)).toBeNull();
+  });
+});

@@ -363,18 +363,22 @@ ne regardait que le jour de la semaine.
 
 Tout mot relatif se résout depuis l'**écriture du texte gardé** : sa dernière
 modification si elle suit la publication (« ce soir » écrit en modifiant
-l'annonce le lendemain vise ce lendemain), sinon sa publication (`posted_at`) —
-jamais depuis l'heure de lecture ni celle d'une réanalyse, dans le fuseau écrit
+l'annonce le lendemain vise ce lendemain), sinon sa publication (`posted_at`).
+Une modification d'un scrim ou d'un remplaçant qui dit la place prise
+(« trouvé », « pourvu », « plus besoin », « found », « filled » — pas « pas
+trouvé ») garde la publication pour base : « (trouvé merci) » ajouté le
+lendemain ne fait pas du scrim de la veille celui du soir. Jamais
+depuis l'heure de lecture ni celle d'une réanalyse, dans le fuseau écrit
 par l'annonce (Paris sinon). Sans date de publication, aucune date n'est lue.
 
 | Écrit | Date |
 | --- | --- |
-| « ce soir », « tonight », « cette nuit », « cet après-midi », « this evening » | le jour de la publication ; « ce soir » / « cette nuit » dont tous les horaires sont d'après minuit (avant 6 h) et déjà passés à la publication : le lendemain (« cette nuit 1h-3h » écrit à 22 h) |
+| « ce soir », « tonight », « cette nuit », « cet après-midi », « this evening » | le jour de la publication ; « ce soir » / « cette nuit » dont tous les horaires sont d'après minuit (avant 6 h), écrit à 6 h ou plus tard : le lendemain (« cette nuit 1h-3h » écrit à 22 h) ; écrit avant 6 h (à 1 h 30) : la nuit en cours |
 | « aujourd'hui », « today », « ajd » | le jour de la publication — **scrim ou remplaçant seulement** (« aujourd'hui, on recrute » ne date pas un recrutement) |
 | « demain », « tomorrow », « tmrw » | le lendemain |
 | « après-demain », « day after tomorrow » | le surlendemain (lu avant « demain », qu'il contient) |
 | « ce week-end », « this weekend », « ce we » | le samedi et le dimanche qui viennent ; publié un dimanche : ce dimanche (« le week-end », « du week-end » restent une habitude) |
-| « lundi prochain », « next friday » | la prochaine occurrence **après** le jour de la publication (« samedi pro league » n'en est pas une) |
+| « lundi prochain », « samedi pro », « next friday » | la prochaine occurrence **après** le jour de la publication (« samedi pro league », « pro am », « pro team » n'en sont pas) |
 | « ce vendredi », « this friday » | la prochaine occurrence, jour de la publication compris (« ce samedi prochain » : celui d'après seulement) |
 
 Publié jeudi à 23 h 30, « tonight » vise jeudi ; publié vendredi à 0 h 30,
@@ -402,10 +406,13 @@ plus n'est gardé.
   remplaçant, « Date passée » ailleurs (un recrutement qui citait un essai
   « ce soir » reste d'actualité).
 - **Filtre par jour** : ne compte que les dates à venir (§ Filtre) — sauf pour
-  une annonce qui cite aussi des jours hors de ses dates (« dispo lundi,
-  mercredi, vendredi, dès ce soir ») : disponibilité habituelle, tous ses jours
-  comptent.
-- **Alertes** : un scrim ou un remplaçant (`isGetiOneEveningPost`) déjà passé à
+  une annonce qui cite aussi au moins deux jours hors de ses dates (« dispo
+  lundi, mercredi, vendredi, dès ce soir ») : disponibilité habituelle, tous ses
+  jours comptent. Un seul (« essai vendredi 27/11, dispo aussi lundi ») compte
+  en plus, sans rendre le vendredi passé.
+- **Alertes** : un scrim ou un remplaçant (`isGetiOneEveningPost` : d'après le
+  salon, ou le mot-clé du texte — « LFSub » dans le salon des joueurs, comme à
+  l'analyse ; la carte le lit pareil) déjà passé à
   sa réception ne prévient personne (`isGetiPostAlertable` — un « tonight » de
   la veille reçu au rattrapage) ; ailleurs, une date passée n'éteint pas
   l'annonce, qui prévient. Une alerte ne garde pas `past=1`.
@@ -426,17 +433,25 @@ est lue à l'heure de Paris (dit dans les `InfoHint` des filtres).
 
 - Sigles en **capitales** n'importe où pour « CET », « CEST », « UTC », « GMT »
   seulement ; les autres, qui sont aussi des mots en capitales (« NOTRE ÉQUIPE
-  EST PRÊTE », « EU WEST »), derrière une heure : européens derrière toute heure
-  (« 21H BST »), américains derrière une heure en am/pm ou « 21:00 » (« 9PM
-  EST » ; « 21H EST BON » reste du français). En minuscules, derrière une heure :
+  EST PRÊTE », « EU WEST »), là où ils ne peuvent être qu'un fuseau : derrière
+  une heure — européens derrière « 21H », une heure en am/pm, « 21:00 » ou une
+  plage « 20-22 » (jamais derrière un rang : « 3K5 WEST », « 4500 WEST »),
+  américains derrière les mêmes sauf « 21H » (« 9PM EST », « 8-10 EST » ;
+  « 21H EST BON » reste du français) ; derrière une étiquette (« Timezone: EST »,
+  « TZ PST », « fuseau : CST », « in EST » pour un sigle américain) ; entre
+  parenthèses (« (EDT) ») ; devant une heure en am/pm (« EST 9PM » ; jamais
+  derrière une apostrophe, « C'EST 9PM »). En minuscules, derrière une heure :
   « 20-22 cet », « 21h cest », « 20-22 utc+1 » ; les sigles américains seulement
   derrière une heure en am/pm (« 9pm est » ; « 21h est bien » reste du français).
 - **« cet » démonstratif** n'est pas un fuseau, en minuscules comme en
   capitales : « 15h cet après-midi », « RDV CET APRÈS-MIDI », « cet été »,
   « cet horaire », « cet effectif »… (`CET_DEMONSTRATIVE`).
-- **Conversion** : chaque horaire suit le décalage de son heure (à la première
-  date, sinon au jour de la publication), chaque date celui de son jour (deux
-  dates de part et d'autre d'un changement d'heure) — heure d'été des deux côtés
+- **Conversion** : chaque horaire suit le décalage de son heure (à la dernière
+  date, celle qui dit quand l'annonce est passée, sinon au jour de la
+  publication), chaque date celui de son jour (deux dates de part et d'autre
+  d'un changement d'heure : « 29/10 et 02/11 6pm EST » garde le 29/10 et le
+  03/11, à minuit — l'horaire de la dernière, une heure plus tard que celui du
+  29 ; la fin d'annonce est exacte) — heure d'été des deux côtés
   comprise (les semaines où New York et Paris ne changent pas d'heure ensemble
   donnent 5 h d'écart au lieu de 6). Une date suit son premier horaire :
   « Friday 9pm EST » tombe le **samedi** à 3 h à Paris, et le jour gardé est

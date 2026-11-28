@@ -8,9 +8,8 @@ export {
   filterGetiPosts,
   getiPostEndsAt,
   getiTimeSlotMatches,
-  isGetiOneEveningPost,
   isGetiPostPast,
   matchesGetiFilter,
 } from "@/lib/shared/geti/filter";
-export { getiCategoryOfChannel, isGetiBotNotice, parseGetiPost } from "@/lib/shared/geti/parse-post";
+export { getiCategoryOfChannel, isGetiBotNotice, isGetiOneEveningPost, parseGetiPost } from "@/lib/shared/geti/parse-post";
 export { GETI_RANK_TOP, getiRankFromValue, getiRankValue } from "@/lib/shared/geti/ranks";

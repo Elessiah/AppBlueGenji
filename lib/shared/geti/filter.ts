@@ -250,15 +250,6 @@ export function getiPostEndsAt(post: GetiParsedPost): number | null {
 }
 
 /**
- * Recherche qui ne vaut que pour sa soirée : un scrim (`lfs`), un remplaçant
- * (`lfsub`). Passée, elle ne vaut plus ; ailleurs, une date passée n'éteint
- * pas l'annonce (un recrutement qui citait un essai reste d'actualité).
- */
-export function isGetiOneEveningPost(post: Pick<GetiParsedPost, "category">): boolean {
-  return post.category === "lfs" || post.category === "lfsub";
-}
-
-/**
  * L'annonce est-elle passée ? Toutes ses dates visées sont finies à `now`
  * ({@link getiPostEndsAt}). Une annonce sans date ne l'est jamais.
  */
@@ -276,9 +267,14 @@ function weekdayOf(day: number): GetiDay {
  * venir**. Le jour d'une date déjà finie ne compte plus (sauf si une date à
  * venir tombe le même jour) ; une annonce dont tous les jours sont passés ne
  * répond à aucun jour, même avec `includeUnknown`. Une annonce qui cite aussi
- * des jours hors de ses dates (« dispo lundi, mercredi, vendredi, dès ce
- * soir ») parle d'une disponibilité habituelle : ses jours comptent tous.
+ * au moins deux jours hors de ses dates (« dispo lundi, mercredi, vendredi, dès
+ * ce soir ») parle d'une disponibilité habituelle : ses jours comptent tous.
+ * Un seul (« essai vendredi 27/11, dispo aussi lundi ») ne rend pas le
+ * vendredi passé : seul ce jour-là, hors date, compte en plus.
  */
+/** Jours cités hors des dates à partir desquels une annonce parle d'une disponibilité habituelle. */
+const HABIT_DAYS_MIN = 2;
+
 function matchesDays(post: GetiParsedPost, days: readonly GetiDay[], includeUnknown: boolean, now: number): boolean {
   if (days.length === 0) return true;
   const found = wanted(post.availability?.days);
@@ -286,7 +282,7 @@ function matchesDays(post: GetiParsedPost, days: readonly GetiDay[], includeUnkn
   const dated = storedDays(post);
   if (dated.length === 0) return days.some((day) => found.includes(day));
   const datedWeekdays = new Set(dated.map(weekdayOf));
-  if (found.some((day) => !datedWeekdays.has(day))) return days.some((day) => found.includes(day));
+  if (found.filter((day) => !datedWeekdays.has(day)).length >= HABIT_DAYS_MIN) return days.some((day) => found.includes(day));
   const end = getiSlotEndMinutes(post.availability?.times);
   const upcoming = new Set<GetiDay>();
   const over = new Set<GetiDay>();

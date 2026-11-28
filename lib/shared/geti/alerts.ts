@@ -10,7 +10,8 @@
  *
  * Module pur : importable côté serveur comme côté client.
  */
-import { isGetiOneEveningPost, isGetiPostPast, matchesGetiFilter } from "@/lib/shared/geti/filter";
+import { isGetiPostPast, matchesGetiFilter } from "@/lib/shared/geti/filter";
+import { isGetiOneEveningPost } from "@/lib/shared/geti/parse-post";
 import { visibleText } from "@/lib/shared/visible-text";
 import {
   getiPageFilter,
@@ -146,7 +147,7 @@ export type GetiAlertCriteria = { id: number; category: GetiCategory; search: st
  * une date passée n'éteint pas l'annonce, qui reste listée et prévient.
  */
 export function isGetiPostAlertable(post: GetiParsedPost, now: number): boolean {
-  return !post.closed && !(isGetiOneEveningPost(post) && isGetiPostPast(post, now));
+  return !post.closed && !(isGetiPostPast(post, now) && isGetiOneEveningPost(post));
 }
 
 /**

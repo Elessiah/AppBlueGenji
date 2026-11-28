@@ -364,3 +364,30 @@ describe("cycle 1 : horaire converti au lendemain, jours habituels, catégories 
     expect(isGetiPostAlertable(fridayScrim({ category: "lfsub" }), SATURDAY_MORNING)).toBe(false);
   });
 });
+
+describe("cycle 2 : recherche d'une soirée postée ailleurs, jour cité hors date", () => {
+  it("isGetiOneEveningPost_lfsubKeywordInLftPost_isTrue", () => {
+    expect(isGetiOneEveningPost(parsedGetiPost({ category: "lft", text: "LFSub ce soir 21h-23h" }))).toBe(true);
+  });
+
+  it("isGetiOneEveningPost_lftTextWithoutKeyword_isFalse", () => {
+    expect(isGetiOneEveningPost(parsedGetiPost({ category: "lft", text: "LFT dps dispo ce soir" }))).toBe(false);
+  });
+
+  it("isGetiPostAlertable_pastLfsubKeywordInLftChannel_isFalse", () => {
+    expect(isGetiPostAlertable(fridayScrim({ category: "lft", text: "LFSub ce soir 21h-23h" }), SATURDAY_MORNING)).toBe(false);
+  });
+
+  it("matchesGetiFilter_oneNonDatedDayWithAPastDate_pastDayDoesNotMatch", () => {
+    // LFT « essai vendredi 27/11, dispo aussi lundi », lu le samedi.
+    const post = parsedGetiPost({ category: "lft", dates: ["2026-11-27"], availability: { days: ["MON", "FRI"], times: [], timezone: null } });
+
+    expect(matchesGetiFilter(post, { days: ["FRI"] }, SATURDAY_MORNING)).toBe(false);
+  });
+
+  it("matchesGetiFilter_oneNonDatedDayWithAPastDate_otherDayMatches", () => {
+    const post = parsedGetiPost({ category: "lft", dates: ["2026-11-27"], availability: { days: ["MON", "FRI"], times: [], timezone: null } });
+
+    expect(matchesGetiFilter(post, { days: ["MON"] }, SATURDAY_MORNING)).toBe(true);
+  });
+});

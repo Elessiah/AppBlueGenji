@@ -593,6 +593,8 @@ const TONIGHT = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:ce soir|cette nuit|tonight|tonite|this evening)${NOT_BEFORE_WORD}`,
   "u",
 );
+/** Les mêmes, partout dans le texte (pour les effacer avant de lire « ce matin », « cet après-midi »). */
+const TONIGHT_ALL = new RegExp(TONIGHT.source, "gu");
 
 /**
  * « aujourd'hui », « today », « ajd » : une date dans une recherche de scrim ou
@@ -620,14 +622,18 @@ const THIS_WEEKEND = new RegExp(
   String.raw`${NOT_AFTER_WORD}(?:(?:ce|this)\sweek[\s-]?end|ce\s(?:we|wk))${NOT_BEFORE_WORD}`,
   "u",
 );
-/** « lundi prochain », « next friday » : la prochaine occurrence après le jour de la publication (« samedi pro league » n'en est pas une). */
+/** Mots qui suivent « pro » sans en faire « prochain » : « samedi pro league », « pro am ». */
+const PRO_FOLLOWERS = "league|ligue|leagues|am|player|players|team|teams|tour|series|scene|circuit|division|div";
+/** « prochain », « prochaine », ou l'abrégé « pro » (« samedi pro ») — pas celui de « samedi pro league ». */
+const NEXT_SUFFIX = String.raw`\s(?:prochaine?|pro${NOT_BEFORE_WORD}(?!\s(?:${PRO_FOLLOWERS})${NOT_BEFORE_WORD}))`;
+/** « lundi prochain », « samedi pro », « next friday » : la prochaine occurrence après le jour de la publication (« samedi pro league » n'en est pas une). */
 const NEXT_NAMED_DAY = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:(${DAY_TABLE.pattern})\sprochaine?|next\s(${DAY_TABLE.pattern}))${NOT_BEFORE_WORD}`,
+  String.raw`${NOT_AFTER_WORD}(?:(${DAY_TABLE.pattern})${NEXT_SUFFIX}|next\s(${DAY_TABLE.pattern}))${NOT_BEFORE_WORD}`,
   "gu",
 );
 /** « ce vendredi », « this friday » : la prochaine occurrence, jour de la publication compris (« ce samedi prochain » : celui d'après seulement). */
 const THIS_NAMED_DAY = new RegExp(
-  String.raw`${NOT_AFTER_WORD}(?:ce|this)\s(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}(?!\sprochaine?${NOT_BEFORE_WORD})`,
+  String.raw`${NOT_AFTER_WORD}(?:ce|this)\s(${DAY_TABLE.pattern})${NOT_BEFORE_WORD}(?!${NEXT_SUFFIX}${NOT_BEFORE_WORD})`,
   "gu",
 );
 
@@ -689,7 +695,7 @@ function daysUntil(day: GetiDay, today: number): number {
 function relativeDays(lower: string, today: number, sameDay: boolean, tonight: number): number[] {
   const found: number[] = [];
   if (TONIGHT.test(lower)) found.push(tonight);
-  if (TODAY.test(lower.replace(new RegExp(TONIGHT.source, "gu"), " ")) || (sameDay && TODAY_WORD.test(lower))) found.push(today);
+  if (TODAY.test(lower.replace(TONIGHT_ALL, " ")) || (sameDay && TODAY_WORD.test(lower))) found.push(today);
   const withoutDayAfter = lower.replace(DAY_AFTER_TOMORROW, (matched) => {
     found.push(today + 2 * DAY_MS);
     return " ".repeat(matched.length);
@@ -764,16 +770,16 @@ const AFTER_MIDNIGHT_HOURS = 6;
 
 /**
  * Jour de « ce soir », « cette nuit » : le lendemain quand tous les horaires
- * commencent après minuit (avant 6 h) et que cette heure-là est déjà passée à
- * la publication (« cette nuit 1h-3h » écrit à 22 h vise 1 h le lendemain ;
- * écrit à 0 h 30, la nuit même), le jour même sinon.
+ * commencent après minuit (avant 6 h) et que l'annonce est écrite dans la
+ * journée ou la soirée d'avant (« cette nuit 1h-3h » écrit à 22 h vise 1 h le
+ * lendemain) ; écrite elle-même avant 6 h (à 0 h 30, à 1 h 30), elle parle de
+ * la nuit en cours : le jour même.
  */
 function tonightDay(stated: readonly GetiTimeRange[], today: number, posted: number, rule: GetiZoneRule): number {
   if (stated.length === 0) return today;
   const latest = Math.max(...stated.map((time) => time.from));
   if (latest >= AFTER_MIDNIGHT_HOURS * 60) return today;
-  const earliest = Math.min(...stated.map((time) => time.from));
-  return posted >= getiWallInstant(today, earliest, rule) ? today + DAY_MS : today;
+  return posted >= getiWallInstant(today, AFTER_MIDNIGHT_HOURS * 60, rule) ? today + DAY_MS : today;
 }
 
 /** Dates et disponibilités d'une annonce, à l'heure de Paris. */
@@ -790,7 +796,8 @@ export type GetiSchedule = { dates: string[]; availability: GetiAvailability };
  * - Un fuseau écrit (« 21h UTC », « 9pm EST ») convertit horaires et dates à
  *   l'heure de Paris, heure d'été comprise ; les horaires tels qu'écrits restent
  *   dans `statedTimes`. Une date suit son premier horaire (« Friday 9pm EST »
- *   tombe le samedi à Paris).
+ *   tombe le samedi à Paris), au décalage de son jour à elle ; les horaires
+ *   gardés suivent celui de la dernière date (la fin d'annonce reste exacte).
  * - `sameDay` (recherche de scrim ou de remplaçant) : un jour nommé vise sa
  *   prochaine occurrence, un horaire sans jour le soir même — le lendemain si
  *   ce créneau était déjà fini à la publication. Les jours rendus sont alors
@@ -821,8 +828,10 @@ export function parseGetiSchedule(prepared: GetiPreparedText, postedAt: string |
   const days = [...new Set([...found, ...(over ? [today + DAY_MS] : evening.days)])].sort((a, b) => a - b).slice(0, DATE_MAX);
   const first = stated[0]?.from;
   const reference = days[0] ?? today;
-  // Chaque horaire suit le décalage de son heure à lui (deux heures écrites de part et d'autre d'un changement d'heure).
-  const shifts = stated.map((time) => getiParisShiftMinutes(rule, reference, time.from));
+  // Les horaires gardés valent pour toutes les dates : ils suivent le décalage de la dernière, celle qui dit
+  // quand l'annonce est passée (deux dates de part et d'autre d'un changement d'heure) ; chacun le sien.
+  const last = days.at(-1) ?? today;
+  const shifts = stated.map((time) => getiParisShiftMinutes(rule, last, time.from));
   const dayShiftAt = (day: number) =>
     first === undefined ? 0 : Math.floor((first + getiParisShiftMinutes(rule, day, first)) / 1440);
   const dayShift = dayShiftAt(reference);
