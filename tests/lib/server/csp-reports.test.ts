@@ -258,145 +258,97 @@ describe("parseCspReport", () => {
     expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
   });
 
-  it("nomme « page » un script fautif qui est la page elle-même", () => {
-    // Chrome nomme le document pour un script en ligne : sur notre site, ceux
-    // de Next portent le nonce, donc ce code a été posé là par un tiers.
-    const [violation] = parseCspReport({
-      "csp-report": {
-        "document-uri": "https://bluegenji-esport.fr/tournois/20?onglet=matchs",
-        "effective-directive": "connect-src",
-        "blocked-uri": "data",
-        "source-file": "https://bluegenji-esport.fr/tournois/20",
-      },
-    });
-    expect(violation.sourceOrigin).toBe(CSP_SOURCE_PAGE);
+  interface SourceCase {
+    name: string;
+    report: Record<string, unknown>;
+    expected: string;
+  }
+
+  const SITE = "https://bluegenji-esport.fr";
+  const legacy = (document: string, directive: string, blocked: string, source: string): Record<string, unknown> => ({
+    "csp-report": {
+      "document-uri": document,
+      "effective-directive": directive,
+      "blocked-uri": blocked,
+      "source-file": source,
+    },
   });
 
-  it("garde l'origine du site pour un script d'une autre page du site", () => {
-    const [violation] = parseCspReport({
-      "csp-report": {
-        "document-uri": "https://bluegenji-esport.fr/tournois/20",
-        "effective-directive": "connect-src",
-        "blocked-uri": "data",
-        "source-file": "https://bluegenji-esport.fr/_next/static/chunks/a.js",
-      },
-    });
-    expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
-  });
-
-  it("nomme « page » un code posé sur une page quittée par une navigation côté client", () => {
-    // L'App Router change document-uri ; le code en ligne garde l'adresse
-    // de la page où il a été posé.
-    const [violation] = parseCspReport({
-      "csp-report": {
-        "document-uri": "https://bluegenji-esport.fr/tournois/20",
-        "effective-directive": "connect-src",
-        "blocked-uri": "data",
-        "source-file": "https://bluegenji-esport.fr/tournois",
-      },
-    });
-    expect(violation.sourceOrigin).toBe(CSP_SOURCE_PAGE);
-  });
-
-  it("nomme « page » une source qui porte une requête ou une barre finale", () => {
-    const [violation] = parseCspReport({
-      "csp-report": {
-        "document-uri": "https://bluegenji-esport.fr/tournois/20",
-        "effective-directive": "connect-src",
-        "blocked-uri": "data",
-        "source-file": "https://bluegenji-esport.fr/tournois/20/?onglet=matchs",
-      },
-    });
-    expect(violation.sourceOrigin).toBe(CSP_SOURCE_PAGE);
-  });
-
-  it("nomme « page » au format Reporting API (documentURL, sourceFile)", () => {
-    const [violation] = parseCspReport([
-      {
+  const sourceCases: SourceCase[] = [
+    {
+      // Chrome nomme le document pour un script en ligne : sur notre site, ceux
+      // de Next portent le nonce, donc ce code a été posé là par un tiers.
+      name: "nomme « page » un script fautif qui est la page elle-même",
+      report: legacy(`${SITE}/tournois/20?onglet=matchs`, "connect-src", "data", `${SITE}/tournois/20`),
+      expected: CSP_SOURCE_PAGE,
+    },
+    {
+      name: "garde l'origine du site pour un script d'une autre page du site",
+      report: legacy(`${SITE}/tournois/20`, "connect-src", "data", `${SITE}/_next/static/chunks/a.js`),
+      expected: SITE,
+    },
+    {
+      // L'App Router change document-uri ; le code en ligne garde l'adresse
+      // de la page où il a été posé.
+      name: "nomme « page » un code posé sur une page quittée par une navigation côté client",
+      report: legacy(`${SITE}/tournois/20`, "connect-src", "data", `${SITE}/tournois`),
+      expected: CSP_SOURCE_PAGE,
+    },
+    {
+      name: "nomme « page » une source qui porte une requête ou une barre finale",
+      report: legacy(`${SITE}/tournois/20`, "connect-src", "data", `${SITE}/tournois/20/?onglet=matchs`),
+      expected: CSP_SOURCE_PAGE,
+    },
+    {
+      name: "nomme « page » au format Reporting API (documentURL, sourceFile)",
+      report: {
         type: "csp-violation",
         body: {
-          documentURL: "https://bluegenji-esport.fr/tournois/20",
+          documentURL: `${SITE}/tournois/20`,
           effectiveDirective: "connect-src",
           blockedURL: "data",
-          sourceFile: "https://bluegenji-esport.fr/tournois/20",
+          sourceFile: `${SITE}/tournois/20`,
         },
       },
-    ]);
-    expect(violation.sourceOrigin).toBe(CSP_SOURCE_PAGE);
-  });
+      expected: CSP_SOURCE_PAGE,
+    },
+    {
+      name: "nomme « page » un script en ligne refusé",
+      report: legacy(`${SITE}/equipes`, "script-src-elem", "inline", `${SITE}/equipes`),
+      expected: CSP_SOURCE_PAGE,
+    },
+    {
+      // Une image tierce réintroduite dans le rendu serveur est un défaut du
+      // site : Chrome nomme le document, la ligne ne doit pas accuser un tiers.
+      name: "garde l'origine du site pour une image écrite dans le HTML de la page",
+      report: legacy(`${SITE}/joueurs/x`, "img-src", "https://lh3.googleusercontent.com/a/photo", `${SITE}/joueurs/x`),
+      expected: SITE,
+    },
+    {
+      name: "garde l'origine du site pour un script externe écrit dans la page",
+      report: legacy(`${SITE}/`, "script-src-elem", "https://cdn.example.com/x.js", `${SITE}/`),
+      expected: SITE,
+    },
+    {
+      name: "garde l'origine du site pour un script servi à la racine (.js)",
+      report: legacy(`${SITE}/tournois/20`, "connect-src", "data", `${SITE}/push-sw.js`),
+      expected: SITE,
+    },
+    {
+      name: "garde le schéma d'une extension qui agit sur une page",
+      report: legacy(`${SITE}/tournois/20`, "connect-src", "data", "chrome-extension://abcdefghijklmnop/content.js"),
+      expected: "chrome-extension",
+    },
+    {
+      name: "garde l'origine d'une page d'un autre site",
+      report: legacy(`${SITE}/tournois/20`, "connect-src", "data", "https://autre.example/page"),
+      expected: "https://autre.example",
+    },
+  ];
 
-  it("nomme « page » un script en ligne refusé", () => {
-    const [violation] = parseCspReport({
-      "csp-report": {
-        "document-uri": "https://bluegenji-esport.fr/equipes",
-        "effective-directive": "script-src-elem",
-        "blocked-uri": "inline",
-        "source-file": "https://bluegenji-esport.fr/equipes",
-      },
-    });
-    expect(violation.sourceOrigin).toBe(CSP_SOURCE_PAGE);
-  });
-
-  it("garde l'origine du site pour une image écrite dans le HTML de la page", () => {
-    // Une image tierce réintroduite dans le rendu serveur est un défaut du
-    // site : Chrome nomme le document, la ligne ne doit pas accuser un tiers.
-    const [violation] = parseCspReport({
-      "csp-report": {
-        "document-uri": "https://bluegenji-esport.fr/joueurs/x",
-        "effective-directive": "img-src",
-        "blocked-uri": "https://lh3.googleusercontent.com/a/photo",
-        "source-file": "https://bluegenji-esport.fr/joueurs/x",
-      },
-    });
-    expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
-  });
-
-  it("garde l'origine du site pour un script externe écrit dans la page", () => {
-    const [violation] = parseCspReport({
-      "csp-report": {
-        "document-uri": "https://bluegenji-esport.fr/",
-        "effective-directive": "script-src-elem",
-        "blocked-uri": "https://cdn.example.com/x.js",
-        "source-file": "https://bluegenji-esport.fr/",
-      },
-    });
-    expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
-  });
-
-  it("garde l'origine du site pour un script servi à la racine (.js)", () => {
-    const [violation] = parseCspReport({
-      "csp-report": {
-        "document-uri": "https://bluegenji-esport.fr/tournois/20",
-        "effective-directive": "connect-src",
-        "blocked-uri": "data",
-        "source-file": "https://bluegenji-esport.fr/push-sw.js",
-      },
-    });
-    expect(violation.sourceOrigin).toBe("https://bluegenji-esport.fr");
-  });
-
-  it("garde le schéma d'une extension qui agit sur une page", () => {
-    const [violation] = parseCspReport({
-      "csp-report": {
-        "document-uri": "https://bluegenji-esport.fr/tournois/20",
-        "effective-directive": "connect-src",
-        "blocked-uri": "data",
-        "source-file": "chrome-extension://abcdefghijklmnop/content.js",
-      },
-    });
-    expect(violation.sourceOrigin).toBe("chrome-extension");
-  });
-
-  it("garde l'origine d'une page d'un autre site", () => {
-    const [violation] = parseCspReport({
-      "csp-report": {
-        "document-uri": "https://bluegenji-esport.fr/tournois/20",
-        "effective-directive": "connect-src",
-        "blocked-uri": "data",
-        "source-file": "https://autre.example/page",
-      },
-    });
-    expect(violation.sourceOrigin).toBe("https://autre.example");
+  it.each(sourceCases)("$name", ({ report, expected }) => {
+    const [violation] = parseCspReport(report.type === undefined ? report : [report]);
+    expect(violation.sourceOrigin).toBe(expected);
   });
 
   it("ne garde que le nom d'une directive historique complète", () => {

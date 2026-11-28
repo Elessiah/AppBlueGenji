@@ -395,7 +395,7 @@ export function documentPathOf(value: unknown): string {
     const cut = trimmed.split(/[?#]/)[0];
     if (!cut.startsWith("/")) return "/";
     try {
-      return logSafe(new URL(cut, "http://chemin.invalid").pathname);
+      return logSafe(new URL(cut, "https://chemin.invalid").pathname);
     } catch {
       return "/";
     }
