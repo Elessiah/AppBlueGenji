@@ -34,7 +34,7 @@ describe("POST /api/csp-report", () => {
   });
 
   it("journalise ce que parseCspReport a lu du corps", async () => {
-    const parsed = [{ directive: "img-src", blockedOrigin: "https://exemple.invalid", documentPath: "/" }];
+    const parsed = [{ directive: "img-src", blockedOrigin: "https://exemple.invalid", documentPath: "/", sourceOrigin: "aucune" }];
     jest.mocked(parseCspReport).mockReturnValue(parsed);
 
     await POST(cspReq({ "csp-report": {} }));

@@ -28,6 +28,8 @@
  * Une table grandirait, et ce que l'on cherche ici tient en quelques lignes.
  */
 
+import { createHash } from "node:crypto";
+
 import { CSP_MODE } from "@/lib/shared/csp";
 
 /** Ce qu'un rapport de violation apprend, une fois débarrassé du reste. */
@@ -38,6 +40,14 @@ export interface CspViolation {
   blockedOrigin: string;
   /** Chemin de la page, sans la chaîne de requête. */
   documentPath: string;
+  /**
+   * D'où part l'appel refusé : origine du script fautif, `"page"` pour un code
+   * écrit dans la page même, schéma d'une extension (`chrome-extension`…),
+   * mot-clé du navigateur (`inline`, `eval`), `"aucune"` quand le navigateur ne
+   * nomme pas de script, `"inconnu"` sur une valeur illisible — voir
+   * {@link sourceOriginOf} et {@link CSP_SOURCE_PAGE}.
+   */
+  sourceOrigin: string;
 }
 
 /** Fenêtre de dédoublonnage : une cause distincte ne se journalise qu'une fois par heure. */
@@ -59,6 +69,142 @@ export const CSP_MAX_TRACKED_CAUSES = 200;
 export const CSP_MAX_VIOLATIONS_PER_REPORT = 25;
 
 /**
+ * Longueur maximale d'un champ de la ligne de journal (et donc de la clé de
+ * dédoublonnage). Le corps est choisi par l'appelant : une origine de 30 Ko
+ * (l'analyse d'URL ne borne pas la longueur d'un hôte) ferait une ligne de
+ * 30 Ko et une clé de 30 Ko gardée en mémoire, deux cents fois.
+ */
+export const CSP_FIELD_MAX_LENGTH = 200;
+
+/**
+ * Longueur lue d'un champ brut du rapport, avant tout découpage ou analyse
+ * d'URL. Le corps pèse jusqu'à 32 Ko et chaque champ est choisi par
+ * l'appelant, sur vingt-cinq violations : aucune origine, aucun schéma ni nom
+ * de directive réel n'approche cette longueur, et lire plus ne ferait que
+ * payer des découpages et des analyses sans rien apprendre à la ligne.
+ */
+export const CSP_INPUT_MAX_LENGTH = 2048;
+
+/** Fenêtre du plafond de lignes (voir {@link CSP_MAX_LOG_LINES_PER_WINDOW}). */
+export const CSP_LOG_BUDGET_WINDOW_MS = 60_000;
+
+/**
+ * Plafond **global** de lignes de cause écrites par fenêtre.
+ *
+ * Le dédoublonnage ne protège pas des causes fabriquées : un corps choisit son
+ * `blocked-uri`, donc 25 causes « nouvelles » par requête et jusqu'à 1 500 par
+ * minute depuis une seule adresse (60 requêtes), chacune une ligne de 400
+ * caractères dans pm2 — le fichier de log que ce module existe pour éviter.
+ * Au-delà du plafond, les causes neuves sont comptées, pas écrites, et la
+ * fenêtre suivante en annonce le nombre sur une seule ligne (en sus du plafond).
+ * Limite assumée : un envoi soutenu garde la fenêtre pleine, et une vraie cause
+ * neuve arrivée plus tard dans la fenêtre est tue — l'annonce, elle, le dit.
+ */
+export const CSP_MAX_LOG_LINES_PER_WINDOW = 30;
+
+/**
+ * Longueur de l'empreinte ajoutée à un champ coupé : deux valeurs qui ne
+ * diffèrent qu'après la coupure restent deux causes, et une valeur fabriquée
+ * ne peut pas taire une vraie violation qui partagerait son début.
+ */
+const TRUNCATION_DIGEST_LENGTH = 10;
+
+/** Borne un champ brut à {@link CSP_INPUT_MAX_LENGTH} avant de le découper. */
+function bounded(value: string): string {
+  if (value.length <= CSP_INPUT_MAX_LENGTH) return value;
+  const head = value.slice(0, CSP_INPUT_MAX_LENGTH);
+  // Coupure entre les deux moitiés d'une paire : la moitié haute part aussi,
+  // sinon l'analyse d'URL la réécrit en U+FFFD et change la cause.
+  return /[\ud800-\udbff]$/.test(head) ? head.slice(0, -1) : head;
+}
+
+/** Texte avant le premier `:` (ou tout le texte), sans découper le reste. */
+function beforeColon(value: string): string {
+  const colon = value.indexOf(":");
+  return colon === -1 ? value : value.slice(0, colon);
+}
+
+/** Mot-clé ou schéma (`inline`, `eval`, `wasm-eval`, `data`, `chrome-extension`…). */
+const KEYWORD = /^[a-z][a-z0-9+.-]{0,39}$/i;
+
+/** Nom de directive (`script-src-elem`, `connect-src`…). */
+const DIRECTIVE = /^[a-z][a-z-]{0,39}$/;
+
+/**
+ * Caractères qu'une ligne de journal ne doit jamais porter tels quels :
+ * contrôles C0 et C1 (`Cc`, dont le saut de ligne, qui fabriquerait une
+ * fausse ligne `[auth] …` dans pm2), séparateurs de ligne et de paragraphe
+ * Unicode (`Zl`, `Zp`), caractères de mise en forme (`Cf` : marques
+ * bidirectionnelles, largeur nulle, trait d'union conditionnel, étiquettes
+ * U+E0000–U+E007F…) et tout caractère ignorable par défaut
+ * (`Default_Ignorable_Code_Point` : remplissages hangul, sélecteurs de
+ * variante, plages réservées…), qui maquillent le texte, et moitiés de paire
+ * UTF-16 orphelines, qui rendraient la ligne invalide en UTF-8. Des classes
+ * Unicode plutôt qu'une liste tenue à la main : une liste en oublie toujours.
+ * Le drapeau `u` lit une paire complète comme un seul caractère : seule une
+ * moitié orpheline tombe dans la plage des demi-codets.
+ */
+const UNSAFE_LOG_CHARS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}\ud800-\udfff]/gu;
+
+/**
+ * Rend un champ sûr pour une ligne de journal : caractères dangereux remplacés
+ * par `?`, longueur bornée à {@link CSP_FIELD_MAX_LENGTH}. Une coupure est
+ * marquée `…#<empreinte>` (empreinte de la valeur entière, pour que la clé de
+ * dédoublonnage ne confonde pas deux valeurs au même début), sans jamais
+ * séparer les deux moitiés d'une paire UTF-16.
+ *
+ * @param value Texte venu du rapport, donc de l'appelant.
+ * @returns Le texte, sur une seule ligne et borné.
+ */
+export function logSafe(value: string): string {
+  // Le remplacement n'allonge jamais le texte (un caractère, d'un ou deux
+  // codets, devient un `?`).
+  // Seule la tête gardée est donc balayée, pas les 32 Ko d'un champ fabriqué ;
+  // l'empreinte, elle, porte sur la valeur entière.
+  if (value.length <= CSP_FIELD_MAX_LENGTH) return value.replace(UNSAFE_LOG_CHARS, "?");
+  const digest = createHash("sha256").update(value).digest("hex").slice(0, TRUNCATION_DIGEST_LENGTH);
+  let head = value.slice(0, CSP_FIELD_MAX_LENGTH - TRUNCATION_DIGEST_LENGTH - 2);
+  // Coupure entre les deux moitiés d'une paire : la moitié haute part aussi.
+  if (/[\ud800-\udbff]$/.test(head)) head = head.slice(0, -1);
+  return `${head.replace(UNSAFE_LOG_CHARS, "?")}\u2026#${digest}`;
+}
+
+/** Origine rendue pour un hôte écrit en adresse IP (v4 ou v6), suivie de `:<port>` s'il est écrit. */
+export const CSP_ORIGIN_IP = "adresse-ip";
+
+/**
+ * Origine rendue pour un hôte local ou de réseau privé (`localhost`, nom sans
+ * point, suffixes de {@link LOCAL_HOST_SUFFIXES}), suivie de `:<port>` s'il est écrit.
+ */
+export const CSP_ORIGIN_LOCAL = "local";
+
+/** Suffixes d'hôtes de réseau local ou privé, qui portent souvent le nom d'une machine. */
+const LOCAL_HOST_SUFFIXES = [".localhost", ".local", ".lan", ".home", ".internal", ".intranet", ".corp", ".home.arpa"];
+
+/**
+ * Origine d'une URL déjà analysée, sauf pour un hôte en adresse IP ou local :
+ * un antivirus ou un proxy qui injecte son script le sert souvent de
+ * `127.0.0.1:<port>`, de l'adresse du réseau du visiteur ou du nom de sa
+ * machine, que la ligne porterait alors. Le mot-clé suffit au tri ; le port
+ * reste, pour que deux services locaux (le site en dev sur `:3000`, un
+ * injecteur sur un autre port) restent deux causes.
+ *
+ * L'hôte se lit sur l'**origine** : celle d'une adresse `blob:` est celle de
+ * l'adresse qu'elle enveloppe, alors que son `hostname` est vide.
+ */
+function safeOrigin(url: URL): string {
+  const origin = new URL(url.origin);
+  // Le point final d'un nom absolu (`machine.local.`) ne change pas l'hôte.
+  const host = origin.hostname.toLowerCase().replace(/\.+$/, "");
+  const port = origin.port ? `:${origin.port}` : "";
+  if (host.startsWith("[") || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return `${CSP_ORIGIN_IP}${port}`;
+  if (host === "localhost" || !host.includes(".") || LOCAL_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))) {
+    return `${CSP_ORIGIN_LOCAL}${port}`;
+  }
+  return logSafe(`${origin.protocol}//${host}${port}`);
+}
+
+/**
  * Réduit une URL à son origine, ou au mot-clé que le navigateur a employé.
  *
  * Les navigateurs ne renvoient pas toujours une URL : `inline`, `eval` et
@@ -67,21 +213,161 @@ export const CSP_MAX_VIOLATIONS_PER_REPORT = 25;
  * la politique, le reste ne fait que grossir la ligne.
  *
  * @param value Valeur de `blocked-uri`.
- * @returns L'origine, le mot-clé, ou `"inconnu"` si la valeur est inexploitable.
+ * @returns L'origine ({@link CSP_ORIGIN_IP} / {@link CSP_ORIGIN_LOCAL} pour un
+ *   hôte en adresse IP ou local), le mot-clé, ou `"inconnu"` si la valeur est
+ *   inexploitable.
  */
 export function blockedOriginOf(value: unknown): string {
   if (typeof value !== "string" || value.trim().length === 0) {
     return "inconnu";
   }
-  const trimmed = value.trim();
+  const trimmed = bounded(value).trim();
   // Mots-clés et schémas sans hôte : `data:`, `blob:`, `inline`, `eval`…
+  // Seul un vrai mot-clé passe : le reste (sauts de ligne compris) est rejeté.
   if (!trimmed.includes("://")) {
-    return trimmed.split(":")[0] || "inconnu";
+    const keyword = beforeColon(trimmed);
+    return KEYWORD.test(keyword) ? keyword.toLowerCase() : "inconnu";
   }
   try {
-    return new URL(trimmed).origin;
+    const url = new URL(trimmed);
+    if (url.origin !== "null") return safeOrigin(url);
+    // Un schéma non standard n'a pas d'origine : son nom suffit.
+    const scheme = beforeColon(trimmed);
+    return KEYWORD.test(scheme) ? scheme.toLowerCase() : "inconnu";
   } catch {
     return "inconnu";
+  }
+}
+
+/**
+ * Schémas des scripts d'extension de navigateur. Un refus qui en part ne se
+ * corrige pas dans le site : il le dit, plutôt que d'envoyer chercher un appel
+ * qui n'existe pas dans le code.
+ */
+const EXTENSION_SCHEMES = new Set([
+  "chrome-extension",
+  "moz-extension",
+  "safari-extension",
+  "safari-web-extension",
+  "ms-browser-extension",
+  // Safari masque l'adresse d'un script d'extension (`webkit-masked-url://hidden/`).
+  "webkit-masked-url",
+]);
+
+/**
+ * Source rendue quand le rapport ne nomme aucun script : code évalué ou
+ * injecté, mais aussi chargement qu'aucun script n'a lancé (police ou image
+ * d'une feuille de style, préchargement, navigation). Seule, elle n'accuse
+ * donc ni le site ni un tiers : la directive et la ressource tranchent.
+ */
+export const CSP_SOURCE_NONE = "aucune";
+
+/**
+ * Source rendue quand l'appel refusé part d'un code **écrit dans la page
+ * même** : Chrome nomme alors l'adresse d'un document (pas d'un fichier de
+ * script) pour un script en ligne ou un attribut d'évènement. Les scripts en
+ * ligne de Next portent le nonce : hors oubli d'un nonce de notre part, un
+ * refus « page » vient d'un code posé dans la page par un tiers.
+ *
+ * Réservée aux refus qu'**un script seul** peut causer (voir
+ * {@link isScriptOnlyViolation}) : une image ou une feuille écrite dans le HTML
+ * nomme elle aussi le document, et c'est alors bien le site qui la sert.
+ */
+export const CSP_SOURCE_PAGE = "page";
+
+/** Mots-clés de `blocked-uri` qui désignent du code sans fichier. */
+const CODE_KEYWORDS = new Set(["inline", "eval", "wasm-eval", "trusted-types-sink"]);
+
+/**
+ * Le refus ne peut-il venir que d'un script en train de s'exécuter ?
+ *
+ * `connect-src` (fetch, XHR, EventSource, WebSocket, sendBeacon) et
+ * `worker-src` ne sont sollicités que par du code ; un script en ligne ou
+ * évalué (`script-src*` refusant `inline` / `eval`) l'est par définition. Le
+ * reste (`img-src`, `style-src`, `font-src`, `frame-src`, un `<script src>`…)
+ * peut venir du HTML que le site a lui-même rendu.
+ *
+ * @param directive Nom de la directive, déjà réduit.
+ * @param blockedOrigin Ressource refusée, déjà réduite.
+ * @returns `true` si seul un script en cours d'exécution cause ce refus.
+ */
+function isScriptOnlyViolation(directive: string, blockedOrigin: string): boolean {
+  if (directive === "connect-src" || directive === "worker-src") return true;
+  return directive.startsWith("script-src") && CODE_KEYWORDS.has(blockedOrigin);
+}
+
+/**
+ * Réduit le script fautif (`source-file` / `sourceFile`) à ce qui sert au tri.
+ *
+ * Sans ce champ, une ligne du journal ne distinguait pas un défaut du site
+ * d'un code **injecté** dans la page — extension, navigateur intégré d'une
+ * application : `connect-src a refusé data sur /tournois/20` a ainsi fait
+ * chercher un `fetch("data:…")` que le site ne contient pas. Un appel parti
+ * d'un morceau du site nomme ce morceau, donc l'origine du site ; une
+ * extension nomme son schéma ; un rapport qui ne nomme **aucun** script
+ * (`"aucune"`) vient d'un code évalué ou injecté, ou d'un chargement qu'aucun
+ * script n'a lancé (voir {@link CSP_SOURCE_NONE}).
+ *
+ * Un code **de la page** (adresse d'un document du site, pas d'un fichier de
+ * script) n'est pas réduit ici mais par l'appelant, en {@link CSP_SOURCE_PAGE},
+ * quand seul un script peut causer le refus.
+ *
+ * Comme pour la ressource refusée, seule l'origine est gardée : le chemin
+ * d'un script d'extension porte l'identifiant de l'extension, qui n'apprend
+ * rien au correctif et singularise le visiteur.
+ *
+ * @param value Valeur de `source-file` ou `sourceFile`.
+ * @returns L'origine (`adresse-ip` / `local` pour un hôte en adresse IP ou
+ *   local), le schéma d'extension, le mot-clé du navigateur
+ *   (`inline`, `eval`…), {@link CSP_SOURCE_NONE} sans script nommé, ou
+ *   `"inconnu"` sur une valeur illisible.
+ */
+export function sourceOriginOf(value: unknown): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return CSP_SOURCE_NONE;
+  }
+  const trimmed = bounded(value).trim();
+  // Tête avant le premier `:` : schéma d'une adresse, ou mot-clé entier.
+  // Chrome ramène souvent le script d'une extension à son seul schéma
+  // (`"chrome-extension"`, sans `:`) ; Firefox et Safari écrivent `inline`
+  // ou `eval` pour du code sans fichier.
+  const head = beforeColon(trimmed).toLowerCase();
+  const keyword = KEYWORD.test(head) ? head : null;
+  if (keyword && EXTENSION_SCHEMES.has(keyword)) return keyword;
+  if (!trimmed.includes("://")) {
+    return keyword ?? "inconnu";
+  }
+  try {
+    const url = new URL(trimmed);
+    // Un schéma non standard n'a pas d'origine (`"null"`) : son nom suffit.
+    return url.origin === "null" ? (keyword ?? "inconnu") : safeOrigin(url);
+  } catch {
+    return "inconnu";
+  }
+}
+
+/**
+ * Le script fautif est-il un **document** du site plutôt qu'un fichier de
+ * script ?
+ *
+ * Le chemin n'a pas à être celui du document : une navigation côté client
+ * (App Router) change `document-uri`, mais un code en ligne garde l'adresse
+ * de la page où il a été posé. Un morceau servi par le site vit sous
+ * `/_next/` ou finit en `.js` (`/push-sw.js`) : il garde l'origine du site.
+ *
+ * @param source Valeur de `source-file` / `sourceFile`.
+ * @param document Valeur de `document-uri` / `documentURL`.
+ * @returns `true` si la source est une page de la même origine que le document.
+ */
+function isSitePage(source: unknown, document: unknown): boolean {
+  if (typeof source !== "string" || typeof document !== "string") return false;
+  try {
+    const a = new URL(bounded(source).trim());
+    const b = new URL(bounded(document).trim());
+    if (a.origin === "null" || a.origin !== b.origin) return false;
+    return !a.pathname.startsWith("/_next/") && !/\.m?js$/i.test(a.pathname);
+  } catch {
+    return false;
   }
 }
 
@@ -95,13 +381,24 @@ export function documentPathOf(value: unknown): string {
   if (typeof value !== "string" || value.trim().length === 0) {
     return "/";
   }
-  const trimmed = value.trim();
+  const trimmed = bounded(value).trim();
   try {
-    return new URL(trimmed).pathname || "/";
+    // Un chemin opaque (`data:text/html,…`, `about:blank`) ne commence pas par
+    // `/` : c'est du texte libre, pas un chemin du site.
+    const path = new URL(trimmed).pathname;
+    return path.startsWith("/") ? logSafe(path) : "/";
   } catch {
-    // Une valeur relative reste exploitable : on coupe à la requête ou au fragment.
+    // Une valeur relative reste exploitable : on coupe à la requête ou au
+    // fragment, puis l'analyse d'URL encode le chemin comme pour une adresse
+    // complète (espaces et caractères non ASCII en `%XX`) — sans quoi le texte
+    // de l'appelant passerait tel quel, faux segment `(source : …)` compris.
     const cut = trimmed.split(/[?#]/)[0];
-    return cut.startsWith("/") ? cut : "/";
+    if (!cut.startsWith("/")) return "/";
+    try {
+      return logSafe(new URL(cut, "https://chemin.invalid").pathname);
+    } catch {
+      return "/";
+    }
   }
 }
 
@@ -157,26 +454,54 @@ function reportBodies(payload: unknown): Record<string, unknown>[] {
 function violationOf(body: Record<string, unknown>): CspViolation | null {
   // Les deux formats nomment les mêmes champs différemment : tirets pour
   // l'historique, camelCase pour le Reporting API.
-  const directive =
-    body["effective-directive"] ??
-    body.effectiveDirective ??
-    body["violated-directive"] ??
-    body.violatedDirective;
-  if (typeof directive !== "string" || directive.trim().length === 0) return null;
+  // Premier candidat non vide : un `effective-directive` vide ou mal typé ne
+  // doit pas écarter le `violated-directive` lisible qui le suit.
+  const directive = [
+    body["effective-directive"],
+    body.effectiveDirective,
+    body["violated-directive"],
+    body.violatedDirective,
+  ].find((candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0);
+  if (directive === undefined) return null;
+  // L'ancien `violated-directive` porte la directive entière
+  // (`script-src 'self'`) : seul son nom compte. Un nom qui n'en est pas un
+  // (saut de ligne, texte libre) écarte le rapport — un navigateur n'en envoie pas.
+  const name = bounded(directive).trim().split(/\s+/, 1)[0].toLowerCase();
+  if (!DIRECTIVE.test(name)) return null;
 
+  const documentUrl = body["document-uri"] ?? body.documentURL;
+  const sourceFile = body["source-file"] ?? body.sourceFile;
+  const blockedOrigin = blockedOriginOf(body["blocked-uri"] ?? body.blockedURL);
+  const fromPage = isScriptOnlyViolation(name, blockedOrigin) && isSitePage(sourceFile, documentUrl);
   return {
-    directive: directive.trim(),
-    blockedOrigin: blockedOriginOf(body["blocked-uri"] ?? body.blockedURL),
-    documentPath: documentPathOf(body["document-uri"] ?? body.documentURL),
+    directive: name,
+    blockedOrigin,
+    documentPath: documentPathOf(documentUrl),
+    sourceOrigin: fromPage ? CSP_SOURCE_PAGE : sourceOriginOf(sourceFile),
   };
 }
 
-/** Clé de dédoublonnage : ce qui distingue deux causes à corriger. */
+/**
+ * Clé de dédoublonnage : ce qui distingue deux causes à corriger.
+ *
+ * La source en fait partie : un même refus venu du site et d'une extension
+ * sont deux causes, et la seconde ne doit pas taire la première.
+ */
 export function violationCause(violation: CspViolation): string {
-  return `${violation.directive}|${violation.blockedOrigin}`;
+  return `${violation.directive}|${violation.blockedOrigin}|${violation.sourceOrigin}`;
 }
 
 type Tracker = Map<string, { last: number; suppressed: number }>;
+
+/**
+ * La dernière ligne de la cause est-elle assez proche pour taire celle-ci ?
+ * L'écart se prend en valeur absolue : une horloge qui recule de quelques
+ * millisecondes (correction NTP) ne relâche pas toutes les causes, et un
+ * grand recul ne prolonge pas le silence au-delà d'une fenêtre.
+ */
+function isWithinDedupeWindow(last: number, now: number): boolean {
+  return Math.abs(now - last) < CSP_DEDUPE_WINDOW_MS;
+}
 
 /**
  * Décide si une violation mérite une ligne, et compte celles qu'on tait.
@@ -191,16 +516,20 @@ type Tracker = Map<string, { last: number; suppressed: number }>;
  */
 export function admitViolation(tracker: Tracker, cause: string, now: number): number | null {
   const entry = tracker.get(cause);
-  if (entry && now - entry.last < CSP_DEDUPE_WINDOW_MS) {
+  if (entry && isWithinDedupeWindow(entry.last, now)) {
     entry.suppressed += 1;
     return null;
   }
 
   const suppressed = entry?.suppressed ?? 0;
+  // Retirer avant d'écrire : `Map.set` sur une clé existante ne la déplace pas,
+  // et une cause tout juste rafraîchie serait la première évincée.
+  tracker.delete(cause);
   tracker.set(cause, { last: now, suppressed: 0 });
 
   if (tracker.size > CSP_MAX_TRACKED_CAUSES) {
-    // `Map` préserve l'ordre d'insertion : les plus anciennes partent d'abord.
+    // `Map` préserve l'ordre d'insertion, donc de dernière écriture : les
+    // moins récemment journalisées partent d'abord.
     for (const key of tracker.keys()) {
       if (tracker.size <= CSP_MAX_TRACKED_CAUSES) break;
       if (key !== cause) tracker.delete(key);
@@ -210,18 +539,132 @@ export function admitViolation(tracker: Tracker, cause: string, now: number): nu
   return suppressed;
 }
 
-const tracker: Tracker = new Map();
+/** Compte des lignes écrites dans la fenêtre courante, et des causes neuves tues. */
+export interface LogBudget {
+  windowStart: number;
+  written: number;
+  /**
+   * Causes distinctes tues dans la fenêtre (une cause retentée compte une
+   * fois), bornée à {@link CSP_MAX_TRACKED_CAUSES} quand `droppedCauses` est suivi.
+   */
+  dropped: number;
+  /** Causes déjà comptées dans `dropped`, bornée à {@link CSP_MAX_TRACKED_CAUSES}. */
+  droppedCauses?: Set<string>;
+  /** Une cause inconnue a été tue, ensemble plein : `dropped` n'est qu'un minimum. */
+  droppedSaturated?: boolean;
+}
+
+/** Causes tues pendant une fenêtre close, à annoncer. */
+interface DroppedAnnounce {
+  count: number;
+  /** Le compte n'est qu'un minimum (ensemble des causes tues plein). */
+  atLeast: boolean;
+}
 
 /**
- * Journalise les violations d'un rapport, une par cause et par heure.
+ * Ouvre une nouvelle fenêtre si l'ancienne est close, et rend le nombre de
+ * causes tues pendant elle, à annoncer.
+ */
+function rollWindow(budget: LogBudget, now: number): DroppedAnnounce {
+  if (now - budget.windowStart < CSP_LOG_BUDGET_WINDOW_MS && now >= budget.windowStart) {
+    return { count: 0, atLeast: false };
+  }
+  const announce = { count: budget.dropped, atLeast: budget.droppedSaturated === true };
+  budget.windowStart = now;
+  budget.written = 0;
+  budget.dropped = 0;
+  budget.droppedSaturated = false;
+  budget.droppedCauses?.clear();
+  return announce;
+}
+
+function announceDropped({ count, atLeast }: DroppedAnnounce): void {
+  if (count > 0) {
+    const amount = atLeast ? `au moins ${count}` : `${count}`;
+    console.warn(`[csp] ${amount} cause(s) non journalisée(s) (plafond de ${CSP_MAX_LOG_LINES_PER_WINDOW} lignes par minute)`);
+  }
+}
+
+/**
+ * Une ligne de cause de plus tient-elle dans le plafond de la fenêtre ?
+ *
+ * @param budget État de la fenêtre, modifié sur place.
+ * @param now Horodatage courant.
+ * @param cause Clé de la cause, pour ne compter qu'une fois une cause retentée.
+ * @returns `allowed` : la ligne peut s'écrire ; `announce` : nombre de causes
+ *   tues pendant la fenêtre qui vient de se clore, à annoncer avant la ligne ;
+ *   `announceAtLeast` : ce nombre n'est qu'un minimum.
+ */
+export function admitLogLine(
+  budget: LogBudget,
+  now: number,
+  cause?: string,
+): { allowed: boolean; announce: number; announceAtLeast: boolean } {
+  const rolled = rollWindow(budget, now);
+  const announce = rolled.count;
+  const announceAtLeast = rolled.atLeast;
+  if (budget.written >= CSP_MAX_LOG_LINES_PER_WINDOW) {
+    const seen = budget.droppedCauses;
+    if (cause === undefined || !seen) {
+      budget.dropped += 1;
+    } else if (!seen.has(cause)) {
+      if (seen.size < CSP_MAX_TRACKED_CAUSES) {
+        budget.dropped += 1;
+        seen.add(cause);
+      } else {
+        // Ensemble plein : une cause inconnue peut être une cause déjà tue,
+        // retentée ; le compte s'arrête là et l'annonce dit « au moins ».
+        budget.droppedSaturated = true;
+      }
+    }
+    return { allowed: false, announce, announceAtLeast };
+  }
+  budget.written += 1;
+  return { allowed: true, announce, announceAtLeast };
+}
+
+const tracker: Tracker = new Map();
+const budget: LogBudget = { windowStart: Number.NEGATIVE_INFINITY, written: 0, dropped: 0, droppedCauses: new Set() };
+
+/** Remet à zéro le suivi et le plafond (tests). */
+export function resetCspLogState(): void {
+  tracker.clear();
+  budget.windowStart = Number.NEGATIVE_INFINITY;
+  budget.written = 0;
+  budget.dropped = 0;
+  budget.droppedSaturated = false;
+  budget.droppedCauses?.clear();
+}
+
+/**
+ * Journalise les violations d'un rapport, une par cause et par heure, dans la
+ * limite de {@link CSP_MAX_LOG_LINES_PER_WINDOW} lignes par fenêtre (plus une
+ * ligne d'annonce des causes tues, une fois la fenêtre close).
+ *
+ * Les champs sont assainis **ici encore**, bien que {@link parseCspReport} l'ait
+ * fait : une {@link CspViolation} se fabrique à la main, et la ligne de journal
+ * est la dernière barrière contre un saut de ligne ou une valeur démesurée —
+ * quelques centaines de caractères, négligeable.
  *
  * @param violations Violations déjà lues par {@link parseCspReport}.
  * @param now Horodatage courant, injectable pour les tests.
  */
 export function logCspViolations(violations: CspViolation[], now: number = Date.now()): void {
+  // La fenêtre se referme aussi sans cause neuve : l'annonce part au prochain rapport.
+  announceDropped(rollWindow(budget, now));
   for (const violation of violations) {
-    const suppressed = admitViolation(tracker, violationCause(violation), now);
-    if (suppressed === null) continue;
+    const cause = violationCause(violation);
+    const known = tracker.get(cause);
+    if (known && isWithinDedupeWindow(known.last, now)) {
+      known.suppressed += 1;
+      continue;
+    }
+    // Le plafond se décide **avant** de toucher au suivi : une cause tue ne
+    // doit ni évincer une cause réelle ni passer pour vue.
+    const { allowed, announce, announceAtLeast } = admitLogLine(budget, now, cause);
+    announceDropped({ count: announce, atLeast: announceAtLeast });
+    if (!allowed) continue;
+    const suppressed = admitViolation(tracker, cause, now) ?? 0;
     const repeated = suppressed > 0 ? ` (+${suppressed} identique(s) depuis)` : "";
     // Le temps du verbe suit le mode : en `Report-Only` le navigateur annonce ce
     // qu'il **aurait** refusé, en application il dit ce qu'il **a** refusé —
@@ -229,7 +672,7 @@ export function logCspViolations(violations: CspViolation[], now: number = Date.
     // « refuserait » sur une page en panne enverrait chercher au mauvais endroit.
     const verbe = CSP_MODE === "enforce" ? "a refusé" : "refuserait";
     console.warn(
-      `[csp] ${violation.directive} ${verbe} ${violation.blockedOrigin} sur ${violation.documentPath}${repeated}`,
+      `[csp] ${logSafe(violation.directive)} ${verbe} ${logSafe(violation.blockedOrigin)} sur ${logSafe(violation.documentPath)} (source : ${logSafe(violation.sourceOrigin)})${repeated}`,
     );
   }
 }

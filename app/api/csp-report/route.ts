@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  * **navigateur**, sans session ni jeton : la route est publique par
  * construction, et n'a aucun moyen de distinguer un vrai rapport d'un corps
  * fabriqué. Elle est donc écrite pour que cela n'ait pas d'importance — elle
- * ne lit que trois champs, n'écrit rien en base, et ne journalise qu'une ligne
+ * ne lit que quatre champs, n'écrit rien en base, et ne journalise qu'une ligne
  * par cause et par heure (voir `csp-reports`).
  *
  * Réponse **toujours 204**, y compris sur un corps illisible : un navigateur
