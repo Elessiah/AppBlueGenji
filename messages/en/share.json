@@ -175,11 +175,11 @@
     "categories": {
       "lfp": {
         "title": "Looking for a player",
-        "subtitle": "Overwatch teams that are recruiting, filterable by role, rank, region and availability."
+        "subtitle": "Teams that are recruiting: spot the ones looking for your role and rank."
       },
       "lft": {
         "title": "Looking for a team",
-        "subtitle": "Overwatch players looking for a team, filterable by role, rank and availability."
+        "subtitle": "Players looking for a team: filter by role, rank and availability."
       },
       "lfsub": {
         "title": "Looking for a sub",
@@ -191,7 +191,7 @@
       },
       "lfs": {
         "title": "Looking for a scrim",
-        "subtitle": "Overwatch teams looking for a practice match, filterable by level, day and time."
+        "subtitle": "Teams looking for a practice match: filter by level, day and time."
       },
       "lfcast": {
         "title": "Looking for a cast",

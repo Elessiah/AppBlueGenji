@@ -283,7 +283,8 @@ describe("GetiCategoryNav — sélecteur de catégorie", () => {
   it("geti_css_hasForcedColorsFallbackAndSubgridFallback", () => {
     const css = readSource("components/geti/geti.module.css");
 
-    expect(css).toMatch(/@media \(forced-colors: active\)\s*\{\s*\.tabActive\s*\{[^}]*border-width: 3px/);
+    expect(css).toMatch(/@media \(forced-colors: active\)\s*\{\s*(?:\/\*[^*]*\*\/\s*)?\.tabActive\s*\{[^}]*box-shadow: inset 0 0 0 2px Highlight/);
+    expect(css).not.toMatch(/\.tabActive\s*\{[^}]*border-width: 3px/);
     expect(css).toMatch(/@supports not \(grid-template-rows: subgrid\)\s*\{\s*\.options/);
     expect(css).toContain("box-shadow 0.15s ease");
     expect(css).toContain("overflow-wrap: break-word");

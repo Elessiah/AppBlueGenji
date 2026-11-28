@@ -622,7 +622,9 @@ posée par `app/geti-info/page.tsx` et `app/geti-info/[category]/page.tsx`.
 - `/geti-info` rend la catégorie **par défaut — les scrims (`lfs`,
   `GETI_DEFAULT_CATEGORY`)** — **sans renvoi** ; son adresse canonique
   est `/geti-info/lfs` (`GETI_DEFAULT_LIST_PATH`, que visent aussi le menu et
-  l'encart de l'accueil). L'adresse canonique ne porte jamais les filtres.
+  l'encart de l'accueil). `/geti-info/lfp` et les autres adresses de catégorie
+  restent valides (le défaut est passé de `lfp` à `lfs`, sans renvoi : seul le nu
+  `/geti-info` change de liste). L'adresse canonique ne porte jamais les filtres.
 - **Non indexée** (`GETI_ROBOTS` : `noindex, follow`, `lib/shared/geti/page.ts`) et
   absente du sitemap : les annonces portent le pseudo Discord de tiers (relais GETI
   compris), et `data-nosnippet` ne cache que l'extrait — une recherche sur un pseudo
@@ -749,15 +751,17 @@ restent visibles d'un coup. La courante se voit autrement que par la couleur
 
 Le nombre est celui des annonces **affichées par défaut** (sans filtre, closes
 cachées) : `countGetiPostsShared` le compte sur les lectures partagées de la liste
-(mêmes règles : fenêtre de garde, oppositions), gardé 10 s comme elles sous le préfixe
-`geti:scan:` (une annonce sortie de la garde quitte nombre et liste ensemble), oublié
+(mêmes règles : fenêtre de garde, oppositions), gardé 5 s (`GETI_COUNT_CACHE_TTL_MS`, bâti sur
+des lectures de 10 s : une annonce sortie de la garde quitte le nombre au plus 15 s
+après, la case courante sans filtre prenant le total de la liste) sous le préfixe
+`geti:scan:`, **une lecture après l'autre** (pas six ensemble sur le pool), oublié
 à toute écriture comme la liste ; la case courante sans filtre reprend le total de la
 liste affichée. Rendu **à part**, sous `Suspense` (`GetiCategoryNavCounted`) : la page
 n'attend jamais ces six lectures, le sélecteur s'affiche d'abord sans nombre. Lu à voix
 haute en entier (« Un scrim, 4 annonces » ; filtres actifs, la case courante dit « 14
 annonces sans filtre »). Illisible (`countGetiPostsForNav`) : aucun nombre, l'échec
 consigné par code comme celui de la liste (`logGetiListFailure`), et 10 s d'abstention
-avant de relire. Finitions : pastille vide de même emprise pendant l'attente des nombres
+avant de relire (levée aussi par toute écriture réussie : la base est revenue). Finitions : pastille vide de même emprise pendant l'attente des nombres
 (`pending`, aucun décalage à leur arrivée), libellé coupé aux mots (`overflow-wrap:
 break-word`, `hyphens: auto`), survol de l'icône et de la pastille, barre basse animée,
 repli `forced-colors` (bordure de 3 px, icône `Highlight`) ; dans la fenêtre « Publier »,

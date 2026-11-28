@@ -175,11 +175,11 @@
     "categories": {
       "lfp": {
         "title": "Je cherche un joueur",
-        "subtitle": "Les équipes Overwatch qui recrutent, filtrables par rôle, rang, région et disponibilités."
+        "subtitle": "Les équipes qui recrutent : repère celles qui cherchent ton rôle et ton rang."
       },
       "lft": {
         "title": "Je cherche une équipe",
-        "subtitle": "Les joueurs Overwatch qui cherchent une équipe, filtrables par rôle, rang et disponibilités."
+        "subtitle": "Les joueurs qui cherchent une équipe : filtre par rôle, rang et disponibilités."
       },
       "lfsub": {
         "title": "Je cherche un remplaçant",
@@ -191,7 +191,7 @@
       },
       "lfs": {
         "title": "Je cherche un scrim",
-        "subtitle": "Les équipes Overwatch qui cherchent un match d'entraînement, filtrables par niveau, jour et horaire."
+        "subtitle": "Les équipes qui cherchent un match d'entraînement : filtre par niveau, jour et horaire."
       },
       "lfcast": {
         "title": "Je cherche un cast",

@@ -756,15 +756,17 @@ export async function listGetiPostsShared(
 }
 
 /**
- * Durée de vie du compte par catégorie : celle des lectures qu'il compte
- * ({@link GETI_SCAN_CACHE_TTL_MS}), pour qu'une annonce sortie de la garde quitte
- * le nombre en même temps que la liste ; oublié avant à toute écriture (`forgetGetiListScans`).
+ * Durée de vie du compte par catégorie : la moitié de celle des lectures qu'il
+ * compte ({@link GETI_SCAN_CACHE_TTL_MS}), car il est bâti sur elles — une annonce
+ * sortie de la garde quitte donc le nombre au plus {@link GETI_COUNT_CACHE_TTL_MS}
+ * + {@link GETI_SCAN_CACHE_TTL_MS} (15 s) plus tard, jamais 2 × 10 s ; oublié avant à
+ * toute écriture (`forgetGetiListScans`).
  */
-export const GETI_COUNT_CACHE_TTL_MS = GETI_SCAN_CACHE_TTL_MS;
+export const GETI_COUNT_CACHE_TTL_MS = GETI_SCAN_CACHE_TTL_MS / 2;
 /** Après un compte illisible, la page s'en passe ce temps-là au lieu de relancer six lectures à chaque visite. */
 export const GETI_COUNT_FAILURE_TTL_MS = 10_000;
-/** Hors du préfixe des lectures : une écriture (base revenue) ne lève pas plus tôt l'abstention, sans gêne. */
-const GETI_COUNT_FAILURE_KEY = "geti:counts:failure";
+/** Sous le préfixe des lectures : une écriture réussie prouve la base revenue et lève l'abstention aussitôt. */
+const GETI_COUNT_FAILURE_KEY = `${GETI_SCAN_CACHE_PREFIX}counts-failure`;
 
 /**
  * Nombre d'annonces que chaque catégorie affiche **par défaut** (aucun filtre,
@@ -777,13 +779,15 @@ const GETI_COUNT_FAILURE_KEY = "geti:counts:failure";
  */
 export async function countGetiPostsShared(now: number = Date.now()): Promise<Record<GetiCategory, number>> {
   return cached(`${GETI_SCAN_CACHE_PREFIX}counts`, GETI_COUNT_CACHE_TTL_MS, async () => {
-    const totals = await Promise.all(
-      GETI_CATEGORIES.map(async (category) => {
-        const page = await listGetiPostsShared(getiPageFilter(category, emptyGetiPageQuery()), { pageSize: 1 }, now);
-        return [category, page.total] as const;
-      }),
-    );
-    return Object.fromEntries(totals) as Record<GetiCategory, number>;
+    // Une lecture après l'autre : après une écriture, les six lectures (jusqu'à
+    // GETI_LIST_SCAN_MAX lignes chacune) ne se lancent pas ensemble sur le petit
+    // pool, au détriment de la liste que la page lit au même instant.
+    const totals: Partial<Record<GetiCategory, number>> = {};
+    for (const category of GETI_CATEGORIES) {
+      const page = await listGetiPostsShared(getiPageFilter(category, emptyGetiPageQuery()), { pageSize: 1 }, now);
+      totals[category] = page.total;
+    }
+    return totals as Record<GetiCategory, number>;
   });
 }
 

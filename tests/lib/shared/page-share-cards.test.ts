@@ -32,6 +32,8 @@ import enRules from "@/messages/en/rules.json";
 import enShare from "@/messages/en/share.json";
 import frRules from "@/messages/fr/rules.json";
 import frShare from "@/messages/fr/share.json";
+import enGeti from "@/messages/en/geti.json";
+import frGeti from "@/messages/fr/geti.json";
 
 const LOCALES: [string, ShareMessages, typeof frRules][] = [
   ["fr", frShare, frRules],
@@ -208,6 +210,18 @@ describe("langues", () => {
   it("ne laisse aucune carte anglaise identique à la française (hors noms propres)", () => {
     const same = PAGE_SHARE_CARD_KEYS.filter((key) => frShare.pages[key].subtitle === enShare.pages[key].subtitle);
     expect(same).toEqual([]);
+  });
+});
+
+describe("textes des cartes GETI", () => {
+  it.each([
+    ["fr", frShare, frGeti],
+    ["en", enShare, enGeti],
+  ] as const)("%s : le sous-titre de la carte est la phrase de l'aperçu de la catégorie", (_locale, share, geti) => {
+    for (const category of Object.keys(share.geti.categories) as (keyof typeof share.geti.categories)[]) {
+      expect(share.geti.categories[category].subtitle).toBe(geti.categories[category].lede);
+      expect(share.geti.categories[category].subtitle.length).toBeLessThanOrEqual(RULE_MODE_SUBTITLE_MAX_LENGTH);
+    }
   });
 });
 

@@ -1242,8 +1242,39 @@ describe("countGetiPostsForNav", () => {
     expect(counts).toEqual({ lfp: 0, lft: 0, lfsub: 0, lfstaff: 0, lfs: 0, lfcast: 0 });
   });
 
-  it("countCacheTtl_equalsScanTtl_soCountAndListExpireTogether", () => {
-    expect(GETI_COUNT_CACHE_TTL_MS).toBe(GETI_SCAN_CACHE_TTL_MS);
+  it("countCacheTtl_isHalfTheScanTtl_soTheNumberLagsTheListByAtMost15s", () => {
+    expect(GETI_COUNT_CACHE_TTL_MS).toBe(GETI_SCAN_CACHE_TTL_MS / 2);
+  });
+
+  it("countGetiPostsShared_coldCache_readsOneCategoryAtATime", async () => {
+    let running = 0;
+    let peak = 0;
+    const execute = jest.fn<SqlQuery>(async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await Promise.resolve();
+      running -= 1;
+      return [[]];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+
+    await countGetiPostsForNav(NOW);
+
+    expect(execute).toHaveBeenCalledTimes(6);
+    expect(peak).toBe(1);
+  });
+
+  it("countGetiPostsForNav_afterAWrite_liftsTheAbstentionAtOnce", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("down"));
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    await countGetiPostsForNav(NOW);
+    execute.mockResolvedValue([[]]);
+
+    forgetGetiListScans();
+    const counts = await countGetiPostsForNav(NOW);
+
+    expect(counts).toEqual({ lfp: 0, lft: 0, lfsub: 0, lfstaff: 0, lfs: 0, lfcast: 0 });
   });
 });
 
