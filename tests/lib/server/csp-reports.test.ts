@@ -2,10 +2,14 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   CSP_DEDUPE_WINDOW_MS,
   CSP_FIELD_MAX_LENGTH,
+  CSP_INPUT_MAX_LENGTH,
+  CSP_LOG_BUDGET_WINDOW_MS,
+  CSP_MAX_LOG_LINES_PER_WINDOW,
   CSP_MAX_TRACKED_CAUSES,
   CSP_MAX_VIOLATIONS_PER_REPORT,
   CSP_SOURCE_NONE,
   CSP_SOURCE_PAGE,
+  admitLogLine,
   admitViolation,
   blockedOriginOf,
   documentPathOf,
@@ -586,5 +590,106 @@ describe("logCspViolations", () => {
       1_000,
     );
     expect(warn).toHaveBeenCalledWith("[csp] font-src?[auth] a a refusé b?c sur /d?e (source : f?g)");
+  });
+});
+
+describe("bornes de lecture d'un corps fabriqué", () => {
+  it("ne balaie que la tête d'un champ démesuré et y remplace les caractères dangereux", () => {
+    const result = logSafe(`a\nb${"x".repeat(30_000)}\n`);
+    expect(result).toHaveLength(CSP_FIELD_MAX_LENGTH);
+    expect(result.startsWith("a?bxxx")).toBe(true);
+  });
+
+  it("lit une origine de 30 Ko faite de deux-points sans la découper", () => {
+    expect(blockedOriginOf(":".repeat(30_000))).toBe("inconnu");
+    expect(sourceOriginOf(":".repeat(30_000))).toBe("inconnu");
+  });
+
+  it("borne un chemin de document démesuré", () => {
+    const path = documentPathOf(`https://exemple.invalid/${"a".repeat(30_000)}`);
+    expect(path.length).toBeLessThanOrEqual(CSP_FIELD_MAX_LENGTH);
+  });
+
+  it("écarte une directive de 30 Ko d'espaces sans la découper", () => {
+    const body = { "csp-report": { "effective-directive": " ".repeat(30_000), "blocked-uri": "inline" } };
+    expect(parseCspReport(body)).toEqual([]);
+  });
+
+  it("garde une directive lisible placée avant le plafond de lecture", () => {
+    const directive = `connect-src ${"x".repeat(CSP_INPUT_MAX_LENGTH * 2)}`;
+    const [violation] = parseCspReport({ "csp-report": { "violated-directive": directive } });
+    expect(violation.directive).toBe("connect-src");
+  });
+});
+
+describe("admitViolation : récence", () => {
+  it("n'évince pas une cause rafraîchie avant des causes plus récentes", () => {
+    const tracker = new Map();
+    admitViolation(tracker, "vieille", 0);
+    for (let i = 0; i < CSP_MAX_TRACKED_CAUSES - 1; i++) admitViolation(tracker, `c-${i}`, 1 + i);
+    // La fenêtre est écoulée : la cause est journalisée de nouveau, donc rafraîchie.
+    admitViolation(tracker, "vieille", CSP_DEDUPE_WINDOW_MS + 1);
+    admitViolation(tracker, "neuve", CSP_DEDUPE_WINDOW_MS + 2);
+    expect(tracker.has("vieille")).toBe(true);
+    expect(tracker.has("c-0")).toBe(false);
+  });
+});
+
+describe("admitLogLine", () => {
+  const fresh = () => ({ windowStart: Number.NEGATIVE_INFINITY, written: 0, dropped: 0 });
+
+  it("laisse passer jusqu'au plafond puis compte les lignes tues", () => {
+    const budget = fresh();
+    for (let i = 0; i < CSP_MAX_LOG_LINES_PER_WINDOW; i++) {
+      expect(admitLogLine(budget, 10).allowed).toBe(true);
+    }
+    expect(admitLogLine(budget, 10).allowed).toBe(false);
+    expect(budget.dropped).toBe(1);
+  });
+
+  it("annonce les causes tues à l'ouverture de la fenêtre suivante", () => {
+    const budget = fresh();
+    for (let i = 0; i < CSP_MAX_LOG_LINES_PER_WINDOW + 3; i++) admitLogLine(budget, 10);
+    expect(admitLogLine(budget, 10 + CSP_LOG_BUDGET_WINDOW_MS)).toEqual({ allowed: true, announce: 3 });
+    expect(budget.written).toBe(1);
+  });
+
+  it("ne réannonce rien dans une fenêtre sans perte", () => {
+    const budget = fresh();
+    admitLogLine(budget, 0);
+    expect(admitLogLine(budget, CSP_LOG_BUDGET_WINDOW_MS)).toEqual({ allowed: true, announce: 0 });
+  });
+});
+
+describe("logCspViolations : plafond global", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const cause = (i: number, host: string) => ({
+    directive: "img-src",
+    blockedOrigin: `https://${host}${i}.invalid`,
+    documentPath: "/",
+    sourceOrigin: CSP_SOURCE_NONE,
+  });
+
+  it("n'écrit qu'un nombre borné de lignes face à des causes fabriquées", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const now = 50 * CSP_DEDUPE_WINDOW_MS;
+    logCspViolations(Array.from({ length: 100 }, (_, i) => cause(i, "flood")), now);
+    expect(warn).toHaveBeenCalledTimes(CSP_MAX_LOG_LINES_PER_WINDOW);
+  });
+
+  it("n'érige pas en cause vue une ligne qui n'a pas été écrite", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const now = 100 * CSP_DEDUPE_WINDOW_MS;
+    logCspViolations(Array.from({ length: CSP_MAX_LOG_LINES_PER_WINDOW + 1 }, (_, i) => cause(i, "noyee")), now);
+    warn.mockClear();
+    // Fenêtre suivante : la dernière cause, tue plus tôt, s'écrit enfin (après l'annonce).
+    const later = now + CSP_LOG_BUDGET_WINDOW_MS;
+    logCspViolations([cause(CSP_MAX_LOG_LINES_PER_WINDOW, "noyee")], later);
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0][0]).toContain("1 cause(s) neuve(s) non journalisée(s)");
+    expect(warn.mock.calls[1][0]).toContain(`noyee${CSP_MAX_LOG_LINES_PER_WINDOW}`);
   });
 });

@@ -77,11 +77,46 @@ export const CSP_MAX_VIOLATIONS_PER_REPORT = 25;
 export const CSP_FIELD_MAX_LENGTH = 200;
 
 /**
+ * Longueur lue d'un champ brut du rapport, avant tout découpage ou analyse
+ * d'URL. Le corps pèse jusqu'à 32 Ko et chaque champ est choisi par
+ * l'appelant, sur vingt-cinq violations : aucune origine, aucun schéma ni nom
+ * de directive réel n'approche cette longueur, et lire plus ne ferait que
+ * payer des découpages et des analyses sans rien apprendre à la ligne.
+ */
+export const CSP_INPUT_MAX_LENGTH = 2048;
+
+/** Fenêtre du plafond de lignes (voir {@link CSP_MAX_LOG_LINES_PER_WINDOW}). */
+export const CSP_LOG_BUDGET_WINDOW_MS = 60_000;
+
+/**
+ * Plafond **global** de lignes de cause écrites par fenêtre.
+ *
+ * Le dédoublonnage ne protège pas des causes fabriquées : un corps choisit son
+ * `blocked-uri`, donc 25 causes « nouvelles » par requête et jusqu'à 1 500 par
+ * minute depuis une seule adresse (60 requêtes), chacune une ligne de 400
+ * caractères dans pm2 — le fichier de log que ce module existe pour éviter.
+ * Au-delà du plafond, les causes neuves sont comptées, pas écrites, et la
+ * fenêtre suivante en annonce le nombre sur une seule ligne.
+ */
+export const CSP_MAX_LOG_LINES_PER_WINDOW = 30;
+
+/**
  * Longueur de l'empreinte ajoutée à un champ coupé : deux valeurs qui ne
  * diffèrent qu'après la coupure restent deux causes, et une valeur fabriquée
  * ne peut pas taire une vraie violation qui partagerait son début.
  */
 const TRUNCATION_DIGEST_LENGTH = 10;
+
+/** Borne un champ brut à {@link CSP_INPUT_MAX_LENGTH} avant de le découper. */
+function bounded(value: string): string {
+  return value.length > CSP_INPUT_MAX_LENGTH ? value.slice(0, CSP_INPUT_MAX_LENGTH) : value;
+}
+
+/** Texte avant le premier `:` (ou tout le texte), sans découper le reste. */
+function beforeColon(value: string): string {
+  const colon = value.indexOf(":");
+  return colon === -1 ? value : value.slice(0, colon);
+}
 
 /** Mot-clé ou schéma (`inline`, `eval`, `wasm-eval`, `data`, `chrome-extension`…). */
 const KEYWORD = /^[a-z][a-z0-9+.-]{0,39}$/i;
@@ -113,13 +148,15 @@ const UNSAFE_LOG_CHARS =
  * @returns Le texte, sur une seule ligne et borné.
  */
 export function logSafe(value: string): string {
-  const clean = value.replace(UNSAFE_LOG_CHARS, "?");
-  if (clean.length <= CSP_FIELD_MAX_LENGTH) return clean;
+  // Le remplacement est d'un codet pour un codet : la longueur ne change pas.
+  // Seule la tête gardée est donc balayée, pas les 32 Ko d'un champ fabriqué ;
+  // l'empreinte, elle, porte sur la valeur entière.
+  if (value.length <= CSP_FIELD_MAX_LENGTH) return value.replace(UNSAFE_LOG_CHARS, "?");
   const digest = createHash("sha256").update(value).digest("hex").slice(0, TRUNCATION_DIGEST_LENGTH);
-  let head = clean.slice(0, CSP_FIELD_MAX_LENGTH - TRUNCATION_DIGEST_LENGTH - 2);
+  let head = value.slice(0, CSP_FIELD_MAX_LENGTH - TRUNCATION_DIGEST_LENGTH - 2);
   // Coupure entre les deux moitiés d'une paire : la moitié haute part aussi.
   if (/[\ud800-\udbff]$/.test(head)) head = head.slice(0, -1);
-  return `${head}\u2026#${digest}`;
+  return `${head.replace(UNSAFE_LOG_CHARS, "?")}\u2026#${digest}`;
 }
 
 /**
@@ -137,18 +174,18 @@ export function blockedOriginOf(value: unknown): string {
   if (typeof value !== "string" || value.trim().length === 0) {
     return "inconnu";
   }
-  const trimmed = value.trim();
+  const trimmed = bounded(value).trim();
   // Mots-clés et schémas sans hôte : `data:`, `blob:`, `inline`, `eval`…
   // Seul un vrai mot-clé passe : le reste (sauts de ligne compris) est rejeté.
   if (!trimmed.includes("://")) {
-    const keyword = trimmed.split(":")[0];
+    const keyword = beforeColon(trimmed);
     return KEYWORD.test(keyword) ? keyword.toLowerCase() : "inconnu";
   }
   try {
     const origin = new URL(trimmed).origin;
     if (origin !== "null") return logSafe(origin);
     // Un schéma non standard n'a pas d'origine : son nom suffit.
-    const scheme = trimmed.split(":")[0];
+    const scheme = beforeColon(trimmed);
     return KEYWORD.test(scheme) ? scheme.toLowerCase() : "inconnu";
   } catch {
     return "inconnu";
@@ -241,12 +278,12 @@ export function sourceOriginOf(value: unknown): string {
   if (typeof value !== "string" || value.trim().length === 0) {
     return CSP_SOURCE_NONE;
   }
-  const trimmed = value.trim();
+  const trimmed = bounded(value).trim();
   // Tête avant le premier `:` : schéma d'une adresse, ou mot-clé entier.
   // Chrome ramène souvent le script d'une extension à son seul schéma
   // (`"chrome-extension"`, sans `:`) ; Firefox et Safari écrivent `inline`
   // ou `eval` pour du code sans fichier.
-  const head = trimmed.split(":")[0].toLowerCase();
+  const head = beforeColon(trimmed).toLowerCase();
   const keyword = KEYWORD.test(head) ? head : null;
   if (keyword && EXTENSION_SCHEMES.has(keyword)) return keyword;
   if (!trimmed.includes("://")) {
@@ -277,8 +314,8 @@ export function sourceOriginOf(value: unknown): string {
 function isSitePage(source: unknown, document: unknown): boolean {
   if (typeof source !== "string" || typeof document !== "string") return false;
   try {
-    const a = new URL(source.trim());
-    const b = new URL(document.trim());
+    const a = new URL(bounded(source).trim());
+    const b = new URL(bounded(document).trim());
     if (a.origin === "null" || a.origin !== b.origin) return false;
     return !a.pathname.startsWith("/_next/") && !/\.m?js$/i.test(a.pathname);
   } catch {
@@ -296,7 +333,7 @@ export function documentPathOf(value: unknown): string {
   if (typeof value !== "string" || value.trim().length === 0) {
     return "/";
   }
-  const trimmed = value.trim();
+  const trimmed = bounded(value).trim();
   try {
     return logSafe(new URL(trimmed).pathname || "/");
   } catch {
@@ -370,7 +407,7 @@ function violationOf(body: Record<string, unknown>): CspViolation | null {
   // L'ancien `violated-directive` porte la directive entière
   // (`script-src 'self'`) : seul son nom compte. Un nom qui n'en est pas un
   // (saut de ligne, texte libre) écarte le rapport — un navigateur n'en envoie pas.
-  const name = directive.trim().split(/\s+/)[0].toLowerCase();
+  const name = bounded(directive).trim().split(/\s+/, 1)[0].toLowerCase();
   if (!DIRECTIVE.test(name)) return null;
 
   const documentUrl = body["document-uri"] ?? body.documentURL;
@@ -416,10 +453,14 @@ export function admitViolation(tracker: Tracker, cause: string, now: number): nu
   }
 
   const suppressed = entry?.suppressed ?? 0;
+  // Retirer avant d'écrire : `Map.set` sur une clé existante ne la déplace pas,
+  // et une cause tout juste rafraîchie serait la première évincée.
+  tracker.delete(cause);
   tracker.set(cause, { last: now, suppressed: 0 });
 
   if (tracker.size > CSP_MAX_TRACKED_CAUSES) {
-    // `Map` préserve l'ordre d'insertion : les plus anciennes partent d'abord.
+    // `Map` préserve l'ordre d'insertion, donc de dernière écriture : les
+    // moins récemment journalisées partent d'abord.
     for (const key of tracker.keys()) {
       if (tracker.size <= CSP_MAX_TRACKED_CAUSES) break;
       if (key !== cause) tracker.delete(key);
@@ -429,18 +470,69 @@ export function admitViolation(tracker: Tracker, cause: string, now: number): nu
   return suppressed;
 }
 
-const tracker: Tracker = new Map();
+/** Compte des lignes écrites dans la fenêtre courante, et des causes neuves tues. */
+export interface LogBudget {
+  windowStart: number;
+  written: number;
+  dropped: number;
+}
 
 /**
- * Journalise les violations d'un rapport, une par cause et par heure.
+ * Une ligne de cause de plus tient-elle dans le plafond de la fenêtre ?
+ *
+ * @param budget État de la fenêtre, modifié sur place.
+ * @param now Horodatage courant.
+ * @returns `allowed` : la ligne peut s'écrire ; `announce` : nombre de causes
+ *   tues pendant la fenêtre qui vient de se clore, à annoncer avant la ligne.
+ */
+export function admitLogLine(budget: LogBudget, now: number): { allowed: boolean; announce: number } {
+  let announce = 0;
+  if (now - budget.windowStart >= CSP_LOG_BUDGET_WINDOW_MS || now < budget.windowStart) {
+    announce = budget.dropped;
+    budget.windowStart = now;
+    budget.written = 0;
+    budget.dropped = 0;
+  }
+  if (budget.written >= CSP_MAX_LOG_LINES_PER_WINDOW) {
+    budget.dropped += 1;
+    return { allowed: false, announce };
+  }
+  budget.written += 1;
+  return { allowed: true, announce };
+}
+
+const tracker: Tracker = new Map();
+const budget: LogBudget = { windowStart: Number.NEGATIVE_INFINITY, written: 0, dropped: 0 };
+
+/**
+ * Journalise les violations d'un rapport, une par cause et par heure, dans la
+ * limite de {@link CSP_MAX_LOG_LINES_PER_WINDOW} lignes par fenêtre.
+ *
+ * Les champs sont assainis **ici encore**, bien que {@link parseCspReport} l'ait
+ * fait : une {@link CspViolation} se fabrique à la main, et la ligne de journal
+ * est la dernière barrière contre un saut de ligne ou une valeur démesurée —
+ * quelques centaines de caractères, négligeable.
  *
  * @param violations Violations déjà lues par {@link parseCspReport}.
  * @param now Horodatage courant, injectable pour les tests.
  */
 export function logCspViolations(violations: CspViolation[], now: number = Date.now()): void {
   for (const violation of violations) {
-    const suppressed = admitViolation(tracker, violationCause(violation), now);
+    const cause = violationCause(violation);
+    const entry = tracker.get(cause);
+    const suppressed = admitViolation(tracker, cause, now);
     if (suppressed === null) continue;
+    const { allowed, announce } = admitLogLine(budget, now);
+    if (announce > 0) {
+      console.warn(`[csp] ${announce} cause(s) neuve(s) non journalisée(s) (plafond de ${CSP_MAX_LOG_LINES_PER_WINDOW} lignes par minute)`);
+    }
+    if (!allowed) {
+      // Rien n'a été écrit : la cause ne doit pas passer pour vue, sinon une
+      // vraie violation noyée sous un envoi fabriqué se tairait une heure.
+      if (entry) tracker.set(cause, entry);
+      else tracker.delete(cause);
+      continue;
+    }
     const repeated = suppressed > 0 ? ` (+${suppressed} identique(s) depuis)` : "";
     // Le temps du verbe suit le mode : en `Report-Only` le navigateur annonce ce
     // qu'il **aurait** refusé, en application il dit ce qu'il **a** refusé —
