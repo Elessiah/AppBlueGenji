@@ -42,6 +42,7 @@ import { SHARE_CARD_COLORS, SHARE_CARD_MOTIF_ALPHA } from "./share-card";
 export const SHARE_ACCENT_COLORS: Readonly<Record<ShareAccent, string>> = {
   cyan: SHARE_CARD_COLORS.cyan,
   blue: SHARE_CARD_COLORS.blueSoft,
+  brand: SHARE_CARD_COLORS.blue,
   violet: SHARE_CARD_COLORS.violetSoft,
   pink: SHARE_CARD_COLORS.pink,
   teal: SHARE_CARD_COLORS.teal,

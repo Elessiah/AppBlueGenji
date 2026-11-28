@@ -5,7 +5,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { getCurrentUser } from "@/lib/server/auth";
 import { listGetiAlerts } from "@/lib/server/geti/alerts";
-import { countGetiPostsShared, listGetiPostsShared, logGetiListFailure } from "@/lib/server/geti/posts";
+import { countGetiPostsForNav, listGetiPostsShared, logGetiListFailure } from "@/lib/server/geti/posts";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -60,15 +60,13 @@ export async function GetiInfoView({
   const now = Date.now();
   // Base injoignable : la page reste lisible (carte, onglets, bouton « Publier »).
   // La session se lit en même temps que la liste (deux lectures indépendantes) ; les alertes du compte, après.
-  const [listed, viewer, counts] = await Promise.all([
+  const [listed, viewer] = await Promise.all([
     listGetiPostsShared(filter, { page: query.page }, now).catch((error: unknown): GetiPostPage | null => {
       // Un code seul (jamais le message, qui peut citer la requête), une ligne par minute au plus.
       logGetiListFailure(error);
       return null;
     }),
     getCurrentUser().catch(() => null),
-    // Nombre d'annonces par catégorie (sélecteur) : mutualisé, jamais bloquant — sans lui, aucun nombre.
-    countGetiPostsShared(now).catch(() => null),
   ]);
   const activeFilters = getiActiveFilterCount(query);
   // Les alertes du compte connecté, s'il y en a un : la page reste publique, et
@@ -102,7 +100,19 @@ export async function GetiInfoView({
       </section>
 
       <div className={styles.section}>
-        <GetiCategoryNav text={m.tabs} locale={locale} current={category} counts={counts} />
+        {/* Nombre d'annonces par catégorie : rendu à part (`Suspense`), la page n'attend jamais ses six lectures. */}
+        <Suspense
+          fallback={<GetiCategoryNav text={m.tabs} locale={locale} current={category} counts={null} filtered={activeFilters > 0} />}
+        >
+          <GetiCategoryNavCounted
+            text={m.tabs}
+            locale={locale}
+            current={category}
+            filtered={activeFilters > 0}
+            currentTotal={listed !== null && activeFilters === 0 ? listed.total : null}
+            now={now}
+          />
+        </Suspense>
 
         <GetiOfficialCard
           text={m.official}
@@ -185,6 +195,31 @@ export async function GetiInfoView({
       <GetiRefresher />
     </PublicPageShell>
   );
+}
+
+/**
+ * Le sélecteur avec ses nombres (`countGetiPostsForNav`, mutualisé) : sans
+ * eux, il se rend sans nombre. La case courante, sans filtre, reprend le total
+ * de la liste affichée (`currentTotal`) : ses deux nombres ne se contredisent jamais.
+ */
+async function GetiCategoryNavCounted({
+  text,
+  locale,
+  current,
+  filtered,
+  currentTotal,
+  now,
+}: Readonly<{
+  text: GetiMessages["tabs"];
+  locale: Locale;
+  current: GetiCategory;
+  filtered: boolean;
+  currentTotal: number | null;
+  now: number;
+}>) {
+  const counts = await countGetiPostsForNav(now);
+  const shown = counts && currentTotal !== null ? { ...counts, [current]: currentTotal } : counts;
+  return <GetiCategoryNav text={text} locale={locale} current={current} counts={shown} filtered={filtered} />;
 }
 
 type ResultsProps = Readonly<{

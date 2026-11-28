@@ -25,7 +25,8 @@
     "lfstaff": "Un staff",
     "lfs": "Un scrim",
     "lfcast": "Un cast",
-    "count": "{count, plural, one {# annonce} other {# annonces}}"
+    "count": "{count, plural, one {# annonce} other {# annonces}}",
+    "countUnfiltered": "{count, plural, one {# annonce sans filtre} other {# annonces sans filtre}}"
   },
   "categories": {
     "lfp": {
@@ -65,7 +66,7 @@
   "publish": {
     "button": "Publier une annonce",
     "title": "Publier une annonce",
-    "intro": "Les annonces de cette page ne s'écrivent pas sur le site : elles viennent de Discord. Deux façons de publier la tienne.",
+    "intro": "Les annonces de cette page ne s'écrivent pas sur le site : elles viennent de Discord.",
     "oursEyebrow": "SERVEUR BLUEGENJI",
     "oursTitle": "Publier sur notre serveur",
     "stepChannel": "Écris ton annonce dans le salon de cette catégorie : elle apparaît ici en quelques instants.",
@@ -75,6 +76,7 @@
     "getiTitle": "Publier via GETI Bot",
     "stepGeti": "Publie-la depuis le serveur officiel de GETI : son bot la relaie vers tous les serveurs abonnés du réseau.",
     "rules": "Une annonce modifiée ou supprimée sur Discord l'est aussi sur cette page.",
+    "rulesSubject": "les annonces modifiées ou supprimées",
     "close": "Fermer",
     "closeLabel": "Fermer la fenêtre",
     "newTab": "(nouvel onglet)"

@@ -25,7 +25,8 @@
     "lfstaff": "Staff",
     "lfs": "Scrims",
     "lfcast": "Casters",
-    "count": "{count, plural, one {# post} other {# posts}}"
+    "count": "{count, plural, one {# post} other {# posts}}",
+    "countUnfiltered": "{count, plural, one {# post without filters} other {# posts without filters}}"
   },
   "categories": {
     "lfp": {
@@ -65,7 +66,7 @@
   "publish": {
     "button": "Publish a post",
     "title": "Publish a post",
-    "intro": "Posts on this page are not written on the site: they come from Discord. Two ways to publish yours.",
+    "intro": "Posts on this page are not written on the site: they come from Discord.",
     "oursEyebrow": "BLUEGENJI SERVER",
     "oursTitle": "Post on our server",
     "stepChannel": "Write your post in this category's channel: it shows up here within moments.",
@@ -75,6 +76,7 @@
     "getiTitle": "Post via GETI Bot",
     "stepGeti": "Publish it from the official GETI server: its bot relays it to every subscribed server of the network.",
     "rules": "A post edited or deleted on Discord is edited or deleted on this page too.",
+    "rulesSubject": "edited or deleted posts",
     "close": "Close",
     "closeLabel": "Close the window",
     "newTab": "(new tab)"

@@ -32,12 +32,15 @@ export function GetiCategoryNav({
   locale,
   current,
   counts,
+  filtered = false,
 }: Readonly<{
   text: GetiMessages["tabs"];
   locale: Locale;
   current: GetiCategory;
   /** Annonces affichées par défaut dans chaque catégorie ; `null` : inconnu, aucun nombre n'est rendu. */
   counts: Readonly<Record<GetiCategory, number>> | null;
+  /** Des filtres sont actifs : le nombre de la case courante (sans filtre) le dit à la lecture vocale. */
+  filtered?: boolean;
 }>) {
   return (
     <nav className={styles.tabs} aria-label={text.label}>
@@ -62,7 +65,9 @@ export function GetiCategoryNav({
                 {counts ? (
                   <span className={styles.tabCount}>
                     <span aria-hidden="true">{formatLocalNumber(counts[entry], locale)}</span>
-                    <span className="sr-only">, {getiText(locale, text.count, { count: counts[entry] })}</span>
+                    <span className="sr-only">
+                      , {getiText(locale, active && filtered ? text.countUnfiltered : text.count, { count: counts[entry] })}
+                    </span>
                   </span>
                 ) : null}
               </LocaleLink>

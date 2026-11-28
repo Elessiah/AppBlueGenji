@@ -138,7 +138,7 @@
 
 .tabActive .tabIcon {
   background: var(--blue-500);
-  color: #001520;
+  color: var(--cyber-bg);
 }
 
 .tabActive .tabCount {

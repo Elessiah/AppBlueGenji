@@ -93,7 +93,7 @@ export type ShareMotif =
  * variantes `.pill-*` — jamais l'ambre (un avertissement), jamais le rouge (une
  * vraie diffusion).
  */
-export type ShareAccent = "cyan" | "blue" | "violet" | "pink" | "teal";
+export type ShareAccent = "cyan" | "blue" | "brand" | "violet" | "pink" | "teal";
 
 export type ShareCardStyle = { motif: ShareMotif | null; accent: ShareAccent };
 
@@ -154,7 +154,8 @@ export function getiShareCardKey(category: GetiCategory): string {
 
 /**
  * Motif et teinte de chaque catégorie d'annonces — les mêmes icônes que le
- * sélecteur de la page (`components/geti/GetiCategoryNav.tsx`).
+ * sélecteur de la page (`components/geti/GetiCategoryNav.tsx`) ; six teintes
+ * distinctes, deux liens collés côte à côte ne se ressemblent pas.
  */
 export const GETI_SHARE_CARD_STYLES: Readonly<Record<GetiCategory, ShareCardStyle>> = {
   lfp: { motif: "userPlus", accent: "blue" },
@@ -162,7 +163,7 @@ export const GETI_SHARE_CARD_STYLES: Readonly<Record<GetiCategory, ShareCardStyl
   lfsub: { motif: "swap", accent: "teal" },
   lfstaff: { motif: "clipboard", accent: "pink" },
   lfs: { motif: "swords", accent: "cyan" },
-  lfcast: { motif: "mic", accent: "violet" },
+  lfcast: { motif: "mic", accent: "brand" },
 };
 
 /** Style des cartes de mode de règles. */

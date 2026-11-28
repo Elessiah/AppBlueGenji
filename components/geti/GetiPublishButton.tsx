@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useAppLocale } from "@/components/i18n/locale-context";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { getiText, type GetiMessages } from "@/lib/shared/geti/page-text";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -66,7 +67,12 @@ export function GetiPublishDialog({
           </button>
         </header>
         <ScrollArea orientation="y" className={`${styles.modalScroll} ${styles.publishScroll}`} ariaLabel={text.title}>
-          <p className={styles.modalText}>{text.intro}</p>
+          <InfoHintRow inline>
+            <p className={styles.modalText}>{text.intro}</p>
+            <InfoHint id="geti-publish-rules-hint" subject={text.rulesSubject}>
+              {text.rules}
+            </InfoHint>
+          </InfoHintRow>
           <div className={styles.options}>
             <section className={`${styles.option} ${styles.optionOurs}`} aria-labelledby={oursId}>
               <header className={styles.optionHead}>
@@ -124,7 +130,6 @@ export function GetiPublishDialog({
               </div>
             </section>
           </div>
-          <p className={styles.modalNote}>{text.rules}</p>
         </ScrollArea>
         <div className={styles.modalActions}>
           <CyberButton variant="ghost" className={styles.publishClose} onClick={onClose}>

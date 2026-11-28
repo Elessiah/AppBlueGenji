@@ -8,7 +8,11 @@ import { getDatabase } from "@/lib/server/database";
 import {
   deleteGetiPosts,
   forgetGetiListScans,
+  countGetiPostsForNav,
   countGetiPostsShared,
+  GETI_COUNT_CACHE_TTL_MS,
+  GETI_COUNT_FAILURE_TTL_MS,
+  GETI_SCAN_CACHE_TTL_MS,
   GETI_LIST_SCAN_MAX,
   getiTrustedBots,
   listGetiPosts,
@@ -1180,6 +1184,66 @@ describe("countGetiPostsShared", () => {
     const counts = await countGetiPostsShared(NOW);
 
     expect(counts.lft).toBe(0);
+  });
+});
+
+describe("countGetiPostsForNav", () => {
+  beforeEach(() => {
+    clearCache();
+    resetGetiListFailureLog();
+    jest.restoreAllMocks();
+  });
+
+  it("countGetiPostsForNav_readSucceeds_returnsCountsPerCategory", async () => {
+    jest.mocked(getDatabase).mockResolvedValue(executor(executeMock([row()])));
+
+    const counts = await countGetiPostsForNav(NOW);
+
+    expect(counts).toEqual({ lfp: 0, lft: 1, lfsub: 0, lfstaff: 0, lfs: 0, lfcast: 0 });
+  });
+
+  it("countGetiPostsForNav_readFails_returnsNullAndLogsCodeOnly", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const failure = Object.assign(new Error("SELECT secret FROM bg_geti_posts"), { code: "ECONNREFUSED" });
+    jest.mocked(getDatabase).mockResolvedValue(executor(jest.fn<SqlQuery>().mockRejectedValue(failure)));
+
+    const counts = await countGetiPostsForNav(NOW);
+
+    expect(counts).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toBe("[geti] post list unavailable:");
+    expect(JSON.stringify(warn.mock.calls[0])).not.toContain("secret");
+  });
+
+  it("countGetiPostsForNav_withinFailureAbstention_returnsNullWithoutReading", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("down"));
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    await countGetiPostsForNav(NOW);
+    const readsAfterFailure = execute.mock.calls.length;
+
+    const counts = await countGetiPostsForNav(NOW);
+
+    expect(counts).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(readsAfterFailure);
+  });
+
+  it("countGetiPostsForNav_afterAbstention_readsAgain", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const clock = jest.spyOn(Date, "now").mockReturnValue(NOW);
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("down"));
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    await countGetiPostsForNav(NOW);
+    execute.mockResolvedValue([[]]);
+    clock.mockReturnValue(NOW + GETI_COUNT_FAILURE_TTL_MS + 1);
+
+    const counts = await countGetiPostsForNav(NOW);
+
+    expect(counts).toEqual({ lfp: 0, lft: 0, lfsub: 0, lfstaff: 0, lfs: 0, lfcast: 0 });
+  });
+
+  it("countCacheTtl_equalsScanTtl_soCountAndListExpireTogether", () => {
+    expect(GETI_COUNT_CACHE_TTL_MS).toBe(GETI_SCAN_CACHE_TTL_MS);
   });
 });
 

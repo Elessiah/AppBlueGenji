@@ -15,7 +15,7 @@
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { purgeGetiAlertHits } from "@/lib/server/geti/alerts";
-import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
+import { cached, invalidateCachedPrefix, isCachedOrLoading } from "@/lib/server/cache";
 import { failureReason } from "@/lib/server/failure-reason";
 import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { toIso } from "@/lib/server/serialization";
@@ -755,8 +755,16 @@ export async function listGetiPostsShared(
   return pageOfStored(stored, filter, page, now);
 }
 
-/** Durée de vie du compte par catégorie : une minute, oublié avant à toute écriture (`forgetGetiListScans`). */
-export const GETI_COUNT_CACHE_TTL_MS = 60_000;
+/**
+ * Durée de vie du compte par catégorie : celle des lectures qu'il compte
+ * ({@link GETI_SCAN_CACHE_TTL_MS}), pour qu'une annonce sortie de la garde quitte
+ * le nombre en même temps que la liste ; oublié avant à toute écriture (`forgetGetiListScans`).
+ */
+export const GETI_COUNT_CACHE_TTL_MS = GETI_SCAN_CACHE_TTL_MS;
+/** Après un compte illisible, la page s'en passe ce temps-là au lieu de relancer six lectures à chaque visite. */
+export const GETI_COUNT_FAILURE_TTL_MS = 10_000;
+/** Hors du préfixe des lectures : une écriture (base revenue) ne lève pas plus tôt l'abstention, sans gêne. */
+const GETI_COUNT_FAILURE_KEY = "geti:counts:failure";
 
 /**
  * Nombre d'annonces que chaque catégorie affiche **par défaut** (aucun filtre,
@@ -764,7 +772,7 @@ export const GETI_COUNT_CACHE_TTL_MS = 60_000;
  * lectures partagées de {@link listGetiPostsShared} — donc avec les mêmes
  * règles que la liste (fenêtre de garde, oppositions, analyse courante) — et
  * gardé {@link GETI_COUNT_CACHE_TTL_MS} sous le préfixe des lectures : au plus
- * six lectures par minute quel que soit le trafic, oubliées avec elles à toute
+ * six lectures par fenêtre quel que soit le trafic, oubliées avec elles à toute
  * écriture (une annonce supprimée sur Discord n'est plus comptée non plus).
  */
 export async function countGetiPostsShared(now: number = Date.now()): Promise<Record<GetiCategory, number>> {
@@ -777,6 +785,24 @@ export async function countGetiPostsShared(now: number = Date.now()): Promise<Re
     );
     return Object.fromEntries(totals) as Record<GetiCategory, number>;
   });
+}
+
+/**
+ * {@link countGetiPostsShared} pour le sélecteur, qui s'en passe : `null` si le
+ * compte ne se lit pas. L'échec est consigné comme celui de la liste
+ * (`logGetiListFailure`, un code, une ligne par minute au plus) et suivi d'une
+ * abstention de {@link GETI_COUNT_FAILURE_TTL_MS} : base en panne, chaque visite
+ * ne relance pas six lectures vouées à l'échec.
+ */
+export async function countGetiPostsForNav(now: number = Date.now()): Promise<Record<GetiCategory, number> | null> {
+  if (isCachedOrLoading(GETI_COUNT_FAILURE_KEY)) return null;
+  try {
+    return await countGetiPostsShared(now);
+  } catch (error) {
+    logGetiListFailure(error);
+    await cached(GETI_COUNT_FAILURE_KEY, GETI_COUNT_FAILURE_TTL_MS, async () => true);
+    return null;
+  }
 }
 
 /** Une ligne de pm2 par minute au plus quand la liste est illisible : chaque visite la redemanderait. */

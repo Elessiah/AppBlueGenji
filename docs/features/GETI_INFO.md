@@ -730,6 +730,8 @@ pas : `hfrom=22&hto=2` est un créneau qui passe minuit.
      serveur et sa fréquentation quand Discord la donne (`count`, le
      `GetiOfficialCount` rendu par le serveur sous `Suspense` : même cache que la
      carte de la page, aucun appel de plus).
+  L'introduction tient en une phrase ; la règle « une annonce modifiée ou supprimée
+  sur Discord l'est aussi ici » est derrière son `InfoHint`.
   Côte à côte (rangées partagées par `subgrid` : les deux boutons restent à la même
   hauteur), empilés sous 700 px ; cibles de 44 px (boutons, fermeture, lien
   d'invitation). La fenêtre ne charge rien de chez Discord.
@@ -747,10 +749,15 @@ restent visibles d'un coup. La courante se voit autrement que par la couleur
 
 Le nombre est celui des annonces **affichées par défaut** (sans filtre, closes
 cachées) : `countGetiPostsShared` le compte sur les lectures partagées de la liste
-(mêmes règles : fenêtre de garde, oppositions), gardé une minute sous le préfixe
-`geti:scan:` — au plus six lectures par minute, oubliées à toute écriture comme la
-liste. Lu à voix haute en entier (« Un scrim, 4 annonces ») ; illisible, aucun
-nombre n'est rendu et la page s'affiche quand même.
+(mêmes règles : fenêtre de garde, oppositions), gardé 10 s comme elles sous le préfixe
+`geti:scan:` (une annonce sortie de la garde quitte nombre et liste ensemble), oublié
+à toute écriture comme la liste ; la case courante sans filtre reprend le total de la
+liste affichée. Rendu **à part**, sous `Suspense` (`GetiCategoryNavCounted`) : la page
+n'attend jamais ces six lectures, le sélecteur s'affiche d'abord sans nombre. Lu à voix
+haute en entier (« Un scrim, 4 annonces » ; filtres actifs, la case courante dit « 14
+annonces sans filtre »). Illisible (`countGetiPostsForNav`) : aucun nombre, l'échec
+consigné par code comme celui de la liste (`logGetiListFailure`), et 10 s d'abstention
+avant de relire.
 
 ### Aperçu d'un lien collé (Discord)
 

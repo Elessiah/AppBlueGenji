@@ -68,10 +68,17 @@ function renderNav(
   current: GetiCategory,
   counts: Record<GetiCategory, number> | null,
   locale: Locale = "fr",
+  filtered = false,
 ): string {
   return renderToStaticMarkup(
     <AppLocaleProvider locale={locale}>
-      <GetiCategoryNav text={(locale === "en" ? enGeti : frGeti).tabs} locale={locale} current={current} counts={counts} />
+      <GetiCategoryNav
+        text={(locale === "en" ? enGeti : frGeti).tabs}
+        locale={locale}
+        current={current}
+        counts={counts}
+        filtered={filtered}
+      />
     </AppLocaleProvider>,
   );
 }
@@ -149,6 +156,23 @@ describe("GetiPublishDialog — deux options dans deux cadres", () => {
     for (const link of links) expect(link).toContain('target="_blank" rel="noopener noreferrer"');
   });
 
+  it("publishDialog_rules_areBehindInfoHint", () => {
+    const html = renderDialog();
+
+    expect(html).toContain('aria-controls="geti-publish-rules-hint"');
+    expect(html).toContain(frGeti.publish.rulesSubject);
+    expect(html).toContain(
+      '<div id="geti-publish-rules-hint" class="panel" hidden="">Une annonce modifiée ou supprimée sur Discord l&#x27;est aussi sur cette page.</div>',
+    );
+    expect(html).not.toContain("modalNote");
+  });
+
+  it("publishDialog_intro_isOneSentenceInBothLanguages", () => {
+    expect(frGeti.publish.intro).toBe("Les annonces de cette page ne s'écrivent pas sur le site : elles viennent de Discord.");
+    expect(enGeti.publish.intro).toBe("Posts on this page are not written on the site: they come from Discord.");
+    expect(renderDialog("en")).toContain(enGeti.publish.rulesSubject);
+  });
+
   it("publishDialog_source_keepsModalRules", () => {
     const source = readSource("components/geti/GetiPublishButton.tsx");
 
@@ -213,6 +237,39 @@ describe("GetiCategoryNav — sélecteur de catégorie", () => {
     expect(html).toContain("Looking for:");
     expect(html).toContain('<span class="tabName">Scrims</span>');
     expect(html).toContain('<span class="sr-only">, 12 posts</span>');
+  });
+
+  it("categoryNav_filteredCurrent_speaksUnfilteredCount", () => {
+    const html = renderNav("lfs", COUNTS, "fr", true);
+
+    expect(html).toContain('<span class="sr-only">, 12 annonces sans filtre</span>');
+  });
+
+  it("categoryNav_filteredOtherBox_speaksPlainCount", () => {
+    const html = renderNav("lfs", COUNTS, "fr", true);
+
+    expect(html).toContain('<span class="sr-only">, 4 annonces</span>');
+  });
+
+  it("categoryNav_filteredEnglish_speaksWithoutFilters", () => {
+    const html = renderNav("lfs", COUNTS, "en", true);
+
+    expect(html).toContain('<span class="sr-only">, 12 posts without filters</span>');
+  });
+
+  it("getiInfoView_counts_renderUnderSuspenseNotAwaitedByThePage", () => {
+    const source = readSource("components/geti/GetiInfoView.tsx");
+
+    expect(source).not.toContain("countGetiPostsShared");
+    expect(source).toContain("const counts = await countGetiPostsForNav(now);");
+    expect(source).toMatch(/<Suspense\s+fallback=\{<GetiCategoryNav [^>]*counts=\{null\}/);
+  });
+
+  it("getiInfoView_currentUnfiltered_overridesWithListedTotal", () => {
+    const source = readSource("components/geti/GetiInfoView.tsx");
+
+    expect(source).toContain("currentTotal={listed !== null && activeFilters === 0 ? listed.total : null}");
+    expect(source).toContain("{ ...counts, [current]: currentTotal }");
   });
 
   it("categoryNav_icons_areHiddenFromAssistiveTech", () => {

@@ -13,6 +13,7 @@ import {
   RULE_MODE_SUBTITLE_MAX_LENGTH,
   shareTagline,
   allShareCardKeys,
+  GETI_SHARE_CARD_STYLES,
   getiShareCardKey,
   pageShareImagePath,
   parseShareImageSegments,
@@ -25,6 +26,7 @@ import {
   teamShareCardKey,
   type ShareMessages,
 } from "@/lib/shared/page-share-cards";
+import { SHARE_ACCENT_COLORS } from "@/components/og/share-motifs";
 import { SITE_SHARE_CARD } from "@/lib/shared/share-metadata";
 import enRules from "@/messages/en/rules.json";
 import enShare from "@/messages/en/share.json";
@@ -60,6 +62,17 @@ describe("cartes des annonces GETI", () => {
     expect(card?.eyebrow).toBe("GETI posts · Overwatch");
     expect(card?.title).toBe("Looking for a cast");
     expect(card?.motif).toBe("mic");
+  });
+
+  it("getiShareCardStyles_sixCategories_haveDistinctAccents", () => {
+    const accents = Object.values(GETI_SHARE_CARD_STYLES).map((style) => style.accent);
+
+    expect(new Set(accents).size).toBe(6);
+    expect(GETI_SHARE_CARD_STYLES.lfcast.accent).toBe("brand");
+  });
+
+  it("shareAccentColors_brand_isTheBrandBlue", () => {
+    expect(SHARE_ACCENT_COLORS.brand).toBe("#5ac8ff");
   });
 
   it("resolvePageShareCard_unknownGetiCategory_returnsNull", () => {

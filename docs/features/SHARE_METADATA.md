@@ -293,7 +293,7 @@ robot. Clé ou langue inconnue, extension absente : 404.
 
 **Annonces GETI** : une carte par catégorie, `geti-<catégorie>` (`getiShareCardKey`,
 texte sous `geti` de `messages/*/share.json`, style `GETI_SHARE_CARD_STYLES` ; motifs
-`mic` et `swap` ajoutés) — `GETI_INFO.md` § Aperçu d'un lien collé.
+`mic` et `swap` ajoutés ; six teintes distinctes, `lfcast` au bleu de marque) — `GETI_INFO.md` § Aperçu d'un lien collé.
 
 **Texte de remplacement** (`og:image:alt`) : ce que la carte montre — son titre
 dans la langue de la page, suivi du nom du site (`shareCardAlt`), et non le
@@ -306,7 +306,7 @@ la carte générique de `/tournois` (mise en page parente) y descendrait.
 
 **Registre** (`lib/shared/page-share-cards.ts`, pur) : `PAGE_SHARE_CARD_KEYS`, le
 style de chaque carte (`PAGE_SHARE_CARD_STYLES` : motif Lucide + teinte parmi les
-tons `.pill-*` — cyan, glacier, violet, rose, turquoise ; **jamais** l'ambre ni le
+tons `.pill-*` — cyan, glacier, violet, rose, turquoise, plus le bleu de marque `--blue-500` (`brand`) ; **jamais** l'ambre ni le
 rouge), puis une carte par mode de règles (`rules-<slug>` : nom et accroche du
 mode dans la langue, accroche bornée à 120 caractères — phrases entières de préférence (`shareTagline`), sinon coupée sur un mot). Textes dans
 l'espace de messages **`share`** (`messages/fr|en/share.json`) : toute carte
