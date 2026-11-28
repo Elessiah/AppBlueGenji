@@ -12,6 +12,7 @@
 import { createElement, type ComponentType, type ReactElement } from "react";
 import {
   Accessibility,
+  ArrowLeftRight,
   Bot,
   BookOpen,
   ClipboardList,
@@ -21,6 +22,7 @@ import {
   HeartHandshake,
   Lock,
   LogIn,
+  Mic,
   Network,
   Scale,
   ScrollText,
@@ -67,6 +69,8 @@ const MOTIF_ICONS: Readonly<Record<ShareMotif, ComponentType>> = {
   teamShield: Shield,
   gamepad: Gamepad2,
   user: UserRound,
+  mic: Mic,
+  swap: ArrowLeftRight,
 };
 
 export type MotifShape = readonly (readonly [string, Readonly<Record<string, string>>])[];

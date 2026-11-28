@@ -14,6 +14,7 @@
  * (réécriture) — elle servirait la carte française à la page anglaise.
  */
 import type frShare from "@/messages/fr/share.json";
+import { GETI_CATEGORIES, type GetiCategory } from "./geti/types";
 import { RULE_MODE_DEFINITIONS } from "./rule-mode-definitions";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "./locales";
 import { PODIUM_TIER_COUNT, type PodiumTier } from "./podium-tiers";
@@ -83,7 +84,9 @@ export type ShareMotif =
   | "users"
   | "teamShield"
   | "gamepad"
-  | "user";
+  | "user"
+  | "mic"
+  | "swap";
 
 /**
  * Teinte d'une carte : la couleur de sa pastille et de son motif. Les tons des
@@ -141,6 +144,27 @@ export function shareTagline(text: string, maxLength: number): string {
   return truncateForShare(flattened, maxLength);
 }
 
+/** Préfixe de la carte d'une catégorie d'annonces GETI : `geti-<catégorie>`. */
+const GETI_PREFIX = "geti-";
+
+/** Clé de la carte d'une catégorie d'annonces (`/geti-info/<catégorie>`). */
+export function getiShareCardKey(category: GetiCategory): string {
+  return `${GETI_PREFIX}${category}`;
+}
+
+/**
+ * Motif et teinte de chaque catégorie d'annonces — les mêmes icônes que le
+ * sélecteur de la page (`components/geti/GetiCategoryNav.tsx`).
+ */
+export const GETI_SHARE_CARD_STYLES: Readonly<Record<GetiCategory, ShareCardStyle>> = {
+  lfp: { motif: "userPlus", accent: "blue" },
+  lft: { motif: "users", accent: "violet" },
+  lfsub: { motif: "swap", accent: "teal" },
+  lfstaff: { motif: "clipboard", accent: "pink" },
+  lfs: { motif: "swords", accent: "cyan" },
+  lfcast: { motif: "mic", accent: "violet" },
+};
+
 /** Style des cartes de mode de règles. */
 const RULE_MODE_STYLE: ShareCardStyle = { motif: "bracket", accent: "violet" };
 
@@ -159,9 +183,13 @@ export function isPageShareCardKey(value: string): value is PageShareCardKey {
   return (PAGE_SHARE_CARD_KEYS as readonly string[]).includes(value);
 }
 
-/** Toutes les clés servies : les cartes fixes, puis une par mode de règles. */
+/** Toutes les clés servies : les cartes fixes, une par mode de règles, une par catégorie d'annonces GETI. */
 export function allShareCardKeys(): string[] {
-  return [...PAGE_SHARE_CARD_KEYS, ...RULE_MODE_DEFINITIONS.map((mode) => ruleModeShareCardKey(mode.slug))];
+  return [
+    ...PAGE_SHARE_CARD_KEYS,
+    ...RULE_MODE_DEFINITIONS.map((mode) => ruleModeShareCardKey(mode.slug)),
+    ...GETI_CATEGORIES.map(getiShareCardKey),
+  ];
 }
 
 /** Adresse de l'image d'une carte, relative à `metadataBase`. */
@@ -219,6 +247,16 @@ export function resolvePageShareCard(
   // la carte générique de la fiche, qui ne dit pas si l'équipe existe.
   if (parseTeamShareCardKey(key) !== null) {
     return { ...messages.pages.team, footer: messages.footer, ...PAGE_SHARE_CARD_STYLES.team };
+  }
+  if (key.startsWith(GETI_PREFIX)) {
+    const category = GETI_CATEGORIES.find((entry) => getiShareCardKey(entry) === key);
+    if (!category) return null;
+    return {
+      eyebrow: messages.geti.eyebrow,
+      ...messages.geti.categories[category],
+      footer: messages.footer,
+      ...GETI_SHARE_CARD_STYLES[category],
+    };
   }
   if (key.startsWith(RULE_MODE_PREFIX)) {
     const mode = modeTexts.get(key.slice(RULE_MODE_PREFIX.length));

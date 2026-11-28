@@ -13,6 +13,7 @@ import {
   RULE_MODE_SUBTITLE_MAX_LENGTH,
   shareTagline,
   allShareCardKeys,
+  getiShareCardKey,
   pageShareImagePath,
   parseShareImageSegments,
   podiumShareEntries,
@@ -39,11 +40,57 @@ function modeTexts(rules: typeof frRules) {
   return new Map(localizedRuleModes(rules).map((mode) => [mode.slug, mode]));
 }
 
+describe("cartes des annonces GETI", () => {
+  it("resolvePageShareCard_getiScrimsFrench_usesCategoryTextAndStyle", () => {
+    const card = resolvePageShareCard("geti-lfs", frShare, modeTexts(frRules));
+
+    expect(card).toEqual({
+      eyebrow: "Annonces GETI · Overwatch",
+      title: "Je cherche un scrim",
+      subtitle: frShare.geti.categories.lfs.subtitle,
+      footer: frShare.footer,
+      motif: "swords",
+      accent: "cyan",
+    });
+  });
+
+  it("resolvePageShareCard_getiCastEnglish_usesEnglishText", () => {
+    const card = resolvePageShareCard("geti-lfcast", enShare, modeTexts(enRules));
+
+    expect(card?.eyebrow).toBe("GETI posts · Overwatch");
+    expect(card?.title).toBe("Looking for a cast");
+    expect(card?.motif).toBe("mic");
+  });
+
+  it("resolvePageShareCard_unknownGetiCategory_returnsNull", () => {
+    expect(resolvePageShareCard("geti-nope", frShare, modeTexts(frRules))).toBeNull();
+  });
+
+  it("parseShareImageSegments_getiCard_isServedInBothLanguages", () => {
+    expect(parseShareImageSegments("fr", "geti-lfs.png")).toEqual({ locale: "fr", key: "geti-lfs" });
+    expect(parseShareImageSegments("en", "geti-lfsub.png")).toEqual({ locale: "en", key: "geti-lfsub" });
+  });
+
+  it("parseShareImageSegments_unknownGetiCategory_isRefused", () => {
+    expect(parseShareImageSegments("fr", "geti-nope.png")).toBeNull();
+  });
+
+  it("getiShareCardKey_category_prefixesTheSlug", () => {
+    expect(getiShareCardKey("lfstaff")).toBe("geti-lfstaff");
+  });
+});
+
 describe("registre des cartes", () => {
-  it("compte une carte fixe par page, puis une par mode de règles", () => {
+  it("compte une carte fixe par page, une par mode de règles, une par catégorie d'annonces GETI", () => {
     expect(allShareCardKeys()).toEqual([
       ...PAGE_SHARE_CARD_KEYS,
       ...RULE_MODE_DEFINITIONS.map((mode) => `rules-${mode.slug}`),
+      "geti-lfp",
+      "geti-lft",
+      "geti-lfsub",
+      "geti-lfstaff",
+      "geti-lfs",
+      "geti-lfcast",
     ]);
     expect(new Set(allShareCardKeys()).size).toBe(allShareCardKeys().length);
   });

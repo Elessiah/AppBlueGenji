@@ -5,7 +5,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { getCurrentUser } from "@/lib/server/auth";
 import { listGetiAlerts } from "@/lib/server/geti/alerts";
-import { listGetiPostsShared, logGetiListFailure } from "@/lib/server/geti/posts";
+import { countGetiPostsShared, listGetiPostsShared, logGetiListFailure } from "@/lib/server/geti/posts";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -31,6 +31,7 @@ import { getiDataText, getiFilterDataText, getiText, type GetiDataText, type Get
 import { localeHref, type Locale } from "@/lib/shared/locales";
 import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
 import { GetiAlerts } from "./GetiAlerts";
+import { GetiCategoryNav } from "./GetiCategoryNav";
 import { GetiFilters } from "./GetiFilters";
 import { GetiLayout } from "./GetiLayout";
 import { GetiRetry } from "./GetiRetry";
@@ -59,13 +60,15 @@ export async function GetiInfoView({
   const now = Date.now();
   // Base injoignable : la page reste lisible (carte, onglets, bouton « Publier »).
   // La session se lit en même temps que la liste (deux lectures indépendantes) ; les alertes du compte, après.
-  const [listed, viewer] = await Promise.all([
+  const [listed, viewer, counts] = await Promise.all([
     listGetiPostsShared(filter, { page: query.page }, now).catch((error: unknown): GetiPostPage | null => {
       // Un code seul (jamais le message, qui peut citer la requête), une ligne par minute au plus.
       logGetiListFailure(error);
       return null;
     }),
     getCurrentUser().catch(() => null),
+    // Nombre d'annonces par catégorie (sélecteur) : mutualisé, jamais bloquant — sans lui, aucun nombre.
+    countGetiPostsShared(now).catch(() => null),
   ]);
   const activeFilters = getiActiveFilterCount(query);
   // Les alertes du compte connecté, s'il y en a un : la page reste publique, et
@@ -99,24 +102,7 @@ export async function GetiInfoView({
       </section>
 
       <div className={styles.section}>
-        <nav className={styles.tabs} aria-label={m.tabs.label}>
-          <span className={styles.tabsLabel} aria-hidden="true">
-            {m.tabs.label}
-          </span>
-          <ul className={styles.tabList} data-tap-zone="">
-            {GETI_CATEGORIES.map((entry) => (
-              <li key={entry}>
-                <LocaleLink
-                  href={getiCategoryPath(entry)}
-                  className={entry === category ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-                  aria-current={entry === category ? "page" : undefined}
-                >
-                  {m.tabs[entry]}
-                </LocaleLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <GetiCategoryNav text={m.tabs} locale={locale} current={category} counts={counts} />
 
         <GetiOfficialCard
           text={m.official}
@@ -160,6 +146,11 @@ export async function GetiInfoView({
               channelUrl={getiChannelUrl(category)}
               ourInviteUrl={DISCORD_INVITE_URL}
               official={m.official}
+              count={
+                <Suspense fallback={null}>
+                  <GetiOfficialCount text={m.official} locale={locale} />
+                </Suspense>
+              }
             />
           </div>
         </header>

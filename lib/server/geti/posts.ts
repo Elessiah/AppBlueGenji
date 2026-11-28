@@ -21,7 +21,7 @@ import { startPeriodicClock } from "@/lib/server/periodic-clock";
 import { toIso } from "@/lib/server/serialization";
 import { purgeStaleGetiObjections, withholdObjectedGetiPosts } from "@/lib/server/geti/objections";
 import type { GetiPushedPost, GetiReconcileRequest } from "@/lib/server/geti/wire";
-import { getiErrorCode } from "@/lib/shared/geti/page";
+import { emptyGetiPageQuery, getiErrorCode, getiPageFilter } from "@/lib/shared/geti/page";
 import {
   GETI_CATEGORIES,
   getiCategoryOfChannel,
@@ -753,6 +753,30 @@ export async function listGetiPostsShared(
     scanGetiPosts(filter, undefined, await getDatabase(), now),
   );
   return pageOfStored(stored, filter, page, now);
+}
+
+/** Durée de vie du compte par catégorie : une minute, oublié avant à toute écriture (`forgetGetiListScans`). */
+export const GETI_COUNT_CACHE_TTL_MS = 60_000;
+
+/**
+ * Nombre d'annonces que chaque catégorie affiche **par défaut** (aucun filtre,
+ * annonces closes cachées), pour le sélecteur de la page. Compté sur les
+ * lectures partagées de {@link listGetiPostsShared} — donc avec les mêmes
+ * règles que la liste (fenêtre de garde, oppositions, analyse courante) — et
+ * gardé {@link GETI_COUNT_CACHE_TTL_MS} sous le préfixe des lectures : au plus
+ * six lectures par minute quel que soit le trafic, oubliées avec elles à toute
+ * écriture (une annonce supprimée sur Discord n'est plus comptée non plus).
+ */
+export async function countGetiPostsShared(now: number = Date.now()): Promise<Record<GetiCategory, number>> {
+  return cached(`${GETI_SCAN_CACHE_PREFIX}counts`, GETI_COUNT_CACHE_TTL_MS, async () => {
+    const totals = await Promise.all(
+      GETI_CATEGORIES.map(async (category) => {
+        const page = await listGetiPostsShared(getiPageFilter(category, emptyGetiPageQuery()), { pageSize: 1 }, now);
+        return [category, page.total] as const;
+      }),
+    );
+    return Object.fromEntries(totals) as Record<GetiCategory, number>;
+  });
 }
 
 /** Une ligne de pm2 par minute au plus quand la liste est illisible : chaque visite la redemanderait. */

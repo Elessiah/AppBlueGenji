@@ -8,6 +8,7 @@ import { getDatabase } from "@/lib/server/database";
 import {
   deleteGetiPosts,
   forgetGetiListScans,
+  countGetiPostsShared,
   GETI_LIST_SCAN_MAX,
   getiTrustedBots,
   listGetiPosts,
@@ -1116,6 +1117,69 @@ describe("refreshStaleGetiPosts", () => {
 
     expect(done).toBe(0);
     expect(execute.mock.calls.filter(([sql]) => String(sql).startsWith("SELECT"))).toHaveLength(1);
+  });
+});
+
+describe("countGetiPostsShared", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+
+  /** Base simulée : chaque lecture rend les lignes de la catégorie demandée (2e paramètre de la requête). */
+  function categoryRows(rowsByCategory: Record<string, unknown[]>) {
+    const execute = jest.fn<SqlQuery>(async (_sql: string, params?: unknown) => [
+      rowsByCategory[Array.isArray(params) ? String(params[1]) : ""] ?? [],
+    ]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+    return execute;
+  }
+
+  it("countGetiPostsShared_sixCategories_returnsTotalPerCategory", async () => {
+    categoryRows({
+      lft: [row(), row({ message_id: "100000000000000902" })],
+      lfs: [row({ category: "lfs", channel_id: GETI_CHANNEL_IDS.lfs }, { category: "lfs" })],
+    });
+
+    const counts = await countGetiPostsShared(NOW);
+
+    expect(counts).toEqual({ lfp: 0, lft: 2, lfsub: 0, lfstaff: 0, lfs: 1, lfcast: 0 });
+  });
+
+  it("countGetiPostsShared_closedPost_isNotCounted", async () => {
+    categoryRows({ lft: [row(), row({ message_id: "100000000000000902" }, { closed: true })] });
+
+    const counts = await countGetiPostsShared(NOW);
+
+    expect(counts.lft).toBe(1);
+  });
+
+  it("countGetiPostsShared_calledTwice_readsEachCategoryOnce", async () => {
+    const execute = categoryRows({ lft: [row()] });
+
+    await countGetiPostsShared(NOW);
+    await countGetiPostsShared(NOW + 30_000);
+
+    expect(execute).toHaveBeenCalledTimes(6);
+  });
+
+  it("countGetiPostsShared_afterDelete_countsAgain", async () => {
+    const execute = categoryRows({ lft: [row()] });
+    await countGetiPostsShared(NOW);
+
+    await deleteGetiPosts(executor(executeMock([], 1)), [GETI_FAKE_MESSAGE_ID]);
+    await countGetiPostsShared(NOW);
+
+    expect(execute).toHaveBeenCalledTimes(12);
+  });
+
+  it("countGetiPostsShared_readFails_rejectsAndIsNotCached", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(new Error("down")).mockResolvedValue([[]]);
+    jest.mocked(getDatabase).mockResolvedValue(executor(execute));
+
+    await expect(countGetiPostsShared(NOW)).rejects.toThrow();
+    const counts = await countGetiPostsShared(NOW);
+
+    expect(counts.lft).toBe(0);
   });
 });
 

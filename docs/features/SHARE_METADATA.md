@@ -291,6 +291,10 @@ aurait affiché la carte française. Ici, `pageMetadata({ shareCard, locale })`
 côté du middleware (son `matcher` écarte les images) : ni nonce ni CSP pour un
 robot. Clé ou langue inconnue, extension absente : 404.
 
+**Annonces GETI** : une carte par catégorie, `geti-<catégorie>` (`getiShareCardKey`,
+texte sous `geti` de `messages/*/share.json`, style `GETI_SHARE_CARD_STYLES` ; motifs
+`mic` et `swap` ajoutés) — `GETI_INFO.md` § Aperçu d'un lien collé.
+
 **Texte de remplacement** (`og:image:alt`) : ce que la carte montre — son titre
 dans la langue de la page, suivi du nom du site (`shareCardAlt`), et non le
 titre de l'encart. `shareImageAlt` le remplace quand le contenu varie : `/classement`

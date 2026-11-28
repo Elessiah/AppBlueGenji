@@ -24,13 +24,18 @@ test.describe("GETI Info — page publique", () => {
 
     const tabs = page.getByRole("navigation", { name: "Je cherche" });
     await expect(tabs.getByRole("link")).toHaveCount(6);
-    await expect(tabs.getByRole("link", { name: "Un joueur" })).toHaveAttribute("aria-current", "page");
-    await expect(tabs.getByRole("link", { name: "Un scrim" })).toHaveAttribute("href", "/geti-info/lfs");
-
-    await tabs.getByRole("link", { name: "Un scrim" }).click();
-    await expect(page).toHaveURL(/\/geti-info\/lfs$/);
-    await expect(page.getByRole("heading", { level: 2, name: "Je cherche un scrim" })).toBeVisible();
+    // `/geti-info` tout court rend les scrims, première case du sélecteur.
+    await expect(tabs.getByRole("link").first()).toHaveAttribute("href", "/geti-info/lfs");
     await expect(tabs.getByRole("link", { name: "Un scrim" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { level: 2, name: "Je cherche un scrim" })).toBeVisible();
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/geti-info\/lfs$/);
+    await expect(tabs.getByRole("link", { name: "Un joueur" })).toHaveAttribute("href", "/geti-info/lfp");
+
+    await tabs.getByRole("link", { name: "Un joueur" }).click();
+    await expect(page).toHaveURL(/\/geti-info\/lfp$/);
+    await expect(page.getByRole("heading", { level: 2, name: "Je cherche un joueur" })).toBeVisible();
+    await expect(tabs.getByRole("link", { name: "Un joueur" })).toHaveAttribute("aria-current", "page");
+    await expect(tabs.locator('[aria-current="page"]')).toHaveCount(1);
   });
 
   test("une catégorie inconnue répond 404", async ({ page }) => {
@@ -52,11 +57,18 @@ test.describe("GETI Info — page publique", () => {
 
     const dialog = page.getByRole("dialog", { name: "Publier une annonce" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("link", { name: /Ouvrir le salon/ })).toHaveAttribute(
+    // Deux options, chacune dans son cadre, avec son propre bouton.
+    const ours = dialog.getByRole("region", { name: "Publier sur notre serveur" });
+    const geti = dialog.getByRole("region", { name: "Publier via GETI Bot" });
+    await expect(ours.getByRole("link", { name: /Ouvrir le salon « Je cherche un staff »/ })).toHaveAttribute(
       "href",
       "https://discord.com/channels/676570513023172637/679323814106103819",
     );
-    await expect(dialog.getByRole("link", { name: /Rejoindre le serveur Discord GETI/ })).toHaveAttribute("href", GETI_INVITE);
+    await expect(ours.getByRole("link", { name: /Rejoindre le Discord BlueGenji/ })).toBeVisible();
+    await expect(geti.getByText("GETI — Geeking Time")).toBeVisible();
+    await expect(geti.getByRole("link", { name: /Rejoindre le serveur Discord GETI/ })).toHaveAttribute("href", GETI_INVITE);
+    await expect(dialog.getByRole("link")).toHaveCount(3);
+    await expect(dialog.locator("iframe")).toHaveCount(0);
 
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
@@ -221,5 +233,37 @@ test.describe("GETI Info — page publique", () => {
     await page.getByRole("form", { name: "Filtres" }).getByRole("checkbox", { name: "Montrer les annonces closes" }).uncheck();
     await expect(page).toHaveURL(/\/geti-info\/lfp$/);
     await expect.poll(() => posts.count()).toBeLessThan(withClosed);
+  });
+
+  test("aperçu d'un lien collé : titre, phrase et carte propres à la catégorie, page non indexée", async ({ page, request }) => {
+    await page.goto("/en/geti-info/lfcast");
+    const meta = (property: string) => page.locator(`meta[property="${property}"]`);
+    await expect(meta("og:title")).toHaveAttribute("content", "GETI posts — Looking for a cast · BlueGenji Esport");
+    await expect(meta("og:description")).toHaveAttribute("content", "Organisers looking for casters, and casters who are available.");
+    await expect(meta("og:site_name")).toHaveAttribute("content", "BlueGenji Esport");
+    await expect(meta("og:locale")).toHaveAttribute("content", "en_US");
+    await expect(meta("og:url")).toHaveAttribute("content", /\/en\/geti-info\/lfcast$/);
+    await expect(meta("og:image")).toHaveAttribute("content", /\/og\/en\/geti-lfcast\.png$/);
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, follow");
+
+    const image = await request.get("/og/fr/geti-lfs.png");
+    expect(image.status()).toBe(200);
+    expect(image.headers()["content-type"]).toBe("image/png");
+    expect((await request.get("/og/fr/geti-inconnue.png")).status()).toBe(404);
+  });
+
+  test("« Créer une alerte » : la cloche est centrée sur le libellé, le bouton aligné sur « Publier »", async ({ page }) => {
+    await page.goto("/geti-info/lfs");
+    const alert = page.getByTestId("geti-alert-open");
+    const middle = (box: { y: number; height: number } | null) => (box ? box.y + box.height / 2 : Number.NaN);
+    const button = await alert.boundingBox();
+    const icon = await alert.locator("svg").boundingBox();
+    const publish = await page.getByRole("button", { name: "Publier une annonce" }).boundingBox();
+
+    expect(Math.abs(middle(icon) - middle(button))).toBeLessThan(1);
+    expect(Math.abs(middle(publish) - middle(button))).toBeLessThan(1);
+    await expect(alert).toHaveCSS("display", "inline-flex");
+    await expect(alert).toHaveCSS("column-gap", "8px");
   });
 });

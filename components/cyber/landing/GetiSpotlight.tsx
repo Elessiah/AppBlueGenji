@@ -2,8 +2,7 @@ import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { CyberButton, CyberCard } from "@/components/cyber";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { landingServerText } from "@/lib/server/i18n-landing";
-import { GETI_DEFAULT_CATEGORY, getiCategoryPath } from "@/lib/shared/geti/page";
-import { GETI_CATEGORIES } from "@/lib/shared/geti/types";
+import { GETI_CATEGORY_ORDER, GETI_DEFAULT_CATEGORY, getiCategoryPath } from "@/lib/shared/geti/page";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import styles from "./GetiSpotlight.module.css";
 
@@ -12,7 +11,7 @@ import styles from "./GetiSpotlight.module.css";
  * principale du site : une phrase d'appel, un bouton vers la page et un
  * raccourci par catégorie (`docs/features/GETI_INFO.md` § Navigation).
  *
- * Le bouton vise l'adresse canonique de la première catégorie (`/geti-info/lfp`,
+ * Le bouton vise l'adresse canonique de la catégorie par défaut (`/geti-info/lfs`,
  * celle que `/geti-info` déclare) : l'encart ne donne qu'une adresse par liste.
  * Les raccourcis disent **ce que la liste contient** (« Équipes qui recrutent »),
  * pas l'intention de l'auteur de l'annonce : « Je cherche un joueur » mènerait
@@ -50,7 +49,7 @@ export function GetiSpotlight({ locale = DEFAULT_LOCALE }: Readonly<{ locale?: L
               {t("geti.categoriesLabel")}
             </p>
             <ul className={styles.categories} aria-labelledby="geti-spotlight-categories">
-              {GETI_CATEGORIES.map((category) => (
+              {GETI_CATEGORY_ORDER.map((category) => (
                 <li key={category}>
                   <LocaleLink href={getiCategoryPath(category)} className={styles.category}>
                     {t(`geti.categories.${category}`)}
