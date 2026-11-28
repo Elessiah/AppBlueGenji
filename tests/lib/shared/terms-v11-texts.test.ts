@@ -269,8 +269,8 @@ describe("entrée PRIVACY_CHANGES de la version 11", () => {
 
 describe("documents du bot — D47 et reprise d'équipe", () => {
   it("botDocs_bothDocuments_bothDated28November2026FrAndEn", () => {
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["28 novembre 2026", "28 November 2026"]);
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["28 novembre 2026", "28 November 2026"]);
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["29 novembre 2026", "29 November 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["29 novembre 2026", "29 November 2026"]);
   });
 
   // D4 (#595) : la reprise ne cite plus « un admin » — la politique du bot ne le dit plus.

@@ -551,7 +551,7 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
     // LEGAL-LOT-1 : datée comme le rectificatif du site du 13 novembre 2026.
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["28 novembre 2026", "28 November 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["29 novembre 2026", "29 November 2026"]);
   });
 });
 
@@ -572,7 +572,7 @@ describe("politique du bot — messages d'équipe (TEAM-INVITE-NOTIFY)", () => {
     const article01 = (lang: "fr" | "en") => JSON.stringify(TERMS_OF_SERVICE[lang].sections[0]);
     expect(article01("fr")).toContain("demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe, jamais personne), alertes d'annonces GETI (aux seuls comptes dont le tag Discord est certifié), messages du staff d'un tournoi à ses participants (signés « le staff du tournoi ») et informations sur les données.");
     expect(article01("en")).toContain("team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team, never anyone), GETI post alerts (only to accounts with a certified Discord tag), messages from a tournament's staff to its participants (signed “the tournament staff”) and data-protection notices.");
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["28 novembre 2026", "28 November 2026"]);
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["29 novembre 2026", "29 November 2026"]);
   });
 
   it("terms_article01_neverNamesWhoInvitesOrOffersFrAndEn", () => {

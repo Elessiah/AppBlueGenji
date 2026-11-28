@@ -99,7 +99,7 @@ import { PLANNING_HISTORY_WEEKS, PLANNING_RETENTION_DAYS } from "@/lib/shared/pl
 import { GETI_RETENTION_DAYS, GETI_RETENTION_MAX_DAYS } from "@/lib/shared/geti/ingest";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-28";
+export const REGISTER_UPDATED_AT = "2026-11-29";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et

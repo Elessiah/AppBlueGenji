@@ -2400,7 +2400,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // GETI-TUNE, avant publication : niveau de division, dates visées et annonce
     // close ajoutés aux critères lus.
     id: "2026-11-annonces-de-recrutement-overwatch",
-    publishedAt: "2026-11-28",
+    publishedAt: "2026-11-29",
     title: "Annonces de recrutement Overwatch recopiées sur le site",
     links: [
       { href: "/rgpd/registre#t21", label: "Lire la fiche T21 du registre" },
@@ -2418,7 +2418,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // /rgpd (FR et EN). Datée comme `REGISTER_UPDATED_AT` — tout avancer
     // ensemble si la mise en ligne glisse.
     id: "2026-11-alertes-d-annonces-geti",
-    publishedAt: "2026-11-28",
+    publishedAt: "2026-11-29",
     title: "Alertes sur une recherche d'annonces de recrutement",
     links: [
       { href: "/rgpd/registre#t22", label: "Lire la fiche T22 du registre" },

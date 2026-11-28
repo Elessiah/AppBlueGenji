@@ -103,8 +103,8 @@ const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 // les deux — datée comme l'entrée `2026-11-alertes-d-annonces-geti` ; même lot,
 // l'article 01 complète la liste des messages de match (dates butoirs, nouveau
 // match, prod) et cite les avis du planning, que le site remettait déjà.
-const LAST_UPDATED_FR = "28 novembre 2026";
-const LAST_UPDATED_EN = "28 November 2026";
+const LAST_UPDATED_FR = "29 novembre 2026";
+const LAST_UPDATED_EN = "29 November 2026";
 // La politique a sa propre date : une modification qui ne touche qu'elle (le
 // passage des sauvegardes chez Hetzner) laisse aux conditions la leur. Les
 // horaires de match remis en message privé touchent les deux ; l'annonce des
@@ -156,8 +156,8 @@ const LAST_UPDATED_EN = "28 November 2026";
 // T08), les deux — même date, celle de l'entrée `2026-11-alertes-d-annonces-geti` ;
 // même lot, la liste des messages remis est complétée de ceux que le site
 // envoyait déjà (dates butoirs, nouveau match, prod, avis du planning, T20).
-const PRIVACY_LAST_UPDATED_FR = "28 novembre 2026";
-const PRIVACY_LAST_UPDATED_EN = "28 November 2026";
+const PRIVACY_LAST_UPDATED_FR = "29 novembre 2026";
+const PRIVACY_LAST_UPDATED_EN = "29 November 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
