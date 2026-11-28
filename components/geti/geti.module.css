@@ -542,8 +542,22 @@
 
 /* Lien « Afficher / Masquer les scrims passés », sous le compteur. */
 .pastToggle {
+  display: inline-flex;
+  align-items: center;
   align-self: flex-start;
-  padding-block: 6px;
+  min-height: 44px;
+}
+
+/* Heure écrite dans l'annonce, à côté de l'heure de Paris : lisible sans survol. */
+.chipStated {
+  font-weight: 400;
+  opacity: 1;
+  color: var(--ink-soft);
+}
+
+/* Scrim passé : estompé comme une annonce close, mais trait plein. */
+.cardPast {
+  background: var(--cyber-bg);
 }
 
 .card {

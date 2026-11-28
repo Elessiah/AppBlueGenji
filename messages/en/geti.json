@@ -187,6 +187,7 @@
     "beyondLink": "Go to page {page}",
     "showPast": "Show past scrims",
     "hidePast": "Hide past scrims",
+    "emptyPast": "No upcoming scrims. Past scrims are hidden: show them above to see them.",
     "emptyReset": "Reset the filters",
     "unavailable": "Posts are temporarily unavailable.",
     "none": "Posts not loaded.",

@@ -187,6 +187,7 @@
     "beyondLink": "Aller à la page {page}",
     "showPast": "Afficher les scrims passés",
     "hidePast": "Masquer les scrims passés",
+    "emptyPast": "Aucun scrim à venir. Les scrims passés sont masqués : affiche-les ci-dessus pour les voir.",
     "emptyReset": "Réinitialiser les filtres",
     "unavailable": "Les annonces sont momentanément indisponibles.",
     "none": "Annonces non chargées.",

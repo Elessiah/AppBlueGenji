@@ -247,10 +247,10 @@ test.describe("GETI Info — page publique", () => {
     const post = page.getByTestId("geti-post").filter({ hasText: "Team Test Meridian" });
     test.skip((await post.count()) === 0, "Aucune annonce : base absente ou non seedée."); // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     // 20 h – 22 h UTC : 21 h – 23 h à Paris en hiver, 22 h – 24 h en été ; l'heure écrite reste lisible.
-    const chip = post.locator(`li[title^="Dans l'annonce"]`);
+    const chip = post.locator("li", { hasText: "Dans l'annonce" });
     await expect(chip).toHaveCount(1);
     await expect(chip).toContainText("heure de Paris");
-    await expect(chip).toHaveAttribute("title", "Dans l'annonce : 20h – 22h (UTC)");
+    await expect(chip).toContainText("Dans l'annonce : 20h – 22h (UTC)");
   });
 
   test("base seedée : une annonce close n'apparaît que sur demande", async ({ page }) => {

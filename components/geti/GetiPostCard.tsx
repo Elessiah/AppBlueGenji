@@ -65,13 +65,19 @@ function relativeDate(iso: string, locale: Locale, now: number): string {
  * passée » ailleurs — un recrutement qui citait un essai reste d'actualité.
  */
 function pastLabelOf(post: GetiStoredPost, text: GetiMessages["post"], now: number): string | null {
-  if (!isGetiPostPast(post.parsed, now)) return null;
+  if (post.parsed.closed || !isGetiPostPast(post.parsed, now)) return null;
   return isGetiOneEveningPost(post.parsed) ? text.past : text.datePast;
 }
 
 /** Carte estompée : annonce close, ou soirée finie d'un scrim ou d'un remplaçant. */
 function isFaded(post: GetiStoredPost, now: number): boolean {
   return post.parsed.closed || (isGetiPostPast(post.parsed, now) && isGetiOneEveningPost(post.parsed));
+}
+
+/** Style de la carte : close (pointillés), passée (estompée, trait plein) ou courante. */
+function cardClassOf(post: GetiStoredPost, now: number): string {
+  if (post.parsed.closed) return `${styles.card} ${styles.cardClosed}`;
+  return isFaded(post, now) ? `${styles.card} ${styles.cardPast}` : styles.card;
 }
 
 /**
@@ -100,7 +106,6 @@ function PostChip({
     <li
       className={["cy-tag", CHIP_TONE[chip.kind], matched ? styles.chipMatch : ""].filter(Boolean).join(" ")}
       data-match={matched ? "true" : undefined}
-      title={title ?? undefined}
     >
       {matched ? (
         <>
@@ -109,7 +114,7 @@ function PostChip({
         </>
       ) : null}
       {getiChipLabel(chip, data, locale)}
-      {title === null ? null : <span className="sr-only"> ({title})</span>}
+      {title === null ? null : <span className={styles.chipStated}> · {title}</span>}
     </li>
   );
 }
@@ -151,7 +156,7 @@ export function GetiPostCard({
   return (
     <article
       id={`post-${post.messageId}`}
-      className={isFaded(post, now) ? `${styles.card} ${styles.cardClosed}` : styles.card}
+      className={cardClassOf(post, now)}
       data-testid="geti-post"
       data-past={pastLabel === null ? undefined : "true"}
     >

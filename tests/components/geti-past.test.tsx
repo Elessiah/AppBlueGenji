@@ -136,21 +136,50 @@ describe("GetiPostCard — horaire converti", () => {
     const markup = renderCard(converted, FRIDAY_MORNING);
 
     expect(markup).toContain("21h – 23h (heure de Paris)");
-    expect(markup).toContain('title="Dans l&#x27;annonce : 20h – 22h (UTC)"');
-    expect(markup).toContain('<span class="sr-only"> (Dans l&#x27;annonce : 20h – 22h (UTC))</span>');
+    expect(markup).toContain("Dans l&#x27;annonce : 20h – 22h (UTC)");
   });
 
   it("GetiPostCard_convertedTimeInEnglish_showsParisTimeAndTheTimeAsWritten", () => {
     const markup = renderCard(converted, FRIDAY_MORNING, "en");
 
     expect(markup).toContain("21:00 – 23:00 (Paris time)");
-    expect(markup).toContain('title="In the post: 20:00 – 22:00 (UTC)"');
+    expect(markup).toContain("In the post: 20:00 – 22:00 (UTC)");
   });
 
   it("GetiPostCard_timeWithoutZone_hasNoTitle", () => {
     const markup = renderCard(storedPost("lfs"), FRIDAY_MORNING);
 
     expect(markup).toContain('<li class="cy-tag cy-tag-success">21h – 23h</li>');
+  });
+});
+
+describe("GetiPostCard — passé et clos", () => {
+  it("GetiPostCard_closedAndPast_showsOnlyTheClosedPill", () => {
+    const post = storedPost("lfs", { closed: true });
+    const markup = renderCard(post, SATURDAY_MORNING);
+
+    expect(markup).toContain("Close");
+    expect(markup).not.toContain("geti-past");
+    expect(markup).toContain("cardClosed");
+    expect(markup).not.toContain("cardPast");
+  });
+
+  it("GetiPostCard_pastScrim_hasItsOwnFadedClass", () => {
+    const markup = renderCard(storedPost("lfs"), SATURDAY_MORNING);
+
+    expect(markup).toContain("cardPast");
+    expect(markup).not.toContain("cardClosed");
+  });
+});
+
+describe("GetiInfoView — liste vide, scrims passés masqués", () => {
+  it("GetiInfoView_emptyWhilePastHidden_saysPastScrimsAreHidden", () => {
+    const source = readSource("components/geti/GetiInfoView.tsx");
+
+    expect(source).toContain("getiHidesPast(category) && !query.showPast");
+    expect(source).toContain("text.emptyPast");
+    expect(frMessages.results.emptyPast).toContain("passés sont masqués");
+    expect(enMessages.results.emptyPast).toContain("Past scrims are hidden");
   });
 });
 
